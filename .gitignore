@@ -1,0 +1,49 @@
+# --- dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- build output ---
+.svelte-kit/
+build/
+dist/
+.output/
+
+# --- env / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- test / coverage ---
+coverage/
+.nyc_output/
+*.lcov
+
+# --- logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- editors / OS ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# --- tooling caches ---
+.eslintcache
+.cache/
+.turbo/
+.vite/
+
+# --- editors ---
+# The visual flow and schema editors are a separate package, checked out
+# here when a build carries them. They are never committed to this tree.
+/src/lib/canvas/editors/

@@ -1,0 +1,33 @@
+# Auto-detect text files and normalize to LF on commit.
+* text=auto eol=lf
+
+# Explicit text formats (force LF regardless of platform)
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.cjs       text eol=lf
+*.mjs       text eol=lf
+*.svelte    text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.sh        text eol=lf
+
+# Binary - never normalize, never diff as text
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.pdf       binary
+
+# Lockfile - show as text but don't bother diffing in PRs
+pnpm-lock.yaml  -diff linguist-generated=true

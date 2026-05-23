@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+		<link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
+		<!-- The dark ink, as the markup default. The script below resolves the
+		     real theme before first paint and moves this with it, so a
+		     light-theme reader gets light browser chrome. -->
+		<meta name="theme-color" content="#0b1422" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- Resolves the stored palette before first paint so a light-theme user
+		     never sees the dark default flash past. Nonced because script-src is
+		     locked to 'self'.
+
+		     It resolves the way the kit's theme utilities resolve at runtime: a
+		     stored light or dark wins, anything else follows the desktop, and
+		     dark is the answer where the desktop states no preference. The two
+		     have to agree, or the palette this paints is repainted a moment
+		     later by the first control that reads the preference back. -->
+		<script nonce="%sveltekit.nonce%">
+			(function () {
+				var stored = null;
+				try {
+					stored = localStorage.getItem('lyeve-theme');
+				} catch (e) {
+					/* private mode or storage disabled: follow the desktop */
+				}
+				try {
+					var t =
+						stored === 'light' || stored === 'dark'
+							? stored
+							: matchMedia('(prefers-color-scheme: light)').matches
+								? 'light'
+								: 'dark';
+					document.documentElement.setAttribute('data-theme', t);
+					// The browser chrome takes the same ink the page does.
+					var meta = document.querySelector('meta[name="theme-color"]');
+					if (meta) meta.setAttribute('content', t === 'light' ? '#f6f7f9' : '#0b1422');
+				} catch (e) {
+					/* no matchMedia either: the dark markup default stands */
+				}
+			})();
+		</script>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+		%sveltekit.head%
+	</head>
+	<body class="bg-ink text-fg min-h-screen font-sans antialiased" data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

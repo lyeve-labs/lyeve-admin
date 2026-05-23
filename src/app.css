@@ -1,0 +1,75 @@
+/*
+ * lyeve-admin root stylesheet
+ *
+ * Theme tokens come from @lyeve-labs/ui-kit, one palette across every app
+ * built on the kit. App-specific tweaks (admin-only utilities, page-level
+ * overrides) live below the import.
+ *
+ * To bend the palette for a specific deployment, override individual tokens
+ * after the import. Example:
+ *
+ *     @theme {
+ *       --color-brand:       #ff5e9c;
+ *       --color-brand-light: #ff85b3;
+ *     }
+ *
+ * The logo does not follow those two. It paints from the --color-mark-*
+ * tokens, which carry the brand book's colors, so recoloring the mark means
+ * overriding those.
+ */
+
+@import '@lyeve-labs/ui-kit/styles.css';
+
+/*
+ * The visual editors sit in a directory the ignore rule keeps out of the tree,
+ * and Tailwind skips ignored files when it looks for class names. Without this
+ * line a class only an editor uses is never generated, so its toolbar, zoom
+ * controls and fold toggle lose their offsets and stack at the corner. A
+ * build without the editors has nothing there to read.
+ */
+@source './lib/canvas/editors';
+
+/*
+ * No palette overrides. A palette change belongs in the kit, so every app
+ * built on it renders the same values.
+ */
+
+/*
+ * The route progress bar's rhythm.
+ *
+ * A loop keeps its own period, which is the one place the motion vocabulary
+ * allows a literal: this is not a transition between two states, it is a signal
+ * that something is still happening, and it has no end to ease into. The curve
+ * is still the theme's.
+ */
+@theme {
+  --animate-route-progress: route-progress 1.1s var(--ease-move) infinite;
+}
+
+@keyframes route-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+
+/*
+ * A tenant's accent, one ramp per theme. The layout sets both ramps as custom
+ * properties and this picks the one for the theme showing. Print keeps the
+ * kit's black brand, so the rule is screen only.
+ */
+@media screen {
+  .tenant-accent {
+    --color-brand: var(--tenant-brand-on-dark);
+    --color-brand-light: var(--tenant-brand-light-on-dark);
+    --color-brand-deep: var(--tenant-brand-deep-on-dark);
+  }
+
+  html[data-theme='light'] .tenant-accent {
+    --color-brand: var(--tenant-brand-on-light);
+    --color-brand-light: var(--tenant-brand-light-on-light);
+    --color-brand-deep: var(--tenant-brand-deep-on-light);
+  }
+}

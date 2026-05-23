@@ -1,0 +1,57 @@
+{
+	"name": "@lyeve/admin",
+	"version": "0.18.2",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"packageManager": "pnpm@11.25.0",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"lint:ui": "node tools/lint-ui-consistency.mjs",
+		"measure:small-screens": "node tools/measure-small-screens.mjs",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"commitlint": "commitlint --edit",
+		"prepare": "node scripts/setup-hooks.mjs",
+		"preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if(!ua.startsWith('pnpm')){console.error('This repo is pnpm only: pnpm enforces supply-chain policies the alternative ignores. Run: corepack enable && pnpm install');process.exit(1)}\""
+	},
+	"devDependencies": {
+		"@commitlint/cli": "^21.2.3",
+		"@commitlint/config-conventional": "^21.2.3",
+		"@sveltejs/adapter-node": "^5.5.7",
+		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/vite-plugin-svelte": "^7.3.1",
+		"@tailwindcss/vite": "^4.3.3",
+		"@testing-library/svelte": "^5.4.2",
+		"@types/node": "^26.6.2",
+		"@types/qrcode": "^1.5.6",
+		"@vitest/coverage-v8": "5.0.3",
+		"autoprefixer": "^10.6.1",
+		"husky": "^9.1.7",
+		"jsdom": "^30.1.1",
+		"svelte": "^5.57.1",
+		"svelte-check": "^4.7.6",
+		"tailwindcss": "^4.3.3",
+		"typescript": "^6.0.3",
+		"vite": "^8.3.0",
+		"vitest": "^5.0.3"
+	},
+	"dependencies": {
+		"@lucide/svelte": "^1.47.0",
+		"@lyeve-labs/client": "^0.5.0",
+		"@lyeve-labs/client-rest": "^0.3.0",
+		"@lyeve-labs/ui-kit": "^0.34.0",
+		"@tiptap/core": "^3.31.3",
+		"@tiptap/extension-link": "^3.31.3",
+		"@tiptap/extension-underline": "^3.31.3",
+		"@tiptap/starter-kit": "^3.31.3",
+		"qrcode": "^1.5.4",
+		"svelte-dnd-action": "^0.9.79"
+	}
+}
