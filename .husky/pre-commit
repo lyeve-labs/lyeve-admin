@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Fast checks only. Heavy work belongs in CI.
+# `svelte-check` is the source of truth for type safety in SvelteKit projects.
+pnpm exec svelte-kit sync
+pnpm exec svelte-check --tsconfig ./tsconfig.json --threshold error
