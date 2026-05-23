@@ -1,0 +1,65 @@
+name: Bug report
+description: Something is broken in the admin UI.
+labels: ['bug', 'triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in the fields
+        below. The more concrete the repro, the faster we can fix it.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The image tag or commit SHA you're running.
+      placeholder: 'vX.Y.Z  /  ghcr.io/lyeve-labs/lyeve-admin@sha256:...'
+    validations:
+      required: true
+
+  - type: input
+    id: engine-version
+    attributes:
+      label: Engine version
+      description: The `lyeve-core` version this admin is talking to.
+      placeholder: 'vX.Y.Z'
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Observed vs expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reliably reproduce the bug on a clean install.
+      placeholder: |
+        1. Open /admin/schema
+        2. Add a "Text" field to a schema and save it
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Browser console / network logs
+      render: text
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - 'Critical - production down / data loss'
+        - 'Major - feature broken, no workaround'
+        - 'Minor - feature broken, workaround exists'
+        - 'Cosmetic'
+    validations:
+      required: true

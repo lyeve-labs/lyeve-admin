@@ -1,0 +1,9 @@
+# Code owners - auto-requested as reviewers on PRs touching these paths.
+# A maintainer reviews every PR.
+
+*                       @lyeve-labs/maintainers
+
+# Versioning surface - extra-cautious review.
+/.github/workflows/     @lyeve-labs/maintainers
+/CHANGELOG.md           @lyeve-labs/maintainers
+/package.json           @lyeve-labs/maintainers
