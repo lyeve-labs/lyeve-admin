@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 64" role="img" aria-label="LyEve">
+  <title>LyEve favicon</title>
+  <!-- Adapts automatically: ink + deep-cyan on light tab bars, white + bright cyan on dark. -->
+  <style>
+    .col{fill:#0a0e14} .ctop{fill:#0099c4} .cside{fill:#006a8a} .cface{fill:#007ea6}
+    @media (prefers-color-scheme: dark){
+      .col{fill:#ffffff} .ctop{fill:#00d4ff} .cside{fill:#0099c4} .cface{fill:#00b4dd}
+    }
+  </style>
+  <g transform="translate(6 4)">
+    <polygon class="col" points="0,14 14,7 14,40 0,47"/>
+    <polygon points="0,47 14,40 14,54 0,61" fill="#9aa1ad"/>
+    <polygon points="14,40 28,33 28,47 14,54" fill="#c5cad3"/>
+    <polygon class="ctop"  points="14,54 28,47 56,33 42,40"/>
+    <polygon class="cside" points="42,40 56,33 56,47 42,54"/>
+    <polygon class="cface" points="14,54 28,61 42,54 28,47"/>
+    <polygon class="cface" points="28,47 42,54 56,47 42,40"/>
+  </g>
+</svg>
