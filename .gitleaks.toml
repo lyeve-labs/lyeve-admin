@@ -1,0 +1,30 @@
+# LyEve admin. Gitleaks Configuration
+# Detect hardcoded secrets, API keys, tokens, and credentials.
+#
+# Run manually:
+#   gitleaks detect --config=.gitleaks.toml --verbose
+#   gitleaks detect --config=.gitleaks.toml --log-opts="--all"   # full history
+
+title = "LyEve admin Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+  description = "LyEve admin project allowlist"
+  paths = [
+    # API reference page embeds decoded example JWTs (alg:EdDSA/HS256 headers)
+    # for documentation. Not real tokens.
+    '''src/lib/api/reference\.ts$''',
+    # Test fixtures and example env templates.
+    '''\.spec\.ts$''',
+    '''\.test\.ts$''',
+    '''\.env\.example$''',
+  ]
+
+  stopwords = [
+    "example",
+    "placeholder",
+    "changeme",
+    "your-",
+  ]
