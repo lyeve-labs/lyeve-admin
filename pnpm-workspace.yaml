@@ -1,0 +1,14 @@
+# pnpm refuses a package younger than minimumReleaseAge, so our own kit and
+# client releases are listed here. Every third-party package stays subject to
+# the rule.
+minimumReleaseAgeExclude:
+  - '@lyeve-labs/client@0.3.7 || 0.4.0 || 0.5.0'
+  - '@lyeve-labs/client-rest@0.3.0'
+  - '@lyeve-labs/ui-kit@0.13.0 || 0.13.1 || 0.15.0 || 0.16.0 || 0.17.0 || 0.18.0 || 0.19.0 || 0.20.0 || 0.21.0 || 0.22.1 || 0.22.2 || 0.23.1 || 0.23.2 || 0.23.3 || 0.24.0 || 0.25.1 || 0.26.0 || 0.27.0 || 0.28.0 || 0.29.0 || 0.30.0 || 0.31.0 || 0.31.1 || 0.32.0 || 0.32.1 || 0.34.0'
+# SvelteKit pins cookie ^0.6.0, which is vulnerable to CVE-2024-47764. Pinned to
+# an exact 0.7.2 rather than a range: it carries the fix and keeps the named
+# parse/serialize exports the Kit runtime imports. cookie 1.x and 2.x reshaped
+# those exports and break the SSR build, so this must not float upward.
+overrides:
+  cookie: 0.7.2
+minimumReleaseAgeStrict: true
