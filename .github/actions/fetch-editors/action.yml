@@ -1,0 +1,60 @@
+# Places the visual editors at the path the seam reads, at the commit
+# .github/editors.ref pins, for the official image and the suite that tests it.
+#
+# The repository is named by a secret and read with a token, so neither is
+# in this tree and the runner masks both in the log. The token goes to one
+# fetch as a header in that command's own environment. It is never written to
+# a git config, a credential helper or the remote URL, so no later step and no
+# file in the build context can read it. A missing secret or an unreadable
+# commit fails the step, so a release can never fall back to the build
+# without the editors.
+
+name: fetch editors
+description: Check out the visual editors at the pinned commit
+
+inputs:
+  repository:
+    description: owner/name of the editors repository
+    required: true
+  token:
+    description: A token that can read that one repository
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch the pinned commit
+      shell: bash
+      env:
+        EDITORS_REPOSITORY: ${{ inputs.repository }}
+        EDITORS_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        if [ -z "$EDITORS_REPOSITORY" ]; then
+          echo "::error::The EDITORS_REPOSITORY secret is not set."
+          exit 1
+        fi
+        if [ -z "$EDITORS_TOKEN" ]; then
+          echo "::error::The EDITORS_READ_TOKEN secret is not set."
+          exit 1
+        fi
+        ref="$(tr -d '[:space:]' < .github/editors.ref)"
+        if ! [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "::error::.github/editors.ref must hold one full commit SHA."
+          exit 1
+        fi
+        dest=src/lib/canvas/editors
+        git init -q "$dest"
+        auth="$(printf 'x-access-token:%s' "$EDITORS_TOKEN" | base64 -w0)"
+        echo "::add-mask::$auth"
+        GIT_CONFIG_COUNT=1 \
+          GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
+          git -C "$dest" fetch -q --depth=1 --no-tags "https://github.com/${EDITORS_REPOSITORY}.git" "$ref"
+        git -C "$dest" -c advice.detachedHead=false checkout -q FETCH_HEAD
+        for f in flow/FlowCanvas.svelte schema/SchemaCanvas.svelte LICENSE.md; do
+          if [ ! -f "$dest/$f" ]; then
+            echo "::error::The editors at $ref carry no $f."
+            exit 1
+          fi
+        done
