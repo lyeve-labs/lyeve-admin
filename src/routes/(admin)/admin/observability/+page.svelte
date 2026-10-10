@@ -38,6 +38,8 @@
 		POOL_SIZE,
 	} from '$lib/api/goroutine-engine';
 	import { LATENCY_TOP_CHOICES } from '$lib/api/observability';
+	import { LICENSE_PAGE, formRefusal } from '$lib/api/refusal';
+	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import {
 		LOG_LEVELS,
 		NO_VALUE,
@@ -96,9 +98,10 @@
 
 	const ge = $derived(data.goroutineEngine);
 	const geAnswered = $derived(Boolean(ge.snapshot || ge.pool || ge.parallel || ge.asyncHooks));
-	// The writes need super_admin and nothing else. A form that could only
-	// ever answer 403 is shown disabled with the reason.
-	const canTune = $derived(ge.superAdmin);
+	// The writes need super_admin and a license that lets tuning through. A
+	// form that could only ever answer 403 or 402 is shown disabled with the
+	// reason. The tiles above it are reads and stay either way.
+	const canTune = $derived(ge.superAdmin && ge.licensed);
 
 	// The forms open on the live values and send them all back, so a field
 	// the operator did not touch is saved as it was. They are seeded once:
@@ -281,7 +284,10 @@
 
 {#snippet tunableStatus(which: TunableForm)}
 	{@const note = tunableNote(which)}
-	{#if note?.error}
+	{@const refusal = formRefusal(note)}
+	{#if refusal}
+		<RefusalNotice {refusal} />
+	{:else if note?.error}
 		<Alert tone="danger">{note.error}</Alert>
 	{:else if note?.saved}
 		<Alert tone="success" autoDismiss>Applied. The change holds until the engine restarts.</Alert>
@@ -499,6 +505,14 @@
 				<p class="text-xs text-muted" data-testid="goroutine-role-note">
 					Only a super admin can change these.
 				</p>
+			{/if}
+			{#if !ge.licensed}
+				<div class="flex flex-wrap items-center gap-2" data-testid="goroutine-license-note">
+					<p class="text-xs text-muted">
+						Changing these settings on a running server needs a license that includes tuning. The readings above stay available.
+					</p>
+					<Button variant="ghost" size="sm" href={LICENSE_PAGE}>View the license</Button>
+				</div>
 			{/if}
 
 			<div class="grid gap-4 lg:grid-cols-3" data-testid="goroutine-tunables">
