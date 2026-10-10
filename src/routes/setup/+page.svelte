@@ -41,7 +41,8 @@
 
 	const missingDatabase = $derived(modeStatus?.missing.some((m) => m.env === 'DATABASE_URL') ?? false);
 	const generatedSecrets = $derived(modeStatus?.missing.filter((m) => m.generated) ?? []);
-	const currentStep = $derived(data.state === 'needs_admin' ? 2 : modeStatus ? 1 : 0);
+	// StepIndicator counts from 1.
+	const currentStep = $derived(data.state === 'needs_admin' ? 3 : modeStatus ? 2 : 1);
 	const polling = $derived(data.state === 'unreachable' || (data.state === 'setup_mode' && modeStatus !== null));
 
 	// Waiting on the engine is the one thing this screen cannot do for the
