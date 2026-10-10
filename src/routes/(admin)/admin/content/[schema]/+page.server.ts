@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
+import { createClient, type SchemaField } from '@lyeve-labs/client';
 import { getSchemas, getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
@@ -30,10 +30,9 @@ const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 
 /**
- * Entries live in the admin store (sys_content_entries), which the admin API
- * serves. The v1 content routes read the schema engine's per-schema tables,
- * a separate store the admin never writes, so the load lists through the
- * admin API. It normalizes the admin rows into the shape the
+ * Entries are listed through the admin API, which holds every entry with its
+ * status and history, those written in the console and those written through
+ * the Content API alike. The load normalizes the admin rows into the shape the
  * page table expects (data.<field> plus data._status).
  */
 export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
@@ -75,6 +74,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 		} as Record<string, unknown>,
 	}));
 
+	await nameRelatedEntries(fetch, token, schemaDef.fields ?? [], items);
+
 	// total_count counts the collection, while rows.length counts this page alone.
 	// totalOf falls back to the page length when a response carries no count,
 	// and that fallback is smaller than the rows already paged past, which
@@ -91,6 +92,57 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 		total,
 	};
 };
+
+type ListedItem = { data: Record<string, unknown> };
+
+/**
+ * A link to one entry of another content type is stored as that entry's id,
+ * and a column of ids tells the reader nothing. Each linked content type is
+ * read once, and every id it holds is replaced by the entry's id and title,
+ * the populated shape the table cell already shows by its title. An id the
+ * read does not find stays as it is.
+ */
+async function nameRelatedEntries(
+	fetchFn: typeof fetch,
+	token: string,
+	fields: SchemaField[],
+	items: ListedItem[],
+): Promise<void> {
+	const links = fields.filter(
+		(f) => f.field_type === 'relation' && f.relation_to && (f.relation_type ?? 'belongs_to') === 'belongs_to',
+	);
+	const wanted = new Set<string>();
+	for (const f of links) {
+		if (items.some((it) => typeof it.data[f.name] === 'string' && it.data[f.name] !== '')) {
+			wanted.add(f.relation_to as string);
+		}
+	}
+	if (wanted.size === 0) return;
+
+	const titles = new Map<string, string>();
+	await Promise.all(
+		[...wanted].map(async (schema) => {
+			const res = await fetchFn(
+				`/api/admin/content?schema=${encodeURIComponent(schema)}&limit=${MAX_LIMIT}&offset=0`,
+				{ headers: { Authorization: `Bearer ${token}` } },
+			).catch(() => null);
+			if (!res?.ok) return;
+			const body: ListEnvelope<EntryRow> = await res.json().catch(() => ({ data: [] }));
+			for (const e of body.data ?? []) {
+				if (e.id && e.title) titles.set(e.id, e.title);
+			}
+		}),
+	);
+
+	for (const f of links) {
+		for (const it of items) {
+			const id = it.data[f.name];
+			if (typeof id === 'string' && titles.has(id)) {
+				it.data[f.name] = { id, title: titles.get(id) };
+			}
+		}
+	}
+}
 
 export const actions: Actions = {
 	delete: async (event) => {

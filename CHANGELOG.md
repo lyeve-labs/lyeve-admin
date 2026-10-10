@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [0.20.1] - 2026-10-10
+
+### Fixed
+
+- The setup page's step indicator marks the current step. Creating the first administrator showed Restart as current.
+- Setup says which password rule the engine refused, such as "Password must be at least 12 characters.", instead of "Setup failed.". The setup placeholder and the users page hint say 12 characters, the engine's default.
+- The entry list shows a linked entry by its title, such as an author's name, instead of the start of its id.
+
 ## [0.20.0] - 2026-10-10
 
 ### Changed
