@@ -151,9 +151,13 @@ describe('setup actions.create', () => {
 		expect(result).toEqual({ error: 'Passwords do not match.' });
 	});
 
-	it('returns error when password is too short', async () => {
-		const result = await actions.create(actionEvent({ ...valid, password: 'short', confirm: 'short' }, vi.fn()));
-		expect(result).toEqual({ error: 'Password must be at least 8 characters.' });
+	it('names the rule the engine refused the password for', async () => {
+		const refusal = { code: 'AUTH_PASSWORD_TOO_SHORT', error: 'Password must be at least 12 characters.' };
+		const result = (await actions.create(
+			actionEvent({ ...valid, password: 'Short1pass', confirm: 'Short1pass' }, fetchReturning(refusal, 422)),
+		)) as { status: number; data: { error: string } };
+		expect(result.status).toBe(422);
+		expect(result.data.error).toBe('Password must be at least 12 characters.');
 	});
 
 	it('sets the session cookie, sends the token, and redirects on success', async () => {

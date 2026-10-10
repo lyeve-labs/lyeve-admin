@@ -6,6 +6,7 @@ import { claimSetup, getSetupModeStatus } from '$lib/api/setup';
 import { readEngineSetup, safeNext } from '$lib/server/setup-gate';
 import { LANDING } from '$lib/landing';
 import { setSessionCookie } from '$lib/server/session-cookie';
+import { actionError } from '$lib/server/action-error';
 
 export const load: PageServerLoad = async ({ fetch, url }) => {
 	const next = safeNext(url.searchParams.get('next'));
@@ -81,9 +82,6 @@ export const actions: Actions = {
 		if (password !== confirm) {
 			return { error: 'Passwords do not match.' };
 		}
-		if (password.length < 8) {
-			return { error: 'Password must be at least 8 characters.' };
-		}
 
 		const client = createClient(fetch);
 		try {
@@ -95,6 +93,12 @@ export const actions: Actions = {
 			}
 			if (err instanceof ApiError && err.status === 409) {
 				redirect(303, '/login');
+			}
+			// The password policy is the engine's and can be configured, so its
+			// 422 names the rule. Repeating a length here would be wrong on any
+			// install that changed it.
+			if (err instanceof ApiError && err.status === 422) {
+				return fail(422, { error: actionError(err, 'The password does not meet the password policy.') });
 			}
 			return { error: 'Setup failed.' };
 		}

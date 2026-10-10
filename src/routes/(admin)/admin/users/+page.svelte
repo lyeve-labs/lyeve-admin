@@ -327,7 +327,7 @@
 				bind:value={password}
 				required
 				autocomplete="new-password"
-				hint="At least 8 characters"
+				hint="At least 12 characters, with upper case, lower case and a digit"
 				error={errors.password}
 			/>
 			{#if data.tenants.length > 1}
