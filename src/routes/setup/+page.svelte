@@ -274,7 +274,7 @@
 						id="password"
 						name="password"
 						label="Password"
-						placeholder="At least 8 characters"
+						placeholder="At least 12 characters"
 						autocomplete="new-password"
 						required
 						error={errors.password}
