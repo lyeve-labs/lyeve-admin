@@ -1,11 +1,53 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createClient } from '@lyeve-labs/client';
 import {
 	byOwnerRows,
 	durationMs,
 	parseAsyncHooksForm,
 	parseParallelForm,
 	parsePoolForm,
+	readGoroutineEngine,
+	readTuningLicensed,
 } from '$lib/api/goroutine-engine';
+
+function clientAnswering(tuning: () => Response) {
+	const fetch = vi.fn(async (url: string) => {
+		if (String(url).endsWith('/debug/goroutines/tuning')) return tuning();
+		return new Response(JSON.stringify({ total: 1 }), { status: 200, headers: { 'content-type': 'application/json' } });
+	}) as unknown as typeof globalThis.fetch;
+	return createClient(fetch, {});
+}
+
+const answer = (body: unknown, status = 200) => () =>
+	new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+describe('readTuningLicensed', () => {
+	it('reads the flag the plugin sends', async () => {
+		expect(await readTuningLicensed(clientAnswering(answer({ licensed: true })))).toBe(true);
+		expect(await readTuningLicensed(clientAnswering(answer({ licensed: false })))).toBe(false);
+	});
+
+	// An older plugin has no such route, and a failed read says nothing about
+	// the license. Both keep the forms, and a refused write still says 402.
+	it('reads a 404, a failure or a body without the flag as licensed', async () => {
+		expect(await readTuningLicensed(clientAnswering(answer({ error: 'not found' }, 404)))).toBe(true);
+		expect(await readTuningLicensed(clientAnswering(answer({ error: 'unavailable' }, 503)))).toBe(true);
+		expect(await readTuningLicensed(clientAnswering(answer({})))).toBe(true);
+		expect(
+			await readTuningLicensed(
+				clientAnswering(() => {
+					throw new TypeError('network down');
+				}),
+			),
+		).toBe(true);
+	});
+
+	it('travels with the four views', async () => {
+		const views = await readGoroutineEngine(clientAnswering(answer({ licensed: false })));
+		expect(views.licensed).toBe(false);
+		expect(views.snapshot).toEqual({ total: 1 });
+	});
+});
 
 function form(fields: Record<string, string>): FormData {
 	const data = new FormData();

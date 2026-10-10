@@ -38,8 +38,16 @@ const views: Record<string, Route> = {
 	'/debug/goroutines/pool': () => json(POOL),
 	'/debug/goroutines/parallel': () => json(PARALLEL),
 	'/debug/goroutines/async-hooks': () => json(ASYNC),
+	'/debug/goroutines/tuning': () => json({ licensed: true }),
 	'/debug/goroutines': () => json(SNAPSHOT),
 };
+
+// The tuning answer replaces the default one. The more specific needle has
+// to come before the snapshot's, which matches every goroutine route.
+function withTuning(tuning: Route): Record<string, Route> {
+	const { '/debug/goroutines': snapshot, ...rest } = views;
+	return { ...rest, '/debug/goroutines/tuning': tuning, '/debug/goroutines': snapshot };
+}
 
 // The layout hands every page the entitlements. This one reads none of them,
 // so an instance that serves no feature is the case to prove.
@@ -76,7 +84,26 @@ describe('observability load', () => {
 		expect(result.goroutineEngine.asyncHooks).toEqual(ASYNC);
 		expect(result.goroutineEngine.byOwner.map((r: { owner: string }) => r.owner)).toEqual(['cron', 'engine']);
 		expect(result.goroutineEngine.superAdmin).toBe(true);
+		expect(result.goroutineEngine.licensed).toBe(true);
 		expect(result.goroutineEngine).not.toHaveProperty('entitled');
+	});
+
+	it('carries the plugin saying tuning is not licensed, and keeps every view', async () => {
+		const result = (await load(loadEvent(withTuning(() => json({ licensed: false }))))) as Loaded;
+		expect(result.goroutineEngine.licensed).toBe(false);
+		expect(result.goroutineEngine.superAdmin).toBe(true);
+		expect(result.goroutineEngine.pool).toEqual(POOL);
+		expect(result.goroutineEngine.asyncHooks).toEqual(ASYNC);
+	});
+
+	// An older plugin has no tuning route and a failed read proves nothing,
+	// so both keep the forms and leave a refusal to the write's own 402.
+	it('reads a failed or missing tuning answer as licensed', async () => {
+		for (const tuning of [() => json({ error: 'unavailable' }, 503), () => json({ error: 'not found' }, 404)]) {
+			const result = (await load(loadEvent(withTuning(tuning)))) as Loaded;
+			expect(result.goroutineEngine.licensed).toBe(true);
+			expect(result.goroutineEngine.pool).toEqual(POOL);
+		}
 	});
 
 	it('reads the views for an admin and says only the role locks the forms', async () => {
@@ -115,6 +142,21 @@ describe('the tunable actions', () => {
 		expect(result).toMatchObject({ status: 400, data: { form: 'parallel' } });
 		const data = (result as { data: { error: string } }).data;
 		expect(data.error).toBe('Failed to reconfigure the parallel engine.');
+	});
+
+	it('returns a 402 as the license refusal, not as a generic error', async () => {
+		const { event } = actionEvent(form({ size: '128' }), {
+			'/debug/goroutines/pool': () =>
+				json({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature' }, 402),
+		});
+		const result = (await actions.pool(event)) as {
+			status: number;
+			data: { form: string; refused: { kind: string; feature: string }; error?: string };
+		};
+		expect(result.status).toBe(402);
+		expect(result.data.form).toBe('pool');
+		expect(result.data.refused).toMatchObject({ kind: 'feature', feature: 'example-feature' });
+		expect(result.data.error).toBeUndefined();
 	});
 
 	it('relays the plugin bounds message on a 422', async () => {

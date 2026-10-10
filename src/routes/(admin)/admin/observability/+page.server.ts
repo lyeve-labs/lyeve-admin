@@ -16,6 +16,7 @@ import {
 	type ParallelView,
 	type PoolView,
 } from '$lib/api/goroutine-engine';
+import { refusalOf } from '$lib/api/refusal';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { goroutineCount } from '$lib/server/goroutines';
@@ -91,8 +92,9 @@ export type TunableForm = 'pool' | 'parallel' | 'asyncHooks';
 
 /**
  * The goroutine engine's panel: the views every admin may read, and whether
- * this session may write them. The writes need super_admin and nothing else.
- * A form that would only ever answer 403 is shown disabled with the reason,
+ * this session may write them. The writes need super_admin and a license
+ * that lets tuning through, which the plugin reports as `licensed`. A form
+ * that could only ever answer 403 or 402 is shown disabled with the reason,
  * rather than as a form that fails.
  */
 export interface GoroutineEnginePanel extends GoroutineEngineViews {
@@ -131,11 +133,15 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 };
 
 /**
- * A refused write, as the form beside the tiles reports it. A 422 carries
- * the plugin's own bounds message, which names the field and the limit, so
- * it is relayed as written. Anything else is the fallback sentence.
+ * A refused write, as the form beside the tiles reports it. A 402 is the
+ * license saying no, so it travels as the refusal every page renders the
+ * same way. A 422 carries the plugin's own bounds message, which names the
+ * field and the limit, so it is relayed as written. Anything else is the
+ * fallback sentence.
  */
 function tunableFailure(form: TunableForm, err: unknown, fallback: string) {
+	const refused = refusalOf(err);
+	if (refused) return fail(402, { form, refused });
 	if (err instanceof ApiError && err.status === 422) {
 		return fail(422, { form, error: actionError(err, fallback) });
 	}
