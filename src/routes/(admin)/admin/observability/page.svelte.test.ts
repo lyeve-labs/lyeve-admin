@@ -111,6 +111,7 @@ function engine(over: Record<string, unknown> = {}) {
 			{ owner: 'email', total: 1, oldest: '2s' },
 		],
 		superAdmin: true,
+		licensed: true,
 		...over,
 	};
 }
@@ -475,9 +476,11 @@ describe('Goroutine engine', () => {
 		expect((container.querySelector('input[name="queue_size"]') as HTMLInputElement).value).toBe('1024');
 		expect((container.querySelector('input[name="enabled"]') as HTMLInputElement).checked).toBe(true);
 		expect(section(container).querySelector('[data-testid="not-enabled"]')).toBeNull();
+		expect(section(container).querySelector('[data-testid="goroutine-license-note"]')).toBeNull();
 	});
 
-	// The role is the only thing that disables a form.
+	// The role and the plugin's tuning flag disable a form. Neither draws the
+	// generic not-enabled notice.
 	it('draws no not-enabled notice in this section for either role', () => {
 		for (const superAdmin of [true, false]) {
 			const { container } = render(ObservabilityPage, {
@@ -495,6 +498,44 @@ describe('Goroutine engine', () => {
 		expect(section(container).querySelector('[data-testid="goroutine-role-note"]')?.textContent).toContain('super admin');
 		// The views stay: the reads are not gated.
 		expect(section(container).querySelector('[data-testid="goroutine-views"]')?.textContent).toContain('Tracked');
+	});
+
+	it('disables the forms for a super admin when tuning is not licensed, with the reason', () => {
+		const { container } = render(ObservabilityPage, {
+			props: props({ goroutineEngine: engine({ licensed: false }) }),
+		});
+		expect(fieldsets(container)).toHaveLength(3);
+		for (const fs of fieldsets(container)) expect(fs.disabled).toBe(true);
+		const note = section(container).querySelector('[data-testid="goroutine-license-note"]') as HTMLElement;
+		expect(note.textContent).toContain('Changing these settings on a running server needs a license that includes tuning.');
+		expect(note.querySelector('a')?.getAttribute('href')).toBe('/admin/settings/license');
+		expect(section(container).querySelector('[data-testid="goroutine-role-note"]')).toBeNull();
+		// Every reading stays: only the writes are licensed.
+		const views = section(container).querySelector('[data-testid="goroutine-views"]') as HTMLElement;
+		for (const label of ['Tracked', 'Size', 'Max concurrent', 'Workers']) expect(views.textContent, label).toContain(label);
+		expect((container.querySelector('input[name="size"]') as HTMLInputElement).value).toBe('64');
+	});
+
+	it('states both reasons when the session is not super admin and tuning is not licensed', () => {
+		const { container } = render(ObservabilityPage, {
+			props: props({ goroutineEngine: engine({ superAdmin: false, licensed: false }) }),
+		});
+		for (const fs of fieldsets(container)) expect(fs.disabled).toBe(true);
+		expect(section(container).querySelector('[data-testid="goroutine-role-note"]')).not.toBeNull();
+		expect(section(container).querySelector('[data-testid="goroutine-license-note"]')).not.toBeNull();
+	});
+
+	it('renders a 402 as the license refusal on the form that asked, not as an error', () => {
+		const { container } = render(ObservabilityPage, {
+			props: props({}, { form: 'pool', refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } }),
+		});
+		const forms = [...section(container).querySelectorAll('form')];
+		const notice = forms[0].querySelector('[data-testid="refusal-notice"]') as HTMLElement;
+		expect(notice.textContent).toContain('This needs example-feature');
+		expect(notice.textContent).toContain('Nothing was changed.');
+		expect(forms[0].querySelector('[role="alert"]')?.textContent ?? '').not.toContain('Failed to');
+		expect(forms[1].querySelector('[data-testid="refusal-notice"]')).toBeNull();
+		expect(forms[2].querySelector('[data-testid="refusal-notice"]')).toBeNull();
 	});
 
 	it('renders a refusal inline on the form that asked, and nowhere else', () => {

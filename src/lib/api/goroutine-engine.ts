@@ -64,6 +64,17 @@ export interface GoroutineEngineViews {
 	pool: PoolView | null;
 	parallel: ParallelView | null;
 	asyncHooks: AsyncHooksView | null;
+	/**
+	 * Whether the install's license lets the three tuning writes through.
+	 * The plugin answers this as a plain flag, so the admin never has to know
+	 * which license grants it.
+	 */
+	licensed: boolean;
+}
+
+/** What the plugin answers at /api/admin/debug/goroutines/tuning. */
+export interface TuningAnswer {
+	licensed?: unknown;
 }
 
 /** The bounds the engine enforces, so a form can refuse before the round trip. */
@@ -175,15 +186,32 @@ export function parseAsyncHooksForm(data: FormData): { body: AsyncHooksBody } | 
 	return { body: { workers: workers.n, queue_size: queue.n, timeout: timeout.d, enabled: enabled === 'on' || enabled === 'true' } };
 }
 
-/** The four views, each null where the engine did not answer. */
+/**
+ * Whether the tuning writes are licensed on this install. Only an explicit
+ * false closes the forms. A failed read, a 404 from a plugin that predates
+ * the route, or a body without the flag all read as licensed, so an older
+ * server keeps the forms it always had and a refused write still reports
+ * itself through its 402.
+ */
+export async function readTuningLicensed(client: HttpClient): Promise<boolean> {
+	try {
+		const answer = await client.get<TuningAnswer>(`${ROOT}/tuning`);
+		return answer?.licensed !== false;
+	} catch {
+		return true;
+	}
+}
+
+/** The four views, each null where the engine did not answer, and the tuning flag. */
 export async function readGoroutineEngine(client: HttpClient): Promise<GoroutineEngineViews> {
-	const [snapshot, pool, parallel, asyncHooks] = await Promise.all([
+	const [snapshot, pool, parallel, asyncHooks, licensed] = await Promise.all([
 		client.get<GoroutineSnapshot>(ROOT).catch(() => null),
 		client.get<PoolView>(`${ROOT}/pool`).catch(() => null),
 		client.get<ParallelView>(`${ROOT}/parallel`).catch(() => null),
 		client.get<AsyncHooksView>(`${ROOT}/async-hooks`).catch(() => null),
+		readTuningLicensed(client),
 	]);
-	return { snapshot, pool, parallel, asyncHooks };
+	return { snapshot, pool, parallel, asyncHooks, licensed };
 }
 
 export function putPoolSize(client: HttpClient, body: PoolBody): Promise<PoolView> {
