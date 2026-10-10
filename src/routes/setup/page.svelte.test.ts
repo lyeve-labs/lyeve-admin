@@ -120,6 +120,13 @@ describe('Setup page: setup mode', () => {
 });
 
 describe('Setup page: create the first admin', () => {
+	it('marks configure and restart done and create admin current', () => {
+		const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
+		const circles = [...container.querySelectorAll('nav[aria-label="Progress"] li')];
+		expect(circles.map((li) => li.querySelector('svg') !== null)).toEqual([true, true, false]);
+		expect(circles[2].textContent).toContain('3');
+	});
+
 	it('reports the database reachable and does not poll', async () => {
 		vi.useFakeTimers();
 		const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
