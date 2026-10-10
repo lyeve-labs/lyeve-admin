@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [0.20.0] - 2026-10-10
+
+### Changed
+
+- Observability: the goroutine engine's tuning forms are disabled, with the
+  reason, when the install's license does not include tuning. The readings
+  stay available. A tuning change that the server refuses for the license is
+  shown as a license refusal rather than a failure.
+
 ## [0.19.0] - 2026-10-07
 
 ### Added
