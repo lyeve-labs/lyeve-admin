@@ -172,3 +172,51 @@ describe('content listing clamps the page size to the server maximum', () => {
 		expect(result.limit).toBe(1);
 	});
 });
+
+// A link to an author is stored as the author's id. The table shows the
+// author's title instead, read once for the linked content type.
+describe('content listing names linked entries', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('replaces a linked id with the linked entry and its title', async () => {
+		rest.getSchema.mockResolvedValueOnce({
+			name: 'posts',
+			display_name: 'Posts',
+			fields: [
+				{ name: 'headline', field_type: 'text' },
+				{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' },
+			],
+		} as never);
+		const posts = {
+			data: [
+				{ ...rows(1)[0], body: { headline: 'h', author: 'a1' } },
+				{ ...rows(1, 1)[0], body: { headline: 'h', author: 'missing' } },
+			],
+			total_count: 2,
+		};
+		const authors = { data: [{ id: 'a1', title: 'Ada Park', created_at: '', updated_at: '' }], total_count: 1 };
+		const fetch = vi.fn(async (input: string | URL | Request) => {
+			const u = new URL(String(input), 'http://localhost');
+			const body = u.searchParams.get('schema') === 'author' ? authors : posts;
+			return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		});
+		const result = (await load({
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			params: { schema: 'posts' },
+			url: new URL('http://localhost/admin/content/posts'),
+		} as never)) as unknown as { items: { data: Record<string, unknown> }[] };
+
+		expect(result.items[0].data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(result.items[1].data.author).toBe('missing');
+		const authorReads = fetch.mock.calls.filter((c) => String(c[0]).includes('schema=author'));
+		expect(authorReads).toHaveLength(1);
+	});
+
+	it('reads nothing more when no row links anywhere', async () => {
+		const { fetch } = await runLoad('', { data: rows(3), total_count: 3 });
+		expect(fetch).toHaveBeenCalledTimes(1);
+	});
+});
