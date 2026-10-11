@@ -43,8 +43,8 @@
 
 	let narrow = $state('');
 	let failedFirst = $state(false);
-	// A replay is rehearsed by default. It posts every event in the window to
-	// a handler again, and nothing undoes that.
+	// A replay is rehearsed by default. It publishes every event in the window
+	// again to everything that listens, and nothing undoes that.
 	let dryRun = $state(true);
 	let since = $state('');
 	// The action runs in the server's zone, so the browser's offset goes with the value.
@@ -90,7 +90,7 @@
 		{#if form?.started}
 			<Alert tone={form.dryRun ? 'brand' : 'success'} autoDismiss={!form.dryRun}>
 				{form.dryRun
-					? 'Rehearsed. Nothing was posted to a handler. Clear the rehearsal box to run it for real.'
+					? 'Rehearsed. Nothing was published. Clear the rehearsal box to run it for real.'
 					: 'Replay started. It runs in the background and the panel below reports it.'}
 			</Alert>
 		{/if}
@@ -126,8 +126,8 @@
 					<input type="hidden" name="since_offset" value={sinceOffset} />
 					<Input
 						name="handler"
-						label="Handler"
-						placeholder="Every handler when empty"
+						label="Run name"
+						placeholder="One shared name when empty"
 						bind:value={handler}
 					/>
 					<input type="hidden" name="dry_run" value={String(dryRun)} />
@@ -139,8 +139,10 @@
 				<div class="mt-3">
 					<Checkbox bind:checked={dryRun} label="Rehearse first, posting nothing" />
 					<p class="mt-1 text-xs text-muted">
-						A replay posts every event in the window to its handler again, and nothing undoes
-						that. The rehearsal reports the same counts without firing anything.
+						A replay publishes every event in the window again to everything that listens:
+						webhooks, flows, the message broker, realtime clients and email triggers. Nothing
+						undoes that. A later run under the same name skips the events that name already
+						replayed. The rehearsal reports the same counts and publishes nothing.
 					</p>
 				</div>
 			</Card>
@@ -150,7 +152,7 @@
 					<thead>
 						<tr>
 							<th scope="col">Started</th>
-							<th scope="col">Handler</th>
+							<th scope="col">Run name</th>
 							<th scope="col">Status</th>
 							<th scope="col">Progress</th>
 							<th scope="col">Result</th>
@@ -160,7 +162,13 @@
 						{#each data.runs as run (run.run_id)}
 							<tr>
 								<td data-cell="nowrap" class="text-xs">{formatDateTime(run.started_at)}</td>
-								<td data-cell="nowrap" class="font-mono text-xs">{run.handler || 'every'}</td>
+								<td data-cell="nowrap" class="font-mono text-xs">
+									{#if run.handler}
+										{run.handler}
+									{:else}
+										<span class="font-sans text-faint">Shared name</span>
+									{/if}
+								</td>
 								<td data-cell="nowrap">
 									<Badge tone={runTone(run.status)}>{run.status}</Badge>
 									{#if run.dry_run}

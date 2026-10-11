@@ -74,7 +74,7 @@ describe('Events gate', () => {
 });
 
 describe('Events replay', () => {
-	// A replay posts every event in the window to its handler again and
+	// A replay publishes every event in the window again to every listener and
 	// nothing undoes that, so the destructive option is never the default.
 	it('rehearses by default', () => {
 		const { container } = render(EventsPage, { props: props() });
@@ -84,14 +84,32 @@ describe('Events replay', () => {
 
 	it('warns that a real replay cannot be taken back', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(said(container)).toContain('nothing undoes that');
+		expect(said(container)).toContain('Nothing undoes that.');
 	});
 
 	it('says plainly that a rehearsal posted nothing', () => {
 		const { container } = render(EventsPage, {
 			props: props({}, { started: 'r9', dryRun: true }),
 		});
-		expect(said(container)).toContain('Nothing was posted to a handler');
+		expect(said(container)).toContain('Rehearsed. Nothing was published.');
+	});
+
+	// The plugin publishes a replay through the same path as a live change,
+	// so every listener hears it. The handler is only the run's name, which
+	// decides what a later run under it skips.
+	it('says a replay reaches every listener and the handler is a run name', () => {
+		const { container, getByLabelText } = render(EventsPage, { props: props() });
+		const text = said(container);
+		expect(text).toContain('again to everything that listens');
+		expect(text).toContain('A later run under the same name skips the events that name already replayed.');
+		expect(text).not.toMatch(/to its handler|to a handler|Every handler/);
+		expect(getByLabelText('Run name').getAttribute('name')).toBe('handler');
+	});
+
+	it('names a run that was given no name as the shared one', () => {
+		const { container } = render(EventsPage, { props: props({ runs: [run({ handler: '' })] }) });
+		const cell = container.querySelector('tbody tr td:nth-child(2)');
+		expect(cell?.textContent?.trim()).toBe('Shared name');
 	});
 
 	it('marks a rehearsal in the run list so its counts are not misread', () => {
