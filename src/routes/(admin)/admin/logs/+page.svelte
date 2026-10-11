@@ -13,10 +13,9 @@
 		Table,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData } from './$types';
-	import { levelName } from '$lib/api/helpers';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { LOG_PAGE_SIZES } from '$lib/api/logs';
-	import { LOG_LEVELS, NO_VALUE, formatDateTime, hasTrace, logLevelTone } from '$lib/format';
+	import { LOG_LEVELS, NO_VALUE, formatDateTime, hasTrace, logLevelLabel, logLevelTone } from '$lib/format';
 	import { FileText, Activity, AlertTriangle, BellRing } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ICON } from '$lib/icon';
@@ -96,7 +95,7 @@
 			<Card>
 				<div class="text-xs uppercase tracking-wide text-faint">Default level</div>
 				<p class="mt-2 text-2xl font-bold text-brand">
-					{data.levels ? levelName(data.levels.default_level) : NO_VALUE}
+					{(data.levels && logLevelLabel(data.levels.default_level)) || NO_VALUE}
 				</p>
 				<p class="mt-2 text-xs text-faint">
 					{overrideCount} tenant and plugin {overrideCount === 1 ? 'override' : 'overrides'}
@@ -138,7 +137,7 @@
 							id="log-search"
 							name="q"
 							value={data.q}
-							placeholder="Messages, fields, trace IDs"
+							placeholder="Message words, a request ID or a trace ID"
 							class="min-w-0 flex-1"
 						/>
 						<Button type="submit" variant="secondary">Search</Button>
