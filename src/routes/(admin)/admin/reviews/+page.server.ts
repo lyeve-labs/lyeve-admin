@@ -7,6 +7,8 @@ import { parseStages } from '$lib/review/definition-form';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
+import { listPeople } from '$lib/server/people';
+import { entryTitle } from '$lib/utils/entry-identity';
 import {
 	createDefinition,
 	deleteDefinition,
@@ -46,7 +48,34 @@ export type ReviewsPage = {
 	assignmentsForbidden: boolean;
 	unavailable: boolean;
 	schemas: string[];
+	/** Each listed entry's title by its id. An entry the read missed is absent. */
+	entries: Record<string, string>;
+	/** Each account's email by its id. An account the read missed is absent. */
+	people: Record<string, string>;
 };
+
+/**
+ * The title each listed entry is known by. The assignment list carries only
+ * the entry id, and a page holds at most LIMIT of them, so each is read once.
+ * An entry the caller may not read, or one since deleted, keeps its id.
+ */
+async function loadEntryTitles(
+	client: ReturnType<typeof authedClient>,
+	ids: string[],
+): Promise<Record<string, string>> {
+	const named = await Promise.all(
+		[...new Set(ids)].map(async (id) => {
+			const entry = await client
+				.get<{ title?: unknown; slug?: unknown; body?: unknown }>(`/api/admin/content/${encodeURIComponent(id)}`)
+				.catch(() => null);
+			if (!entry) return null;
+			const data = entry.body && typeof entry.body === 'object' ? (entry.body as Record<string, unknown>) : undefined;
+			const { label } = entryTitle({ id, title: entry.title, slug: entry.slug, data });
+			return label ? ([id, label] as const) : null;
+		}),
+	);
+	return Object.fromEntries(named.filter((n) => n !== null));
+}
 
 function forbidden(err: unknown): boolean {
 	return err instanceof ApiError && err.status === 403;
@@ -87,12 +116,14 @@ export const load: PageServerLoad = async (event) => {
 		assignmentsForbidden: false,
 		unavailable: false,
 		schemas: [],
+		entries: {},
+		people: {},
 	};
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.review)) return page;
 
 	const client = authedClient(event);
-	const [definitions, assignments, schemas] = await Promise.all([
+	const [definitions, assignments, schemas, people] = await Promise.all([
 		operator
 			? loadDefinitions(client).then(
 					(read) => ({ ...read, forbidden: false, failed: false }),
@@ -104,6 +135,9 @@ export const load: PageServerLoad = async (event) => {
 			(err) => ({ items: [] as ReviewAssignment[], total: 0, forbidden: forbidden(err), failed: !forbidden(err) }),
 		),
 		operator ? getSchemas(client).catch(() => []) : Promise.resolve([]),
+		// The directory is an operator's to read. A reviewer sees their own
+		// email and the ids of everyone else.
+		operator ? listPeople(client) : Promise.resolve([]),
 	]);
 
 	page.definitions = definitions.rows;
@@ -114,6 +148,14 @@ export const load: PageServerLoad = async (event) => {
 	page.assignmentsForbidden = assignments.forbidden;
 	page.unavailable = definitions.failed || assignments.failed;
 	page.schemas = schemas.map((s) => s.name);
+	page.entries = await loadEntryTitles(
+		client,
+		assignments.items.map((a) => a.entry_id),
+	);
+	page.people = Object.fromEntries([
+		...people.map((p) => [p.id, p.email] as const),
+		...(user.email ? [[user.id, user.email] as const] : []),
+	]);
 	return page;
 };
 
