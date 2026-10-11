@@ -148,3 +148,37 @@ describe('Paging', () => {
 		expect(container.textContent).toContain('entries 101 to 200 of 250');
 	});
 });
+
+/*
+ * The levels endpoint names the default level ("INFO"), while slog's integer
+ * shape is what the SSE tail sends. Reading the name as an integer compared a
+ * string with numbers, every comparison was false, and the card said ERROR.
+ */
+describe('Default level card', () => {
+	function defaultLevel(container: HTMLElement): string {
+		const label = [...container.querySelectorAll('div')].find((el) => el.textContent?.trim() === 'Default level');
+		return label?.nextElementSibling?.textContent?.trim() ?? '';
+	}
+
+	it('shows the level the engine names', () => {
+		const { container } = render(LogsPage, {
+			props: props([], { levels: { default_level: 'INFO', tenants: {}, plugins: {} } }),
+		});
+
+		expect(defaultLevel(container)).toBe('INFO');
+	});
+
+	it('shows a level sent as slog severity', () => {
+		const { container } = render(LogsPage, {
+			props: props([], { levels: { default_level: -4, tenants: {}, plugins: {} } }),
+		});
+
+		expect(defaultLevel(container)).toBe('DEBUG');
+	});
+
+	it('shows no value when the levels could not be read', () => {
+		const { container } = render(LogsPage, { props: props([]) });
+
+		expect(defaultLevel(container)).toBe('-');
+	});
+});
