@@ -52,9 +52,9 @@
 	}
 
 	/**
-	 * The rule that applies to every schema. The engine reads the schema rule and
-	 * this one together and unions their actions, so a grant made here holds on
-	 * every schema and clearing a schema rule cannot take it back.
+	 * The rule that applies to every schema without a rule of its own. A schema
+	 * rule replaces its actions on that schema, so a grant made here can be
+	 * taken back on one schema. Field masks are the exception and add up.
 	 */
 	const WILDCARD = '*';
 
@@ -69,7 +69,7 @@
 	type TriState = 'none' | 'some' | 'all';
 
 	/** Where a single grant came from, which decides whether it can be cleared here. */
-	type Mark = 'none' | 'stored' | 'inherited' | 'both' | 'exempt';
+	type Mark = 'none' | 'stored' | 'inherited' | 'exempt';
 
 	// Set when the read failed. An empty matrix and a failed read look the same
 	// on this screen, so the table is withheld rather than drawn from nothing.
@@ -97,8 +97,9 @@
 	const schemaNames = $derived(data.schemas.map((s: Schema) => s.name));
 
 	// The flow resources beside the schemas: every flow of the tenant, then
-	// one per flow the engine lists. A rule on `flows` is unioned into each
-	// `flow:<slug>` the way the wildcard rule is unioned into each schema.
+	// one per flow the engine lists. A rule on `flows` reaches each
+	// `flow:<slug>` with no rule of its own, the way the wildcard rule reaches
+	// each schema.
 	const flowResources = $derived([ALL_FLOWS, ...(data.flows ?? []).map((f) => flowResource(f.slug))]);
 	const resourceNames = $derived([...schemaNames, ...flowResources]);
 
@@ -127,6 +128,16 @@
 	function inheritedActions(role: string, resource: string = 'schema'): string[] {
 		const parent = parentOf(resource);
 		return parent ? (rule(role, parent)?.actions ?? []) : [];
+	}
+
+	/**
+	 * The actions the engine allows a role on a resource. A resource's own rule
+	 * replaces its parent's, so the parent's actions count only where the
+	 * resource has no rule of its own.
+	 */
+	function effectiveActions(role: string, resource: string): string[] {
+		const own = rule(role, resource);
+		return own ? own.actions : inheritedActions(role, resource);
 	}
 
 	/** What the reader sees the parent rule called. */
@@ -179,13 +190,12 @@
 	}
 
 	/**
-	 * A collapsed role still has to say what it grants. The wildcard rule is a
-	 * floor here for the same reason the engine treats it as one: it is unioned
-	 * into every schema, so a schema with no rule of its own still counts as
-	 * granted.
+	 * A collapsed role still has to say what it grants. It counts what the
+	 * engine allows: a schema with no rule of its own takes the wildcard rule,
+	 * and a schema with one takes that rule alone.
 	 */
 	function granted(role: string, name: string, action: Action): boolean {
-		return inheritedActions(role, name).includes(action) || (rule(role, name)?.actions.includes(action) ?? false);
+		return effectiveActions(role, name).includes(action);
 	}
 
 	/** The bar's state, over every resource the action applies to. */
@@ -218,13 +228,12 @@
 
 	function markFor(role: string, schema: string, action: Action): Mark {
 		if (role === EXEMPT_ROLE) return 'exempt';
-		const stored = rule(role, schema)?.actions.includes(action) ?? false;
-		// The wildcard row and the all-flows row are the sources of the
-		// inheritance, so they inherit nothing.
-		const inherited = inheritedActions(role, schema).includes(action);
-		if (stored && inherited) return 'both';
-		if (stored) return 'stored';
-		return inherited ? 'inherited' : 'none';
+		// A resource's own rule replaces its parent's, so the parent's grant
+		// shows only on a resource without one. The wildcard row and the
+		// all-flows row are the parents, so they inherit nothing.
+		const own = rule(role, schema);
+		if (own) return own.actions.includes(action) ? 'stored' : 'none';
+		return inheritedActions(role, schema).includes(action) ? 'inherited' : 'none';
 	}
 
 	function markText(role: string, schema: string, action: Action): string {
@@ -235,23 +244,24 @@
 			case 'stored':
 				return `${role} is granted ${action} on ${where} by this rule.`;
 			case 'inherited':
-				return `${role} is granted ${action} on ${where} by the ${parentLabel(schema)}. Clearing this rule does not revoke it.`;
-			case 'both':
-				return `${role} is granted ${action} on ${where} by this rule and by the ${parentLabel(schema)}. Clearing this rule does not revoke it.`;
+				return `${role} is granted ${action} on ${where} by the ${parentLabel(schema)}, because ${where} has no rule of its own.`;
 			default:
+				if (rule(role, schema) && inheritedActions(role, schema).includes(action)) {
+					return `${role} is denied ${action} on ${where}. This rule replaces the ${parentLabel(schema)}, which grants it.`;
+				}
 				return `${role} is denied ${action} on ${where}.`;
 		}
 	}
 
 	/**
 	 * A stored grant is filled and an inherited one is a ring, because the ring
-	 * is the one no control on this row can take away.
+	 * comes from the parent rule and holds only until this resource has a rule
+	 * of its own.
 	 */
 	const MARK_PAINT: Record<Mark, string> = {
 		none: 'bg-surface-2',
 		stored: 'bg-brand',
 		inherited: 'border-2 border-brand',
-		both: 'border-2 border-brand bg-brand/40',
 		exempt: 'bg-muted/40',
 	};
 
@@ -321,11 +331,24 @@
 
 	function openRule(role: string, schema: string | null) {
 		const perm = schema ? rule(role, schema) : undefined;
-		editActions = perm ? [...perm.actions] : [];
+		// A new rule starts from what applies now, its parent's actions,
+		// because saving it replaces them on this resource.
+		editActions = perm ? [...perm.actions] : schema ? [...inheritedActions(role, schema)] : [];
 		editFieldMask = perm ? perm.field_mask.join(', ') : '';
 		editSchema = '';
 		ruleTarget = { role, schema };
 		ruleOpen = true;
+	}
+
+	/**
+	 * Whether a rule on this resource takes away a grant the role holds
+	 * without it. An empty rule still denies what it replaces: the parent
+	 * rule's actions, or the standing grant admin holds on a flow until a rule
+	 * names admin there. Only a rule that replaces nothing does nothing.
+	 */
+	function replacesAGrant(role: string, resource: string): boolean {
+		if (resource === '') return false;
+		return inheritedActions(role, resource).length > 0 || (role === 'admin' && isFlowResource(resource));
 	}
 
 	/** Resources the role has no rule for yet, which is what a new rule can name. */
@@ -337,8 +360,8 @@
 
 	// Removal goes through the kit's confirm dialog, then a hidden form, so
 	// the row's button never posts on its own and the action stays a form
-	// action. The message says what the wildcard rule keeps granting, because
-	// a removal that revokes nothing has to say so before it is agreed to.
+	// action. The message says what the parent rule grants once this one is
+	// gone, because a removal can open as much as it closes.
 	let deleteId = $state('');
 	let deleteForm = $state<HTMLFormElement>();
 
@@ -351,7 +374,7 @@
 		} else if (target.schema_name === ALL_FLOWS) {
 			message += ' Every flow falls back to its own rule, and any flow without one is denied.';
 		} else if (inherited.length > 0) {
-			message += ` The ${parentLabel(target.schema_name)} for ${target.role} still grants ${inherited.join(', ')} on this ${isFlowResource(target.schema_name) ? 'flow' : 'schema'}. Removing this rule does not revoke that.`;
+			message += ` The ${parentLabel(target.schema_name)} for ${target.role} then applies to this ${isFlowResource(target.schema_name) ? 'flow' : 'schema'} and grants ${inherited.join(', ')}.`;
 		}
 		const ok = await confirmDialog('Remove permission', message, { confirmLabel: 'Delete' });
 		if (!ok) return;
@@ -511,7 +534,7 @@
 						id="show-unruled"
 						bind:checked={showUnruled}
 						label="Show resources with no rule"
-						hint="A schema or flow with no rule is denied. This brings those rows in."
+						hint="A schema with no rule of its own takes the wildcard rule, and a flow the All flows rule. This brings those rows in."
 					/>
 				{/snippet}
 			</ListToolbar>
@@ -649,26 +672,27 @@
 		<Card title="How the engine reads these rules">
 			<ul class="list-disc space-y-2 pl-5 text-sm text-muted">
 				<li>
-					A role with no rule for a schema is denied every action on it. The gate walks the caller's
-					roles, skips each one whose rule is missing, and answers 403 when none of them granted the
-					action.
+					With no rule for a schema, its own or the wildcard rule, a role is denied every action on it.
+					The gate walks the caller's roles, skips each one whose rule is missing, and answers 403 when
+					none of them granted the action.
 				</li>
 				<li>
-					A schema rule and the wildcard rule are read together and their actions are unioned. A
-					grant the wildcard makes cannot be taken back on one schema, so clear it on the wildcard
-					rule instead. An inherited grant draws as a ring, a stored one as a filled dot.
+					A schema rule replaces the wildcard rule on that schema. The engine reads the schema rule's
+					actions alone, so clearing an action there denies it on that schema while the wildcard rule
+					keeps granting it everywhere else. A schema rule with no action shuts the role out of that
+					schema. An inherited grant draws as a ring, a stored one as a filled dot.
 				</li>
 				<li>
 					{EXEMPT_ROLE} passes the content gate before any rule is read. Every rule stored under it is
 					inert, and its rows stay listed so an operator can still find them.
 				</li>
 				<li>
-					A field mask removes the named fields from read responses. Masks are unioned across the two
-					rules the same way actions are, so a wildcard mask applies to every schema.
+					A field mask removes the named fields from read responses. Masks add up across the two rules,
+					unlike actions, so a wildcard mask applies to every schema.
 				</li>
 				<li>
-					Flows are governed the same way under their own two resources: the All flows rule is read
-					together with the rule for one flow. Activate is theirs alone and covers publish, disable,
+					Flows are governed the same way under their own two resources: a rule for one flow replaces
+					the All flows rule on that flow. Activate is theirs alone and covers publish, disable,
 					rollback, run and test. The wildcard rule does not reach a flow.
 				</li>
 			</ul>
@@ -682,7 +706,8 @@
 	{@const stored = schema ? rule(role, schema) : undefined}
 	{@const resource = schema ?? editSchema}
 	{@const inherited = inheritedActions(role, resource)}
-	{@const emptyWrite = editActions.length === 0 && editFieldMask.trim() === ''}
+	{@const noGrant = editActions.length === 0 && editFieldMask.trim() === ''}
+	{@const emptyWrite = noGrant && !replacesAGrant(role, resource)}
 	<Drawer
 		bind:open={ruleOpen}
 		title="Rule for {role} on {schema === null ? 'a new resource' : schemaLabel(schema)}"
@@ -712,11 +737,11 @@
 				<input type="hidden" name="schema_name" value={schema} />
 			{/if}
 
-			{#if schema !== null && inherited.length > 0}
-				<Alert tone="warn" title="The {parentLabel(schema)} already grants {inherited.join(', ')}">
+			{#if resource !== '' && inherited.length > 0}
+				<Alert tone="warn" title="This rule replaces the {parentLabel(resource)} on {schemaLabel(resource)}">
 					{#snippet children()}
-						The engine unions this rule with the {parentLabel(schema)} for {role}, so clearing an action here
-						does not revoke it. Change the {parentLabel(schema)} to take it away.
+						The {parentLabel(resource)} grants {role} {inherited.join(', ')}. The engine reads this rule alone
+						on {schemaLabel(resource)}, so an action left clear is denied on {schemaLabel(resource)}.
 					{/snippet}
 				</Alert>
 			{/if}
@@ -732,7 +757,7 @@
 					label: ACTION_LABEL[action],
 					description:
 						inherited.includes(action)
-							? `Granted by the ${parentLabel(resource)}. Clearing it here does not revoke it.`
+							? `The ${parentLabel(resource)} grants it. Left clear, it is denied here.`
 							: undefined
 				}))}
 				bind:value={editActions}
@@ -751,8 +776,14 @@
 			{#if emptyWrite}
 				<Alert tone="warn" title="This rule would do nothing">
 					{#snippet children()}
-						A rule with no action and no field mask grants nothing and revokes nothing, and it still
-						counts against the role ceiling.
+						A rule with no action and no field mask grants nothing and revokes nothing here, and it
+						still counts against the role ceiling.
+					{/snippet}
+				</Alert>
+			{:else if noGrant}
+				<Alert tone="warn" title="This rule shuts {role} out">
+					{#snippet children()}
+						It names no action, so {role} is denied every action on {schemaLabel(resource)}.
 					{/snippet}
 				</Alert>
 			{/if}

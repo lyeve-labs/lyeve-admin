@@ -418,21 +418,41 @@ describe('permissions page collapsed summary', () => {
 });
 
 describe('permissions page inherited grants', () => {
-	it('names the wildcard rule as the source of an inherited grant', () => {
-		// GetEffective unions the schema row's actions with the wildcard row's,
-		// so a grant the wildcard makes cannot be revoked on one schema.
+	// The engine reads a schema's own rule alone when it has one. The wildcard
+	// rule's actions apply only to a schema without a rule of its own, so a
+	// schema rule can take back what the wildcard grants everywhere else.
+	it('marks the wildcard grant denied on a schema whose own rule leaves it out', () => {
 		const { container } = setupWith(
 			[rule('editor', '*', ['read']), rule('editor', 'article', ['create'])],
 			['article'],
 		);
 		const row = childRow(container, 'editor', 'article');
-		expect(row.textContent).toContain(
-			'editor is granted read on article by the wildcard rule. Clearing this rule does not revoke it.',
-		);
 		expect(row.textContent).toContain('editor is granted create on article by this rule.');
+		expect(row.textContent).toContain(
+			'editor is denied read on article. This rule replaces the wildcard rule, which grants it.',
+		);
+		expect(row.textContent).not.toContain('does not revoke');
 	});
 
-	it('warns in the editor that clearing an inherited action revokes nothing', async () => {
+	it('names the wildcard rule as the source on a schema with no rule of its own', async () => {
+		const { container } = setupWith([rule('editor', '*', ['read'])], ['article']);
+		await fireEvent.click(container.querySelector('#show-unruled') as HTMLElement);
+		const row = childRow(container, 'editor', 'article');
+		expect(row.textContent).toContain(
+			'editor is granted read on article by the wildcard rule, because article has no rule of its own.',
+		);
+	});
+
+	it('counts a schema whose own rule takes back a wildcard grant as not granted', () => {
+		const { container } = setupWith(
+			[rule('editor', '*', ['read', 'update']), rule('editor', 'article', ['read'])],
+			['article', 'page'],
+		);
+		expect(roleRow(container, 'editor').textContent).toContain('editor grants read on every schema.');
+		expect(roleRow(container, 'editor').textContent).toContain('editor grants update on some schemas.');
+	});
+
+	it('warns in the editor that an action left clear is denied on the schema', async () => {
 		const { container, getAllByRole } = setupWith(
 			[rule('editor', '*', ['read']), rule('editor', 'article', ['create'])],
 			['article'],
@@ -443,11 +463,51 @@ describe('permissions page inherited grants', () => {
 		await fireEvent.click(edit!);
 
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
-		expect(dialog.textContent).toContain('does not revoke it');
+		expect(dialog.textContent).toContain('This rule replaces the wildcard rule on article');
+		expect(dialog.textContent).toContain('an action left clear is denied on article');
+		expect(dialog.textContent).not.toContain('does not revoke');
 	});
 
-	it('tells the operator a removal leaves the inherited grant standing', async () => {
+	it('starts a new schema rule from the wildcard rule it replaces', async () => {
+		const { container, getAllByRole, getByLabelText } = setupWith(
+			[rule('editor', '*', ['read', 'update'])],
+			['article'],
+		);
+		await fireEvent.click(container.querySelector('#show-unruled') as HTMLElement);
+		const add = getAllByRole('button').find(
+			(b) => b.getAttribute('aria-label') === 'Add rule for editor on article',
+		);
+		await fireEvent.click(add!);
+		await tick();
+
+		expect((getByLabelText('Read') as HTMLInputElement).checked).toBe(true);
+		expect((getByLabelText('Update') as HTMLInputElement).checked).toBe(true);
+		expect((getByLabelText('Delete') as HTMLInputElement).checked).toBe(false);
+	});
+
+	// A schema rule with no action is how one schema is shut to a role the
+	// wildcard opens everything to, so the editor has to let it be saved.
+	it('lets an empty schema rule be saved when it takes a wildcard grant back', async () => {
 		const { container, getAllByRole } = setupWith(
+			[rule('editor', '*', ['read']), rule('editor', 'payroll', [])],
+			['payroll'],
+		);
+		const edit = getAllByRole('button').find(
+			(b) => b.getAttribute('aria-label') === 'Edit rule for editor on payroll',
+		);
+		await fireEvent.click(edit!);
+		await tick();
+
+		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+		expect(dialog.textContent).not.toContain('This rule would do nothing');
+		expect(dialog.textContent).toContain('editor is denied every action on payroll');
+		const save = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Save');
+		expect(save, 'no Save button').toBeTruthy();
+		expect((save as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('tells the operator a removal puts the wildcard rule back in force', async () => {
+		const { getAllByRole } = setupWith(
 			[rule('editor', '*', ['read']), rule('editor', 'article', ['create'])],
 			['article'],
 		);
@@ -458,7 +518,8 @@ describe('permissions page inherited grants', () => {
 
 		await tick();
 		const [, message] = kit.confirm.mock.calls[0] as unknown as [string, string];
-		expect(message).toContain('still grants read on this schema');
+		expect(message).toContain('The wildcard rule for editor then applies to this schema and grants read.');
+		expect(message).not.toContain('does not revoke');
 	});
 });
 
@@ -513,6 +574,14 @@ describe('permissions page schema filter', () => {
 });
 
 describe('permissions page copy', () => {
+	it('says a schema rule replaces the wildcard rule rather than adding to it', () => {
+		const { container } = setupWith([], ['article']);
+		const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+		expect(text).toContain('A schema rule replaces the wildcard rule on that schema.');
+		expect(text).not.toContain('their actions are unioned');
+		expect(text).not.toContain('cannot be taken back');
+	});
+
 	it('says a missing rule denies', () => {
 		// The gate skips every role whose rule is missing and answers 403 when
 		// none granted the action, so a row with no entry is not unrestricted.
@@ -558,10 +627,12 @@ describe('permissions page flow resources', () => {
 		expect(queryByLabelText('Activate')).toBeTruthy();
 	});
 
-	it('draws no activate mark on a schema row and inherits a flow row from the All flows rule', () => {
+	it('draws no activate mark on a schema row, and a flow rule replaces the All flows rule', () => {
 		const { container } = setupFlows([rule('publisher', 'flows', ['read', 'activate']), rule('publisher', 'flow:send-receipt', ['update'])]);
 		const flowRow = childRow(container, 'publisher', 'flow:send-receipt');
-		expect(flowRow.textContent).toContain('publisher is granted activate on flow send-receipt by the All flows rule.');
+		expect(flowRow.textContent).toContain(
+			'publisher is denied activate on flow send-receipt. This rule replaces the All flows rule, which grants it.',
+		);
 		expect(flowRow.textContent).toContain('publisher is granted update on flow send-receipt by this rule.');
 		const all = childRow(container, 'publisher', 'flows');
 		expect(all.textContent).toContain('Every flow');
