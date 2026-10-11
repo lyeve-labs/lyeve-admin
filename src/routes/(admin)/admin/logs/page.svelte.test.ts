@@ -182,3 +182,12 @@ describe('Default level card', () => {
 		expect(defaultLevel(container)).toBe('-');
 	});
 });
+
+describe('Search box', () => {
+	it('promises only what the search finds', () => {
+		const { container } = render(LogsPage, { props: props([]) });
+
+		const input = container.querySelector<HTMLInputElement>('#log-search');
+		expect(input?.placeholder).toBe('Message words, a request ID or a trace ID');
+	});
+});

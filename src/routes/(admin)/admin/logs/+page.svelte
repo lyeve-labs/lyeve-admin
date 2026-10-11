@@ -137,7 +137,7 @@
 							id="log-search"
 							name="q"
 							value={data.q}
-							placeholder="Messages, fields, trace IDs"
+							placeholder="Message words, a request ID or a trace ID"
 							class="min-w-0 flex-1"
 						/>
 						<Button type="submit" variant="secondary">Search</Button>
