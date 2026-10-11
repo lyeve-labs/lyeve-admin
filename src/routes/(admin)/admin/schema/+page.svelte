@@ -2193,6 +2193,22 @@
 	{/snippet}
 </Drawer>
 
+<!-- A previewed statement's number and description. One the engine marks
+     destructive is queued by the save rather than run, and says so. -->
+{#snippet statementHead(stmt: DryRunStatement, i: number)}
+	<p class="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+		<span>{i + 1}. {stmt.description}</span>
+		{#if stmt.destructive}
+			<Badge tone="warn" size="sm">Queued</Badge>
+		{/if}
+	</p>
+	{#if stmt.destructive}
+		<p class="mb-1 text-xs text-muted">
+			Drops data. The save queues it, and it runs only when a super admin applies it from History.
+		</p>
+	{/if}
+{/snippet}
+
 <!-- The save that moves data asks first, with what it moves and how much. -->
 {#if riskOpen && ddlPreview !== null}
 	{@const statements = ddlPreview}
@@ -2226,8 +2242,8 @@
 				{/if}
 				<div class="flex flex-col gap-3">
 					{#each statements as stmt, i (stmt.description + i)}
-						<div>
-							<p class="mb-1 text-xs text-muted">{i + 1}. {stmt.description}</p>
+						<div data-testid="ddl-statement" data-destructive={stmt.destructive ? 'true' : undefined}>
+							{@render statementHead(stmt, i)}
 							<pre class="overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{stmt.sql}</pre>
 						</div>
 					{/each}
@@ -2256,8 +2272,8 @@
 		{:else}
 			<div class="flex flex-col gap-4">
 				{#each statements as stmt, i (stmt.description + i)}
-					<div>
-						<p class="mb-1 text-xs text-muted">{i + 1}. {stmt.description}</p>
+					<div data-testid="ddl-statement" data-destructive={stmt.destructive ? 'true' : undefined}>
+						{@render statementHead(stmt, i)}
 						<pre class="overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{stmt.sql}</pre>
 						{#if stmt.down_sql}
 							<details class="mt-1">
