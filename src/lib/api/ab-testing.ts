@@ -14,7 +14,7 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
-import type { ListEnvelope } from './list';
+import { rowsOf, type ListEnvelope } from './list';
 
 export const EXPERIMENTS_URL = '/api/admin/ab/experiments';
 
@@ -108,12 +108,29 @@ export async function listExperiments(
 	);
 }
 
+/**
+ * The most rows one list read returns. An experiment's page shows every
+ * variant and metric at once, and the split total is only right over all of
+ * them, so the read asks for the whole page the engine allows.
+ */
+export const PANEL_LIMIT = 500;
+
+/** Every variant of an experiment, out of the paged answer. */
 export async function listVariants(client: HttpClient, id: string): Promise<Variant[]> {
-	return client.get<Variant[]>(`${EXPERIMENTS_URL}/${encodeURIComponent(id)}/variants`);
+	return rowsOf(
+		await client.get<ListEnvelope<Variant>>(
+			`${EXPERIMENTS_URL}/${encodeURIComponent(id)}/variants?limit=${PANEL_LIMIT}`
+		)
+	);
 }
 
+/** Every metric of an experiment, out of the paged answer. */
 export async function listMetrics(client: HttpClient, id: string): Promise<Metric[]> {
-	return client.get<Metric[]>(`${EXPERIMENTS_URL}/${encodeURIComponent(id)}/metrics`);
+	return rowsOf(
+		await client.get<ListEnvelope<Metric>>(
+			`${EXPERIMENTS_URL}/${encodeURIComponent(id)}/metrics?limit=${PANEL_LIMIT}`
+		)
+	);
 }
 
 export async function readResults(
