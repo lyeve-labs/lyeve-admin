@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -54,6 +54,20 @@ describe('FocalPointPicker', () => {
 		});
 		expect(container.querySelector('input[name="x"]')?.getAttribute('value')).toBe('0.25');
 		expect(getByText('Reset to center')).toBeTruthy();
+	});
+
+	it('measures a click against the picture, not the frame around it', async () => {
+		const { container, getByRole } = render(FocalPointPicker, { props: { id: 'm1', src: '/f', alt: 'a', stored: null } });
+		const frame = getByRole('button', { name: /Focal point at/ });
+		const rect = (left: number, width: number, height: number) =>
+			({ left, top: 0, width, height, right: left + width, bottom: height, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+		// A portrait picture centered in a frame four times its width.
+		frame.getBoundingClientRect = () => rect(0, 400, 200);
+		(container.querySelector('img') as HTMLImageElement).getBoundingClientRect = () => rect(150, 100, 200);
+		await fireEvent.click(frame, { clientX: 160, clientY: 50 });
+		expect(container.querySelector('input[name="x"]')?.getAttribute('value')).toBe('0.1');
+		expect(container.querySelector('input[name="y"]')?.getAttribute('value')).toBe('0.25');
+		expect((container.querySelector('[data-testid="focal-marker"]') as HTMLElement).style.left).toBe('10%');
 	});
 
 	it('moves the point with the arrow keys', async () => {
