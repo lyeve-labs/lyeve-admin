@@ -134,9 +134,10 @@ export function deprovisionTone(p: ScimProvider): 'danger' | 'warn' | 'neutral' 
 /**
  * Minimum length for a bearer token this screen will accept.
  *
- * The engine takes any non-empty string. A token is the whole authentication
- * for a route that creates and deletes accounts, so a short one is a real
- * exposure and the form refuses it here rather than storing it and hoping.
+ * A token is the whole authentication for a route that creates and deletes
+ * accounts, so a short one is a real exposure. The API refuses one under this
+ * length on create and on rotate, and the form refuses it first so the reason
+ * reads next to the field.
  */
 export const MIN_TOKEN_LENGTH = 32;
 

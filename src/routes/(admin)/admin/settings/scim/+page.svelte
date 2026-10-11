@@ -229,7 +229,7 @@
 					count={data.providers.length}
 					total={data.total ?? undefined}
 					hasNext={data.hasMore}
-					noun="providers"
+					noun="connections"
 					href={pageHref('/admin/settings/scim', data.limit)}
 				/>
 			{/if}
