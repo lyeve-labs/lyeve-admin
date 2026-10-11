@@ -99,22 +99,120 @@ export async function listQueryLog(
 	return client.get<Page<QueryLogEntry>>(`${QUERY_LOG_URL}?limit=${limit}&offset=${offset}`);
 }
 
+/** Why an analysis read no plan, as the plugin names it. */
+export type NoPlansReason =
+	| 'other_dialect'
+	| 'capture_disabled'
+	| 'source_missing'
+	| 'source_unreadable'
+	| 'none_captured';
+
 /**
- * The slowest statements the analyzer could explain, newest first.
+ * What one analysis read.
  *
- * An instance that is not on this dialect answers 400 or 503 rather than an
- * empty list, so the caller keeps the failure rather than drawing "nothing
- * was slow" over a refusal.
+ * Suggestions come out of plans, so an empty suggestion list means nothing
+ * until it is known whether any plan was read. PostgreSQL and MySQL answer
+ * the captured entries with a count of the ones that carry a plan and, when
+ * that count is 0, the reason. SQL Server answers its own missing-index
+ * views instead, which hold no captured statement.
+ */
+export interface AnalysisRead {
+	entries: QueryLogEntry[];
+	/** SQL Server's missing-index suggestions. Empty on the other two. */
+	missingIndexes: IndexSuggestion[];
+	/** How many entries carry a plan. Null for SQL Server, which reads none. */
+	plansRead: number | null;
+	noPlansReason: NoPlansReason | null;
+}
+
+const NO_PLANS_REASONS: readonly NoPlansReason[] = [
+	'other_dialect',
+	'capture_disabled',
+	'source_missing',
+	'source_unreadable',
+	'none_captured',
+];
+
+/**
+ * Reads an analyze answer of either shape.
+ *
+ * An answer that does not count its plans, from a plugin older than the
+ * count, is counted here from the entries it carries.
+ */
+export function readAnalysis(dialect: Dialect, raw: unknown): AnalysisRead {
+	const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+	if (dialect === 'mssql') {
+		const missing = Array.isArray(r.missing_indexes) ? (r.missing_indexes as IndexSuggestion[]) : [];
+		return { entries: [], missingIndexes: missing, plansRead: null, noPlansReason: null };
+	}
+	const entries = Array.isArray(r.entries) ? (r.entries as QueryLogEntry[]) : [];
+	const counted = entries.filter((e) => e.engine === dialect && !!e.plan_text).length;
+	const plansRead = typeof r.plans_read === 'number' ? r.plans_read : counted;
+	const reason = NO_PLANS_REASONS.find((why) => why === r.no_plans_reason) ?? null;
+	return { entries, missingIndexes: [], plansRead, noPlansReason: plansRead === 0 ? reason : null };
+}
+
+/**
+ * Analyzes the slowest statements as one dialect.
+ *
+ * An instance that is not on this dialect answers PostgreSQL and MySQL with
+ * no plan and the reason, and SQL Server with empty lists. A refusal is
+ * thrown, so the caller keeps it rather than drawing "nothing was slow".
  */
 export async function analyzeQueries(
 	client: HttpClient,
 	dialect: Dialect,
 	limit: number,
-): Promise<QueryLogEntry[]> {
-	const res = await client.get<Page<QueryLogEntry> | QueryLogEntry[]>(
-		`${ANALYZE_PATH[dialect]}?limit=${limit}`,
-	);
-	return Array.isArray(res) ? res : (res.data ?? []);
+): Promise<AnalysisRead> {
+	const param = dialect === 'mssql' ? 'top_n' : 'limit';
+	const res = await client.get<unknown>(`${ANALYZE_PATH[dialect]}?${param}=${limit}`);
+	return readAnalysis(dialect, res);
+}
+
+/** Where each dialect's plans come from, as an operator would name it. */
+const PLAN_SOURCE: Record<Exclude<Dialect, 'mssql'>, string> = {
+	postgres: 'pg_stat_statements',
+	mysql: 'performance_schema',
+};
+
+const DIALECT_NAME: Record<Dialect, string> = {
+	postgres: 'PostgreSQL',
+	mysql: 'MySQL',
+	mssql: 'SQL Server',
+};
+
+/**
+ * Why there is no suggestion, in a sentence.
+ *
+ * Saying "the plans already use an index" over an analysis that read no plan
+ * sends an operator away from a database that was never examined.
+ */
+export function noSuggestionText(dialect: Dialect, read: AnalysisRead): string {
+	if (dialect === 'mssql') {
+		return 'SQL Server suggested no index. Its missing-index views are also empty on an instance that runs another database.';
+	}
+	const name = DIALECT_NAME[dialect];
+	const source = PLAN_SOURCE[dialect];
+	const plans = read.plansRead ?? 0;
+	if (plans > 0) {
+		return `Nothing to suggest in the ${plans === 1 ? 'plan' : `${plans} plans`} the analyzer read.`;
+	}
+	switch (read.noPlansReason) {
+		case 'other_dialect':
+			return `No plans were read. This instance does not run ${name}.`;
+		case 'capture_disabled':
+			return `No plans were read. Reading ${source} is turned off by QUERY_MONITOR_DISABLE_PG_STAT_CAPTURE.`;
+		case 'source_missing':
+			return dialect === 'postgres'
+				? `No plans were read. Plans come from ${source}, and the extension is not installed in this database.`
+				: `No plans were read. Plans come from ${source}, and this server does not expose its statement digests.`;
+		case 'source_unreadable':
+			return `No plans were read. The check for ${source} failed, so it is not known whether plans can be read.`;
+		case 'none_captured':
+			return `No plans were read yet. ${source} is there, and none of the recent slow requests captured a plan.`;
+		default:
+			return 'No plans were read, so there is nothing to suggest.';
+	}
 }
 
 /** A duration worth coloring. The engine samples what is already slow. */

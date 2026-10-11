@@ -99,3 +99,49 @@ describe('saving notice channels', () => {
 		expect(out).toEqual({ channelsSaved: 'p1', signingSecret: 'k'.repeat(64) });
 	});
 });
+
+describe('running a probe now', () => {
+	it('reports a run that failed in one of its regions as failed', async () => {
+		engine.post.mockResolvedValue([
+			{ id: 'r1', probe_id: 'p1', status: 'pass', response_time_ms: 90, region: 'us-east', created_at: '' },
+			{ id: 'r2', probe_id: 'p1', status: 'fail', response_time_ms: 3000, region: 'eu-west', created_at: '' },
+		]);
+		const out = await actions.run(actionEvent({ id: 'p1' }));
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1/run', {});
+		expect(out).toEqual({ ran: 'p1', status: 'fail', ms: 3000, failed: 1, regions: 2 });
+	});
+});
+
+describe('the probe limits load', () => {
+	it('hands the form the floor the plugin answers', async () => {
+		route({ channels: {}, licensed: true });
+		const probesOnly = engine.get.getMockImplementation()!;
+		engine.get.mockImplementation(async (url: string) =>
+			url.endsWith('/limits') ? { probes: { limit: 0, current: 1 }, min_interval_seconds: 15 } : probesOnly(url),
+		);
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.limits).toEqual({ probes: { limit: 0, current: 1 }, minIntervalSeconds: 15 });
+	});
+
+	it('keeps the page when the limits cannot be read', async () => {
+		route({ channels: {}, licensed: true });
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.probes).toHaveLength(1);
+		expect(out.limits).toBeNull();
+	});
+});
+
+describe('saving a probe', () => {
+	// The plugin holds the floor for the install's license and refuses with
+	// the reason, so the console no longer refuses an interval of its own.
+	it('sends a short interval for the plugin to accept or refuse', async () => {
+		engine.post.mockResolvedValue(PROBE);
+		await actions.create(
+			actionEvent({ name: 'Homepage', type: 'health_check', url: 'https://example.com', interval_seconds: '15', timeout_seconds: '10' }),
+		);
+		expect(engine.post).toHaveBeenCalledWith(
+			'/api/admin/synthetic-monitoring/probes',
+			expect.objectContaining({ interval_seconds: 15 }),
+		);
+	});
+});

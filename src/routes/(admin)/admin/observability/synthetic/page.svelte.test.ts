@@ -157,6 +157,25 @@ describe('the form', () => {
 		expect(names).toContain('enabled');
 	});
 
+	// The floor depends on the install's license, so the hint is the one the
+	// plugin answers. A fixed "at least 30" was wrong both ways: free installs
+	// refuse anything under 300, licensed ones accept 15.
+	it('gives the interval floor the plugin answers', async () => {
+		render(SyntheticPage, {
+			props: props({ limits: { probes: { limit: 3, current: 1 }, minIntervalSeconds: 300 } }),
+		});
+		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
+		expect(said(document.body)).toContain('At least 300. A probe is this instance calling itself.');
+		expect(said(document.body)).not.toContain('At least 30.');
+	});
+
+	it('names no floor when the plugin did not say', async () => {
+		render(SyntheticPage, { props: props({ limits: null }) });
+		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
+		expect(said(document.body)).toContain('A probe is this instance calling itself.');
+		expect(said(document.body)).not.toMatch(/At least \d+\. A probe/);
+	});
+
 	it('shows the action error where the form is', () => {
 		const { container } = render(SyntheticPage, {
 			props: props({}, { error: 'The timeout has to be shorter than the interval.' }),

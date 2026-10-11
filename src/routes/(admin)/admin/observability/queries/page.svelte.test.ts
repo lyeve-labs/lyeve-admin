@@ -8,9 +8,13 @@ vi.mock('$app/navigation', () => ({
 }));
 
 import QueriesPage from './+page.svelte';
-import type { QueryLogEntry } from '$lib/api/query-monitor';
+import type { AnalysisRead, NoPlansReason, QueryLogEntry } from '$lib/api/query-monitor';
 
 afterEach(cleanup);
+
+function read(entries: QueryLogEntry[], plansRead: number | null = null, noPlansReason: NoPlansReason | null = null): AnalysisRead {
+	return { entries, missingIndexes: [], plansRead, noPlansReason };
+}
 
 function entry(over: Partial<QueryLogEntry> = {}): QueryLogEntry {
 	return {
@@ -33,7 +37,7 @@ const props = (over: Record<string, unknown> = {}) => ({
 		offset: 0,
 		gate: { state: 'ok' },
 		dialect: null,
-		analyzed: [],
+		analysis: null,
 		analyzeFailed: false,
 		licensed: true,
 		...over,
@@ -116,7 +120,7 @@ describe('Slow queries analysis', () => {
 		const { container } = render(QueriesPage, {
 			props: props({
 				dialect: 'postgres',
-				analyzed: [
+				analysis: read([
 					entry({
 						analysis: {
 							index_suggestions: [
@@ -129,12 +133,47 @@ describe('Slow queries analysis', () => {
 							],
 						},
 					}),
-				],
+				]),
 			}),
 		});
 
 		expect(container.textContent).toContain('sys_content');
 		expect(container.textContent).toContain('CREATE INDEX ON sys_content (tenant_id, status)');
+	});
+
+	it('says no plan was read and why, rather than that every plan uses an index', () => {
+		const { container } = render(QueriesPage, {
+			props: props({ dialect: 'postgres', analysis: read([entry()], 0, 'source_missing') }),
+		});
+
+		expect(container.textContent).toContain('No plans were read');
+		expect(container.textContent).toContain('pg_stat_statements');
+		expect(container.textContent).not.toContain('already');
+	});
+
+	it('says how many plans it read when none needs an index', () => {
+		const { container } = render(QueriesPage, {
+			props: props({ dialect: 'postgres', analysis: read([entry({ plan_text: '[]' })], 1) }),
+		});
+
+		expect(container.textContent).toContain('Nothing to suggest in the plan the analyzer read');
+	});
+
+	it("lists SQL Server's own missing-index suggestions", () => {
+		const { container } = render(QueriesPage, {
+			props: props({
+				dialect: 'mssql',
+				analysis: {
+					entries: [],
+					missingIndexes: [{ table: 'sys_users', columns: ['email'], reason: 'equality on email' }],
+					plansRead: null,
+					noPlansReason: null,
+				},
+			}),
+		});
+
+		expect(container.textContent).toContain('sys_users');
+		expect(container.textContent).toContain('equality on email');
 	});
 
 	it('says the dialect is wrong rather than that there is nothing to suggest', () => {

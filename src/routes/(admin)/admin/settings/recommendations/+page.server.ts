@@ -8,6 +8,7 @@ import {
 	RECOMMENDATIONS_OK,
 	generateFeed,
 	isAlreadyRunning,
+	isUserId,
 	readAbStats,
 	recommendationsGate,
 	refreshAll,
@@ -107,6 +108,9 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const userId = String(form.get('user_id') ?? '').trim();
 		if (!userId) return fail(400, { error: 'Name the user whose feed you want to see.' });
+		if (!isUserId(userId)) {
+			return fail(400, { error: 'That is not a user id. Pick a reader by email, or paste the id from the Users page.' });
+		}
 		try {
 			const entries = await generateFeed(client, userId);
 			return { previewFor: userId, feed: entries ?? [] };
