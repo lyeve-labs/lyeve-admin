@@ -117,6 +117,16 @@ describe('the list', () => {
 		expect(said(container)).toContain('1 experiment is running');
 	});
 
+	// The plugin counts the minimum across all variants together, so the
+	// column says so rather than promising a count for each.
+	it('states the minimum as a total across all variants', () => {
+		const { container } = render(ExperimentsPage, { props: props() });
+		const text = said(container);
+		expect(text).toContain('Exposures needed');
+		expect(text).toContain('100 across all variants');
+		expect(text).not.toContain('per variant');
+	});
+
 	it('says what an empty list means', () => {
 		const { container } = render(ExperimentsPage, { props: props({ experiments: [] }) });
 		expect(said(container)).toContain('No experiment is set up');
@@ -134,6 +144,15 @@ describe('the confidence level', () => {
 		const { container, getAllByText } = render(ExperimentsPage, { props: props() });
 		await fireEvent.click(getAllByText('New experiment')[0]);
 		expect(threshold(container)).toBe('0.95');
+	});
+
+	it('labels the minimum as a total across all variants', async () => {
+		const { getAllByText, getByLabelText } = render(ExperimentsPage, { props: props() });
+		await fireEvent.click(getAllByText('New experiment')[0]);
+		const field = getByLabelText('Minimum exposures');
+		expect(field.getAttribute('name')).toBe('min_sample_size');
+		expect(said(field.ownerDocument.body)).toContain('Counted across all variants together.');
+		expect(said(field.ownerDocument.body)).not.toContain('per variant');
 	});
 
 	it('opens an experiment stored at 0.95 with 0.95', async () => {

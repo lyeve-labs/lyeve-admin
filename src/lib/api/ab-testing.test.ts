@@ -135,16 +135,24 @@ describe('what the results support', () => {
 });
 
 describe('whether a result is worth believing', () => {
-	// Per variant, not in total: the whole point of a minimum sample is that
-	// each arm has been seen enough times.
-	it('measures the minimum per variant', () => {
+	// The plugin counts the minimum across all variants together before it
+	// calls a result significant, so the warning reads the same count.
+	it('counts the minimum across all variants together', () => {
 		const lopsided = results({
 			variants: [
 				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 500, conversions: 50, conversion_rate: 0.1 },
 				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 10, conversions: 3, conversion_rate: 0.3 },
 			],
 		});
-		expect(underpowered(experiment(), lopsided)).toBe(true);
+		const short = results({
+			variants: [
+				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 60, conversions: 6, conversion_rate: 0.1 },
+				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 39, conversions: 4, conversion_rate: 0.1 },
+			],
+		});
+		expect(underpowered(experiment(), lopsided)).toBe(false);
+		expect(underpowered(experiment(), short)).toBe(true);
+		expect(underpowered(experiment(), results({ variants: [] }))).toBe(true);
 		expect(underpowered(experiment(), results())).toBe(false);
 	});
 

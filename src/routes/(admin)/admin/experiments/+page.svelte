@@ -231,7 +231,7 @@
 						<tr>
 							<th scope="col">Experiment</th>
 							<th scope="col">Status</th>
-							<th scope="col">Needs per variant</th>
+							<th scope="col">Exposures needed</th>
 							<th scope="col">Created</th>
 							<th scope="col"><span class="sr-only">Actions</span></th>
 						</tr>
@@ -251,7 +251,7 @@
 									<Badge tone={statusTone(e.status)} dot>{STATUS_LABELS[e.status]}</Badge>
 								</td>
 								<td data-cell="nowrap" class="text-xs text-faint">
-									{e.min_sample_size} exposures
+									{e.min_sample_size} across all variants
 								</td>
 								<td data-cell="nowrap" class="text-xs text-faint">
 									{formatDateTime(e.created_at)}
@@ -350,8 +350,8 @@
 			<Input
 				id="exp-min-sample"
 				name="min_sample_size"
-				label="Minimum exposures per variant"
-				hint="Below this the result is not believable, whatever the p-value says."
+				label="Minimum exposures"
+				hint="Counted across all variants together. Below this no result counts as significant, whatever the p-value says."
 				bind:value={minSample}
 			/>
 			<!-- Toggle renders a button, which submits nothing, and the action

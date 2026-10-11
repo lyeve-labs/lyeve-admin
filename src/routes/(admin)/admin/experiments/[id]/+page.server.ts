@@ -55,7 +55,7 @@ export const load: PageServerLoad = async (event) => {
 	]);
 
 	const gate: AbGate = AB_OK;
-	return { experiment, variants: variants ?? [], metrics: metrics ?? [], results, gate };
+	return { experiment, variants, metrics, results, gate };
 };
 
 export const actions: Actions = {
