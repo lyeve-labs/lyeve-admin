@@ -14,7 +14,7 @@
 import type { HttpClient } from '@lyeve-labs/client';
 import { toChannels, type AlertChannels } from './alert-channels';
 import { GATE_OK, gateOf, type Gate } from './gate';
-import type { ListEnvelope } from './list';
+import { rowsOf, statedTotal, type ListEnvelope } from './list';
 
 export const BASE_URL = '/api/admin/error-tracking';
 export const ALERTS_URL = `${BASE_URL}/alerts`;
@@ -138,11 +138,10 @@ export interface AlertSettingsInput {
 	spike_z_score: number | null;
 }
 
+/** One page of alerts. `total` is null when the plugin states no count. */
 export interface AlertPage {
-	alerts?: ErrorAlert[] | null;
-	total?: number;
-	limit?: number;
-	offset?: number;
+	alerts: ErrorAlert[];
+	total: number | null;
 }
 
 export type ErrorGate = Gate;
@@ -162,7 +161,8 @@ export async function listAlerts(
 ): Promise<AlertPage> {
 	const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
 	if (status) q.set('status', status);
-	return client.get<AlertPage>(`${ALERTS_URL}?${q}`);
+	const res = await client.get<ListEnvelope<ErrorAlert>>(`${ALERTS_URL}?${q}`);
+	return { alerts: rowsOf(res), total: statedTotal(res) };
 }
 
 export async function triage(client: HttpClient, id: string, action: TriageAction): Promise<void> {

@@ -42,22 +42,58 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('the errors load', () => {
 	it('asks the plugin for the status the address names', async () => {
-		route({ '/alerts': { alerts: [], total: 0 }, '/codes': { data: [] }, '/events': { data: [], total_count: 0, hidden_older: 0 } });
+		route({ '/alerts': { data: [], limit: 50, offset: 0, total_count: 0 }, '/codes': { data: [] }, '/events': { data: [], total_count: 0, hidden_older: 0 } });
 		const out = (await load(loadEvent('?status=resolved'))) as Loaded;
 		expect(engine.get.mock.calls.find(([u]) => String(u).includes('/alerts'))?.[0]).toContain('status=resolved');
 		expect(out.status).toBe('resolved');
 	});
 
 	it('ignores a status the plugin does not know', async () => {
-		route({ '/alerts': { alerts: [], total: 0 }, '/codes': { data: [] }, '/events': { data: [] } });
+		route({ '/alerts': { data: [], limit: 50, offset: 0, total_count: 0 }, '/codes': { data: [] }, '/events': { data: [] } });
 		const out = (await load(loadEvent('?status=closed'))) as Loaded;
 		expect(engine.get.mock.calls.find(([u]) => String(u).includes('/alerts'))?.[0]).not.toContain('status=');
 		expect(out.status).toBe('');
 	});
 
+	// The plugin answers the paged envelope every admin list answers. Reading
+	// other names found no rows and no count, and the page said nothing had
+	// failed while the plugin held open alerts.
+	it('lists the alerts and the count the plugin sends', async () => {
+		const sample = {
+			id: 'a1',
+			fingerprint: 'fp1',
+			error_code_id: 'c1',
+			source_file: '/app/pay/gateway.go',
+			source_line: 42,
+			message_sample: 'Gateway timed out',
+			error_count: 3,
+			first_seen: '2026-10-11T18:36:19Z',
+			last_seen: '2026-10-11T18:36:19Z',
+			acknowledged: false,
+			acknowledged_by: '',
+			created_at: '2026-10-11T18:36:19Z',
+			status: 'open',
+		};
+		route({
+			'/alerts': { data: [sample, { ...sample, id: 'a2' }], limit: 2, offset: 0, total_count: 3 },
+			'/codes': { data: [] },
+			'/events': { data: [] },
+		});
+		const out = (await load(loadEvent('?limit=2'))) as Loaded;
+		expect(out.alerts.map((a: { id: string }) => a.id)).toEqual(['a1', 'a2']);
+		expect(out.total).toBe(3);
+	});
+
+	it('states no count when the plugin sends none', async () => {
+		route({ '/alerts': { data: [] }, '/codes': { data: [] }, '/events': { data: [] } });
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.alerts).toEqual([]);
+		expect(out.total).toBeNull();
+	});
+
 	it('carries the count of older events the plugin left out', async () => {
 		route({
-			'/alerts': { alerts: [], total: 0 },
+			'/alerts': { data: [], limit: 50, offset: 0, total_count: 0 },
 			'/codes': { data: [] },
 			'/events': { data: [{ id: 'e1', ts: '2026-10-01T00:00:00Z', endpoint: '/x', http_status: 500, message: 'boom' }], total_count: 1, hidden_older: 42, window_days: 30 },
 		});
@@ -67,7 +103,7 @@ describe('the errors load', () => {
 	});
 
 	it('says the events could not be read rather than that there are none', async () => {
-		route({ '/alerts': { alerts: [], total: 0 }, '/codes': { data: [] }, '/events': new ApiError(503, 'down', {}) });
+		route({ '/alerts': { data: [], limit: 50, offset: 0, total_count: 0 }, '/codes': { data: [] }, '/events': new ApiError(503, 'down', {}) });
 		const out = (await load(loadEvent())) as Loaded;
 		expect(out.events).toBeNull();
 		expect(out.gate.state).toBe('ok');
