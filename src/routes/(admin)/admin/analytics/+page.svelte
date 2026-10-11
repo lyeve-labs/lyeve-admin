@@ -27,9 +27,11 @@
 	const agents = $derived(data.agents.items ?? []);
 	const anomalies = $derived(data.anomalies.anomalies ?? []);
 
-	// Largest method request_count, which scales the bar rows.
-	const maxMethodCount = $derived(
-		methods.reduce((m: number, it: BreakdownItem) => Math.max(m, it.request_count), 0)
+	// Every request the methods account for, which scales the bar rows. Each
+	// bar then states its method's share of all requests. Scaled to the
+	// busiest method instead, that method always read 100%.
+	const methodTotal = $derived(
+		methods.reduce((sum: number, it: BreakdownItem) => sum + it.request_count, 0)
 	);
 
 	function fmtInt(n: number): string {
@@ -132,7 +134,7 @@
 
 <PageShell
 	title="API analytics"
-	description="Request volume, latency and error rate across the public API over the last 24 hours."
+	description="Request volume, latency and error rate across the Content API and the Admin API over the last 24 hours."
 	width="wide"
 >
 	<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
@@ -225,7 +227,7 @@
 			<EmptyState
 				iconSnippet={noEndpoints}
 				title="No endpoint data yet"
-				description="Traffic to the public API shows up here once requests have been recorded."
+				description="Requests to either API show up here once the engine has recorded some."
 			/>
 		{:else}
 			<Table label="Top endpoints">
@@ -280,7 +282,7 @@
 							<Progress
 								label={`${item.key || NO_VALUE} (${fmtInt(item.request_count)})`}
 								value={item.request_count}
-								max={maxMethodCount}
+								max={methodTotal}
 								showValue
 							/>
 						{/each}
