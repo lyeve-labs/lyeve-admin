@@ -20,21 +20,20 @@ export const DEVICES_URL = '/api/admin/devices';
 export const TRUST_URL = '/api/admin/devices/trust';
 
 /**
- * One remembered device.
+ * One remembered device, as the list route sends it.
  *
- * The fingerprint hash and the tenant are deliberately absent: the engine
- * never serializes either. What identifies a device to its owner is the label
- * they gave it, the browser it was, and when it was last seen.
+ * The fingerprint hash, the address and the tenant are deliberately absent:
+ * the engine never serializes them. What identifies a device to its owner is
+ * the label they gave it, the browser it was, and when it was last seen.
+ *
+ * The user agent is optional because an engine whose device plugin predates
+ * it sends none, and that says nothing about which browser the device was.
  */
 export interface Device {
 	id: string;
 	user_id: string;
 	label: string;
-	trusted: boolean;
-	user_agent: string;
-	ip: string;
-	tls_fingerprint?: string;
-	header_hash?: string;
+	user_agent?: string;
 	last_seen_at: string;
 	created_at: string;
 }
@@ -75,7 +74,7 @@ export async function untrustDevice(client: HttpClient, id: string): Promise<voi
  * shown as itself rather than as "Unknown", which would make two different
  * devices look like the same one.
  */
-export function deviceName(userAgent: string): string {
+export function deviceName(userAgent: string | undefined): string {
 	const ua = userAgent ?? '';
 	if (!ua.trim()) return 'Unrecognized device';
 

@@ -153,9 +153,11 @@
 											<Badge tone="brand">Looks like this one</Badge>
 										{/if}
 									</div>
-									<div class="text-xs text-faint" title={d.user_agent}>
-										{deviceName(d.user_agent)}
-									</div>
+									{#if d.user_agent}
+										<div class="text-xs text-faint" title={d.user_agent}>
+											{deviceName(d.user_agent)}
+										</div>
+									{/if}
 								</td>
 								<td data-cell="nowrap" class="text-xs text-faint">
 									{formatDateTime(d.last_seen_at)}

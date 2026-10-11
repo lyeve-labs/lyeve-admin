@@ -23,9 +23,7 @@ function device(over: Partial<Device> = {}): Device {
 		id: 'd1',
 		user_id: 'u1',
 		label: 'Work laptop',
-		trusted: true,
 		user_agent: CHROME_MAC,
-		ip: '203.0.113.4',
 		last_seen_at: '2026-09-22T10:00:00Z',
 		created_at: '2026-09-01T10:00:00Z',
 		...over,
@@ -90,6 +88,26 @@ describe('this browser', () => {
 	it('marks nothing when the request carried no user agent', () => {
 		const { container } = render(DevicesPage, { props: props({ userAgent: null }) });
 		expect(said(container)).not.toContain('Looks like this one');
+	});
+});
+
+describe('the rows', () => {
+	it('names the browser each device was trusted from', () => {
+		const { container } = render(DevicesPage, {
+			props: props({ devices: [device(), device({ id: 'd2', label: 'Edge box', user_agent: EDGE_WIN })] }),
+		});
+		expect(said(container)).toContain('Chrome on macOS');
+		expect(said(container)).toContain('Edge on Windows');
+		expect(said(container)).not.toContain('Unrecognized device');
+	});
+
+	// An engine whose device plugin predates the field sends no user agent.
+	// That says nothing about the device, so the row shows its name alone.
+	it('shows the name alone when the engine sends no user agent', () => {
+		const { user_agent: _omitted, ...withoutAgent } = device();
+		const { container } = render(DevicesPage, { props: props({ devices: [withoutAgent] }) });
+		expect(said(container)).toContain('Work laptop');
+		expect(said(container)).not.toContain('Unrecognized device');
 	});
 });
 
