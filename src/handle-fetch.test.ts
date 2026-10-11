@@ -16,7 +16,7 @@ import {
 	consoleSignature
 } from '$lib/server/engine';
 
-async function call(url: string, headers: Record<string, string> = {}): Promise<Request> {
+async function call(url: string, headers: Record<string, string> = {}, browser?: string): Promise<Request> {
 	const sent: Request[] = [];
 	const fetch = vi.fn(async (req: Request) => {
 		sent.push(req);
@@ -24,7 +24,10 @@ async function call(url: string, headers: Record<string, string> = {}): Promise<
 	});
 	const event = {
 		url: new URL('https://admin.example.com/admin/users'),
-		getClientAddress: () => '203.0.113.9'
+		getClientAddress: () => '203.0.113.9',
+		request: new Request('https://admin.example.com/admin/users', {
+			headers: browser ? { 'User-Agent': browser } : {}
+		})
 	};
 	await handleFetch({
 		request: new Request(url, { headers }),
@@ -54,6 +57,12 @@ describe('handleFetch', () => {
 		});
 		expect(req.headers.get(CONSOLE_CLIENT_HEADER)).toBe('203.0.113.9');
 		expect(req.headers.get(CONSOLE_SIGNATURE_HEADER)).not.toBe('forged');
+	});
+
+	it('names the browser to the engine, not this server', async () => {
+		const browser = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 Safari/605.1.15';
+		const req = await call('https://admin.example.com/api/admin/devices', {}, browser);
+		expect(req.headers.get('user-agent')).toBe(browser);
 	});
 
 	it('leaves a call to another origin alone', async () => {

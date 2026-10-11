@@ -96,6 +96,11 @@ export const handleFetch: HandleFetch = async ({ request, fetch, event }) => {
 	const target = ENGINE_URL ? new URL(parsed.pathname + parsed.search, ENGINE_URL) : parsed;
 	const outbound = new Request(target, request);
 	signEngineRequest(outbound.headers, outbound.method, target, callerOf(event));
+	// The engine reads the browser from User-Agent: a sign-in's device and
+	// risk score, a trusted device's name, the audit trail. Sent from here,
+	// it would read this server's runtime for every person.
+	const browser = event.request?.headers.get('user-agent');
+	if (browser) outbound.headers.set('user-agent', browser);
 	const response = await fetch(outbound);
 	// A rewritten call leaves this app, so SvelteKit does not pass the
 	// engine's cookies on to the browser. The CSRF pair has to arrive anyway.
