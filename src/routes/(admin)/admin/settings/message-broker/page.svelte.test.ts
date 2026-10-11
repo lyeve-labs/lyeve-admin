@@ -156,3 +156,19 @@ describe('the connection', () => {
 		expect(said(container)).toContain('Nothing has been published');
 	});
 });
+
+describe('where the broker is set', () => {
+	it('names EVENT_BUS alone in one sentence when no broker is set', () => {
+		const { container } = render(BrokerPage, props({ status: status({ backend: '' }) }));
+		const text = said(container);
+		expect(text).toContain('through EVENT_BUS. Set it as an environment variable');
+		expect(text).not.toContain('EVENT_BUS .');
+	});
+
+	it('names every setting the backend reads', () => {
+		const { container } = render(BrokerPage, props({ status: status({ backend: 'rabbitmq' }) }));
+		expect(said(container)).toContain(
+			'through EVENT_BUS and RABBITMQ_URL, RABBITMQ_TLS, RABBITMQ_TLS_CA_FILE. Set them as environment variables'
+		);
+	});
+});

@@ -238,10 +238,15 @@
 					discarded and no flow can hear a message. Set it to nats, kafka or rabbitmq.
 				</Alert>
 			{/if}
+			<!-- One run of text per sentence end: a line break inside the markup
+			     before a period renders as a space in front of it. -->
 			<p class="text-xs text-muted">
-				The broker is configured by the deployment, through <span class="font-mono">EVENT_BUS</span>
-				{#if backendSettings.length}and {backendSettings.join(', ')}{/if}. Set them as
-				environment variables or in the configuration file, and see what each does on
+				The broker is configured by the deployment, through <span class="font-mono">EVENT_BUS</span
+				>{#if backendSettings.length}{' '}and {backendSettings.join(', ')}{/if}.
+				{backendSettings.length
+					? 'Set them as environment variables or in the configuration file'
+					: 'Set it as an environment variable or in the configuration file'}, and see what each
+				setting does on
 				<a href="/admin/settings/configuration" class="text-brand hover:underline">Configuration</a>. TLS is on
 				by default and a broker's certificate is always verified.
 			</p>
