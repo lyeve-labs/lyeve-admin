@@ -33,6 +33,7 @@ import {
 	type StageSLA,
 } from '$lib/api/review';
 import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
+import { listPeople, type Person } from '$lib/server/people';
 
 /**
  * Entries live in the admin store (sys_content_entries) and are served by the
@@ -185,6 +186,8 @@ export type EntryReview = {
 	/** Approvals the current stage needs before it moves, 1 for a single approval. */
 	approvalsNeeded: number;
 	userId: string;
+	/** The accounts a review can be handed to. Empty for a caller who may not list them. */
+	people: Person[];
 	unavailable: boolean;
 	forbidden: boolean;
 };
@@ -195,6 +198,7 @@ const REVIEW_NONE = (userId: string): EntryReview => ({
 	definitions: [],
 	approvalsNeeded: 1,
 	userId,
+	people: [],
 	unavailable: false,
 	forbidden: false,
 });
@@ -247,12 +251,12 @@ export type EntryComments = {
 	unavailable: boolean;
 };
 
-async function loadComments(client: ReturnType<typeof createClient>, entryId: string): Promise<EntryComments | null> {
+async function loadComments(
+	client: ReturnType<typeof createClient>,
+	entryId: string,
+	people: Promise<Person[]>,
+): Promise<EntryComments | null> {
 	// Accounts to mention. A caller who may not list them comments without mentions.
-	const people = client
-		.get<{ id: string; email: string }[] | { data?: { id: string; email: string }[] }>('/api/admin/users?limit=200&offset=0')
-		.then((r) => (Array.isArray(r) ? r : (r?.data ?? [])).map((u) => ({ id: u.id, email: u.email })))
-		.catch(() => [] as { id: string; email: string }[]);
 	try {
 		const threads = await listComments(client, entryId, 'all');
 		return { threads, people: await people, unavailable: false };
@@ -296,14 +300,18 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, parent, url
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 	const { plugins, user } = await parent();
+	// One read of the directory serves the mention list and the review picker.
+	const people = listPeople(client);
 
 	const [schemaDef, item, revisionList, localization, review, comments, releases] = await Promise.all([
 		getSchema(params.schema, client).catch(() => null),
 		getEntry(fetch, token, params.id),
 		listRevisions(fetch, token, params.id),
 		loadLocalization(client, params.id, runs(plugins, PLUGIN.localization)),
-		loadReview(client, params.id, runs(plugins, PLUGIN.review), user),
-		loadComments(client, params.id).catch(() => null),
+		loadReview(client, params.id, runs(plugins, PLUGIN.review), user).then(async (r) =>
+			r ? { ...r, people: await people } : null,
+		),
+		loadComments(client, params.id, people).catch(() => null),
 		loadReleases(client, params.id).catch(() => null),
 	]);
 
@@ -536,8 +544,11 @@ export const actions: Actions = {
 		if (!definitionId || !assigneeId) {
 			return fail(400, { error: 'Pick a definition and an assignee.', review: true, reviewStatus: 400 });
 		}
-		const others = String(form.get('other_assignees') ?? '')
-			.split(/[\n,]/)
+		// The picker posts one field per account and the typed fallback one
+		// field of ids, by line or by comma. Both read the same way.
+		const others = form
+			.getAll('other_assignees')
+			.flatMap((v) => String(v).split(/[\n,]/))
 			.map((s) => s.trim())
 			.filter((s) => s && s !== assigneeId);
 		const assigneeIds = [assigneeId, ...new Set(others)];

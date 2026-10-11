@@ -218,6 +218,7 @@
 						definitions={data.review.definitions}
 						approvalsNeeded={data.review.approvalsNeeded}
 						userId={data.review.userId}
+						people={data.review.people}
 						unavailable={data.review.unavailable}
 						forbidden={data.review.forbidden}
 						error={reviewError?.message}
