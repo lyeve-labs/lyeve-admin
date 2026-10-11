@@ -80,14 +80,30 @@
 	// The add-entry drawer.
 	let addOpen = $state(false);
 	let entryId = $state('');
+	let picked = $state<string | null>(null);
 	let itemAction = $state('publish');
 	const add = submitter(() => (addOpen = false));
 	const ACTIONS = [
 		{ value: 'publish', label: 'Publish it' },
 		{ value: 'unpublish', label: 'Unpublish it' },
 	];
+	// The entries the release can take, grouped by collection. A group is a
+	// run of neighboring rows, so the rows are ordered by collection, and the
+	// sort is stable, so each group keeps the newest first.
+	const entryOptions = $derived(
+		[...(data.choices ?? [])]
+			.sort((a, b) => a.schema.localeCompare(b.schema))
+			.map((c) => ({
+				value: c.id,
+				label: c.title || c.slug || shortId(c.id),
+				group: c.schema || undefined,
+				keywords: [c.id, c.slug].filter(Boolean),
+			})),
+	);
+
 	function openAdd() {
 		entryId = '';
+		picked = null;
 		itemAction = 'publish';
 		addOpen = true;
 	}
@@ -237,7 +253,7 @@
 				{#if (release.items ?? []).length === 0}
 					<EmptyState
 						title="No entries yet"
-						description="Add an entry here by its ID, or from the entry's own page."
+						description="Add an entry here, or from the entry's own page."
 					>
 						{#snippet iconSnippet()}<FileText size={ICON.lg} />{/snippet}
 					</EmptyState>
@@ -299,18 +315,34 @@
 	{/snippet}
 </Drawer>
 
-<Drawer bind:open={addOpen} title="Add an entry">
+<Drawer bind:open={addOpen} title="Include an entry">
 	<form method="POST" action="?/addItem" id="release-add" use:enhance={add.enhance} class="flex flex-col gap-4">
 		<FormErrors message={formError} fields={errors} {refused} />
-		<Input
-			id="release-entry"
-			name="entry_id"
-			label="Entry ID"
-			required
-			bind:value={entryId}
-			error={errors.entry_id}
-			hint="The ID shown under an entry's title on its page."
-		/>
+		{#if data.choices}
+			<Select
+				id="release-entry"
+				name="entry_id"
+				label="Entry"
+				placeholder="Pick an entry"
+				options={entryOptions}
+				searchable
+				required
+				bind:value={picked}
+				error={errors.entry_id}
+				hint="The most recently changed entries, by collection. Add an older one from its own page."
+			/>
+		{:else}
+			<!-- The entry list could not be read, so the drawer takes an id. -->
+			<Input
+				id="release-entry"
+				name="entry_id"
+				label="Entry ID"
+				required
+				bind:value={entryId}
+				error={errors.entry_id}
+				hint="The ID shown under an entry's title on its page."
+			/>
+		{/if}
 		<Select
 			id="release-action"
 			name="action"
@@ -322,7 +354,7 @@
 	</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (addOpen = false)}>Cancel</Button>
-		<Button variant="primary" type="submit" form="release-add" disabled={!entryId.trim()} loading={add.pending}>Create</Button>
+		<Button variant="primary" type="submit" form="release-add" disabled={!(data.choices ? picked : entryId.trim())} loading={add.pending}>Include</Button>
 	{/snippet}
 </Drawer>
 

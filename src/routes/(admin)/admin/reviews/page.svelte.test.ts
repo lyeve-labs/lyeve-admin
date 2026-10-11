@@ -57,6 +57,8 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 		assignmentsForbidden: false,
 		unavailable: false,
 		schemas: ['article'],
+		entries: {},
+		people: {},
 		...overrides,
 	} as unknown as PageData;
 }
@@ -83,6 +85,38 @@ describe('reviews page', () => {
 		expect(row.textContent).toContain('Overdue');
 		const link = row.querySelector('a') as HTMLAnchorElement;
 		expect(link.getAttribute('href')).toBe('/admin/content/article/e1e1e1e1-0000-0000-0000-000000000000');
+	});
+
+	it('names the entry by its title and the assignee by their email', () => {
+		render(ReviewsPage, {
+			props: {
+				data: data({
+					entries: { [assignment.entry_id]: 'Spring launch notes' },
+					people: { [assignment.assignee_id]: 'mira.costa@example.com' },
+				}),
+				form: null,
+			},
+		});
+		const row = screen.getByTestId('assignment-row');
+		expect((row.querySelector('a') as HTMLAnchorElement).textContent).toBe('Spring launch notes');
+		expect(row.textContent).toContain('mira.costa@example.com');
+		expect(row.textContent).not.toContain('e1e1e1e1');
+		expect(row.textContent).not.toContain('22222222');
+	});
+
+	it('falls back to the short ids when the page could not read the names', () => {
+		render(ReviewsPage, { props: { data: data(), form: null } });
+		const row = screen.getByTestId('assignment-row');
+		expect(row.textContent).toContain('e1e1e1e1');
+		expect(row.textContent).toContain('22222222');
+	});
+
+	it('counts the assignments in the pager, not the definitions', () => {
+		const second = { ...assignment, id: 'a2' };
+		render(ReviewsPage, { props: { data: data({ assignments: [assignment, second], total: 2 }), form: null } });
+		const section = screen.getByRole('region', { name: 'Assignments' });
+		expect(section.textContent).toContain('assignments 1 to 2 of 2');
+		expect(section.textContent).not.toContain('definitions 1');
 	});
 
 	it('shows the approvals a quorum stage holds and the other assignees', () => {

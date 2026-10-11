@@ -37,8 +37,14 @@
 	const changed = $derived(!stored || stored.x !== point.x || stored.y !== point.y);
 	const save = submitter();
 
+	// The point is a share of the picture, so a click is measured against the
+	// image and not against the frame around it. The frame is wider than a
+	// portrait image, and measuring the frame put a click a tenth of the way
+	// across the picture at a third.
+	let image = $state<HTMLImageElement>();
+
 	function place(e: MouseEvent) {
-		const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const box = (image ?? (e.currentTarget as HTMLElement)).getBoundingClientRect();
 		if (box.width === 0 || box.height === 0) return;
 		point = focalAt((e.clientX - box.left) / box.width, (e.clientY - box.top) / box.height);
 	}
@@ -68,17 +74,21 @@
 	{/if}
 	<button
 		type="button"
-		class="relative block w-full overflow-hidden rounded-lg bg-surface-2/50 outline-none focus-visible:ring-2 focus-visible:ring-brand"
+		class="flex w-full justify-center overflow-hidden rounded-lg bg-surface-2/50 outline-none focus-visible:ring-2 focus-visible:ring-brand"
 		aria-label={placeLabel}
 		onclick={place}
 		onkeydown={nudge}
 	>
-		<img {src} {alt} class="block max-h-72 w-full object-contain" draggable="false" />
-		<span
-			aria-hidden="true"
-			class="pointer-events-none absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fg bg-brand/60 shadow"
-			style="left: {point.x * 100}%; top: {point.y * 100}%"
-		></span>
+		<!-- Sized by the image, so the marker's percentages are the image's. -->
+		<span class="relative inline-block max-w-full">
+			<img bind:this={image} {src} {alt} class="block max-h-72 max-w-full" draggable="false" />
+			<span
+				aria-hidden="true"
+				class="pointer-events-none absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fg bg-brand/60 shadow"
+				style="left: {point.x * 100}%; top: {point.y * 100}%"
+				data-testid="focal-marker"
+			></span>
+		</span>
 	</button>
 	<div class="flex flex-wrap items-center gap-2">
 		<form method="POST" action="?/focal" use:enhance={save.enhance} class="contents">

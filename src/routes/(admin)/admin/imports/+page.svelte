@@ -445,7 +445,10 @@
 								<td data-cell="nowrap">
 									<span class="font-mono text-xs">{formatCount(j.errored_rows)}</span>
 									{#if rejectionRate(j) !== null && j.errored_rows > 0}
-										<div class="text-xs text-faint">{rejectionRate(j)}% of rows read</div>
+										<div class="text-xs text-faint">
+											{rejectionRate(j)}% of the {formatCount(j.processed_rows)}
+											{j.processed_rows === 1 ? 'row' : 'rows'} read
+										</div>
 									{/if}
 								</td>
 								<td data-cell="nowrap">

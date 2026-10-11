@@ -78,6 +78,17 @@
 		return byDefinition.get(definitionId)?.definition.name ?? shortId(definitionId);
 	}
 
+	/** The entry's title, or its short id when the page could not read one. */
+	function entryName(entryId: string): string {
+		return data.entries[entryId] ?? shortId(entryId);
+	}
+
+	/** The account's email, or its short id when the page could not read one. */
+	function personName(userId: string): string {
+		if (!userId || /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(userId)) return 'Nobody';
+		return data.people[userId] ?? shortId(userId);
+	}
+
 	function entryHref(definitionId: string, entryId: string): string | null {
 		const schema = byDefinition.get(definitionId)?.definition.content_schema;
 		return schema ? `/admin/content/${encodeURIComponent(schema)}/${encodeURIComponent(entryId)}` : null;
@@ -127,7 +138,7 @@
 		const notes: string[] = [];
 		if (approvalsNeeded(stage) > 1) notes.push(`${approvalsNeeded(stage)} approvals`);
 		if (stage.escalate_to_role) notes.push(`escalates to ${stage.escalate_to_role}`);
-		else if (stage.escalate_to_user_id) notes.push(`escalates to ${shortId(stage.escalate_to_user_id)}`);
+		else if (stage.escalate_to_user_id) notes.push(`escalates to ${personName(stage.escalate_to_user_id)}`);
 		if (stage.condition) notes.push(`when ${conditionText(stage.condition)}`);
 		return notes;
 	}
@@ -378,11 +389,11 @@
 							{@const href = entryHref(a.definition_id, a.entry_id)}
 							{@const late = overdue(a)}
 							<tr data-testid="assignment-row" data-status={a.status}>
-								<td data-cell="nowrap" class="font-mono text-xs">
+								<td data-cell="nowrap" class={a.entry_id in data.entries ? '' : 'font-mono text-xs'}>
 									{#if href}
-										<a {href} class="text-brand underline-offset-2 hover:underline">{shortId(a.entry_id)}</a>
+										<a {href} class="text-brand underline-offset-2 hover:underline">{entryName(a.entry_id)}</a>
 									{:else}
-										{shortId(a.entry_id)}
+										{entryName(a.entry_id)}
 									{/if}
 								</td>
 								<td data-cell="nowrap">{definitionName(a.definition_id)}</td>
@@ -397,8 +408,8 @@
 								<td data-cell="nowrap">
 									<Badge tone={STATUS_TONE[a.status]} dot>{STATUS_LABEL[a.status]}</Badge>
 								</td>
-								<td data-cell="nowrap" class="font-mono text-xs">
-									{shortId(a.assignee_id)}
+								<td data-cell="nowrap" class={a.assignee_id in data.people ? '' : 'font-mono text-xs'}>
+									{personName(a.assignee_id)}
 									{#if a.assignee_ids.length > 1}
 										<span class="font-sans text-muted">and {a.assignee_ids.length - 1} more</span>
 									{/if}
@@ -416,9 +427,9 @@
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
-					count={data.definitions.length}
+					count={data.assignments.length}
 					total={data.total}
-					noun="definitions"
+					noun="assignments"
 					href={(page) => pageHref(pageOffset(page, data.limit))}
 				/>
 			{/if}

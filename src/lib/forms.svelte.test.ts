@@ -59,7 +59,13 @@ describe('submitter', () => {
 	it('applies the result, so the page is not left showing what it submitted', async () => {
 		const s = submitter();
 		const o = await run(s.enhance);
-		expect(o.update).toHaveBeenCalled();
+		expect(o.update).toHaveBeenCalledWith({ reset: true });
+	});
+
+	it('keeps the fields of a form whose answer is built from them', async () => {
+		const s = submitter(undefined, { reset: false });
+		const o = await run(s.enhance);
+		expect(o.update).toHaveBeenCalledWith({ reset: false });
 	});
 });
 

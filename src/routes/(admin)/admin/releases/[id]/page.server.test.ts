@@ -38,6 +38,37 @@ describe('release load', () => {
 		expect(out.conflictsRead).toBe(true);
 	});
 
+	it('offers the entries the release does not hold yet', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.endsWith('/conflicts')) return { data: [] };
+			if (url.startsWith('/api/admin/content?')) {
+				return {
+					data: [
+						{ id: 'e1', title: 'Hello', slug: 'hello', schema: 'posts' },
+						{ id: 'e2', title: 'Pricing', slug: 'pricing', schema: 'pages', body: { text: 'x' } },
+					],
+					total_count: 2,
+				};
+			}
+			if (url === '/api/admin/content/e1') return { title: 'Hello', schema: 'posts', status: 'draft' };
+			return release;
+		});
+		const out = (await load(event())) as Record<string, unknown>;
+		expect(out.choices).toEqual([{ id: 'e2', title: 'Pricing', slug: 'pricing', schema: 'pages' }]);
+		expect(engine.get).toHaveBeenCalledWith('/api/admin/content?limit=200&offset=0');
+	});
+
+	it('offers no entries to a release that went out', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.endsWith('/conflicts')) return { data: [] };
+			if (url.startsWith('/api/admin/content/')) return { title: 'Hello', schema: 'posts', status: 'published' };
+			return { ...release, status: 'published' };
+		});
+		const out = (await load(event())) as Record<string, unknown>;
+		expect(out.choices).toBeNull();
+		expect(engine.get.mock.calls.some(([url]) => String(url).startsWith('/api/admin/content?'))).toBe(false);
+	});
+
 	it('answers 404 for a release that is not there', async () => {
 		engine.get.mockRejectedValue(new ApiError(404, 'release not found'));
 		await expect(load(event())).rejects.toMatchObject({ status: 404 });

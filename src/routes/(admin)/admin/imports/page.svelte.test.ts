@@ -77,6 +77,15 @@ describe('Imports', () => {
 		expect(said(partial.container)).toContain('Finished with rows rejected');
 	});
 
+	it('states the rejected share against the rows it was read from', () => {
+		const { container } = render(ImportsPage, {
+			props: props({
+				jobs: [job({ status: 'completed_with_errors', total_rows: 4, processed_rows: 4, errored_rows: 1, inserted_rows: 3 })],
+			}),
+		});
+		expect(said(container)).toContain('25% of the 4 rows read');
+	});
+
 	it('follows a running import with its row count', () => {
 		const { container } = render(ImportsPage, {
 			props: props({ jobs: [job({ status: 'running', processed_rows: 400, total_rows: 1000 })] }),

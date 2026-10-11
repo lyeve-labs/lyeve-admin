@@ -15,7 +15,12 @@ import { sessionToken } from '$lib/server/session-cookie';
 /** Every schema write the engine serves takes one of these. */
 const WRITERS = ['admin', 'super_admin'];
 
-export type DryRunStatement = { description: string; sql: string; down_sql?: string };
+/**
+ * One statement a save would run. `destructive` marks one the save queues
+ * instead of running, because it drops data: it waits in History until a
+ * super admin applies it.
+ */
+export type DryRunStatement = { description: string; sql: string; down_sql?: string; destructive?: boolean };
 
 /** One statement the engine recorded for a table, as GET .../history answers it. */
 export type HistoryEntry = {
