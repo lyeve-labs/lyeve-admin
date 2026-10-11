@@ -338,15 +338,14 @@ export function pValue(p: number | null | undefined): string {
 /**
  * Whether an experiment has collected enough exposures to be believed.
  *
- * The threshold is the experiment's own minimum sample size, and it is per
- * variant rather than in total: the whole point of the number is that each arm
- * has been seen enough times.
+ * The threshold is the experiment's own minimum sample size, counted across
+ * all variants together. That is how the plugin reads it before it calls a
+ * result significant, so the page warns on the same count rather than on a
+ * stricter rule the plugin never applies.
  */
 export function underpowered(exp: Experiment, results: ExperimentResults | null): boolean {
 	if (!results || exp.min_sample_size <= 0) return false;
-	const variants = results.variants ?? [];
-	if (variants.length === 0) return true;
-	return variants.some((v) => (v.sample_size ?? 0) < exp.min_sample_size);
+	return totalSample(results) < exp.min_sample_size;
 }
 
 /**

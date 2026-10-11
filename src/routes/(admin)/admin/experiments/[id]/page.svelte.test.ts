@@ -101,15 +101,40 @@ describe('the verdict', () => {
 		expect(text).not.toContain('Ahead');
 	});
 
-	it('warns when a variant is below the minimum the experiment set itself', () => {
+	it('warns while the exposures across all variants are below the minimum', () => {
 		const thin = results({
+			variants: [
+				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 40, conversions: 4, conversion_rate: 0.1 },
+				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 9, conversions: 4, conversion_rate: 0.44 },
+			],
+		});
+		const { container } = render(DetailPage, { props: props({ results: thin }) });
+		const text = said(container);
+		expect(text).toContain('So far the experiment has 49 exposures across all variants, fewer than the 100 it needs.');
+		expect(text).toContain('no result counts as significant');
+	});
+
+	it('counts a single exposure in the singular', () => {
+		const one = results({
+			variants: [
+				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 0, conversions: 0, conversion_rate: 0 },
+				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 1, conversions: 1, conversion_rate: 1 },
+			],
+		});
+		const { container } = render(DetailPage, { props: props({ results: one }) });
+		expect(said(container)).toContain('So far the experiment has 1 exposure across all variants');
+	});
+
+	// The minimum is a total, so a lopsided split past it is not short of it.
+	it('does not warn once the total reaches the minimum, however it is split', () => {
+		const lopsided = results({
 			variants: [
 				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 500, conversions: 50, conversion_rate: 0.1 },
 				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 9, conversions: 4, conversion_rate: 0.44 },
 			],
 		});
-		const { container } = render(DetailPage, { props: props({ results: thin }) });
-		expect(said(container)).toContain('not yet worth acting on');
+		const { container } = render(DetailPage, { props: props({ results: lopsided }) });
+		expect(said(container)).not.toContain('fewer than');
 	});
 });
 

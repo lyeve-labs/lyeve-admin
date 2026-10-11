@@ -46,6 +46,7 @@
 	const exp = $derived(data.experiment);
 	const soundSplit = $derived(splitIsSound(data.variants));
 	const thin = $derived(underpowered(exp, data.results));
+	const exposures = $derived(totalSample(data.results));
 
 	let addingVariant = $state(false);
 	let variantName = $state('');
@@ -162,9 +163,10 @@
 
 		{#if thin}
 			<Alert tone="warn">
-				At least one variant has fewer than {exp.min_sample_size} exposures, which is the minimum
-				this experiment set for itself. Whatever the p-value says, the result is not yet worth
-				acting on.
+				So far the experiment has {exposures}
+				{exposures === 1 ? 'exposure' : 'exposures'} across all variants, fewer than the
+				{exp.min_sample_size} it needs. Until then no result counts as significant, whatever the
+				p-value says.
 			</Alert>
 		{/if}
 
