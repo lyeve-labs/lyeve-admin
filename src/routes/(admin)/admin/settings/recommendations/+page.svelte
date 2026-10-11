@@ -112,11 +112,16 @@
 				<SectionHeading level={3}>What recommendations do</SectionHeading>
 				<p>
 					Your application tells the engine what each reader does: views, likes, bookmarks and shares,
-					weighted 1, 2, 5 and 3. From that the plugin works out three lists: entries similar to one
-					another (read by the same people over the last 30 days), what is trending this week, and a
-					feed per reader built from what people like them read. Readers are split between the
-					recommended feed and a random baseline, so the split below shows whether recommending changes
-					what people read.
+					weighted 1, 2, 5 and 3. From that, each reader gets:
+				</p>
+				<ul class="flex list-disc flex-col gap-1 ps-5">
+					<li>More like the entry they are on: entries the same people read over the last 30 days.</li>
+					<li>What is trending: the entries with the most activity this week.</li>
+					<li>A feed of their own: what readers who liked the same entries read next.</li>
+				</ul>
+				<p>
+					Readers are split between the recommended feed and a random baseline, so the split below
+					shows whether recommending changes what people read.
 				</p>
 				<p>
 					The lists are computed, not live: new behavior counts once a super admin recomputes them.

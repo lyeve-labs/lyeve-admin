@@ -180,3 +180,11 @@ describe('the per-reader preview', () => {
 	});
 });
 
+describe('what the page says recommendations do', () => {
+	it('says what a reader gets, not how the plugin works', () => {
+		const { container } = render(RecommendationsPage, { props: props() });
+		const text = said(container);
+		expect(text).toContain('each reader gets');
+		expect(text).not.toContain('the plugin works out');
+	});
+});
