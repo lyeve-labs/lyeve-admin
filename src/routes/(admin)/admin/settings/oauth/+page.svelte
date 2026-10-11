@@ -195,7 +195,7 @@
 											{provider.enabled ? 'Enabled' : 'Disabled'}
 										</Badge>
 									</div>
-									<div class="font-mono text-xs text-faint">/auth/oauth/{provider.name}</div>
+									<div class="font-mono text-xs text-faint">/api/admin/auth/oauth/{provider.name}</div>
 								</td>
 								<td class="max-w-xs truncate text-xs text-muted" title={provider.issuer_url}>
 									{provider.issuer_url}
@@ -251,7 +251,7 @@
 			required
 			bind:value={name}
 			placeholder="google"
-			hint="Lowercase slug used in the login URL. google gives /auth/oauth/google."
+			hint="Lowercase slug used in the sign-in URL. google gives /api/admin/auth/oauth/google."
 		/>
 		<Input
 			id="provider-issuer"
