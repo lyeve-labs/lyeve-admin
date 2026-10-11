@@ -131,7 +131,7 @@
 
 	// A separate origin from the instance being administered, like the
 	// support link.
-	const DOCS_URL = 'https://docs.lyeve.com/';
+	const DOCS_URL = 'https://lyeve.com/docs/';
 </script>
 
 <!-- Focus mode narrows the sidebar to the kit's icon rail and puts the header
