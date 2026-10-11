@@ -9,6 +9,7 @@ import {
 	analyzeQueries,
 	listQueryLog,
 	queryGate,
+	type AnalysisRead,
 	type Dialect,
 	type QueryGate,
 	type QueryLogEntry,
@@ -46,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
 			offset,
 			gate: { state: 'absent' } as QueryGate,
 			dialect,
-			analyzed: [] as QueryLogEntry[],
+			analysis: null as AnalysisRead | null,
 			analyzeFailed: false,
 		};
 	}
@@ -67,11 +68,11 @@ export const load: PageServerLoad = async (event) => {
 
 	// Analysis runs only when a dialect is asked for. It is EXPLAIN against a
 	// live database, which is not something to do on every page view.
-	let analyzed: QueryLogEntry[] = [];
+	let analysis: AnalysisRead | null = null;
 	let analyzeFailed = false;
 	if (dialect && gate.state === 'ok') {
 		try {
-			analyzed = await analyzeQueries(client, dialect, ANALYZE_LIMIT);
+			analysis = await analyzeQueries(client, dialect, ANALYZE_LIMIT);
 		} catch {
 			// A swallowed failure reads as "nothing to suggest", which is the
 			// opposite of what a refusal means on an instance of another dialect.
@@ -79,5 +80,5 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	return { entries, total, limit, offset, gate, dialect, analyzed, analyzeFailed };
+	return { entries, total, limit, offset, gate, dialect, analysis, analyzeFailed };
 };

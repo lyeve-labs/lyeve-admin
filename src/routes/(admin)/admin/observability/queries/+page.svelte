@@ -21,6 +21,7 @@
 		ANALYZABLE,
 		callerOf,
 		durationTone,
+		noSuggestionText,
 		oneLine,
 		type Dialect,
 		type QueryLogEntry,
@@ -68,12 +69,16 @@
 		return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 	}
 
-	/** Every suggestion the analyzer made, flattened with the query it came from. */
-	const suggestions = $derived(
-		data.analyzed.flatMap((entry) =>
-			(entry.analysis?.index_suggestions ?? []).map((s) => ({ entry, suggestion: s })),
+	/**
+	 * Every suggestion the analyzer made, flattened with the query it came
+	 * from. SQL Server's come from its own views and name no captured query.
+	 */
+	const suggestions = $derived([
+		...(data.analysis?.entries ?? []).flatMap((entry) =>
+			(entry.analysis?.index_suggestions ?? []).map((s) => ({ key: entry.id, suggestion: s })),
 		),
-	);
+		...(data.analysis?.missingIndexes ?? []).map((s) => ({ key: 'mssql', suggestion: s })),
+	]);
 
 	function analyze(dialect: Dialect | null) {
 		const url = new URL(window.location.href);
@@ -161,10 +166,8 @@
 						The analyzer could not explain these statements as {data.dialect}. An instance runs
 						one dialect, and EXPLAIN is a different grammar in each.
 					</Alert>
-				{:else if data.dialect && suggestions.length === 0}
-					<p class="text-sm text-muted">
-						Nothing to suggest. The plans the analyzer read are already using an index.
-					</p>
+				{:else if data.dialect && data.analysis && suggestions.length === 0}
+					<p class="text-sm text-muted">{noSuggestionText(data.dialect, data.analysis)}</p>
 				{:else if suggestions.length > 0}
 					<Table label="Index suggestions">
 						<thead>
@@ -176,7 +179,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each suggestions as { entry, suggestion }, i (`${entry.id}-${i}`)}
+							{#each suggestions as { key, suggestion }, i (`${key}-${i}`)}
 								<tr>
 									<td data-cell="nowrap" class="font-mono text-xs">{suggestion.table}</td>
 									<td data-cell="nowrap" class="font-mono text-xs"
