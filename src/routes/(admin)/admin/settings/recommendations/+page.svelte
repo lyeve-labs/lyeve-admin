@@ -34,8 +34,9 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	// The accounts the preview can run for, searchable by email. The field still
-	// takes a typed id, so an account past the first page is reachable.
+	// The accounts the preview can run for, searchable by email. Picking one
+	// fills the id field, which is what the form posts, so an account past the
+	// first page is reachable by pasting its id there.
 	const readerOptions = $derived(
 		(data.readers ?? []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
 	);
@@ -47,7 +48,8 @@
 	const preview = $derived(
 		(form as { previewFor?: string; feed?: FeedEntry[] } | null)?.feed ?? null,
 	);
-	const previewFor = $derived((form as { previewFor?: string } | null)?.previewFor ?? '');
+	const previewId = $derived((form as { previewFor?: string } | null)?.previewFor ?? '');
+	const previewFor = $derived((data.readers ?? []).find((r) => r.id === previewId)?.email ?? previewId);
 
 	const stats = $derived(data.stats);
 	const skewed = $derived(splitIsSkewed(stats));
@@ -219,38 +221,41 @@
 					Generates the feed for one reader now. This is the same computation the reader would
 					get, so it shows what they would actually be shown rather than a sample.
 					{#if readerOptions.length > 0}
-						Search by email, or paste an id for an account past the first page.
+						Find a reader by email to fill in their id, or paste the id of any account from the Users
+						page.
 					{:else}
 						Give the user id as it appears on the Users page.
 					{/if}
 				</p>
-				<!-- A field and its button, at the width the field needs. The
-				     guidance sits in the paragraph above rather than under the
-				     field, because a hint there would make the field taller than
-				     the button and align the button with the hint instead of the
-				     input. -->
-				<form method="POST" action="?/preview" use:enhance class="flex flex-wrap items-end gap-2">
-					<div class="w-full min-w-0 sm:w-80">
-						{#if readerOptions.length > 0}
+				<!-- The combobox posts the label it shows, an email, so it only
+				     fills the id field and the id field is what the form posts.
+				     The guidance sits in the paragraph above rather than under the
+				     id field, because a hint there would make the field taller
+				     than the button and align the button with the hint instead of
+				     the input. -->
+				<form method="POST" action="?/preview" use:enhance class="flex flex-col gap-3">
+					{#if readerOptions.length > 0}
+						<div class="w-full min-w-0 sm:w-80">
 							<Autocomplete
-								id="rec-user"
-								name="user_id"
-								label="Reader"
+								id="rec-reader"
+								label="Find a reader"
+								placeholder="Search by email"
 								options={readerOptions}
-								bind:value={userId}
+								value={userId}
+								onchange={(v) => {
+									if (v) userId = v;
+								}}
 							/>
-						{:else}
-							<Input
-								id="rec-user"
-								name="user_id"
-								label="Reader"
-								bind:value={userId}
-							/>
-						{/if}
+						</div>
+					{/if}
+					<div class="flex flex-wrap items-end gap-2">
+						<div class="w-full min-w-0 sm:w-80">
+							<Input id="rec-user" name="user_id" label="User id" bind:value={userId} />
+						</div>
+						<Button variant="secondary" type="submit">
+							<UserSearch size={ICON.sm} /> Generate
+						</Button>
 					</div>
-					<Button variant="secondary" type="submit">
-						<UserSearch size={ICON.sm} /> Generate
-					</Button>
 				</form>
 
 				{#if preview !== null}
@@ -265,7 +270,7 @@
 						</EmptyState>
 					{:else}
 						<p class="text-xs text-muted">
-							{preview.length} entries for {previewFor}.
+							{preview.length} {preview.length === 1 ? 'entry' : 'entries'} for {previewFor}.
 						</p>
 						<Table label="What one reader would see">
 							<thead>

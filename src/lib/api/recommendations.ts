@@ -64,8 +64,19 @@ export async function refreshAll(client: HttpClient): Promise<RefreshResult> {
 	return client.post<RefreshResult>(REFRESH_URL, {});
 }
 
+/** Generates one reader's feed now. The plugin answers `{entries, total}`. */
 export async function generateFeed(client: HttpClient, userId: string): Promise<FeedEntry[]> {
-	return client.post<FeedEntry[]>(`${GENERATE_FEED_URL}/${encodeURIComponent(userId)}`, {});
+	const res = await client.post<unknown>(`${GENERATE_FEED_URL}/${encodeURIComponent(userId)}`, {});
+	if (Array.isArray(res)) return res as FeedEntry[];
+	const entries = res && typeof res === 'object' ? (res as { entries?: unknown }).entries : undefined;
+	return Array.isArray(entries) ? (entries as FeedEntry[]) : [];
+}
+
+const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Whether a value has the shape of a user id, which the engine issues as a UUID. */
+export function isUserId(value: string): boolean {
+	return USER_ID.test(value);
 }
 
 /**

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -142,4 +142,41 @@ describe('the per-reader preview', () => {
 		expect(field.lastElementChild!.contains(container.querySelector('#rec-user'))).toBe(true);
 		expect(said(container)).toContain('the Users page');
 	});
+
+	// The combobox posts the label it shows. Named user_id, it posted the
+	// picked reader's email, which the plugin refused as an invalid user ID,
+	// and a pasted id that matched no option was cleared to nothing.
+	it('posts the id field and never the combobox', () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({ readers: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] }),
+		});
+		const posted = [...container.querySelectorAll('form[action="?/preview"] [name]')].map((el) => el.getAttribute('name'));
+		expect(posted).toEqual(['user_id']);
+		expect(container.querySelector('[name="user_id"]')!.getAttribute('role')).not.toBe('combobox');
+	});
+
+	it('fills the id field with the reader picked by email', async () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({ readers: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] }),
+		});
+		const search = container.querySelector('#rec-reader') as HTMLInputElement;
+		await fireEvent.input(search, { target: { value: 'mira' } });
+		await fireEvent.keyDown(search, { key: 'ArrowDown' });
+		await fireEvent.keyDown(search, { key: 'Enter' });
+		expect((container.querySelector('[name="user_id"]') as HTMLInputElement).value).toBe(
+			'24d6560b-540e-47b6-8957-59934db4021d',
+		);
+	});
+
+	it('names the reader a preview was generated for by email', () => {
+		const id = '24d6560b-540e-47b6-8957-59934db4021d';
+		const { container } = render(RecommendationsPage, {
+			props: props(
+				{ readers: [{ id, email: 'mira@example.com' }] },
+				{ previewFor: id, feed: [{ id: 'f1', user_id: id, content_id: 'c1', score: 0.5, source: 'trending', created_at: '' }] },
+			),
+		});
+		expect(said(container)).toContain('1 entry for mira@example.com');
+	});
 });
+
