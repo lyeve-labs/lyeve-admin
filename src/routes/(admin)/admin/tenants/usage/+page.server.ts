@@ -20,6 +20,7 @@ import {
 	type UsageGate,
 } from '$lib/api/usage';
 import { rowsOf, pageWindow, totalOf } from '$lib/api/list';
+import { listPeople } from '$lib/server/people';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins, user } = await event.parent();
@@ -36,6 +37,7 @@ export const load: PageServerLoad = async (event) => {
 			requests: [] as QuotaRequest[],
 			usage: [] as TenantUsage[],
 			requestsRead: false,
+			people: {} as Record<string, string>,
 			gate: USAGE_OK as UsageGate,
 			permitted,
 		};
@@ -61,7 +63,9 @@ export const load: PageServerLoad = async (event) => {
 
 	// Pending requests are the queue somebody has to act on, so an unread list
 	// is never drawn as an empty one.
-	const [requests, usage] = await Promise.all([
+	// A request names its requester by account id, so the directory turns the
+	// ids into emails. The page is a super admin's, who may read it.
+	const [requests, usage, people] = await Promise.all([
 		gate.state === 'ok'
 			? listRequests(client)
 					.then((r) => ({ rows: rowsOf(r), read: true }))
@@ -72,6 +76,7 @@ export const load: PageServerLoad = async (event) => {
 					.then((u) => rowsOf(u))
 					.catch((): TenantUsage[] => [])
 			: Promise.resolve([] as TenantUsage[]),
+		gate.state === 'ok' ? listPeople(client) : Promise.resolve([]),
 	]);
 
 	return {
@@ -82,6 +87,10 @@ export const load: PageServerLoad = async (event) => {
 		requests: requests.rows,
 		requestsRead: requests.read,
 		usage,
+		people: Object.fromEntries([
+			...people.map((p) => [p.id, p.email] as const),
+			...(user.email ? [[user.id, user.email] as const] : []),
+		]) as Record<string, string>,
 		gate,
 		permitted,
 	};
