@@ -46,11 +46,7 @@ export const load: PageServerLoad = async (event) => {
 	let gate: ErrorGate = notRunning(plugins, PLUGIN.errorTracking) ? { state: 'absent' } : ERROR_OK;
 	if (gate.state === 'ok') {
 		try {
-			// This route answers its own envelope shape rather than the usual
-			// one, so it is unwrapped here instead of through pageOf.
-			const page = await listAlerts(client, limit, offset, status);
-			alerts = page.alerts ?? [];
-			total = typeof page.total === 'number' ? page.total : null;
+			({ alerts, total } = await listAlerts(client, limit, offset, status));
 		} catch (err) {
 			gate = errorGate(err);
 		}
