@@ -5,8 +5,9 @@
  * resource and the actions it grants. The resources are `flows`, every
  * flow of the tenant, and `flow:<slug>`, one of them. The actions are the
  * content four plus `activate`, which covers publish, disable, rollback,
- * run and test. A rule on `flows` is unioned into every `flow:<slug>`, the
- * way the wildcard rule is unioned into every schema.
+ * run and test. A rule on `flows` reaches every `flow:<slug>` with no rule
+ * of its own, and a rule on one flow replaces it there, the way a schema
+ * rule replaces the wildcard rule.
  *
  * The engine is the authority and answers 403 when a role is short of an
  * action. The flow plugin carries what the caller's roles grant on each
