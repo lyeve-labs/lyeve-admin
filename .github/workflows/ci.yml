@@ -56,6 +56,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      # The release workflow decides which image tags a release ref moves from
+      # this script alone, so its rules are tested before any tag reaches it.
+      - name: Image tag rules
+        run: bash .github/scripts/image-tags_test.sh
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
