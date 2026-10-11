@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -56,5 +56,31 @@ describe('release page', () => {
 		const { queryByRole } = setup({ release: { ...release, status: 'published', published_at: '2026-10-01T00:00:00Z' } });
 		expect(queryByRole('button', { name: /Publish now/ })).toBeNull();
 		expect(queryByRole('button', { name: /Include entry/ })).toBeNull();
+	});
+});
+
+describe('including an entry', () => {
+	const choices = [
+		{ id: 'e2', title: 'Pricing', slug: 'pricing', schema: 'pages' },
+		{ id: 'e3', title: '', slug: 'spring-sale', schema: 'posts' },
+	];
+
+	it('offers the entries by title to pick from, and adds the one picked', async () => {
+		const { getByRole, getAllByRole, queryByRole } = setup({ choices });
+		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
+		expect(queryByRole('textbox', { name: /Entry ID/ })).toBeNull();
+		await fireEvent.click(document.getElementById('release-entry') as HTMLElement);
+		expect(getAllByRole('option').map((o) => o.textContent?.trim())).toEqual(['Pricing', 'spring-sale']);
+		await fireEvent.click(getByRole('option', { name: 'Pricing' }));
+		expect((document.querySelector('input[name="entry_id"]') as HTMLInputElement).value).toBe('e2');
+		const add = getByRole('button', { name: 'Include' }) as HTMLButtonElement;
+		expect(add.disabled).toBe(false);
+		expect(queryByRole('button', { name: 'Create' })).toBeNull();
+	});
+
+	it('asks for an id when the entries could not be read', async () => {
+		const { getByRole } = setup({ choices: null });
+		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
+		expect(getByRole('textbox', { name: /Entry ID/ })).toBeTruthy();
 	});
 });

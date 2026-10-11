@@ -4,11 +4,13 @@ import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { gateOf } from '$lib/api/gate';
+import { rowsOf, type ListEnvelope } from '$lib/api/list';
 import {
 	addReleaseItem,
 	cancelRelease,
 	conflictsOf,
 	deleteRelease,
+	editable,
 	getRelease,
 	publishRelease,
 	releaseConflicts,
@@ -29,6 +31,39 @@ export interface EntryLabel {
 // A release holds up to 500 entries. The page names the first hundred and
 // shows the rest by id, so one load never fans out past that.
 const NAMED = 100;
+
+/** An entry the Include entry drawer offers. */
+export interface EntryChoice {
+	id: string;
+	title: string;
+	slug: string;
+	schema: string;
+}
+
+/**
+ * How many entries the drawer offers. The engine lists every collection by the
+ * time an entry last changed, so these are the most recent. An older entry is
+ * added from its own page.
+ */
+const CHOICES = 200;
+
+/**
+ * The entries a release can take, the ones it already holds left out. Null
+ * when the read failed, and the drawer then asks for an id.
+ */
+async function entryChoices(client: HttpClient, holding: Set<string>): Promise<EntryChoice[] | null> {
+	try {
+		const res = await client.get<ListEnvelope<{ id?: unknown; title?: unknown; slug?: unknown; schema?: unknown }>>(
+			`/api/admin/content?limit=${CHOICES}&offset=0`,
+		);
+		const text = (v: unknown) => (typeof v === 'string' ? v : '');
+		return rowsOf(res)
+			.filter((e): e is typeof e & { id: string } => typeof e.id === 'string' && !holding.has(e.id))
+			.map((e) => ({ id: e.id, title: text(e.title), slug: text(e.slug), schema: text(e.schema) }));
+	} catch {
+		return null;
+	}
+}
 
 async function entryLabel(client: HttpClient, id: string): Promise<EntryLabel | null> {
 	try {
@@ -53,14 +88,23 @@ export const load: PageServerLoad = async (event) => {
 	} catch (err) {
 		if (err instanceof ApiError && err.status === 404) error(404, 'Release not found');
 		const gate = gateOf(err, 'The release could not be read.');
-		return { release: null, gate, conflicts: [] as ReleaseConflict[], conflictsRead: false, labels: {} as Record<string, EntryLabel | null> };
+		return {
+			release: null,
+			gate,
+			conflicts: [] as ReleaseConflict[],
+			conflictsRead: false,
+			labels: {} as Record<string, EntryLabel | null>,
+			choices: null as EntryChoice[] | null,
+		};
 	}
 	const items = release.items ?? [];
-	const [conflicts, named] = await Promise.all([
+	const [conflicts, named, choices] = await Promise.all([
 		releaseConflicts(client, release.id)
 			.then((c) => ({ rows: c, read: true }))
 			.catch(() => ({ rows: [] as ReleaseConflict[], read: false })),
 		Promise.all(items.slice(0, NAMED).map(async (it) => [it.entry_id, await entryLabel(client, it.entry_id)] as const)),
+		// Only a release that can still change takes entries.
+		editable(release) ? entryChoices(client, new Set(items.map((it) => it.entry_id))) : Promise.resolve(null),
 	]);
 	return {
 		release,
@@ -68,6 +112,7 @@ export const load: PageServerLoad = async (event) => {
 		conflicts: conflicts.rows,
 		conflictsRead: conflicts.read,
 		labels: Object.fromEntries(named) as Record<string, EntryLabel | null>,
+		choices,
 	};
 };
 
@@ -104,7 +149,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const entryId = String(form.get('entry_id') ?? '').trim();
 		const action = String(form.get('action') ?? '');
-		if (!entryId) return fail(400, { error: 'Check the highlighted fields.', fields: { entry_id: 'Entry ID is required' } });
+		if (!entryId) return fail(400, { error: 'Check the highlighted fields.', fields: { entry_id: 'Pick an entry' } });
 		if (action !== 'publish' && action !== 'unpublish') {
 			return fail(400, { error: 'An entry is either published or unpublished by the release.' });
 		}
