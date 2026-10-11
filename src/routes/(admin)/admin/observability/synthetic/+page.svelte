@@ -36,6 +36,7 @@
 		PROBE_TYPE_HINTS,
 		PROBE_TYPE_LABELS,
 		everyLabel,
+		intervalHint,
 		probeHealth,
 		probeTarget,
 		probeTone,
@@ -172,9 +173,14 @@
 			async ({ result, update }) => {
 				await update();
 				if (result.type === 'success') {
-					const out = result.data as { status?: string; ms?: number } | undefined;
-					if (out?.status === 'fail') toast.error(`${p.name} failed`);
-					else toast.success(`${p.name} passed in ${out?.ms ?? 0} ms`);
+					const out = result.data as
+						| { status?: string | null; ms?: number; failed?: number; regions?: number }
+						| undefined;
+					if (out?.status === 'fail') {
+						const where = (out.regions ?? 0) > 1 ? ` in ${out.failed} of ${out.regions} regions` : '';
+						toast.error(`${p.name} failed${where}`);
+					} else if (out?.status === 'pass') toast.success(`${p.name} passed in ${out.ms ?? 0} ms`);
+					else toast.warn(`${p.name} ran, and no result was recorded`);
 				}
 			};
 	}
@@ -480,7 +486,7 @@
 					id="probe-interval"
 					name="interval_seconds"
 					label="Interval, in seconds"
-					hint="At least 30. A probe is this instance calling itself."
+					hint={intervalHint(data.limits)}
 					bind:value={intervalSeconds}
 				/>
 				<Input

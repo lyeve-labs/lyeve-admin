@@ -14,6 +14,8 @@ import {
 	listProbes,
 	probeType,
 	putProbeChannels,
+	readProbeLimits,
+	runOutcome,
 	runProbeNow,
 	syntheticGate,
 	updateProbe,
@@ -21,6 +23,7 @@ import {
 	type ProbeAlert,
 	type ProbeChannels,
 	type ProbeConfig,
+	type ProbeLimits,
 	type SyntheticGate,
 } from '$lib/api/synthetic';
 import { channelsFrom, hasChannels } from '$lib/api/alert-channels';
@@ -40,14 +43,10 @@ const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 
 /**
- * Bounds the engine does not enforce.
- *
- * A probe is the instance making requests of itself on a timer, so an interval
- * of one second is a load generator with a monitoring label on it. The floor
- * is here rather than in the engine because the engine's callers include a
- * migration and a restore, which legitimately write whatever was stored.
+ * The interval floor is not here. The plugin holds every write to the floor
+ * the install is licensed for and answers it on its limits read, which the
+ * form's hint shows, and a write under it is refused with the reason.
  */
-const MIN_INTERVAL_SECONDS = 30;
 const MIN_TIMEOUT_SECONDS = 1;
 
 function positive(raw: FormDataEntryValue | null, fallback: number): number {
@@ -103,6 +102,7 @@ export const load: PageServerLoad = async (event) => {
 			hasMore: false,
 			gate: { state: 'absent' } as SyntheticGate,
 			channelsFor: null as ChannelsFor,
+			limits: null as ProbeLimits | null,
 		};
 	}
 
@@ -143,7 +143,11 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor };
+	// What a write will accept. Unread, the form says less rather than a
+	// floor that may not be this install's.
+	const limits = gate.state === 'ok' ? await readProbeLimits(client).catch(() => null) : null;
+
+	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor, limits };
 };
 
 async function save(event: Parameters<Actions[string]>[0], id: string | null) {
@@ -163,11 +167,6 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	}
 
 	const interval = positive(form.get('interval_seconds'), 300);
-	if (interval < MIN_INTERVAL_SECONDS) {
-		return fail(400, {
-			error: `A probe runs against this instance, so the shortest interval is ${MIN_INTERVAL_SECONDS} seconds.`,
-		});
-	}
 	const timeout = positive(form.get('timeout_seconds'), 10);
 	if (timeout < MIN_TIMEOUT_SECONDS || timeout >= interval) {
 		return fail(400, { error: 'The timeout has to be shorter than the interval.' });
@@ -223,8 +222,8 @@ export const actions: Actions = {
 		const id = String(form.get('id') ?? '');
 		if (!id) return fail(400, { error: 'No probe was named.' });
 		try {
-			const result = await runProbeNow(client, id);
-			return { ran: id, status: result.status, ms: result.response_time_ms };
+			const run = runOutcome(await runProbeNow(client, id));
+			return { ran: id, status: run.status, ms: run.ms, failed: run.failed, regions: run.regions };
 		} catch (err) {
 			return actionFailure(err, 'The probe could not be run.');
 		}

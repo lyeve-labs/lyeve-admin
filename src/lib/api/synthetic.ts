@@ -170,8 +170,74 @@ export async function deleteProbe(client: HttpClient, id: string): Promise<void>
 	await client.delete(`${PROBES_URL}/${encodeURIComponent(id)}`);
 }
 
-export async function runProbeNow(client: HttpClient, id: string): Promise<ProbeResult> {
-	return client.post<ProbeResult>(`${PROBES_URL}/${encodeURIComponent(id)}/run`, {});
+/** Runs a probe now. The answer is one result per region it is watched from. */
+export async function runProbeNow(client: HttpClient, id: string): Promise<ProbeResult[]> {
+	const res = await client.post<unknown>(`${PROBES_URL}/${encodeURIComponent(id)}/run`, {});
+	return Array.isArray(res) ? (res as ProbeResult[]) : [];
+}
+
+/** How one run went across its regions. */
+export interface RunOutcome {
+	/** Failed when any region failed. Null when the run recorded no result. */
+	status: ProbeStatus | null;
+	/** The slowest region's response time, in milliseconds. */
+	ms: number;
+	failed: number;
+	regions: number;
+}
+
+/**
+ * One run read as a whole.
+ *
+ * A run is a result per region, and a run fails when any region fails, which
+ * is also what counts toward the alert. Timed by the slowest region, because
+ * that is the time the run took.
+ */
+export function runOutcome(results: readonly ProbeResult[]): RunOutcome {
+	const failed = results.filter((r) => r.status === 'fail').length;
+	return {
+		status: results.length === 0 ? null : failed > 0 ? 'fail' : 'pass',
+		ms: results.reduce((slowest, r) => Math.max(slowest, r.response_time_ms || 0), 0),
+		failed,
+		regions: results.length,
+	};
+}
+
+export const LIMITS_URL = '/api/admin/synthetic-monitoring/limits';
+
+/** What a probe write will accept for this tenant, as the plugin answers it. */
+export interface ProbeLimits {
+	/** The probes the tenant keeps against its ceiling. A limit of 0 is no ceiling. */
+	probes: { limit: number; current: number };
+	/** The shortest interval a new probe may be given, in seconds. */
+	minIntervalSeconds: number;
+}
+
+/**
+ * The limits a probe write is held to, or null when the plugin does not say.
+ *
+ * The floor depends on what the install is licensed for, so the console reads
+ * it rather than guessing one of its own.
+ */
+export async function readProbeLimits(client: HttpClient): Promise<ProbeLimits | null> {
+	const raw = await client.get<unknown>(LIMITS_URL);
+	const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+	const probes = r.probes && typeof r.probes === 'object' ? (r.probes as Record<string, unknown>) : {};
+	const min = r.min_interval_seconds;
+	if (typeof min !== 'number' || !Number.isFinite(min) || min <= 0) return null;
+	return {
+		probes: {
+			limit: typeof probes.limit === 'number' ? probes.limit : 0,
+			current: typeof probes.current === 'number' ? probes.current : 0,
+		},
+		minIntervalSeconds: min,
+	};
+}
+
+/** The interval field's hint, with the floor when the plugin said what it is. */
+export function intervalHint(limits: ProbeLimits | null): string {
+	const why = 'A probe is this instance calling itself.';
+	return limits ? `At least ${limits.minIntervalSeconds}. ${why}` : why;
 }
 
 export async function acknowledgeAlert(client: HttpClient, id: string): Promise<void> {
