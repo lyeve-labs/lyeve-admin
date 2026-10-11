@@ -32,6 +32,7 @@
 		hasAnyLimit,
 		limitLabel,
 		pending,
+		requesterName,
 		uncheckedDimensions,
 		usageTone,
 		usedPct,
@@ -315,7 +316,7 @@
 							<tr>
 								<td data-cell="nowrap">
 									<span class="font-medium text-fg">{r.tenant_id}</span>
-									<div class="text-xs text-faint">by {r.requested_by}</div>
+									<div class="text-xs text-faint">by {requesterName(r.requested_by, data.people)}</div>
 								</td>
 								<td class="text-xs text-faint">
 									{#if r.requests_limit}

@@ -19,6 +19,7 @@ import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import { formatCount } from '$lib/format';
+import { shortId } from '$lib/utils/entry-identity';
 
 export const QUOTAS_URL = '/api/admin/quotas';
 export const REQUESTS_URL = '/api/admin/quota-requests';
@@ -52,6 +53,21 @@ export interface QuotaRequest {
 	reviewed_by: string;
 	reviewed_at?: string | null;
 	created_at: string;
+}
+
+/** What the plugin writes over a requester whose personal data was erased. */
+export const ERASED_REQUESTER = 'erased';
+
+/**
+ * Who asked for more, as a reader recognizes them.
+ *
+ * The plugin stores the requester's account id. The email comes from the
+ * account directory, and an account the page could not read keeps its short id.
+ */
+export function requesterName(id: string, people: Readonly<Record<string, string>>): string {
+	if (!id) return 'an unknown account';
+	if (id === ERASED_REQUESTER) return 'an erased account';
+	return people[id] ?? shortId(id);
 }
 
 export interface TenantUsage {

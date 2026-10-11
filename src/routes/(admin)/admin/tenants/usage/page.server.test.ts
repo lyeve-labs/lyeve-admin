@@ -1,0 +1,79 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@lyeve-labs/client';
+
+const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...((await importOriginal()) as object),
+	authedClient: vi.fn(() => engine),
+}));
+
+import { load } from './+page.server';
+
+const ADMIN = '5cec39db-bbeb-44a3-bdef-912a4f57a344';
+const MIRA = '24d6560b-540e-47b6-8957-59934db4021d';
+
+function loadEvent() {
+	return {
+		url: new URL('http://localhost/admin/tenants/usage'),
+		parent: async () => ({
+			plugins: { state: 'named', running: ['usage'], withheld: [] },
+			user: { id: ADMIN, email: 'admin@example.com', roles: ['super_admin'] },
+		}),
+	} as never;
+}
+
+function route(map: Record<string, unknown>) {
+	engine.get.mockImplementation(async (url: string) => {
+		const path = String(url).split('?')[0];
+		if (path in map) {
+			const body = map[path];
+			if (body instanceof Error) throw body;
+			return body;
+		}
+		throw new ApiError(404, 'not found', {});
+	});
+}
+
+const request = (requested_by: string) => ({
+	id: 'q1',
+	tenant_id: 'default',
+	requested_by,
+	requests_limit: 100000,
+	reason: 'Launch traffic in November',
+	status: 'pending',
+	reviewed_by: '',
+	created_at: '2026-10-11T18:36:49Z',
+});
+
+beforeEach(() => vi.clearAllMocks());
+
+describe('the usage load', () => {
+	// A request carries the requester's account id, so the load reads the
+	// account directory to name them.
+	it('reads the emails the requests are named by', async () => {
+		route({
+			'/api/admin/quotas': { data: [], total_count: 0 },
+			'/api/admin/quota-requests': { data: [request(MIRA)], total_count: 1 },
+			'/api/admin/usage/tenants': { data: [] },
+			'/api/admin/users': [{ id: MIRA, email: 'mira.costa@example.com', roles: ['editor'] }],
+		});
+
+		const out = (await load(loadEvent())) as Record<string, unknown>;
+
+		expect(out.people).toEqual({ [MIRA]: 'mira.costa@example.com', [ADMIN]: 'admin@example.com' });
+	});
+
+	it('keeps the page when the directory cannot be read', async () => {
+		route({
+			'/api/admin/quotas': { data: [], total_count: 0 },
+			'/api/admin/quota-requests': { data: [request(MIRA)], total_count: 1 },
+			'/api/admin/usage/tenants': { data: [] },
+			'/api/admin/users': new ApiError(503, 'down', {}),
+		});
+
+		const out = (await load(loadEvent())) as Record<string, unknown>;
+
+		expect(out.people).toEqual({ [ADMIN]: 'admin@example.com' });
+		expect(out.requestsRead).toBe(true);
+	});
+});

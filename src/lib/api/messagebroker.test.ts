@@ -5,6 +5,7 @@ import {
 	brokerGate,
 	brokerHealth,
 	deliveryRate,
+	hasBroker,
 	healthTone,
 	type BrokerStatus,
 } from './messagebroker';
@@ -46,6 +47,14 @@ describe('the one sentence the page leads with', () => {
 		expect(healthTone('idle')).toBe('neutral');
 	});
 
+	// With no broker the plugin counts every discarded event as published.
+	it('says events are discarded when no broker is set, whatever the counters say', () => {
+		expect(brokerHealth(status({ backend: '', published: 25 }))).toBe('discarding');
+		expect(brokerHealth(status({ backend: 'noop', published: 0 }))).toBe('discarding');
+		expect(brokerHealth(status({ backend: '', degraded: true }))).toBe('disabled');
+		expect(healthTone('discarding')).toBe('warn');
+	});
+
 	it('says publishing when events are getting through', () => {
 		expect(brokerHealth(status())).toBe('publishing');
 		expect(healthTone('publishing')).toBe('success');
@@ -64,6 +73,13 @@ describe('the delivery rate', () => {
 		expect(deliveryRate(status({ published: 0, failed: 0, dropped: 0 }))).toBeNull();
 		expect(deliveryRate(null)).toBeNull();
 	});
+
+	it('reports nothing when there is no broker to reach', () => {
+		expect(deliveryRate(status({ backend: '', published: 25 }))).toBeNull();
+		expect(deliveryRate(status({ backend: 'noop', published: 25 }))).toBeNull();
+		expect(hasBroker(status({ backend: 'kafka' }))).toBe(true);
+		expect(hasBroker(null)).toBe(false);
+	});
 });
 
 describe('naming the backend', () => {
@@ -72,6 +88,7 @@ describe('naming the backend', () => {
 		expect(backendLabel('kafka')).toBe('Apache Kafka');
 		expect(backendLabel('rabbitmq')).toBe('RabbitMQ');
 		expect(backendLabel('')).toBe('No broker configured');
+		expect(backendLabel('noop')).toBe('No broker configured');
 	});
 
 	it('prints a backend it does not know rather than hiding it', () => {

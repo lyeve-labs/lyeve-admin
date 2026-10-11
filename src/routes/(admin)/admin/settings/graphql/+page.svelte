@@ -142,8 +142,14 @@
 										<tbody>
 											{#each fields as f (f.name)}
 												<tr>
+													<!-- The table breaks a narrow column anywhere, which split
+													     names mid-word. Each identifier is held whole, so a long
+													     argument list breaks only between arguments. -->
 													<td class="font-mono text-xs text-fg">
-														{f.name}{#if f.args.length}<span class="text-faint">({f.args.join(', ')})</span>{/if}
+														<span class="whitespace-nowrap">{f.name}</span>{#each f.args as arg, i (arg)}{#if i > 0}{' '}{/if}<span
+																class="whitespace-nowrap text-faint"
+																>{i === 0 ? '(' : ''}{arg}{i === f.args.length - 1 ? ')' : ','}</span
+															>{/each}
 													</td>
 													<td class="text-xs text-muted">{f.description}</td>
 												</tr>

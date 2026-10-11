@@ -21,6 +21,7 @@
 		backendLabel,
 		brokerHealth,
 		deliveryRate,
+		hasBroker,
 		healthTone,
 	} from '$lib/api/messagebroker';
 	import { NO_VALUE, formatDateTime } from '$lib/format';
@@ -40,6 +41,7 @@
 	}
 
 	const health = $derived(brokerHealth(data.status));
+	const broker = $derived(hasBroker(data.status));
 	const rate = $derived(deliveryRate(data.status));
 	const guide = $derived(data.status ? connectionGuide(data.status.backend, data.status.topic_prefix) : null);
 	const backendSettings = $derived(data.status ? (BACKEND_SETTINGS[data.status.backend] ?? []) : []);
@@ -118,7 +120,9 @@
 		<p class="text-xs text-muted">
 			Counted since this process started. A restart sets them back to zero, so a low number is
 			not on its own a quiet week.
-			{#if rate !== null}
+			{#if !broker}
+				With no broker set, Published counts events that were discarded.
+			{:else if rate !== null}
 				{rate}% of attempts reached the broker.
 			{/if}
 		</p>
@@ -134,9 +138,13 @@
 					<tr>
 						<th scope="row">Connected</th>
 						<td>
-							<Badge tone={data.status.connected ? 'success' : 'warn'} dot>
-								{data.status.connected ? 'Yes' : 'No'}
-							</Badge>
+							{#if broker}
+								<Badge tone={data.status.connected ? 'success' : 'warn'} dot>
+									{data.status.connected ? 'Yes' : 'No'}
+								</Badge>
+							{:else}
+								<span class="text-faint">{NO_VALUE}</span>
+							{/if}
 						</td>
 					</tr>
 					<tr>
@@ -161,9 +169,13 @@
 					<tr>
 						<th scope="row">TLS</th>
 						<td>
-							<Badge tone={data.status.tls ? 'success' : 'danger'}>
-								{data.status.tls ? 'On' : 'Off'}
-							</Badge>
+							{#if broker}
+								<Badge tone={data.status.tls ? 'success' : 'danger'}>
+									{data.status.tls ? 'On' : 'Off'}
+								</Badge>
+							{:else}
+								<span class="text-faint">{NO_VALUE}</span>
+							{/if}
 						</td>
 					</tr>
 					<tr>
@@ -173,7 +185,7 @@
 					<tr>
 						<th scope="row">Last publish</th>
 						<td class="text-xs text-faint">
-							{data.status.last_publish_at
+							{broker && data.status.last_publish_at
 								? formatDateTime(data.status.last_publish_at)
 								: 'Nothing has been published'}
 						</td>
@@ -226,10 +238,15 @@
 					discarded and no flow can hear a message. Set it to nats, kafka or rabbitmq.
 				</Alert>
 			{/if}
+			<!-- One run of text per sentence end: a line break inside the markup
+			     before a period renders as a space in front of it. -->
 			<p class="text-xs text-muted">
-				The broker is configured by the deployment, through <span class="font-mono">EVENT_BUS</span>
-				{#if backendSettings.length}and {backendSettings.join(', ')}{/if}. Set them as
-				environment variables or in the configuration file, and see what each does on
+				The broker is configured by the deployment, through <span class="font-mono">EVENT_BUS</span
+				>{#if backendSettings.length}{' '}and {backendSettings.join(', ')}{/if}.
+				{backendSettings.length
+					? 'Set them as environment variables or in the configuration file'
+					: 'Set it as an environment variable or in the configuration file'}, and see what each
+				setting does on
 				<a href="/admin/settings/configuration" class="text-brand hover:underline">Configuration</a>. TLS is on
 				by default and a broker's certificate is always verified.
 			</p>

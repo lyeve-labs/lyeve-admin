@@ -103,6 +103,39 @@ describe('what the numbers mean', () => {
 	});
 });
 
+/*
+ * With EVENT_BUS unset or noop, the plugin hands each event to a publisher
+ * that discards it, counts it as published and reports itself connected.
+ * None of that reached a broker, so the page must not say it did.
+ */
+describe('an instance with no broker', () => {
+	const none = (backend: string) =>
+		props({ status: status({ backend, target: '', stream: '', tls: false, published: 25 }) });
+
+	it.each(['', 'noop'])('claims no delivery with backend "%s"', (backend) => {
+		const { container } = render(BrokerPage, none(backend));
+		const text = said(container);
+		expect(text).not.toContain('reached the broker');
+		expect(text).not.toContain('Publishing');
+		expect(text).toContain('No broker, events are discarded');
+		expect(text).toContain('Published counts events that were discarded');
+	});
+
+	it('states no connection, TLS setting or publish time', () => {
+		const { container } = render(BrokerPage, none(''));
+		const row = (name: string) =>
+			[...container.querySelectorAll('th')].find((th) => th.textContent?.trim() === name)?.nextElementSibling?.textContent?.trim();
+		expect(row('Connected')).toBe('-');
+		expect(row('TLS')).toBe('-');
+		expect(row('Last publish')).toBe('Nothing has been published');
+	});
+
+	it('still states the delivery rate with a broker', () => {
+		const { container } = render(BrokerPage, props({ status: status({ published: 9, failed: 1 }) }));
+		expect(said(container)).toContain('90% of attempts reached the broker.');
+	});
+});
+
 describe('the connection', () => {
 	it('shows the target the engine already redacted', () => {
 		const { container } = render(BrokerPage, {
@@ -121,5 +154,21 @@ describe('the connection', () => {
 			props: props({ status: status({ published: 0, last_publish_at: null }) }),
 		});
 		expect(said(container)).toContain('Nothing has been published');
+	});
+});
+
+describe('where the broker is set', () => {
+	it('names EVENT_BUS alone in one sentence when no broker is set', () => {
+		const { container } = render(BrokerPage, props({ status: status({ backend: '' }) }));
+		const text = said(container);
+		expect(text).toContain('through EVENT_BUS. Set it as an environment variable');
+		expect(text).not.toContain('EVENT_BUS .');
+	});
+
+	it('names every setting the backend reads', () => {
+		const { container } = render(BrokerPage, props({ status: status({ backend: 'rabbitmq' }) }));
+		expect(said(container)).toContain(
+			'through EVENT_BUS and RABBITMQ_URL, RABBITMQ_TLS, RABBITMQ_TLS_CA_FILE. Set them as environment variables'
+		);
 	});
 });
