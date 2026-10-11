@@ -2,7 +2,14 @@
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+// Each form's submit handler, by its action, so a case can run a submit.
+const forms = vi.hoisted(() => ({ handlers: new Map<string, unknown>() }));
+vi.mock('$app/forms', () => ({
+	enhance: (form: HTMLFormElement, submit: unknown) => {
+		forms.handlers.set(form.getAttribute('action') ?? '', submit);
+		return { destroy() {} };
+	},
+}));
 
 import TransformUrlBuilder from './TransformUrlBuilder.svelte';
 import FocalPointPicker from './FocalPointPicker.svelte';
@@ -38,6 +45,15 @@ describe('TransformUrlBuilder', () => {
 		});
 		const text = getByTestId('refusal-notice').textContent ?? '';
 		expect(text).toContain('9 of 9 items are in use');
+	});
+
+	it('keeps the size, quality and format it built the URL from', async () => {
+		render(TransformUrlBuilder, { props: { id: 'm1', published: true, focal: null } });
+		const submit = forms.handlers.get('?/transformUrl') as (o: unknown) => Promise<(o: unknown) => Promise<void>>;
+		const update = vi.fn(async () => {});
+		const after = await submit({ formData: new FormData(), cancel: vi.fn() });
+		await after({ result: { type: 'success', status: 200, data: {} }, update });
+		expect(update).toHaveBeenCalledWith({ reset: false });
 	});
 
 	it('sends the focal point only when the file has one', () => {

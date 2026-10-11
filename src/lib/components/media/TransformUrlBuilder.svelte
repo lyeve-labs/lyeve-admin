@@ -53,7 +53,8 @@
 		{ value: '604800', label: 'In a week' },
 	]);
 
-	const build = submitter();
+	// The fields stay as they were sent, so the URL below reads against them.
+	const build = submitter(undefined, { reset: false });
 	// The engine answers a path on the tenant's host, which the browser
 	// resolves against the address the admin is served from.
 	const absolute = $derived(signed ? (browser ? window.location.origin + signed.url : signed.url) : '');

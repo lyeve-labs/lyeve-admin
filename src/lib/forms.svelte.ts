@@ -24,15 +24,19 @@ import type { SubmitFunction } from '@sveltejs/kit';
  *
  * On failure the panel stays open so the error is visible against the values
  * that caused it.
+ *
+ * A form whose answer is computed from what it sent, such as a URL built from
+ * a size and a format, passes `{ reset: false }`. Cleared, its fields no
+ * longer say what the answer was built from.
  */
-export function submitter(close?: () => void) {
+export function submitter(close?: () => void, { reset = true }: { reset?: boolean } = {}) {
 	let pending = $state(false);
 	const enhance: SubmitFunction = () => {
 		pending = true;
 		return async ({ result, update }) => {
 			try {
 				if (result.type !== 'failure' && result.type !== 'error') close?.();
-				await update();
+				await update({ reset });
 			} finally {
 				// Cleared after the patch, as `tracked` does: a primary that goes
 				// live again mid-update invites the second click.
