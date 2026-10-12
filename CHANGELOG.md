@@ -4,6 +4,39 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [0.20.2] - 2026-10-12
+
+### Changed
+
+- The console's docs link and the README point at the documentation's new address, lyeve.com/docs. The old host redirects there.
+- A release candidate image is published under its exact tag only, `X.Y.Z-rc.N`, and never as `latest` or the minor line.
+- The release jobs that read secrets run in a release environment that admits only version tags.
+
+### Fixed
+
+- The console names the person's browser to the engine on every call, so sign-in risk, trusted devices and the audit trail see the real browser instead of the console's server.
+- Remembered devices show the browser when the engine sends one, instead of reading as unrecognized.
+- Reviews: a stage's escalation user, a review's assignees and the Assignments table name accounts by email, and entries by title, instead of raw ids. A caller who may not list the accounts keeps the typed fields.
+- Releases: Include entry offers the most recently changed entries by title, grouped by collection and searchable, and its button says Include.
+- Media: Build URL keeps the Width, Height and Quality fields, and a focal point click is measured against the image rather than its frame.
+- Schema: a previewed column drop is badged as Queued, with a note that it drops data and runs only when a super admin applies it from History.
+- Imports: the rejected share names the rows it was counted against.
+- Recommendations: the intro says what a reader gets, and the feed preview posts the chosen reader's id and shows the generated feed.
+- Synthetic monitoring: the New probe hint names the interval floor the plugin answers, and Run now fails when any region failed.
+- Query monitor: a slow query analysis reads the plugin's answer and says why no plan was read.
+- Experiments: the detail page reads variants and metrics again instead of answering 500, and the minimum sample size reads as a total across variants.
+- Usage: a quota request names its requester by email.
+- GraphQL: schema field names no longer break mid-word.
+- Events: the replay page says a replay reaches every listener and that the field is a run name.
+- Permissions: a schema rule reads as replacing the wildcard rule, as the engine applies it, and an empty rule that closes a schema to a role can be saved.
+- Message broker: with no broker set, the page says events are discarded instead of claiming delivery.
+- Analytics: the page says both APIs are counted, and each HTTP method bar states its share of all requests.
+- SCIM: the pager counts connections, and the token note matches the 32-character minimum.
+- Errors: the alert list reads the plugin's answer, so open alerts and their triage buttons appear.
+- Logs: a one-word search also finds a request or trace id, and the default level reads as the engine names it.
+- OAuth: the providers table shows the API path where provider sign-in starts.
+- Cache: the URL of the retired metrics route is gone.
+
 ## [0.20.1] - 2026-10-10
 
 ### Fixed
