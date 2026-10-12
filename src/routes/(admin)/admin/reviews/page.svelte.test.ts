@@ -259,6 +259,37 @@ describe('reviews page, what the install allows', () => {
 		expect((document.querySelector('input[id^="stage-quorum-"]') as HTMLInputElement).disabled).toBe(false);
 	});
 
+	it('picks the escalation user by email and saves their id', async () => {
+		render(ReviewsPage, {
+			props: {
+				data: data({
+					limits: { licensed: true, workflows: { limit: null, current: 1 } },
+					people: { 'u-ada': 'ada@example.com', 'u-jon': 'jon@example.com' },
+				}),
+				form: null,
+			},
+		});
+		await fireEvent.click(screen.getByRole('button', { name: /New definition/ }));
+		const sla = document.querySelector('input[id^="stage-sla-"]') as HTMLInputElement;
+		await fireEvent.input(sla, { target: { value: '24' } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'A user' }));
+		expect(screen.queryByRole('textbox', { name: /User id/ })).toBeNull();
+		await fireEvent.click(screen.getByRole('combobox', { name: /^User/ }));
+		await fireEvent.click(screen.getByRole('option', { name: 'jon@example.com' }));
+		const stages = JSON.parse((document.querySelector('input[name="stages"]') as HTMLInputElement).value);
+		expect(stages[0]).toMatchObject({ escalate_kind: 'user', escalate_to: 'u-jon' });
+	});
+
+	it('keeps the typed id when the page could not read the directory', async () => {
+		render(ReviewsPage, {
+			props: { data: data({ limits: { licensed: true, workflows: { limit: null, current: 1 } } }), form: null },
+		});
+		await fireEvent.click(screen.getByRole('button', { name: /New definition/ }));
+		await fireEvent.input(document.querySelector('input[id^="stage-sla-"]') as HTMLInputElement, { target: { value: '24' } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'A user' }));
+		expect(screen.getByRole('textbox', { name: /User id/ })).toBeTruthy();
+	});
+
 	it('renders a refused create with the plugin numbers', () => {
 		render(ReviewsPage, {
 			props: {
