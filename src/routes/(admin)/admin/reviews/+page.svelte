@@ -213,6 +213,19 @@
 		),
 	);
 	let schemaOptions = $derived(data.schemas.map((s) => ({ value: s, label: s })));
+
+	// The accounts an escalation can go to, by email. A stage saved with an
+	// account the directory no longer lists keeps it as an option, so the field
+	// still shows what the stage holds.
+	let peopleOptions = $derived(
+		Object.entries(data.people)
+			.map(([id, email]) => ({ value: id, label: email }))
+			.sort((a, b) => a.label.localeCompare(b.label)),
+	);
+	function escalateOptions(current: string) {
+		if (!current || peopleOptions.some((o) => o.value === current)) return peopleOptions;
+		return [...peopleOptions, { value: current, label: shortId(current) }];
+	}
 	let errors = $derived(fieldErrors(form));
 
 	let deleteForm = $state<HTMLFormElement | null>(null);
@@ -580,7 +593,18 @@
 									disabled={stagesLocked || stage.sla_hours === 0}
 									bind:value={stage.escalate_kind}
 								/>
-								{#if stage.escalate_kind !== 'none'}
+								{#if stage.escalate_kind === 'user' && peopleOptions.length > 0}
+									<Select
+										id="stage-escalate-{stage.key}"
+										label="User"
+										hint="The user becomes the assignee when the SLA passes."
+										placeholder="Pick a user"
+										options={escalateOptions(stage.escalate_to)}
+										searchable={peopleOptions.length > 10}
+										disabled={stagesLocked}
+										bind:value={stage.escalate_to}
+									/>
+								{:else if stage.escalate_kind !== 'none'}
 									<Input
 										id="stage-escalate-{stage.key}"
 										label={stage.escalate_kind === 'user' ? 'User id' : 'Role'}
