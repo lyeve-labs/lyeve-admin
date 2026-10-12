@@ -4,12 +4,6 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
-## [Unreleased]
-
-### Fixed
-
-- Choosing an option in an autocomplete field posts the option's value rather than the label shown in the field. A dismissed notification leaves from where it stood instead of jumping to the corner of the stack. Both come with ui-kit 0.35.2.
-
 ## [0.20.2] - 2026-10-12
 
 ### Changed
@@ -20,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Choosing an option in an autocomplete field posts the option's value rather than the label shown in the field. A dismissed notification leaves from where it stood instead of jumping to the corner of the stack. Both come with ui-kit 0.35.2.
 - The console names the person's browser to the engine on every call, so sign-in risk, trusted devices and the audit trail see the real browser instead of the console's server.
 - Remembered devices show the browser when the engine sends one, instead of reading as unrecognized.
 - Reviews: a stage's escalation user, a review's assignees and the Assignments table name accounts by email, and entries by title, instead of raw ids. A caller who may not list the accounts keeps the typed fields.
