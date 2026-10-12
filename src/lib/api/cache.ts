@@ -18,7 +18,6 @@ import type { ListEnvelope } from './list';
 import type { Limit } from './limits';
 
 export const STATS_URL = '/api/admin/cache/stats';
-export const METRICS_URL = '/api/admin/cache/metrics';
 export const PROVIDERS_URL = '/api/admin/cache/providers';
 export const ENTRIES_URL = '/api/admin/cache/entries';
 export const FLUSH_URL = '/api/admin/cache/flush';
