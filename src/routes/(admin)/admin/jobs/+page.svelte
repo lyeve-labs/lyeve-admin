@@ -29,6 +29,7 @@
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { ALERT_PREFIX, hasChannels } from '$lib/api/cron-alerts';
 	import AlertChannelFields from '$lib/components/AlertChannelFields.svelte';
@@ -136,7 +137,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.jobs.filter(
+		(data.jobs.ok ? data.jobs.value : []).filter(
 			(j) =>
 				narrows(query, j.name, j.description, j.schedule, j.endpoint) &&
 				(status === '' || (status === 'enabled') === j.enabled)
@@ -148,16 +149,25 @@
 
 <PageShell title="Scheduled jobs" {description} width="wide">
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New job
-		</Button>
+		<!-- A list that could not be read offers no write against it. -->
+		{#if data.jobs.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New job
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if !open}
 		<FormErrors message={formError} {refused} />
 	{/if}
 
-	{#if data.jobs.length === 0}
+	{#if !data.jobs.ok}
+		<GateNotice
+			gate={data.jobs.gate}
+			title="Scheduled jobs"
+			absent="The cron plugin is not part of this build, so no job runs on a schedule."
+		/>
+	{:else if data.jobs.value.length === 0}
 		<EmptyState title="No jobs yet" description="Schedule HTTP jobs to run on a cron expression.">
 			{#snippet iconSnippet()}
 				<Inbox size={ICON.lg} />
@@ -261,7 +271,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.jobs.length}
+			count={data.jobs.value.length}
 			hasNext={data.hasMore}
 			noun="jobs"
 			href={pageHref('/admin/jobs', data.limit)}

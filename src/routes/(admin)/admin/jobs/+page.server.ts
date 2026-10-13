@@ -4,6 +4,7 @@ import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
+import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { sessionToken } from '$lib/server/session-cookie';
 
@@ -35,21 +36,20 @@ const DEFAULT_LIMIT = 50;
  */
 const MAX_LIMIT = 199;
 
+/** What the page says for a list read that failed for no reason it can name. */
+const LIST_FAILED = 'The jobs could not be read. This is not a report that there are none.';
+
 async function listJobs(
 	client: ReturnType<typeof createClient>,
 	limit: number,
 	offset: number
 ): Promise<Job[]> {
-	try {
-		// GET /api/admin/jobs returns a bare array. Reading a `jobs` wrapper that
-		// is not there resolves to undefined and renders an empty list.
-		const res = await client.get<Job[] | { jobs: Job[] }>(
-			`/api/admin/jobs?limit=${limit}&offset=${offset}`
-		);
-		return Array.isArray(res) ? res : (res?.jobs ?? []);
-	} catch {
-		return [];
-	}
+	// GET /api/admin/jobs returns a bare array. Reading a `jobs` wrapper that
+	// is not there resolves to undefined and renders an empty list.
+	const res = await client.get<Job[] | { jobs: Job[] }>(
+		`/api/admin/jobs?limit=${limit}&offset=${offset}`
+	);
+	return Array.isArray(res) ? res : (res?.jobs ?? []);
 }
 
 export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
@@ -66,8 +66,11 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	 * next page exists and nothing more, and it is dropped before the page sees
 	 * it.
 	 */
-	const rows = await listJobs(client, limit + 1, offset);
-	const page = pageOf<Job>(rows, limit, offset);
+	const read = await section(listJobs(client, limit + 1, offset), LIST_FAILED);
+	// The page draws the gate in place of the list. Nothing was read, so the
+	// drawer stays shut whatever the address asks for.
+	if (!read.ok) return { jobs: read, limit, offset, hasMore: false, openNew: false, openJob: null };
+	const page = pageOf<Job>(read.value, limit, offset);
 	const back = pastEndOffset(page.rows.length, limit, offset, null);
 	if (back !== null) redirect(307, withOffset(url, back));
 
@@ -80,7 +83,10 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	if (editId) {
 		openJob = page.rows.find((j) => j.id === editId) ?? (await readJob(client, editId));
 	}
-	return { jobs: page.rows, limit, offset, hasMore: page.hasMore, openNew, openJob };
+	// Typed, because a bare literal widens `ok` to boolean and the page could
+	// no longer tell the two cases apart.
+	const jobs: Section<Job[]> = { ok: true, value: page.rows };
+	return { jobs, limit, offset, hasMore: page.hasMore, openNew, openJob };
 };
 
 async function readJob(client: ReturnType<typeof createClient>, id: string): Promise<Job | null> {

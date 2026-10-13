@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Entitlements } from '$lib/entitlements';
+import type { Gate } from '$lib/api/gate';
 import JobsPage from './+page.svelte';
 
 const state = vi.hoisted(() => ({ page: { url: new URL('http://localhost/admin/jobs') } }));
@@ -35,7 +36,7 @@ const job = {
 function setup(extra: Record<string, unknown> = {}) {
 	return render(JobsPage, {
 		props: {
-			data: { jobs: [job], limit: 50, offset: 0, hasMore: false, openNew: false, openJob: null, entitlements, ...extra },
+			data: { jobs: { ok: true, value: [job] }, limit: 50, offset: 0, hasMore: false, openNew: false, openJob: null, entitlements, ...extra },
 			form: null,
 		} as never,
 	});
@@ -96,7 +97,7 @@ describe('the job drawer', () => {
 describe('the job list toolbar', () => {
 	it('narrows the page by the typed fragment', async () => {
 		const other = { ...job, id: 'j2', name: 'Weekly digest', schedule: '0 9 * * 1' };
-		const { container } = setup({ jobs: [job, other] });
+		const { container } = setup({ jobs: { ok: true, value: [job, other] } });
 		const box = container.querySelector('#job-search') as HTMLInputElement;
 		await fireEvent.input(box, { target: { value: 'digest' } });
 		const names = [...container.querySelectorAll('tbody td p.font-medium')].map((p) => p.textContent);
@@ -115,7 +116,7 @@ describe('the job alert channels', () => {
 				failure_threshold: 3,
 			},
 		};
-		const { container } = setup({ jobs: [alerting], openJob: alerting });
+		const { container } = setup({ jobs: { ok: true, value: [alerting] }, openJob: alerting });
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
 		expect((dialog.querySelector('#job-alert-slack') as HTMLInputElement).value).toBe('https://hooks.slack.com/...1a2b');
 		const pd = dialog.querySelector('#job-alert-pagerduty') as HTMLInputElement;
@@ -123,5 +124,62 @@ describe('the job alert channels', () => {
 		expect(pd.name).toBe('alert_pagerduty_routing_key');
 		expect(pd.disabled).toBe(false);
 		expect((dialog.querySelector('input[name="alerts_stored"]') as HTMLInputElement).value).toBe('true');
+	});
+});
+
+/*
+ * The first-run state invites the reader to create the first job. Drawn over a
+ * read that failed, it tells somebody whose engine is down that nothing is
+ * scheduled.
+ */
+describe('the job list when it could not be read', () => {
+	function failed(gate: Gate) {
+		return setup({ jobs: { ok: false, gate } });
+	}
+
+	it('says the engine did not answer, with a way to try again, and offers no first job', () => {
+		state.page.url = new URL('http://localhost/admin/jobs?offset=50');
+		const { container, queryByRole, getByRole } = failed({ state: 'unavailable' });
+		expect(container.textContent).toContain('Temporarily unavailable');
+		expect(container.textContent).toContain('so Scheduled jobs could not be read. Nothing was changed.');
+		expect(getByRole('link', { name: 'Try again' }).getAttribute('href')).toBe('/admin/jobs?offset=50');
+		expect(container.textContent).not.toContain('No jobs yet');
+		expect(queryByRole('button', { name: /new job/i })).toBeNull();
+	});
+
+	it('names the role for a refusal and offers nothing to press', () => {
+		const { container, queryByRole } = failed({ state: 'forbidden' });
+		expect(container.textContent).toContain('Your role cannot open Scheduled jobs. Ask a super admin if you need it.');
+		expect(container.textContent).not.toContain('No jobs yet');
+		expect(queryByRole('button', { name: /new job/i })).toBeNull();
+		expect(queryByRole('link', { name: 'Try again' })).toBeNull();
+	});
+
+	it('states a failure in the page\'s words, with a way to try again', () => {
+		const message = 'The jobs could not be read. This is not a report that there are none.';
+		const { container, getByRole, queryByRole } = failed({ state: 'error', message });
+		expect(container.textContent).toContain(message);
+		expect(getByRole('link', { name: 'Try again' })).toBeTruthy();
+		expect(queryByRole('button', { name: /new job/i })).toBeNull();
+	});
+
+	it('draws neither the toolbar, the table nor the pager', () => {
+		const answered = setup();
+		expect(answered.container.querySelector('#job-search')).not.toBeNull();
+		expect(answered.container.querySelector('table')).not.toBeNull();
+		expect(answered.container.textContent).toContain('jobs 1 to 1');
+		cleanup();
+
+		const { container } = failed({ state: 'unavailable' });
+		expect(container.querySelector('#job-search')).toBeNull();
+		expect(container.querySelector('table')).toBeNull();
+		expect(container.textContent).not.toContain('jobs 1 to');
+	});
+
+	it('keeps the first-run state for a list that answered empty', () => {
+		const { container, getAllByRole } = setup({ jobs: { ok: true, value: [] } });
+		expect(container.textContent).toContain('No jobs yet');
+		expect(getAllByRole('button', { name: /new job/i })).toHaveLength(2);
+		expect(container.textContent).not.toContain('Temporarily unavailable');
 	});
 });
