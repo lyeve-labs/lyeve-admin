@@ -10,8 +10,9 @@ afterEach(cleanup);
 
 const licensed = { plan: 'example', state: 'active', features: ['mfa'], tenant_quota: 1 };
 
-function setup(mfaEnabled: boolean, form: unknown = null) {
-	return render(Page, { props: { data: { mfaEnabled, entitlements: licensed }, form } as never });
+function setup(mfaEnabled: boolean | { ok: false; gate: unknown }, form: unknown = null) {
+	const mfa = typeof mfaEnabled === 'boolean' ? { ok: true, value: mfaEnabled } : mfaEnabled;
+	return render(Page, { props: { data: { mfa, entitlements: licensed }, form } as never });
 }
 
 describe('two-factor authentication page', () => {
@@ -37,6 +38,14 @@ describe('two-factor authentication page', () => {
 		const { getByText } = setup(false, { step: 'done', backupCodes: ['a1', 'b2'] });
 		expect(getByText('a1')).toBeTruthy();
 		expect(getByText(/not shown again/)).toBeTruthy();
+	});
+
+	it('says the state could not be read instead of offering to turn it on', () => {
+		const { container, queryByRole } = setup({ ok: false, gate: { state: 'unavailable' } });
+		expect(container.textContent).toContain('could not be read');
+		expect(container.textContent).not.toContain('is off for this account');
+		expect(queryByRole('button', { name: /Turn on/ })).toBeNull();
+		expect(queryByRole('button', { name: /Turn off/ })).toBeNull();
 	});
 
 	it('asks for a code to turn it off when it is on', () => {

@@ -252,7 +252,7 @@ const cases: Case[] = [
 	{
 		route: 'settings/mfa',
 		component: SettingsMfa,
-		data: { mfaEnabled: false, entitlements: licensed },
+		data: { mfa: { ok: true, value: false }, entitlements: licensed },
 		href: '/admin/settings',
 		label: 'Settings',
 	},
