@@ -24,6 +24,12 @@ const DEFAULT_LIMIT = 60;
  */
 const MAX_LIMIT = 199;
 
+/**
+ * A write that names no file belongs to no drawer, so it is said at the top
+ * of the page with the other page-level failures.
+ */
+const NO_FILE = 'No file was named.';
+
 const LIST_FAILED = 'The media library could not be read. This is not a report that it is empty.';
 
 /**
@@ -89,7 +95,7 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
-		if (!id) return fail(400, { detailsError: 'No file was named.' });
+		if (!id) return fail(400, { error: NO_FILE });
 		try {
 			const item = await updateMediaDetails(authedClient(event), id, {
 				alt_text: String(data.get('alt_text') ?? '').trim(),
@@ -125,7 +131,7 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
-		if (!id) return fail(400, { detailsError: 'No file was named.' });
+		if (!id) return fail(400, { error: NO_FILE });
 		try {
 			const item = await setMediaPublic(authedClient(event), id, data.get('public') === 'true');
 			return { updated: item };
@@ -138,7 +144,7 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
-		if (!id) return fail(400, { focalError: 'No file was named.' });
+		if (!id) return fail(400, { error: NO_FILE });
 		const clear = data.get('clear') === 'true';
 		const x = Number(data.get('x'));
 		const y = Number(data.get('y'));
@@ -157,7 +163,7 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
-		if (!id) return fail(400, { transformError: 'No file was named.' });
+		if (!id) return fail(400, { error: NO_FILE });
 		try {
 			const signed = await signTransformUrl(authedClient(event), id, transformRequestFrom(data));
 			return { transform: { id, url: signed.url, expires_at: signed.expires_at ?? null } };
@@ -171,7 +177,7 @@ export const actions: Actions = {
 	describe: async (event) => {
 		await requireUser(event);
 		const id = String((await event.request.formData()).get('id') ?? '');
-		if (!id) return fail(400, { detailsError: 'No file was named.' });
+		if (!id) return fail(400, { error: NO_FILE });
 		try {
 			return { described: { id, text: await describeMedia(authedClient(event), id) } };
 		} catch (err) {

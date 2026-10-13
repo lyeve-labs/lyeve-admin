@@ -287,6 +287,11 @@ describe('media library failures stay with their file and form', () => {
 		expect(screen.getByText('The details could not be saved.')).toBeTruthy();
 	});
 
+	it('shows a write that named no file at the top of the page', () => {
+		withForm({ error: 'No file was named.' });
+		expect(screen.getByText('No file was named.')).toBeTruthy();
+	});
+
 	it('leaves the import drawer clean after a failed delete', async () => {
 		withForm({ error: 'Failed to delete media' });
 		await fireEvent.click(screen.getByRole('button', { name: /Import from URL/ }));
