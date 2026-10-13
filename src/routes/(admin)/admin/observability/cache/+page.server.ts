@@ -158,12 +158,13 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 	const client = authedClient(event);
 	const form = await event.request.formData();
 	const body = ruleBody(form);
-	if (typeof body === 'string') return fail(400, { error: body });
+	if (typeof body === 'string') return fail(400, { error: body, drawer: 'rule' });
 	try {
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		return actionFailure(err, 'The rule could not be saved.');
+		const failed = actionFailure(err, 'The rule could not be saved.');
+		return fail(failed.status, { ...failed.data, drawer: 'rule' });
 	}
 	return { savedRule: body.pattern };
 }
@@ -174,7 +175,7 @@ export const actions: Actions = {
 	updateRule: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { error: 'No rule was named.', drawer: 'rule' });
 		return saveRule(event, id);
 	},
 

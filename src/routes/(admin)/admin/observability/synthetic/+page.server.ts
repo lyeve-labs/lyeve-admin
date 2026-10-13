@@ -163,19 +163,19 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 
 	const name = String(form.get('name') ?? '').trim();
 	const type = probeType(String(form.get('type') ?? ''));
-	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.' });
-	if (!type) return fail(400, { error: 'Choose a probe type.' });
+	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' });
+	if (!type) return fail(400, { error: 'Choose a probe type.', drawer: 'probe' });
 
 	const config = configFor(type, form);
 	const required = REQUIRED_TARGET[type];
 	if (required && !config[required.field]) {
-		return fail(400, { error: required.says });
+		return fail(400, { error: required.says, drawer: 'probe' });
 	}
 
 	const interval = positive(form.get('interval_seconds'), 300);
 	const timeout = positive(form.get('timeout_seconds'), 10);
 	if (timeout < MIN_TIMEOUT_SECONDS || timeout >= interval) {
-		return fail(400, { error: 'The timeout has to be shorter than the interval.' });
+		return fail(400, { error: 'The timeout has to be shorter than the interval.', drawer: 'probe' });
 	}
 
 	const body = {
@@ -192,7 +192,8 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateProbe(client, id, body);
 		else await createProbe(client, body);
 	} catch (err) {
-		return actionFailure(err, 'The probe could not be saved.');
+		const failed = actionFailure(err, 'The probe could not be saved.');
+		return fail(failed.status, { ...failed.data, drawer: 'probe' });
 	}
 	return { saved: name };
 }
@@ -203,7 +204,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No probe was named.' });
+		if (!id) return fail(400, { error: 'No probe was named.', drawer: 'probe' });
 		return save(event, id);
 	},
 

@@ -30,7 +30,7 @@ function alert(over: Partial<ErrorAlert> = {}): ErrorAlert {
 	};
 }
 
-function setup(over: Record<string, unknown> = {}) {
+function setup(over: Record<string, unknown> = {}, form: Record<string, unknown> | null = null) {
 	return render(ErrorsPage, {
 		props: {
 			data: {
@@ -44,7 +44,7 @@ function setup(over: Record<string, unknown> = {}) {
 				events: { data: [], total: 0, hiddenOlder: 0, windowDays: null },
 				...over,
 			},
-			form: null,
+			form,
 		} as never,
 	});
 }
@@ -119,5 +119,23 @@ describe('the tiles', () => {
 		const { container } = setup();
 		expect(tile(container, 'Distinct failures tracked')).toBe('1');
 		expect(container.textContent).not.toContain('on this page');
+	});
+});
+
+describe('which surface says a failure', () => {
+	const dialog = (container: HTMLElement) => container.ownerDocument.querySelector('[role="dialog"]') as HTMLElement;
+
+	// A failed acknowledge or triage was said inside the next Assign prompt.
+	it('says a failed triage on the page and not in the Assign prompt', async () => {
+		const { container, getByRole } = setup({}, { error: 'The alert could not be changed.' });
+		expect(container.textContent).toContain('The alert could not be changed.');
+		await fireEvent.click(getByRole('button', { name: 'Assign this failure' }));
+		expect(dialog(container).textContent).not.toContain('could not be changed');
+	});
+
+	it('says a failed assign inside the Assign prompt', async () => {
+		const { container, getByRole } = setup({}, { error: 'The alert could not be assigned.', drawer: 'assign' });
+		await fireEvent.click(getByRole('button', { name: 'Assign this failure' }));
+		expect(dialog(container).textContent).toContain('The alert could not be assigned.');
 	});
 });

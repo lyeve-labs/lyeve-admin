@@ -149,9 +149,19 @@ describe('a failed rule save', () => {
 	// The message went to the page behind the drawer, so the open panel said
 	// nothing about why the save did not happen.
 	it('is said at the top of the open form', async () => {
-		render(CachePage, { props: props({}, { error: 'A rule needs a route pattern.' }) });
+		render(CachePage, { props: props({}, { error: 'A rule needs a route pattern.', drawer: 'rule' }) });
 		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
 		const form = document.querySelector('#cache-rule-form') as HTMLFormElement;
 		expect(form.textContent).toContain('A rule needs a route pattern.');
+	});
+
+	// A failed delete, purge, flush or circuit reset belongs to the page. Read
+	// by the drawer, it greeted the next New rule as that rule's failure.
+	it('keeps a failure from a row out of the drawer', async () => {
+		const { container } = render(CachePage, { props: props({}, { error: 'The rule could not be deleted.' }) });
+		expect(said(container)).toContain('The rule could not be deleted.');
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#cache-rule-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('The rule could not be deleted.');
 	});
 });

@@ -309,9 +309,21 @@ describe('a failed save', () => {
 	// The message went to the page behind the drawer, so the open panel said
 	// nothing about why the save did not happen.
 	it('is said at the top of the open form', async () => {
-		render(SyntheticPage, { props: props({}, { error: 'Name the probe so an alert can say which one fired.' }) });
+		render(SyntheticPage, { props: props({}, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' }) });
 		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
 		const form = document.querySelector('#probe-form') as HTMLFormElement;
 		expect(form.textContent).toContain('Name the probe so an alert can say which one fired.');
+	});
+});
+
+describe('a failed row action', () => {
+	// A failed delete, run or acknowledge greeted the next New probe as that
+	// probe's failure.
+	it('is said on the page and not in the probe drawer', async () => {
+		const { container } = render(SyntheticPage, { props: props({}, { error: 'The probe could not be deleted.' }) });
+		expect(said(container)).toContain('The probe could not be deleted.');
+		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
+		const form = document.querySelector('#probe-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be deleted');
 	});
 });

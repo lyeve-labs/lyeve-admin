@@ -52,12 +52,19 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	// A refusal from the channels drawer stays in the drawer.
+	// A failure from a drawer stays in that drawer. The channels drawer marks
+	// its own, and a probe save names the probe drawer. Every other failure is
+	// the page's.
 	const channelsFailed = $derived(!!form && 'channels' in form && form.channels === true);
-	const pageRefusal = $derived(channelsFailed ? null : formRefusal(form));
+	const probeFailed = $derived(!!form && 'drawer' in form && form.drawer === 'probe');
+	const pageRefusal = $derived(channelsFailed || probeFailed ? null : formRefusal(form));
 	const channelsRefusal = $derived(channelsFailed ? formRefusal(form) : null);
+	const probeRefusal = $derived(probeFailed ? formRefusal(form) : null);
 
-	const formError = $derived(channelsFailed ? '' : ((form as { error?: string } | null)?.error ?? ''));
+	const formError = $derived(
+		channelsFailed || probeFailed ? '' : ((form as { error?: string } | null)?.error ?? ''),
+	);
+	const probeError = $derived(probeFailed ? ((form as { error?: string } | null)?.error ?? '') : '');
 	const channelsError = $derived(channelsFailed ? ((form as { error?: string } | null)?.error ?? '') : '');
 
 	// The notice channels drawer is addressable: `?channels=<id>` opens it on
@@ -246,9 +253,9 @@
 			absent="The synthetic monitoring plugin is not part of this build, so nothing is being probed."
 		/>
 	{:else}
-		{#if pageRefusal && !open}
+		{#if pageRefusal}
 			<RefusalNotice refusal={pageRefusal} />
-		{:else if formError && !open}
+		{:else if formError}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -456,7 +463,7 @@
 		action={editing ? '?/update' : '?/create'}
 		use:enhance={saveProbeSubmit.enhance}
 	>
-		<FormErrors message={formError || undefined} refused={pageRefusal} />
+		<FormErrors message={probeError || undefined} refused={probeRefusal} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}

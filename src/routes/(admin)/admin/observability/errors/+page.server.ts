@@ -110,12 +110,15 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const assignee = String(form.get('assignee') ?? '').trim();
-		if (!id) return fail(400, { error: 'No alert was named.' });
-		if (assignee.length > 255) return fail(400, { error: 'An assignee is at most 255 characters.' });
+		// The assign prompt names itself on a failure, so the prompt says it and
+		// the page does not.
+		if (!id) return fail(400, { error: 'No alert was named.', drawer: 'assign' });
+		if (assignee.length > 255) return fail(400, { error: 'An assignee is at most 255 characters.', drawer: 'assign' });
 		try {
 			await assign(authedClient(event), id, assignee);
 		} catch (err) {
-			return actionFailure(err, 'The alert could not be assigned.');
+			const failed = actionFailure(err, 'The alert could not be assigned.');
+			return fail(failed.status, { ...failed.data, drawer: 'assign' });
 		}
 		return { assigned: id, assignee };
 	},

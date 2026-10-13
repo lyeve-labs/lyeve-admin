@@ -170,3 +170,10 @@ describe('the probe list load', () => {
 		});
 	});
 });
+
+describe('which surface a failure belongs to', () => {
+	it('tags a failed probe save for the probe drawer', async () => {
+		const out = (await actions.create(actionEvent({ name: '' }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('probe');
+	});
+});

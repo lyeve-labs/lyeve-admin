@@ -192,3 +192,26 @@ describe('replay sets', () => {
 		expect(api.replaySet).toHaveBeenCalledWith(expect.anything(), 's1', true);
 	});
 });
+
+describe('which surface a failure belongs to', () => {
+	const fields = { route_pattern: '/api/v1/orders', method: '*', sample_percent: '100', retention_seconds: '3600', enabled: 'true' };
+
+	it('tags a failed rule save for the rule drawer', async () => {
+		api.createCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.createRule(formEvent(fields))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('rule');
+	});
+
+	it('tags a failed set save for the set drawer', async () => {
+		const out = (await actions.createSet(formEvent({ name: '' }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('set');
+	});
+
+	it('leaves a failed switch-off from the row for the page', async () => {
+		api.updateCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.updateRule(formEvent({ ...fields, id: 'r1', enabled: 'false', from: 'row' }))) as {
+			data: Record<string, unknown>;
+		};
+		expect(out.data.drawer).toBeNull();
+	});
+});

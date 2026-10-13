@@ -191,3 +191,18 @@ describe('cache rule actions', () => {
 		expect(api.flushAll).not.toHaveBeenCalled();
 	});
 });
+
+describe('which surface a failure belongs to', () => {
+	it('tags a failed rule save for the rule drawer', async () => {
+		api.createRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.createRule(formEvent({ pattern: '/api/v1/content/x', ttl_seconds: '60' }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('rule');
+	});
+
+	it('leaves a failed delete untagged, for the page', async () => {
+		authz.roles = ['admin'];
+		api.deleteRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.deleteRule(formEvent({ id: rule.id }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBeUndefined();
+	});
+});

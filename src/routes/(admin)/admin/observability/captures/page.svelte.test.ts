@@ -187,9 +187,26 @@ describe('a failed rule save', () => {
 	// The message went to the page behind the drawer, so the open panel said
 	// nothing about why the save did not happen.
 	it('is said at the top of the open form', async () => {
-		render(CapturesPage, { props: props({}, { error: 'A route is an absolute path.' }) });
+		render(CapturesPage, { props: props({}, { error: 'A route is an absolute path.', drawer: 'rule' }) });
 		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
 		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
 		expect(form.textContent).toContain('A route is an absolute path.');
+	});
+
+	// The rule and set drawers each showed the other's failures, and every
+	// row action's failure too.
+	it('keeps a failed set save out of the rule drawer', async () => {
+		render(CapturesPage, { props: props({}, { error: 'Name the set so a replay can say which one ran.', drawer: 'set' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('Name the set');
+	});
+
+	it('says a failed row action on the page and not in the drawer', async () => {
+		const { container } = render(CapturesPage, { props: props({}, { error: 'The replay set could not be deleted.' }) });
+		expect(said(container)).toContain('The replay set could not be deleted.');
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be deleted');
 	});
 });

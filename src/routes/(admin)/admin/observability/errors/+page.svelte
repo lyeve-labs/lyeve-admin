@@ -44,6 +44,9 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
+	// The assign prompt's own failure is tagged, so the prompt says it and the
+	// page says every other one.
+	const assignFailed = $derived(!!form && 'drawer' in form && form.drawer === 'assign');
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const refused = $derived(formRefusal(form));
 	const open = $derived(unacknowledged(data.alerts));
@@ -140,9 +143,7 @@
 			absent="The error tracking plugin is not part of this build, so failures are logged and not grouped."
 		/>
 	{:else}
-		{#if !assigning}
-			<FormErrors message={formError} {refused} />
-		{/if}
+		<FormErrors message={assignFailed ? undefined : formError || undefined} refused={assignFailed ? null : refused} />
 
 		<div class="grid gap-4 sm:grid-cols-3">
 			<!-- Distinct failures, not events. Ten thousand events from one
@@ -346,7 +347,7 @@
 {#if assigning}
 	<Modal open title="Assign this failure" onclose={() => (assigning = null)}>
 		<form method="POST" action="?/assign" id="assign-form" use:enhance={assignSubmit} class="flex flex-col gap-3">
-			<FormErrors message={formError} {refused} />
+			<FormErrors message={assignFailed ? formError || undefined : undefined} refused={assignFailed ? refused : null} />
 			<input type="hidden" name="id" value={assigning.id} />
 			<Input
 				id="alert-assignee"

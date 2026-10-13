@@ -47,6 +47,11 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const refusal = $derived(formRefusal(form));
+	// A failed save names the drawer it came from, so it is said inside that
+	// drawer and nowhere else. Every other failure is the page's.
+	const fromDrawer = $derived(
+		form && 'drawer' in form && typeof form.drawer === 'string' ? form.drawer : null,
+	);
 	// The plugin refuses a new rule or a new replay set on an install whose
 	// license leaves them out, so neither is offered there. Switching a rule
 	// off and deleting one stay allowed.
@@ -189,7 +194,7 @@
 			absent="The request capture plugin is not part of this build, so no request is kept."
 		/>
 	{:else}
-		{#if refusal && !ruleOpen && !setOpen}
+		{#if refusal && !fromDrawer}
 			<RefusalNotice {refusal} />
 		{:else if needsWrites}
 			{@const s = data.sets.find((x) => x.id === needsWrites)}
@@ -203,7 +208,7 @@
 					</form>
 				{/if}
 			</Alert>
-		{:else if formError && !ruleOpen && !setOpen}
+		{:else if formError && !fromDrawer}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -465,7 +470,10 @@
 
 <Drawer bind:open={ruleOpen} title={editing ? 'Edit rule' : 'New rule'}>
 	<form id="capture-rule-form" method="POST" action={editing ? '?/updateRule' : '?/createRule'} use:enhance={saveRule.enhance}>
-		<FormErrors message={formError || undefined} refused={refusal} />
+		<FormErrors
+			message={fromDrawer === 'rule' ? formError || undefined : undefined}
+			refused={fromDrawer === 'rule' ? refusal : null}
+		/>
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}
@@ -514,7 +522,10 @@
 
 <Drawer bind:open={setOpen} title="New replay set">
 	<form id="replay-set-form" method="POST" action="?/createSet" use:enhance={saveSet.enhance}>
-		<FormErrors message={formError || undefined} refused={refusal} />
+		<FormErrors
+			message={fromDrawer === 'set' ? formError || undefined : undefined}
+			refused={fromDrawer === 'set' ? refusal : null}
+		/>
 		{#each selected as id (id)}
 			<input type="hidden" name="capture_id" value={id} />
 		{/each}
