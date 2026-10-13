@@ -57,6 +57,7 @@
 	// off and deleting one stay allowed.
 	const canCreate = $derived(data.licensed !== false);
 	const NOT_INCLUDED = 'Not included in this license';
+	const EDIT_REFUSED = `${NOT_INCLUDED}. Switch the rule off or delete it.`;
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const needsWrites = $derived((form as { needsWrites?: string } | null)?.needsWrites ?? '');
 	const replay = $derived((form as { replay?: SetReplay } | null)?.replay ?? null);
@@ -277,7 +278,7 @@
 												size="sm"
 												aria-label="Edit {r.route_pattern}"
 												disabled
-												title="{NOT_INCLUDED}. Switch the rule off or delete it."
+												title={EDIT_REFUSED}
 											>
 												<Pencil size={ICON.sm} />
 											</Button>
