@@ -43,7 +43,6 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 		presetsGate: null,
 		canWrite: true,
 		isSuperAdmin: true,
-		loadError: false,
 		loadGate: null,
 		...overrides,
 	} as unknown as PageData;

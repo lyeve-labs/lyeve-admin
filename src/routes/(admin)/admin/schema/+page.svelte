@@ -909,7 +909,8 @@
 	const transferItems = $derived([
 		{ label: 'Export as YAML', icon: Download, onclick: () => download('/admin/schema/export') },
 		{ label: 'Export as JSON', icon: Download, onclick: () => download('/admin/schema/export?format=json') },
-		...(isSuperAdmin ? [{ label: 'Import', icon: Upload, onclick: openImport }] : []),
+		// Import creates schemas, so it is not offered beside a list that could not be read.
+		...(isSuperAdmin && !data.loadGate ? [{ label: 'Import', icon: Upload, onclick: openImport }] : []),
 	]);
 
 	// Import, in two steps: the engine's plan first, then the run. The file
@@ -1726,12 +1727,12 @@
 				{#if canWrite}
 					<!-- The one place a schema is started from. A list that could
 					     not be read offers no create beside it. -->
-					{#if !data.loadError}
+					{#if !data.loadGate}
 						<Button variant="secondary" size="sm" onclick={newSchema}>
 							<Plus size={ICON.sm} /> New schema
 						</Button>
 					{/if}
-					{#if hasPresets && !data.loadError}
+					{#if hasPresets && !data.loadGate}
 						<Button variant="ghost" size="sm" onclick={() => (showPresets = true)}>
 							<LayoutTemplate size={ICON.sm} /> Presets
 						</Button>
@@ -1820,7 +1821,7 @@
 				/>
 			</div>
 		{/if}
-		{#if !canWrite}
+		{#if !canWrite && !data.loadGate}
 			<div class="shrink-0 px-3 pt-3">
 				<Alert tone="brand">Your role reads schemas. Changing one takes admin or super_admin.</Alert>
 			</div>
@@ -1976,7 +1977,7 @@
 				<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 					{#if selected}
 						{@render editorBody(selected)}
-					{:else if schemas.length === 0 && !data.loadError}
+					{:else if schemas.length === 0 && !data.loadGate}
 						<!-- The offer the flow editor makes from its empty canvas: a way in
 						     that is not a blank form. A preset is a set of content types
 						     the engine ships. New schema in the toolbar stays the other door. -->

@@ -69,7 +69,6 @@ type Loaded = {
 	schemas: { name: string }[];
 	presets: { id: string }[];
 	presetsGate: { state: string } | null;
-	loadError: boolean;
 	loadGate: { state: string } | null;
 	canvas: { licensed: boolean };
 };
@@ -105,8 +104,14 @@ describe('admin/schema load', () => {
 	it('keeps a failed schema list as a gate rather than an empty list', async () => {
 		const { event } = loadEvent({ '/api/admin/schemas': () => json({ error: 'slow down' }, 429) });
 		const out = (await load(event)) as unknown as Loaded;
-		expect(out.loadError).toBe(true);
 		expect(out.loadGate).toEqual({ state: 'busy' });
+	});
+
+	it('answers no gate for a list it read', async () => {
+		const { event } = loadEvent(schemaRoutes);
+		const out = (await load(event)) as unknown as Loaded;
+		expect(out.loadGate).toBeNull();
+		expect('loadError' in out).toBe(false);
 	});
 
 	it('reads neither the presets nor the canvas for a role that cannot use them', async () => {

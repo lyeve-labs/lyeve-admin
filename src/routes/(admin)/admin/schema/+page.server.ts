@@ -89,7 +89,6 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 			canvas: NO_CANVAS as CanvasLayout,
 			canWrite,
 			isSuperAdmin,
-			loadError: true,
 			loadGate: read.gate as Gate | null,
 		};
 	}
@@ -129,7 +128,6 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 		canvas,
 		canWrite,
 		isSuperAdmin,
-		loadError: false,
 		loadGate: null as Gate | null,
 	};
 };
