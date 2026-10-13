@@ -954,7 +954,7 @@ describe('flow editor refusal', () => {
 	it('renders a refusal inline with the node ids, and marks the nodes as problems', () => {
 		const form = {
 			error: '2 elements use what this instance does not enable: the trigger, orders.',
-			refusal: { nodeIds: ['trigger', 'orders'], limit: null, current: null },
+			refusal: { nodeIds: ['trigger', 'orders'], limit: null, current: null, upgradeUrl: '' },
 			errors: [
 				{ node_id: 'trigger', path: '/trigger/type', message: 'not enabled here' },
 				{ node_id: 'orders', path: '/type', message: 'not enabled here' },

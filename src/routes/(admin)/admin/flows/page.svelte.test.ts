@@ -304,6 +304,21 @@ describe('flows list page ceiling', () => {
 		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
 		expect(drawer.textContent).toContain('7 of 7 flows are in use');
 	});
+
+	it('links where the plugin says more flows are bought, in a new tab', async () => {
+		const link = 'https://shop.example.com/pricing?utm_campaign=flow.flows';
+		const { container, getAllByText, rerender } = setup();
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({
+			data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
+			form: { action: 'create', error: '7 of 7 flows are in use, the most this instance keeps. Add more with a license, or delete one to make room.', refusal: { nodeIds: [], limit: 7, current: 7, upgradeUrl: link } },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
+		const a = drawer.querySelector(`a[href="${link}"]`) as HTMLAnchorElement;
+		expect(a.textContent).toBe('How to raise the limit');
+		expect(a.getAttribute('target')).toBe('_blank');
+		expect(a.getAttribute('rel')).toBe('noopener noreferrer');
+	});
 });
 
 describe('flows list page role grants', () => {

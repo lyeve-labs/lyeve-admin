@@ -124,6 +124,13 @@ describe('refusalOf', () => {
 		expect(refusal.limit).toBe(7);
 		expect(refusal.current).toBe(6);
 		expect(refusal.nodeIds).toEqual([]);
+		expect(refusal.upgradeUrl).toBe('');
+	});
+
+	it('reads the link a ceiling refusal names for more', () => {
+		const link = 'https://shop.example.com/pricing?utm_campaign=example.cap';
+		const refusal = refusalOf(402, JSON.stringify({ error: 'cap_exceeded', cap: 'example.cap', limit: 7, current: 7, upgrade_url: link }))!;
+		expect(refusal.upgradeUrl).toBe(link);
 	});
 
 	it('answers null for any other status and an empty refusal for a body that is not JSON', () => {
