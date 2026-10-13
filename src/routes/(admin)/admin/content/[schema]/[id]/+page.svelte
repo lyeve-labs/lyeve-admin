@@ -193,6 +193,9 @@
 						<History size={ICON.sm} /> History ({revisions.length})
 					</Button>
 				{/if}
+				{#if data.revisionsFailed}
+					<span class="text-xs text-muted">The revision history could not be read.</span>
+				{/if}
 				<div class="flex flex-col items-end gap-1 text-xs text-faint">
 					<span class="flex items-center gap-1">
 						<Clock size={ICON.xs} /> Created {formatDate(data.item?.created_at ?? '')}
@@ -221,6 +224,7 @@
 						people={data.review.people}
 						unavailable={data.review.unavailable}
 						forbidden={data.review.forbidden}
+						definitionsFailed={data.review.definitionsFailed}
 						error={reviewError?.message}
 						errorStatus={reviewError?.status}
 					/>
@@ -249,8 +253,8 @@
 							fields={userFields}
 							{formValues}
 							{validationErrors}
-							relationItems={data.relationItems}
-				mediaChoices={data.mediaChoices}
+							relations={data.relations}
+							mediaChoices={data.mediaChoices}
 							error={translationError || reviewError || commentError || releaseError || revisionError ? null : form?.error}
 						/>
 					</div>
@@ -266,6 +270,7 @@
 					<AddToRelease
 						releases={data.releases.open}
 						holding={data.releases.holding}
+						failed={data.releases.failed}
 						error={releaseError || undefined}
 						refused={releaseError ? sideRefusal : null}
 						added={!!form && 'addedToRelease' in form}

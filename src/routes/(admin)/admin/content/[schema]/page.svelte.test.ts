@@ -27,8 +27,12 @@ function items(count: number, from = 0) {
  * carries only what this page renders and is asserted against PageData once.
  */
 function data(overrides: Record<string, unknown> = {}): PageData {
+	// A test names its rows as an array. The load hands the page a read that
+	// succeeded, or the gate of one that failed.
+	const { items: rows, ...rest } = overrides;
+	const read = Array.isArray(rows) ? { ok: true, value: rows } : (rows ?? { ok: true, value: items(100) });
 	return {
-		schemas: [{ name: 'posts', display_name: 'Posts' }],
+		schemas: { ok: true, value: [{ name: 'posts', display_name: 'Posts' }] },
 		schemaDef: {
 			name: 'posts',
 			display_name: 'Posts',
@@ -36,12 +40,12 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 			with_draft_publish: false,
 			with_updated_at: false,
 		},
-		items: items(100),
 		activeSchema: 'posts',
 		limit: 100,
 		offset: 0,
 		total: 4000,
-		...overrides,
+		...rest,
+		items: read,
 	} as unknown as PageData;
 }
 
@@ -205,5 +209,34 @@ describe('content listing row links', () => {
 		const { container } = render(ContentListPage, { props: { data: data(), form: null } });
 		const link = container.querySelector('tbody a[href^="/admin/content/posts/entry-0"]');
 		expect(link?.getAttribute('href')).toBe('/admin/content/posts/entry-0-0000-0000-0000');
+	});
+});
+
+describe('content listing reads', () => {
+	it('says the entries could not be read instead of calling the collection empty', () => {
+		render(ContentListPage, {
+			props: { data: data({ items: { ok: false, gate: { state: 'unavailable' } }, total: 0 }), form: null },
+		});
+
+		expect(screen.getByText(/Entries could not be read/)).toBeTruthy();
+		expect(screen.queryByText('No entries yet')).toBeNull();
+		expect(screen.queryByRole('link', { name: /New entry/ })).toBeNull();
+	});
+
+	it('tells a role the listing refuses that it cannot open the entries', () => {
+		render(ContentListPage, {
+			props: { data: data({ items: { ok: false, gate: { state: 'forbidden' } }, total: 0 }), form: null },
+		});
+
+		expect(screen.getByText(/Your role cannot open Entries/)).toBeTruthy();
+		expect(screen.queryByText('No entries yet')).toBeNull();
+	});
+
+	it('says the picker is missing when the collections could not be read', () => {
+		render(ContentListPage, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+
+		expect(screen.getByText(/other collections could not be read/)).toBeTruthy();
 	});
 });

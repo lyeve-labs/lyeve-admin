@@ -18,9 +18,11 @@
 		error?: string;
 		refused?: Refusal | null;
 		added?: boolean;
+		/** The releases could not be read, so the card has none to offer. */
+		failed?: boolean;
 	}
 
-	let { releases, holding, error = undefined, refused = null, added = false }: Props = $props();
+	let { releases, holding, error = undefined, refused = null, added = false, failed = false }: Props = $props();
 
 	const options = $derived(releases.map((r) => ({ value: r.id, label: `${r.name} (${r.status})` })));
 	// svelte-ignore state_referenced_locally
@@ -53,7 +55,9 @@
 				{/each}
 			</p>
 		{/if}
-		{#if options.length === 0}
+		{#if failed}
+			<p class="text-sm text-muted">The releases could not be read, so this entry cannot be added to one. Reload the page to try again.</p>
+		{:else if options.length === 0}
 			<p class="text-sm text-muted">
 				No release is open for changes. <a class="text-brand" href="/admin/releases">Create one</a> to publish this entry with others.
 			</p>

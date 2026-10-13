@@ -24,6 +24,7 @@
 		people = [],
 		unavailable = false,
 		forbidden = false,
+		definitionsFailed = false,
 		error = null,
 		errorStatus = 0,
 	}: {
@@ -47,6 +48,8 @@
 		unavailable?: boolean;
 		/** The engine refused to show this entry's review to the caller. */
 		forbidden?: boolean;
+		/** The definitions could not be read, so no review can be started from here. */
+		definitionsFailed?: boolean;
 		/** The last review action's refusal, as the engine worded it. */
 		error?: string | null;
 		/** The status the refusal came with. A 403 is named as a permission. */
@@ -241,6 +244,8 @@
 						</Button>
 					</div>
 				</form>
+			{:else if definitionsFailed}
+				<p class="text-sm text-muted">The review definitions could not be read, so a review cannot be started here. Reload the page to try again.</p>
 			{:else if error}
 				<Alert tone="danger">{error}</Alert>
 			{/if}

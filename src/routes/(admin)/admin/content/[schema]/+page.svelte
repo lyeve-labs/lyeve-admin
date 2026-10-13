@@ -20,6 +20,7 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { listQuery } from '$lib/back';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { Plus, Trash2, Inbox } from '@lucide/svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import FieldCell from '$lib/components/FieldCell.svelte';
@@ -29,7 +30,10 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	type EntryItem = PageData['items'][number];
+	// A failed read draws its gate instead of the table, so these are only
+	// ever rows the engine answered with.
+	const entries = $derived(data.items.ok ? data.items.value : []);
+	type EntryItem = (typeof entries)[number];
 
 	let userFields = $derived((data.schemaDef?.fields ?? []).filter((f: SchemaField) => !f.system));
 
@@ -52,7 +56,7 @@
 	 * labeled once.
 	 */
 	let schemaOptions = $derived(
-		data.schemas.map((s: Schema) => ({
+		(data.schemas.ok ? data.schemas.value : []).map((s: Schema) => ({
 			value: s.name,
 			label: s.display_name && s.display_name !== s.name ? `${s.display_name} (${s.name})` : s.name,
 		})),
@@ -141,12 +145,14 @@
 	{/snippet}
 
 	{#snippet actions()}
-		<Button size="sm" href="/admin/content/{data.activeSchema}/new">
-			<Plus size={ICON.sm} /> New entry
-		</Button>
+		{#if data.items.ok}
+			<Button size="sm" href="/admin/content/{data.activeSchema}/new">
+				<Plus size={ICON.sm} /> New entry
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if data.schemas.length > 1}
+	{#if data.schemas.ok && data.schemas.value.length > 1}
 		<!-- A GET form, so submitting opens the collection without JavaScript.
 		     A search scales to any number of schemas, where a tab strip in one
 		     horizontal scroller stops being usable at a few dozen. -->
@@ -162,6 +168,8 @@
 				onchange={openCollection}
 			/>
 		</form>
+	{:else if !data.schemas.ok}
+		<p class="text-sm text-muted">The other collections could not be read, so the collection picker is not shown.</p>
 	{/if}
 
 	{#if form?.error}
@@ -173,7 +181,13 @@
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Entries</SectionHeading>
 
-		{#if data.items.length === 0}
+		{#if !data.items.ok}
+			<GateNotice
+				gate={data.items.gate}
+				title="Entries"
+				absent="This build does not serve content entries."
+			/>
+		{:else if entries.length === 0}
 			<EmptyState title="No entries yet" description="Add the first entry to this collection.">
 				{#snippet iconSnippet()}
 					<Inbox size={ICON.lg} />
@@ -203,7 +217,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.items as item (item.id)}
+					{#each entries as item (item.id)}
 						{@const title = entryTitle(item, userFields)}
 						<tr>
 							<!-- Truncate rather than wrap: the kit's default breaks a cell

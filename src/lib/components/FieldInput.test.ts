@@ -194,15 +194,53 @@ describe('FieldInput', () => {
 		expect(getByRole('option', { name: '3f2b1c9a' })).toBeTruthy();
 	});
 
-	it('falls back to a manual ID input for a belongs_to relation without items', () => {
+	it('falls back to a manual ID input for a belongs_to relation with no entries', () => {
 		const { getByText } = render(FieldInput, {
 			props: {
 				field: field('relation', { relation_type: 'belongs_to', relation_to: 'posts' }),
 				value: '',
 				relationItems: [],
+				relationTotal: 0,
 			},
 		});
-		expect(getByText(/Enter an ID manually/)).toBeTruthy();
+		expect(getByText(/posts has no entries yet. Enter an ID by hand/)).toBeTruthy();
+	});
+
+	it('says a failed read failed instead of calling the related collection empty', () => {
+		const { getByText, queryByText } = render(FieldInput, {
+			props: {
+				field: field('relation', { relation_type: 'belongs_to', relation_to: 'posts' }),
+				value: '',
+				relationItems: [],
+				relationFailed: true,
+			},
+		});
+		expect(getByText(/The entries in posts could not be read/)).toBeTruthy();
+		expect(queryByText(/no entries/)).toBeNull();
+	});
+
+	it('says when the picker offers only part of the related collection', () => {
+		const { getByText } = render(FieldInput, {
+			props: {
+				field: field('relation', { relation_type: 'belongs_to', relation_to: 'posts' }),
+				value: '',
+				relationItems: [content('id-1', { title: 'One' })],
+				relationTotal: 1200,
+			},
+		});
+		expect(getByText('Only the first 1 of 1,200 entries in posts are offered here.')).toBeTruthy();
+	});
+
+	it('says nothing about a cut when the picker holds the whole collection', () => {
+		const { queryByText } = render(FieldInput, {
+			props: {
+				field: field('relation', { relation_type: 'belongs_to', relation_to: 'posts' }),
+				value: '',
+				relationItems: [content('id-1', { title: 'One' })],
+				relationTotal: 1,
+			},
+		});
+		expect(queryByText(/Only the first/)).toBeNull();
 	});
 
 	// Without the id, the field's label would point at an element that does not
@@ -249,15 +287,29 @@ describe('FieldInput', () => {
 		expect(getByRole('combobox', { expanded: false }).textContent).toContain('Two');
 	});
 
-	it('shows an empty-state message for a many_to_many relation without items', () => {
+	it('shows an empty-state message for a many_to_many relation with no entries', () => {
 		const { getByText } = render(FieldInput, {
 			props: {
 				field: field('relation', { relation_type: 'many_to_many', relation_to: 'posts' }),
 				value: [],
 				relationItems: [],
+				relationTotal: 0,
 			},
 		});
-		expect(getByText(/No entries found/)).toBeTruthy();
+		expect(getByText(/has no entries yet/)).toBeTruthy();
+	});
+
+	it('says a many_to_many picker could not be read', () => {
+		const { getByText, queryByText } = render(FieldInput, {
+			props: {
+				field: field('relation', { relation_type: 'many_to_many', relation_to: 'posts' }),
+				value: [],
+				relationItems: [],
+				relationFailed: true,
+			},
+		});
+		expect(getByText(/could not be read, so none can be picked/)).toBeTruthy();
+		expect(queryByText(/has no entries yet/)).toBeNull();
 	});
 
 	// The key of a has_one or has_many lives on the other table. A control

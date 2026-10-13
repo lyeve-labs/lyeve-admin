@@ -15,6 +15,7 @@
 	import JsonFieldEditor from './JsonFieldEditor.svelte';
 	import MediaPicker from './media/MediaPicker.svelte';
 	import type { MediaChoice } from '$lib/api/media';
+	import { formatCount } from '$lib/format';
 
 	type InputEv = Event & { currentTarget: HTMLInputElement };
 	type TextareaEv = Event & { currentTarget: HTMLTextAreaElement };
@@ -23,6 +24,8 @@
 		field,
 		value = $bindable<unknown>(''),
 		relationItems = [],
+		relationTotal = undefined,
+		relationFailed = false,
 		mediaChoices = [],
 		id,
 		error,
@@ -31,6 +34,10 @@
 		value?: unknown;
 		/** Items from the related schema, for relation-type fields */
 		relationItems?: Content[];
+		/** How many entries the related schema holds. Above the items' count, the picker is cut. */
+		relationTotal?: number;
+		/** The related schema could not be read, so the picker has nothing to offer. */
+		relationFailed?: boolean;
 		/** Published library files, offered by a media field's picker. */
 		mediaChoices?: MediaChoice[];
 		/**
@@ -50,6 +57,14 @@
 	// A relation option's name, resolved the same way a listing row's is.
 	let relationOptions = $derived(
 		relationItems.map((item) => ({ value: item.id, label: entryLabel(item) })),
+	);
+
+	// The picker is one page of the related collection. Past that page it
+	// cannot find an entry, and it says so rather than reading as the whole set.
+	const relationCutNote = $derived(
+		relationTotal !== undefined && relationTotal > relationItems.length
+			? `Only the first ${formatCount(relationItems.length)} of ${formatCount(relationTotal)} entries in ${field.relation_to} are offered here.`
+			: undefined,
 	);
 
 	let selectedIds = $derived(
@@ -147,19 +162,28 @@
 			</p>
 		</div>
 	{:else if field.relation_type === 'many_to_many'}
-		{#if relationItems.length > 0}
+		{#if relationFailed}
+			<p class="text-xs text-danger">
+				The entries in <code>{field.relation_to}</code> could not be read, so none can be picked. Reload the page to try again.
+			</p>
+		{:else if relationItems.length > 0}
 			<MultiSelect
 				{id}
 				{error}
 				value={selectedIds}
 				options={relationOptions}
 				placeholder="Select {field.relation_to ?? 'entries'}"
+				hint={relationCutNote}
 				required={field.required}
 				onchange={(ids: string[]) => { value = ids; }}
 			/>
+		{:else if relationTotal === 0}
+			<p class="text-xs text-faint">
+				<code class="text-muted">{field.relation_to}</code> has no entries yet.
+			</p>
 		{:else}
-			<p class="text-xs text-faint italic">
-				No entries found in <code class="text-muted">{field.relation_to}</code>.
+			<p class="text-xs text-faint">
+				No entries of <code class="text-muted">{field.relation_to}</code> were handed to this form.
 			</p>
 		{/if}
 	{:else if relationItems.length > 0}
@@ -171,6 +195,7 @@
 			value={String(value ?? '')}
 			options={relationOptions}
 			placeholder="Search {field.relation_to ?? 'entries'}"
+			hint={relationCutNote}
 			required={field.required}
 			onchange={(next: string) => { value = next || null; }}
 		/>
@@ -182,7 +207,11 @@
 			value={String(value ?? '')}
 			oninput={(e: InputEv) => { value = e.currentTarget.value; }}
 			placeholder="Enter related item ID (UUID)"
-			hint="No entries found in {field.relation_to}. Enter an ID manually."
+			hint={relationFailed
+				? `The entries in ${field.relation_to} could not be read. Enter an ID by hand, or reload the page to try again.`
+				: relationTotal === 0
+					? `${field.relation_to} has no entries yet. Enter an ID by hand.`
+					: `Enter the ID of an entry in ${field.relation_to}.`}
 			required={field.required}
 		/>
 	{/if}

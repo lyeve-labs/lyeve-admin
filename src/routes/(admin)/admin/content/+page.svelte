@@ -15,6 +15,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { ArrowDown, ArrowUp, CalendarClock, Database, Inbox, LayoutGrid, Plus } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { planSchemaRelations } from '$lib/relations';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import {
@@ -47,8 +48,12 @@
 		);
 	}
 
+	// A failed read draws its gate instead of the list, so the rows are only
+	// ever the ones the engine answered with.
+	const rows = $derived(data.schemas.ok ? data.schemas.value : []);
+
 	let filtered = $derived(
-		data.schemas.filter((s: Schema) => matches(s, query.trim().toLowerCase())),
+		rows.filter((s: Schema) => matches(s, query.trim().toLowerCase())),
 	);
 
 	/**
@@ -70,7 +75,7 @@
 			rows: st?.rows ?? null,
 			updated: st?.last_updated ?? null,
 			fields: fields.length,
-			relations: planSchemaRelations(schema, data.schemas).length,
+			relations: planSchemaRelations(schema, rows).length,
 		};
 	}
 
@@ -167,7 +172,13 @@
 		</Button>
 	{/snippet}
 
-	{#if data.schemas.length === 0 && data.filter === 'all' && !data.query}
+	{#if !data.schemas.ok}
+		<GateNotice
+			gate={data.schemas.gate}
+			title="Content"
+			absent="This build does not serve the collections."
+		/>
+	{:else if rows.length === 0 && data.filter === 'all' && !data.query}
 		<EmptyState
 			title="No schemas yet"
 			description="Build a schema first, then come back here to manage content."
@@ -221,7 +232,7 @@
 			<SectionHeading level={2}>
 				Collections
 				<span class="ml-2 text-sm font-normal tabular-nums text-faint">
-					{data.total ?? data.schemas.length}
+					{data.total ?? rows.length}
 					{#if data.filter !== 'all'}{filterLabel}{/if}
 				</span>
 			</SectionHeading>
@@ -316,7 +327,7 @@
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
-					count={data.schemas.length}
+					count={rows.length}
 					total={data.total ?? undefined}
 					hasNext={data.hasMore}
 					noun="collections"

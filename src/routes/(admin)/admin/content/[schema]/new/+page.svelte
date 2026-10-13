@@ -98,7 +98,7 @@
 				fields={userFields}
 				{formValues}
 				{validationErrors}
-				relationItems={data.relationItems}
+				relations={data.relations}
 				mediaChoices={data.mediaChoices}
 				error={form?.error}
 			/>

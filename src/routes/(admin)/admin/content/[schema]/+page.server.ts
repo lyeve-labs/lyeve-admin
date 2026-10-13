@@ -1,10 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error, fail } from '@sveltejs/kit';
-import { createClient, type SchemaField } from '@lyeve-labs/client';
+import { fail, redirect } from '@sveltejs/kit';
+import { ApiError, createClient, type Schema, type SchemaField } from '@lyeve-labs/client';
 import { getSchemas, getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { totalOf, type ListEnvelope } from '$lib/api/list';
+import { readError } from '$lib/server/read-error';
+import { section, type Section } from '$lib/api/gate';
+import { pageWindow, pastEndOffset, totalOf, withOffset, type ListEnvelope } from '$lib/api/list';
 import { sessionToken } from '$lib/server/session-cookie';
 
 /** One row of the admin content listing, before it is reshaped for the table. */
@@ -29,6 +31,23 @@ const DEFAULT_LIMIT = 100;
  */
 const MAX_LIMIT = 500;
 
+const ENTRIES_FAILED = 'The entries could not be read. This is not a report that the collection is empty.';
+const SCHEMAS_FAILED = 'The other collections could not be read.';
+
+/**
+ * The listing is read with the page's own fetch, so a refusal is turned into
+ * the client's error here. Its status is what tells a refused role, an outage
+ * and a failed read apart.
+ */
+async function readEntries(fetchFn: typeof fetch, token: string, path: string): Promise<ListEnvelope<EntryRow>> {
+	const res = await fetchFn(path, { headers: { Authorization: `Bearer ${token}` } });
+	if (!res.ok) {
+		const body: unknown = await res.json().catch(() => undefined);
+		throw new ApiError(res.status, `list content: ${res.status}`, body);
+	}
+	return (await res.json()) as ListEnvelope<EntryRow>;
+}
+
 /**
  * Entries are listed through the admin API, which holds every entry with its
  * status and history, those written in the console and those written through
@@ -39,31 +58,22 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 
-	const limit = Math.max(
-		1,
-		Math.min(MAX_LIMIT, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT),
-	);
-	const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
+	const query = new URLSearchParams({ schema: params.schema, limit: String(limit), offset: String(offset) });
 
-	const [schemas, schemaDef, listRes] = await Promise.all([
-		getSchemas(client).catch(() => []),
-		getSchema(params.schema, client).catch(() => null),
-		fetch(
-			`/api/admin/content?schema=${encodeURIComponent(params.schema)}&limit=${limit}&offset=${offset}`,
-			{ headers: { Authorization: `Bearer ${token}` } },
-		),
+	const [schemas, schemaDef, listed] = await Promise.all([
+		section<Schema[]>(getSchemas(client), SCHEMAS_FAILED),
+		getSchema(params.schema, client).catch((err: unknown) => readError(err, `Schema "${params.schema}" not found`)),
+		section(readEntries(fetch, token, `/api/admin/content?${query}`), ENTRIES_FAILED),
 	]);
 
-	if (!schemaDef) {
-		error(404, `Schema "${params.schema}" not found`);
+	const base = { schemas, schemaDef, activeSchema: params.schema, limit, offset };
+	if (!listed.ok) {
+		return { ...base, items: listed as Section<ListedEntry[]>, total: 0 };
 	}
 
-	const empty: ListEnvelope<EntryRow> = { data: [] };
-	const listBody: ListEnvelope<EntryRow> = listRes.ok
-		? await listRes.json().catch(() => empty)
-		: empty;
-	const rows = listBody.data ?? [];
-	const items = rows.map((e) => ({
+	const rows = listed.value.data ?? [];
+	const entries: ListedEntry[] = rows.map((e) => ({
 		id: e.id,
 		created_at: e.created_at,
 		updated_at: e.updated_at,
@@ -74,23 +84,26 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 		} as Record<string, unknown>,
 	}));
 
-	await nameRelatedEntries(fetch, token, schemaDef.fields ?? [], items);
-
 	// total_count counts the collection, while rows.length counts this page alone.
 	// totalOf falls back to the page length when a response carries no count,
 	// and that fallback is smaller than the rows already paged past, which
 	// would leave the pager claiming fewer entries than the table shows.
-	const total = Math.max(totalOf(listBody), offset + items.length);
+	const total = Math.max(totalOf(listed.value), offset + entries.length);
+	const back = pastEndOffset(entries.length, limit, offset, totalOf(listed.value));
+	if (back !== null) redirect(307, withOffset(url, back));
 
-	return {
-		schemas,
-		schemaDef,
-		items,
-		activeSchema: params.schema,
-		limit,
-		offset,
-		total,
-	};
+	await nameRelatedEntries(fetch, token, schemaDef.fields ?? [], entries);
+
+	const items: Section<ListedEntry[]> = { ok: true, value: entries };
+	return { ...base, items, total };
+};
+
+/** One entry as the table reads it. */
+type ListedEntry = {
+	id: string;
+	created_at: string;
+	updated_at: string;
+	data: Record<string, unknown>;
 };
 
 type ListedItem = { data: Record<string, unknown> };

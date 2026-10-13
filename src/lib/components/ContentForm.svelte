@@ -1,16 +1,17 @@
 <script lang="ts">
 	import { Alert } from '@lyeve-labs/ui-kit';
-	import type { SchemaField, Content } from '@lyeve-labs/client';
+	import type { SchemaField } from '@lyeve-labs/client';
 	import { fieldKey } from '$lib/utils/content-form';
 	import { humanizeFieldName } from '$lib/utils/entry-identity';
 	import FieldInput from './FieldInput.svelte';
 	import type { MediaChoice } from '$lib/api/media';
+	import type { RelationChoices } from './content/relation-choices';
 
 	let {
 		fields,
 		formValues,
 		validationErrors = {},
-		relationItems = {},
+		relations = {},
 		mediaChoices = [],
 		error,
 	}: {
@@ -18,7 +19,8 @@
 		/** Reactive $state proxy from parent - mutated in-place by FieldInput */
 		formValues: Record<string, unknown>;
 		validationErrors?: Record<string, string>;
-		relationItems?: Record<string, Content[]>;
+		/** What each related collection's read gave, by collection name. */
+		relations?: Record<string, RelationChoices>;
 		/** Published library files a media field may point at. */
 		mediaChoices?: MediaChoice[];
 		/** Server-side error message */
@@ -57,6 +59,10 @@
 		return field.field_type === 'datetime' ? `field-${field.name}-date` : `field-${field.name}`;
 	}
 
+	function relationOf(field: SchemaField): RelationChoices | undefined {
+		return relations[field.relation_to ?? ''];
+	}
+
 	/** "first_name" reads "First name", the case every other field label uses. */
 	function fieldLabel(name: string): string {
 		const words = humanizeFieldName(name);
@@ -92,7 +98,9 @@
 						{field}
 						id="field-{field.name}"
 						bind:value={formValues[field.name]}
-						relationItems={relationItems[field.relation_to ?? ''] ?? []}
+						relationItems={relationOf(field)?.items ?? []}
+						relationTotal={relationOf(field)?.total}
+						relationFailed={relationOf(field)?.failed ?? false}
 						{mediaChoices}
 						error={validationErrors[field.name]}
 					/>
@@ -109,7 +117,9 @@
 					{field}
 					id="field-{field.name}"
 					bind:value={formValues[fieldKey(field)]}
-					relationItems={relationItems[field.relation_to ?? ''] ?? []}
+					relationItems={relationOf(field)?.items ?? []}
+					relationTotal={relationOf(field)?.total}
+					relationFailed={relationOf(field)?.failed ?? false}
 					{mediaChoices}
 					error={validationErrors[field.name]}
 				/>

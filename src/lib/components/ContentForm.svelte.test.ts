@@ -54,7 +54,7 @@ describe('ContentForm', () => {
 					field('text', { name: 'title' }),
 				],
 				formValues,
-				relationItems: { tags: items },
+				relations: { tags: { items, total: items.length, failed: false } },
 			},
 		});
 		expect(getByText('Title')).toBeTruthy();
@@ -152,7 +152,7 @@ describe('ContentForm', () => {
 			props: {
 				fields: [field('relation', { relation_type: 'many_to_many', relation_to: 'posts' })],
 				formValues: manyValues,
-				relationItems: { posts: [content('id-1', { title: 'One' })] },
+				relations: { posts: { items: [content('id-1', { title: 'One' })], total: 1, failed: false } },
 			},
 		});
 		const group = many.container.querySelector('[role="group"]');

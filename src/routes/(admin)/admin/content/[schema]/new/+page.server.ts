@@ -1,21 +1,25 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error, fail, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
-import { getSchema, listContent } from '@lyeve-labs/client-rest';
+import { fail, redirect } from '@sveltejs/kit';
+import { createClient, type Schema } from '@lyeve-labs/client';
+import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
+import { readError } from '$lib/server/read-error';
 import { setRelations } from '$lib/server/content-relations';
 import { entryIdentity } from '$lib/utils/new-entry';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
+import { readRelationChoices } from '$lib/components/content/relation-choices';
 import { sessionToken } from '$lib/server/session-cookie';
 
 export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 
-	const schemaDef = await getSchema(params.schema, client).catch(() => null);
-	if (!schemaDef) {
-		error(404, `Schema "${params.schema}" not found`);
+	let schemaDef: Schema;
+	try {
+		schemaDef = await getSchema(params.schema, client);
+	} catch (err) {
+		readError(err, `Schema "${params.schema}" not found`);
 	}
 
 	// Load available locales if schema supports localization
@@ -31,20 +35,10 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 		}));
 	}
 
-	// Load relation picker items
-	const relationItems: Record<string, import('@lyeve-labs/client').Content[]> = {};
-	const relSchemas = [
-		...new Set(
-			schemaDef.fields
-				.filter((f) => f.field_type === 'relation' && f.relation_to)
-				.map((f) => f.relation_to as string),
-		),
-	];
-	await Promise.all(
-		relSchemas.map(async (name) => {
-			relationItems[name] = await listContent(name, client, 500, 0).catch(() => []);
-		}),
-	);
+	// The pickers read the admin store, the one this form writes to. The
+	// public content routes read a different store, so an entry made here
+	// would not be in a picker fed from them.
+	const relations = await readRelationChoices(fetch, token, schemaDef.fields ?? []);
 
 	// Published library files, for a media field's picker. Read only when
 	// the schema has one.
@@ -52,7 +46,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 		? await Promise.resolve().then(() => listMediaChoices(client)).catch((): MediaChoice[] => [])
 		: [];
 
-	return { schemaDef, relationItems, locales, mediaChoices };
+	return { schemaDef, relations, locales, mediaChoices };
 };
 
 /**

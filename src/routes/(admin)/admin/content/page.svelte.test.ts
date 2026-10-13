@@ -7,10 +7,13 @@ afterEach(cleanup);
 
 function data(overrides: Record<string, unknown> = {}) {
 	return {
-		schemas: [
-			{ name: 'post', display_name: 'Post', fields: [{ name: 'title', type: 'string' }], with_draft_publish: true },
-			{ name: 'tag', display_name: 'Tag', fields: [] },
-		],
+		schemas: {
+			ok: true,
+			value: [
+				{ name: 'post', display_name: 'Post', fields: [{ name: 'title', type: 'string' }], with_draft_publish: true },
+				{ name: 'tag', display_name: 'Tag', fields: [] },
+			],
+		},
 		stats: { post: { rows: 12, last_updated: '2026-09-13T08:00:00Z' }, tag: { rows: 0, last_updated: null } },
 		query: '',
 		sort: 'name',
@@ -64,7 +67,7 @@ describe('content index chips', () => {
 
 	it('names the empty subset and offers the whole set back', () => {
 		const { container } = render(ContentIndex, {
-			props: { data: data({ schemas: [], total: 0, filter: 'localized' }) },
+			props: { data: data({ schemas: { ok: true, value: [] }, total: 0, filter: 'localized' }) },
 		});
 
 		const text = container.textContent ?? '';
@@ -78,5 +81,32 @@ describe('content index chips', () => {
 		const text = container.textContent ?? '';
 		expect(text).toContain('1 of 2 on this page holds no rows.');
 		expect(container.querySelector('a[href*="filter=with-rows"]')).not.toBeNull();
+	});
+});
+
+describe('content index read', () => {
+	it('says the collections could not be read instead of offering a first schema', () => {
+		const { container } = render(ContentIndex, {
+			props: {
+				data: data({
+					schemas: { ok: false, gate: { state: 'error', message: 'The collections could not be read.' } },
+					total: 0,
+				}),
+			},
+		});
+
+		const text = container.textContent ?? '';
+		expect(text).toContain('The collections could not be read.');
+		expect(text).not.toContain('No schemas yet');
+		expect(container.querySelector('table')).toBeNull();
+	});
+
+	it('names the outage when the engine did not answer', () => {
+		const { container } = render(ContentIndex, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } }, total: 0 }) },
+		});
+
+		expect(container.textContent).toContain('Content could not be read');
+		expect(container.textContent).not.toContain('No schemas yet');
 	});
 });

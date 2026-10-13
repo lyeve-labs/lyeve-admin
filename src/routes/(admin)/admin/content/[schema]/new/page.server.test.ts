@@ -22,8 +22,9 @@ const { FakeApiError } = vi.hoisted(() => ({
 		}
 	},
 }));
+const reads = vi.hoisted(() => ({ get: vi.fn(async (_path: string): Promise<unknown> => ({})) }));
 vi.mock('@lyeve-labs/client', () => ({
-	createClient: vi.fn(() => ({})),
+	createClient: vi.fn(() => reads),
 	ApiError: FakeApiError,
 }));
 
@@ -36,7 +37,6 @@ const rest = vi.hoisted(() => ({
 			{ name: 'active', field_type: 'boolean' },
 		],
 	})),
-	listContent: vi.fn(async () => []),
 }));
 vi.mock('@lyeve-labs/client-rest', () => rest);
 
@@ -49,7 +49,8 @@ const relations = vi.hoisted(() => ({
 }));
 vi.mock('$lib/server/content-relations', () => relations);
 
-import { actions } from './+page.server';
+import { isHttpError } from '@sveltejs/kit';
+import { actions, load } from './+page.server';
 
 function cookies(): Cookies {
 	return { get: vi.fn(() => 'tok') } as unknown as Cookies;
@@ -128,5 +129,22 @@ describe('creating a content entry', () => {
 		client.post.mockRejectedValueOnce(new FakeApiError('slug already in use', 409));
 		const { result } = await create({ title: 'Contact' });
 		expect(JSON.stringify(result)).toContain('slug already in use');
+	});
+});
+
+describe('opening the new entry form', () => {
+	it('reports an outage as an outage, not as a schema that is not there', async () => {
+		rest.getSchema.mockRejectedValueOnce(new FakeApiError('down', 503) as never);
+
+		const thrown = await Promise.resolve(
+			load({
+				fetch: vi.fn(),
+				cookies: cookies(),
+				params: { schema: 'surveys' },
+				url: new URL('http://localhost/admin/content/surveys/new'),
+			} as never),
+		).catch((err: unknown) => err);
+
+		expect(isHttpError(thrown) && thrown.status).toBe(503);
 	});
 });
