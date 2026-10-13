@@ -178,6 +178,21 @@ describe('the budget drawer and the failures of other actions', () => {
 		expect(drawerText()).not.toContain('Failed to delete the budget.');
 	});
 
+	it('keeps the warn tone of a refusal for a ledger that is not enabled', async () => {
+		const { rerender } = render(CostsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		await rerender({
+			data: data(),
+			form: { form: 'budget-new', error: 'The cost ledger is not enabled on this instance.', locked: true } as never,
+		});
+		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
+		const alert = [...form.querySelectorAll('[role="alert"], [role="status"], div')].find(
+			(el) => el.textContent?.trim() === 'The cost ledger is not enabled on this instance.' && el.className.includes('warn'),
+		);
+		expect(alert).toBeTruthy();
+		expect(form.textContent).toContain('The cost ledger is not enabled on this instance.');
+	});
+
 	it('shows a failed create inside the open drawer, first in its form', async () => {
 		const { rerender } = render(CostsPage, { props: { data: data(), form: null } });
 		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);

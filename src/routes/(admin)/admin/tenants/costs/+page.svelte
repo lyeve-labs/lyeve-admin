@@ -451,7 +451,15 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={budgetFailure?.message} />
+		<!-- A refusal for an instance the ledger is not enabled on keeps the warn
+		     tone the list gives it. Both regions stay mounted, so either message
+		     arrives in a region a screen reader already watches. -->
+		<FormErrors message={budgetFailure && !budgetFailure.locked ? budgetFailure.message : undefined} />
+		<div class="contents" aria-live="assertive" aria-atomic="true">
+			{#if budgetFailure?.locked}
+				<Alert tone="warn">{budgetFailure.message}</Alert>
+			{/if}
+		</div>
 		<input type="hidden" name="period_start" value={budgetStart} />
 		<input type="hidden" name="period_end" value={budgetEnd} />
 		<Input id="budget-name" name="name" label="Name" required bind:value={budgetName} placeholder="Q4 storage" />
