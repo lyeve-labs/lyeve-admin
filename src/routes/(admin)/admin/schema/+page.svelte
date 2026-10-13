@@ -19,6 +19,7 @@
 		SectionHeading,
 		SegmentedControl,
 		Select,
+		Skeleton,
 		Textarea,
 		confirm,
 		toast,
@@ -97,6 +98,8 @@
 	import type { Positions } from '$lib/api/schema-canvas-layout';
 	import type { SchemaCanvasApi } from '$lib/canvas/contract';
 	import ProblemsMenu from '$lib/components/ProblemsMenu.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -177,9 +180,15 @@
 	// The drawer stays open on a refusal so the reason sits beside the card.
 	let showPresets = $state(false);
 	let presetPending = $state('');
-	const presetError = $derived(form && 'preset' in form && 'error' in form && form.error ? form : null);
+	// Applying and deleting a preset share the one `form` result, so each
+	// failure is read by the action that caused it and shown where that
+	// action was asked for.
+	const presetError = $derived(form && 'action' in form && form.action === 'preset' && form.error ? form : null);
+	const presetDeleteError = $derived(form && 'action' in form && form.action === 'deletePreset' && form.error ? String(form.error) : '');
 	const presetCreated = $derived(form && 'created' in form && Array.isArray(form.created) ? form.created : null);
-	const hasPresets = $derived((data.presets?.length ?? 0) > 0 || Boolean(data.presetsError));
+	// A plugin that serves no presets route has none to offer. Any other
+	// failure still opens the drawer, which says why it is empty.
+	const hasPresets = $derived((data.presets?.length ?? 0) > 0 || (data.presetsGate != null && data.presetsGate.state !== 'absent'));
 
 	// A preset the tenant keeps: read from a URL, a file or a pasted document,
 	// and listed with the built-in ones so it can be applied again later.
@@ -804,6 +813,9 @@
 	let historyOpen = $state(false);
 	let ddlHistory = $state<{ name: string; entries: HistoryEntry[]; pending: number; limit: number } | null>(null);
 	let historyError = $state('');
+	// Kept apart from the read's failure: the read that follows an apply
+	// clears that one, and a failed apply would vanish with it.
+	let applyError = $state('');
 	let historyLoading = $state(false);
 	let applying = $state(false);
 
@@ -812,6 +824,7 @@
 		if (ddlHistory && ddlHistory.name !== saved?.name) {
 			ddlHistory = null;
 			historyError = '';
+			applyError = '';
 		}
 	});
 
@@ -853,13 +866,14 @@
 
 	const submitApply: SubmitFunction = () => {
 		applying = true;
+		applyError = '';
 		return async ({ result }) => {
 			applying = false;
 			if (result.type === 'success' && result.data && 'applied' in result.data) {
 				toast.success(appliedMessage(Number(result.data.applied), Number((result.data as { canceled?: number }).canceled ?? 0)));
 				loadHistory();
 			} else if (result.type === 'failure') {
-				historyError = String((result.data as { error?: string })?.error ?? 'The queued changes could not be applied.');
+				applyError = String((result.data as { error?: string })?.error ?? 'The queued changes could not be applied.');
 				loadHistory();
 			}
 		};
@@ -1580,11 +1594,27 @@
 			     instead of running. Read when the section opens. -->
 			<Collapsible label="History" icon={History} bind:open={historyOpen} badge={ddlHistory?.pending ? `${ddlHistory.pending} queued` : undefined}>
 				<div class="flex flex-col gap-3" data-testid="schema-history">
-					{#if historyError}
-						<Alert tone="danger">{historyError}</Alert>
+					{#if applyError}
+						<Alert tone="danger">{applyError}</Alert>
 					{/if}
-					{#if historyLoading && !ddlHistory}
-						<p class="text-sm text-muted">Reading the history.</p>
+					{#if historyError}
+						<!-- A failed read is not an empty history, and opening the
+						     section again does not read it again, so the retry is here. -->
+						<Alert tone="danger" title="The history could not be read">
+							{#snippet children()}
+								<p>{historyError}</p>
+								<div class="mt-3">
+									<Button variant="secondary" size="sm" loading={historyLoading} onclick={loadHistory}>Try again</Button>
+								</div>
+							{/snippet}
+						</Alert>
+					{/if}
+					{#if historyLoading && !ddlHistory && !historyError}
+						<div class="flex flex-col gap-2" aria-busy="true" data-testid="schema-history-loading">
+							<span class="sr-only">Reading the history.</span>
+							<Skeleton height="3.5rem" rounded="rounded-lg" />
+							<Skeleton height="3.5rem" rounded="rounded-lg" />
+						</div>
 					{:else if ddlHistory}
 						{#if ddlHistory.pending > 0}
 							<Alert tone="warn" title="{ddlHistory.pending} queued {ddlHistory.pending === 1 ? 'change' : 'changes'}">
@@ -1681,11 +1711,14 @@
 					/>
 				{/if}
 				{#if canWrite}
-					<!-- The one place a schema is started from. -->
-					<Button variant="secondary" size="sm" onclick={newSchema}>
-						<Plus size={ICON.sm} /> New schema
-					</Button>
-					{#if hasPresets}
+					<!-- The one place a schema is started from. A list that could
+					     not be read offers no create beside it. -->
+					{#if !data.loadError}
+						<Button variant="secondary" size="sm" onclick={newSchema}>
+							<Plus size={ICON.sm} /> New schema
+						</Button>
+					{/if}
+					{#if hasPresets && !data.loadError}
 						<Button variant="ghost" size="sm" onclick={() => (showPresets = true)}>
 							<LayoutTemplate size={ICON.sm} /> Presets
 						</Button>
@@ -1765,11 +1798,13 @@
 			</Toolbar>
 		</div>
 
-		{#if data.loadError}
+		{#if data.loadGate}
 			<div class="shrink-0 px-3 pt-3">
-				<Alert tone="danger" title="The schemas could not be read">
-					{#snippet children()}The engine did not answer. This is not a report that there are none. Reload once it does.{/snippet}
-				</Alert>
+				<GateNotice
+					gate={data.loadGate}
+					title="Schemas"
+					absent="The schema plugin does not run on this instance, so there are no schemas to show."
+				/>
 			</div>
 		{/if}
 		{#if !canWrite}
@@ -2005,10 +2040,11 @@
 				</div>
 			{/if}
 		{/if}
-		{#if data.presetsError}
-			<Alert tone="danger" title="Presets could not be loaded">
-				{#snippet children()}{data.presetsError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if presetDeleteError}
+			<Alert tone="danger">{presetDeleteError}</Alert>
+		{/if}
+		{#if data.presetsGate}
+			<GateNotice gate={data.presetsGate} title="Presets" absent="This install ships no presets. Start from New schema instead." />
 		{:else if (data.presets ?? []).length === 0}
 			<EmptyState title="No presets" description="The engine offered none. Start from New schema instead." />
 		{:else}
