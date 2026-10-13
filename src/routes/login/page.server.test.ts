@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { load, actions } from './+page.server';
 import { resetRateLimitStore } from '$lib/server/rate-limit';
+import { OUTAGE } from '$lib/outage';
 
 // helpers
 
@@ -91,6 +92,34 @@ describe('login/+page.server.ts load', () => {
 			secure: true,
 			sameSite: 'strict',
 		});
+	});
+
+	/*
+	 * A cookie the engine could not check has not been rejected. Dropping it
+	 * would sign the reader out through a database blip, and the form could
+	 * not sign them in again until the engine answers anyway.
+	 */
+	it.each([
+		['answers 503', () => json({ error: 'session check unavailable' }, 503)],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('keeps the cookie and shows the outage page when the engine %s', async (_case, me) => {
+		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
+			if (String(url).includes('/api/admin/auth/me')) return me();
+			return json([]);
+		}) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies({ '__Host-sys_session': 'valid-token' });
+
+		const thrown = (await Promise.resolve(load({ fetch, cookies } as never)).then(
+			() => {
+				throw new Error('expected the outage page');
+			},
+			(e: unknown) => e
+		)) as { status?: number; location?: string; body?: { message?: string } };
+
+		expect(cookies.delete).not.toHaveBeenCalled();
+		expect(thrown.location).toBeUndefined();
+		expect(thrown.status).toBe(503);
+		expect(thrown.body?.message).toBe(OUTAGE.body);
 	});
 
 	it('returns no providers when not logged in and no setup required (happy path)', async () => {
@@ -255,22 +284,25 @@ describe('login/+page.server.ts actions.default', () => {
 		expect(result).toEqual({ mfa_required: true, challenge_token: 'ch-tok' });
 	});
 
-	it('returns generic error when login API throws (no backend detail leaked)', async () => {
+	// An engine that never answered checked no password. Calling the password
+	// wrong sends the reader to reset one that was right.
+	it('reports an engine that never answered as unavailable, without its detail', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) => {
-			throw new Error('invalid credentials');
+			throw new TypeError('fetch failed: connect ECONNREFUSED 10.0.0.7:3002');
 		}) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies();
 		const formData = new FormData();
 		formData.set('email', 'a@b.co');
-		formData.set('password', 'wrong');
+		formData.set('password', 'right-password');
 
 		const result = await actions.default(mockEvent({
 			request: { formData: () => Promise.resolve(formData) } as never,
 			fetch,
 			cookies,
-		}) as never);
+		}) as never) as { status: number; data: { error: string } };
 
-		expect(result).toEqual({ error: 'Invalid email or password.' });
+		expect(result.status).toBe(503);
+		expect(result.data.error).toBe('Sign-in is unavailable right now. Please try again shortly.');
 	});
 
 	// The engine rate-limits login at 5 attempts. Reporting that as a bad
@@ -392,22 +424,42 @@ describe('login/+page.server.ts actions.default', () => {
 		expect(r.location).toBe('/admin');
 	});
 
-	it('MFA step: returns generic error when MFA verification fails (no backend detail leaked)', async () => {
-		const fetch = vi.fn(async (_url: string, _init: RequestInit) => {
-			throw new Error('Invalid code.');
-		}) as unknown as typeof globalThis.fetch;
-		const cookies = mockCookies();
+	function verify(answer: () => Response | Promise<Response>) {
+		const fetch = vi.fn(async (_url: string, _init: RequestInit) => answer()) as unknown as typeof globalThis.fetch;
 		const formData = new FormData();
 		formData.set('challenge_token', 'ch-tok');
 		formData.set('code', '000000');
-
-		const result = await actions.default(mockEvent({
+		return actions.default(mockEvent({
 			request: { formData: () => Promise.resolve(formData) } as never,
 			fetch,
-			cookies,
-		}) as never);
+			cookies: mockCookies(),
+		}) as never) as Promise<{ status: number; data: Record<string, unknown> }>;
+	}
 
-		expect(result).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch-tok' });
+	// The engine answers 422 for a code that does not match and 401 for a
+	// challenge it no longer honors. Both are the code's fault.
+	it.each([
+		[422, 'invalid code'],
+		[401, 'challenge expired'],
+	])('MFA step: reports a %i as an invalid code and keeps the challenge', async (status, message) => {
+		const result = await verify(() => json({ error: message }, status));
+		expect(result.status).toBe(400);
+		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch-tok' });
+	});
+
+	// A code the engine never checked may be right. Calling it wrong sends the
+	// reader to their authenticator for a new one that fails the same way.
+	it.each([
+		['answers 503', () => json({ error: 'session store unavailable' }, 503)],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('MFA step: says the code was not checked when the engine %s', async (_case, answer) => {
+		const result = await verify(answer);
+		expect(result.status).toBe(503);
+		expect(result.data).toEqual({
+			error: 'The engine did not answer, so the code was not checked. Try again in a moment.',
+			mfa_required: true,
+			challenge_token: 'ch-tok',
+		});
 	});
 });
 

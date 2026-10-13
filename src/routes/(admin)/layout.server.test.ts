@@ -4,6 +4,7 @@ import type { Cookies } from '@sveltejs/kit';
 // The load function under test. SvelteKit's redirect() throws a Redirect object.
 // We catch it and inspect status/location.
 import { load } from './+layout.server';
+import { BUSY, OUTAGE } from '$lib/outage';
 
 // helpers
 
@@ -64,7 +65,7 @@ describe('(admin)/+layout.server.ts load', () => {
 		expect(r.location).toBe('/login');
 	});
 
-	it('deletes the session cookie and redirects to /login when getMe fails', async () => {
+	it('deletes the session cookie and redirects to /login when the engine answers 401', async () => {
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			if (String(url).includes('/api/admin/setup')) return json({ setup_required: false });
 			// /me endpoint: return 401 (invalid/expired token)
@@ -86,6 +87,61 @@ describe('(admin)/+layout.server.ts load', () => {
 		});
 		expect(r.status).toBe(302);
 		expect(r.location).toBe('/login');
+	});
+
+	/*
+	 * The engine answers 503 when its database cannot check a session, so that
+	 * an outage signs nobody out. The shell has to keep that promise: the cookie
+	 * stays, and the reader sees the outage page instead of the sign-in form.
+	 */
+	describe('when the engine cannot check the session', () => {
+		async function outage(me: () => Response | Promise<Response>) {
+			const fetch = vi.fn(async (url: string, _init: RequestInit) => {
+				if (String(url).includes('/api/admin/auth/me')) return me();
+				return json({});
+			}) as unknown as typeof globalThis.fetch;
+			const cookies = mockCookies({ '__Host-sys_session': 'valid-token' });
+			const thrown = (await Promise.resolve(load({ fetch, cookies } as never)).then(
+				() => {
+					throw new Error('expected the outage page');
+				},
+				(e: unknown) => e
+			)) as { status?: number; location?: string; body?: { message?: string } };
+			return { thrown, cookies };
+		}
+
+		it('keeps the cookie and shows the outage page on a 503', async () => {
+			const { thrown, cookies } = await outage(() => json({ error: 'session check unavailable' }, 503));
+			expect(cookies.delete).not.toHaveBeenCalled();
+			expect(thrown.location).toBeUndefined();
+			expect(thrown.status).toBe(503);
+			expect(thrown.body?.message).toBe(OUTAGE.body);
+		});
+
+		it('keeps the cookie and shows the outage page when the engine does not answer', async () => {
+			const { thrown, cookies } = await outage(() => Promise.reject(new TypeError('fetch failed')));
+			expect(cookies.delete).not.toHaveBeenCalled();
+			expect(thrown.location).toBeUndefined();
+			expect(thrown.status).toBe(503);
+		});
+
+		// A refusal is an answer, so it gets its own page and never the outage
+		// wording. The session is intact, so the cookie stays for each.
+		it.each([
+			[
+				402,
+				{ error: 'cap_exceeded', cap: 'admin.seats', limit: 3, current: 3, upgrade_url: '' },
+				'Every admin seat is taken. 3 of 3 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.',
+			],
+			[403, { error: 'forbidden' }, 'This account or network cannot reach the admin right now.'],
+			[429, { error: 'rate limit exceeded' }, BUSY.body],
+		])('keeps the cookie and shows its own page for a %i', async (status, body, message) => {
+			const { thrown, cookies } = await outage(() => json(body, status));
+			expect(cookies.delete).not.toHaveBeenCalled();
+			expect(thrown.location).toBeUndefined();
+			expect(thrown.status).toBe(status);
+			expect(thrown.body?.message).toBe(message);
+		});
 	});
 
 	it('returns user and fail-closed NO_ENTITLEMENTS when entitlements endpoint errors', async () => {

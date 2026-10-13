@@ -23,6 +23,8 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 const TOKEN_REFUSED =
 	'The engine did not accept that setup token. Copy it again from the place named under the field.';
 
+const ENGINE_SILENT = 'The engine did not answer. It may be restarting. Try again in a moment.';
+
 function limited(ip: string) {
 	const limit = checkRateLimit(ip);
 	return limit.allowed
@@ -55,7 +57,7 @@ export const actions: Actions = {
 				// settings. The next load shows the step that applies.
 				return { status: null };
 			}
-			return fail(503, { error: 'The engine did not answer. It may be restarting; try again in a moment.' });
+			return fail(503, { error: ENGINE_SILENT });
 		}
 	},
 
@@ -99,6 +101,13 @@ export const actions: Actions = {
 			// install that changed it.
 			if (err instanceof ApiError && err.status === 422) {
 				return fail(422, { error: actionError(err, 'The password does not meet the password policy.') });
+			}
+			// A 5xx or no answer at all says nothing about the form, so the
+			// operator is told to wait rather than to change it. An account
+			// created before the answer was lost shows on the retry: the engine
+			// answers 409, and the branch above sends the operator to sign in.
+			if (!(err instanceof ApiError) || err.status >= 500) {
+				return fail(503, { error: ENGINE_SILENT });
 			}
 			return { error: 'Setup failed.' };
 		}

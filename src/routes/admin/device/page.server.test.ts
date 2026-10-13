@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { actions, load } from './+page.server';
+import { OUTAGE } from '$lib/outage';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -76,6 +77,30 @@ describe('admin/device load', () => {
 		const r = await redirected(() => load(loadEvent('?code=WDJB-MJHT', fetch as never, jar)));
 		expect(r.location).toContain('/login?next=');
 		expect(jar.delete).toHaveBeenCalled();
+	});
+
+	// The engine answers 503 when its database cannot check a session, so that
+	// an outage signs nobody out. The approval page keeps that promise too.
+	it.each([
+		['answers 503', async () => json({ error: 'session check unavailable' }, 503)],
+		[
+			'does not answer',
+			async (): Promise<Response> => {
+				throw new TypeError('fetch failed');
+			},
+		],
+	])('keeps the cookie and shows the outage page when the engine %s', async (_case, answer) => {
+		const jar = signedIn();
+		const thrown = (await Promise.resolve(load(loadEvent('?code=WDJB-MJHT', vi.fn(answer) as never, jar))).then(
+			() => {
+				throw new Error('expected the outage page');
+			},
+			(e: unknown) => e,
+		)) as { status?: number; location?: string; body?: { message?: string } };
+		expect(jar.delete).not.toHaveBeenCalled();
+		expect(thrown.location).toBeUndefined();
+		expect(thrown.status).toBe(503);
+		expect(thrown.body?.message).toBe(OUTAGE.body);
 	});
 
 	it('asks for the code when none came with the link', async () => {

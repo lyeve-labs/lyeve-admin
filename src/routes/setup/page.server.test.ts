@@ -30,6 +30,8 @@ function catchRedirect(fn: () => unknown): Promise<{ status: number; location: s
 	);
 }
 
+const ENGINE_SILENT = 'The engine did not answer. It may be restarting. Try again in a moment.';
+
 function fetchReturning(body: unknown, status = 200) {
 	return vi.fn(async (_url: string, _init?: RequestInit) => json(body, status)) as unknown as typeof globalThis.fetch;
 }
@@ -126,6 +128,18 @@ describe('setup actions.status', () => {
 		const result = await actions.status(actionEvent({ setup_token: 'tok' }, fetchReturning({}, 404)));
 		expect(result).toEqual({ status: null });
 	});
+
+	it('tells the operator to try again when the engine is down', async () => {
+		const fetch = vi.fn(async () => {
+			throw new TypeError('fetch failed');
+		});
+		const result = (await actions.status(actionEvent({ setup_token: 'tok' }, fetch))) as {
+			status: number;
+			data: { error: string };
+		};
+		expect(result.status).toBe(503);
+		expect(result.data.error).toBe(ENGINE_SILENT);
+	});
 });
 
 describe('setup actions.create', () => {
@@ -188,11 +202,29 @@ describe('setup actions.create', () => {
 		expect(r.location).toBe('/login');
 	});
 
-	it('returns a generic error when the engine fails otherwise (no backend detail leaked)', async () => {
-		const fetch = vi.fn(async () => {
-			throw new Error('driver: connection reset');
-		});
-		const result = await actions.create(actionEvent(valid, fetch));
+	// An engine that did not answer judged nothing about the form, so the
+	// operator is told to wait and try again rather than that setup failed.
+	it.each([
+		['a 503', async () => json({ code: 'DATABASE_ERROR' }, 503)],
+		[
+			'no answer at all',
+			async (): Promise<Response> => {
+				throw new Error('driver: connection reset');
+			},
+		],
+	])('tells the operator to try again after %s, without the detail', async (_case, answer) => {
+		const cookies = mockCookies();
+		const result = (await actions.create(actionEvent(valid, vi.fn(answer), cookies))) as {
+			status: number;
+			data: { error: string };
+		};
+		expect(result.status).toBe(503);
+		expect(result.data.error).toBe(ENGINE_SILENT);
+		expect(cookies.set).not.toHaveBeenCalled();
+	});
+
+	it('keeps the plain failure for a refusal it has no words for', async () => {
+		const result = await actions.create(actionEvent(valid, fetchReturning({ error: 'forbidden' }, 403)));
 		expect(result).toEqual({ error: 'Setup failed.' });
 	});
 });

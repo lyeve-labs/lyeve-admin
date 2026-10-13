@@ -1,9 +1,10 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { createClient } from '@lyeve-labs/client';
 import { mfaVerify } from '@lyeve-labs/client-rest';
 import { isMagicLinkMFAChallenge, verifyMagicLink } from '$lib/api/magic-link';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { secondFactorFailure } from '$lib/server/second-factor';
 import { setSessionCookie } from '$lib/server/session-cookie';
 import { LANDING } from '$lib/landing';
 import type { Actions, PageServerLoad } from './$types';
@@ -56,14 +57,8 @@ export const actions: Actions = {
 			const res = await mfaVerify(challengeToken, code, createClient(event.fetch));
 			setSessionCookie(event, res.token);
 		} catch (e) {
-			if (e instanceof ApiError && e.status === 429) {
-				return fail(429, {
-					error: 'Too many verification attempts. Please wait before trying again.',
-					mfa_required: true,
-					challenge_token: challengeToken,
-				});
-			}
-			return fail(400, { error: 'Invalid code.', mfa_required: true, challenge_token: challengeToken });
+			const failed = secondFactorFailure(e);
+			return fail(failed.status, { error: failed.error, mfa_required: true, challenge_token: challengeToken });
 		}
 		redirect(303, LANDING);
 	},
