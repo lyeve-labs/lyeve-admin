@@ -3,7 +3,7 @@
 	 * Builds a signed URL for a resized or converted copy of this image. A
 	 * refusal the engine sends renders as a notice.
 	 */
-	import { Alert, CopyField, Button, NumberInput, SectionHeading, Select, Toggle } from '@lyeve-labs/ui-kit';
+	import { Alert, CopyField, Button, NumberInput, RadioGroup, SectionHeading, Select, Toggle } from '@lyeve-labs/ui-kit';
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
@@ -33,11 +33,13 @@
 	// svelte-ignore state_referenced_locally
 	let expires = $state(published ? '' : '3600');
 
+	// Each fit changes the picture in a way its name does not say, so each
+	// carries its sentence beside it rather than inside a closed list.
 	const FITS = [
-		{ value: '', label: 'Engine default' },
-		{ value: 'cover', label: 'Cover: fill the box, crop the rest' },
-		{ value: 'contain', label: 'Contain: fit inside the box' },
-		{ value: 'fill', label: 'Fill: stretch to the box' },
+		{ value: '', label: 'Engine default', description: 'The engine picks the fit.' },
+		{ value: 'cover', label: 'Cover', description: 'Fills the box and crops what falls outside it.' },
+		{ value: 'contain', label: 'Contain', description: 'Fits the whole image inside the box.' },
+		{ value: 'fill', label: 'Fill', description: 'Stretches the image to the box.' },
 	];
 	const FORMATS = [
 		{ value: '', label: 'Engine default' },
@@ -75,10 +77,10 @@
 			<input type="hidden" name="focal_x" value={focal.x} />
 			<input type="hidden" name="focal_y" value={focal.y} />
 		{/if}
+		<RadioGroup name="fit" label="Fit" options={FITS} bind:value={fit} />
 		<div class="grid gap-3 sm:grid-cols-2">
 			<NumberInput id="transform-w" name="w" label="Width" min={0} bind:value={w} hint="0 keeps the original." />
 			<NumberInput id="transform-h" name="h" label="Height" min={0} bind:value={h} hint="0 keeps the original." />
-			<Select id="transform-fit" name="fit" label="Fit" options={FITS} value={fit} onvaluechange={(v) => (fit = v)} />
 			<Select id="transform-fmt" name="fmt" label="Format" options={FORMATS} value={fmt} onvaluechange={(v) => (fmt = v)} />
 			<NumberInput id="transform-q" name="q" label="Quality" min={0} max={100} bind:value={q} hint="0 is the engine default." />
 			<Select id="transform-exp" name="expires_in" label="Expires" options={EXPIRY} value={expires} onvaluechange={(v) => (expires = v)} />

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		Alert,
 		Badge,
 		Button,
 		DescriptionList,
@@ -30,6 +29,7 @@
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import ImageZoom from './ImageZoom.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 
 	interface Props {
 		/** The item on show, or null while the drawer is shut. */
@@ -118,7 +118,7 @@
 
 	async function askDelete() {
 		if (!item) return;
-		const ok = await confirm('Delete file', `Delete ${item.filename}? This cannot be undone.`, {
+		const ok = await confirm(`Delete ${item.filename}`, 'The file leaves the library, and any page that links to it stops loading it. This cannot be undone.', {
 			confirmLabel: 'Delete',
 		});
 		if (ok) ondelete(item);
@@ -246,9 +246,7 @@
 				}}
 			>
 				<SectionHeading level={3}>Details</SectionHeading>
-				{#if detailsError}
-					<Alert tone="danger">{detailsError}</Alert>
-				{/if}
+				<FormErrors message={detailsError || undefined} />
 				<input type="hidden" name="id" value={item.id} />
 				<Textarea
 					id="media-alt"

@@ -32,6 +32,16 @@ describe('TransformUrlBuilder', () => {
 		expect(container.textContent).toContain('Stops working');
 	});
 
+	it('lays out each fit as a choice with the sentence that says what it does', () => {
+		const { getByRole } = render(TransformUrlBuilder, { props: { id: 'm1', published: true, focal: null } });
+		const group = getByRole('radiogroup', { name: 'Fit' });
+		const cover = getByRole('radio', { name: /Cover/ }) as HTMLInputElement;
+		expect(group.contains(cover)).toBe(true);
+		expect(cover.name).toBe('fit');
+		expect(group.textContent).toContain('crops what falls outside it');
+		expect((getByRole('radio', { name: /Engine default/ }) as HTMLInputElement).checked).toBe(true);
+	});
+
 	it('renders the refusal in place of a URL', () => {
 		const { getByTestId } = render(TransformUrlBuilder, {
 			props: { id: 'm1', published: true, focal: null, refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },

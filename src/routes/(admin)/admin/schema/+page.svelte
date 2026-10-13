@@ -338,10 +338,9 @@
 	 * a reader who knows `belongs_to` still finds it and a reader who does not
 	 * is told what it means without opening anything.
 	 */
-	const RELATION_OPTIONS: SelectOption[] = RELATION_KINDS.map((k) => ({
+	const RELATION_OPTIONS: { value: RelationType; label: string }[] = RELATION_KINDS.map((k) => ({
 		value: k.type,
-		label: `${k.label} (${k.cardinality})`,
-		keywords: [k.type, k.storage],
+		label: k.label,
 	}));
 
 	// A schema is served over every transport until it says otherwise, so each
@@ -353,7 +352,7 @@
 		{ key: 'grpc', label: 'gRPC', hint: 'The content and schema services.' },
 	];
 
-	const TRANSPORT_MODE_OPTIONS: SelectOption[] = [
+	const TRANSPORT_MODE_OPTIONS: { value: TransportMode; label: string }[] = [
 		{ value: 'rw', label: 'Read and write' },
 		{ value: 'r', label: 'Read only' },
 		{ value: 'w', label: 'Write only' },
@@ -1205,17 +1204,19 @@
 							three until it is narrowed here.
 						</span>
 					</div>
-					<div class="flex flex-wrap gap-4">
+					<div class="flex flex-col gap-3">
 						{#each TRANSPORTS as t (t.key)}
-							<Select
-								id="transport-{t.key}"
-								label={t.label}
-								hint={t.hint}
-								options={TRANSPORT_MODE_OPTIONS}
-								value={transportMode(schema, t.key)}
-								onvaluechange={(v) => setTransport(t.key, v as TransportMode)}
-								class="w-48 shrink-0"
-							/>
+							<div class="flex min-w-0 flex-col gap-1" data-testid="transport-{t.key}">
+								<SegmentedControl
+									label={t.label}
+									size="sm"
+									class="max-w-full overflow-x-auto"
+									options={TRANSPORT_MODE_OPTIONS}
+									value={transportMode(schema, t.key)}
+									onchange={(v) => setTransport(t.key, v)}
+								/>
+								<span class="text-xs text-faint">{t.hint}</span>
+							</div>
 						{/each}
 					</div>
 				</div>
@@ -1377,18 +1378,25 @@
 						data-testid="relation-panel-{rowId}"
 						use:keysStayInRow
 					>
-						<div class="grid gap-3 sm:grid-cols-2">
-							<Select
-								id="relation-type-{rowId}"
+						<!-- The problem list moves focus to the kind by this id, so the
+						     wrapper takes focus and carries the problem beside it. -->
+						<div id="relation-type-{rowId}" tabindex="-1" class="flex min-w-0 flex-col gap-1 outline-none">
+							<SegmentedControl
 								label="Relation"
-								error={problemAt(`relation-type-${rowId}`)}
+								size="sm"
+								class="max-w-full overflow-x-auto"
 								options={RELATION_OPTIONS}
 								value={field.relation_type ?? 'belongs_to'}
-								onvaluechange={(v) => {
-									field.relation_type = v as RelationType;
+								onchange={(v) => {
+									field.relation_type = v;
 									dropInertFlags(field);
 								}}
 							/>
+							{#if problemAt(`relation-type-${rowId}`)}
+								<p class="text-xs text-danger">{problemAt(`relation-type-${rowId}`)}</p>
+							{/if}
+						</div>
+						<div class="grid gap-3 sm:grid-cols-2">
 							<Select
 								id="relation-target-{rowId}"
 								label="Target schema"
@@ -2335,7 +2343,7 @@
 {/if}
 
 <!-- A one-field prompt: the new machine name. -->
-<Modal bind:open={renameOpen} size="sm" title="Rename {saved?.name ?? 'schema'}">
+<Modal bind:open={renameOpen} title="Rename {saved?.name ?? 'schema'}">
 	<form method="POST" action="?/rename" use:enhance={submitRename} id="schema-rename" class="flex flex-col gap-3">
 		<input type="hidden" name="from" value={saved?.name ?? ''} />
 		<Input
