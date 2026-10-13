@@ -71,3 +71,28 @@ describe('webhooks edit drawer posts the schemas it holds', () => {
 		expect(container.textContent).toContain('The schemas could not be read');
 	});
 });
+
+/*
+ * A new webhook names no schema, and one saved with none fires on every
+ * schema. During a schema outage nothing can be picked, so the form says what
+ * saving it now does.
+ */
+describe('webhooks create drawer during a schema outage', () => {
+	it('says a webhook saved without a schema fires on every schema', async () => {
+		const { container, getAllByText } = render(WebhooksPage, {
+			props: {
+				data: {
+					webhooks: { ok: true, value: [] },
+					schemas: { ok: false, gate: { state: 'unavailable' } },
+					entitlements,
+					user: { roles: ['super_admin'] },
+				},
+				form: null,
+			} as never,
+		});
+		await fireEvent.click(getAllByText('New webhook')[0]);
+		const form = container.querySelector('form#webhook-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Saved like this, the webhook fires on every schema.');
+		expect(form.textContent).not.toContain('already names');
+	});
+});

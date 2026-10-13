@@ -555,7 +555,9 @@
 			placeholder="Every schema"
 			hint={data.schemas.ok
 				? 'Leave empty to fire on every schema.'
-				: 'The schemas could not be read, so only the ones this webhook already names are listed.'}
+				: editing
+					? 'The schemas could not be read, so only the ones this webhook already names are listed.'
+					: 'The schemas could not be read, so none can be picked. Saved like this, the webhook fires on every schema.'}
 			searchable
 			options={schemaOptions}
 			bind:value={schemas}
