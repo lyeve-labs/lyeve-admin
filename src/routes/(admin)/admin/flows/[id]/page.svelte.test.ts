@@ -332,13 +332,13 @@ describe('flow editor page', () => {
 		const { getByRole, getByLabelText } = setup();
 		const palette = getByLabelText('Palette', { selector: 'aside' });
 		const inspector = getByLabelText('Inspector', { selector: 'aside' });
-		expect(palette.className).toContain('hidden');
-		expect(palette.className).toContain('xl:block');
+		expect(palette.className).toContain('invisible');
+		expect(palette.className).toContain('xl:visible');
 		await fireEvent.click(getByRole('button', { name: 'Node palette' }));
-		expect(palette.className).not.toContain('hidden');
+		expect(palette.className).not.toContain('invisible');
 		await fireEvent.click(getByRole('button', { name: 'Inspector' }));
-		expect(inspector.className).not.toContain('hidden');
-		expect(palette.className).toContain('hidden');
+		expect(inspector.className).not.toContain('invisible');
+		expect(palette.className).toContain('invisible');
 	});
 
 	describe('an empty canvas offers three equal starts, none required', () => {

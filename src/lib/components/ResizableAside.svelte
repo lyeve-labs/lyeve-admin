@@ -72,10 +72,14 @@
 	}: Props = $props();
 
 	// Tailwind reads class names from source, so each breakpoint spells its
-	// variants out rather than building them from the prop.
+	// variants out rather than building them from the prop. The dock entry
+	// hands an overlay back to the page at the breakpoint, and nothing moves or
+	// transitions there. It resets the offset with translate-none rather than a
+	// zero offset, because any translate makes the aside the containing block
+	// for a fixed popover inside it.
 	const AT: Record<Breakpoint, Record<'dock' | 'w8' | 'strip' | 'flex' | 'block' | 'hidden' | 'width' | 'noBorderB' | 'borderR' | 'borderL' | 'flexNone' | 'maxHNone', string>> = {
 		md: {
-			dock: 'md:static md:z-auto md:block',
+			dock: 'md:static md:z-auto md:visible md:translate-none md:opacity-100 md:transition-none',
 			w8: 'md:w-8',
 			strip: 'md:flex',
 			flex: 'md:flex',
@@ -89,7 +93,7 @@
 			maxHNone: 'md:max-h-none',
 		},
 		lg: {
-			dock: 'lg:static lg:z-auto lg:block',
+			dock: 'lg:static lg:z-auto lg:visible lg:translate-none lg:opacity-100 lg:transition-none',
 			w8: 'lg:w-8',
 			strip: 'lg:flex',
 			flex: 'lg:flex',
@@ -103,7 +107,7 @@
 			maxHNone: 'lg:max-h-none',
 		},
 		xl: {
-			dock: 'xl:static xl:z-auto xl:block',
+			dock: 'xl:static xl:z-auto xl:visible xl:translate-none xl:opacity-100 xl:transition-none',
 			w8: 'xl:w-8',
 			strip: 'xl:flex',
 			flex: 'xl:flex',
@@ -119,6 +123,35 @@
 	};
 	const at = $derived(AT[breakpoint]);
 	const id = $derived(testId ?? `aside-${storageKey}`);
+
+	// Each breakpoint as the stylesheet compiles it, in rem, so the script and
+	// the variants above change over at the same width.
+	const WIDE: Record<Breakpoint, string> = {
+		md: '(min-width: 48rem)',
+		lg: '(min-width: 64rem)',
+		xl: '(min-width: 80rem)',
+	};
+
+	/**
+	 * Whether the page is under the breakpoint, once the browser has said. Only
+	 * an overlay asks, and only to set inert. Every other part of the overlay is
+	 * a class, and its breakpoint variant hands the docked column back. Inert is
+	 * an attribute, which no variant can scope, and the docked column has to
+	 * take focus and clicks whatever the overlay flag says. Until the browser
+	 * answers, invisible keeps a closed overlay out of focus and out of reach.
+	 */
+	let narrow = $state(false);
+
+	$effect(() => {
+		if (below !== 'overlay' || typeof window.matchMedia !== 'function') return;
+		const wide = window.matchMedia(WIDE[breakpoint]);
+		const sync = () => {
+			narrow = !wide.matches;
+		};
+		sync();
+		wide.addEventListener('change', sync);
+		return () => wide.removeEventListener('change', sync);
+	});
 
 	function storage(): Storage | null {
 		try {
@@ -192,18 +225,41 @@
 
 	const edge = $derived(side === 'start' ? at.borderR : at.borderL);
 
+	/**
+	 * The overlay's motion under the breakpoint. It is CSS because the overlay
+	 * stays mounted at every width, so what the reader typed in it survives a
+	 * close and a resize. Closed, it sits off its own edge, transparent and
+	 * invisible. It slides and fades in on the slow rung and out one rung
+	 * faster. Visibility is in the exit's list only. Leaving, the panel turns
+	 * invisible once the slide has finished. Arriving, it is visible at once, so
+	 * a field inside can take focus on the first frame.
+	 */
+	const slide = $derived(
+		overlay
+			? 'transition-[translate,opacity] duration-slow ease-enter'
+			: `invisible opacity-0 ${side === 'start' ? '-translate-x-full' : 'translate-x-full'} transition-[translate,opacity,visibility] duration-base ease-exit`
+	);
+
 	const frame = $derived.by(() => {
 		if (below === 'overlay') {
 			// Floating under the breakpoint at the panel's own width. Only the
 			// docked variant folds to the strip.
-			return `absolute inset-y-0 z-20 w-(--panel-w) max-w-full shrink-0 border-line bg-surface ${at.dock} ${folded ? at.w8 : ''} ${side === 'start' ? 'left-0 border-r' : 'right-0 border-l'} ${overlay ? '' : 'hidden'}`;
+			return `absolute inset-y-0 z-20 w-(--panel-w) max-w-full shrink-0 border-line bg-surface ${slide} ${at.dock} ${folded ? at.w8 : ''} ${side === 'start' ? 'left-0 border-r' : 'right-0 border-l'}`;
 		}
 		const shown = below === 'hidden' ? `hidden ${at.flex}` : `flex border-b ${at.noBorderB} ${at.flexNone} ${at.maxHNone}`;
 		return `${shown} min-h-0 flex-col border-line bg-surface ${folded ? at.w8 : at.width} ${edge} ${klass}`;
 	});
 </script>
 
-<aside class={frame} style="--panel-w:{width}px" aria-label={label} data-testid={id} data-open={open} data-locked={locked}>
+<aside
+	class={frame}
+	style="--panel-w:{width}px"
+	aria-label={label}
+	data-testid={id}
+	data-open={open}
+	data-locked={locked}
+	inert={below === 'overlay' && narrow && !overlay}
+>
 	{#if collapsible}
 		<!-- The strip: the name read down the edge and the one control that brings the aside back. -->
 		<div class="h-full flex-col items-center gap-2 py-1 {folded ? `hidden ${at.strip}` : 'hidden'}" data-testid="{id}-strip">
