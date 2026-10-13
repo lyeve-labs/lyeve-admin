@@ -67,6 +67,30 @@ function props(roles: string[], over: Record<string, unknown> = {}, form: unknow
 	};
 }
 
+// The audit plugin takes every retention write from a super admin only.
+describe('Retention controls by role', () => {
+	it('offers every write to a super admin', () => {
+		const { container, getAllByRole } = render(RetentionPage, { props: props(['super_admin']) });
+		expect(getAllByRole('button', { name: /enforce now/i })).toHaveLength(1);
+		expect(getAllByRole('button', { name: /new policy/i }).length).toBeGreaterThan(0);
+		expect(getAllByRole('button', { name: /new hold/i }).length).toBeGreaterThan(0);
+		expect(container.querySelector('[aria-label^="Delete the policy"]')).not.toBeNull();
+		expect(container.querySelector('[aria-label^="Duplicate the policy"]')).not.toBeNull();
+		expect(container.querySelector('[aria-label="Release Litigation 42"]')).not.toBeNull();
+	});
+
+	it('withholds every write from an admin and says who can make them', () => {
+		const { container, queryByRole } = render(RetentionPage, { props: props(['admin']) });
+		expect(queryByRole('button', { name: /enforce now/i })).toBeNull();
+		expect(queryByRole('button', { name: /new policy/i })).toBeNull();
+		expect(queryByRole('button', { name: /new hold/i })).toBeNull();
+		expect(container.querySelector('[aria-label^="Delete the policy"]')).toBeNull();
+		expect(container.querySelector('[aria-label^="Duplicate the policy"]')).toBeNull();
+		expect(container.querySelector('[aria-label="Release Litigation 42"]')).toBeNull();
+		expect(container.textContent).toContain('Only a super admin can change a retention policy');
+	});
+});
+
 describe('Retention holds that could not be read', () => {
 	it('says so instead of reporting that nothing is held', () => {
 		const { container } = render(RetentionPage, {

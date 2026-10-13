@@ -45,6 +45,9 @@
 	const holds = $derived(data.holds.ok ? data.holds.value : []);
 	const live = $derived(activeHolds(holds));
 	const blocked = $derived(deletionIsBlocked(data.policies, holds));
+	// The audit plugin takes every write on this page from a super admin only.
+	// An admin reads the rules and is told who can change them.
+	const canWrite = $derived(data.user.roles.includes('super_admin'));
 
 	let addingPolicy = $state(false);
 	let eventType = $state('');
@@ -188,7 +191,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		{#if data.gate.state === 'ok'}
+		{#if data.gate.state === 'ok' && canWrite}
 			<form method="POST" action="?/enforce" use:enhance={enforce}>
 				<Button variant="secondary" size="sm" type="submit">
 					<Trash2 size={ICON.sm} /> Enforce now
@@ -211,6 +214,11 @@
 	{:else}
 		{#if formError}
 			<Alert tone="danger">{formError}</Alert>
+		{/if}
+		{#if !canWrite}
+			<Alert tone="info">
+				Only a super admin can change a retention policy, raise or release a hold, or enforce retention.
+			</Alert>
 		{/if}
 		{#if outcome?.enforced}
 			<Alert tone="success" autoDismiss>
@@ -240,9 +248,11 @@
 						<ScrollText size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openPolicy}>
-							<Plus size={ICON.sm} /> New policy
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openPolicy}>
+								<Plus size={ICON.sm} /> New policy
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -276,27 +286,29 @@
 									<Badge tone={archivalTone(p)}>{archivalLabel(p)}</Badge>
 								</td>
 								<td data-cell="nowrap">
-									<div class="flex justify-end">
-										<Button
-											variant="ghost"
-											size="sm"
-											aria-label="Duplicate the policy covering {policyScope(p)}"
-											onclick={() => duplicatePolicy(p)}
-										>
-											<Copy size={ICON.sm} />
-										</Button>
-										<form method="POST" action="?/deletePolicy" use:enhance={removePolicy(p)}>
-											<input type="hidden" name="id" value={p.id} />
+									{#if canWrite}
+										<div class="flex justify-end">
 											<Button
 												variant="ghost"
 												size="sm"
-												type="submit"
-												aria-label="Delete the policy covering {policyScope(p)}"
+												aria-label="Duplicate the policy covering {policyScope(p)}"
+												onclick={() => duplicatePolicy(p)}
 											>
-												<Trash2 size={ICON.sm} class="text-danger" />
+												<Copy size={ICON.sm} />
 											</Button>
-										</form>
-									</div>
+											<form method="POST" action="?/deletePolicy" use:enhance={removePolicy(p)}>
+												<input type="hidden" name="id" value={p.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Delete the policy covering {policyScope(p)}"
+												>
+													<Trash2 size={ICON.sm} class="text-danger" />
+												</Button>
+											</form>
+										</div>
+									{/if}
 								</td>
 							</tr>
 						{/each}
@@ -322,9 +334,11 @@
 						<Unlock size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openHold}>
-							<Plus size={ICON.sm} /> New hold
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openHold}>
+								<Plus size={ICON.sm} /> New hold
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -360,29 +374,33 @@
 									{/if}
 								</td>
 								<td data-cell="nowrap">
-									<div class="flex justify-end">
-										<form method="POST" action="?/releaseHold" use:enhance={release(h)}>
-											<input type="hidden" name="id" value={h.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Release {h.name}"
-											>
-												<Unlock size={ICON.sm} />
-											</Button>
-										</form>
-									</div>
+									{#if canWrite}
+										<div class="flex justify-end">
+											<form method="POST" action="?/releaseHold" use:enhance={release(h)}>
+												<input type="hidden" name="id" value={h.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Release {h.name}"
+												>
+													<Unlock size={ICON.sm} />
+												</Button>
+											</form>
+										</div>
+									{/if}
 								</td>
 							</tr>
 						{/each}
 					</tbody>
 				</Table>
-				<div>
-					<Button variant="secondary" size="sm" onclick={openHold}>
-						<Plus size={ICON.sm} /> New hold
-					</Button>
-				</div>
+				{#if canWrite}
+					<div>
+						<Button variant="secondary" size="sm" onclick={openHold}>
+							<Plus size={ICON.sm} /> New hold
+						</Button>
+					</div>
+				{/if}
 			{/if}
 		</section>
 	{/if}

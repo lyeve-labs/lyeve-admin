@@ -122,3 +122,19 @@ describe('Imports reads that failed', () => {
 		expect(document.body.textContent).toContain('The content types could not be read');
 	});
 });
+
+describe('Imports rollback by role', () => {
+	const rolled = job({ status: 'completed', inserted_rows: 4 });
+
+	it('offers a rollback to a super admin', () => {
+		const { container } = render(ImportsPage, { props: props({ jobs: [rolled] }) });
+		expect(container.querySelector('[aria-label^="Roll back"]')).not.toBeNull();
+	});
+
+	it('withholds the rollback from an admin, whom the page refuses it', () => {
+		const { container } = render(ImportsPage, {
+			props: props({ jobs: [rolled], user: { id: 'u2', roles: ['admin'] } }),
+		});
+		expect(container.querySelector('[aria-label^="Roll back"]')).toBeNull();
+	});
+});

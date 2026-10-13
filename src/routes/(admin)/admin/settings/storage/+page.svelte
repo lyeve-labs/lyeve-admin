@@ -186,6 +186,11 @@
 		{#if formError}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
+		{#if !data.canConfigure}
+			<Alert tone="info">
+				Only a super admin can add, change or delete a provider. Any admin can test one.
+			</Alert>
+		{/if}
 
 		{#if broken.length > 0}
 			<!-- A row whose secrets will not decrypt looks configured and fails
@@ -272,6 +277,11 @@
 				{#snippet iconSnippet()}
 					<HardDrive size={ICON.lg} />
 				{/snippet}
+				{#snippet action()}
+					{#if data.canConfigure}
+						<Button variant="secondary" onclick={openCreate}><Plus size={ICON.sm} /> New provider</Button>
+					{/if}
+				{/snippet}
 			</EmptyState>
 		{:else}
 			<Table label="Storage">
@@ -323,17 +333,19 @@
 											<Copy size={ICON.sm} />
 										</Button>
 									{/if}
-									<form method="POST" action="?/delete" use:enhance={remove(p)}>
-										<input type="hidden" name="id" value={p.id} />
-										<Button
-											variant="ghost"
-											size="sm"
-											type="submit"
-											aria-label="Delete {p.name}"
-										>
-											<Trash2 size={ICON.sm} class="text-danger" />
-										</Button>
-									</form>
+									{#if data.canConfigure}
+										<form method="POST" action="?/delete" use:enhance={remove(p)}>
+											<input type="hidden" name="id" value={p.id} />
+											<Button
+												variant="ghost"
+												size="sm"
+												type="submit"
+												aria-label="Delete {p.name}"
+											>
+												<Trash2 size={ICON.sm} class="text-danger" />
+											</Button>
+										</form>
+									{/if}
 								</div>
 							</td>
 						</tr>

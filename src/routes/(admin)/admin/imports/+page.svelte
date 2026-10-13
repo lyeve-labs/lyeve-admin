@@ -81,6 +81,9 @@
 	// Null while the content types are unread, so each place that offers one
 	// says why it offers none.
 	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
+	// The page takes a rollback from a super admin only, so no other role is
+	// offered one.
+	const canRollback = $derived(data.user.roles.includes('super_admin'));
 	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 	const running = $derived(data.jobs.filter(cancelable));
 	const rejecting = $derived(data.jobs.filter((j) => outcome(j) === 'partial' || outcome(j) === 'nothing'));
@@ -480,7 +483,7 @@
 												</Button>
 											</form>
 										{/if}
-										{#if rollbackable(j)}
+										{#if rollbackable(j) && canRollback}
 											<form method="POST" action="?/rollback" use:enhance={rollback(j)}>
 												<input type="hidden" name="id" value={j.id} />
 												<Button variant="ghost" size="sm" type="submit" aria-label="Roll back the import of {j.source_name}">
