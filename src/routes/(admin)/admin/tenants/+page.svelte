@@ -26,6 +26,7 @@
 	import type { Tenant } from '@lyeve-labs/client-rest';
 	import { formatDate as formatDay, NO_VALUE } from '$lib/format';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -117,7 +118,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.tenants.filter(
+		(data.tenants.ok ? data.tenants.value : []).filter(
 			(t: Tenant) =>
 				narrows(query, t.slug, t.name, t.plan) &&
 				(status === '' || (status === 'enabled') === t.enabled)
@@ -148,7 +149,7 @@
 
 <PageShell
 	title="Tenants"
-	description={`${data.total} ${data.total === 1 ? 'tenant' : 'tenants'} on this instance`}
+	description={data.tenants.ok ? `${data.total} ${data.total === 1 ? 'tenant' : 'tenants'} on this instance` : 'Every tenant on this instance'}
 	width="wide"
 >
 	{#snippet actions()}
@@ -164,14 +165,20 @@
 
 	<FormErrors message={form?.error} fields={errors} />
 
-	{#if !canProvision}
+	{#if data.tenants.ok && !canProvision}
 		<NotEnabled
 			title="Tenant provisioning"
 			description="Creating a tenant from this page. The tenants below can still be edited, disabled and deleted."
 		/>
 	{/if}
 
-	{#if data.tenants.length === 0}
+	{#if !data.tenants.ok}
+		<GateNotice
+			gate={data.tenants.gate}
+			title="Tenants"
+			absent="The multitenant plugin is not part of this build, so this instance serves one tenant."
+		/>
+	{:else if data.tenants.value.length === 0}
 		<EmptyState
 			title="No tenants yet"
 			description="Create a tenant to start serving content on this instance."

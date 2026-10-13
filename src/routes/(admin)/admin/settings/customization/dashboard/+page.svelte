@@ -169,6 +169,12 @@
 		{/if}
 	</p>
 
+	{#if !data.schemasRead}
+		<Alert tone="warn">
+			The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.
+		</Alert>
+	{/if}
+
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Widgets</SectionHeading>
 		{#if widgets.length === 0}
@@ -216,7 +222,7 @@
 						</div>
 
 						{#if w.type === 'entry_counts'}
-							{#if schemaOptions.length === 0}
+							{#if data.schemasRead && schemaOptions.length === 0}
 								<p class="text-sm text-muted">This tenant has no schemas to count yet.</p>
 							{:else}
 								<CheckboxGroup label="Schemas" hint="Up to 12, in the order listed here." orientation="horizontal" options={schemaOptions} bind:value={w.schemas} />

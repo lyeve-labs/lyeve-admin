@@ -29,14 +29,17 @@ function tenants(count: number, from = 0) {
 }
 
 function data(overrides: Record<string, unknown> = {}) {
+	// A bare array of rows is a read that answered. Anything else is passed
+	// through, so a case can hand the page a failed read.
+	const { tenants: rows = tenants(50), ...rest } = overrides;
 	return {
-		tenants: tenants(50),
+		tenants: Array.isArray(rows) ? { ok: true, value: rows } : rows,
 		limit: 50,
 		offset: 0,
 		total: 731,
 		// Creating is enabled, so a pagination test is not also a gate test.
 		canProvision: true,
-		...overrides,
+		...rest,
 	};
 }
 
@@ -148,5 +151,24 @@ describe('Tenants pagination', () => {
 		});
 
 		expect(container.textContent).toContain('No tenants yet');
+	});
+});
+
+/*
+ * The first-run state invites the reader to create the first tenant. Drawn
+ * over a read that failed, it tells somebody whose engine is down that the
+ * instance has no tenants.
+ */
+describe('Tenants when the list could not be read', () => {
+	it('says the engine did not answer and offers no create, no pager and no count', () => {
+		const { container, queryByRole } = render(TenantsPage, {
+			props: props({ tenants: { ok: false, gate: { state: 'unavailable' } }, canProvision: false, total: 0 }),
+		});
+		expect(container.textContent).toContain('so Tenants could not be read. Nothing was changed.');
+		expect(container.textContent).not.toContain('No tenants yet');
+		expect(container.textContent).not.toContain('0 tenants on this instance');
+		expect(container.textContent).not.toContain('Tenant provisioning');
+		expect(queryByRole('button', { name: /new tenant/i })).toBeNull();
+		expect(container.querySelector('table')).toBeNull();
 	});
 });

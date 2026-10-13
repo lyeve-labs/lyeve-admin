@@ -127,6 +127,12 @@
 			<Alert tone="success" autoDismiss>Saved.</Alert>
 		{/if}
 
+		{#if !data.schemasRead}
+			<Alert tone="warn">
+				The schemas could not be read, so no schema can be picked below. A block keeps the schemas it already names.
+			</Alert>
+		{/if}
+
 		<Card pad="md">
 			{#snippet header()}
 				<SectionHeading level={3}>Page</SectionHeading>

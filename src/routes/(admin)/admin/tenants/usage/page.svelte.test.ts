@@ -35,6 +35,7 @@ const props = (over: Record<string, unknown> = {}) => ({
 		requests: [request(MIRA)],
 		requestsRead: true,
 		usage: [],
+		usageRead: true,
 		people: { [MIRA]: 'mira.costa@example.com' },
 		gate: { state: 'ok' },
 		permitted: true,
@@ -56,5 +57,31 @@ describe('Requests for more', () => {
 		const text = said(container);
 		expect(text).toContain('by 24d6560b');
 		expect(text).not.toContain(MIRA);
+	});
+});
+
+describe('Quotas when the usage could not be read', () => {
+	const quota = {
+		id: 'q1',
+		tenant_id: 'acme',
+		requests_limit: 1000,
+		storage_bytes_limit: 0,
+		bandwidth_bytes_limit: 0,
+		is_hard_limit: true,
+		block_on_exceeded: true,
+		grace_period_hours: 0,
+		warn_at_pct_80: true,
+		warn_at_pct_90: true,
+		blocked_at: null,
+	};
+
+	it('says so over the table rather than drawing rows that used nothing', () => {
+		const { container } = render(UsagePage, {
+			props: props({ quotas: [quota], quotaTotal: 1, usageRead: false }),
+		});
+		expect(said(container)).toContain('What each tenant used could not be read');
+		cleanup();
+		const answered = render(UsagePage, { props: props({ quotas: [quota], quotaTotal: 1, usageRead: true }) });
+		expect(said(answered.container)).not.toContain('could not be read');
 	});
 });

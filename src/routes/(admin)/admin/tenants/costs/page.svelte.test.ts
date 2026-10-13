@@ -50,8 +50,19 @@ const prices = [
 	{ resource_type: 'compute', unit_price: '1.00', per_units: 1000000, currency: 'USD', source: 'default', updated_at: null },
 ];
 
+/** A read that answered. A null override is a read that failed for no reason the page can name. */
+function read(value: unknown) {
+	return value === null ? { ok: false, gate: { state: 'error', message: 'It could not be read.' } } : { ok: true, value };
+}
+
 function data(overrides: Record<string, unknown> = {}): PageData {
-	return { enabled: true, upgradeUrl: '', summary, dashboard, budgets, prices, ...overrides } as unknown as PageData;
+	const reads = { summary, dashboard, budgets, prices };
+	const merged: Record<string, unknown> = { enabled: true, upgradeUrl: '', ...overrides };
+	for (const key of Object.keys(reads) as (keyof typeof reads)[]) {
+		const value = key in overrides ? overrides[key] : reads[key];
+		merged[key] = value !== null && typeof value === 'object' && 'ok' in value ? value : read(value);
+	}
+	return merged as unknown as PageData;
 }
 
 function fieldsets(): HTMLFieldSetElement[] {
@@ -105,8 +116,10 @@ describe('tenant costs page', () => {
 	});
 
 	it('says which read did not answer', () => {
-		render(CostsPage, { props: { data: data({ summary: null }), form: null } });
-		expect(screen.getByText('The split by resource did not answer.')).toBeTruthy();
+		render(CostsPage, {
+			props: { data: data({ summary: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+		expect(screen.getByText(/so the split by resource could not be read/)).toBeTruthy();
 		expect(screen.getByTestId('cost-dashboard')).toBeTruthy();
 	});
 

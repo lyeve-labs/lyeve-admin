@@ -91,7 +91,7 @@ describe('admin/webhooks/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.webhooks).toHaveLength(50);
+		expect(result.webhooks.ok && result.webhooks.value).toHaveLength(50);
 		expect(result.hasMore).toBe(true);
 	});
 
@@ -117,24 +117,39 @@ describe('admin/webhooks/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.webhooks).toHaveLength(50);
+		expect(result.webhooks.ok && result.webhooks.value).toHaveLength(50);
 	});
 
-	it('still renders when the endpoint fails', async () => {
+	function failing(status: number, schemas = 200, search = '?offset=50') {
 		const fetch = vi.fn(async (url: string) =>
-			String(url).includes('/schemas') ? json([]) : json({ error: 'nope' }, 500)
+			String(url).includes('/schemas')
+				? schemas === 200
+					? json([])
+					: json({ error: 'nope' }, schemas)
+				: json({ error: 'nope' }, status)
 		) as unknown as typeof globalThis.fetch;
-		const event = {
+		return {
 			fetch,
 			cookies: mockCookies(),
-			url: new URL('http://localhost/admin/webhooks'),
+			url: new URL(`http://localhost/admin/webhooks${search}`),
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
+	}
 
-		const result = (await load(event)) as Loaded;
+	// An empty list is the first-run state with an offer to create the first
+	// webhook. A read that failed is a gate, never that state, and it is not
+	// sent back to page one as if the list had ended.
+	it('keeps a failed list read as its gate, never as no webhooks', async () => {
+		const failed = (await load(failing(500))) as Loaded;
+		expect(failed.webhooks).toMatchObject({ ok: false, gate: { state: 'error' } });
+		expect(failed.hasMore).toBe(false);
+		expect(((await load(failing(503))) as Loaded).webhooks).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(((await load(failing(403))) as Loaded).webhooks).toEqual({ ok: false, gate: { state: 'forbidden' } });
+	});
 
-		expect(result.webhooks).toEqual([]);
-		expect(result.hasMore).toBe(false);
+	it('keeps a failed schema read apart from a list of none', async () => {
+		const result = (await load(failing(200, 503, ''))) as Loaded;
+		expect(result.schemas).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 });
 

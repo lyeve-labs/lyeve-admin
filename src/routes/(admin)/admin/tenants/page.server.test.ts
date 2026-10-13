@@ -69,7 +69,8 @@ describe('admin/tenants load', () => {
 		const result = await run(event);
 
 		expect(result.total).toBe(731);
-		expect(result.tenants).toHaveLength(50);
+		expect(result.tenants).toMatchObject({ ok: true });
+		expect(result.tenants.ok && result.tenants.value).toHaveLength(50);
 	});
 
 	it('defaults to the engine page size and the first page', async () => {
@@ -121,9 +122,11 @@ describe('admin/tenants load', () => {
 		expect(result.total).toBe(750);
 	});
 
-	it('renders an empty page when the engine cannot be reached', async () => {
+	// An empty list is the first-run state with an offer to create the first
+	// tenant. A read that failed is a gate, never that state.
+	it('keeps an unreachable engine as an outage, never as no tenants', async () => {
 		const fetch = vi.fn(async () => {
-			throw new Error('engine unreachable');
+			throw new TypeError('fetch failed');
 		}) as unknown as typeof globalThis.fetch;
 
 		const result = await run({
@@ -133,8 +136,25 @@ describe('admin/tenants load', () => {
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never);
 
-		expect(result.tenants).toEqual([]);
-		expect(result.total).toBe(0);
+		expect(result.tenants).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(result.canProvision).toBe(false);
+	});
+
+	it('keeps a refused or failed list read as its gate', async () => {
+		const refuse = (status: number) => {
+			const fetch = vi.fn(async (url: string) =>
+				String(url).includes('/provisioning') ? json({ enabled: true }) : json({ error: 'no' }, status),
+			) as unknown as typeof globalThis.fetch;
+			return run({
+				fetch,
+				cookies: mockCookies(),
+				url: new URL('http://localhost/admin/tenants'),
+				parent: async () => ({ user: { roles: ['super_admin'] } }),
+			} as never);
+		};
+		expect((await refuse(403)).tenants).toEqual({ ok: false, gate: { state: 'forbidden' } });
+		expect((await refuse(503)).tenants).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect((await refuse(500)).tenants).toMatchObject({ ok: false, gate: { state: 'error' } });
 	});
 
 	it('throws 403 for anyone but a super_admin', async () => {

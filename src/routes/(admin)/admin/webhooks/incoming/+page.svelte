@@ -25,6 +25,7 @@
 	import { submitter } from '$lib/forms.svelte';
 	import { Plus, Pencil, Trash2, ArrowDownToLine } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ICON } from '$lib/icon';
 
@@ -33,7 +34,8 @@
 
 	const submit = submitter(() => (open = false));
 
-	const schemaOptions = $derived(data.schemas.map((s) => ({ value: s.name, label: s.name })));
+	const rows = $derived(data.incomingWebhooks.ok ? data.incomingWebhooks.value : []);
+	const schemaNames = $derived(data.schemas.ok ? data.schemas.value.map((s) => s.name) : []);
 
 	// One drawer for both writes: a null target is a new endpoint.
 	let open = $state(false);
@@ -45,10 +47,16 @@
 	let enabled = $state(true);
 	let allowedIPs = $state('');
 
+	// The endpoint's own schema stays among the options even when the schema
+	// list could not be read, so saving an edit never moves it.
+	const schemaOptions = $derived(
+		[...new Set([...schemaNames, ...(schema ? [schema] : [])])].map((name) => ({ value: name, label: name }))
+	);
+
 	function openCreate() {
 		editing = null;
 		name = '';
-		schema = data.schemas[0]?.name ?? '';
+		schema = schemaNames[0] ?? '';
 		secret = '';
 		fieldMap = '{\n  "external_field": "schema_field"\n}';
 		enabled = true;
@@ -93,7 +101,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.incomingWebhooks.filter(
+		rows.filter(
 			(wh) =>
 				narrows(query, wh.name, wh.schema_name, wh.id) &&
 				(status === '' || (status === 'enabled') === wh.enabled)
@@ -109,10 +117,13 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} />
-			New incoming webhook
-		</Button>
+		<!-- A list that could not be read offers no write against it. -->
+		{#if data.incomingWebhooks.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} />
+				New incoming webhook
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if pageRefusal}
@@ -123,7 +134,13 @@
 		</Alert>
 	{/if}
 
-	{#if data.incomingWebhooks.length === 0}
+	{#if !data.incomingWebhooks.ok}
+		<GateNotice
+			gate={data.incomingWebhooks.gate}
+			title="Incoming webhooks"
+			absent="The webhook plugin is not part of this build, so no external service can send payloads here."
+		/>
+	{:else if data.incomingWebhooks.value.length === 0}
 		<EmptyState
 			title="No incoming webhooks"
 			description="Create one to receive payloads from external services."
@@ -218,6 +235,9 @@
 	>
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input id="incoming-name" name="name" label="Name" required bind:value={name} placeholder="Stripe events" />
+		{#if !data.schemas.ok}
+			<p class="text-xs text-muted">The schemas could not be read, so only the one this endpoint already names is listed.</p>
+		{/if}
 		<Select
 			id="incoming-schema"
 			name="schema_name"

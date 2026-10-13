@@ -65,11 +65,14 @@ describe('admin/tenants/[id] load', () => {
 			'GET /api/admin/tenant-members/acme': { members: [{ id: 'u1', email: 'a@x.io', disabled: false, home: true, roles: ['admin'] }], total: 1 },
 		});
 		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
-		expect(data.choices).toEqual([
-			{ name: 'flow', available: true },
-			{ name: 'search', available: false },
-		]);
-		expect(data.members?.[0].email).toBe('a@x.io');
+		expect(data.choices).toEqual({
+			ok: true,
+			value: [
+				{ name: 'flow', available: true },
+				{ name: 'search', available: false },
+			],
+		});
+		expect(data.members.ok && data.members.value[0].email).toBe('a@x.io');
 	});
 
 	it('keeps the features when the members read fails', async () => {
@@ -78,8 +81,31 @@ describe('admin/tenants/[id] load', () => {
 			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: [], known: ['flow'] },
 		});
 		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
-		expect(data.members).toBeNull();
-		expect(data.choices).toEqual([{ name: 'flow', available: true }]);
+		expect(data.members).toMatchObject({ ok: false, gate: { state: 'absent' } });
+		expect(data.choices).toEqual({ ok: true, value: [{ name: 'flow', available: true }] });
+	});
+
+	// A tenant that exists is never reported missing because the engine or its
+	// database did not answer.
+	it('answers 404 only for the engine 404', async () => {
+		const missing = event({});
+		await expect(load(missing.event)).rejects.toMatchObject({ status: 404, body: { message: 'No tenant has that id.' } });
+
+		const down = event({ 'GET /api/admin/tenants/t1': json({ error: 'database unavailable' }, 503) });
+		await expect(load(down.event)).rejects.toMatchObject({ status: 503 });
+
+		const refused = event({ 'GET /api/admin/tenants/t1': json({ error: 'forbidden' }, 403) });
+		await expect(load(refused.event)).rejects.toMatchObject({ status: 403 });
+	});
+
+	it('keeps an outage on the members read apart from a tenant with no members', async () => {
+		const { event: ev } = event({
+			'GET /api/admin/tenants/t1': TENANT,
+			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: [], known: ['flow'] },
+			'GET /api/admin/tenant-members/acme': json({ error: 'database unavailable' }, 503),
+		});
+		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
+		expect(data.members).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 });
 

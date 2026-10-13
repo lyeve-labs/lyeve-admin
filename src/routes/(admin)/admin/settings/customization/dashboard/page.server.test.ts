@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@lyeve-labs/client';
+import { listSchemaNames } from '$lib/api/search-settings';
 
 const api = vi.hoisted(() => ({
 	getDashboardLayout: vi.fn(),
@@ -47,6 +49,22 @@ beforeEach(() => {
 });
 
 describe('dashboard editor', () => {
+	it('keeps an outage on the layout read apart from a missing route', async () => {
+		api.getDashboardLayout.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		await expect(load(event())).rejects.toMatchObject({ status: 503 });
+		api.getDashboardLayout.mockRejectedValueOnce(new ApiError(403, 'forbidden'));
+		await expect(load(event())).rejects.toMatchObject({ status: 403 });
+		api.getDashboardLayout.mockRejectedValueOnce(new ApiError(404, 'not found'));
+		await expect(load(event())).rejects.toMatchObject({ status: 404 });
+	});
+
+	it('says the schemas were not read rather than that there are none', async () => {
+		vi.mocked(listSchemaNames).mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		const data = (await load(event())) as { schemas: string[]; schemasRead: boolean };
+		expect(data.schemas).toEqual([]);
+		expect(data.schemasRead).toBe(false);
+	});
+
 	it('sends a reader without the capability back to customization', async () => {
 		await expect(load(event({}, { entitled: false }))).rejects.toMatchObject({ status: 303, location: '/admin/settings/customization' });
 	});

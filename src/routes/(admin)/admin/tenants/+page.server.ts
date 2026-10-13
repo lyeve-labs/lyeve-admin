@@ -12,6 +12,7 @@ import {
 import { actionError } from '$lib/server/action-error';
 import { getProvisioning } from '$lib/api/tenants';
 import { sessionToken } from '$lib/server/session-cookie';
+import { section, type Section } from '$lib/api/gate';
 
 export type { Tenant };
 
@@ -23,6 +24,9 @@ const DEFAULT_LIMIT = 50;
  * refusing it, so asking for more comes back silently short.
  */
 const MAX_LIMIT = 500;
+
+/** What the page says for a list read that failed for no reason it can name. */
+const LIST_FAILED = 'The tenants could not be read. This is not a report that there are none.';
 
 export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const { user } = await parent();
@@ -39,17 +43,23 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	// The plugin says whether a create would pass, so the page offers one only
 	// then. A failed read, a plugin without the route among them, offers
 	// none and says creating is not enabled, the way a refusal would.
-	const [result, canProvision] = await Promise.all([
-		listTenants(client, limit, offset).catch((): { items: Tenant[]; total: number } => ({ items: [], total: 0 })),
+	const [read, canProvision] = await Promise.all([
+		section(listTenants(client, limit, offset), LIST_FAILED),
 		getProvisioning(client).catch(() => false),
 	]);
+	// The page draws the gate in place of the list and offers no create.
+	if (!read.ok) return { tenants: read, limit, offset, total: 0, canProvision: false };
+	const result = read.value;
 
 	// The envelope carries the collection count, so one server page is never
 	// described as the whole instance. What has been read is the floor, for an
 	// answer that omits the count.
 	const total = Math.max(result.total, offset + result.items.length);
 
-	return { tenants: result.items, limit, offset, total, canProvision };
+	// Typed, because a bare literal widens `ok` to boolean and the page could
+	// no longer tell the two cases apart.
+	const tenants: Section<Tenant[]> = { ok: true, value: result.items };
+	return { tenants, limit, offset, total, canProvision };
 };
 
 export const actions: Actions = {

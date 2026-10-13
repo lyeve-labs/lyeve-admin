@@ -18,7 +18,8 @@
 		kind: 'logo' | 'favicon';
 		/** The address the brand stores now. */
 		current: string;
-		mediaChoices: MediaChoice[];
+		/** Null when the media library could not be read, which is not a library with nothing in it. */
+		mediaChoices: MediaChoice[] | null;
 		error?: string;
 		fieldError?: string;
 		notice?: ImageNotice;
@@ -173,7 +174,11 @@
 		</form>
 
 		<div>
-			<MediaPicker choices={mediaChoices} onpick={(c) => pickFromLibrary(c.public_url)} label="Choose from the library" />
+			{#if mediaChoices}
+				<MediaPicker choices={mediaChoices} onpick={(c) => pickFromLibrary(c.public_url)} label="Choose from the library" />
+			{:else}
+				<p class="text-sm text-muted">The media library could not be read, so nothing can be chosen from it. Upload a file or use an address.</p>
+			{/if}
 		</div>
 
 		<form bind:this={libraryForm} method="POST" action="?/{copy.address}" class="flex flex-col gap-4" use:enhance={keep}>

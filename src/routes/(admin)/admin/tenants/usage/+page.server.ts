@@ -36,6 +36,7 @@ export const load: PageServerLoad = async (event) => {
 			offset: 0,
 			requests: [] as QuotaRequest[],
 			usage: [] as TenantUsage[],
+			usageRead: false,
 			requestsRead: false,
 			people: {} as Record<string, string>,
 			gate: USAGE_OK as UsageGate,
@@ -71,11 +72,13 @@ export const load: PageServerLoad = async (event) => {
 					.then((r) => ({ rows: rowsOf(r), read: true }))
 					.catch(() => ({ rows: [] as QuotaRequest[], read: false }))
 			: Promise.resolve({ rows: [] as QuotaRequest[], read: false }),
+		// A quota row draws its usage beside its limit. An unread usage list is
+		// said once over the table, never drawn as rows that used nothing.
 		gate.state === 'ok'
 			? listTenantUsage(client)
-					.then((u) => rowsOf(u))
-					.catch((): TenantUsage[] => [])
-			: Promise.resolve([] as TenantUsage[]),
+					.then((u) => ({ rows: rowsOf(u), read: true }))
+					.catch(() => ({ rows: [] as TenantUsage[], read: false }))
+			: Promise.resolve({ rows: [] as TenantUsage[], read: false }),
 		gate.state === 'ok' ? listPeople(client) : Promise.resolve([]),
 	]);
 
@@ -86,7 +89,8 @@ export const load: PageServerLoad = async (event) => {
 		offset,
 		requests: requests.rows,
 		requestsRead: requests.read,
-		usage,
+		usage: usage.rows,
+		usageRead: usage.read,
 		people: Object.fromEntries([
 			...people.map((p) => [p.id, p.email] as const),
 			...(user.email ? [[user.id, user.email] as const] : []),

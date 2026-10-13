@@ -4,6 +4,8 @@ import { archiveTenant, getTenant, restoreTenant } from '@lyeve-labs/client-rest
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
+import { section, type Section } from '$lib/api/gate';
+import { readError } from '$lib/server/read-error';
 import {
 	featureChoices,
 	findUserByEmail,
@@ -22,29 +24,36 @@ export const load: PageServerLoad = async (event) => {
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 
-	const tenant = await getTenant(event.params.id, client).catch(() => null);
-	if (!tenant) error(404, 'No tenant has that id.');
+	// Only the engine's 404 says the tenant does not exist. A refusal or an
+	// outage keeps a status of its own.
+	const tenant = await getTenant(event.params.id, client).catch((err: unknown) =>
+		readError(err, 'No tenant has that id.'),
+	);
 
 	// Each half is read on its own: a members list that fails is no reason to
 	// hide what the tenant may use, and the reverse.
 	const [features, members] = await Promise.all([
-		getTenantFeatures(client, tenant.slug).catch(() => null),
-		listTenantMembers(client, tenant.slug, 200, 0).catch(() => null),
+		section(getTenantFeatures(client, tenant.slug), "This tenant's features could not be read."),
+		section(
+			listTenantMembers(client, tenant.slug, 200, 0),
+			"This tenant's members could not be read. This is not a report that it has none.",
+		),
 	]);
 
 	// The entitlements the layout read are the signed-in super admin's, whose
 	// tenant is not this one, so only `features` is read from them: the
 	// license, which is the same for every tenant.
 	const licensed = entitlements?.features ?? [];
-	const choices: FeatureChoice[] | null = features
-		? featureChoices(features.known, licensed, features.withheld)
-		: null;
+	const choices: Section<FeatureChoice[]> = features.ok
+		? { ok: true, value: featureChoices(features.value.known, licensed, features.value.withheld) }
+		: features;
+	const people: Section<TenantMember[]> = members.ok ? { ok: true, value: members.value.members ?? [] } : members;
 
 	return {
 		tenant,
 		choices,
-		members: (members?.members ?? null) as TenantMember[] | null,
-		memberTotal: members?.total ?? 0,
+		members: people,
+		memberTotal: members.ok ? members.value.total : 0,
 	};
 };
 

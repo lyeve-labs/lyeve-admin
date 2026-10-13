@@ -39,7 +39,7 @@ const webhook = {
 
 function setup() {
 	return render(WebhooksPage, {
-		props: { data: { webhooks: [webhook], schemas: [], entitlements }, form: null } as never,
+		props: { data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements }, form: null } as never,
 	});
 }
 
@@ -87,5 +87,35 @@ describe('webhooks page', () => {
 		expect(dialog.textContent).toContain('Edit Ship it');
 		expect((dialog.querySelector('#webhook-url') as HTMLInputElement).value).toBe('https://example.com/hook');
 		expect(dialog.querySelector('button[type="submit"]')?.textContent?.trim()).toBe('Save');
+	});
+});
+
+/*
+ * The first-run state invites the reader to create the first webhook. Drawn
+ * over a read that failed, it tells somebody whose engine is down that no
+ * callback is configured.
+ */
+describe('the webhook list when it could not be read', () => {
+	function failed(gate: Record<string, unknown>) {
+		return render(WebhooksPage, {
+			props: {
+				data: { webhooks: { ok: false, gate }, schemas: { ok: true, value: [] }, entitlements, user: { roles: ['super_admin'] } },
+				form: null,
+			} as never,
+		});
+	}
+
+	it('says the engine did not answer and offers no first webhook', () => {
+		const { container, queryByRole } = failed({ state: 'unavailable' });
+		expect(container.textContent).toContain('so Webhooks could not be read. Nothing was changed.');
+		expect(container.textContent).not.toContain('No webhooks configured yet');
+		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
+		expect(container.querySelector('table')).toBeNull();
+	});
+
+	it('names the role for a refusal', () => {
+		const { container } = failed({ state: 'forbidden' });
+		expect(container.textContent).toContain('Your role cannot open Webhooks.');
+		expect(container.textContent).not.toContain('No webhooks configured yet');
 	});
 });

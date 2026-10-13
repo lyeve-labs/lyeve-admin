@@ -21,6 +21,7 @@
 	import { roleTone } from '$lib/roles';
 	import { formatDate } from '$lib/format';
 	import type { TenantMember } from '$lib/api/tenant-access';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -40,9 +41,9 @@
 
 	let available = $state<string[]>([]);
 	$effect.pre(() => {
-		available = (data.choices ?? []).filter((c) => c.available).map((c) => c.name);
+		available = (data.choices.ok ? data.choices.value : []).filter((c) => c.available).map((c) => c.name);
 	});
-	const featureOptions = $derived((data.choices ?? []).map((c) => ({ value: c.name, label: c.name })));
+	const featureOptions = $derived((data.choices.ok ? data.choices.value : []).map((c) => ({ value: c.name, label: c.name })));
 	let savingFeatures = $state(false);
 
 	let memberOpen = $state(false);
@@ -125,9 +126,13 @@
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>What this tenant may use</SectionHeading>
-		{#if data.choices === null}
-			<Alert tone="warn">The engine did not answer for this tenant's features. Reload to try again.</Alert>
-		{:else if data.choices.length === 0}
+		{#if !data.choices.ok}
+			<GateNotice
+				gate={data.choices.gate}
+				title="this tenant's features"
+				absent="The multitenant plugin does not serve per-tenant features on this instance."
+			/>
+		{:else if data.choices.value.length === 0}
 			<EmptyState title="Nothing to withhold" description="This instance serves no plugin this tenant could be refused." />
 		{:else}
 			{#if form?.featuresError}
@@ -147,7 +152,7 @@
 					};
 				}}
 			>
-				{#each data.choices as c (c.name)}
+				{#each data.choices.value as c (c.name)}
 					<input type="hidden" name="offered" value={c.name} />
 				{/each}
 				<CheckboxGroup
@@ -168,14 +173,20 @@
 	<section class="flex flex-col gap-4">
 		<div class="flex items-center justify-between gap-4">
 			<SectionHeading level={2}>Members</SectionHeading>
-			<Button variant="secondary" onclick={openNewMember}>New member</Button>
+			{#if data.members.ok}
+				<Button variant="secondary" onclick={openNewMember}>New member</Button>
+			{/if}
 		</div>
 		{#if form?.memberError && !memberOpen}
 			<Alert tone="danger">{form.memberError}</Alert>
 		{/if}
-		{#if data.members === null}
-			<Alert tone="warn">The engine did not answer for this tenant's members. Reload to try again.</Alert>
-		{:else if data.members.length === 0}
+		{#if !data.members.ok}
+			<GateNotice
+				gate={data.members.gate}
+				title="this tenant's members"
+				absent="The multitenant plugin does not serve tenant members on this instance."
+			/>
+		{:else if data.members.value.length === 0}
 			<EmptyState title="No members" description="No account calls this tenant home or holds a membership in it." />
 		{:else}
 			<Table label="Members">
@@ -188,7 +199,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.members as m (m.id)}
+					{#each data.members.value as m (m.id)}
 						<tr>
 							<td data-cell="nowrap">
 								{m.email}
@@ -223,8 +234,8 @@
 					{/each}
 				</tbody>
 			</Table>
-			{#if data.memberTotal > data.members.length}
-				<p class="text-xs text-faint">Showing {data.members.length} of {data.memberTotal} members.</p>
+			{#if data.memberTotal > data.members.value.length}
+				<p class="text-xs text-faint">Showing {data.members.value.length} of {data.memberTotal} members.</p>
 			{/if}
 		{/if}
 	</section>

@@ -1,5 +1,4 @@
 import type { PageServerLoad, Actions } from './$types';
-import type { IncomingWebhook } from '@lyeve-labs/client';
 import { fail } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import {
@@ -12,6 +11,10 @@ import {
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { sessionToken } from '$lib/server/session-cookie';
+import { section } from '$lib/api/gate';
+
+/** What the page says for a list read that failed for no reason it can name. */
+const LIST_FAILED = 'The incoming webhooks could not be read. This is not a report that there are none.';
 
 function parseIPList(raw: FormDataEntryValue | null): string[] {
 	const s = String(raw ?? '').trim();
@@ -27,8 +30,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 
 	const [incomingWebhooks, schemas] = await Promise.all([
-		listIncomingWebhooks(client).catch((): IncomingWebhook[] => []),
-		getSchemas(client).catch(() => [])
+		section(listIncomingWebhooks(client), LIST_FAILED),
+		section(getSchemas(client), 'The schemas could not be read.')
 	]);
 
 	return { incomingWebhooks, schemas };

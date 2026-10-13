@@ -21,6 +21,7 @@
 	import { Coins, Plus, RefreshCw, RotateCcw, Trash2 } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { BUDGET_PERIODS, RESOURCE_TYPES, type Price, type ResourceType, costShares } from '$lib/api/cost';
 	import { formatDate, formatDateTime, NO_VALUE } from '$lib/format';
@@ -35,6 +36,12 @@
 	);
 
 	const submit = submitter(() => (open = false));
+
+	// Each read is its value or null, and the gate beside it says why it is null.
+	const summary = $derived(data.summary.ok ? data.summary.value : null);
+	const dashboard = $derived(data.dashboard.ok ? data.dashboard.value : null);
+	const budgets = $derived(data.budgets.ok ? data.budgets.value : null);
+	const prices = $derived(data.prices.ok ? data.prices.value : null);
 
 	const RESOURCE_LABEL: Record<ResourceType, string> = {
 		database: 'Database',
@@ -107,7 +114,7 @@
 	function seed(): Record<ResourceType, PriceRow> {
 		const rows = {} as Record<ResourceType, PriceRow>;
 		for (const r of RESOURCE_TYPES) {
-			const p = data.prices?.find((x) => x.resource_type === r);
+			const p = prices?.find((x) => x.resource_type === r);
 			rows[r] = { unit_price: p?.unit_price ?? '0', per_units: p?.per_units ?? 1, currency: p?.currency ?? 'USD' };
 		}
 		return rows;
@@ -117,7 +124,7 @@
 	// svelte-ignore state_referenced_locally
 	let seededVersion = version();
 	function version(): string {
-		return (data.prices ?? []).map((p) => `${p.resource_type}:${p.unit_price}:${p.per_units}:${p.currency}:${p.source}`).join('|');
+		return (prices ?? []).map((p) => `${p.resource_type}:${p.unit_price}:${p.per_units}:${p.currency}:${p.source}`).join('|');
 	}
 	$effect(() => {
 		const v = version();
@@ -127,7 +134,7 @@
 	});
 
 	function priceOf(r: ResourceType): Price | undefined {
-		return data.prices?.find((p) => p.resource_type === r);
+		return prices?.find((p) => p.resource_type === r);
 	}
 
 	let deleteForm = $state<HTMLFormElement | null>(null);
@@ -176,9 +183,12 @@
 					<RefreshCw size={ICON.sm} /> Aggregate now
 				</Button>
 			</form>
-			<Button variant="primary" size="sm" onclick={openCreate}>
-				<Plus size={ICON.sm} /> New budget
-			</Button>
+			<!-- A budget list that could not be read offers no write against it. -->
+			{#if budgets}
+				<Button variant="primary" size="sm" onclick={openCreate}>
+					<Plus size={ICON.sm} /> New budget
+				</Button>
+			{/if}
 		{/if}
 	{/snippet}
 
@@ -201,57 +211,57 @@
 
 			<section class="flex flex-col gap-4" aria-label="This month">
 				<SectionHeading level={2}>This month</SectionHeading>
-				{#if data.summary || data.dashboard}
+				{#if summary || dashboard}
 					<Card>
 						<div class="grid gap-6 lg:grid-cols-2">
 							<div class="flex flex-col gap-4">
 								<Stat
 									label="Spend so far"
-									value={data.summary ? money(data.summary.total_amount, data.summary.currency) : (data.dashboard?.total_cost_this_month ?? NO_VALUE)}
+									value={summary ? money(summary.total_amount, summary.currency) : (dashboard?.total_cost_this_month ?? NO_VALUE)}
 									mono
 								/>
-								{#if data.dashboard}
+								{#if dashboard}
 									<div class="grid gap-3 sm:grid-cols-3" data-testid="cost-dashboard">
 										<Stat
 											label="Budgets at risk"
-											value={data.dashboard.budgets_at_risk.length}
+											value={dashboard.budgets_at_risk.length}
 											size="sm"
-											tone={data.dashboard.budgets_at_risk.length > 0 ? 'warn' : undefined}
+											tone={dashboard.budgets_at_risk.length > 0 ? 'warn' : undefined}
 										/>
 										<Stat
 											label="Open anomalies"
-											value={data.dashboard.open_anomalies}
+											value={dashboard.open_anomalies}
 											size="sm"
-											tone={data.dashboard.open_anomalies > 0 ? 'warn' : undefined}
+											tone={dashboard.open_anomalies > 0 ? 'warn' : undefined}
 										/>
-										<Stat label="Could save" value={money(data.dashboard.potential_savings, data.summary?.currency ?? '')} size="sm" mono />
+										<Stat label="Could save" value={money(dashboard.potential_savings, summary?.currency ?? '')} size="sm" mono />
 									</div>
 								{/if}
 							</div>
-							{#if data.summary}
+							{#if summary}
 								<div class="flex flex-col gap-2" data-testid="cost-summary">
 									<p class="text-xs font-medium tracking-wide text-faint uppercase">By resource</p>
 									<ul class="flex flex-col gap-2">
-										{#each costShares(data.summary) as share (share.label)}
+										{#each costShares(summary) as share (share.label)}
 											<li class="grid grid-cols-[6rem_minmax(0,1fr)_7rem] items-center gap-3 text-sm">
 												<span class="text-muted">{share.label}</span>
 												<span class="h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
 													<span class="block h-full rounded-full bg-brand" style="width: {share.percent}%"></span>
 												</span>
-												<span class="text-right font-mono text-xs text-fg">{money(share.amount, data.summary.currency)}</span>
+												<span class="text-right font-mono text-xs text-fg">{money(share.amount, summary.currency)}</span>
 											</li>
 										{/each}
 									</ul>
-									<p class="text-xs text-faint">From {data.summary.entry_count} cost {data.summary.entry_count === 1 ? 'line' : 'lines'} since the first of the month.</p>
+									<p class="text-xs text-faint">From {summary.entry_count} cost {summary.entry_count === 1 ? 'line' : 'lines'} since the first of the month.</p>
 								</div>
-							{:else}
-								<Alert tone="warn">The split by resource did not answer.</Alert>
+							{:else if !data.summary.ok}
+								<GateNotice gate={data.summary.gate} title="the split by resource" absent="This instance does not serve the split by resource." />
 							{/if}
 						</div>
 					</Card>
-					{#if data.dashboard && data.dashboard.budgets_at_risk.length > 0}
+					{#if dashboard && dashboard.budgets_at_risk.length > 0}
 						<ul class="flex flex-col gap-1 text-sm" aria-label="Budgets at risk">
-							{#each data.dashboard.budgets_at_risk as alert (alert.budget_id + ':' + alert.threshold)}
+							{#each dashboard.budgets_at_risk as alert (alert.budget_id + ':' + alert.threshold)}
 								<li class="flex flex-wrap items-center gap-2">
 									<Badge tone={alert.triggered ? 'danger' : 'warn'} size="sm">{alert.threshold}%</Badge>
 									<span class="text-fg">{alert.budget_name}</span>
@@ -262,8 +272,8 @@
 							{/each}
 						</ul>
 					{/if}
-				{:else}
-					<Alert tone="warn">The costs did not answer.</Alert>
+				{:else if !data.dashboard.ok}
+					<GateNotice gate={data.dashboard.gate} title="this month's costs" absent="This instance does not serve the cost ledger." />
 				{/if}
 			</section>
 
@@ -274,7 +284,7 @@
 				{:else if saved === 'budget'}
 					<Alert tone="success" autoDismiss>Budgets saved.</Alert>
 				{/if}
-				{#if data.budgets && data.budgets.length > 0}
+				{#if budgets && budgets.length > 0}
 					<Table label="Budgets">
 						<thead>
 							<tr>
@@ -289,7 +299,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each data.budgets as budget (budget.id)}
+							{#each budgets as budget (budget.id)}
 								<tr data-testid="budget-row">
 									<td data-cell="nowrap" class="font-medium text-fg">{budget.name}</td>
 									<td data-cell="nowrap">{budget.resource_type ? RESOURCE_LABEL[budget.resource_type] : 'Every resource'}</td>
@@ -315,7 +325,7 @@
 							{/each}
 						</tbody>
 					</Table>
-				{:else if data.budgets}
+				{:else if budgets}
 					<EmptyState
 						title="No budget yet"
 						description="A budget caps spend over a monthly, quarterly or annual window, for one resource or all of them, and publishes an event when a threshold is crossed."
@@ -327,8 +337,8 @@
 							</Button>
 						{/snippet}
 					</EmptyState>
-				{:else}
-					<Alert tone="warn">The budget list did not answer.</Alert>
+				{:else if !data.budgets.ok}
+					<GateNotice gate={data.budgets.gate} title="the budgets" absent="This instance does not serve cost budgets." />
 				{/if}
 			</section>
 

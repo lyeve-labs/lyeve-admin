@@ -203,6 +203,12 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if !data.usageRead}
+					<Alert tone="warn">
+						What each tenant used could not be read, so the quotas below show their limits alone.
+						This is not a report that nothing was used.
+					</Alert>
+				{/if}
 				<Table label="Quotas">
 					<thead>
 						<tr>

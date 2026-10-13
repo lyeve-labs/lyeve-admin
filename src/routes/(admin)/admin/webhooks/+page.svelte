@@ -44,6 +44,7 @@
 	} from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formatDateTime } from '$lib/format';
 	import { narrows } from '$lib/narrow';
 	import { pageHref, pageNumber } from '$lib/api/list';
@@ -67,9 +68,8 @@
 		'after_delete'
 	].map((value) => ({ value, label: value }));
 
-	const schemaOptions = $derived<ChoiceOption[]>(
-		data.schemas.map((s) => ({ value: s.name, label: s.name }))
-	);
+	const rows = $derived(data.webhooks.ok ? data.webhooks.value : []);
+
 
 	// One drawer for both writes: a null target is a new webhook.
 	let open = $state(false);
@@ -80,6 +80,14 @@
 	let enabled = $state(true);
 	let events = $state<string[]>([]);
 	let schemas = $state<string[]>([]);
+
+	// A schema the webhook already names stays among the options even when the
+	// schema list could not be read, so saving an edit never drops it.
+	const schemaOptions = $derived<ChoiceOption[]>(
+		[...new Set([...(data.schemas.ok ? data.schemas.value.map((s) => s.name) : []), ...schemas])].map(
+			(name) => ({ value: name, label: name })
+		)
+	);
 	// The delivery options. An edit sends back what it read, so an endpoint keeps
 	// them through a change of its name.
 	let template = $state('');
@@ -133,7 +141,7 @@
 	 */
 	function openDuplicate(wh: Webhook) {
 		const draft = duplicateRow(wh as unknown as Record<string, unknown>, {
-			taken: data.webhooks.map((w) => w.name),
+			taken: rows.map((w) => w.name),
 		});
 		editing = null;
 		name = String(draft.name ?? wh.name);
@@ -171,7 +179,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.webhooks.filter(
+		rows.filter(
 			(wh) =>
 				narrows(query, wh.name, wh.url, wh.events.join(' '), wh.schemas.join(' ')) &&
 				(status === '' || (status === 'enabled') === wh.enabled)
@@ -295,10 +303,13 @@
 				Dead letters
 			</Button>
 		</form>
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} />
-			New webhook
-		</Button>
+		<!-- A list that could not be read offers no write against it. -->
+		{#if data.webhooks.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} />
+				New webhook
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if pageRefusal}
@@ -309,7 +320,13 @@
 		</Alert>
 	{/if}
 
-	{#if data.webhooks.length === 0}
+	{#if !data.webhooks.ok}
+		<GateNotice
+			gate={data.webhooks.gate}
+			title="Webhooks"
+			absent="The webhook plugin is not part of this build, so no callback is sent on a content event."
+		/>
+	{:else if data.webhooks.value.length === 0}
 		<EmptyState
 			title="No webhooks configured yet"
 			description="Add one to receive HTTP callbacks on content events."
@@ -475,7 +492,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.webhooks.length}
+			count={data.webhooks.value.length}
 			total={data.total ?? undefined}
 			hasNext={data.hasMore}
 			noun="webhooks"
@@ -509,6 +526,9 @@
 			bind:value={secret}
 		/>
 		<CheckboxGroup name="events" label="Events" orientation="horizontal" options={EVENT_OPTIONS} bind:value={events} />
+		{#if !data.schemas.ok}
+			<p class="text-xs text-muted">The schemas could not be read, so only the ones this webhook already names are listed.</p>
+		{/if}
 		<CheckboxGroup
 			name="schemas"
 			label="Schemas"

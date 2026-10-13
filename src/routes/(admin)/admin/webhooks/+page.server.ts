@@ -7,6 +7,7 @@ import { getSchemas } from '@lyeve-labs/client-rest';
 import { deleteWebhook, testWebhook, listDeliveries, rotateSecret, retryDelivery, replayDeadLetter, dismissDeadLetter, deleteDeadLetter } from '@lyeve-labs/client-rest';
 import { actionFailure } from '$lib/server/action-error';
 import { createWebhookRecord, updateWebhookRecord, webhookBodyFrom } from '$lib/api/webhook-options';
+import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
 import { sessionToken } from '$lib/server/session-cookie';
 
@@ -21,6 +22,12 @@ const DEFAULT_LIMIT = 50;
  */
 const MAX_LIMIT = 199;
 
+/** What the page says for a list read that failed for no reason it can name. */
+const LIST_FAILED = 'The webhooks could not be read. This is not a report that there are none.';
+
+/** What the drawer says when the schema names could not be read. */
+const SCHEMAS_FAILED = 'The schemas could not be read.';
+
 export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
@@ -32,20 +39,27 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	 * states a total only when the endpoint sends one and falls back to a probe
 	 * row otherwise, so neither branch reports a number nobody measured.
 	 */
-	const [res, schemas] = await Promise.all([
-		client
-			.get<ListEnvelope<Webhook> | Webhook[]>(
+	const [read, schemas] = await Promise.all([
+		section(
+			client.get<ListEnvelope<Webhook> | Webhook[]>(
 				`/api/admin/webhooks?limit=${limit + 1}&offset=${offset}`
-			)
-			.catch(() => null),
-		getSchemas(client).catch(() => [])
+			),
+			LIST_FAILED
+		),
+		section(getSchemas(client), SCHEMAS_FAILED)
 	]);
 
-	const page = pageOf<Webhook>(res, limit, offset);
+	// The page draws the gate in place of the list, so nothing is paged.
+	if (!read.ok) return { webhooks: read, schemas, limit, offset, total: null, hasMore: false };
+
+	const page = pageOf<Webhook>(read.value, limit, offset);
 	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
 	if (back !== null) redirect(307, withOffset(url, back));
+	// Typed, because a bare literal widens `ok` to boolean and the page could
+	// no longer tell the two cases apart.
+	const webhooks: Section<Webhook[]> = { ok: true, value: page.rows };
 	return {
-		webhooks: page.rows,
+		webhooks,
 		schemas,
 		limit,
 		offset,
