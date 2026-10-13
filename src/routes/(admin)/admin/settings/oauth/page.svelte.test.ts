@@ -18,8 +18,9 @@ const provider = (name: string, enabled = true) => ({
 	enabled,
 });
 
-function setup(providers: ReturnType<typeof provider>[]) {
-	return render(Page, { props: { data: { providers }, form: null } as never });
+function setup(providers: ReturnType<typeof provider>[] | { ok: false; gate: unknown }, form: unknown = null) {
+	const read = Array.isArray(providers) ? { ok: true, value: providers } : providers;
+	return render(Page, { props: { data: { providers: read }, form } as never });
 }
 
 describe('OAuth providers page', () => {
@@ -41,4 +42,12 @@ describe('OAuth providers page', () => {
 		await fireEvent.input(getByPlaceholderText('Search providers'), { target: { value: 'git' } });
 		expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
 	});
+
+	it('says the providers could not be read instead of inviting a first one', () => {
+		const { container, queryByRole } = setup({ ok: false, gate: { state: 'error', message: 'The OAuth providers could not be read.' } });
+		expect(container.textContent).toContain('The OAuth providers could not be read.');
+		expect(container.textContent).not.toContain('No OAuth providers configured');
+		expect(queryByRole('button', { name: 'New provider' })).toBeNull();
+	});
+
 });

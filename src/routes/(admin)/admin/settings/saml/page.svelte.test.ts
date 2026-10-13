@@ -172,3 +172,12 @@ describe('the form', () => {
 		expect(said(container)).toContain('The provider could not be created.');
 	});
 });
+
+describe('the pager', () => {
+	it('stays when nothing on this page matches the search', async () => {
+		const { container } = render(SamlPage, { props: props({ total: 60, hasMore: true }) });
+		await fireEvent.input(screen.getByPlaceholderText('Search providers'), { target: { value: 'nothing like it' } });
+		expect(said(container)).toContain('No provider matches');
+		expect(container.querySelector('a[href="/admin/settings/saml?limit=25&offset=25"]')).toBeTruthy();
+	});
+});

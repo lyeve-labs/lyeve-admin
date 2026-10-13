@@ -10,6 +10,7 @@ import type { FlowOption } from '$lib/flow/types';
 import { isFlowResource } from '$lib/flow/permissions';
 import { getRoleLimits, type RoleLimits } from '$lib/api/permissions';
 import { sessionToken } from '$lib/server/session-cookie';
+import { section } from '$lib/api/gate';
 
 // Static text. The engine's own message can carry driver or upstream detail
 // that has no place in a page, and the operator's next step is the same
@@ -33,15 +34,22 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	try {
 		// The flows are resources beside the schemas. An instance without the
 		// flow plugin answers 404 for the list, which is an empty picker, not
-		// a failed read of the rules.
-		const [permissions, schemas, flows] = await Promise.all([listPermissions(client), getSchemas(client), listAllFlows(client).catch((): FlowOption[] => [])]);
-		return { permissions, schemas, flows, roleCap, roleCount, loadError: null as string | null };
+		// a failed read of the rules. Any other failure is said in the rule
+		// form, which then offers the schemas alone.
+		const [permissions, schemas, flowRead] = await Promise.all([
+			listPermissions(client),
+			getSchemas(client),
+			section(listAllFlows(client), 'The flows could not be read.'),
+		]);
+		const flows: FlowOption[] = flowRead.ok ? flowRead.value : [];
+		const flowsFailed = !flowRead.ok && flowRead.gate.state !== 'absent';
+		return { permissions, schemas, flows, flowsFailed, roleCap, roleCount, loadError: null as string | null };
 	} catch {
 		// An empty list alone draws exactly the matrix an instance with no rules
 		// draws. On a 503 or an expired session that would tell the operator
 		// nothing is restricted, and the next click would grant a rule on top of
 		// rules still in the database, so the failure is named.
-		return { permissions: [] as Permission[], schemas: [] as Schema[], flows: [] as FlowOption[], roleCap, roleCount, loadError: LOAD_FAILED };
+		return { permissions: [] as Permission[], schemas: [] as Schema[], flows: [] as FlowOption[], flowsFailed: false, roleCap, roleCount, loadError: LOAD_FAILED };
 	}
 };
 

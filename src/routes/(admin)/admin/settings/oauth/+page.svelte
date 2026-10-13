@@ -26,6 +26,7 @@
 	import { tracked } from '$lib/forms.svelte';
 	import { KeyRound, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -40,14 +41,15 @@
 	/** The provider name as the list shows it, rather than its stored form. */
 	const providerLabel = (name: string) => name.replace(/_/g, ' ');
 
-	const enabledCount = $derived(data.providers.filter((p) => p.enabled).length);
+	const providers = $derived(data.providers.ok ? data.providers.value : []);
+	const enabledCount = $derived(providers.filter((p) => p.enabled).length);
 	let narrow = $state('');
 	const visible = $derived(
 		narrow.trim()
-			? data.providers.filter((p) =>
+			? providers.filter((p) =>
 					[p.name, p.issuer_url, p.client_id].some((v) => v.toLowerCase().includes(narrow.trim().toLowerCase())),
 				)
-			: data.providers,
+			: providers,
 	);
 
 	/**
@@ -130,9 +132,11 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New provider
-		</Button>
+		{#if data.providers.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New provider
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if pageRefusal}
@@ -141,14 +145,18 @@
 		<Alert tone="danger">{formError}</Alert>
 	{/if}
 
-	<div class="grid gap-4 sm:grid-cols-3">
-		<Stat size="sm" mono label="Providers" value={data.providers.length} />
-		<Stat size="sm" mono label="Enabled" value={enabledCount} />
-	</div>
+	{#if data.providers.ok}
+		<div class="grid gap-4 sm:grid-cols-3">
+			<Stat size="sm" mono label="Providers" value={providers.length} />
+			<Stat size="sm" mono label="Enabled" value={enabledCount} />
+		</div>
+	{/if}
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Providers</SectionHeading>
-		{#if data.providers.length === 0}
+		{#if !data.providers.ok}
+			<GateNotice gate={data.providers.gate} title="OAuth providers" absent="This engine does not serve OAuth sign-in." />
+		{:else if providers.length === 0}
 			<EmptyState
 				title="No OAuth providers configured"
 				description="Add an OpenID Connect provider to offer single sign-on on the login page."

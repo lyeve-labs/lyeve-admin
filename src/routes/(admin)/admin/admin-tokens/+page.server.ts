@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { listTenants, type Tenant } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
@@ -14,13 +14,13 @@ import {
 	resolveExpiry,
 	revokeAdminToken,
 	rotateAdminToken,
-	type AdminGrant,
 	type AdminToken,
 	type AdminTokenIssued,
 	type AdminTokenRequest,
 	type StepUp,
 } from '$lib/api/admin-tokens';
-import { pageWindow, rowsOf, totalOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 
 /** The engine pages this list at fifty and refuses more than a hundred. */
 const PAGE = 50;
@@ -49,13 +49,11 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, PAGE, MAX_PAGE);
 
-	let listError = '';
 	const [list, grants, mfa, tenants] = await Promise.all([
-		listAdminTokens(client, limit, offset).catch((err) => {
-			listError = loadError(err, 'token list');
-			return null;
-		}),
-		listAdminGrants(client).catch((): AdminGrant[] => []),
+		section(listAdminTokens(client, limit, offset), 'The admin tokens could not be read. This is not a report that there are none.'),
+		// The grants are the create form's only required choice, so a failed
+		// read is said in the form rather than drawn as a catalog with none.
+		section(listAdminGrants(client), 'The grants could not be read, so no token can be created now. Reload the page to try again.'),
 		// Which step-up the engine will ask for. An unreadable status leaves it
 		// unknown: the form asks for the password, and an engine that wants a
 		// code says so and the form switches.
@@ -64,13 +62,22 @@ export const load: PageServerLoad = async (event) => {
 			.then((s) => s.enabled === true)
 			.catch(() => false),
 		superAdmin
-			? listTenants(client, 500, 0)
-					.then((r) => r.items)
-					.catch((): Tenant[] => [])
-			: Promise.resolve<Tenant[]>([]),
+			? section(
+					listTenants(client, 500, 0).then((r) => r.items),
+					'The tenants could not be read, so this form cannot name the tenant a token acts in.'
+				)
+			: Promise.resolve<Section<Tenant[]>>({ ok: true, value: [] }),
 	]);
-	const tokens: AdminToken[] = rowsOf(list);
-	const total = Math.max(totalOf(list), offset + tokens.length);
+	const rows: AdminToken[] = list.ok ? rowsOf(list.value) : [];
+	if (list.ok) {
+		const back = pastEndOffset(rows.length, limit, offset, statedTotal(list.value));
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
+	const tokens: Section<AdminToken[]> = list.ok ? { ok: true, value: rows } : list;
+	const total = list.ok ? Math.max(totalOf(list.value), offset + rows.length) : 0;
+	const tenantChoices: Section<{ slug: string; name: string }[]> = tenants.ok
+		? { ok: true, value: tenants.value.filter((t) => !t.archived).map((t) => ({ slug: t.slug, name: t.name })) }
+		: tenants;
 
 	// The request log opens in a drawer over the list, and the URL names it
 	// so the load reads it and the pager inside it works as links.
@@ -98,10 +105,9 @@ export const load: PageServerLoad = async (event) => {
 		total,
 		limit,
 		offset,
-		listError,
 		grants,
 		mfaEnrolled: mfa,
-		tenants: tenants.filter((t) => !t.archived).map((t) => ({ slug: t.slug, name: t.name })),
+		tenants: tenantChoices,
 		log,
 		adminOrigin: url.origin,
 	};

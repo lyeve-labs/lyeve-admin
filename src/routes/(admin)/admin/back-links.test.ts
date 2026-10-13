@@ -343,7 +343,7 @@ describe('every nested page names the way back', () => {
  * section instead.
  */
 const destinations: { route: string; component: Page; data: Record<string, unknown> }[] = [
-	{ route: 'settings/oauth', component: SettingsOauth, data: { providers: [], entitlements: licensed } },
+	{ route: 'settings/oauth', component: SettingsOauth, data: { providers: { ok: true, value: [] }, entitlements: licensed } },
 	{ route: 'settings/permissions', component: SettingsPermissions, data: { permissions: [], schemas: [], entitlements: licensed, loadError: null } },
 	{ route: 'webhooks/incoming', component: WebhooksIncoming, data: { schemas: [], incomingWebhooks: [], entitlements: licensed } },
 ];

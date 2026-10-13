@@ -25,6 +25,7 @@
 	import { Key, Plus, Trash2, Ban, Copy, Check, Gauge } from '@lucide/svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { copyText } from '$lib/clipboard';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
@@ -51,11 +52,14 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
+	type APIKeyRow = Extract<PageData['keys'], { ok: true }>['value'][number];
+	const keys = $derived(data.keys.ok ? data.keys.value : []);
+
 	const errors = $derived(fieldErrors(form));
 	const formError = $derived(form && 'error' in form ? String(form.error) : undefined);
 
 	function usagePct(keyId: string): number {
-		const key = data.keys.find((k) => k.id === keyId);
+		const key = keys.find((k) => k.id === keyId);
 		const usage = data.usageMap?.[keyId];
 		if (!key || !usage || !key.monthly_limit || key.monthly_limit === 0) return -1;
 		return Math.min(100, Math.round((usage.requests / key.monthly_limit) * 100));
@@ -78,14 +82,14 @@
 	let limitKey = $state<{ id: string; name: string } | null>(null);
 	let limitOpen = $state(false);
 	let limitValues = $state<KeyLimits>({ ...NO_LIMITS });
-	function openLimit(key: PageData['keys'][number]) {
+	function openLimit(key: APIKeyRow) {
 		limitKey = { id: key.id, name: key.name };
 		limitValues = limitsOf(key);
 		limitOpen = true;
 	}
 
 	/** The hourly and daily ceilings, for the usage cell under the monthly bar. */
-	function windowNote(key: PageData['keys'][number]): string {
+	function windowNote(key: APIKeyRow): string {
 		const l = limitsOf(key);
 		const parts = LIMIT_FIELDS.filter((f) => f.field !== 'monthly_limit' && l[f.field] > 0).map(
 			(f) => `${formatCount(l[f.field])}/${f.per}`,
@@ -108,10 +112,10 @@
 	const scopeProblem = $derived(keyScopeProblem(createRoles, createScopes));
 	// A privileged key with no expiry keeps working. The page counts those so
 	// they get replaced rather than forgotten.
-	const neverExpiring = $derived(data.keys.filter((k) => k.enabled && !k.expires_at && isPrivilegedKey(k.roles)).length);
+	const neverExpiring = $derived(keys.filter((k) => k.enabled && !k.expires_at && isPrivilegedKey(k.roles)).length);
 	// The admin API refuses these and takes admin tokens instead. The page
 	// counts them so automation still sending one is found.
-	const adminRoleKeys = $derived(data.keys.filter((k) => k.enabled && isPrivilegedKey(k.roles)).length);
+	const adminRoleKeys = $derived(keys.filter((k) => k.enabled && isPrivilegedKey(k.roles)).length);
 
 	function openCreate() {
 		createName = '';
@@ -210,7 +214,7 @@
 		{ value: 'revoked', label: 'Revoked' },
 	];
 	const visible = $derived(
-		data.keys.filter(
+		keys.filter(
 			(k) =>
 				narrows(query, k.name, k.roles.join(' '), k.schemas.join(' ')) &&
 				(status === '' || (status === 'active') === k.enabled)
@@ -229,9 +233,11 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New key
-		</Button>
+		{#if data.keys.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New key
+			</Button>
+		{/if}
 	{/snippet}
 
 	<p class="text-sm text-muted">
@@ -241,7 +247,9 @@
 
 	<FormErrors message={formError} fields={errors} {refused} />
 
-	{#if data.keys.length === 0}
+	{#if !data.keys.ok}
+		<GateNotice gate={data.keys.gate} title="API keys" absent="This engine does not serve API keys." />
+	{:else if keys.length === 0}
 		<EmptyState
 			title="No API keys yet"
 			description="Create a key to allow external services to authenticate."
@@ -360,6 +368,8 @@
 								</div>
 							{:else if u}
 								<span class="text-xs text-faint">{u.requests} req</span>
+							{:else if data.usageUnknown.includes(key.id)}
+								<span class="text-xs text-faint">Unknown, the usage could not be read</span>
 							{:else}
 								<span class="text-xs text-faint">None</span>
 							{/if}
@@ -406,15 +416,17 @@
 				{/each}
 			</tbody>
 		</Table>
-			<Pagination
-				page={pageNumber(data.offset, data.limit)}
-				perPage={data.limit}
-				count={data.keys.length}
-				total={data.total ?? undefined}
-				noun="keys"
-				href={pageHref('/admin/api-keys', data.limit)}
-			/>
 		{/if}
+		<!-- The search narrows this page only, so the pager stays when nothing on
+		     it matches: the next page may hold the key. -->
+		<Pagination
+			page={pageNumber(data.offset, data.limit)}
+			perPage={data.limit}
+			count={keys.length}
+			total={data.total ?? undefined}
+			noun="keys"
+			href={pageHref('/admin/api-keys', data.limit)}
+		/>
 	{/if}
 </PageShell>
 
@@ -437,6 +449,8 @@
 			<KeyAccess
 				bind:access={createAccess}
 				schemas={data.schemaNames ?? []}
+				schemasFailed={data.schemasFailed}
+				catalogFailed={data.catalogFailed}
 				{groups}
 				{privileged}
 				error={errors.scopes ?? (scopeProblem || undefined)}

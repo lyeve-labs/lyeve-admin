@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
@@ -38,7 +38,6 @@ function setup(over: Record<string, unknown> = {}, roles = ['super_admin']) {
 		total: 0,
 		limit: 50,
 		offset: 0,
-		listError: '',
 		grants: [{ name: 'schemas:read', description: 'Read schemas.', routes: [{ method: 'GET', pattern: '/api/admin/schemas' }] }],
 		mfaEnrolled: false,
 		tenants: [],
@@ -46,6 +45,11 @@ function setup(over: Record<string, unknown> = {}, roles = ['super_admin']) {
 		adminOrigin: 'http://admin',
 		...over,
 	};
+	// A bare array stands for a read that answered, as the load returns it.
+	for (const name of ['tokens', 'grants', 'tenants'] as const) {
+		const value = data[name];
+		if (Array.isArray(value)) (data as Record<string, unknown>)[name] = { ok: true, value };
+	}
 	return render(Page, { props: { data, form: null } as never });
 }
 
@@ -58,9 +62,10 @@ describe('admin tokens page', () => {
 	});
 
 	it('says the list could not be read rather than drawing it empty', () => {
-		const { getByText, queryByText } = setup({ listError: 'The database is unavailable, so the list could not be read. Try again in a moment.' });
-		expect(getByText(/database is unavailable/)).toBeTruthy();
+		const { getByText, queryByText, queryByRole } = setup({ tokens: { ok: false, gate: { state: 'unavailable' } } });
+		expect(getByText(/did not answer, so Admin tokens could not be read/)).toBeTruthy();
 		expect(queryByText('No admin tokens yet')).toBeNull();
+		expect(queryByRole('button', { name: /New token/ })).toBeNull();
 	});
 
 	it('reads each row status, and offers only the actions that row allows', () => {
@@ -113,4 +118,18 @@ describe('admin tokens page', () => {
 		expect(getByText('12 requests not logged (the log queue was full)')).toBeTruthy();
 		expect(getByText('/api/admin/schemas')).toBeTruthy();
 	});
+
+	it('says in the create form that the grants could not be read', async () => {
+		const failed = { ok: false, gate: { state: 'error', message: 'The grants could not be read, so no token can be created now.' } };
+		const { getAllByRole } = setup({ tokens: [token({})], total: 1, grants: failed });
+		await fireEvent.click(getAllByRole('button', { name: /New token/ })[0]);
+		expect(document.body.textContent).toContain('The grants could not be read');
+	});
+
+	it('says in the create form that the tenants could not be read', async () => {
+		const { getAllByRole } = setup({ tokens: [token({})], total: 1, tenants: { ok: false, gate: { state: 'unavailable' } } });
+		await fireEvent.click(getAllByRole('button', { name: /New token/ })[0]);
+		expect(document.body.textContent).toContain('Tenants could not be read');
+	});
+
 });

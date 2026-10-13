@@ -32,6 +32,7 @@ vi.mock('$lib/server/authz', () => ({
 
 import { load, actions } from './+page.server';
 import { listPermissions, getSchemas, upsertPermission } from '@lyeve-labs/client-rest';
+import { ApiError } from '@lyeve-labs/client';
 
 const mockedListPermissions = vi.mocked(listPermissions);
 const mockedGetSchemas = vi.mocked(getSchemas);
@@ -182,9 +183,20 @@ describe('permissions +page.server.ts flows as resources', () => {
 	it('reads an instance without the flow plugin as no flows, not a failed read', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([] as never);
-		flows.listAllFlows.mockRejectedValueOnce(new Error('404'));
-		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[] };
+		flows.listAllFlows.mockRejectedValueOnce(new ApiError(404, 'not found'));
+		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
 		expect(result.flows).toEqual([]);
+		expect(result.flowsFailed).toBe(false);
+		expect(result.loadError).toBeNull();
+	});
+
+	it('says the flows could not be read when the list fails for another reason', async () => {
+		mockedListPermissions.mockResolvedValue([permission] as never);
+		mockedGetSchemas.mockResolvedValue([] as never);
+		flows.listAllFlows.mockRejectedValueOnce(new ApiError(500, 'boom'));
+		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
+		expect(result.flows).toEqual([]);
+		expect(result.flowsFailed).toBe(true);
 		expect(result.loadError).toBeNull();
 	});
 

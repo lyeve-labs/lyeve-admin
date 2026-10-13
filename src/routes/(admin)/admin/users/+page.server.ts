@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { ApiError, createClient, type User } from '@lyeve-labs/client';
 import { createUser, updateUserRoles, deleteUser, listTenants, type Tenant } from '@lyeve-labs/client-rest';
-import { fail, error } from '@sveltejs/kit';
+import { fail, error, redirect } from '@sveltejs/kit';
 import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
@@ -9,6 +9,8 @@ import { actionError } from '$lib/server/action-error';
 import { setUserPassword } from '$lib/api/users';
 import { sessionToken } from '$lib/server/session-cookie';
 import { seatRefusal } from '$lib/api/admin-seats';
+import { section, type Section } from '$lib/api/gate';
+import { pastEndOffset, withOffset } from '$lib/api/list';
 
 /** The engine's own page size when a request names none. */
 const DEFAULT_LIMIT = 25;
@@ -44,25 +46,31 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	 * more. Without it, a page that ends at the engine's default looks complete.
 	 */
 	const [rows, tenants] = await Promise.all([
-		client.get<User[]>(`/api/admin/users?limit=${limit + 1}&offset=${offset}`).catch(() => [] as User[]),
+		section(
+			client.get<User[]>(`/api/admin/users?limit=${limit + 1}&offset=${offset}`),
+			'The accounts could not be read. This is not a report that there are none.'
+		),
 		// An account belongs to one tenant. With several, the engine cannot
 		// tell which one a new account is for unless the form names it.
 		notRunning(plugins, PLUGIN.multitenant)
-			? Promise.resolve<Tenant[]>([])
-			: listTenants(client, 500, 0)
-					.then((r) => (Array.isArray(r?.items) ? r.items : []))
-					.catch((): Tenant[] => []),
+			? Promise.resolve<Section<Tenant[]>>({ ok: true, value: [] })
+			: section(
+					listTenants(client, 500, 0).then((r) => (Array.isArray(r?.items) ? r.items : [])),
+					'The tenants could not be read, so this form cannot name the tenant a new account belongs to.'
+				),
 	]);
-	const page = Array.isArray(rows) ? rows : [];
+	const page = rows.ok && Array.isArray(rows.value) ? rows.value : [];
 	const hasMore = page.length > limit;
+	if (rows.ok) {
+		const back = pastEndOffset(page.length, limit, offset, null);
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
 
-	return {
-		users: page.slice(0, limit),
-		limit,
-		offset,
-		hasMore,
-		tenants: tenants.filter((t) => !t.archived).map((t) => ({ slug: t.slug, name: t.name })),
-	};
+	const users: Section<User[]> = rows.ok ? { ok: true, value: page.slice(0, limit) } : rows;
+	const choices: Section<{ slug: string; name: string }[]> = tenants.ok
+		? { ok: true, value: tenants.value.filter((t) => !t.archived).map((t) => ({ slug: t.slug, name: t.name })) }
+		: tenants;
+	return { users, limit, offset, hasMore, tenants: choices };
 };
 
 /**

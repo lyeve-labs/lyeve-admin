@@ -646,3 +646,22 @@ describe('permissions page flow resources', () => {
 		expect(roleRow(container, 'reviewer').textContent).toContain('reviewer grants activate on no flow.');
 	});
 });
+
+describe('permissions page drawers', () => {
+	function setupWith(form: unknown, over: Record<string, unknown> = {}) {
+		return render(PermissionsPage, {
+			props: {
+				data: { permissions: [permission], schemas: [{ name: 'article' }], entitlements, loadError: null, ...over },
+				form,
+			} as never,
+		});
+	}
+
+	it('says in the new rule form that the flows could not be read', async () => {
+		const { container, getAllByRole } = setupWith(null, { flowsFailed: true });
+		const add = getAllByRole('button').find((b) => b.getAttribute('aria-label') === 'Add a schema rule for editor');
+		expect(add, 'no control adds a rule for a new resource').toBeTruthy();
+		await fireEvent.click(add!);
+		expect(container.ownerDocument.body.textContent).toContain('The flows could not be read');
+	});
+});

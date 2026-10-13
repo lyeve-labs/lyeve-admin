@@ -722,6 +722,9 @@
 			<input type="hidden" name="role" value={role} />
 
 			{#if schema === null}
+				{#if data.flowsFailed}
+					<Alert tone="warn">The flows could not be read, so only schemas are offered here. Reload the page to try again.</Alert>
+				{/if}
 				<!-- The combobox posts whatever text is in its box, so the write reads
 				     the chosen option instead. A typed fragment nobody picked would
 				     otherwise create a rule for a schema that does not exist. -->

@@ -361,16 +361,16 @@
 							{/each}
 						</tbody>
 					</Table>
-					<Pagination
-						page={pageNumber(data.offset, data.limit)}
-						perPage={data.limit}
-						count={data.providers.length}
-						total={data.total ?? undefined}
-						hasNext={data.hasMore}
-						noun="providers"
-						href={pageHref('/admin/settings/saml', data.limit)}
-					/>
 				{/if}
+				<Pagination
+					page={pageNumber(data.offset, data.limit)}
+					perPage={data.limit}
+					count={data.providers.length}
+					total={data.total ?? undefined}
+					hasNext={data.hasMore}
+					noun="providers"
+					href={pageHref('/admin/settings/saml', data.limit)}
+				/>
 			{/if}
 		</section>
 	{/if}

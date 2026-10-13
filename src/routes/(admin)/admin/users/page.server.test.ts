@@ -145,11 +145,11 @@ describe('admin/users/+page.server.ts load', () => {
 		const result = await run(event);
 
 		expect(result).toEqual({
-			users: [{ id: 'u1', email: 'a@b.co' }],
+			users: { ok: true, value: [{ id: 'u1', email: 'a@b.co' }] },
 			limit: 25,
 			offset: 0,
 			hasMore: false,
-			tenants: [],
+			tenants: { ok: true, value: [] },
 		});
 	});
 
@@ -163,7 +163,8 @@ describe('admin/users/+page.server.ts load', () => {
 		expect(seen[0]).toContain('limit=26');
 		expect(seen[0]).toContain('offset=0');
 		expect(result.hasMore).toBe(true);
-		expect(result.users).toHaveLength(25);
+		expect(result.users).toEqual({ ok: true, value: expect.any(Array) });
+		expect(result.users.ok && result.users.value).toHaveLength(25);
 	});
 
 	it('reports no next page when the probe row does not come back', async () => {
@@ -172,7 +173,8 @@ describe('admin/users/+page.server.ts load', () => {
 		const result = await run(event);
 
 		expect(result.hasMore).toBe(false);
-		expect(result.users).toHaveLength(25);
+		expect(result.users).toEqual({ ok: true, value: expect.any(Array) });
+		expect(result.users.ok && result.users.value).toHaveLength(25);
 	});
 
 	it('carries the requested offset and page size through to the engine', async () => {
@@ -206,9 +208,9 @@ describe('admin/users/+page.server.ts load', () => {
 		expect(seen[0]).toContain('offset=0');
 	});
 
-	it('renders an empty page when the engine cannot be reached', async () => {
+	it('reports an unreachable engine rather than an empty list', async () => {
 		const fetch = vi.fn(async () => {
-			throw new Error('engine unreachable');
+			throw new TypeError('fetch failed');
 		}) as unknown as typeof globalThis.fetch;
 
 		const result = await run({
@@ -218,8 +220,29 @@ describe('admin/users/+page.server.ts load', () => {
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never);
 
-		expect(result.users).toEqual([]);
+		expect(result.users).toEqual({ ok: false, gate: { state: 'unavailable' } });
 		expect(result.hasMore).toBe(false);
+	});
+
+	it('keeps a refused read apart from an empty one', async () => {
+		const { event } = loadEvent([]);
+		const failing = {
+			...(event as Record<string, unknown>),
+			fetch: vi.fn(async () => json({ error: 'boom' }, 500)) as unknown as typeof globalThis.fetch,
+		};
+
+		const result = await run(failing as never);
+
+		expect(result.users.ok).toBe(false);
+	});
+
+	it('sends a page past the end back to the first page', async () => {
+		const { event } = loadEvent([], '?offset=50&limit=25');
+
+		const out = await catchRedirect(() => load(event));
+
+		expect(out.status).toBe(307);
+		expect(out.location).toBe('/admin/users?offset=0&limit=25');
 	});
 
 	it('throws 403 when user lacks super_admin role', async () => {
@@ -503,7 +526,7 @@ describe('admin/users/+page.server.ts tenants', () => {
 			url: new URL('http://localhost/admin/users'),
 			parent: async () => ({ user: { roles: ['super_admin'] }, plugins: { state: 'named', running: ['multitenant'], withheld: [] } }),
 		} as never)) as Loaded;
-		expect(out.tenants).toEqual([{ slug: 'acme', name: 'Acme' }]);
+		expect(out.tenants).toEqual({ ok: true, value: [{ slug: 'acme', name: 'Acme' }] });
 	});
 
 	it('asks for no tenants on an engine without the multitenant plugin', async () => {
@@ -518,8 +541,22 @@ describe('admin/users/+page.server.ts tenants', () => {
 			url: new URL('http://localhost/admin/users'),
 			parent: async () => ({ user: { roles: ['super_admin'] }, plugins: { state: 'named', running: [], withheld: [] } }),
 		} as never)) as Loaded;
-		expect(out.tenants).toEqual([]);
+		expect(out.tenants).toEqual({ ok: true, value: [] });
 		expect(seen.some((u) => u.startsWith('/api/admin/tenants'))).toBe(false);
+	});
+
+	it('says the tenants could not be read rather than offering no choice', async () => {
+		const fetch = vi.fn(async (url: string) =>
+			String(url).startsWith('/api/admin/tenants') ? json({ error: 'down' }, 503) : json([]),
+		) as unknown as typeof globalThis.fetch;
+		const out = (await load({
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			url: new URL('http://localhost/admin/users'),
+			parent: async () => ({ user: { roles: ['super_admin'] }, plugins: { state: 'named', running: ['multitenant'], withheld: [] } }),
+		} as never)) as Loaded;
+		expect(out.tenants).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(out.users.ok).toBe(true);
 	});
 
 	it('creates the account in the tenant the form names', async () => {
