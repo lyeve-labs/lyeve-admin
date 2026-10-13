@@ -197,8 +197,18 @@ export async function deleteProvider(client: HttpClient, id: string): Promise<vo
 export const DELIVERY_STATUSES = ['pending', 'failed'] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
-export async function listDeliveries(client: HttpClient, status: DeliveryStatus | '' = ''): Promise<Listed<Delivery>> {
-	const q = new URLSearchParams({ limit: '50' });
+/**
+ * How many owed deliveries the page lists. The plugin answers the newest first
+ * and takes no offset, so the rest cannot be paged to, only filtered by status.
+ */
+export const DELIVERY_LIMIT = 50;
+
+export async function listDeliveries(
+	client: HttpClient,
+	status: DeliveryStatus | '' = '',
+	limit: number = DELIVERY_LIMIT,
+): Promise<Listed<Delivery>> {
+	const q = new URLSearchParams({ limit: String(limit) });
 	if (status) q.set('status', status);
 	return listed(await client.get<unknown>(`${DELIVERIES_URL}?${q}`), toDelivery);
 }

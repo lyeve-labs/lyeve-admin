@@ -13,14 +13,17 @@
 		Modal,
 		PageShell,
 		SectionHeading,
-		Select,
 		Stat,
 		Table,
 		Toggle,
 		confirm as confirmDialog,
 		toast,
 		Pagination,
+		RadioGroup,
+		SearchInput,
+		SegmentedControl,
 	} from '@lyeve-labs/ui-kit';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { submitter, tracked } from '$lib/forms.svelte';
@@ -49,12 +52,19 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	// A refusal from the channels drawer stays in the drawer.
+	// A failure from a drawer stays in that drawer. The channels drawer marks
+	// its own, and a probe save names the probe drawer. Every other failure is
+	// the page's.
 	const channelsFailed = $derived(!!form && 'channels' in form && form.channels === true);
-	const pageRefusal = $derived(channelsFailed ? null : formRefusal(form));
+	const probeFailed = $derived(!!form && 'drawer' in form && form.drawer === 'probe');
+	const pageRefusal = $derived(channelsFailed || probeFailed ? null : formRefusal(form));
 	const channelsRefusal = $derived(channelsFailed ? formRefusal(form) : null);
+	const probeRefusal = $derived(probeFailed ? formRefusal(form) : null);
 
-	const formError = $derived(channelsFailed ? '' : ((form as { error?: string } | null)?.error ?? ''));
+	const formError = $derived(
+		channelsFailed || probeFailed ? '' : ((form as { error?: string } | null)?.error ?? ''),
+	);
+	const probeError = $derived(probeFailed ? ((form as { error?: string } | null)?.error ?? '') : '');
 	const channelsError = $derived(channelsFailed ? ((form as { error?: string } | null)?.error ?? '') : '');
 
 	// The notice channels drawer is addressable: `?channels=<id>` opens it on
@@ -86,8 +96,25 @@
 			reveal = form.signingSecret;
 		}
 	});
-	const failing = $derived(data.probes.filter((p) => probeHealth(p) === 'failing').length);
-	const paused = $derived(data.probes.filter((p) => probeHealth(p) === 'paused').length);
+	// The load counts the states across every probe when it read them all.
+	// Otherwise the state tiles count the rows read, and say so unless every
+	// probe is on this page.
+	const failing = $derived(
+		data.counts?.failing ?? data.probes.filter((p) => probeHealth(p) === 'failing').length,
+	);
+	const paused = $derived(data.counts?.paused ?? data.probes.filter((p) => probeHealth(p) === 'paused').length);
+	const wholeList = $derived(!!data.counts || (data.offset === 0 && !data.hasMore));
+	const pageNote = $derived(wholeList ? undefined : `of the ${data.probes.length} on this page`);
+
+	let narrow = $state('');
+	let showing = $state<'all' | 'failing' | 'paused'>('all');
+	const visible = $derived(
+		data.probes.filter((p) => {
+			if (showing !== 'all' && probeHealth(p) !== showing) return false;
+			const term = narrow.trim().toLowerCase();
+			return !term || `${p.name} ${probeTarget(p)}`.toLowerCase().includes(term);
+		}),
+	);
 
 	let open = $state(false);
 	let editing = $state<Probe | null>(null);
@@ -236,22 +263,29 @@
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
-			<Stat size="sm" mono label="Probes" value={data.probes.length} />
+			<Stat size="sm" mono label="Probes" value={data.total ?? data.probes.length} sub={data.total === null ? pageNote : undefined} />
 			<Stat
 				size="sm"
 				mono
 				label="Failing"
 				value={failing}
+				sub={pageNote}
 				tone={failing > 0 ? 'danger' : 'neutral'}
 			/>
-			<Stat size="sm" mono label="Paused" value={paused} />
+			<Stat size="sm" mono label="Paused" value={paused} sub={pageNote} />
 		</div>
 
-		{#if data.alerts.length > 0}
+		{#if !data.alerts.ok}
+			<GateNotice
+				gate={data.alerts.gate}
+				title="the open alerts"
+				absent="This version of the synthetic monitoring plugin keeps no alert list."
+			/>
+		{:else if data.alerts.value.length > 0}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Unacknowledged alerts</SectionHeading>
 				<div class="flex flex-col gap-3">
-					{#each data.alerts as a (a.id)}
+					{#each data.alerts.value as a (a.id)}
 						<div class="rounded border border-line bg-surface-2 p-3">
 							<div class="flex flex-wrap items-start justify-between gap-2">
 								<div class="min-w-0">
@@ -299,127 +333,154 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
-				<Table label="Probes">
-					<thead>
-						<tr>
-							<th scope="col">Probe</th>
-							<th scope="col">State</th>
-							<th scope="col">Runs</th>
-							<th scope="col">Last run</th>
-							<th scope="col"><span class="sr-only">Actions</span></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each data.probes as p (p.id)}
+				<ListToolbar label="Filter probes">
+					{#snippet search()}
+						<SearchInput id="probe-narrow" bind:value={narrow} placeholder="Name or target on this page" />
+					{/snippet}
+					{#snippet filters()}
+						<SegmentedControl
+							label="Show"
+							labelHidden
+							size="sm"
+							bind:value={showing}
+							options={[
+								{ value: 'all', label: 'All' },
+								{ value: 'failing', label: 'Failing' },
+								{ value: 'paused', label: 'Paused' },
+							]}
+						/>
+					{/snippet}
+				</ListToolbar>
+				{#if visible.length === 0}
+					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
+						{#snippet iconSnippet()}
+							<Radar size={ICON.lg} />
+						{/snippet}
+						{#snippet action()}
+							<Button variant="secondary" onclick={() => { narrow = ''; showing = 'all'; }}>Clear the filter</Button>
+						{/snippet}
+					</EmptyState>
+				{:else}
+					<Table label="Probes">
+						<thead>
 							<tr>
-								<td>
-									<div class="font-medium text-fg">{p.name}</div>
-									<div class="text-xs text-faint">
-										{PROBE_TYPE_LABELS[p.type] ?? p.type}
-									</div>
-									<div class="max-w-md truncate font-mono text-xs text-faint" title={probeTarget(p)}>
-										{probeTarget(p)}
-									</div>
-								</td>
-								<td data-cell="nowrap">
-									<Badge tone={probeTone(probeHealth(p))} dot>
-										{PROBE_HEALTH_LABELS[probeHealth(p)]}
-									</Badge>
-									<div class="text-xs text-faint">
-										Alerts after {p.alert_threshold}
-									</div>
-								</td>
-								<td data-cell="nowrap" class="text-xs text-faint">
-									{everyLabel(p.interval_seconds)}
-								</td>
-								<td data-cell="nowrap" class="text-xs text-faint">
-									{p.last_run_at ? formatDateTime(p.last_run_at) : 'Never'}
-								</td>
-								<td data-cell="nowrap">
-									<div class="flex items-center justify-end gap-1">
-										<form method="POST" action="?/run" use:enhance={runNow(p)}>
-											<input type="hidden" name="id" value={p.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Run {p.name} now"
-												title="Run now"
-											>
-												<Play size={ICON.sm} />
-											</Button>
-										</form>
-										<Button
-											variant="ghost"
-											size="sm"
-											href={channelsHref(p.id)}
-											aria-label="Notice channels for {p.name}"
-											title="Notice channels"
-										>
-											<BellRing size={ICON.sm} />
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											aria-label="Edit {p.name}"
-											onclick={() => openEdit(p)}
-										>
-											<Pencil size={ICON.sm} />
-										</Button>
-										<form method="POST" action="?/delete" use:enhance={removeProbe(p)}>
-											<input type="hidden" name="id" value={p.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Delete {p.name}"
-											>
-												<Trash2 size={ICON.sm} class="text-danger" />
-											</Button>
-										</form>
-									</div>
-								</td>
+								<th scope="col">Probe</th>
+								<th scope="col">State</th>
+								<th scope="col">Runs</th>
+								<th scope="col">Last run</th>
+								<th scope="col"><span class="sr-only">Actions</span></th>
 							</tr>
-						{/each}
-					</tbody>
-				</Table>
-				<Pagination
-					page={pageNumber(data.offset, data.limit)}
-					perPage={data.limit}
-					count={data.probes.length}
-					total={data.total ?? undefined}
-					hasNext={data.hasMore}
-					noun="probes"
-					href={pageHref('/admin/observability/synthetic', data.limit)}
-				/>
+						</thead>
+						<tbody>
+							{#each visible as p (p.id)}
+								<tr>
+									<td>
+										<div class="font-medium text-fg">{p.name}</div>
+										<div class="text-xs text-faint">
+											{PROBE_TYPE_LABELS[p.type] ?? p.type}
+										</div>
+										<div class="max-w-md truncate font-mono text-xs text-faint" title={probeTarget(p)}>
+											{probeTarget(p)}
+										</div>
+									</td>
+									<td data-cell="nowrap">
+										<Badge tone={probeTone(probeHealth(p))} dot>
+											{PROBE_HEALTH_LABELS[probeHealth(p)]}
+										</Badge>
+										<div class="text-xs text-faint">
+											Alerts after {p.alert_threshold}
+										</div>
+									</td>
+									<td data-cell="nowrap" class="text-xs text-faint">
+										{everyLabel(p.interval_seconds)}
+									</td>
+									<td data-cell="nowrap" class="text-xs text-faint">
+										{p.last_run_at ? formatDateTime(p.last_run_at) : 'Never'}
+									</td>
+									<td data-cell="nowrap">
+										<div class="flex items-center justify-end gap-1">
+											<form method="POST" action="?/run" use:enhance={runNow(p)}>
+												<input type="hidden" name="id" value={p.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Run {p.name} now"
+													title="Run now"
+												>
+													<Play size={ICON.sm} />
+												</Button>
+											</form>
+											<Button
+												variant="ghost"
+												size="sm"
+												href={channelsHref(p.id)}
+												aria-label="Notice channels for {p.name}"
+												title="Notice channels"
+											>
+												<BellRing size={ICON.sm} />
+											</Button>
+											<Button
+												variant="ghost"
+												size="sm"
+												aria-label="Edit {p.name}"
+												onclick={() => openEdit(p)}
+											>
+												<Pencil size={ICON.sm} />
+											</Button>
+											<form method="POST" action="?/delete" use:enhance={removeProbe(p)}>
+												<input type="hidden" name="id" value={p.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Delete {p.name}"
+												>
+													<Trash2 size={ICON.sm} class="text-danger" />
+												</Button>
+											</form>
+										</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+					<Pagination
+						page={pageNumber(data.offset, data.limit)}
+						perPage={data.limit}
+						count={data.probes.length}
+						total={data.total ?? undefined}
+						hasNext={data.hasMore}
+						noun="probes"
+						href={pageHref('/admin/observability/synthetic', data.limit)}
+					/>
+				{/if}
 			{/if}
 		</section>
 	{/if}
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New probe'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		id="probe-form"
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
 		use:enhance={saveProbeSubmit.enhance}
 	>
+		<FormErrors message={probeError || undefined} refused={probeRefusal} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}
 
 		<div class="flex flex-col gap-4">
 			<Input id="probe-name" name="name" label="Name" bind:value={name} required />
-			<Select
-				id="probe-type"
+			<!-- Each type needs a sentence to tell it from the others, so every
+			     option carries its own rather than one hint that changes. -->
+			<RadioGroup
 				name="type"
 				label="What it checks"
-				hint={PROBE_TYPE_HINTS[type]}
 				bind:value={type}
-				options={PROBE_TYPES.map((t) => ({ value: t, label: PROBE_TYPE_LABELS[t] }))}
+				options={PROBE_TYPES.map((t) => ({ value: t, label: PROBE_TYPE_LABELS[t], description: PROBE_TYPE_HINTS[t] }))}
 			/>
 
 			<!-- The four probe types take different settings, so only the ones

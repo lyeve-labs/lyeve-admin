@@ -97,14 +97,23 @@
 
 		<div class="grid gap-4 sm:grid-cols-3">
 			<Stat size="sm" mono label="Recorded" value={data.total} />
+			<!-- The log is read a page at a time and the engine counts no errors
+			     of its own, so this figure covers the rows on this page only. -->
 			<Stat
 				size="sm"
 				mono
 				label="Carrying an error"
 				value={failures}
+				sub={`of the ${data.events.length} on this page`}
 				tone={failures > 0 ? 'danger' : undefined}
 			/>
-			<Stat size="sm" mono label="Recent replays" value={data.runs.length} />
+			<Stat
+				size="sm"
+				mono
+				label="Replays"
+				value={data.runs.ok ? data.runs.value.total : NO_VALUE}
+				sub={data.runs.ok ? undefined : 'Not read'}
+			/>
 		</div>
 
 		<section class="flex flex-col gap-4">
@@ -147,7 +156,13 @@
 				</div>
 			</Card>
 
-			{#if data.runs.length > 0}
+			{#if !data.runs.ok}
+				<GateNotice
+					gate={data.runs.gate}
+					title="the replay runs"
+					absent="This version of the events plugin keeps no list of replay runs."
+				/>
+			{:else if data.runs.value.rows.length > 0}
 				<Table label="Replay">
 					<thead>
 						<tr>
@@ -159,7 +174,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.runs as run (run.run_id)}
+						{#each data.runs.value.rows as run (run.run_id)}
 							<tr>
 								<td data-cell="nowrap" class="text-xs">{formatDateTime(run.started_at)}</td>
 								<td data-cell="nowrap" class="font-mono text-xs">

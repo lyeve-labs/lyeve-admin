@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -46,6 +47,17 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const refusal = $derived(formRefusal(form));
+	// A failed save names the drawer it came from, so it is said inside that
+	// drawer and nowhere else. Every other failure is the page's.
+	const fromDrawer = $derived(
+		form && 'drawer' in form && typeof form.drawer === 'string' ? form.drawer : null,
+	);
+	// The plugin refuses a new rule or a new replay set on an install whose
+	// license leaves them out, so neither is offered there. Switching a rule
+	// off and deleting one stay allowed.
+	const canCreate = $derived(data.licensed !== false);
+	const NOT_INCLUDED = 'Not included in this license';
+	const EDIT_REFUSED = `${NOT_INCLUDED}. Switch the rule off or delete it.`;
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const needsWrites = $derived((form as { needsWrites?: string } | null)?.needsWrites ?? '');
 	const replay = $derived((form as { replay?: SetReplay } | null)?.replay ?? null);
@@ -164,7 +176,13 @@
 >
 	{#snippet actions()}
 		{#if data.gate.state === 'ok'}
-			<Button variant="primary" size="sm" onclick={openCreate}>
+			<Button
+				variant="primary"
+				size="sm"
+				onclick={openCreate}
+				disabled={!canCreate}
+				title={canCreate ? undefined : NOT_INCLUDED}
+			>
 				<Plus size={ICON.sm} /> New rule
 			</Button>
 		{/if}
@@ -177,7 +195,7 @@
 			absent="The request capture plugin is not part of this build, so no request is kept."
 		/>
 	{:else}
-		{#if refusal}
+		{#if refusal && !fromDrawer}
 			<RefusalNotice {refusal} />
 		{:else if needsWrites}
 			{@const s = data.sets.find((x) => x.id === needsWrites)}
@@ -191,7 +209,7 @@
 					</form>
 				{/if}
 			</Alert>
-		{:else if formError}
+		{:else if formError && !fromDrawer}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -222,7 +240,7 @@
 						<History size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openCreate}>
+						<Button variant="secondary" onclick={openCreate} disabled={!canCreate} title={canCreate ? undefined : NOT_INCLUDED}>
 							<Plus size={ICON.sm} /> New rule
 						</Button>
 					{/snippet}
@@ -251,9 +269,36 @@
 								</td>
 								<td data-cell="nowrap">
 									<div class="flex items-center justify-end gap-1">
-										<Button variant="ghost" size="sm" aria-label="Edit {r.route_pattern}" onclick={() => openEdit(r)}>
-											<Pencil size={ICON.sm} />
-										</Button>
+										{#if !canCreate && r.enabled}
+											<!-- The plugin refuses any change that leaves a rule enabled on
+											     this license, so the drawer is not offered. Switching the
+											     rule off stays allowed, from the row. -->
+											<Button
+												variant="ghost"
+												size="sm"
+												aria-label="Edit {r.route_pattern}"
+												disabled
+												title={EDIT_REFUSED}
+											>
+												<Pencil size={ICON.sm} />
+											</Button>
+											<form method="POST" action="?/updateRule" use:enhance>
+												<input type="hidden" name="from" value="row" />
+												<input type="hidden" name="id" value={r.id} />
+												<input type="hidden" name="route_pattern" value={r.route_pattern} />
+												<input type="hidden" name="method" value={r.method} />
+												<input type="hidden" name="sample_percent" value={String(Math.round(r.sample_rate * 1000) / 10)} />
+												<input type="hidden" name="retention_seconds" value={String(r.retention_seconds)} />
+												<input type="hidden" name="enabled" value="false" />
+												<Button variant="ghost" size="sm" type="submit" aria-label="Switch off {r.route_pattern}">
+													Switch off
+												</Button>
+											</form>
+										{:else}
+											<Button variant="ghost" size="sm" aria-label="Edit {r.route_pattern}" onclick={() => openEdit(r)}>
+												<Pencil size={ICON.sm} />
+											</Button>
+										{/if}
 										<form
 											method="POST"
 											action="?/deleteRule"
@@ -380,7 +425,8 @@
 					<Button
 						variant="secondary"
 						size="sm"
-						disabled={selected.length === 0 || selected.length > MAX_SET_CAPTURES}
+						disabled={!canCreate || selected.length === 0 || selected.length > MAX_SET_CAPTURES}
+						title={canCreate ? undefined : NOT_INCLUDED}
 						onclick={openSet}
 					>
 						<FileStack size={ICON.sm} /> New replay set{selected.length > 0 ? ` from ${selected.length}` : ''}
@@ -451,12 +497,11 @@
 </PageShell>
 
 <Drawer bind:open={ruleOpen} title={editing ? 'Edit rule' : 'New rule'}>
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="capture-rule-form" method="POST" action={editing ? '?/updateRule' : '?/createRule'} use:enhance={saveRule.enhance}>
+		<FormErrors
+			message={fromDrawer === 'rule' ? formError || undefined : undefined}
+			refused={fromDrawer === 'rule' ? refusal : null}
+		/>
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}
@@ -492,7 +537,15 @@
 				options={retentionOptions(editing?.retention_seconds)}
 			/>
 			<input type="hidden" name="enabled" value={ruleEnabled ? 'true' : 'false'} />
-			<Toggle id="capture-enabled" label="Apply this rule" bind:checked={ruleEnabled} />
+			<!-- Applying a rule needs the license. A rule that is off can still
+			     be edited and saved off. -->
+			<Toggle
+				id="capture-enabled"
+				label="Apply this rule"
+				bind:checked={ruleEnabled}
+				disabled={!canCreate && !ruleEnabled}
+				hint={!canCreate && !ruleEnabled ? `${NOT_INCLUDED}, so the rule stays off.` : undefined}
+			/>
 		</div>
 	</form>
 	{#snippet footer()}
@@ -504,12 +557,11 @@
 </Drawer>
 
 <Drawer bind:open={setOpen} title="New replay set">
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="replay-set-form" method="POST" action="?/createSet" use:enhance={saveSet.enhance}>
+		<FormErrors
+			message={fromDrawer === 'set' ? formError || undefined : undefined}
+			refused={fromDrawer === 'set' ? refusal : null}
+		/>
 		{#each selected as id (id)}
 			<input type="hidden" name="capture_id" value={id} />
 		{/each}

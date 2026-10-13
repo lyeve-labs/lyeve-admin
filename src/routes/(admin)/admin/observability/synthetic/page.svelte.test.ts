@@ -54,7 +54,6 @@ function alert(over: Partial<ProbeAlert> = {}): ProbeAlert {
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		probes: [probe()],
-		alerts: [],
 		total: 1,
 		limit: 25,
 		offset: 0,
@@ -62,6 +61,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		gate: { state: 'ok' },
 		licensed: true,
 		...over,
+		alerts: Array.isArray(over.alerts) ? { ok: true, value: over.alerts } : (over.alerts ?? { ok: true, value: [] }),
 	} as never,
 	form: form as never,
 });
@@ -134,6 +134,15 @@ describe('alerts', () => {
 	it('shows no alert band when nothing is outstanding', () => {
 		const { container } = render(SyntheticPage, { props: props() });
 		expect(said(container)).not.toContain('Unacknowledged alerts');
+	});
+
+	// A hidden band read as nothing alerting while the read had failed.
+	it('says the alerts could not be read rather than hiding the band', () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ alerts: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		expect(said(container)).toContain('did not answer');
+		expect(said(container)).toContain('the open alerts');
 	});
 });
 
@@ -247,5 +256,96 @@ describe('notice channels', () => {
 			props: props({}, { channelsSaved: 'p1', signingSecret: 'f'.repeat(64) }),
 		});
 		expect(said(container.ownerDocument.body)).toContain('Webhook signing secret');
+	});
+});
+
+describe('the tiles', () => {
+	const failingProbe = (id: string) => probe({ id, name: id, last_status: 'fail' });
+
+	// The plugin counts probes but not their states, so a state tile that read
+	// one page of a longer list had to say so.
+	it('says the state counts cover this page when more probes exist', () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ probes: [failingProbe('a'), probe({ id: 'b', name: 'b' })], total: 60, hasMore: true }),
+		});
+		const text = said(container);
+		expect(text).toContain('of the 2 on this page');
+		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Probes');
+		expect(tile?.nextElementSibling?.textContent?.trim()).toBe('60');
+	});
+
+	it('states the counts plainly when every probe is on the page', () => {
+		const { container } = render(SyntheticPage, { props: props() });
+		expect(said(container)).not.toContain('on this page');
+	});
+});
+
+describe('the probe toolbar', () => {
+	it('narrows the rows on this page by name', async () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ probes: [probe({ id: 'a', name: 'Homepage' }), probe({ id: 'b', name: 'Checkout' })], total: 2 }),
+		});
+		const input = container.querySelector('#probe-narrow') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'check' } });
+		const rows = [...container.querySelectorAll('tbody tr')].map((r) => r.textContent ?? '');
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toContain('Checkout');
+	});
+});
+
+describe('the probe type', () => {
+	it('offers each type with the sentence that tells it apart', async () => {
+		const { container, getAllByRole } = render(SyntheticPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new probe/i })[0]);
+		const radios = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"][name="type"]')];
+		expect(radios).toHaveLength(4);
+		expect(said(document.body)).toContain('Fetches a URL and checks the status code.');
+		expect(said(document.body)).toContain('Sends a webhook and waits for the receipt.');
+		void container;
+	});
+});
+
+describe('a failed save', () => {
+	// The message went to the page behind the drawer, so the open panel said
+	// nothing about why the save did not happen.
+	it('is said at the top of the open form', async () => {
+		render(SyntheticPage, { props: props({}, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' }) });
+		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
+		const form = document.querySelector('#probe-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Name the probe so an alert can say which one fired.');
+	});
+});
+
+describe('a failed row action', () => {
+	// A failed delete, run or acknowledge greeted the next New probe as that
+	// probe's failure.
+	it('is said on the page and not in the probe drawer', async () => {
+		const { container } = render(SyntheticPage, { props: props({}, { error: 'The probe could not be deleted.' }) });
+		expect(said(container)).toContain('The probe could not be deleted.');
+		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
+		const form = document.querySelector('#probe-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be deleted');
+	});
+});
+
+describe('a filter that matches nothing', () => {
+	it('draws no table or pager above the empty state', async () => {
+		const { container } = render(SyntheticPage, { props: props() });
+		await fireEvent.input(container.querySelector('#probe-narrow') as HTMLInputElement, { target: { value: 'no such probe' } });
+		expect(said(container)).toContain('Nothing on this page matches');
+		expect(container.querySelector('table')).toBeNull();
+	});
+});
+
+describe('tiles counted across every probe', () => {
+	it('states the load\'s counts without a page note', () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ probes: [probe()], total: 40, offset: 25, hasMore: false, counts: { failing: 7, paused: 2 } }),
+		});
+		const tile = (label: string) =>
+			[...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === label)?.nextElementSibling?.textContent?.trim();
+		expect(tile('Failing')).toBe('7');
+		expect(tile('Paused')).toBe('2');
+		expect(said(container)).not.toContain('on this page');
 	});
 });

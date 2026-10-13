@@ -1,7 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Checkbox,
@@ -230,7 +229,11 @@
 				</div>
 			{/if}
 			{#if data.deliveries === null}
-				<Alert tone="warn">The deliveries could not be read. This is not a report that every event arrived.</Alert>
+				<GateNotice
+					gate={data.deliveriesGate ?? { state: 'error', message: 'The deliveries could not be read. This is not a report that every event arrived.' }}
+					title="the deliveries"
+					absent="This version of the analytics plugin does not list the deliveries it owes."
+				/>
 			{:else if data.deliveries.data.length === 0}
 				<EmptyState
 					title="Nothing is owed"
@@ -287,6 +290,12 @@
 						{/each}
 					</tbody>
 				</Table>
+				{#if data.moreDeliveries}
+					<p class="text-xs text-muted" data-testid="more-deliveries">
+						The {data.deliveryLimit} newest are listed and more are owed. The plugin lists no older ones, so
+						filter by status to see a different set.
+					</p>
+				{/if}
 			{/if}
 		</section>
 	{/if}

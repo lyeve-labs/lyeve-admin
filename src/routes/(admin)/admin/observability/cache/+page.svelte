@@ -17,6 +17,7 @@
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { enhance } from '$app/forms';
@@ -53,6 +54,11 @@
 	const tripped = $derived(trippedProviders(data.providers));
 	const tags = $derived(tagsOf(data.entries));
 	const refusal = $derived(formRefusal(form));
+	// A failed save names the drawer it came from, so it is said inside that
+	// drawer and nowhere else. Every other failure is the page's.
+	const fromDrawer = $derived(
+		form && 'drawer' in form && typeof form.drawer === 'string' ? form.drawer : null,
+	);
 	const rules = $derived(data.rules);
 	const ruleTags = $derived([...new Set(rules.rows.flatMap((r) => r.tags))].sort());
 	const rulesFull = $derived(rules.licensed !== true && atCeiling(rules.limit));
@@ -191,9 +197,9 @@
 			absent="The cache plugin is not part of this build, so nothing is cached."
 		/>
 	{:else}
-		{#if refusal}
+		{#if refusal && !fromDrawer}
 			<RefusalNotice {refusal} />
-		{:else if formError}
+		{:else if formError && !fromDrawer}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -463,7 +469,13 @@
 				{/each}
 			</div>
 
-			{#if data.entries.length === 0}
+			{#if data.entriesGate}
+				<GateNotice
+					gate={data.entriesGate}
+					title="the stored entries"
+					absent="This version of the cache plugin does not list its stored entries."
+				/>
+			{:else if data.entries.length === 0}
 				<EmptyState
 					title="Nothing is cached"
 					description="Either nothing has been asked for yet, or every entry has expired."
@@ -513,12 +525,11 @@
 </PageShell>
 
 <Drawer bind:open={ruleOpen} title={editing ? 'Edit rule' : 'New rule'}>
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="cache-rule-form" method="POST" action={editing ? '?/updateRule' : '?/createRule'} use:enhance={saveRule.enhance}>
+		<FormErrors
+			message={fromDrawer === 'rule' ? formError || undefined : undefined}
+			refused={fromDrawer === 'rule' ? refusal : null}
+		/>
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}

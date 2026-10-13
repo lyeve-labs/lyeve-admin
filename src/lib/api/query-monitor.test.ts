@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '@lyeve-labs/client';
 import {
 	callerOf,
 	durationTone,
 	noSuggestionText,
 	oneLine,
-	queryGate,
 	readAnalysis,
 	type QueryLogEntry,
 } from './query-monitor';
@@ -21,28 +19,6 @@ function entry(over: Partial<QueryLogEntry> = {}): QueryLogEntry {
 		...over,
 	};
 }
-
-describe('queryGate', () => {
-	// The four refusals want different words. Reading them all as "nothing was
-	// slow" is the failure this sorting exists to prevent.
-	it('reads a 402 as not enabled', () => {
-		expect(queryGate(new ApiError(402, 'nope')).state).toBe('locked');
-	});
-
-	it('reads a 404 as the plugin missing from this build', () => {
-		expect(queryGate(new ApiError(404, 'nope')).state).toBe('absent');
-	});
-
-	it('reads a 503 as the capture store', () => {
-		expect(queryGate(new ApiError(503, 'nope')).state).toBe('unavailable');
-	});
-
-	it('keeps the banner for anything else, and says it is not a report of none', () => {
-		const gate = queryGate(new Error('socket'));
-		expect(gate.state).toBe('error');
-		expect(gate.state === 'error' && gate.message).toContain('not a report that nothing was slow');
-	});
-});
 
 describe('durationTone', () => {
 	it('names the vocabulary the kit accepts, not a synonym', () => {

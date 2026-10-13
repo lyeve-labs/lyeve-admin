@@ -16,6 +16,8 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { Lightbulb, RefreshCw, Search, Timer } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { page } from '$app/state';
+	import { OUTAGE } from '$lib/outage';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
 		ANALYZABLE,
@@ -32,6 +34,8 @@
 	import { ICON } from '$lib/icon';
 
 	let { data }: { data: PageData } = $props();
+
+	const here = $derived(`${page.url.pathname}${page.url.search}`);
 
 	let refreshing = $state(false);
 	async function refresh() {
@@ -116,10 +120,19 @@
 		</Button>
 	{/snippet}
 
-	{#if data.gate.state === 'unavailable'}
+	{#if data.gate.state === 'capture_store'}
 		<Alert tone="warn">
-			The capture store did not answer. Sampling writes to its own table, which a pending
-			migration can leave absent.
+			<p>
+				The capture store did not answer. Sampling writes to its own table, which a pending
+				migration can leave absent.
+			</p>
+			<!-- A plain link to this address asks for a fresh document, as the
+			     shared notice's retry does, so it works before hydration. -->
+			<div class="mt-3">
+				<Button variant="secondary" size="sm" href={here} data-sveltekit-reload>
+					<RefreshCw size={ICON.sm} aria-hidden="true" /> {OUTAGE.action}
+				</Button>
+			</div>
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
@@ -223,52 +236,6 @@
 					{/snippet}
 				</ListToolbar>
 
-				<Table label="Captured statements">
-					<thead>
-						<tr>
-							<th scope="col">Statement</th>
-							<th scope="col">Took</th>
-							<th scope="col">Rows</th>
-							<th scope="col">Caller</th>
-							<th scope="col">Captured</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as entry (entry.id)}
-							<tr>
-								<td>
-									<code class="text-xs">{oneLine(entry.query_text)}</code>
-									{#if planFlags(entry).length > 0}
-										<div class="mt-1 flex flex-wrap gap-1">
-											{#each planFlags(entry) as flag (flag)}
-												<Badge tone="warn">{flag}</Badge>
-											{/each}
-										</div>
-									{/if}
-								</td>
-								<td data-cell="nowrap">
-									<Badge tone={durationTone(entry.duration_ms)}>{ms(entry.duration_ms)}</Badge>
-								</td>
-								<td data-cell="nowrap" class="text-xs">{entry.rows_returned ?? NO_VALUE}</td>
-								<td data-cell="nowrap" class="font-mono text-xs text-faint"
-									>{callerOf(entry) ?? NO_VALUE}</td
-								>
-								<td data-cell="nowrap" class="text-xs text-faint"
-									>{formatDateTime(entry.captured_at)}</td
-								>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-				<Pagination
-					page={pageNumber(data.offset, data.limit)}
-					perPage={data.limit}
-					count={data.entries.length}
-					total={data.total ?? undefined}
-					noun="queries"
-					href={pageHref('/admin/observability/queries', data.limit)}
-				/>
-
 				{#if visible.length === 0}
 					<EmptyState
 						title="Nothing on this page matches"
@@ -277,7 +244,56 @@
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}
+						{#snippet action()}
+							<Button variant="secondary" onclick={() => (narrow = '')}>Clear the filter</Button>
+						{/snippet}
 					</EmptyState>
+				{:else}
+					<Table label="Captured statements">
+						<thead>
+							<tr>
+								<th scope="col">Statement</th>
+								<th scope="col">Took</th>
+								<th scope="col">Rows</th>
+								<th scope="col">Caller</th>
+								<th scope="col">Captured</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as entry (entry.id)}
+								<tr>
+									<td>
+										<code class="text-xs">{oneLine(entry.query_text)}</code>
+										{#if planFlags(entry).length > 0}
+											<div class="mt-1 flex flex-wrap gap-1">
+												{#each planFlags(entry) as flag (flag)}
+													<Badge tone="warn">{flag}</Badge>
+												{/each}
+											</div>
+										{/if}
+									</td>
+									<td data-cell="nowrap">
+										<Badge tone={durationTone(entry.duration_ms)}>{ms(entry.duration_ms)}</Badge>
+									</td>
+									<td data-cell="nowrap" class="text-xs">{entry.rows_returned ?? NO_VALUE}</td>
+									<td data-cell="nowrap" class="font-mono text-xs text-faint"
+										>{callerOf(entry) ?? NO_VALUE}</td
+									>
+									<td data-cell="nowrap" class="text-xs text-faint"
+										>{formatDateTime(entry.captured_at)}</td
+									>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+					<Pagination
+						page={pageNumber(data.offset, data.limit)}
+						perPage={data.limit}
+						count={data.entries.length}
+						total={data.total ?? undefined}
+						noun="queries"
+						href={pageHref('/admin/observability/queries', data.limit)}
+					/>
 				{/if}
 			{/if}
 		</section>

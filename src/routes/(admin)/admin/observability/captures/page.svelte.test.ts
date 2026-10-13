@@ -73,6 +73,24 @@ describe('capture rules', () => {
 		expect(said(container)).toContain('Capture rules and replay sets are not included');
 	});
 
+	// The note said the license was missing while New rule stayed live, so a
+	// reader filled in a rule only to be refused on save.
+	it('offers no new rule or replay set the license refuses', () => {
+		const { getAllByRole } = render(CapturesPage, { props: props({ licensed: false, rules: [] }) });
+		const newRule = getAllByRole('button', { name: /New rule/ });
+		expect(newRule.length).toBeGreaterThan(0);
+		for (const b of newRule) {
+			expect((b as HTMLButtonElement).disabled).toBe(true);
+			expect(b.getAttribute('title')).toBe('Not included in this license');
+		}
+		expect((getAllByRole('button', { name: /New replay set/ })[0] as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it('keeps New rule live on a licensed install', () => {
+		const { getAllByRole } = render(CapturesPage, { props: props({ licensed: true }) });
+		expect((getAllByRole('button', { name: /New rule/ })[0] as HTMLButtonElement).disabled).toBe(false);
+	});
+
 	it('reports a failed rules read as a failure', () => {
 		const { container } = render(CapturesPage, { props: props({ rules: [], rulesRead: false }) });
 		expect(said(container)).toContain('could not be read');
@@ -162,5 +180,56 @@ describe('the gate', () => {
 		const { container } = render(CapturesPage, { props: props({ gate: { state: 'absent' }, captures: [] }) });
 		expect(said(container)).toContain('not part of this build');
 		expect(said(container)).not.toContain('No request is kept');
+	});
+});
+
+describe('a failed rule save', () => {
+	// The message went to the page behind the drawer, so the open panel said
+	// nothing about why the save did not happen.
+	it('is said at the top of the open form', async () => {
+		render(CapturesPage, { props: props({}, { error: 'A route is an absolute path.', drawer: 'rule' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
+		expect(form.textContent).toContain('A route is an absolute path.');
+	});
+
+	// The rule and set drawers each showed the other's failures, and every
+	// row action's failure too.
+	it('keeps a failed set save out of the rule drawer', async () => {
+		render(CapturesPage, { props: props({}, { error: 'Name the set so a replay can say which one ran.', drawer: 'set' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('Name the set');
+	});
+
+	it('says a failed row action on the page and not in the drawer', async () => {
+		const { container } = render(CapturesPage, { props: props({}, { error: 'The replay set could not be deleted.' }) });
+		expect(said(container)).toContain('The replay set could not be deleted.');
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be deleted');
+	});
+});
+
+describe('editing a rule without the license', () => {
+	// The plugin refuses any change that leaves a rule enabled, so the drawer
+	// could only fail. Switching the rule off stays allowed.
+	it('offers no edit of an enabled rule, and offers to switch it off', () => {
+		const { container } = render(CapturesPage, { props: props({ licensed: false }) });
+		const edit = screen.getByRole('button', { name: `Edit ${rule.route_pattern}` }) as HTMLButtonElement;
+		expect(edit.disabled).toBe(true);
+		expect(edit.getAttribute('title')).toContain('Not included in this license');
+		const off = screen.getByRole('button', { name: `Switch off ${rule.route_pattern}` });
+		const form = off.closest('form') as HTMLFormElement;
+		expect(form.getAttribute('action')).toBe('?/updateRule');
+		expect((form.querySelector('input[name="enabled"]') as HTMLInputElement).value).toBe('false');
+		expect((form.querySelector('input[name="from"]') as HTMLInputElement).value).toBe('row');
+		void container;
+	});
+
+	it('keeps Edit live on a licensed install', () => {
+		render(CapturesPage, { props: props({ licensed: true }) });
+		expect((screen.getByRole('button', { name: `Edit ${rule.route_pattern}` }) as HTMLButtonElement).disabled).toBe(false);
+		expect(screen.queryByRole('button', { name: `Switch off ${rule.route_pattern}` })).toBeNull();
 	});
 });

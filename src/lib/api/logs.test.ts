@@ -97,6 +97,24 @@ describe('log search', () => {
 
 		expect(res?.total).toBe(5);
 	});
+
+	// A failed search drawn as an empty one told the reader no entry matched.
+	it('throws when the message search fails', async () => {
+		const get = vi.fn(async (url: string) => {
+			if (url.includes('query=')) throw new Error('refused');
+			return page(0);
+		});
+
+		await expect(searchLogEntries({ get } as unknown as HttpClient, query(REQUEST_ID))).rejects.toThrow('refused');
+	});
+
+	it('throws when a search with no term fails', async () => {
+		const get = vi.fn(async () => {
+			throw new Error('refused');
+		});
+
+		await expect(searchLogEntries({ get } as unknown as HttpClient, query(''))).rejects.toThrow('refused');
+	});
 });
 
 describe('what could be an id', () => {

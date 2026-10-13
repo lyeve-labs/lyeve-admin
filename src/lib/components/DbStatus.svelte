@@ -18,6 +18,8 @@
 	 * whose JavaScript never ran.
 	 */
 	import { Button } from '@lyeve-labs/ui-kit';
+	import { CircleAlert, CircleCheck, CircleHelp } from '@lucide/svelte';
+	import { ICON } from '$lib/icon';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -60,6 +62,11 @@
 
 	const chip =
 		'flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs whitespace-nowrap';
+
+	// Below sm the words leave the screen and stay with a screen reader. Each
+	// state keeps an icon of its own shape, so the chip never says which state
+	// it is in by color alone.
+	const words = 'sr-only sm:not-sr-only';
 </script>
 
 {#if pending === null}
@@ -71,13 +78,13 @@
 		data-testid="db-status"
 		title="The instance did not answer the migration check"
 	>
-		<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-faint"></span>
-		<span class="hidden sm:inline">Database unknown</span>
+		<CircleHelp size={ICON.sm} class="shrink-0" aria-hidden="true" />
+		<span class={words}>Database unknown</span>
 	</span>
 {:else if pending === 0}
 	<span class="{chip} border-line text-success" data-testid="db-status" title="No pending migrations">
-		<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-success"></span>
-		<span class="hidden sm:inline">Database synced</span>
+		<CircleCheck size={ICON.sm} class="shrink-0" aria-hidden="true" />
+		<span class={words}>Database synced</span>
 	</span>
 {:else}
 	<!-- Pending work, so the control that clears it is the thing on screen
@@ -94,9 +101,9 @@
 			loading={syncing}
 			title={error || `${pending} migration${pending === 1 ? '' : 's'} waiting to be applied`}
 		>
-			<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-warn"></span>
+			<CircleAlert size={ICON.sm} class="shrink-0 text-warn" aria-hidden="true" />
 			<span class="text-warn">{pending} pending</span>
-			<span class="hidden text-warn sm:inline">migration{pending === 1 ? '' : 's'}</span>
+			<span class="text-warn {words}">migration{pending === 1 ? '' : 's'}</span>
 		</Button>
 	</form>
 {/if}

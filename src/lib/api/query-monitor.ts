@@ -10,8 +10,7 @@
  * grammar per dialect, and an instance runs one. The page asks for the one
  * the engine reports and never guesses.
  */
-import { ApiError, type HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
+import type { HttpClient } from '@lyeve-labs/client';
 
 export const QUERY_LOG_URL = '/api/admin/query-log';
 
@@ -67,28 +66,6 @@ interface Page<T> {
 	total_count?: number;
 	limit?: number;
 	offset?: number;
-}
-
-/**
- * Why a read came back empty, when it did.
- *
- * A 402 is the feature not enabled, and the page says so. A 404 is the
- * plugin absent from this build. A 503 is the store, which for a sampler
- * usually means the capture table is not there yet. Anything else keeps the
- * banner, which is not a report that nothing was slow.
- */
-export type QueryGate = Gate | { state: 'unavailable' };
-
-export const QUERY_OK: QueryGate = GATE_OK;
-
-/**
- * What a refused query log read means, read the way every plugin's is, and a
- * 503 as the plugin saying it has no database to sample, which is its own
- * state rather than a failure.
- */
-export function queryGate(err: unknown): QueryGate {
-	if (err instanceof ApiError && err.status === 503) return { state: 'unavailable' };
-	return gateOf(err, 'The query log could not be read. This is not a report that nothing was slow.');
 }
 
 export async function listQueryLog(

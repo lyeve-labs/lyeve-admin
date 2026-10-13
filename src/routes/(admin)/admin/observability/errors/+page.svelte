@@ -44,11 +44,19 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
+	// The assign prompt's own failure is tagged, so the prompt says it and the
+	// page says every other one.
+	const assignFailed = $derived(!!form && 'drawer' in form && form.drawer === 'assign');
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const refused = $derived(formRefusal(form));
 	const open = $derived(unacknowledged(data.alerts));
 	const fresh = $derived(firstSeenWithin(data.alerts, 24));
 	const ordered = $derived(triageOrder(data.alerts));
+	// The plugin counts the alerts but not how many are unacknowledged or new,
+	// so those two count the rows read. They cover every alert only when every
+	// alert is on this page.
+	const wholeList = $derived(data.offset === 0 && (data.total === null ? data.alerts.length < data.limit : data.total <= data.alerts.length));
+	const pageNote = $derived(wholeList ? undefined : `of the ${data.alerts.length} on this page`);
 
 	const bySeverity = $derived(
 		new Map(data.codes.map((c) => [c.id, { severity: c.severity, title: c.title }])),
@@ -135,9 +143,7 @@
 			absent="The error tracking plugin is not part of this build, so failures are logged and not grouped."
 		/>
 	{:else}
-		{#if !assigning}
-			<FormErrors message={formError} {refused} />
-		{/if}
+		<FormErrors message={assignFailed ? undefined : formError || undefined} refused={assignFailed ? null : refused} />
 
 		<div class="grid gap-4 sm:grid-cols-3">
 			<!-- Distinct failures, not events. Ten thousand events from one
@@ -148,10 +154,17 @@
 				mono
 				label="Unacknowledged failures"
 				value={open.length}
+				sub={pageNote}
 				tone={open.length > 0 ? 'danger' : 'neutral'}
 			/>
-			<Stat size="sm" mono label="New in the last day" value={fresh.length} />
-			<Stat size="sm" mono label="Distinct failures tracked" value={data.alerts.length} />
+			<Stat size="sm" mono label="New in the last day" value={fresh.length} sub={pageNote} />
+			<Stat
+				size="sm"
+				mono
+				label="Distinct failures tracked"
+				value={data.total ?? data.alerts.length}
+				sub={data.total === null ? pageNote : undefined}
+			/>
 		</div>
 		<p class="text-xs text-muted">
 			Each row is a group of errors that share a source location, not a single occurrence.
@@ -334,7 +347,7 @@
 {#if assigning}
 	<Modal open title="Assign this failure" onclose={() => (assigning = null)}>
 		<form method="POST" action="?/assign" id="assign-form" use:enhance={assignSubmit} class="flex flex-col gap-3">
-			<FormErrors message={formError} {refused} />
+			<FormErrors message={assignFailed ? formError || undefined : undefined} refused={assignFailed ? refused : null} />
 			<input type="hidden" name="id" value={assigning.id} />
 			<Input
 				id="alert-assignee"

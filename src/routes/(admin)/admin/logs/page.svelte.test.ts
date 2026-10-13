@@ -18,18 +18,21 @@ function entry(overrides: Record<string, unknown> = {}) {
 	};
 }
 
+const ok = <T,>(value: T) => ({ ok: true as const, value });
+const failed = { ok: false as const, gate: { state: 'error', message: 'Could not be read.' } };
+
 function data(entries: Record<string, unknown>[], overrides: Record<string, unknown> = {}) {
+	const { total, volume, levels, config, ...rest } = overrides;
 	return {
-		entries,
-		total: entries.length,
+		search: ok({ results: entries, total: total ?? entries.length }),
 		limit: 100,
 		offset: 0,
-		levels: null,
-		config: null,
-		volume: null,
+		levels: levels === undefined ? failed : ok(levels),
+		config: config === undefined ? failed : ok(config),
+		volume: volume === undefined ? failed : ok(volume),
 		q: '',
 		level: '',
-		...overrides,
+		...rest,
 	};
 }
 
@@ -156,7 +159,7 @@ describe('Paging', () => {
  */
 describe('Default level card', () => {
 	function defaultLevel(container: HTMLElement): string {
-		const label = [...container.querySelectorAll('div')].find((el) => el.textContent?.trim() === 'Default level');
+		const label = [...container.querySelectorAll('p')].find((el) => el.textContent?.trim() === 'Default level');
 		return label?.nextElementSibling?.textContent?.trim() ?? '';
 	}
 
@@ -189,5 +192,61 @@ describe('Search box', () => {
 
 		const input = container.querySelector<HTMLInputElement>('#log-search');
 		expect(input?.placeholder).toBe('Message words, a request ID or a trace ID');
+	});
+});
+
+describe('a search that failed', () => {
+	// A failed search drawn as an empty one told the reader no entry matched.
+	it('says the entries could not be read', () => {
+		const { container } = render(LogsPage, {
+			props: { data: { ...data([]), search: { ok: false, gate: { state: 'unavailable' } } } as never },
+		});
+
+		expect(container.textContent).toContain('did not answer');
+		expect(container.textContent).not.toContain('No log entries');
+	});
+
+	it('says the plugin is missing once for the page', () => {
+		const absent = { ok: false, gate: { state: 'absent' } };
+		const { container } = render(LogsPage, {
+			props: { data: { ...data([]), search: absent, volume: absent, levels: absent, config: absent } as never },
+		});
+
+		const text = container.textContent ?? '';
+		expect(text.split('not part of this build').length - 1).toBe(1);
+		expect(text).not.toContain('Volume (24h)');
+	});
+});
+
+describe('an empty log', () => {
+	it('does not tell a reader with no filter to widen one', () => {
+		const { container } = render(LogsPage, { props: props([]) });
+
+		expect(container.textContent).toContain('No log entries yet');
+		expect(container.textContent).not.toContain('match the current filter');
+	});
+
+	it('says the filter matched nothing when there is one', () => {
+		const { container } = render(LogsPage, { props: props([], { level: 'ERROR' }) });
+
+		expect(container.textContent).toContain('No log entries match the current filter');
+	});
+});
+
+describe('figures that could not be read', () => {
+	it('does not count zero overrides when the levels failed', () => {
+		const { container } = render(LogsPage, { props: props([]) });
+
+		expect(container.textContent).not.toContain('0 tenant and plugin overrides');
+		expect(container.textContent).toContain('Could not be read.');
+	});
+});
+
+describe('page size', () => {
+	it('offers the sizes as segments that submit with the filter', () => {
+		const { container } = render(LogsPage, { props: props([entry()]) });
+
+		expect(container.querySelector('select[name="limit"]')).toBeNull();
+		expect(container.querySelector<HTMLInputElement>('input[name="limit"]')?.value).toBe('100');
 	});
 });

@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -31,7 +31,7 @@ import {
 	type Limit,
 } from '$lib/api/cache';
 import { gateOf, type Gate } from '$lib/api/gate';
-import { pageOf, pageWindow, rowsOf } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 /** What the response cache rules read answered, beside the rest of the page. */
 export interface RulesState {
@@ -103,12 +103,21 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	const entries =
-		gate.state === 'ok' && superAdmin
-			? await listEntries(client, limit + 1, offset)
-					.then((p) => pageOf(p, limit, offset))
-					.catch(() => ({ rows: [] as CacheEntry[], limit, offset, total: null, hasMore: false }))
-			: { rows: [] as CacheEntry[], limit, offset, total: null, hasMore: false };
+	// A failed read of the stored keys keeps its reason. Drawn as no rows, it
+	// said nothing is cached beside a counter of thousands of entries.
+	let entries: { rows: CacheEntry[]; total: number | null; hasMore: boolean } = { rows: [], total: null, hasMore: false };
+	let entriesGate: Gate | null = null;
+	if (gate.state === 'ok' && superAdmin) {
+		try {
+			entries = pageOf(await listEntries(client, limit + 1, offset), limit, offset);
+		} catch (err) {
+			entriesGate = gateOf(err, 'The stored entries could not be read. This is not a report that nothing is cached.');
+		}
+		if (!entriesGate) {
+			const back = pastEndOffset(entries.rows.length, limit, offset, entries.total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
+		}
+	}
 
 	return {
 		superAdmin,
@@ -119,6 +128,7 @@ export const load: PageServerLoad = async (event) => {
 		inactive: providers.inactive,
 		rules,
 		entries: entries.rows,
+		entriesGate,
 		total: entries.total,
 		limit,
 		offset,
@@ -148,12 +158,13 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 	const client = authedClient(event);
 	const form = await event.request.formData();
 	const body = ruleBody(form);
-	if (typeof body === 'string') return fail(400, { error: body });
+	if (typeof body === 'string') return fail(400, { error: body, drawer: 'rule' });
 	try {
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		return actionFailure(err, 'The rule could not be saved.');
+		const failed = actionFailure(err, 'The rule could not be saved.');
+		return fail(failed.status, { ...failed.data, drawer: 'rule' });
 	}
 	return { savedRule: body.pattern };
 }
@@ -164,7 +175,7 @@ export const actions: Actions = {
 	updateRule: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { error: 'No rule was named.', drawer: 'rule' });
 		return saveRule(event, id);
 	},
 

@@ -1,20 +1,43 @@
 import type { PageServerLoad } from './$types';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { ApiError } from '@lyeve-labs/client';
 import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
 	ANALYZABLE,
-	QUERY_OK,
 	analyzeQueries,
 	listQueryLog,
-	queryGate,
 	type AnalysisRead,
 	type Dialect,
-	type QueryGate,
 	type QueryLogEntry,
 } from '$lib/api/query-monitor';
-import { pageWindow } from '$lib/api/list';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+
+/**
+ * Why the capture log was not read. Beside every shared state, the plugin can
+ * answer that its own capture table did not answer, which a pending migration
+ * can leave absent. That is its own state, named apart from the shared
+ * `unavailable`, which means the engine itself did not answer.
+ */
+export type CaptureGate = Gate | { state: 'capture_store' };
+
+/** The sentence the plugin sends when its capture table did not answer. */
+const CAPTURE_STORE_REFUSAL = 'failed to load query log';
+
+/**
+ * What a refused capture log read means. Only the plugin's own refusal is the
+ * capture store. A 503 with any other sentence, a 502, a 504 or a read that
+ * never reached the engine is an outage, and reads as one.
+ */
+function captureGate(err: unknown): CaptureGate {
+	if (err instanceof ApiError && err.status === 503) {
+		const said = (err.body as { error?: unknown } | undefined)?.error;
+		if (said === CAPTURE_STORE_REFUSAL) return { state: 'capture_store' };
+	}
+	return gateOf(err, 'The query log could not be read. This is not a report that nothing was slow.');
+}
 
 /** The page size when a request names none. */
 const DEFAULT_LIMIT = 50;
@@ -45,7 +68,7 @@ export const load: PageServerLoad = async (event) => {
 			total: 0,
 			limit,
 			offset,
-			gate: { state: 'absent' } as QueryGate,
+			gate: { state: 'absent' } as CaptureGate,
 			dialect,
 			analysis: null as AnalysisRead | null,
 			analyzeFailed: false,
@@ -55,15 +78,21 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	let entries: QueryLogEntry[] = [];
 	let total = 0;
-	let gate: QueryGate = QUERY_OK;
+	let gate: CaptureGate = GATE_OK;
+	let stated: number | null = null;
 	try {
 		const page = await listQueryLog(client, limit, offset);
 		entries = page.data ?? [];
+		stated = page.total_count ?? null;
 		// The envelope carries the collection count. Keeping what has been read
 		// as the floor answers the case where it omits one.
 		total = Math.max(page.total_count ?? 0, offset + entries.length);
 	} catch (err) {
-		gate = queryGate(err);
+		gate = captureGate(err);
+	}
+	if (gate.state === 'ok') {
+		const back = pastEndOffset(entries.length, limit, offset, stated);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
 	// Analysis runs only when a dialect is asked for. It is EXPLAIN against a

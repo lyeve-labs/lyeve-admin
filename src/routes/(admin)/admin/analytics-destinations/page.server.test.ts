@@ -54,7 +54,7 @@ describe('the destinations load', () => {
 		expect(out.licensed).toBe(false);
 		expect(out.providers[0]).toMatchObject({ id: 'p1', retry_policy: { max_attempts: 3, backoff_seconds: 30 } });
 		expect(out.deliveries?.data[0]).toMatchObject({ id: 'd1', status: 'failed', last_error: 'timeout' });
-		expect(engine.get).toHaveBeenCalledWith('/api/admin/analytics/deliveries?limit=50&status=failed');
+		expect(engine.get).toHaveBeenCalledWith('/api/admin/analytics/deliveries?limit=51&status=failed');
 	});
 
 	it('still reads a plugin that answers the old bare array', async () => {
@@ -71,7 +71,28 @@ describe('the destinations load', () => {
 		});
 		const out = (await load(loadEvent())) as Loaded;
 		expect(out.deliveries).toBeNull();
+		expect(out.deliveriesGate).toEqual({ state: 'unavailable' });
 		expect(out.gate.state).toBe('ok');
+	});
+
+	// The plugin takes no offset and sends no count, so the list stopped at
+	// fifty with nothing saying more were owed.
+	it('says when more deliveries are owed than the list holds', async () => {
+		const rows = Array.from({ length: 51 }, (_, i) => ({ id: `d${i}`, status: 'failed' }));
+		engine.get.mockImplementation(async (url: string) =>
+			url.startsWith('/api/admin/analytics/providers') ? { data: [], licensed: true } : { data: rows, licensed: true },
+		);
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.deliveries?.data).toHaveLength(50);
+		expect(out.moreDeliveries).toBe(true);
+	});
+
+	it('says nothing more when the list holds every delivery', async () => {
+		engine.get.mockImplementation(async (url: string) =>
+			url.startsWith('/api/admin/analytics/providers') ? { data: [], licensed: true } : { data: [{ id: 'd1' }], licensed: true },
+		);
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.moreDeliveries).toBe(false);
 	});
 
 	it('reads nothing while the plugin does not run', async () => {

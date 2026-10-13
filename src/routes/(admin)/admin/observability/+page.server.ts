@@ -1,6 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { ApiError, createClient } from '@lyeve-labs/client';
 import { error, fail } from '@sveltejs/kit';
+import { section } from '$lib/api/gate';
 import { latencyTop } from '$lib/api/observability';
 import {
 	byOwnerRows,
@@ -20,6 +21,8 @@ import { refusalOf } from '$lib/api/refusal';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { goroutineCount } from '$lib/server/goroutines';
+import { PLUGIN } from '$lib/plugin-names';
+import { notRunning } from '$lib/plugins';
 import { sessionToken } from '$lib/server/session-cookie';
 
 export interface PoolStatsSnapshot {
@@ -73,19 +76,13 @@ export interface LatencyResponse {
 	total: number;
 }
 
-// A request that failed carries no statistics, so it names none. A zeroed
-// snapshot would read on screen as a pool with no connections open, which is
-// a measurement rather than the absence of one.
-const FALLBACK_POOL_HEALTH: PoolHealth = {
-	healthy: false,
-	engine: '',
-	errors: ['Failed to fetch pool health'],
-};
-
-const FALLBACK_LATENCY: LatencyResponse = {
-	slowest: [],
-	total: 0,
-};
+// A read that failed carries no statistics, so it is kept as the reason it
+// failed. A zeroed snapshot would read on screen as a pool with no connections
+// open, and an empty ranking as an engine that has timed nothing.
+const FAILED = {
+	pool: 'The pool health could not be read. This is not a report that the pool is unhealthy.',
+	latency: 'The latency rankings could not be read. This is not a report that nothing was timed.',
+} as const;
 
 /** Which of the three tunable forms an action answered for. */
 export type TunableForm = 'pool' | 'parallel' | 'asyncHooks';
@@ -103,7 +100,7 @@ export interface GoroutineEnginePanel extends GoroutineEngineViews {
 }
 
 export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
-	const { user } = await parent();
+	const { user, plugins } = await parent();
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
 		error(403, 'Requires admin or super_admin role');
 	}
@@ -116,10 +113,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const top = latencyTop(url.searchParams.get('top'));
 
 	const [poolHealth, latency, views] = await Promise.all([
-		client.get<PoolHealth>('/api/admin/pool/health').catch(() => FALLBACK_POOL_HEALTH),
-		client
-			.get<LatencyResponse>(`/api/admin/debug/latency?top=${top}`)
-			.catch(() => FALLBACK_LATENCY),
+		section(client.get<PoolHealth>('/api/admin/pool/health'), FAILED.pool),
+		section(client.get<LatencyResponse>(`/api/admin/debug/latency?top=${top}`), FAILED.latency),
 		readGoroutineEngine(client),
 	]);
 
@@ -129,7 +124,11 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 		superAdmin: user.roles.includes('super_admin'),
 	};
 
-	return { poolHealth, latency, top, goroutines: goroutineCount(views.snapshot), goroutineEngine };
+	// The tail is the logging plugin's stream. Without the plugin the stream is
+	// refused on every attempt, so the page says so rather than opening it.
+	const logTail = !notRunning(plugins, PLUGIN.logging);
+
+	return { poolHealth, latency, top, goroutines: goroutineCount(views.snapshot), goroutineEngine, logTail };
 };
 
 /**

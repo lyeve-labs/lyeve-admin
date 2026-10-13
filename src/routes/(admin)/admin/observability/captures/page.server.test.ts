@@ -90,6 +90,15 @@ describe('captures load', () => {
 	});
 });
 
+describe('the captures pager', () => {
+	it('sends an offset past the end back to the last page', async () => {
+		api.listCaptures.mockResolvedValue({ data: [], total_count: 60, licensed: true });
+		const event = loadEvent() as unknown as { url: URL };
+		event.url = new URL('http://admin/admin/observability/captures?limit=50&offset=500');
+		await expect(load(event as never)).rejects.toMatchObject({ status: 307, location: expect.stringContaining('offset=50') });
+	});
+});
+
 describe('capture rule actions', () => {
 	it('sends the sample as a fraction and the retention in seconds', async () => {
 		api.createCaptureRule.mockResolvedValue({});
@@ -181,5 +190,28 @@ describe('replay sets', () => {
 		api.replaySet.mockResolvedValue({ set_id: 's1', results: [] });
 		await actions.replaySet(formEvent({ id: 's1', confirm_mutating: 'true' }));
 		expect(api.replaySet).toHaveBeenCalledWith(expect.anything(), 's1', true);
+	});
+});
+
+describe('which surface a failure belongs to', () => {
+	const fields = { route_pattern: '/api/v1/orders', method: '*', sample_percent: '100', retention_seconds: '3600', enabled: 'true' };
+
+	it('tags a failed rule save for the rule drawer', async () => {
+		api.createCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.createRule(formEvent(fields))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('rule');
+	});
+
+	it('tags a failed set save for the set drawer', async () => {
+		const out = (await actions.createSet(formEvent({ name: '' }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('set');
+	});
+
+	it('leaves a failed switch-off from the row for the page', async () => {
+		api.updateCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.updateRule(formEvent({ ...fields, id: 'r1', enabled: 'false', from: 'row' }))) as {
+			data: Record<string, unknown>;
+		};
+		expect(out.data.drawer).toBeNull();
 	});
 });

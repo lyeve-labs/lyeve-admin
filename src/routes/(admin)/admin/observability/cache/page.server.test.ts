@@ -88,6 +88,20 @@ beforeEach(() => {
 });
 
 describe('cache load', () => {
+	it('keeps a failed read of the stored entries as a gate rather than an empty cache', async () => {
+		api.listEntries.mockRejectedValue(new ApiError(503, 'down', {}));
+		const result = (await load(loadEvent(['super_admin']))) as Loaded;
+		expect(result.entriesGate).toEqual({ state: 'unavailable' });
+		expect(result.entries).toEqual([]);
+	});
+
+	it('sends an offset past the stored entries back to the first page', async () => {
+		api.listEntries.mockResolvedValue({ data: [], total_count: 0 });
+		const event = loadEvent(['super_admin']) as unknown as { url: URL };
+		event.url = new URL('http://admin/admin/observability/cache?offset=100');
+		await expect(load(event as never)).rejects.toMatchObject({ status: 307 });
+	});
+
 	// The counters and stored keys describe every tenant, so a tenant admin's
 	// page never asks for them, and their absence is not an error.
 	it('reads the rules and providers for a tenant admin and never the instance counters', async () => {
@@ -175,5 +189,20 @@ describe('cache rule actions', () => {
 	it('keeps the instance flush to a super admin', async () => {
 		await expect(actions.flush(formEvent({}))).rejects.toThrow('403');
 		expect(api.flushAll).not.toHaveBeenCalled();
+	});
+});
+
+describe('which surface a failure belongs to', () => {
+	it('tags a failed rule save for the rule drawer', async () => {
+		api.createRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.createRule(formEvent({ pattern: '/api/v1/content/x', ttl_seconds: '60' }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('rule');
+	});
+
+	it('leaves a failed delete untagged, for the page', async () => {
+		authz.roles = ['admin'];
+		api.deleteRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.deleteRule(formEvent({ id: rule.id }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBeUndefined();
 	});
 });

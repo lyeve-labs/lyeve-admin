@@ -28,12 +28,15 @@ const MEMORY = {
 	leak_reason: 'heap grew for 10 snapshots',
 };
 
+const ok = <T,>(value: T) => ({ ok: true as const, value });
+const down = { ok: false as const, gate: { state: 'unavailable' } };
+
 function page(over: Record<string, unknown> = {}) {
 	return {
-		endpoints: [STATS],
-		slowest: [STATS],
-		plugins: [{ plugin: 'core', count: 4, avg_duration_ns: 1_000_000, max_duration_ns: 2_000_000, total_alloc_bytes: 4096 }],
-		memory: MEMORY,
+		endpoints: ok([STATS]),
+		slowest: ok([STATS]),
+		plugins: ok([{ plugin: 'core', count: 4, avg_duration_ns: 1_000_000, max_duration_ns: 2_000_000, total_alloc_bytes: 4096 }]),
+		memory: ok(MEMORY),
 		selected: null,
 		detail: null,
 		...over,
@@ -71,23 +74,32 @@ describe('the profiler page', () => {
 			limit: 100,
 			offset: 0,
 		};
-		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/api/v1/content', detail })));
+		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/api/v1/content', detail: ok(detail) })));
 		const section = getByTestId('profiler-detail');
 		expect(section.textContent).toContain('4 entries in the ring');
 		expect(section.textContent).toContain('Recent GET requests');
 		expect(section.textContent).toContain('503');
 	});
 
-	it('says the ring holds nothing for a selection the engine did not answer', () => {
-		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/nothing', detail: null })));
+	it('says the ring holds nothing for a selection it has no sample of', () => {
+		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/nothing', detail: ok(null) })));
 		expect(getByTestId('profiler-detail').textContent).toContain('No data for this endpoint');
 	});
 
+	// A failed read of the selection said the endpoint had no samples.
+	it('says the selection could not be read rather than that it has no data', () => {
+		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/api/v1/content', detail: down })));
+		const text = getByTestId('profiler-detail').textContent ?? '';
+		expect(text).toContain('did not answer');
+		expect(text).not.toContain('No data for this endpoint');
+	});
+
 	it('says which view the engine did not answer instead of rendering zeros', () => {
-		const { container } = render(ProfilerPage, props(page({ memory: null, slowest: null, plugins: null })));
-		expect(container.textContent).toContain('Memory trend unavailable');
-		expect(container.textContent).toContain('Profiler unavailable');
-		expect(container.textContent).toContain('Plugin breakdown unavailable');
+		const { container, getByTestId } = render(ProfilerPage, props(page({ memory: down, slowest: down, plugins: down, endpoints: down })));
+		expect(getByTestId('profiler-memory').textContent).toContain('did not answer');
+		expect(getByTestId('profiler-slowest').textContent).toContain('did not answer');
+		expect(getByTestId('profiler-plugins').textContent).toContain('did not answer');
+		expect(container.textContent).not.toContain('0 endpoints sampled');
 	});
 
 	// The exports post to the admin's own proxy, which forwards the session

@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -12,6 +12,7 @@ import {
 	getProbeChannels,
 	listOpenAlerts,
 	listProbes,
+	probeHealth,
 	probeType,
 	putProbeChannels,
 	readProbeLimits,
@@ -27,7 +28,7 @@ import {
 	type SyntheticGate,
 } from '$lib/api/synthetic';
 import { channelsFrom, hasChannels } from '$lib/api/alert-channels';
-import { gateOf, type Gate } from '$lib/api/gate';
+import { gateOf, section, type Gate, type Section } from '$lib/api/gate';
 
 /** What the notice channels drawer posts its fields under. */
 const CHANNEL_PREFIX = 'channel_';
@@ -37,7 +38,15 @@ const CHANNEL_PREFIX = 'channel_';
  * A refused or failed read is said in the drawer rather than as no channels.
  */
 type ChannelsFor = { probe: Probe; read: ProbeChannels | null; gate: Gate } | null;
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+
+const NO_ALERTS: Section<ProbeAlert[]> = { ok: true, value: [] };
+
+/** The probes failing and paused across every probe, when every probe was read. */
+interface ProbeCounts {
+	failing: number;
+	paused: number;
+}
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -95,7 +104,7 @@ export const load: PageServerLoad = async (event) => {
 	if (notRunning(plugins, PLUGIN.syntheticMonitoring)) {
 		return {
 			probes: [] as Probe[],
-			alerts: [] as ProbeAlert[],
+			alerts: NO_ALERTS,
 			total: null as number | null,
 			limit,
 			offset,
@@ -103,38 +112,61 @@ export const load: PageServerLoad = async (event) => {
 			gate: { state: 'absent' } as SyntheticGate,
 			channelsFor: null as ChannelsFor,
 			limits: null as ProbeLimits | null,
+			counts: null as ProbeCounts | null,
 		};
 	}
 
 	const client = authedClient(event);
 	let probes: Probe[] = [];
+	let every: Probe[] = [];
+	let counts: ProbeCounts | null = null;
 	let total: number | null = null;
 	let hasMore = false;
 	let gate: SyntheticGate = SYNTHETIC_OK;
 	try {
-		const page = pageOf(await listProbes(client, limit + 1, offset), limit, offset);
-		probes = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
+		const read = await listProbes(client, limit + 1, offset);
+		if (Array.isArray(read)) {
+			// The plugin answers every probe as a bare array and ignores the
+			// window it was asked for, so the page is cut here, and every count
+			// covers every probe rather than the rows on this page.
+			every = read;
+			total = read.length;
+			probes = read.slice(offset, offset + limit);
+			hasMore = offset + probes.length < total;
+			counts = {
+				failing: read.filter((p) => probeHealth(p) === 'failing').length,
+				paused: read.filter((p) => probeHealth(p) === 'paused').length,
+			};
+		} else {
+			const page = pageOf(read, limit, offset);
+			every = page.rows;
+			probes = page.rows;
+			total = page.total;
+			hasMore = page.hasMore;
+		}
+		const back = pastEndOffset(probes.length, limit, offset, total);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
+		if (isRedirect(err)) throw err;
 		gate = syntheticGate(err);
 	}
 
 	// Alerts are a band above the list. Losing them must not lose the probes,
-	// but an unread alert list is never rendered as "nothing is wrong": the
-	// page shows the band only when the read succeeded.
+	// and an unread alert list is never rendered as "nothing is wrong": the
+	// band says the read failed.
 	const alerts =
 		gate.state === 'ok'
-			? await listOpenAlerts(client)
-					.then((p) => p.data ?? [])
-					.catch((): ProbeAlert[] => [])
-			: [];
+			? await section(
+					listOpenAlerts(client).then((p) => p.data ?? []),
+					'The open alerts could not be read. This is not a report that no probe is alerting.'
+				)
+			: NO_ALERTS;
 
 	// `?channels=<id>` opens the notice channels drawer on that probe. The
 	// channels are a read of their own, so they are asked for only then.
 	let channelsFor: ChannelsFor = null;
 	const channelsId = event.url.searchParams.get('channels');
-	const probe = channelsId ? probes.find((p) => p.id === channelsId) : undefined;
+	const probe = channelsId ? every.find((p) => p.id === channelsId) : undefined;
 	if (gate.state === 'ok' && probe) {
 		try {
 			channelsFor = { probe, read: await getProbeChannels(client, probe.id), gate: { state: 'ok' } };
@@ -147,7 +179,7 @@ export const load: PageServerLoad = async (event) => {
 	// floor that may not be this install's.
 	const limits = gate.state === 'ok' ? await readProbeLimits(client).catch(() => null) : null;
 
-	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor, limits };
+	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor, limits, counts };
 };
 
 async function save(event: Parameters<Actions[string]>[0], id: string | null) {
@@ -157,19 +189,19 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 
 	const name = String(form.get('name') ?? '').trim();
 	const type = probeType(String(form.get('type') ?? ''));
-	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.' });
-	if (!type) return fail(400, { error: 'Choose a probe type.' });
+	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' });
+	if (!type) return fail(400, { error: 'Choose a probe type.', drawer: 'probe' });
 
 	const config = configFor(type, form);
 	const required = REQUIRED_TARGET[type];
 	if (required && !config[required.field]) {
-		return fail(400, { error: required.says });
+		return fail(400, { error: required.says, drawer: 'probe' });
 	}
 
 	const interval = positive(form.get('interval_seconds'), 300);
 	const timeout = positive(form.get('timeout_seconds'), 10);
 	if (timeout < MIN_TIMEOUT_SECONDS || timeout >= interval) {
-		return fail(400, { error: 'The timeout has to be shorter than the interval.' });
+		return fail(400, { error: 'The timeout has to be shorter than the interval.', drawer: 'probe' });
 	}
 
 	const body = {
@@ -186,7 +218,8 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateProbe(client, id, body);
 		else await createProbe(client, body);
 	} catch (err) {
-		return actionFailure(err, 'The probe could not be saved.');
+		const failed = actionFailure(err, 'The probe could not be saved.');
+		return fail(failed.status, { ...failed.data, drawer: 'probe' });
 	}
 	return { saved: name };
 }
@@ -197,7 +230,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No probe was named.' });
+		if (!id) return fail(400, { error: 'No probe was named.', drawer: 'probe' });
 		return save(event, id);
 	},
 

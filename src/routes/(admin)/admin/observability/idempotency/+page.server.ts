@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -14,7 +14,7 @@ import {
 	type IdempotencyKey,
 	type IdempotencyStats,
 } from '$lib/api/idempotency';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -35,7 +35,10 @@ export const load: PageServerLoad = async (event) => {
 			keys = page.rows;
 			total = page.total;
 			hasMore = page.hasMore;
+			const back = pastEndOffset(keys.length, limit, offset, total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 		} catch (err) {
+			if (isRedirect(err)) throw err;
 			gate = idempotencyGate(err);
 		}
 	}
@@ -64,9 +67,10 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
 	// Releasing a key lets the next request carrying it run the handler again,
 	// which is the repair for a key whose process died mid-write and the wrong
-	// thing to do to one that is genuinely in flight.
+	// thing to do to one that is genuinely in flight. The plugin admits any
+	// admin to the release, the same readers who can list the keys.
 	release: async (event) => {
-		await requireRole(event, ['super_admin']);
+		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const key = String(form.get('key') ?? '');
