@@ -553,7 +553,9 @@
 
 	/** What a save does to columns that already exist, and how many rows they hold. */
 	const change = $derived(selected ? changesOf(saved, selected) : changesOf(null, { name: '', display_name: '', fields: [] }));
-	const rowsAtRisk = $derived(saved ? (rowCounts[saved.name] ?? 0) : 0);
+	// Undefined while the count is on its way or when it could not be read.
+	// Either way it is unknown, and an unknown count is never shown as 0.
+	const rowsAtRisk = $derived<number | undefined>(saved ? rowCounts[saved.name] : undefined);
 
 	/**
 	 * Why a row's localized mark was just cleared, by row id. It stays beside
@@ -736,12 +738,14 @@
 	async function deleteSchema() {
 		if (!saved?.name) return;
 		const name = saved.name;
-		const rows = rowCounts[name] ?? 0;
+		const rows = rowCounts[name];
 		const ok = await confirm(
 			`Delete schema ${name}?`,
-			rows > 0
-				? `This deletes the definition, its table and all ${rows} ${rows === 1 ? 'row' : 'rows'} in it. It cannot be undone.`
-				: 'This deletes the definition and its table. It cannot be undone.',
+			rows === undefined
+				? 'This deletes the definition, its table and every row in it. How many rows it holds could not be read. It cannot be undone.'
+				: rows > 0
+					? `This deletes the definition, its table and all ${rows} ${rows === 1 ? 'row' : 'rows'} in it. It cannot be undone.`
+					: 'This deletes the definition and its table. It cannot be undone.',
 			{ confirmLabel: 'Delete' },
 		);
 		if (ok) deleteForm?.requestSubmit();
@@ -855,10 +859,11 @@
 
 	async function applyQueued() {
 		if (!saved || !ddlHistory?.pending) return;
-		const rows = rowCounts[saved.name] ?? 0;
+		const rows = rowCounts[saved.name];
+		const held = rows === undefined ? 'How many rows the table holds could not be read. It may hold data' : `The table holds ${rows} ${rows === 1 ? 'row' : 'rows'}`;
 		const ok = await confirm(
 			`Apply ${ddlHistory.pending} queued ${ddlHistory.pending === 1 ? 'change' : 'changes'} to ${saved.name}?`,
-			`A queued change is one a save recorded instead of running: a column or table drop, or clearing one tenant's values in a column other tenants keep. The table holds ${rows} ${rows === 1 ? 'row' : 'rows'}, and every tenant that defines ${saved.name} shares it, so the data in a dropped column is gone for all of them. A change whose column a definition uses again is canceled rather than run.`,
+			`A queued change is one a save recorded instead of running: a column or table drop, or clearing one tenant's values in a column other tenants keep. ${held}, and every tenant that defines ${saved.name} shares it, so the data in a dropped column is gone for all of them. A change whose column a definition uses again is canceled rather than run.`,
 			{ confirmLabel: 'Apply' },
 		);
 		if (ok) applyForm?.requestSubmit();
@@ -2252,7 +2257,11 @@
 		<div class="flex flex-col gap-4" data-testid="save-risk">
 			<Alert tone={change.drops.length + change.systemDrops.length > 0 ? 'danger' : 'warn'}>
 				{#snippet children()}
-					{saved?.name ?? 'This table'} holds {rowsAtRisk} {rowsAtRisk === 1 ? 'row' : 'rows'}.
+					{#if rowsAtRisk === undefined}
+						How many rows {saved?.name ?? 'this table'} holds could not be read. Treat it as holding data.
+					{:else}
+						{saved?.name ?? 'This table'} holds {rowsAtRisk} {rowsAtRisk === 1 ? 'row' : 'rows'}.
+					{/if}
 					<ul class="mt-1 space-y-0.5">
 						{#each change.renames as r (r.from)}
 							<li>Renames <span class="font-mono">{r.from}</span> to <span class="font-mono">{r.to}</span>. The data moves with it.</li>
