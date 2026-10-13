@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Card, Breadcrumb, Button, Label, PageShell, Select } from '@lyeve-labs/ui-kit';
+	import { Alert, Card, Breadcrumb, Button, PageShell, Select } from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { enhance } from '$app/forms';
@@ -21,8 +21,9 @@
 	let validationErrors = $state<Record<string, string>>({});
 	let submitting = $state(false);
 
-	// Locale. Default to first locale's code or 'en'
-	let locales = $derived(data.locales ?? []);
+	// Locale. Default to first locale's code or 'en'. A schema that is not
+	// localized, or an instance without the localization plugin, has none.
+	let locales = $derived(data.locales?.ok ? data.locales.value : []);
 	// svelte-ignore state_referenced_locally
 	let selectedLocale = $state((locales.find((l) => l.is_default) ?? locales[0])?.code ?? 'en');
 
@@ -67,9 +68,12 @@
 
 	{#snippet actions()}
 		{#if locales.length > 0}
-			<div class="flex items-center gap-2">
-				<Globe size={ICON.sm} class="text-muted" />
+			<div class="flex items-end gap-2">
+				<Globe size={ICON.sm} class="mb-2.5 text-muted" aria-hidden="true" />
 				<Select
+					id="entry-locale"
+					label="Locale"
+					searchable
 					options={locales.map((l) => ({ value: l.code, label: `${l.name} (${l.code})` }))}
 					value={selectedLocale}
 					onvaluechange={(v) => (selectedLocale = v)}
@@ -77,6 +81,12 @@
 			</div>
 		{/if}
 	{/snippet}
+
+	{#if data.locales && !data.locales.ok}
+		<Alert tone="warn">
+			The locales could not be read, so no locale can be picked. The entry is saved without one. Reload the page to try again.
+		</Alert>
+	{/if}
 
 	<form
 		method="POST"

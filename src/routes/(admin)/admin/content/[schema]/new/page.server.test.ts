@@ -133,17 +133,58 @@ describe('creating a content entry', () => {
 });
 
 describe('opening the new entry form', () => {
+	const localizedSchema = { name: 'surveys', display_name: 'Surveys', with_localization: true, fields: [] };
+
+	function open(running: string[]) {
+		const fetch = vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200 }));
+		return load({
+			fetch,
+			cookies: cookies(),
+			params: { schema: 'surveys' },
+			url: new URL('http://localhost/admin/content/surveys/new'),
+			parent: async () => ({ plugins: { state: 'named', running, withheld: [] } }),
+		} as never) as Promise<{ locales: { ok: boolean; value?: unknown } | null }>;
+	}
+
+	beforeEach(() => reads.get.mockReset());
+
+	it('opens a localized schema without the localization plugin, and offers no locale', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+
+		const data = await open([]);
+
+		expect(data.locales).toBeNull();
+		expect(reads.get).not.toHaveBeenCalled();
+	});
+
+	it('keeps the form when the locales cannot be read, and says so', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+		reads.get.mockRejectedValueOnce(new FakeApiError('down', 503));
+
+		const data = await open(['localization']);
+
+		expect(data.locales?.ok).toBe(false);
+	});
+
+	it('offers the enabled locales while the plugin runs', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+		reads.get.mockResolvedValueOnce({ default_locale: 'en', enabled_locales: ['en', 'fr'] });
+
+		const data = await open(['localization']);
+
+		expect(data.locales).toEqual({
+			ok: true,
+			value: [
+				{ code: 'en', name: 'en', is_default: true },
+				{ code: 'fr', name: 'fr', is_default: false },
+			],
+		});
+	});
+
 	it('reports an outage as an outage, not as a schema that is not there', async () => {
 		rest.getSchema.mockRejectedValueOnce(new FakeApiError('down', 503) as never);
 
-		const thrown = await Promise.resolve(
-			load({
-				fetch: vi.fn(),
-				cookies: cookies(),
-				params: { schema: 'surveys' },
-				url: new URL('http://localhost/admin/content/surveys/new'),
-			} as never),
-		).catch((err: unknown) => err);
+		const thrown = await open([]).catch((err: unknown) => err);
 
 		expect(isHttpError(thrown) && thrown.status).toBe(503);
 	});

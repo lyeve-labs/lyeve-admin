@@ -8,12 +8,22 @@ import { readError } from '$lib/server/read-error';
 import { setRelations } from '$lib/server/content-relations';
 import { entryIdentity } from '$lib/utils/new-entry';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
+import { getLocales } from '$lib/api/localization';
+import { section, type Section } from '$lib/api/gate';
+import { PLUGIN } from '$lib/plugin-names';
+import { runs } from '$lib/plugins';
 import { readRelationChoices } from '$lib/components/content/relation-choices';
 import { sessionToken } from '$lib/server/session-cookie';
 
-export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
+/** One locale the new entry can be written in. */
+type LocaleChoice = { code: string; name: string; is_default: boolean };
+
+const LOCALES_FAILED = 'The locales could not be read, so no locale can be picked for this entry.';
+
+export const load: PageServerLoad = async ({ fetch, cookies, params, url, parent }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const { plugins } = await parent();
 
 	let schemaDef: Schema;
 	try {
@@ -22,18 +32,22 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 		readError(err, `Schema "${params.schema}" not found`);
 	}
 
-	// Load available locales if schema supports localization
-	let locales: { code: string; name: string; is_default: boolean }[] = [];
-	if (schemaDef.with_localization) {
-		const prefs = await client.get<{ default_locale: string; enabled_locales: string[] }>(
-			'/api/admin/localization/locales'
-		);
-		locales = prefs.enabled_locales.map((code) => ({
-			code,
-			name: code,
-			is_default: code === prefs.default_locale,
-		}));
-	}
+	// The locale routes belong to the localization plugin. Without it there is
+	// no locale to pick, and a read of them would only be refused. A read that
+	// fails while the plugin runs is said so beside the form.
+	const locales: Section<LocaleChoice[]> | null =
+		schemaDef.with_localization && runs(plugins, PLUGIN.localization)
+			? await section(
+					getLocales(client).then((prefs) =>
+						prefs.enabled_locales.map((code) => ({
+							code,
+							name: code,
+							is_default: code === prefs.default_locale,
+						})),
+					),
+					LOCALES_FAILED,
+				)
+			: null;
 
 	// The pickers read the admin store, the one this form writes to. The
 	// public content routes read a different store, so an entry made here
