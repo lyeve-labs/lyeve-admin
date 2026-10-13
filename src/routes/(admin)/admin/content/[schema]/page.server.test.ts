@@ -173,6 +173,14 @@ describe('content listing reads its collection', () => {
 		expect(result.items.ok).toBe(true);
 	});
 
+	it('asks the listing for the status the URL names, and ignores one it does not know', async () => {
+		const { fetch, result } = await runLoad('?status=draft', { data: [], total_count: 0 });
+		expect(new URL(String((fetch.mock.calls[0] as unknown[])[0]), 'http://localhost').searchParams.get('status')).toBe('draft');
+		expect((result as unknown as { status: string | null }).status).toBe('draft');
+
+		const other = await runLoad('?status=famous', { data: [], total_count: 0 });
+		expect(new URL(String((other.fetch.mock.calls[0] as unknown[])[0]), 'http://localhost').searchParams.has('status')).toBe(false);
+	});
 });
 
 // reqparse.MaxPageLimit is 500 and ParsePagination clamps an over-limit request

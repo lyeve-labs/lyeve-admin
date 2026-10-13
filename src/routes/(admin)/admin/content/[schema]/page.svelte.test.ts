@@ -41,6 +41,7 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 			with_updated_at: false,
 		},
 		activeSchema: 'posts',
+		status: null,
 		limit: 100,
 		offset: 0,
 		total: 4000,
@@ -89,18 +90,19 @@ describe('content listing states the collection total', () => {
 		expect(screen.queryByText(/\d+\s+entries/)).toBeNull();
 	});
 
-	it('offers a page button per page of the collection, not just prev and next', () => {
+	it('offers a page link per page of the collection, not just prev and next', () => {
 		render(ContentListPage, { props: { data: data(), form: null } });
 
-		expect(screen.getByRole('button', { name: '40' })).toBeTruthy();
-		expect(screen.getByRole('button', { name: 'Next page' })).toBeTruthy();
+		expect(screen.getByRole('link', { name: '40' })).toBeTruthy();
+		expect(screen.getByRole('link', { name: 'Next page' })).toBeTruthy();
 	});
 
-	it('disables the previous button on the first page', () => {
-		render(ContentListPage, { props: { data: data(), form: null } });
+	it('disables the previous link on the first page', () => {
+		const { container } = render(ContentListPage, { props: { data: data(), form: null } });
 
-		const prev = screen.getByRole('button', { name: 'Previous page' }) as HTMLButtonElement;
-		expect(prev.disabled).toBe(true);
+		const prev = container.querySelector('[aria-label="Previous page"]');
+		expect(prev?.getAttribute('aria-disabled')).toBe('true');
+		expect(prev?.hasAttribute('href')).toBe(false);
 	});
 });
 
@@ -115,7 +117,7 @@ describe('content listing derives the page from the offset', () => {
 			props: { data: data({ offset: 150, items: items(100, 150) }), form: null },
 		});
 
-		const current = screen.getByRole('button', { current: 'page' });
+		const current = screen.getByRole('link', { current: 'page' });
 		expect(current.textContent?.trim()).toBe('2');
 	});
 
@@ -124,19 +126,16 @@ describe('content listing derives the page from the offset', () => {
 			props: { data: data({ offset: 3900, items: items(100, 3900) }), form: null },
 		});
 
-		const current = screen.getByRole('button', { current: 'page' });
+		const current = screen.getByRole('link', { current: 'page' });
 		expect(current.textContent?.trim()).toBe('40');
 	});
 
-	it('navigates by querystring so the page is linkable', async () => {
+	it('links each page by querystring, so a page turn works before the page hydrates', () => {
 		render(ContentListPage, {
 			props: { data: data({ offset: 150, items: items(100, 150) }), form: null },
 		});
 
-		await fireEvent.click(screen.getByRole('button', { name: '3' }));
-
-		expect(nav.goto).toHaveBeenCalledOnce();
-		const target = new URL(nav.goto.mock.calls[0][0], 'http://localhost');
+		const target = new URL(screen.getByRole('link', { name: '3' }).getAttribute('href') ?? '', 'http://localhost');
 		expect(target.pathname).toBe('/admin/content/posts');
 		expect(target.searchParams.get('offset')).toBe('200');
 		expect(target.searchParams.get('limit')).toBe('100');
@@ -238,5 +237,46 @@ describe('content listing reads', () => {
 		});
 
 		expect(screen.getByText(/other collections could not be read/)).toBeTruthy();
+	});
+});
+
+describe('content listing status filter', () => {
+	const drafted = (overrides: Record<string, unknown> = {}) =>
+		data({
+			schemaDef: {
+				name: 'posts',
+				display_name: 'Posts',
+				fields: [{ name: 'title', field_type: 'string', system: false }],
+				with_draft_publish: true,
+			},
+			...overrides,
+		});
+
+	it('links each status and marks the current one', () => {
+		render(ContentListPage, { props: { data: drafted({ status: 'draft' }), form: null } });
+
+		const draft = screen.getByRole('link', { name: 'Draft' });
+		expect(draft.getAttribute('href')).toBe('/admin/content/posts?limit=100&status=draft');
+		expect(draft.getAttribute('aria-current')).toBe('page');
+		expect(screen.getByRole('link', { name: 'All' }).getAttribute('href')).toBe('/admin/content/posts?limit=100');
+	});
+
+	it('keeps the status on a page link', () => {
+		render(ContentListPage, { props: { data: drafted({ status: 'published' }), form: null } });
+
+		expect(screen.getByRole('link', { name: '2' }).getAttribute('href')).toContain('status=published');
+	});
+
+	it('names the empty subset and offers every entry back', () => {
+		render(ContentListPage, { props: { data: drafted({ status: 'archived', items: [], total: 0 }), form: null } });
+
+		expect(screen.getByText('No archived entries')).toBeTruthy();
+		expect(screen.queryByText('No entries yet')).toBeNull();
+	});
+
+	it('offers no status filter on a collection without draft and publish', () => {
+		render(ContentListPage, { props: { data: data(), form: null } });
+
+		expect(screen.queryByRole('link', { name: 'Draft' })).toBeNull();
 	});
 });

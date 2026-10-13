@@ -58,6 +58,7 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 			],
 		},
 		activeSchema: 'posts',
+		status: null,
 		limit: 100,
 		offset: 0,
 		total: 1,

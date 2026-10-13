@@ -6,11 +6,11 @@
 		Badge,
 		Button,
 		EmptyState,
+		FilterChips,
 		PageShell,
 		Pagination,
 		SearchInput,
 		SectionHeading,
-		SegmentedControl,
 		Table,
 	} from '@lyeve-labs/ui-kit';
 	import { ArrowDown, ArrowUp, CalendarClock, Database, Inbox, LayoutGrid, Plus } from '@lucide/svelte';
@@ -217,12 +217,7 @@
 				{/snippet}
 				{#snippet filters()}
 					<nav aria-label="Narrow the collections">
-						<SegmentedControl
-							label="Narrow the collections"
-							labelHidden
-							value={data.filter}
-							options={filterOptions}
-						/>
+						<FilterChips label="Narrow the collections" value={data.filter} options={filterOptions} />
 					</nav>
 				{/snippet}
 			</ListToolbar>

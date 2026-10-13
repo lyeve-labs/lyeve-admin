@@ -58,11 +58,12 @@ describe('Search page results panel', () => {
 });
 
 describe('Search page settings', () => {
-	it('offers each schema for public search and names what could not be read', () => {
-		const { getByLabelText, getByText } = render(SearchPage, {
+	it('offers each schema for public search in a searchable picker and names what could not be read', () => {
+		const { container, getByText } = render(SearchPage, {
 			props: { data: data({ publicSchemas: ok(['blog']) }) as never, form: null },
 		});
-		expect((getByLabelText('blog') as HTMLInputElement).checked).toBe(true);
+		expect(container.querySelector('input[type="hidden"][name="schemas"]')?.getAttribute('value')).toBe('blog');
+		expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
 		expect(getByText('Search analytics could not be read.')).toBeTruthy();
 	});
 

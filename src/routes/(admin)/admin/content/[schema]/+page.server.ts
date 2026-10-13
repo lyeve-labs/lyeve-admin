@@ -31,6 +31,15 @@ const DEFAULT_LIMIT = 100;
  */
 const MAX_LIMIT = 500;
 
+/** The statuses the listing route filters on. Anything else lists every entry. */
+const ENTRY_STATUSES = ['draft', 'published', 'archived'] as const;
+type EntryStatus = (typeof ENTRY_STATUSES)[number];
+
+function statusFrom(url: URL): EntryStatus | null {
+	const asked = url.searchParams.get('status');
+	return (ENTRY_STATUSES as readonly string[]).includes(asked ?? '') ? (asked as EntryStatus) : null;
+}
+
 const ENTRIES_FAILED = 'The entries could not be read. This is not a report that the collection is empty.';
 const SCHEMAS_FAILED = 'The other collections could not be read.';
 
@@ -59,7 +68,9 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
+	const status = statusFrom(url);
 	const query = new URLSearchParams({ schema: params.schema, limit: String(limit), offset: String(offset) });
+	if (status) query.set('status', status);
 
 	const [schemas, schemaDef, listed] = await Promise.all([
 		section<Schema[]>(getSchemas(client), SCHEMAS_FAILED),
@@ -67,7 +78,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 		section(readEntries(fetch, token, `/api/admin/content?${query}`), ENTRIES_FAILED),
 	]);
 
-	const base = { schemas, schemaDef, activeSchema: params.schema, limit, offset };
+	const base = { schemas, schemaDef, activeSchema: params.schema, status, limit, offset };
 	if (!listed.ok) {
 		return { ...base, items: listed as Section<ListedEntry[]>, total: 0 };
 	}

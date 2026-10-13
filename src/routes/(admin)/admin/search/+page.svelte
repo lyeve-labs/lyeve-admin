@@ -6,10 +6,10 @@
 		Button,
 		Card,
 		EmptyState,
-		CheckboxGroup,
 		CopyButton,
 		Drawer,
 		Input,
+		MultiSelect,
 		NumberInput,
 		PageShell,
 		SearchInput,
@@ -23,6 +23,7 @@
 	import { ArrowRight, Database, Plus, Search, Shuffle, Trash2 } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -110,9 +111,9 @@
 							<li>
 								<Card pad="sm">
 									<div class="flex items-start justify-between gap-3">
-										<h3 class="text-sm font-medium text-fg">
+										<SectionHeading level={3}>
 											{hit.title || hit.slug || '(untitled)'}
-										</h3>
+										</SectionHeading>
 										<span class="shrink-0 text-xs text-faint tabular-nums">
 											rank {hit.rank.toFixed(3)}
 										</span>
@@ -168,13 +169,20 @@
 						{:else if form && 'publicSaved' in form}
 							<Alert tone="success" autoDismiss>Saved.</Alert>
 						{/if}
-						<CheckboxGroup
-							name="schemas"
+						<!-- A searchable picker rather than a box per schema, which grows
+						     into a wall past a dozen. The picks travel as one field each. -->
+						<MultiSelect
+							id="public-schemas"
 							label="Anyone may search"
-							hint="Published entries of a ticked schema answer on your site's own host with no credential: title, slug, tags and a snippet, never the stored body."
+							hint="Published entries of a picked schema answer on your site's own host with no credential: title, slug, tags and a snippet, never the stored body."
+							placeholder="Pick schemas"
+							searchable
 							options={data.schemas.value.map((n) => ({ value: n, label: n }))}
 							bind:value={publicChoice}
 						/>
+						{#each publicChoice as name (name)}
+							<input type="hidden" name="schemas" value={name} />
+						{/each}
 						{#if publicChoice.length > 0}
 							<div class="flex items-start gap-1">
 								<code class="min-w-0 flex-1 break-all text-xs text-muted">GET /api/v1/search/{publicChoice[0]}?q=kettle</code>
@@ -302,9 +310,7 @@
 
 <Drawer bind:open={synonymOpen} title="New synonym">
 	<form method="POST" action="?/createSynonym" id="synonym-form" class="flex flex-col gap-4" use:enhance={saveSynonym}>
-		{#if form?.synonymError && synonymOpen}
-			<Alert tone="danger">{form.synonymError}</Alert>
-		{/if}
+		<FormErrors message={synonymOpen ? (form?.synonymError ?? undefined) : undefined} fields={synonymOpen ? synFields : {}} />
 		<Input id="syn-base" name="base_term" label="Term" required hint="A search for exactly this term also matches the terms below." bind:value={baseTerm} error={synFields.base_term} />
 		<Input id="syn-terms" name="synonyms" label="Also matches" required hint="Separated by commas." bind:value={terms} error={synFields.synonyms} />
 	</form>

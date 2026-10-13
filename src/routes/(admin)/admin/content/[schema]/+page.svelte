@@ -10,6 +10,7 @@
 		PageShell,
 		Pagination,
 		SectionHeading,
+		SegmentedControl,
 		Table,
 		confirm as confirmDialog,
 		toast,
@@ -20,7 +21,9 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { listQuery } from '$lib/back';
+	import { pageHref, pageNumber } from '$lib/api/list';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { Plus, Trash2, Inbox } from '@lucide/svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import FieldCell from '$lib/components/FieldCell.svelte';
@@ -63,20 +66,41 @@
 	);
 
 	// An offset need not sit on a page boundary: it arrives in the URL and a
-	// delete can leave a hand-edited one behind. Floor it onto the page that
-	// contains it rather than assuming offset / limit divides evenly.
-	let currentPage = $derived(Math.floor(data.offset / data.limit) + 1);
+	// delete can leave a hand-edited one behind. pageNumber floors it onto the
+	// page that contains it rather than assuming offset / limit divides evenly.
+	let currentPage = $derived(pageNumber(data.offset, data.limit));
 	// A row link carries the page it was opened from, so the entry's back link
 	// can return to it. The first page at the default size stays a clean path.
 	let rowQuery = $derived(listQuery(data.offset > 0 ? { limit: data.limit, offset: data.offset } : {}));
 
-	function goToPage(page: number) {
-		const offset = Math.max(0, (page - 1) * data.limit);
-		const params = new URLSearchParams({ limit: String(data.limit), offset: String(offset) });
-		// A querystring, so the page is linkable and the back button returns to
-		// the previous one.
-		goto(`/admin/content/${data.activeSchema}?${params}`, { noScroll: true, keepFocus: true });
+	// Page links rather than a callback, so a page turn works before the page
+	// hydrates. The status filter rides along, or a page turn would drop it.
+	const pageLink = $derived(
+		pageHref(`/admin/content/${data.activeSchema}`, data.limit, data.status ? { status: data.status } : {}),
+	);
+
+	type StatusChoice = 'all' | 'draft' | 'published' | 'archived';
+	const STATUS_LABELS: Record<StatusChoice, string> = {
+		all: 'All',
+		draft: 'Draft',
+		published: 'Published',
+		archived: 'Archived',
+	};
+
+	/** A status link keeps the page size and drops the offset: page three of one subset is nobody's page three in another. */
+	function statusHref(choice: StatusChoice): string {
+		const params = new URLSearchParams({ limit: String(data.limit) });
+		if (choice !== 'all') params.set('status', choice);
+		return `/admin/content/${data.activeSchema}?${params}`;
 	}
+
+	const statusOptions = $derived(
+		(Object.keys(STATUS_LABELS) as StatusChoice[]).map((value) => ({
+			value,
+			label: STATUS_LABELS[value],
+			href: statusHref(value),
+		})),
+	);
 
 	function openCollection(name: string) {
 		if (!name || name === data.activeSchema) return;
@@ -181,12 +205,41 @@
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Entries</SectionHeading>
 
+		<!-- The listing route filters by status and by nothing else, so the
+		     toolbar offers no search: a box that narrowed only the rows on
+		     screen would read as a search of the collection. -->
+		{#if data.schemaDef.with_draft_publish && data.items.ok}
+			<ListToolbar label="Filter entries">
+				{#snippet filters()}
+					<SegmentedControl
+						label="Status"
+						labelHidden
+						size="sm"
+						value={data.status ?? 'all'}
+						options={statusOptions}
+					/>
+				{/snippet}
+			</ListToolbar>
+		{/if}
+
 		{#if !data.items.ok}
 			<GateNotice
 				gate={data.items.gate}
 				title="Entries"
 				absent="This build does not serve content entries."
 			/>
+		{:else if entries.length === 0 && data.status}
+			<EmptyState
+				title="No {STATUS_LABELS[data.status].toLowerCase()} entries"
+				description="Pick another status, or All to see every entry."
+			>
+				{#snippet iconSnippet()}
+					<Inbox size={ICON.lg} />
+				{/snippet}
+				{#snippet action()}
+					<Button href={statusHref('all')} variant="secondary">Show every entry</Button>
+				{/snippet}
+			</EmptyState>
 		{:else if entries.length === 0}
 			<EmptyState title="No entries yet" description="Add the first entry to this collection.">
 				{#snippet iconSnippet()}
@@ -296,7 +349,12 @@
 				</tbody>
 			</Table>
 
-			<Pagination page={currentPage} total={data.total} perPage={data.limit} onchange={goToPage} />
+			<Pagination
+				page={currentPage}
+				total={data.total}
+				perPage={data.limit}
+				href={pageLink}
+			/>
 		{/if}
 	</section>
 </PageShell>

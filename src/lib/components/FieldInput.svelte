@@ -174,6 +174,7 @@
 				options={relationOptions}
 				placeholder="Select {field.relation_to ?? 'entries'}"
 				hint={relationCutNote}
+				searchable
 				required={field.required}
 				onchange={(ids: string[]) => { value = ids; }}
 			/>

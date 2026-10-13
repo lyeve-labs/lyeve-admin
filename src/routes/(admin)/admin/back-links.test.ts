@@ -93,7 +93,7 @@ const cases: Case[] = [
 	{
 		route: 'content/[schema]',
 		component: ContentCollection,
-		data: { schemas: { ok: true, value: [] }, schemaDef: posts, items: { ok: true, value: [] }, activeSchema: 'posts', limit: 100, offset: 0, total: 0 },
+		data: { schemas: { ok: true, value: [] }, schemaDef: posts, items: { ok: true, value: [] }, activeSchema: 'posts', status: null, limit: 100, offset: 0, total: 0 },
 		href: '/admin/content',
 		label: 'Content',
 	},

@@ -9,6 +9,7 @@
 		Card,
 		Drawer,
 		EmptyState,
+		FilterChips,
 		Input,
 		NumberInput,
 		PageShell,
@@ -20,6 +21,7 @@
 		Toggle,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ArrowDown, ArrowUp, ClipboardCheck, Plus, Trash2, X } from '@lucide/svelte';
@@ -57,8 +59,8 @@
 		published: 'success',
 	};
 
-	// Link segments: the filter is the engine's, so the page reloads with it
-	// in the URL and the choice survives a refresh and a share.
+	// Link chips: the filter is the engine's, so the page reloads with it in
+	// the URL and the choice survives a refresh and a share.
 	const statusOptions = [
 		{ value: '', label: 'All', href: '/admin/reviews' },
 		...REVIEW_STATUSES.filter((s) => s !== 'draft').map((s) => ({
@@ -246,7 +248,9 @@
 		);
 		if (!ok) return;
 		deleteId = id;
-		await Promise.resolve();
+		// The hidden form reads the id from the DOM, so it waits for Svelte to
+		// write it there.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 </script>
@@ -374,7 +378,7 @@
 			<SectionHeading level={2}>Assignments</SectionHeading>
 			<ListToolbar label="Filter assignments">
 				{#snippet filters()}
-					<SegmentedControl label="Status" labelHidden value={data.status} options={statusOptions} />
+					<FilterChips label="Status" value={data.status} options={statusOptions} />
 				{/snippet}
 			</ListToolbar>
 			{#if !data.assignments.ok && data.assignments.gate.state === 'forbidden'}
@@ -503,6 +507,7 @@
 				label="Content schema"
 				hint="The schema whose entries this definition reviews. Approval publishes the row there."
 				options={schemaOptions}
+				searchable
 				bind:value={contentSchema}
 			/>
 		{:else}
@@ -619,7 +624,7 @@
 										hint="The user becomes the assignee when the SLA passes."
 										placeholder="Pick a user"
 										options={escalateOptions(stage.escalate_to)}
-										searchable={peopleOptions.length > 10}
+										searchable
 										disabled={stagesLocked}
 										bind:value={stage.escalate_to}
 									/>

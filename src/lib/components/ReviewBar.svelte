@@ -185,6 +185,7 @@
 							label="Definition"
 							placeholder="Pick a definition"
 							options={definitionOptions}
+							searchable
 							bind:value={definitionId}
 							required
 						/>

@@ -47,10 +47,7 @@ describe('content index chips', () => {
 			'/admin/content?limit=50&sort=rows&dir=desc&filter=soft-delete',
 		]);
 		expect(chips[0].getAttribute('aria-current')).toBe('page');
-		// The kit's segment carries an aria-hidden twin of its label that holds
-		// the width of the bold state, so the visible text is read past it.
-		const visible = (a: Element) => a.querySelector('span[class*="font-"]:not([aria-hidden])')?.textContent?.trim();
-		expect(chips.map(visible)).toEqual(['All', 'With rows', 'Empty', 'Draft and publish', 'Localized', 'Soft delete']);
+		expect(chips.map((a) => a.textContent?.trim())).toEqual(['All', 'With rows', 'Empty', 'Draft and publish', 'Localized', 'Soft delete']);
 	});
 
 	it('carries the filter through a sort link, a page link and the search form', () => {
