@@ -2026,13 +2026,11 @@
 			{#if canSavePresets}
 				<Collapsible label="Save a preset from a URL or a file">
 					<form method="POST" action="?/savePreset" enctype="multipart/form-data" use:enhance={presetSave} class="flex flex-col gap-4 pt-2">
+						<FormErrors message={presetSaveError || undefined} />
 						<p class="text-sm text-muted">A preset document is JSON or YAML with an id, a name, a description and its schemas, each the body a new schema takes. Saved, it is listed here beside the built-in ones. Saving the same id again replaces it, so reading the URL again refreshes it.</p>
 						<Input id="preset-url" name="url" type="url" label="URL" placeholder="https://example.com/presets/blog.json" hint="Read over http or https. Private and loopback addresses are refused." />
 						<FileInput id="preset-file" name="file" label="Or a file" accept=".json,.yaml,.yml,application/json,application/yaml" />
 						<Textarea id="preset-document" name="document" label="Or paste the document" rows={6} class="[&_textarea]:text-xs" mono />
-						{#if presetSaveError}
-							<Alert tone="danger">{presetSaveError}</Alert>
-						{/if}
 						<div class="flex justify-end">
 							<Button variant="primary" type="submit" loading={presetSaving}>Save</Button>
 						</div>
@@ -2122,6 +2120,7 @@
 		bind:this={importForm}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors message={importError || undefined} />
 		<input type="hidden" name="apply" value={importApply ? 'true' : 'false'} />
 		<Select
 			id="import-source"
@@ -2155,9 +2154,6 @@
 			placeholder={'schemas:\n  - name: articles\n    fields: []'}
 			mono
 		/>
-		{#if importError}
-			<Alert tone="danger">{importError}</Alert>
-		{/if}
 		{#if importPlan}
 			<div class="flex flex-col gap-3" data-testid="import-plan">
 				<SectionHeading level={3}>What importing does</SectionHeading>

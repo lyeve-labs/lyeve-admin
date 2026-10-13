@@ -98,7 +98,7 @@ export const actions: Actions = {
 			});
 			return { updated: item };
 		} catch (err) {
-			return fail(400, { detailsError: actionError(err, 'The details could not be saved.') });
+			return fail(400, { detailsError: actionError(err, 'The details could not be saved.'), detailsId: id });
 		}
 	},
 
@@ -130,7 +130,7 @@ export const actions: Actions = {
 			const item = await setMediaPublic(authedClient(event), id, data.get('public') === 'true');
 			return { updated: item };
 		} catch (err) {
-			return fail(400, { detailsError: actionError(err, 'The file could not be published.') });
+			return fail(400, { detailsError: actionError(err, 'The file could not be published.'), detailsId: id });
 		}
 	},
 
@@ -143,13 +143,13 @@ export const actions: Actions = {
 		const x = Number(data.get('x'));
 		const y = Number(data.get('y'));
 		if (!clear && (!Number.isFinite(x) || !Number.isFinite(y))) {
-			return fail(400, { focalError: 'Click the image to place the point.' });
+			return fail(400, { focalError: 'Click the image to place the point.', focalId: id });
 		}
 		try {
 			const item = await setFocalPoint(authedClient(event), id, clear ? null : { x, y });
 			return { updated: item, focalSaved: id };
 		} catch (err) {
-			return fail(400, { focalError: actionError(err, 'The focal point could not be saved.') });
+			return fail(400, { focalError: actionError(err, 'The focal point could not be saved.'), focalId: id });
 		}
 	},
 
@@ -175,7 +175,7 @@ export const actions: Actions = {
 		try {
 			return { described: { id, text: await describeMedia(authedClient(event), id) } };
 		} catch (err) {
-			return fail(400, { detailsError: actionError(err, 'No description came back.') });
+			return fail(400, { detailsError: actionError(err, 'No description came back.'), detailsId: id });
 		}
 	},
 };

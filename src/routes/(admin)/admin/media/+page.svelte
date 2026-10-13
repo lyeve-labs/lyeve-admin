@@ -37,8 +37,9 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	// A refused transform belongs to the file it was asked for, and only that
-	// file's drawer shows it.
+	// The drawer's forms share one `form` result with the page's. Each failure
+	// names the file it was asked for, and only that file's drawer shows it.
+	// A refused transform carries a refusal as well as its sentence.
 	const transformFailure = $derived.by(() => {
 		const f = form as Record<string, unknown> | null;
 		if (!f || !('transformError' in f) || f.transformId !== selected?.id) return null;
@@ -275,9 +276,7 @@
 			};
 		}}
 	>
-		{#if importError}
-			<Alert tone="danger">{importError}</Alert>
-		{/if}
+		<FormErrors message={importError || undefined} />
 		<Input id="import-url" name="url" label="Address" type="url" mono required placeholder="https://example.com/logo.png" bind:value={importUrl} />
 		<Input id="import-alt" name="alt_text" label="Alt text" hint="What the image shows, for readers who cannot see it." />
 		<Checkbox name="public" value="true" label="Publish it, so a site or a content field can use its address" bind:checked={importPublic} />
@@ -293,8 +292,8 @@
 	{deleting}
 	aiEnabled={data.aiEnabled}
 	suggestion={form && 'described' in form && form.described && form.described.id === selected?.id ? form.described.text : ''}
-	detailsError={form && 'detailsError' in form ? String(form.detailsError ?? '') : ''}
-	focalError={form && 'focalError' in form ? String(form.focalError ?? '') : ''}
+	detailsError={form && 'detailsError' in form && 'detailsId' in form && form.detailsId === selected?.id ? String(form.detailsError ?? '') : ''}
+	focalError={form && 'focalError' in form && 'focalId' in form && form.focalId === selected?.id ? String(form.focalError ?? '') : ''}
 	focalSaved={!!form && 'focalSaved' in form && form.focalSaved === selected?.id}
 	transform={form && 'transform' in form && form.transform && form.transform.id === selected?.id ? form.transform : null}
 	transformError={transformFailure?.error ?? ''}

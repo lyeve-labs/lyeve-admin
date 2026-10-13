@@ -19,6 +19,8 @@ vi.mock('$app/forms', () => ({
 }));
 const nav = vi.hoisted(() => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 vi.mock('$app/navigation', () => nav);
+const state = vi.hoisted(() => ({ page: { url: new URL('http://localhost/admin/media') } }));
+vi.mock('$app/state', () => state);
 
 const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false), success: vi.fn() }));
 vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
@@ -33,6 +35,7 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
 import MediaPage from './+page.svelte';
 import type { PageData } from './$types';
 import type { MediaItem } from '$lib/api/media';
+import type { Gate } from '$lib/api/gate';
 import { MEDIA_VIEW_KEY } from '$lib/components/media/view-preference';
 import { IMAGE, ONE_OF_EACH, PDF } from '$lib/components/media/fixtures';
 
@@ -48,7 +51,7 @@ function setup(items: MediaItem[] = ONE_OF_EACH, extra: Partial<PageData> = {}) 
 	return render(MediaPage, {
 		props: {
 			data: {
-				items,
+				items: { ok: true, value: items },
 				limit: 60,
 				offset: 0,
 				total: items.length,
@@ -56,6 +59,15 @@ function setup(items: MediaItem[] = ONE_OF_EACH, extra: Partial<PageData> = {}) 
 				q: '',
 				...extra,
 			} as unknown as PageData,
+			form: null,
+		},
+	});
+}
+
+function failed(gate: Gate) {
+	return render(MediaPage, {
+		props: {
+			data: { items: { ok: false, gate }, limit: 60, offset: 0, total: null, hasMore: false, q: '' } as unknown as PageData,
 			form: null,
 		},
 	});
@@ -153,7 +165,7 @@ describe('media library preview', () => {
 		expect(kit.success).toHaveBeenCalledWith('Deleted clip.webm');
 
 		await rerender({
-			data: { items: [IMAGE, PDF], limit: 60, offset: 0, total: 2, hasMore: false, q: '' } as unknown as PageData,
+			data: { items: { ok: true, value: [IMAGE, PDF] }, limit: 60, offset: 0, total: 2, hasMore: false, q: '' } as unknown as PageData,
 			form: null,
 		});
 		expect(screen.queryByRole('dialog')).toBeNull();
@@ -226,3 +238,60 @@ describe('media library controls carry a name', () => {
 		expect(unnamed.map((el) => el.outerHTML)).toEqual([]);
 	});
 });
+
+describe('media library read failures', () => {
+	it('says the library could not be read rather than that nothing was uploaded', () => {
+		failed({ state: 'unavailable' });
+		expect(screen.queryByText('No files uploaded yet.')).toBeNull();
+		expect(screen.getByText(/could not be read/)).toBeTruthy();
+		expect(screen.getByRole('link', { name: /Try again/ })).toBeTruthy();
+	});
+
+	it('offers no upload or import over a library it could not read', () => {
+		failed({ state: 'error', message: 'The media library could not be read.' });
+		expect(screen.queryByRole('button', { name: /Upload files/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Import from URL/ })).toBeNull();
+		expect(screen.queryByText(/files?$/, { selector: 'p' })).toBeNull();
+	});
+
+	it('tells a role the engine refused that it cannot open the library', () => {
+		failed({ state: 'forbidden' });
+		expect(screen.getByText(/Your role cannot open Media library/)).toBeTruthy();
+		expect(screen.queryByText('No files uploaded yet.')).toBeNull();
+	});
+});
+
+describe('media library failures stay with their file and form', () => {
+	function withForm(form: Record<string, unknown>) {
+		return render(MediaPage, {
+			props: {
+				data: { items: { ok: true, value: ONE_OF_EACH }, limit: 60, offset: 0, total: ONE_OF_EACH.length, hasMore: false, q: '' } as unknown as PageData,
+				form: form as never,
+			},
+		});
+	}
+	const open = async (name: string) => {
+		const tile = screen.getAllByRole('button').find((el) => (el.textContent ?? '').includes(name)) as HTMLElement;
+		await fireEvent.click(tile);
+	};
+
+	it('shows a failed save only in the drawer of the file it was for', async () => {
+		withForm({ detailsError: 'The details could not be saved.', detailsId: 'm-video' });
+		await open(IMAGE.filename);
+		expect(screen.queryByText('The details could not be saved.')).toBeNull();
+	});
+
+	it('shows a failed save in its own file drawer', async () => {
+		withForm({ detailsError: 'The details could not be saved.', detailsId: IMAGE.id });
+		await open(IMAGE.filename);
+		expect(screen.getByText('The details could not be saved.')).toBeTruthy();
+	});
+
+	it('leaves the import drawer clean after a failed delete', async () => {
+		withForm({ error: 'Failed to delete media' });
+		await fireEvent.click(screen.getByRole('button', { name: /Import from URL/ }));
+		const importForm = document.querySelector('form#import-form') as HTMLFormElement;
+		expect(importForm.textContent).not.toContain('Failed to delete media');
+	});
+});
+
