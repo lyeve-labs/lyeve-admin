@@ -14,7 +14,12 @@
 		Table,
 		Toggle,
 		confirm as confirmDialog,
-		toast, Pagination } from '@lyeve-labs/ui-kit';
+		toast,
+		Pagination,
+		SearchInput,
+	} from '@lyeve-labs/ui-kit';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import { narrows } from '$lib/narrow';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
@@ -111,6 +116,10 @@
 	const reportingOnly = $derived(
 		data.quotas.filter((q) => hasAnyLimit(q) && !enforces(q)),
 	);
+	// The endpoint takes no search, so the box narrows the page on screen and
+	// the pager below still walks every quota.
+	let query = $state('');
+	const visibleQuotas = $derived(data.quotas.filter((q) => narrows(query, q.tenant_id)));
 	const usageByTenant = $derived(new Map(data.usage.map((u) => [u.tenant_id, u])));
 
 	function review(r: QuotaRequest, decision: 'approve' | 'deny'): SubmitFunction {
@@ -211,14 +220,31 @@
 					{#snippet iconSnippet()}
 						<Gauge size={ICON.lg} />
 					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={() => openQuota(null)}>
+							<Plus size={ICON.sm} /> New quota
+						</Button>
+					{/snippet}
 				</EmptyState>
 			{:else}
+				<ListToolbar label="Filter quotas">
+					{#snippet search()}
+						<label for="quota-search" class="sr-only">Narrow this page</label>
+						<SearchInput id="quota-search" bind:value={query} placeholder="Tenant on this page" />
+					{/snippet}
+				</ListToolbar>
 				{#if !data.usageRead}
 					<Alert tone="warn">
 						What each tenant used could not be read, so the quotas below show their limits alone.
 						This is not a report that nothing was used.
 					</Alert>
 				{/if}
+				{#if visibleQuotas.length === 0}
+					<EmptyState
+						title="No quota on this page matches"
+						description="Clear the search, or turn the page: the box narrows what is on screen."
+					/>
+				{:else}
 				<Table label="Quotas">
 					<thead>
 						<tr>
@@ -231,7 +257,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.quotas as q (q.id)}
+						{#each visibleQuotas as q (q.id)}
 							{@const used = usageByTenant.get(q.tenant_id)}
 							{@const callPct = used ? usedPct(used.api_calls, q.requests_limit) : null}
 							{@const storePct = used ? usedPct(used.storage_bytes, q.storage_bytes_limit) : null}
@@ -290,6 +316,7 @@
 						{/each}
 					</tbody>
 				</Table>
+				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}

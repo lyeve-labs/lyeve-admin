@@ -110,3 +110,32 @@ describe('the quota drawer and the failures of other actions', () => {
 		expect(drawerText()).toContain('The quota could not be saved.');
 	});
 });
+
+describe('the quota list', () => {
+	const quota = (tenant_id: string) => ({
+		id: `q-${tenant_id}`,
+		tenant_id,
+		requests_limit: 1000,
+		storage_bytes_limit: 0,
+		bandwidth_bytes_limit: 0,
+		is_hard_limit: true,
+		block_on_exceeded: true,
+		grace_period_hours: 0,
+		warn_at_pct_80: true,
+		warn_at_pct_90: true,
+		blocked_at: null,
+	});
+
+	it('narrows the page by the typed tenant', async () => {
+		const { container } = render(UsagePage, { props: props({ quotas: [quota('acme'), quota('globex')], quotaTotal: 2 }) });
+		await fireEvent.input(container.querySelector('#quota-search') as HTMLInputElement, { target: { value: 'glob' } });
+		const rows = [...container.querySelectorAll('table[aria-label="Quotas"] tbody tr, [aria-label="Quotas"] tbody tr')].map((tr) => tr.textContent ?? '');
+		expect(rows.some((t) => t.includes('globex'))).toBe(true);
+		expect(rows.some((t) => t.includes('acme'))).toBe(false);
+	});
+
+	it('offers the first quota from the empty list', () => {
+		const { getAllByRole } = render(UsagePage, { props: props() });
+		expect(getAllByRole('button', { name: /new quota/i })).toHaveLength(2);
+	});
+});

@@ -93,3 +93,12 @@ describe('what this tenant may use', () => {
 		expect(offered.sort()).toEqual(['ai', 'flow', 'search']);
 	});
 });
+
+describe('the members of a large tenant', () => {
+	it('pages the members rather than stopping at the first page', () => {
+		const members = Array.from({ length: 50 }, (_, i) => ({ ...member, id: `u${i}`, email: `m${i}@example.com` }));
+		render(TenantPage, { props: props({ members: { ok: true, value: members }, memberTotal: 230 }) });
+		expect(screen.getByRole('link', { name: 'Next page' }).getAttribute('href')).toBe('/admin/tenants/t1?limit=50&offset=50');
+		expect(document.body.textContent).toContain('of 230');
+	});
+});

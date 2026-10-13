@@ -269,3 +269,20 @@ describe('admin/tenants load provisioning', () => {
 		expect((await run(eventFor(() => json({ error: 'unavailable' }, 503))))).toMatchObject({ canProvision: false, total: 1 });
 	});
 });
+
+/*
+ * A page past the end draws the first-run state, which says the instance has
+ * no tenants. A bookmark or a delete leaves such an offset behind.
+ */
+describe('admin/tenants load past the end', () => {
+	it('sends a page past the end back to the last page that holds rows', async () => {
+		const { event } = loadEvent({ data: [], total_count: 120 }, '?limit=50&offset=500');
+		await expect(load(event)).rejects.toMatchObject({ status: 307, location: '/admin/tenants?limit=50&offset=100' });
+	});
+
+	it('renders an empty first page as it is', async () => {
+		const { event } = loadEvent({ data: [], total_count: 0 });
+		const result = await run(event);
+		expect(result.tenants).toEqual({ ok: true, value: [] });
+	});
+});

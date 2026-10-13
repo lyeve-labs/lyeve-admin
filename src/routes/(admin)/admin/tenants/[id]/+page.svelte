@@ -11,6 +11,7 @@
 		Input,
 		MultiSelect,
 		PageShell,
+		Pagination,
 		SectionHeading,
 		Table,
 		confirm as confirmDialog,
@@ -20,6 +21,7 @@
 	import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { roleTone } from '$lib/roles';
+	import { pageHref, pageNumber } from '$lib/api/list';
 	import { formatDate } from '$lib/format';
 	import type { TenantMember } from '$lib/api/tenant-access';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -257,9 +259,14 @@
 					{/each}
 				</tbody>
 			</Table>
-			{#if data.memberTotal > data.members.value.length}
-				<p class="text-xs text-faint">Showing {data.members.value.length} of {data.memberTotal} members.</p>
-			{/if}
+			<Pagination
+				page={pageNumber(data.offset, data.limit)}
+				perPage={data.limit}
+				count={data.members.value.length}
+				total={data.memberTotal}
+				noun="members"
+				href={pageHref(`/admin/tenants/${tenant.id}`, data.limit)}
+			/>
 		{/if}
 	</section>
 </PageShell>

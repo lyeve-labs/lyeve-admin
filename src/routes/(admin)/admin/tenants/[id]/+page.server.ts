@@ -1,11 +1,18 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { archiveTenant, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { section, type Section } from '$lib/api/gate';
 import { readError } from '$lib/server/read-error';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+
+/** The members page size when a request names none. */
+const MEMBERS_LIMIT = 50;
+
+/** The most members one page asks for. */
+const MEMBERS_MAX = 200;
 import {
 	featureChoices,
 	findUserByEmail,
@@ -30,12 +37,16 @@ export const load: PageServerLoad = async (event) => {
 		readError(err, 'No tenant has that id.'),
 	);
 
+	// The members are paged rather than capped, so a tenant with more than one
+	// page of accounts shows every one of them a page at a time.
+	const { limit, offset } = pageWindow(event.url, MEMBERS_LIMIT, MEMBERS_MAX);
+
 	// Each half is read on its own: a members list that fails is no reason to
 	// hide what the tenant may use, and the reverse.
 	const [features, members] = await Promise.all([
 		section(getTenantFeatures(client, tenant.slug), "This tenant's features could not be read."),
 		section(
-			listTenantMembers(client, tenant.slug, 200, 0),
+			listTenantMembers(client, tenant.slug, limit, offset),
 			"This tenant's members could not be read. This is not a report that it has none.",
 		),
 	]);
@@ -47,6 +58,10 @@ export const load: PageServerLoad = async (event) => {
 	const choices: Section<FeatureChoice[]> = features.ok
 		? { ok: true, value: featureChoices(features.value.known, licensed, features.value.withheld) }
 		: features;
+	if (members.ok) {
+		const back = pastEndOffset(members.value.members?.length ?? 0, limit, offset, members.value.total ?? null);
+		if (back !== null) redirect(307, withOffset(event.url, back));
+	}
 	const people: Section<TenantMember[]> = members.ok ? { ok: true, value: members.value.members ?? [] } : members;
 
 	return {
@@ -54,6 +69,8 @@ export const load: PageServerLoad = async (event) => {
 		choices,
 		members: people,
 		memberTotal: members.ok ? members.value.total : 0,
+		limit,
+		offset,
 	};
 };
 

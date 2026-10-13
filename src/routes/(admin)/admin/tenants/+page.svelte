@@ -15,7 +15,6 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import { Building2, Coins, Pencil, Plus, Trash2, ToggleLeft, ToggleRight } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -28,6 +27,7 @@
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
+	import { pageHref, pageNumber } from '$lib/api/list';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -143,18 +143,6 @@
 		return formatDay(iso, 'Unknown');
 	}
 
-	// An offset need not sit on a page boundary: it arrives in the URL and a
-	// delete can leave a hand-edited one behind. Floor it onto the page that
-	// contains it rather than assuming offset / limit divides evenly.
-	const currentPage = $derived(Math.floor(data.offset / data.limit) + 1);
-
-	function goToPage(page: number) {
-		const offset = Math.max(0, (page - 1) * data.limit);
-		const params = new URLSearchParams({ limit: String(data.limit), offset: String(offset) });
-		// A querystring, so the page is linkable and the back button returns to
-		// the previous one.
-		goto(`/admin/tenants?${params}`, { noScroll: true, keepFocus: true });
-	}
 
 	const saveTenantSubmit = tracked(saveTenant);
 </script>
@@ -309,7 +297,15 @@
 		</Table>
 		{/if}
 
-		<Pagination page={currentPage} total={data.total} perPage={data.limit} onchange={goToPage} />
+		<!-- Links rather than a callback, so a page turns before hydration. -->
+		<Pagination
+			page={pageNumber(data.offset, data.limit)}
+			perPage={data.limit}
+			count={data.tenants.value.length}
+			total={data.total}
+			noun="tenants"
+			href={pageHref('/admin/tenants', data.limit)}
+		/>
 	{/if}
 </PageShell>
 

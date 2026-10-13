@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, error } from '@sveltejs/kit';
+import { fail, error, redirect } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import {
@@ -13,6 +13,7 @@ import { actionError } from '$lib/server/action-error';
 import { getProvisioning } from '$lib/api/tenants';
 import { sessionToken } from '$lib/server/session-cookie';
 import { section, type Section } from '$lib/api/gate';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 export type { Tenant };
 
@@ -34,11 +35,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 
-	const limit = Math.max(
-		1,
-		Math.min(MAX_LIMIT, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT)
-	);
-	const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	// The plugin says whether a create would pass, so the page offers one only
 	// then. A failed read, a plugin without the route among them, offers
@@ -50,6 +47,10 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	// The page draws the gate in place of the list and offers no create.
 	if (!read.ok) return { tenants: read, limit, offset, total: 0, canProvision: false };
 	const result = read.value;
+	// A page past the end is not an instance with no tenants, so the request
+	// goes back to the last page that holds rows.
+	const back = pastEndOffset(result.items.length, limit, offset, result.total > 0 ? result.total : null);
+	if (back !== null) redirect(307, withOffset(url, back));
 
 	// The envelope carries the collection count, so one server page is never
 	// described as the whole instance. What has been read is the floor, for an

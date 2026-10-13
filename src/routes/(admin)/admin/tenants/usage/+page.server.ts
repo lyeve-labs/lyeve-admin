@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, type ActionFailure } from '@sveltejs/kit';
+import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -19,7 +19,7 @@ import {
 	type TenantUsage,
 	type UsageGate,
 } from '$lib/api/usage';
-import { rowsOf, pageWindow, totalOf } from '$lib/api/list';
+import { rowsOf, pageWindow, pastEndOffset, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
 
 export const load: PageServerLoad = async (event) => {
@@ -50,6 +50,7 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, 50, 500);
 	let quotas: Quota[] = [];
 	let quotaTotal = 0;
+	let back: number | null = null;
 	// The shell says why the page is unavailable while its plugin does not run.
 	let gate: UsageGate = notRunning(plugins, PLUGIN.usage) ? { state: 'absent' } : USAGE_OK;
 	if (gate.state === 'ok') {
@@ -57,10 +58,13 @@ export const load: PageServerLoad = async (event) => {
 			const res = await listQuotas(client, limit, offset);
 			quotas = rowsOf(res);
 			quotaTotal = Math.max(totalOf(res), offset + quotas.length);
+			// A page past the end is not an instance with no quota set.
+			back = pastEndOffset(quotas.length, limit, offset, statedTotal(res));
 		} catch (err) {
 			gate = usageGate(err);
 		}
 	}
+	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// Pending requests are the queue somebody has to act on, so an unread list
 	// is never drawn as an empty one.

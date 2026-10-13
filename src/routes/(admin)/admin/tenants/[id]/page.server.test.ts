@@ -183,3 +183,27 @@ describe('admin/tenants/[id] grant action', () => {
 		expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ tenant_id: 'acme', roles: ['editor'] });
 	});
 });
+
+describe('admin/tenants/[id] members paging', () => {
+	it('asks for the window the address names', async () => {
+		const { event: ev, calls } = event({
+			'GET /api/admin/tenants/t1': TENANT,
+			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: [], known: [] },
+			'GET /api/admin/tenant-members/acme': { members: [{ id: 'u1', email: 'a@x.io', disabled: false, home: true, roles: ['admin'] }], total: 51 },
+		});
+		(ev as { url: URL }).url = new URL('http://localhost/admin/tenants/t1?limit=50&offset=50');
+		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
+		expect(data.offset).toBe(50);
+		expect(calls.some((c) => c.url === '/api/admin/tenant-members/acme')).toBe(true);
+	});
+
+	it('sends a page past the end back to the last page that holds rows', async () => {
+		const { event: ev } = event({
+			'GET /api/admin/tenants/t1': TENANT,
+			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: [], known: [] },
+			'GET /api/admin/tenant-members/acme': { members: [], total: 3 },
+		});
+		(ev as { url: URL }).url = new URL('http://localhost/admin/tenants/t1?limit=50&offset=100');
+		await expect(load(ev)).rejects.toMatchObject({ status: 307, location: '/admin/tenants/t1?limit=50&offset=0' });
+	});
+});
