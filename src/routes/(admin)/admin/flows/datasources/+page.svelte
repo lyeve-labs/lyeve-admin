@@ -25,6 +25,7 @@
 	import type { ActionData, PageData } from './$types';
 	import type { Datasource, DatasourceKind } from '$lib/api/flows';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { useInstance } from '$lib/instance.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { formatDuration } from '$lib/flow/time';
@@ -44,6 +45,13 @@
 	// disabled and the page says the feature is not enabled rather than that
 	// there are none yet.
 	const available = $derived(data.available !== false);
+	// The plugin refuses an edit and a connection test as it refuses a create
+	// while datasources are not enabled. A delete it still takes.
+	const UNAVAILABLE = 'Datasources are not enabled on this instance';
+	// Only a super admin may grant writes or private addresses, or change
+	// either grant. An admin sees both and the reason they are fixed.
+	const superAdmin = $derived(data.user.roles.includes('super_admin'));
+	const GRANT_HINT = 'Only a super admin can change this.';
 	const instance = useInstance();
 	const enableLink = $derived(instance.upgradeLink());
 
@@ -200,10 +208,12 @@
 			{#if !available && data.datasources.length > 0}
 				<NotEnabled compact title="Datasources" />
 			{/if}
-			<Button variant="primary" size="sm" onclick={openCreate} disabled={!available} title={available ? undefined : 'Not enabled on this instance'}>
-				<Plus size={ICON.sm} />
-				New datasource
-			</Button>
+			{#if data.gate.state === 'ok'}
+				<Button variant="primary" size="sm" onclick={openCreate} disabled={!available} title={available ? undefined : 'Not enabled on this instance'}>
+					<Plus size={ICON.sm} />
+					New datasource
+				</Button>
+			{/if}
 		{/snippet}
 
 		<!-- Chat lives here because a chat channel is a datasource and nothing
@@ -236,10 +246,8 @@
 			</div>
 		</Card>
 
-		{#if data.loadError}
-			<Alert tone="danger" title="Datasources could not be loaded">
-				{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if data.gate.state !== 'ok'}
+			<GateNotice gate={data.gate} title="datasources" absent="The flow plugin does not serve datasources on this instance." />
 		{/if}
 
 		{#if form && 'refused' in form && form.refused}
@@ -257,7 +265,7 @@
 			</Alert>
 		{/if}
 
-		{#if data.loadError}
+		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if !available && data.datasources.length === 0}
 			<NotEnabled title="Datasources" description="A flow that uses one is refused when it is saved." />
@@ -318,11 +326,11 @@
 								<div class="flex items-center gap-2">
 									<form method="POST" action="?/test" use:enhance>
 										<input type="hidden" name="id" value={ds.id} />
-										<Button variant="ghost" size="sm" type="submit" title="Test connection" aria-label="Test {ds.name}">
+										<Button variant="ghost" size="sm" type="submit" title={available ? 'Test connection' : UNAVAILABLE} aria-label="Test {ds.name}" disabled={!available}>
 											<PlugZap size={ICON.sm} />
 										</Button>
 									</form>
-									<Button variant="ghost" size="sm" onclick={() => openEdit(ds)} title="Edit" aria-label="Edit {ds.name}">
+									<Button variant="ghost" size="sm" onclick={() => openEdit(ds)} title={available ? 'Edit' : UNAVAILABLE} aria-label="Edit {ds.name}" disabled={!available}>
 										<Pencil size={ICON.sm} />
 									</Button>
 									<Button variant="ghost" size="sm" onclick={() => askDelete(ds)} title="Delete" aria-label="Delete {ds.name}">
@@ -459,11 +467,23 @@
 
 			<div>
 				<input type="hidden" name="allow_writes" value={allowWrites ? 'true' : 'false'} />
-				<Toggle id="ds-allow-writes" label="Allow writes" hint="A db.query node may commit when this is on." bind:checked={allowWrites} />
+				<Toggle
+					id="ds-allow-writes"
+					label="Allow writes"
+					hint={superAdmin ? 'A db.query node may commit when this is on.' : `A db.query node may commit when this is on. ${GRANT_HINT}`}
+					disabled={!superAdmin}
+					bind:checked={allowWrites}
+				/>
 			</div>
 			<div>
 				<input type="hidden" name="allow_private" value={allowPrivate ? 'true' : 'false'} />
-				<Toggle id="ds-allow-private" label="Allow private addresses" hint="Off refuses hosts that resolve to a private range." bind:checked={allowPrivate} />
+				<Toggle
+					id="ds-allow-private"
+					label="Allow private addresses"
+					hint={superAdmin ? 'Off refuses hosts that resolve to a private range.' : `Off refuses hosts that resolve to a private range. ${GRANT_HINT}`}
+					disabled={!superAdmin}
+					bind:checked={allowPrivate}
+				/>
 			</div>
 		</form>
 		{#snippet footer()}

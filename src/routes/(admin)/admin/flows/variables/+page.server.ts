@@ -3,7 +3,8 @@ import { fail } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { flowLoadOutcome } from '$lib/server/flow-load';
+import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';
 import { pageWindow, rowsOf, totalOf } from '$lib/api/list';
 import { sessionToken } from '$lib/server/session-cookie';
@@ -17,15 +18,18 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	let variables: Variable[] = [];
 	let total = 0;
 	let locked = false;
-	let loadError: string | null = null;
+	// Why the list could not be read. The plugin answers it to an admin only,
+	// so a reader below admin sees the role refusal and nothing to create.
+	let gate: Gate = GATE_OK;
 	try {
 		const res = await listVariables(client, limit, offset);
 		variables = rowsOf(res);
 		total = Math.max(totalOf(res), offset + variables.length);
 	} catch (err) {
-		({ locked, loadError } = flowLoadOutcome(err, { cookies, url }, 'variables'));
+		({ locked } = flowLoadOutcome(err, { cookies, url }, 'variables'));
+		if (!locked) gate = gateOf(err, engineBanner('variables'));
 	}
-	return { variables, total, limit, offset, locked, loadError };
+	return { variables, total, limit, offset, locked, gate };
 };
 
 export const actions: Actions = {

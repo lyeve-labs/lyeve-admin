@@ -7,7 +7,8 @@ import { flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
 import { refusalFailure } from '$lib/server/flow-refusal';
-import { flowLoadOutcome } from '$lib/server/flow-load';
+import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import {
 	ImportError,
@@ -37,7 +38,9 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	// One row past the page answers "is there another page" when the endpoint
 	// states no total. It is never rendered.
 	let locked = false;
-	let loadError: string | null = null;
+	// Why the list could not be read: a role the plugin refuses, an outage or
+	// a failure. Each says so in its own words and offers nothing to create.
+	let gate: Gate = GATE_OK;
 	let flows: Flow[] = [];
 	let total: number | null = null;
 	let hasMore = false;
@@ -51,7 +54,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 		total = page.total;
 		hasMore = total === null ? page.rows.length > limit : offset + flows.length < total;
 	} catch (err) {
-		({ locked, loadError } = flowLoadOutcome(err, { cookies, url }, 'flows'));
+		({ locked } = flowLoadOutcome(err, { cookies, url }, 'flows'));
+		if (!locked) gate = gateOf(err, engineBanner('flows'));
 	}
 
 	const back = pastEndOffset(flows.length, limit, offset, total);
@@ -66,7 +70,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 		status,
 		q,
 		locked,
-		loadError,
+		gate,
 		canCreate,
 	};
 };

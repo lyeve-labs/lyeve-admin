@@ -9,6 +9,7 @@
 	import type { ActionData, PageData } from './$types';
 	import type { Variable } from '$lib/api/flows';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { relativeTime, formatDateTime } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -76,16 +77,16 @@
 		back={flowBack(page.url)}
 	>
 		{#snippet actions()}
-			<Button variant="primary" size="sm" onclick={openCreate}>
-				<Plus size={ICON.sm} />
-				New variable
-			</Button>
+			{#if data.gate.state === 'ok'}
+				<Button variant="primary" size="sm" onclick={openCreate}>
+					<Plus size={ICON.sm} />
+					New variable
+				</Button>
+			{/if}
 		{/snippet}
 
-		{#if data.loadError}
-			<Alert tone="danger" title="Variables could not be loaded">
-				{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if data.gate.state !== 'ok'}
+			<GateNotice gate={data.gate} title="flow variables" absent="The flow plugin does not serve variables on this instance." />
 		{/if}
 
 		{#if form && 'error' in form && form.error && !open}
@@ -94,7 +95,7 @@
 			</Alert>
 		{/if}
 
-		{#if data.loadError}
+		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.variables.length === 0}
 			<EmptyState title="No variables yet" description="Expressions read one as vars.<key>.">

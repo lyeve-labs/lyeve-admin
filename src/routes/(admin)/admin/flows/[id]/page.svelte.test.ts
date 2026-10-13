@@ -77,6 +77,7 @@ function setup(form: unknown = null, overrides: Record<string, unknown> = {}, co
 				templates: fixtureTemplates,
 				entitlements: licensed,
 				assistant: 'ready',
+				user: { roles: ['admin'] },
 				...overrides,
 			},
 			form,
@@ -254,6 +255,12 @@ describe('flow editor page', () => {
 			'Shortcuts',
 			'Guide',
 		]);
+	});
+
+	it('draws no datasource or variable shortcut for a role those routes refuse', () => {
+		const { queryByTestId } = setup(null, { user: { roles: ['editor'] } });
+		expect(queryByTestId('flow-datasources')).toBeNull();
+		expect(queryByTestId('flow-variables')).toBeNull();
 	});
 
 	it('links the datasources and variables from the toolbar, carrying the way back to this flow', () => {

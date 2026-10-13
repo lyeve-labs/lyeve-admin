@@ -17,9 +17,9 @@ const variables: Variable[] = [
 	{ key: 'api_key', is_secret: true, updated_at: '2026-09-01T00:00:00Z' },
 ];
 
-function setup(rows: Variable[] = variables, form: unknown = null, locked = false, loadError: string | null = null) {
+function setup(rows: Variable[] = variables, form: unknown = null, locked = false, gate: unknown = { state: 'ok' }, roles: string[] = ['super_admin']) {
 	return render(VariablesPage, {
-		props: { data: { variables: rows, locked, loadError, entitlements: licensed }, form } as never,
+		props: { data: { variables: rows, locked, gate, user: { roles }, entitlements: licensed }, form } as never,
 	});
 }
 
@@ -118,8 +118,24 @@ describe('variables page', () => {
 	});
 
 	it('shows a failed load as an alert and not as an empty list', () => {
-		const { container, queryByText } = setup([], null, false, 'Variables could not be read from the engine.');
+		const { container, queryByText } = setup([], null, false, { state: 'error', message: 'Variables could not be read from the engine.' });
 		expect(container.textContent).toContain('Variables could not be read from the engine.');
 		expect(queryByText('No variables yet')).toBeNull();
+	});
+});
+
+describe('variables page for a role the plugin refuses', () => {
+	it('says the role cannot read variables and offers nothing to create', () => {
+		const { container, queryByText } = setup([], null, false, { state: 'forbidden' }, ['editor']);
+		expect(container.textContent).toContain('Your role cannot open flow variables.');
+		expect(container.textContent).not.toContain('Reload');
+		expect(queryByText('New variable')).toBeNull();
+		expect(queryByText('No variables yet')).toBeNull();
+	});
+
+	it('offers nothing to create while the list could not be read', () => {
+		const { container, queryByText } = setup([], null, false, { state: 'unavailable' });
+		expect(container.textContent).toContain('flow variables could not be read');
+		expect(queryByText('New variable')).toBeNull();
 	});
 });

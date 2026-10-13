@@ -122,6 +122,9 @@
 	// still decides and its 403 renders inline. Update covers save and
 	// import. Activate covers publish, disable, rollback and test.
 	const can = $derived(flowGrants(data.flow?.actions));
+	// The datasources and the variables are admin routes, so the shortcuts to
+	// them are drawn only for a role the plugin answers there.
+	const isAdmin = $derived(data.user.roles.includes('admin') || data.user.roles.includes('super_admin'));
 
 	// The 402 the plugin answered, when the last action was one. Read
 	// through the type because the action data is a union of every
@@ -811,14 +814,16 @@
 					     or a variable is what a node most often turns out to be missing,
 					     so both are a click from the canvas. The words show once the row
 					     has room for them. -->
-					<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/datasources', flowId)} aria-label="Datasources" data-testid="flow-datasources">
-						<Database size={ICON.sm} />
-						<span class="hidden 2xl:inline">Datasources</span>
-					</Button>
-					<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/variables', flowId)} aria-label="Variables" data-testid="flow-variables">
-						<Variable size={ICON.sm} />
-						<span class="hidden 2xl:inline">Variables</span>
-					</Button>
+					{#if isAdmin}
+						<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/datasources', flowId)} aria-label="Datasources" data-testid="flow-datasources">
+							<Database size={ICON.sm} />
+							<span class="hidden 2xl:inline">Datasources</span>
+						</Button>
+						<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/variables', flowId)} aria-label="Variables" data-testid="flow-variables">
+							<Variable size={ICON.sm} />
+							<span class="hidden 2xl:inline">Variables</span>
+						</Button>
+					{/if}
 					<Dropdown items={overflow} align="left">
 						{#snippet trigger({ open, toggle })}
 							<Button variant="ghost" size="sm" aria-label="More actions" aria-haspopup="menu" aria-expanded={open} onclick={toggle}>

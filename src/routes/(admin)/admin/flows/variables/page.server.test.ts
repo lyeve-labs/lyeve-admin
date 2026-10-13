@@ -52,7 +52,7 @@ describe('admin/flows/variables load', () => {
 	it('maps a 402 to the locked state', async () => {
 		const result = (await load(loadEvent({ '/variables': () => json({ error: 'nope' }, 402) }))) as Loaded;
 		expect(result.locked).toBe(true);
-		expect(result.loadError).toBeNull();
+		expect(result.gate).toEqual({ state: 'ok' });
 	});
 
 	it('sends an expired session to the login page with the cookie cleared', async () => {
@@ -64,7 +64,7 @@ describe('admin/flows/variables load', () => {
 	it('names the role as the reason for a 403', async () => {
 		const result = (await load(loadEvent({ '/variables': () => json({ error: 'forbidden' }, 403) }))) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBe('Your role cannot read variables.');
+		expect(result.gate).toEqual({ state: 'forbidden' });
 	});
 
 	it('keeps the engine banner for a network failure', async () => {
@@ -75,14 +75,13 @@ describe('admin/flows/variables load', () => {
 				},
 			})
 		)) as Loaded;
-		expect(result.loadError).toContain('could not be read from the engine');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 
 	it('reports a failed read as a static message rather than an empty list', async () => {
 		const result = (await load(loadEvent({ '/variables': () => json({ error: 'pq: connection refused' }, 503) }))) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBeTruthy();
-		expect(result.loadError).not.toContain('pq:');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 });
 

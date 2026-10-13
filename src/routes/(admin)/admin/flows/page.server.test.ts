@@ -118,8 +118,7 @@ describe('admin/flows load', () => {
 		});
 		const result = (await load(event)) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBeTruthy();
-		expect(result.loadError).not.toContain('pq:');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 		expect(result.flows).toEqual([]);
 		expect(calls.some((c) => c.url.includes('/templates'))).toBe(false);
 	});
@@ -134,7 +133,7 @@ describe('admin/flows load', () => {
 		const { event } = loadEvent({ '/api/admin/flows?': () => json({ error: 'forbidden' }, 403) });
 		const result = (await load(event)) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBe('Your role cannot read flows.');
+		expect(result.gate).toEqual({ state: 'forbidden' });
 	});
 
 	it('keeps the engine banner for a network failure', async () => {
@@ -144,7 +143,7 @@ describe('admin/flows load', () => {
 			},
 		});
 		const result = (await load(event)) as Loaded;
-		expect(result.loadError).toContain('could not be read from the engine');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 
 	it('passes the status and search filters to the engine and back to the page', async () => {

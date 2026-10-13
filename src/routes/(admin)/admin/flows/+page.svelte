@@ -23,6 +23,7 @@
 	import type { ActionData, PageData } from './$types';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { slugify, statusTone, triggerLabel } from '$lib/flow/triggers';
 	import { blockedText } from '$lib/flow/blocked';
@@ -48,7 +49,10 @@
 	// beside the list whether the caller may create, and on each flow what
 	// it may do to it. The engine still decides, and a refusal it answers
 	// renders below like any other.
-	const canCreate = $derived(data.canCreate !== false);
+	const canCreate = $derived(data.gate.state === 'ok' && data.canCreate !== false);
+	// The datasources and the variables are admin routes, so a reader below
+	// admin is not sent to a page that can only refuse them.
+	const isAdmin = $derived(data.user.roles.includes('admin') || data.user.roles.includes('super_admin'));
 	const canDelete = (flow: Flow) => flowGrants(flow.actions).delete;
 
 	// The dialog asks for a name and derives the slug, and nothing else. A
@@ -140,14 +144,16 @@
 	>
 		{#snippet actions()}
 			<Badge tone="violet" size="sm">Beta</Badge>
-			<Button variant="ghost" size="sm" href="/admin/flows/datasources">
-				<Database size={ICON.sm} />
-				Datasources
-			</Button>
-			<Button variant="ghost" size="sm" href="/admin/flows/variables">
-				<Variable size={ICON.sm} />
-				Variables
-			</Button>
+			{#if isAdmin}
+				<Button variant="ghost" size="sm" href="/admin/flows/datasources">
+					<Database size={ICON.sm} />
+					Datasources
+				</Button>
+				<Button variant="ghost" size="sm" href="/admin/flows/variables">
+					<Variable size={ICON.sm} />
+					Variables
+				</Button>
+			{/if}
 			{#if canCreate}
 				<Button variant="secondary" size="sm" onclick={() => (showImport = true)}>
 					<Upload size={ICON.sm} />
@@ -160,10 +166,8 @@
 			{/if}
 		{/snippet}
 
-		{#if data.loadError}
-			<Alert tone="danger" title="Flows could not be loaded">
-				{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if data.gate.state !== 'ok'}
+			<GateNotice gate={data.gate} title="flows" absent="The flow plugin does not serve its list on this instance." />
 		{/if}
 
 		{#if refusal}
@@ -210,30 +214,33 @@
 			</Alert>
 		{/if}
 
-		<!-- The field's label is for the screen reader only, so nothing sits
-		     above the row to push its middle down. -->
-		<form method="GET" data-testid="flow-filters">
-			{#if data.status}<input type="hidden" name="status" value={data.status} />{/if}
-			<ListToolbar label="Filter flows">
-				{#snippet search()}
-					<div class="flex items-center gap-2">
-						<label for="flow-search" class="sr-only">Search flows</label>
-						<SearchInput id="flow-search" name="q" bind:value={q} placeholder="Name or slug" class="min-w-0 flex-1" />
-						<Button type="submit" variant="secondary">Search</Button>
-						{#if filtered}
-							<Button variant="ghost" href="/admin/flows">Clear</Button>
-						{/if}
-					</div>
-				{/snippet}
-				{#snippet filters()}
-					<nav aria-label="Status">
-						<SegmentedControl label="Status" labelHidden value={data.status} options={statusOptions} />
-					</nav>
-				{/snippet}
-			</ListToolbar>
-		</form>
+		<!-- A role the plugin refuses has nothing to filter. -->
+		{#if data.gate.state !== 'forbidden'}
+			<!-- The field's label is for the screen reader only, so nothing sits
+			     above the row to push its middle down. -->
+			<form method="GET" data-testid="flow-filters">
+				{#if data.status}<input type="hidden" name="status" value={data.status} />{/if}
+				<ListToolbar label="Filter flows">
+					{#snippet search()}
+						<div class="flex items-center gap-2">
+							<label for="flow-search" class="sr-only">Search flows</label>
+							<SearchInput id="flow-search" name="q" bind:value={q} placeholder="Name or slug" class="min-w-0 flex-1" />
+							<Button type="submit" variant="secondary">Search</Button>
+							{#if filtered}
+								<Button variant="ghost" href="/admin/flows">Clear</Button>
+							{/if}
+						</div>
+					{/snippet}
+					{#snippet filters()}
+						<nav aria-label="Status">
+							<SegmentedControl label="Status" labelHidden value={data.status} options={statusOptions} />
+						</nav>
+					{/snippet}
+				</ListToolbar>
+			</form>
+		{/if}
 
-		{#if data.loadError}
+		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.flows.length === 0 && filtered}
 			<EmptyState title="No flows match" description="Widen the status or clear the search to see more." />

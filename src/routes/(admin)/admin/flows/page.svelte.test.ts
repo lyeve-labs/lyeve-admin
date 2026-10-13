@@ -40,7 +40,8 @@ function setup(overrides: Record<string, unknown> = {}, entitlements = licensed)
 				status: '',
 				q: '',
 				locked: false,
-				loadError: null,
+				gate: { state: 'ok' },
+				user: { roles: ['admin'] },
 				entitlements,
 				...overrides,
 			},
@@ -133,11 +134,33 @@ describe('flows list page', () => {
 		expect(locked.queryByText('New flow')).toBeNull();
 	});
 
-	it('shows a failed load as an alert and not as an empty tenant', () => {
-		const { container, queryByText } = setup({ loadError: 'Flows could not be read from the engine.' });
+	it('shows a failed load as an alert and not as an empty tenant, with nothing to create', () => {
+		const { container, queryByText } = setup({ gate: { state: 'error', message: 'Flows could not be read from the engine.' } });
 		expect(container.textContent).toContain('Flows could not be read from the engine.');
 		expect(queryByText('No flows yet')).toBeNull();
+		expect(queryByText('New flow')).toBeNull();
+		expect(queryByText('Import')).toBeNull();
 		expect(container.querySelector('[data-testid="flow-templates"]')).toBeNull();
+	});
+
+	// A role refusal is not an outage, so it offers no reload and no create.
+	it('says the role cannot read flows, with nothing to create, filter or reload', () => {
+		const { container, queryByText } = setup({ gate: { state: 'forbidden' } });
+		expect(container.textContent).toContain('Your role cannot open flows.');
+		expect(container.textContent).not.toContain('Reload');
+		expect(queryByText('Try again')).toBeNull();
+		expect(queryByText('New flow')).toBeNull();
+		expect(queryByText('Import')).toBeNull();
+		expect(container.querySelector('[data-testid="flow-filters"]')).toBeNull();
+	});
+
+	it('links the datasources and the variables only for an admin, whose routes they are', () => {
+		const editor = setup({ user: { roles: ['editor'] } });
+		expect(editor.container.querySelector('a[href="/admin/flows/datasources"]')).toBeNull();
+		expect(editor.container.querySelector('a[href="/admin/flows/variables"]')).toBeNull();
+		cleanup();
+		const admin = setup();
+		expect(admin.container.querySelector('a[href="/admin/flows/datasources"]')).not.toBeNull();
 	});
 
 	it('filters by status and search through query parameters', () => {
@@ -191,7 +214,7 @@ describe('flows list page', () => {
 	it('lists validation errors the create action returned', () => {
 		const { container } = render(FlowsPage, {
 			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, entitlements: licensed },
+				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
 				form: {
 					error: 'The definition did not validate.',
 					errors: [
@@ -225,7 +248,7 @@ describe('flows list page ceiling', () => {
 	it('shows the refusal with the limit the plugin sent', () => {
 		const { container } = render(FlowsPage, {
 			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, loadError: null, entitlements: licensed },
+				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
 				form: { error: '7 of 7 flows are in use, the most this instance keeps. Delete one to make room for another.', refusal: { nodeIds: [], limit: 7, current: 7 } },
 			} as never,
 		});
@@ -257,7 +280,7 @@ describe('flows list page role grants', () => {
 	it('renders a 403 inline as a role refusal', () => {
 		const { container } = render(FlowsPage, {
 			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, loadError: null, entitlements: licensed, canCreate: true },
+				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed, canCreate: true },
 				form: { error: 'permission denied: create on flows', forbidden: true },
 			} as never,
 		});

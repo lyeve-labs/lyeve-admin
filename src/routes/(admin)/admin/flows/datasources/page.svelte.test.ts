@@ -33,9 +33,9 @@ const inventory: Datasource = {
 	allow_writes: true,
 };
 
-function setup(datasources: Datasource[] = [warehouse, inventory], form: unknown = null, locked = false, loadError: string | null = null) {
+function setup(datasources: Datasource[] = [warehouse, inventory], form: unknown = null, locked = false, gate: unknown = { state: 'ok' }, roles: string[] = ['super_admin']) {
 	return render(DatasourcesPage, {
-		props: { data: { datasources, locked, loadError, entitlements: licensed }, form } as never,
+		props: { data: { datasources, locked, gate, user: { roles }, entitlements: licensed }, form } as never,
 	});
 }
 
@@ -188,7 +188,7 @@ describe('datasources page', () => {
 	});
 
 	it('shows a failed load as an alert and not as an empty list', () => {
-		const { container, queryByText } = setup([], null, false, 'Datasources could not be read from the engine.');
+		const { container, queryByText } = setup([], null, false, { state: 'error', message: 'Datasources could not be read from the engine.' });
 		expect(container.textContent).toContain('Datasources could not be read from the engine.');
 		expect(queryByText('No datasources yet')).toBeNull();
 	});
@@ -202,7 +202,7 @@ describe('datasources page', () => {
 describe('datasources page when the plugin says they are not enabled', () => {
 	function unavailable(datasources: Datasource[] = [], form: unknown = null) {
 		return render(DatasourcesPage, {
-			props: { data: { datasources, available: false, locked: false, loadError: null, entitlements: licensed }, form } as never,
+			props: { data: { datasources, available: false, locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed }, form } as never,
 		});
 	}
 
@@ -215,6 +215,15 @@ describe('datasources page when the plugin says they are not enabled', () => {
 		expect(queryByText('No datasources yet')).toBeNull();
 		const create = getAllByText('New datasource')[0].closest('button') as HTMLButtonElement;
 		expect(create.disabled).toBe(true);
+	});
+
+	// The plugin refuses an edit and a test as it refuses a create, so neither
+	// stays live beside a create that is disabled.
+	it('disables edit and test on a stored row, and leaves delete', () => {
+		const { getByLabelText } = unavailable([warehouse]);
+		expect((getByLabelText('Edit warehouse') as HTMLButtonElement).disabled).toBe(true);
+		expect((getByLabelText('Test warehouse') as HTMLButtonElement).disabled).toBe(true);
+		expect((getByLabelText('Delete warehouse') as HTMLButtonElement).disabled).toBe(false);
 	});
 
 	it('lists the stored rows and says it once, in the header', () => {
@@ -252,5 +261,30 @@ describe('datasources page chat channels', () => {
 		const text = (setup().container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('EVENT_BUS');
 		expect(text).toContain('stop the engine from starting');
+	});
+});
+
+describe('datasources page and the role of the reader', () => {
+	it('says the role cannot read datasources and offers nothing to create', () => {
+		const { container, queryByText } = setup([], null, false, { state: 'forbidden' }, ['editor']);
+		expect(container.textContent).toContain('Your role cannot open datasources.');
+		expect(container.textContent).not.toContain('Reload');
+		expect(queryByText('New datasource')).toBeNull();
+	});
+
+	// The plugin takes either grant from a super admin only.
+	it('shows an admin the write and private grants fixed, with the reason', async () => {
+		const { getByLabelText, getAllByText } = setup(undefined, null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		expect((getByLabelText('Allow writes') as HTMLButtonElement).disabled).toBe(true);
+		expect((getByLabelText('Allow private addresses') as HTMLButtonElement).disabled).toBe(true);
+		expect(document.body.textContent).toContain('Only a super admin can change this.');
+	});
+
+	it('leaves both grants to a super admin', async () => {
+		const { getByLabelText, getAllByText } = setup();
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		expect((getByLabelText('Allow writes') as HTMLButtonElement).disabled).toBe(false);
+		expect(document.body.textContent).not.toContain('Only a super admin can change this.');
 	});
 });

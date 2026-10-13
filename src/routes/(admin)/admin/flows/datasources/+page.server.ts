@@ -3,7 +3,8 @@ import { fail } from '@sveltejs/kit';
 import { ApiError, createClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { flowLoadOutcome } from '$lib/server/flow-load';
+import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { flowClient } from '$lib/server/flow-client';
 import {
 	createDatasource,
@@ -30,13 +31,16 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	// the banner is what the page draws, not a locked state.
 	let available = true;
 	let locked = false;
-	let loadError: string | null = null;
+	// Why the list could not be read. The plugin answers it to an admin only,
+	// so a reader below admin sees the role refusal and nothing to create.
+	let gate: Gate = GATE_OK;
 	try {
 		({ rows: datasources, enabled: available } = await listDatasources(client));
 	} catch (err) {
-		({ locked, loadError } = flowLoadOutcome(err, { cookies, url }, 'datasources'));
+		({ locked } = flowLoadOutcome(err, { cookies, url }, 'datasources'));
+		if (!locked) gate = gateOf(err, engineBanner('datasources'));
 	}
-	return { datasources, available, locked, loadError };
+	return { datasources, available, locked, gate };
 };
 
 /**
