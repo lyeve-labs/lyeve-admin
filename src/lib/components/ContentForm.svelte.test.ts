@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
+import { tick } from 'svelte';
 import ContentForm from './ContentForm.svelte';
 import type { Content, FieldType, SchemaField } from '@lyeve-labs/client';
 
@@ -159,5 +160,35 @@ describe('ContentForm', () => {
 		expect(group?.getAttribute('aria-label')).toBe('f');
 		expect(many.container.querySelector('label[for]')).toBeNull();
 		many.unmount();
+	});
+});
+
+describe('ContentForm failures', () => {
+	const fields = [field('text', { name: 'title' }), field('text', { name: 'summary', required: true })];
+
+	it('puts the server error above the first field', () => {
+		const formValues = $state({ title: '', summary: '' });
+		const { getByText, container } = render(ContentForm, {
+			props: { fields, formValues, error: 'The entry could not be saved.' },
+		});
+		const alert = getByText('The entry could not be saved.');
+		const first = container.querySelector('[data-field-name="title"]') as Node;
+		expect(alert.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+
+	it('counts the fields that need attention at the top of the form', () => {
+		const formValues = $state({ title: '', summary: '' });
+		const { getByText } = render(ContentForm, {
+			props: { fields, formValues, validationErrors: { summary: 'Required' } },
+		});
+		expect(getByText('1 field needs attention.')).toBeTruthy();
+	});
+
+	it('moves focus to the first field a refused submit names', async () => {
+		const formValues = $state({ title: '', summary: '' });
+		const { container, rerender } = render(ContentForm, { props: { fields, formValues } });
+		await rerender({ fields, formValues, validationErrors: { summary: 'Required' } });
+		await tick();
+		expect(document.activeElement).toBe(container.querySelector('#field-summary'));
 	});
 });

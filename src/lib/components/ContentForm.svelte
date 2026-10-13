@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Alert } from '@lyeve-labs/ui-kit';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { fieldKey } from '$lib/utils/content-form';
 	import { humanizeFieldName } from '$lib/utils/entry-identity';
 	import FieldInput from './FieldInput.svelte';
+	import FormErrors from './FormErrors.svelte';
 	import type { MediaChoice } from '$lib/api/media';
 	import type { RelationChoices } from './content/relation-choices';
 
@@ -59,6 +59,26 @@
 		return field.field_type === 'datetime' ? `field-${field.name}-date` : `field-${field.name}`;
 	}
 
+	let root: HTMLDivElement | undefined = $state();
+
+	/*
+	 * A refused submit moves focus to the first field it names. The summary at
+	 * the top says how many need attention, and focus on the field is what lets
+	 * a keyboard reader fix it without hunting down the form. The errors object
+	 * is replaced on every refused submit, so this runs once per refusal.
+	 */
+	$effect(() => {
+		const named = Object.keys(validationErrors);
+		if (named.length === 0 || !root) return;
+		const first = fields.find((f) => named.includes(f.name));
+		if (!first) return;
+		const box = root.querySelector(`[data-field-name="${first.name}"]`);
+		const control = box?.querySelector<HTMLElement>(
+			'input:not([type="hidden"]), textarea, select, button, [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
+		);
+		control?.focus();
+	});
+
 	function relationOf(field: SchemaField): RelationChoices | undefined {
 		return relations[field.relation_to ?? ''];
 	}
@@ -69,6 +89,11 @@
 		return words.charAt(0) + words.slice(1).toLowerCase();
 	}
 </script>
+
+<!-- The failure is read before the fields, so a refused save is the first
+     thing in the form rather than something below the last field. -->
+<div bind:this={root} class="flex flex-col gap-5">
+<FormErrors message={error ?? undefined} fields={validationErrors} />
 
 {#if fields.length === 0}
 	<p class="text-faint text-sm py-4 text-center">This schema has no editable fields.</p>
@@ -128,7 +153,4 @@
 	{/each}
 	</div>
 {/if}
-
-{#if error}
-	<Alert tone="danger" class="mt-2">{error}</Alert>
-{/if}
+</div>
