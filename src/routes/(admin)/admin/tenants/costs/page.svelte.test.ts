@@ -139,3 +139,31 @@ describe('tenant costs page', () => {
 		expect(screen.getAllByText('The cost ledger is not enabled on this instance.')).toHaveLength(1);
 	});
 });
+
+/*
+ * A price card states what this tenant pays per block of units. Drawn with no
+ * price read, every card claimed the default at 0 USD and offered to save it.
+ */
+describe('tenant cost prices that are not known', () => {
+	it('draws no price card when the prices could not be read', () => {
+		render(CostsPage, {
+			props: { data: data({ prices: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+		expect(screen.queryByTestId('cost-prices')).toBeNull();
+		expect(screen.queryAllByRole('form', { name: /Price for/ })).toHaveLength(0);
+		expect(screen.queryByText('Default')).toBeNull();
+		expect(screen.getByText(/so the prices could not be read/)).toBeTruthy();
+	});
+
+	it('marks a resource the engine sent no price for, and seeds no zero', () => {
+		render(CostsPage, { props: { data: data(), form: null } });
+		// Storage and compute were sent. Database, bandwidth and AI were not.
+		expect(screen.getAllByText('No price stated')).toHaveLength(3);
+		expect(screen.getAllByText('Default')).toHaveLength(1);
+		const database = screen.getByRole('form', { name: 'Price for Database' });
+		expect((database.querySelector('#price-database-unit') as HTMLInputElement).value).toBe('');
+		expect((database.querySelector('#price-database-currency') as HTMLInputElement).value).toBe('');
+		const compute = screen.getByRole('form', { name: 'Price for Compute' });
+		expect((compute.querySelector('#price-compute-unit') as HTMLInputElement).value).toBe('1.00');
+	});
+});

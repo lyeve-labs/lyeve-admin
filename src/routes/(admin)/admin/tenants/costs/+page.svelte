@@ -115,7 +115,9 @@
 		const rows = {} as Record<ResourceType, PriceRow>;
 		for (const r of RESOURCE_TYPES) {
 			const p = prices?.find((x) => x.resource_type === r);
-			rows[r] = { unit_price: p?.unit_price ?? '0', per_units: p?.per_units ?? 1, currency: p?.currency ?? 'USD' };
+			// A resource the engine sent no price for starts empty. Zero in USD
+			// would read as a price somebody set.
+			rows[r] = { unit_price: p?.unit_price ?? '', per_units: p?.per_units ?? 1, currency: p?.currency ?? '' };
 		}
 		return rows;
 	}
@@ -353,6 +355,9 @@
 				{:else if saved === 'price'}
 					<Alert tone="success" autoDismiss>Price saved.</Alert>
 				{/if}
+				{#if !data.prices.ok}
+					<GateNotice gate={data.prices.gate} title="the prices" absent="This instance does not serve cost prices." />
+				{:else}
 				<div class="grid gap-3 lg:grid-cols-2" data-testid="cost-prices">
 					{#each RESOURCE_TYPES as resource (resource)}
 						{@const current = priceOf(resource)}
@@ -360,9 +365,13 @@
 							{#snippet header()}
 								<div class="flex items-center justify-between gap-3">
 									<SectionHeading level={3}>{RESOURCE_LABEL[resource]}</SectionHeading>
-									<Badge tone={current?.source === 'tenant' ? 'brand' : 'neutral'} size="sm">
-										{current?.source === 'tenant' ? 'Set by this tenant' : 'Default'}
-									</Badge>
+									{#if !current}
+										<Badge tone="warn" size="sm">No price stated</Badge>
+									{:else}
+										<Badge tone={current.source === 'tenant' ? 'brand' : 'neutral'} size="sm">
+											{current.source === 'tenant' ? 'Set by this tenant' : 'Default'}
+										</Badge>
+									{/if}
 								</div>
 							{/snippet}
 							<form
@@ -423,6 +432,7 @@
 						</Card>
 					{/each}
 				</div>
+				{/if}
 			</section>
 		</div>
 	{/if}
