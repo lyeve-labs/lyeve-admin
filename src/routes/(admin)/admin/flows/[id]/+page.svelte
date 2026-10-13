@@ -16,6 +16,7 @@
 		Drawer,
 		Modal,
 		PageShell,
+		Pagination,
 		SectionHeading,
 		SegmentedControl,
 		Select,
@@ -72,6 +73,8 @@
 	import FlowGuide from '$lib/components/flow/FlowGuide.svelte';
 	import AssistantPanel from '$lib/components/flow/AssistantPanel.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { pageHref, pageNumber } from '$lib/api/list';
 	import { useInstance } from '$lib/instance.svelte';
 	import { csrfHeaders } from '$lib/api/csrf';
 	import { submitter } from '$lib/forms.svelte';
@@ -440,15 +443,22 @@
 	let exportFormat = $state<'json' | 'yaml'>('json');
 	let exportText = $state('');
 	let exportError = $state('');
+	let exportLoading = $state(false);
 
 	async function loadExport(format: 'json' | 'yaml') {
 		exportFormat = format;
 		exportError = '';
+		// The text of the other format is not this one's, so it goes while the
+		// new one loads.
+		exportText = '';
+		exportLoading = true;
 		try {
 			const text = await exportFlow(fetch, flowId, format, csrfHeaders());
 			exportText = format === 'json' ? JSON.stringify(JSON.parse(text), null, 2) : text;
 		} catch {
 			exportError = 'The export could not be loaded. Save the draft and try again.';
+		} finally {
+			exportLoading = false;
 		}
 	}
 
@@ -464,14 +474,25 @@
 
 	// Drawer
 	let drawerOpen = $state(true);
-	let tab = $state('test');
+	// A page of runs is a link, so an address that names one opens on the
+	// runs tab.
+	let tab = $state(page.url.searchParams.has('offset') ? 'runs' : 'test');
+	const runs = $derived(data.runs.ok ? data.runs.value : null);
+	// The list's filter rides along, so the way back still lands on it.
+	const runsHref = $derived(
+		pageHref(
+			page.url.pathname,
+			runs?.limit ?? 20,
+			Object.fromEntries(['status', 'q'].flatMap((k) => (page.url.searchParams.get(k) ? [[k, page.url.searchParams.get(k) ?? '']] : []))),
+		),
+	);
 	// The Assistant tab exists only when the engine offers the assistant's
 	// catalog. A tab that could only say it is not enabled is left out rather
 	// than shown locked.
 	const assistantOn = $derived(data.assistant === 'ready');
 	const tabs = $derived([
 		{ id: 'test', label: 'Test' },
-		{ id: 'runs', label: 'Runs', count: data.runs?.length ?? 0 },
+		{ id: 'runs', label: 'Runs', count: runs ? (runs.total ?? runs.rows.length) : undefined },
 		...(assistantOn ? [{ id: 'assistant', label: 'Assistant' }] : []),
 		{ id: 'guide', label: 'Guide' },
 	]);
@@ -940,6 +961,14 @@
 				{/if}
 			</div>
 
+			{#if data.catalogGate.state !== 'ok'}
+				<!-- The palette and every inspector form come from the node types,
+				     so the editor says they could not be read rather than offering
+				     an empty palette. -->
+				<div class="shrink-0 px-3 pt-2" data-testid="flow-catalog-unread">
+					<GateNotice gate={data.catalogGate} title="the node types" absent="The flow plugin did not send its node types, so the palette has nothing to offer." />
+				</div>
+			{/if}
 			{#if blocked}
 				<div class="shrink-0 px-3 pt-2" data-testid="flow-blocked">
 					<Alert tone="warn" title="This flow is blocked">
@@ -979,6 +1008,7 @@
 				<SidePanel name="palette" label="Palette" side="start" bind:open={paletteOpen} overlay={showPalette}>
 					<NodePalette
 						catalog={data.catalog}
+						unread={data.catalogGate.state !== 'ok'}
 						onadd={(type) => {
 							canvas?.addNodeAtCenter(type);
 							showPalette = false;
@@ -1112,11 +1142,13 @@
 						</div>
 					</div>
 				{:else if tab === 'runs'}
-					<div class="h-full overflow-y-auto p-3">
-						{#if data.runs.length === 0}
+					<div class="flex h-full flex-col gap-3 overflow-y-auto p-3">
+						{#if !data.runs.ok}
+							<GateNotice gate={data.runs.gate} title="the runs" absent="This flow is no longer there, so it has no runs." />
+						{:else if data.runs.value.rows.length === 0}
 							<p class="text-sm text-muted">No runs recorded yet.</p>
 						{:else}
-							<Table hoverable label="Versions">
+							<Table hoverable label="Runs">
 								<thead>
 									<tr>
 										<th scope="col">Status</th>
@@ -1128,7 +1160,7 @@
 									</tr>
 								</thead>
 								<tbody>
-									{#each data.runs as run (run.id)}
+									{#each data.runs.value.rows as run (run.id)}
 										<tr>
 											<td><Badge tone={statusTone(run.status)} dot>{run.status}</Badge></td>
 											<td data-cell="nowrap" class="text-muted">{triggerLabel(run.trigger_type)}</td>
@@ -1147,6 +1179,15 @@
 									{/each}
 								</tbody>
 							</Table>
+							<Pagination
+								page={pageNumber(data.runs.value.offset, data.runs.value.limit)}
+								perPage={data.runs.value.limit}
+								count={data.runs.value.rows.length}
+								total={data.runs.value.total ?? undefined}
+								hasNext={data.runs.value.hasMore}
+								noun="runs"
+								href={runsHref}
+							/>
 						{/if}
 					</div>
 				{:else if tab === 'assistant' && assistantOn}
@@ -1199,7 +1240,11 @@
 							{#snippet children()}{exportError}{/snippet}
 						</Alert>
 					{/if}
-					<pre class="max-h-96 overflow-auto rounded-md border border-line bg-surface-2 p-3 font-mono text-xs text-fg">{exportText || 'Loading'}</pre>
+					{#if exportLoading}
+						<p class="text-sm text-muted" aria-live="polite">Loading the export.</p>
+					{:else if exportText}
+						<pre class="max-h-96 overflow-auto rounded-md border border-line bg-surface-2 p-3 font-mono text-xs text-fg">{exportText}</pre>
+					{/if}
 					{#if exportText}
 						<a
 							class="text-xs text-brand underline"

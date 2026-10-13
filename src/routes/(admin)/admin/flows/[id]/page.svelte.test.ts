@@ -68,10 +68,11 @@ function setup(form: unknown = null, overrides: Record<string, unknown> = {}, co
 				locked: false,
 				flow: fixtureFlow,
 				catalog: fixtureCatalog,
+				catalogGate: { state: 'ok' },
 				datasources: [{ id: 'd1', name: 'warehouse', kind: 'postgres' }],
 				variables: ['region'],
 				schemas: [],
-				runs: [fixtureRun],
+				runs: { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 0, total: 1, hasMore: false } },
 				versions: [],
 				templates: fixtureTemplates,
 				entitlements: licensed,
@@ -512,6 +513,51 @@ describe('flow editor page', () => {
 		expect(rows[0].querySelector('form[action="?/run"] input[name="run_id"]')?.getAttribute('value')).toBe('r1');
 	});
 
+	// The tab is a table of runs, named for what it lists.
+	it('names the runs table for its runs and pages past the first twenty', async () => {
+		const runs = { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 20, total: 41, hasMore: true } };
+		const { getByRole, container } = setup(null, { runs });
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
+		expect(getByRole('region', { name: 'Runs' })).toBeTruthy();
+		const next = [...drawer.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+		expect(next).toContain('/admin/flows/f1?limit=20&offset=40');
+		expect(getByRole('tab', { name: /Runs/ }).textContent).toContain('41');
+	});
+
+	it('says the runs could not be read rather than that none were recorded', async () => {
+		const { getByRole, container } = setup(null, { runs: { ok: false, gate: { state: 'unavailable' } } });
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
+		expect(drawer.textContent).toContain('the runs could not be read');
+		expect(drawer.textContent).not.toContain('No runs recorded yet.');
+	});
+
+	it('says the node types could not be read rather than that none matches', () => {
+		const { getByTestId } = setup(null, { catalog: [], catalogGate: { state: 'error', message: 'The node types could not be read, so the palette has nothing to offer.' } });
+		expect(getByTestId('flow-catalog-unread').textContent).toContain('The node types could not be read');
+		expect(getByTestId('node-palette').textContent).toContain('could not be read');
+		expect(getByTestId('node-palette').textContent).not.toContain('No node type matches.');
+	});
+
+	// The export panel said Loading under its own error, so the reader could
+	// not tell the read had ended.
+	it('says the export could not be loaded and stops saying it is loading', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) =>
+				String(url).includes('/export')
+					? new Response('{"error":"down"}', { status: 503, headers: { 'content-type': 'application/json' } })
+					: new Response(JSON.stringify({ ok: true, errors: [] }), { status: 200, headers: { 'content-type': 'application/json' } }),
+			),
+		);
+		const { getByRole } = setup();
+		await pickOverflow(getByRole, 'Export');
+		await vi.waitFor(() => expect(document.body.textContent).toContain('The export could not be loaded.'));
+		expect(document.body.textContent).not.toContain('Loading the export.');
+		expect(document.body.querySelector('pre')).toBeNull();
+	});
+
 	it('carries the in-product guide', async () => {
 		const { getByRole, container } = setup();
 		await fireEvent.click(getByRole('tab', { name: 'Guide' }));
@@ -520,7 +566,7 @@ describe('flow editor page', () => {
 	});
 
 	it('renders the not-enabled state when the engine answered 402', () => {
-		const { getByTestId } = setup(null, { locked: true, flow: null, catalog: [], runs: [] });
+		const { getByTestId } = setup(null, { locked: true, flow: null, catalog: [] });
 		expect(getByTestId('not-enabled')).toBeTruthy();
 	});
 
