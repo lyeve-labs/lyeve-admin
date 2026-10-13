@@ -395,18 +395,32 @@ describe('admin dashboard load', () => {
 		expect(d.entriesByStatus).toBeNull();
 	});
 
-	it('does not attempt the admin reads for an editor', async () => {
+	// The content list and every tile but the schemas are admin routes, so an
+	// editor is asked for none of them rather than shown their refusal as zero.
+	it('reads only the schemas for an editor', async () => {
 		const { seen, event } = loadEvent(
-			{ '/api/admin/schemas': schemaList, '/api/admin/content': { data: [], total_count: 3 } },
+			{ '/api/admin/schemas': schemaList },
 			{ ...admin, roles: ['editor'] }
 		);
 
 		const d = (await load(event)) as Loaded;
 
 		expect(d.isAdmin).toBe(false);
-		expect(d.entryTotal).toBe(3);
-		expect(seen.filter((p) => !p.includes('/schemas') && !p.includes('/content'))).toEqual([]);
+		expect(seen).toEqual(['/api/admin/schemas']);
+		expect(d.entryTotal).toBeNull();
+		expect(d.entries).toBeNull();
 		expect(d.requests).toBeNull();
+	});
+
+	// The scheduler lists its jobs to a super admin only.
+	it('does not ask the scheduler for an admin', async () => {
+		const { seen, event } = loadEvent({ '/api/admin/schemas': schemaList, '/api/admin/jobs': [] });
+
+		const d = (await load(event)) as Loaded;
+
+		expect(d.superAdmin).toBe(false);
+		expect(seen.some((p) => p.startsWith('/api/admin/jobs'))).toBe(false);
+		expect(d.jobs).toBeNull();
 	});
 
 	it('reads a jobs list wrapped in an object as well as a bare array', async () => {

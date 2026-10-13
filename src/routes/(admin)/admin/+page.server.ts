@@ -51,7 +51,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	const { user, entitlements, customization, plugins } = await parent();
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
-	const isAdmin = user.roles.includes('admin') || user.roles.includes('super_admin');
+	const superAdmin = user.roles.includes('super_admin');
+	const isAdmin = superAdmin || user.roles.includes('admin');
 
 	/*
 	 * Every windowed read is told the window. The analytics summary with no
@@ -93,15 +94,20 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 		audit: runs(plugins, PLUGIN.audit),
 	};
 
-	// A read that failed comes back null, which each tile and list draws as
-	// unknown.
+	/*
+	 * Every read below is one the engine admits only from an admin, so a
+	 * reader below admin is not asked about it and sees no tile for it. A
+	 * refusal there would draw as a count of nothing. A read that failed
+	 * comes back null, which each tile and list draws as unknown.
+	 */
 	const ifAdmin = <T>(offered: boolean, read: () => Promise<T>): Promise<T | null> =>
 		isAdmin && stock && offered ? read().catch(() => null) : Promise.resolve(null);
-	const ifStock = <T>(offered: boolean, read: () => Promise<T>): Promise<T | null> =>
-		stock && offered ? read().catch(() => null) : Promise.resolve(null);
+	// The jobs list is the scheduler's super admin route.
+	const ifSuperAdmin = <T>(offered: boolean, read: () => Promise<T>): Promise<T | null> =>
+		superAdmin ? ifAdmin(offered, read) : Promise.resolve(null);
 
 	const count = (status: string) =>
-		ifStock(offers.content, () =>
+		ifAdmin(offers.content, () =>
 			client
 				.get<ListEnvelope<RecentEntry>>(`/api/admin/content?status=${status}&limit=1&offset=0`)
 				.then(statedTotal),
@@ -127,7 +133,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 		offers.schema
 			? section(getSchemas(client), 'The schemas could not be read. This is not a report that there are none.')
 			: Promise.resolve(null),
-		ifStock(offers.content, () =>
+		ifAdmin(offers.content, () =>
 			client.get<ListEnvelope<RecentEntry>>(`/api/admin/content?limit=${RECENT}&offset=0`),
 		),
 		count('published'),
@@ -135,7 +141,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 		ifAdmin(offers.analytics, () => getSummary({ from }, client)),
 		ifAdmin(offers.analytics, () => getTrend({ from }, client)),
 		ifAdmin(offers.analytics, () => getEndpoints({ from, limit: RECENT }, client)),
-		ifAdmin(offers.jobs, () => client.get<Job[] | { jobs: Job[] }>('/api/admin/jobs')),
+		ifSuperAdmin(offers.jobs, () => client.get<Job[] | { jobs: Job[] }>('/api/admin/jobs')),
 		ifAdmin(offers.logs, () => getLogVolume(client, window)),
 		ifAdmin(offers.webhooks, () => getGlobalHealth(client)),
 		// Not listDeadLetters(): its declared envelope is items and total, and
@@ -184,6 +190,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	return {
 		schemas: schemas as Section<Schema[]> | null,
 		isAdmin,
+		superAdmin,
 		offers,
 		window,
 		welcome: customization?.entitled ? customization.settings.brand.welcome : '',

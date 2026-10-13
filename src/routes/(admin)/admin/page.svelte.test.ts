@@ -9,6 +9,7 @@ function data(overrides: Record<string, unknown> = {}) {
 	return {
 		schemas: { ok: true, value: [{ name: 'post', display_name: 'Post', fields: [] }] },
 		isAdmin: true,
+		superAdmin: true,
 		offers: { schema: true, content: true, analytics: true, jobs: true, logs: true, webhooks: true, audit: true },
 		entries: [],
 		entryTotal: 0,
@@ -124,16 +125,29 @@ describe('dashboard tiles', () => {
 		expect(container.textContent).not.toContain('License');
 	});
 
+	// The entry list and counts are admin routes, so an editor is shown no
+	// count rather than a refusal drawn as nothing.
 	it('shows an editor only what the engine would let them read', () => {
 		const { container } = render(DashboardPage, {
-			props: { data: data({ isAdmin: false, entryTotal: 3 }), form: null },
+			props: { data: data({ isAdmin: false, superAdmin: false, entryTotal: null, entries: null }), form: null },
 		});
 
 		const text = container.textContent ?? '';
-		expect(text).toContain('Entries');
+		expect(text).toContain('Collections');
+		expect(text).not.toContain('Entries');
 		expect(text).not.toContain('Requests, 24h');
 		expect(text).not.toContain('Recent audit entries');
-		expect(text).toContain('Recent entries');
+		expect(text).not.toContain('Recent entries');
+		expect(text).not.toContain('unknown');
+	});
+
+	it('shows no jobs tile to an admin, whom the scheduler does not answer', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ superAdmin: false }), form: null },
+		});
+
+		expect(container.textContent).not.toContain('Failed jobs');
+		expect(container.querySelector('a[href="/admin/jobs"]')).toBeNull();
 	});
 
 	it('keeps the dashboard and says unknown when the schemas could not be read', () => {
@@ -145,6 +159,19 @@ describe('dashboard tiles', () => {
 		expect(text).not.toContain('No schemas yet');
 		expect(text).toContain('Right now');
 		expect(text).toContain('schemas unavailable');
+	});
+
+	it('offers the first schema only to a role that may make one', () => {
+		const admin = render(DashboardPage, { props: { data: empty, form: null } });
+		expect(admin.container.textContent).toContain('No schemas yet');
+		expect(admin.container.querySelector('a[href="/admin/schema"]')).not.toBeNull();
+		cleanup();
+
+		const { container } = render(DashboardPage, {
+			props: { data: data({ schemas: { ok: true, value: [] }, isAdmin: false, superAdmin: false }), form: null },
+		});
+		expect(container.textContent).toContain('An admin makes the first content type.');
+		expect(container.querySelector('a[href="/admin/schema"]')).toBeNull();
 	});
 
 	it('says each list could not be read rather than that it is empty', () => {

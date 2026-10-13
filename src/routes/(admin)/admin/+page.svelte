@@ -58,7 +58,7 @@
 	 */
 	const unread = $derived(
 		(data.offers.analytics && !data.requests) ||
-			(data.offers.jobs && !data.jobs) ||
+			(data.superAdmin && data.offers.jobs && !data.jobs) ||
 			(data.offers.logs && data.errorsLogged === null) ||
 			(data.offers.webhooks && !data.webhooks)
 	);
@@ -121,13 +121,18 @@
 			<DashboardWidgets widgets={data.composed} now={new Date(data.now)} />
 		{/if}
 	{:else if schemas && schemas.length === 0}
-		<EmptyState title="No schemas yet" description="A content type is the first thing to make.">
-			{#snippet action()}
-				<Button variant="secondary" href="/admin/schema">
-					<Plus size={ICON.sm} /> New schema
-				</Button>
-			{/snippet}
-		</EmptyState>
+		{#if data.isAdmin}
+			<EmptyState title="No schemas yet" description="A content type is the first thing to make.">
+				{#snippet action()}
+					<Button variant="secondary" href="/admin/schema">
+						<Plus size={ICON.sm} /> New schema
+					</Button>
+				{/snippet}
+			</EmptyState>
+		{:else}
+			<!-- The engine admits a new schema only from an admin. -->
+			<EmptyState title="No schemas yet" description="An admin makes the first content type. Your entries start once one exists." />
+		{/if}
 	{:else}
 		{#if data.isAdmin}
 			<section class="flex flex-col gap-4">
@@ -187,7 +192,9 @@
 						/>
 					</a>
 				{/if}
-				{#if data.offers.content}
+				<!-- The entry counts are read from a route the engine admits only
+				     from an admin, so no other role is shown a count. -->
+				{#if data.isAdmin && data.offers.content}
 					<a href="/admin/content" class="block h-full rounded-xl outline-none transition-shadow hover:ring-1 hover:ring-brand/40 focus-visible:ring-2 focus-visible:ring-brand">
 						<Stat class="h-full"
 							label="Entries"
@@ -216,7 +223,8 @@
 							/>
 						</a>
 					{/if}
-					{#if data.offers.jobs}
+					<!-- The scheduler lists its jobs to a super admin only. -->
+					{#if data.superAdmin && data.offers.jobs}
 						<a href="/admin/jobs" class="block h-full rounded-xl outline-none transition-shadow hover:ring-1 hover:ring-brand/40 focus-visible:ring-2 focus-visible:ring-brand">
 							<Stat class="h-full"
 								label="Failed jobs"
@@ -307,7 +315,7 @@
 			</section>
 		{/if}
 
-		{#if data.offers.content || (data.isAdmin && (data.offers.audit || data.offers.webhooks || data.offers.logs))}
+		{#if data.isAdmin && (data.offers.content || data.offers.audit || data.offers.webhooks || data.offers.logs)}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>What changed</SectionHeading>
 
