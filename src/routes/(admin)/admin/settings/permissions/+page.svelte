@@ -31,11 +31,21 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
-	const formErrorText = $derived.by(() => {
-		const said = (form as Record<string, unknown> | null)?.error;
-		return typeof said === 'string' ? said : undefined;
-	});
+	const refusal = $derived(formRefusal(form));
+
+	/*
+	 * Each failure names what caused it: the rule drawer, the new role drawer
+	 * or a delete. A drawer shows only its own failure, and only one that came
+	 * back after it was opened, so a failed delete never reads as a failure of
+	 * the form opened next. A failed delete shows above the matrix.
+	 */
+	const failure = $derived(form as { error?: unknown; action?: string; roleCapReached?: boolean } | null);
+	const failureText = $derived(typeof failure?.error === 'string' ? failure.error : undefined);
+	const inDrawer = $derived(failure?.action === 'rule' || failure?.action === 'role');
+	let openedOver = $state.raw<unknown>(null);
+	const freshIn = (drawer: 'rule' | 'role') => failure?.action === drawer && form !== openedOver;
+	const pageRefusal = $derived(inDrawer ? null : refusal);
+	const pageError = $derived(inDrawer ? undefined : failureText);
 
 	const KNOWN_ROLES = ['super_admin', 'admin', 'editor'];
 	// Activate is the fifth action and belongs to flows alone: publish,
@@ -343,6 +353,7 @@
 		editFieldMask = perm ? perm.field_mask.join(', ') : '';
 		editSchema = '';
 		ruleTarget = { role, schema };
+		openedOver = form;
 		ruleOpen = true;
 	}
 
@@ -395,6 +406,10 @@
 	// so creating one writes its wildcard rule with no actions.
 	let roleOpen = $state(false);
 	let newRoleName = $state('');
+	function openRole() {
+		openedOver = form;
+		roleOpen = true;
+	}
 
 	/**
 	 * Returning a callback replaces SvelteKit's own handling, so this one calls
@@ -493,14 +508,14 @@
 >
 	{#snippet actions()}
 		{#if !loadError && !atRoleCap}
-			<Button variant="primary" size="sm" onclick={() => (roleOpen = true)}>
+			<Button variant="primary" size="sm" onclick={openRole}>
 				<Plus size={ICON.sm} />
 				New role
 			</Button>
 		{/if}
 	{/snippet}
 
-	{#if !loadError && atRoleCap && !(form as Record<string, unknown> | null)?.roleCapReached}
+	{#if !loadError && atRoleCap && !failure?.roleCapReached}
 		<Alert tone="info" title="{storedRoleCount} of {roleCap} roles">
 			The engine refuses a new role past this instance's ceiling of {roleCap}. Every role you have keeps working.
 		</Alert>
@@ -508,16 +523,16 @@
 
 	{#if pageRefusal}
 		<RefusalNotice refusal={pageRefusal} />
-	{:else if (form as Record<string, unknown> | null)?.roleCapReached}
+	{:else if failure?.roleCapReached}
 		<Alert tone="warn" title="That would pass this instance's role ceiling">
 			{#snippet children()}
 				The ceiling is {roleCap} roles and this instance has {storedRoleCount}. Nothing was changed
 				and every role you have keeps working.
 			{/snippet}
 		</Alert>
-	{:else if (form as Record<string, unknown> | null)?.error}
+	{:else if pageError}
 		<Alert tone="danger" title="The change was not saved">
-			{#snippet children()}{(form as Record<string, unknown>).error}{/snippet}
+			{#snippet children()}{pageError}{/snippet}
 		</Alert>
 	{/if}
 
@@ -729,7 +744,8 @@
 		>
 			<!-- A refused save keeps the drawer open, so the reason has to be in
 			     it and not behind the panel on the page. -->
-			<FormErrors message={formErrorText} refused={pageRefusal} />
+			<FormErrors message={freshIn('rule') ? failureText : undefined} refused={freshIn('rule') ? refusal : null} />
+			<input type="hidden" name="drawer" value="rule" />
 			<input type="hidden" name="role" value={role} />
 
 			{#if schema === null}
@@ -839,7 +855,8 @@
 		use:enhance={saveRole.enhance}
 		class="space-y-4"
 	>
-		<FormErrors message={formErrorText} refused={pageRefusal} />
+		<FormErrors message={freshIn('role') ? failureText : undefined} refused={freshIn('role') ? refusal : null} />
+		<input type="hidden" name="drawer" value="role" />
 		<!-- The matrix lists a role only where a rule names it, so a new role
 		     is a wildcard rule with no actions: it grants nothing until a
 		     rule is edited. -->

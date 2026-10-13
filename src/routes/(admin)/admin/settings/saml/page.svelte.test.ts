@@ -192,12 +192,30 @@ describe('the role', () => {
 });
 
 describe('the drawer', () => {
+	const drawerText = () => document.body.querySelector('form#saml-provider-form')?.textContent ?? '';
+
 	it('shows a refused save inside the open drawer', async () => {
-		render(SamlPage, { props: props({}, { error: 'The provider could not be saved.' }) });
+		const { rerender } = render(SamlPage, { props: props() });
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
-		const form = document.body.querySelector('form#saml-provider-form');
-		expect(form?.textContent).toContain('The provider could not be saved.');
+		await rerender(props({}, { action: 'create', error: 'The provider could not be created.' }));
+		expect(drawerText()).toContain('The provider could not be created.');
 	});
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container } = render(SamlPage, {
+			props: props({}, { action: 'delete', error: 'The provider could not be removed.' }),
+		});
+		expect(said(container)).toContain('The provider could not be removed.');
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		expect(drawerText()).not.toContain('could not be removed');
+	});
+
+	it('leaves a reopened drawer clean of the failure it showed before', async () => {
+		render(SamlPage, { props: props({}, { action: 'create', error: 'The provider could not be created.' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		expect(drawerText()).not.toContain('could not be created');
+	});
+
 });
 
 describe('the pager', () => {

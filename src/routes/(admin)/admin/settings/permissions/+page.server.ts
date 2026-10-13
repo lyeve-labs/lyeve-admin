@@ -10,7 +10,7 @@ import type { FlowOption } from '$lib/flow/types';
 import { isFlowResource } from '$lib/flow/permissions';
 import { getRoleLimits, type RoleLimits } from '$lib/api/permissions';
 import { sessionToken } from '$lib/server/session-cookie';
-import { actionError } from '$lib/server/action-error';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { section } from '$lib/api/gate';
 
 // Static text. The engine's own message can carry driver or upstream detail
@@ -75,13 +75,16 @@ export const actions: Actions = {
 		// nothing ever matches it.
 		const role = ((form.get('role') as string) ?? '').trim();
 		const schemaName = ((form.get('schema_name') as string) ?? '').trim();
+		// The rule drawer and the new role drawer both post here. The failure
+		// names the one that posted, so it shows in that drawer only.
+		const action = form.get('drawer') === 'role' ? 'role' : 'rule';
 		if (!role || !schemaName) {
-			return fail(422, { error: 'Role and resource are required' });
+			return fail(422, { action, error: 'Role and resource are required' });
 		}
 		// The engine's validator refuses activate on anything but a flow
 		// resource. Refusing it here keeps the message about the form.
 		if (actions.includes('activate') && !isFlowResource(schemaName)) {
-			return fail(422, { error: 'Activate applies to flows only' });
+			return fail(422, { action, error: 'Activate applies to flows only' });
 		}
 
 		try {
@@ -97,9 +100,12 @@ export const actions: Actions = {
 		} catch (e: unknown) {
 			if (isRoleCapRefusal(e)) {
 				const refused = refusalOf(e);
-				return fail(402, { roleCapReached: true, refused });
+				return fail(402, { action, roleCapReached: true, refused });
 			}
-			return fail(400, { error: actionError(e, 'The rule could not be saved.') });
+			// Any other 402 is a license refusal, which the drawer renders with
+			// its numbers and its link rather than as the engine's sentence.
+			const failure = actionFailure(e, 'The rule could not be saved.');
+			return fail(failure.status, { ...failure.data, action });
 		}
 		return { success: true };
 	},
@@ -113,7 +119,7 @@ export const actions: Actions = {
 		try {
 			await deletePermission(id, client);
 		} catch (e: unknown) {
-			return fail(400, { error: actionError(e, 'The rule could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(e, 'The rule could not be removed.') });
 		}
 		return { success: true };
 	},

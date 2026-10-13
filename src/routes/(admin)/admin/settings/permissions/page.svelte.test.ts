@@ -657,19 +657,54 @@ describe('permissions page drawers', () => {
 		});
 	}
 
+	const dataWith = (over: Record<string, unknown> = {}) => ({
+		permissions: [permission],
+		schemas: [{ name: 'article' }],
+		entitlements,
+		loadError: null,
+		...over,
+	});
+	const ruleText = () => document.body.querySelector('form#rule-form')?.textContent ?? '';
+	const roleText = () => document.body.querySelector('form#role-form')?.textContent ?? '';
+	const editButton = (all: HTMLElement[]) => all.find((b) => b.getAttribute('aria-label')?.startsWith('Edit rule'))!;
+	const newRoleButton = (all: HTMLElement[]) => all.find((b) => b.textContent?.includes('New role'))!;
+
 	it('shows a refused rule save inside the open rule drawer', async () => {
-		const { container, getAllByRole } = setupWith({ error: 'The rule could not be saved.' });
-		const edit = getAllByRole('button').find((b) => b.getAttribute('aria-label')?.startsWith('Edit rule'));
-		await fireEvent.click(edit!);
-		const ruleForm = container.ownerDocument.querySelector('form#rule-form');
-		expect(ruleForm?.textContent).toContain('The rule could not be saved.');
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(editButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
+		expect(ruleText()).toContain('The rule could not be saved.');
 	});
 
 	it('shows a refused role inside the open role drawer', async () => {
-		const { container, getAllByRole } = setupWith({ error: 'The rule could not be saved.' });
-		await fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('New role'))!);
-		const roleForm = container.ownerDocument.querySelector('form#role-form');
-		expect(roleForm?.textContent).toContain('The rule could not be saved.');
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'role', error: 'The rule could not be saved.' } } as never);
+		expect(roleText()).toContain('The rule could not be saved.');
+	});
+
+	it('shows the role ceiling refusal with its numbers in the role drawer', async () => {
+		const refused = { kind: 'cap', cap: 'permissions.roles', limit: 3, current: 3, upgradeUrl: '' };
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'role', roleCapReached: true, refused } } as never);
+		expect(roleText()).toContain('3 of 3 roles are in use');
+	});
+
+	it('leaves newly opened drawers clean after a failed delete', async () => {
+		const { container, getAllByRole } = setupWith({ action: 'delete', error: 'The rule could not be removed.' });
+		expect(container.textContent).toContain('The rule could not be removed.');
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		expect(roleText()).not.toContain('could not be removed');
+		await fireEvent.click(editButton(getAllByRole('button')));
+		expect(ruleText()).not.toContain('could not be removed');
+	});
+
+	it('keeps a failed rule save out of the role drawer', async () => {
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
+		expect(roleText()).not.toContain('could not be saved');
 	});
 
 	it('says in the new rule form that the flows could not be read', async () => {

@@ -139,18 +139,43 @@ describe('the role', () => {
 });
 
 describe('the drawers', () => {
+	const createText = () => document.body.querySelector('form#scim-connection-form')?.textContent ?? '';
+	const rotateText = () => document.body.querySelector('form#scim-rotate-form')?.textContent ?? '';
+
 	it('shows a refused create inside the open drawer', async () => {
-		render(ScimPage, { props: props({}, { error: 'The connection could not be created.' }) });
+		const { rerender } = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
-		const form = document.body.querySelector('form#scim-connection-form');
-		expect(form?.textContent).toContain('The connection could not be created.');
+		await rerender(props({}, { action: 'create', error: 'The connection could not be created.' }));
+		expect(createText()).toContain('The connection could not be created.');
 	});
 
 	it('shows a refused rotation inside the open drawer', async () => {
-		render(ScimPage, { props: props({}, { error: 'The token could not be rotated.' }) });
+		const { rerender } = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
-		const form = document.body.querySelector('form#scim-rotate-form');
-		expect(form?.textContent).toContain('The token could not be rotated.');
+		await rerender(props({}, { action: 'rotate', error: 'The token could not be rotated.' }));
+		expect(rotateText()).toContain('The token could not be rotated.');
+	});
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container } = render(ScimPage, {
+			props: props({}, { action: 'delete', error: 'The connection could not be removed.' }),
+		});
+		expect(said(container)).toContain('The connection could not be removed.');
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		expect(createText()).not.toContain('could not be removed');
+	});
+
+	it('keeps a failed create out of the rotate drawer, and a failed rotation out of the create drawer', async () => {
+		const { rerender } = render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
+		await rerender(props({}, { action: 'create', error: 'The connection could not be created.' }));
+		expect(rotateText()).not.toContain('could not be created');
+		cleanup();
+
+		const second = render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		await second.rerender(props({}, { action: 'rotate', error: 'The token could not be rotated.' }));
+		expect(createText()).not.toContain('could not be rotated');
 	});
 
 	it('offers the deprovision choice as radios that say deleting cannot be undone', async () => {

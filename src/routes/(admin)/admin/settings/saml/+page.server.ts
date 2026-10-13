@@ -95,10 +95,10 @@ export const actions: Actions = {
 		const ssoUrl = String(form.get('sso_url') ?? '').trim();
 		const idpCert = String(form.get('idp_cert') ?? '').trim();
 
-		if (!name) return fail(400, { error: 'Name the provider so people know what they are signing in with.' });
-		if (!entityId) return fail(400, { error: 'The IdP entity ID is required.' });
-		if (!ssoUrl) return fail(400, { error: 'The IdP sign-on URL is required.' });
-		if (!idpCert) return fail(400, { error: 'The IdP certificate is required, or no assertion can be verified.' });
+		if (!name) return fail(400, { action: 'create', error: 'Name the provider so people know what they are signing in with.' });
+		if (!entityId) return fail(400, { action: 'create', error: 'The IdP entity ID is required.' });
+		if (!ssoUrl) return fail(400, { action: 'create', error: 'The IdP sign-on URL is required.' });
+		if (!idpCert) return fail(400, { action: 'create', error: 'The IdP certificate is required, or no assertion can be verified.' });
 
 		try {
 			await createProvider(client, {
@@ -116,7 +116,7 @@ export const actions: Actions = {
 				enabled: form.get('enabled') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The provider could not be created.') });
+			return fail(400, { action: 'create', error: actionError(err, 'The provider could not be created.') });
 		}
 		return { saved: name };
 	},
@@ -126,10 +126,10 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No provider was named.' });
+		if (!id) return fail(400, { action: 'update', error: 'No provider was named.' });
 
 		const name = String(form.get('name') ?? '').trim();
-		if (!name) return fail(400, { error: 'Name the provider so people know what they are signing in with.' });
+		if (!name) return fail(400, { action: 'update', error: 'Name the provider so people know what they are signing in with.' });
 
 		// An empty certificate field means "leave the stored one alone". Sending
 		// the empty string would wipe the only thing that verifies an assertion.
@@ -151,7 +151,7 @@ export const actions: Actions = {
 				enabled: form.get('enabled') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The provider could not be saved.') });
+			return fail(400, { action: 'update', error: actionError(err, 'The provider could not be saved.') });
 		}
 		return { saved: name };
 	},
@@ -161,11 +161,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No provider was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'No provider was named.' });
 		try {
 			await deleteProvider(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The provider could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The provider could not be removed.') });
 		}
 		return { removed: id };
 	},
@@ -175,11 +175,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No provider was named.' });
+		if (!id) return fail(400, { action: 'prepare', error: 'No provider was named.' });
 		try {
 			await prepareCert(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'A new certificate could not be prepared.') });
+			return fail(400, { action: 'prepare', error: actionError(err, 'A new certificate could not be prepared.') });
 		}
 		return { prepared: id };
 	},
@@ -189,11 +189,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No provider was named.' });
+		if (!id) return fail(400, { action: 'rollover', error: 'No provider was named.' });
 		try {
 			await rolloverCert(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The certificate could not be promoted.') });
+			return fail(400, { action: 'rollover', error: actionError(err, 'The certificate could not be promoted.') });
 		}
 		return { rolled: id };
 	},

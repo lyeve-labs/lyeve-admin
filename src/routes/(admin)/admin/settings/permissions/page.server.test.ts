@@ -252,3 +252,26 @@ describe('permissions +page.server.ts actions.upsert', () => {
 		expect(mockedUpsertPermission).not.toHaveBeenCalled();
 	});
 });
+
+describe('permissions +page.server.ts refused writes', () => {
+	type Failed = { status: number; data: Record<string, unknown> };
+
+	it('renders a license refusal that is not the role ceiling as a refusal, not as engine text', async () => {
+		const refusal = Object.assign(new ApiError(402, 'payment_required'), {
+			body: { error: 'payment_required', feature: 'feature:rbac', plugin: 'permissions' },
+		});
+		mockedUpsertPermission.mockRejectedValueOnce(refusal);
+		const result = (await actions.upsert(upsertEvent({ role: 'editor', schema_name: 'article', drawer: 'rule' }))) as Failed;
+		expect(result.status).toBe(402);
+		expect(result.data.refused).toMatchObject({ kind: 'feature' });
+		expect(result.data.roleCapReached).toBeUndefined();
+		expect(result.data.action).toBe('rule');
+	});
+
+	it('names the drawer that posted, so the failure shows in that drawer only', async () => {
+		mockedUpsertPermission.mockRejectedValueOnce(new ApiError(500, 'pq: boom'));
+		const result = (await actions.upsert(upsertEvent({ role: 'reviewer', schema_name: '*', drawer: 'role' }))) as Failed;
+		expect(result.data.action).toBe('role');
+		expect(result.data.error).toBe('The rule could not be saved.');
+	});
+});

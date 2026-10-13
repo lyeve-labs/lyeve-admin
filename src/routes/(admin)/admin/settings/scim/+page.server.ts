@@ -68,13 +68,14 @@ export const actions: Actions = {
 		const token = String(form.get('bearer_token') ?? '');
 		const action = deprovisionAction(String(form.get('deprovision_action') ?? 'disable'));
 
-		if (!name) return fail(400, { error: 'Name the connection so it can be told from the others.' });
+		if (!name) return fail(400, { action: 'create', error: 'Name the connection so it can be told from the others.' });
 		if (token.length < MIN_TOKEN_LENGTH) {
 			return fail(400, {
+				action: 'create',
 				error: `The token is the whole authentication for a route that creates and deletes accounts. Use at least ${MIN_TOKEN_LENGTH} characters.`,
 			});
 		}
-		if (!action) return fail(400, { error: 'Choose what happens to a deprovisioned account.' });
+		if (!action) return fail(400, { action: 'create', error: 'Choose what happens to a deprovisioned account.' });
 
 		try {
 			await createProvider(client, {
@@ -84,7 +85,7 @@ export const actions: Actions = {
 				deprovision_action: action,
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The connection could not be created.') });
+			return fail(400, { action: 'create', error: actionError(err, 'The connection could not be created.') });
 		}
 		return { saved: name };
 	},
@@ -95,16 +96,17 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const token = String(form.get('new_token') ?? '');
-		if (!id) return fail(400, { error: 'No connection was named.' });
+		if (!id) return fail(400, { action: 'rotate', error: 'No connection was named.' });
 		if (token.length < MIN_TOKEN_LENGTH) {
 			return fail(400, {
+				action: 'rotate',
 				error: `Use at least ${MIN_TOKEN_LENGTH} characters. The old token stops working the moment this one is stored.`,
 			});
 		}
 		try {
 			await rotateToken(client, id, token);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The token could not be rotated.') });
+			return fail(400, { action: 'rotate', error: actionError(err, 'The token could not be rotated.') });
 		}
 		return { rotated: id };
 	},
@@ -114,11 +116,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No connection was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'No connection was named.' });
 		try {
 			await deleteProvider(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The connection could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The connection could not be removed.') });
 		}
 		return { removed: id };
 	},

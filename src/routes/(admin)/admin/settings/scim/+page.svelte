@@ -42,7 +42,19 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Each failure names the action that caused it. A drawer shows only its own
+	 * actions' failures, and only one that came back after it was opened, so a
+	 * failed delete never reads as a failure of the form opened next. The rest
+	 * show above the list.
+	 */
+	const failure = $derived(form as { error?: string; action?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	function failedIn(actions: string[]): string | undefined {
+		if (!failure?.error || form === openedOver) return undefined;
+		return actions.includes(failure.action ?? '') ? failure.error : undefined;
+	}
+	const rowError = $derived(failure?.error && failure.action !== 'create' && failure.action !== 'rotate' ? failure.error : '');
 	const deprovisioning = $derived(data.providers.filter((p) => p.deprovision_on_delete).length);
 
 	// An admin may read the connections. Every write is the super admin's, so an
@@ -83,10 +95,12 @@
 		token = '';
 		deprovisionOnDelete = true;
 		action = 'disable';
+		openedOver = form;
 		creating = true;
 	}
 
 	function openRotate(p: ScimProvider) {
+		openedOver = form;
 		rotating = p;
 		newToken = '';
 	}
@@ -158,8 +172,8 @@
 			absent="The SCIM plugin is not part of this build, so no directory can provision accounts here."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 		{#if !canWrite}
 			<Alert tone="brand">Only a super admin can add or remove a connection, or rotate its token.</Alert>
@@ -288,7 +302,7 @@
 		<div class="flex flex-col gap-4">
 			<!-- A refused save keeps the drawer open, so the reason has to be in
 			     it and not behind the panel on the page. -->
-			<FormErrors message={formError || undefined} />
+			<FormErrors message={failedIn(['create'])} />
 			<Input
 				id="scim-name"
 				name="name"
@@ -341,7 +355,7 @@
 	<form id="scim-rotate-form" method="POST" action="?/rotate" use:enhance={saveTokenSubmit.enhance}>
 		<input type="hidden" name="id" value={rotating?.id ?? ''} />
 		<div class="flex flex-col gap-4">
-			<FormErrors message={formError || undefined} />
+			<FormErrors message={failedIn(['rotate'])} />
 			<Alert tone="warn">
 				The old token stops working the moment this one is stored. Provisioning fails until
 				the directory is updated with the new one.

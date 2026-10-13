@@ -31,9 +31,20 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+	const refusal = $derived(formRefusal(form));
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Each failure names the action that caused it. The drawer shows only a
+	 * failed save, and only one that came back after it was opened, so a failed
+	 * delete never reads as a failure of the form opened next. A failed delete
+	 * shows above the list.
+	 */
+	const failure = $derived(form as { error?: string; action?: string } | null);
+	const savedInDrawer = $derived(failure?.action === 'create' || failure?.action === 'update');
+	let openedOver = $state.raw<unknown>(null);
+	const drawerFresh = $derived(savedInDrawer && form !== openedOver);
+	const pageRefusal = $derived(savedInDrawer ? null : refusal);
+	const formError = $derived(savedInDrawer ? '' : (failure?.error ?? ''));
 
 	// One drawer for both writes: a null target is a new provider.
 	let open = $state(false);
@@ -95,6 +106,7 @@
 		rolesClaim = 'roles';
 		defaultRoles = 'editor';
 		enabled = true;
+		openedOver = form;
 		open = true;
 	}
 
@@ -108,6 +120,7 @@
 		rolesClaim = p.roles_claim;
 		defaultRoles = p.default_roles.join(', ');
 		enabled = p.enabled;
+		openedOver = form;
 		open = true;
 	}
 
@@ -251,7 +264,7 @@
 	>
 		<!-- A refused save keeps the drawer open, so the reason has to be in it
 		     and not behind the panel on the page. -->
-		<FormErrors message={formError || undefined} refused={pageRefusal} />
+		<FormErrors message={drawerFresh ? failure?.error : undefined} refused={drawerFresh ? refusal : null} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input
 			id="provider-name"

@@ -41,7 +41,21 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Each failure names the action that caused it. A drawer shows only its own
+	 * actions' failures, and only one that came back after it was opened, so a
+	 * failed delete never reads as a failure of the form opened next. The rest
+	 * show above the list.
+	 */
+	const failure = $derived(form as { error?: string; action?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	function failedIn(actions: string[]): string | undefined {
+		if (!failure?.error || form === openedOver) return undefined;
+		return actions.includes(failure.action ?? '') ? failure.error : undefined;
+	}
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const drawerError = $derived(failedIn(DRAWER_ACTIONS));
+	const rowError = $derived(failure?.error && !DRAWER_ACTIONS.includes(failure.action ?? '') ? failure.error : '');
 
 	// An admin may read the providers. Every write is the super admin's, so an
 	// admin is shown the list and no control that would only be refused.
@@ -98,6 +112,7 @@
 		signAuthnRequests = true;
 		encryptAssertions = false;
 		enabled = true;
+		openedOver = form;
 		open = true;
 	}
 
@@ -119,6 +134,7 @@
 		signAuthnRequests = p.sign_authn_requests;
 		encryptAssertions = p.encrypt_assertions;
 		enabled = p.enabled;
+		openedOver = form;
 		open = true;
 	}
 
@@ -202,8 +218,8 @@
 			absent="The SAML plugin is not part of this build, so no identity provider can be configured here."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 		{#if !canWrite}
 			<Alert tone="brand">Only a super admin can add, change or remove an identity provider, or renew its certificate.</Alert>
@@ -404,7 +420,7 @@
 		<div class="flex flex-col gap-4">
 			<!-- A refused save keeps the drawer open, so the reason has to be in
 			     it and not behind the panel on the page. -->
-			<FormErrors message={formError || undefined} />
+			<FormErrors message={drawerError} />
 			<Input
 				id="saml-name"
 				name="name"
