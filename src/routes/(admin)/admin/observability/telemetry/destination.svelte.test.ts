@@ -68,6 +68,22 @@ describe('the tenant destination', () => {
 		expect(screen.getByRole('button', { name: 'Remove destination' })).toBeTruthy();
 	});
 
+	// The form stayed live with Save enabled, so an unlicensed reader filled it
+	// in only to be refused on submit.
+	it('offers no save the license refuses, and says why beside the button', () => {
+		const { container } = render(TelemetryPage, props({ destination: STORED, licensed: false }));
+		const save = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+		expect(save.disabled).toBe(true);
+		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).matches(':disabled')).toBe(true);
+		expect(said(container)).toContain('Not enabled on this instance.');
+		expect((screen.getByRole('button', { name: 'Remove destination' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('keeps the save live on a licensed install', () => {
+		render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+
 	it('renders a refused save through the refusal notice', () => {
 		render(
 			TelemetryPage,

@@ -313,7 +313,7 @@
 			{/if}
 
 			{#if !data.destination.licensed}
-				<p class="text-sm text-muted">
+				<p class="text-sm text-muted" id="destination-unlicensed">
 					Setting or changing a destination needs a license this install does not hold. A destination already
 					saved keeps receiving, and removing it is always allowed.
 				</p>
@@ -342,75 +342,91 @@
 					use:enhance={saveDest.enhance}
 					class="flex flex-col gap-4"
 				>
-					<SegmentedControl label="Protocol" name="kind" bind:value={kind} options={[...DESTINATION_KINDS]} />
-					<Input
-						id="destination-url"
-						name="url"
-						label="URL"
-						placeholder="https://otlp.example.com/v1/metrics"
-						hint="An http or https address. Credentials go in a header, never in the URL."
-						bind:value={destUrl}
-						required
-					/>
-
-					{#if destination && destination.header_names.length > 0}
-						<SegmentedControl
-							label="Headers"
-							name="headers_mode"
-							bind:value={headersMode}
-							options={[
-								{ value: 'keep', label: 'Keep the stored headers' },
-								{ value: 'replace', label: 'Replace them' },
-							]}
+					<!-- A save the license refuses is not offered. The fields stay in
+					     sight, so the reader sees what is set, and the reason is
+					     beside the button. -->
+					<fieldset class="contents" disabled={!data.destination.licensed}>
+						<SegmentedControl label="Protocol" name="kind" bind:value={kind} options={[...DESTINATION_KINDS]} disabled={!data.destination.licensed} />
+						<Input
+							id="destination-url"
+							name="url"
+							label="URL"
+							placeholder="https://otlp.example.com/v1/metrics"
+							hint="An http or https address. Credentials go in a header, never in the URL."
+							bind:value={destUrl}
+							required
 						/>
-						{#if headersMode === 'keep'}
-							<p class="text-xs text-muted">
-								Stored: <span class="font-mono">{destination.header_names.join(', ')}</span>. Their values are
-								never shown.
-							</p>
+
+						{#if destination && destination.header_names.length > 0}
+							<SegmentedControl
+								label="Headers"
+								name="headers_mode"
+								bind:value={headersMode}
+								options={[
+									{ value: 'keep', label: 'Keep the stored headers' },
+									{ value: 'replace', label: 'Replace them' },
+								]}
+							/>
+							{#if headersMode === 'keep'}
+								<p class="text-xs text-muted">
+									Stored: <span class="font-mono">{destination.header_names.join(', ')}</span>. Their values are
+									never shown.
+								</p>
+							{/if}
+						{:else}
+							<input type="hidden" name="headers_mode" value="replace" />
 						{/if}
-					{:else}
-						<input type="hidden" name="headers_mode" value="replace" />
-					{/if}
 
-					{#if movesHost}
-						<Alert tone="warn">
-							This URL is on another host than the stored one, so the stored headers will not follow it. Replace
-							the headers to save.
-						</Alert>
-					{/if}
+						{#if movesHost}
+							<Alert tone="warn">
+								This URL is on another host than the stored one, so the stored headers will not follow it. Replace
+								the headers to save.
+							</Alert>
+						{/if}
 
-					{#if headersMode === 'replace'}
-						<div class="flex flex-col gap-3">
-							{#each headers as h (h.id)}
-								<div class="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
-									<Input id="header-name-{h.id}" name="header_name" label="Header" placeholder="Authorization" bind:value={h.name} />
-									<PasswordInput
-										id="header-value-{h.id}"
-										name="header_value"
-										label="Value"
-										autocomplete="off"
-										bind:value={h.value}
-									/>
-									<Button variant="ghost" size="sm" aria-label="Remove header {h.name || h.id}" onclick={() => dropHeader(h.id)}>
-										<Trash2 size={ICON.sm} class="text-danger" />
+						{#if headersMode === 'replace'}
+							<div class="flex flex-col gap-3">
+								{#each headers as h (h.id)}
+									<div class="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
+										<Input id="header-name-{h.id}" name="header_name" label="Header" placeholder="Authorization" bind:value={h.name} />
+										<PasswordInput
+											id="header-value-{h.id}"
+											name="header_value"
+											label="Value"
+											autocomplete="off"
+											bind:value={h.value}
+										/>
+										<Button variant="ghost" size="sm" aria-label="Remove header {h.name || h.id}" onclick={() => dropHeader(h.id)}>
+											<Trash2 size={ICON.sm} class="text-danger" />
+										</Button>
+									</div>
+								{/each}
+								<div>
+									<Button variant="secondary" size="sm" onclick={addHeader}>
+										<Plus size={ICON.sm} /> Add header
 									</Button>
 								</div>
-							{/each}
-							<div>
-								<Button variant="secondary" size="sm" onclick={addHeader}>
-									<Plus size={ICON.sm} /> Add header
-								</Button>
+								{#if destination && destination.header_names.length > 0 && headers.length === 0}
+									<p class="text-xs text-muted">Saving with no header clears the stored ones.</p>
+								{/if}
 							</div>
-							{#if destination && destination.header_names.length > 0 && headers.length === 0}
-								<p class="text-xs text-muted">Saving with no header clears the stored ones.</p>
+						{/if}
+
+						<div class="flex flex-wrap items-center gap-2">
+							<Button
+								variant="primary"
+								type="submit"
+								loading={saveDest.pending}
+								disabled={!data.destination.licensed}
+								aria-describedby={data.destination.licensed ? undefined : 'destination-unlicensed'}
+							>
+								Save
+							</Button>
+							{#if !data.destination.licensed}
+								<span class="text-xs text-muted">Not enabled on this instance.</span>
 							{/if}
 						</div>
-					{/if}
-
-					<div class="flex flex-wrap gap-2">
-						<Button variant="primary" type="submit" loading={saveDest.pending}>Save</Button>
-					</div>
+					</fieldset>
 				</form>
 				{#if destination}
 					<form method="POST" action="?/removeDestination" class="mt-4 border-t border-line pt-4" use:enhance={removeDest}>

@@ -73,6 +73,24 @@ describe('capture rules', () => {
 		expect(said(container)).toContain('Capture rules and replay sets are not included');
 	});
 
+	// The note said the license was missing while New rule stayed live, so a
+	// reader filled in a rule only to be refused on save.
+	it('offers no new rule or replay set the license refuses', () => {
+		const { getAllByRole } = render(CapturesPage, { props: props({ licensed: false, rules: [] }) });
+		const newRule = getAllByRole('button', { name: /New rule/ });
+		expect(newRule.length).toBeGreaterThan(0);
+		for (const b of newRule) {
+			expect((b as HTMLButtonElement).disabled).toBe(true);
+			expect(b.getAttribute('title')).toBe('Not included in this license');
+		}
+		expect((getAllByRole('button', { name: /New replay set/ })[0] as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it('keeps New rule live on a licensed install', () => {
+		const { getAllByRole } = render(CapturesPage, { props: props({ licensed: true }) });
+		expect((getAllByRole('button', { name: /New rule/ })[0] as HTMLButtonElement).disabled).toBe(false);
+	});
+
 	it('reports a failed rules read as a failure', () => {
 		const { container } = render(CapturesPage, { props: props({ rules: [], rulesRead: false }) });
 		expect(said(container)).toContain('could not be read');

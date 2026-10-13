@@ -64,9 +64,10 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
 	// Releasing a key lets the next request carrying it run the handler again,
 	// which is the repair for a key whose process died mid-write and the wrong
-	// thing to do to one that is genuinely in flight.
+	// thing to do to one that is genuinely in flight. The plugin admits any
+	// admin to the release, the same readers who can list the keys.
 	release: async (event) => {
-		await requireRole(event, ['super_admin']);
+		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const key = String(form.get('key') ?? '');

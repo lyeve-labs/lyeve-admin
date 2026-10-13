@@ -46,6 +46,11 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const refusal = $derived(formRefusal(form));
+	// The plugin refuses a new rule or a new replay set on an install whose
+	// license leaves them out, so neither is offered there. Switching a rule
+	// off and deleting one stay allowed.
+	const canCreate = $derived(data.licensed !== false);
+	const NOT_INCLUDED = 'Not included in this license';
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const needsWrites = $derived((form as { needsWrites?: string } | null)?.needsWrites ?? '');
 	const replay = $derived((form as { replay?: SetReplay } | null)?.replay ?? null);
@@ -164,7 +169,13 @@
 >
 	{#snippet actions()}
 		{#if data.gate.state === 'ok'}
-			<Button variant="primary" size="sm" onclick={openCreate}>
+			<Button
+				variant="primary"
+				size="sm"
+				onclick={openCreate}
+				disabled={!canCreate}
+				title={canCreate ? undefined : NOT_INCLUDED}
+			>
 				<Plus size={ICON.sm} /> New rule
 			</Button>
 		{/if}
@@ -222,7 +233,7 @@
 						<History size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openCreate}>
+						<Button variant="secondary" onclick={openCreate} disabled={!canCreate} title={canCreate ? undefined : NOT_INCLUDED}>
 							<Plus size={ICON.sm} /> New rule
 						</Button>
 					{/snippet}
@@ -380,7 +391,8 @@
 					<Button
 						variant="secondary"
 						size="sm"
-						disabled={selected.length === 0 || selected.length > MAX_SET_CAPTURES}
+						disabled={!canCreate || selected.length === 0 || selected.length > MAX_SET_CAPTURES}
+						title={canCreate ? undefined : NOT_INCLUDED}
 						onclick={openSet}
 					>
 						<FileStack size={ICON.sm} /> New replay set{selected.length > 0 ? ` from ${selected.length}` : ''}
