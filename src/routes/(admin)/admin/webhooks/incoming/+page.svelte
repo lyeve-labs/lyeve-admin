@@ -34,6 +34,10 @@
 
 	const submit = submitter(() => (open = false));
 
+	// The webhook plugin serves create, update and delete to a super admin
+	// only. An admin reads the endpoints and is told the rest.
+	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
+
 	const rows = $derived(data.incomingWebhooks.ok ? data.incomingWebhooks.value : []);
 	const schemaNames = $derived(data.schemas.ok ? data.schemas.value.map((s) => s.name) : []);
 
@@ -118,7 +122,7 @@
 >
 	{#snippet actions()}
 		<!-- A list that could not be read offers no write against it. -->
-		{#if data.incomingWebhooks.ok}
+		{#if data.incomingWebhooks.ok && isSuperAdmin}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} />
 				New incoming webhook
@@ -134,6 +138,10 @@
 		</Alert>
 	{/if}
 
+	{#if data.incomingWebhooks.ok && !isSuperAdmin}
+		<Alert tone="brand">Your role reads incoming webhooks. Creating, changing or deleting one takes a super admin.</Alert>
+	{/if}
+
 	{#if !data.incomingWebhooks.ok}
 		<GateNotice
 			gate={data.incomingWebhooks.gate}
@@ -147,10 +155,12 @@
 		>
 			{#snippet iconSnippet()}<ArrowDownToLine size={ICON.lg} />{/snippet}
 			{#snippet action()}
-				<Button variant="secondary" onclick={openCreate}>
-					<Plus size={ICON.sm} />
-					New incoming webhook
-				</Button>
+				{#if isSuperAdmin}
+					<Button variant="secondary" onclick={openCreate}>
+						<Plus size={ICON.sm} />
+						New incoming webhook
+					</Button>
+				{/if}
 			{/snippet}
 		</EmptyState>
 	{:else}
@@ -194,6 +204,7 @@
 								</div>
 							{/if}
 						</div>
+						{#if isSuperAdmin}
 						<div class="flex shrink-0 items-center gap-2">
 							<Button
 								variant="ghost"
@@ -214,6 +225,7 @@
 								<Trash2 size={ICON.sm} class="text-danger" />
 							</Button>
 						</div>
+						{/if}
 					</div>
 				</Card>
 			{/each}

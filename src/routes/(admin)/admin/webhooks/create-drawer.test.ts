@@ -14,7 +14,7 @@ describe('webhooks create drawer posts a real event list', () => {
 	it('names every checkbox so getAll("events") sees a list', async () => {
 		const { container, getAllByText } = render(WebhooksPage, {
 			props: {
-				data: { webhooks: { ok: true, value: [] }, schemas: { ok: true, value: [{ name: 'post' }] }, entitlements, user: { roles: [] } },
+				data: { webhooks: { ok: true, value: [] }, schemas: { ok: true, value: [{ name: 'post' }] }, entitlements, user: { roles: ['super_admin'] } },
 				form: null
 			} as never
 		});
@@ -33,7 +33,7 @@ describe('webhooks create drawer posts a real event list', () => {
 	it('says what an empty delivery option means and when an option is refused', async () => {
 		const { container, getAllByText } = render(WebhooksPage, {
 			props: {
-				data: { webhooks: { ok: true, value: [] }, schemas: { ok: true, value: [{ name: 'post' }] }, entitlements, user: { roles: [] } },
+				data: { webhooks: { ok: true, value: [] }, schemas: { ok: true, value: [{ name: 'post' }] }, entitlements, user: { roles: ['super_admin'] } },
 				form: null
 			} as never
 		});

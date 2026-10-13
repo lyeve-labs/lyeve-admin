@@ -48,3 +48,25 @@ describe('the incoming webhook list when it could not be read', () => {
 		expect(getAllByRole('button', { name: /new incoming webhook/i })).toHaveLength(2);
 	});
 });
+
+/*
+ * The webhook plugin serves create, update and delete to a super admin only.
+ * An admin offered them meets a refusal after filling the form in.
+ */
+describe('the incoming webhook controls by role', () => {
+	it('offers an admin no write and says who may make one', () => {
+		const { container, queryByRole } = setup({ user: { roles: ['admin'] } });
+		expect(container.textContent).toContain('Stripe');
+		expect(queryByRole('button', { name: /new incoming webhook/i })).toBeNull();
+		expect(queryByRole('button', { name: 'Edit Stripe' })).toBeNull();
+		expect(queryByRole('button', { name: 'Delete Stripe' })).toBeNull();
+		expect(container.textContent).toContain('Creating, changing or deleting one takes a super admin.');
+	});
+
+	it('offers a super admin every write', () => {
+		const { getByRole } = setup();
+		expect(getByRole('button', { name: /new incoming webhook/i })).toBeTruthy();
+		expect(getByRole('button', { name: 'Edit Stripe' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Delete Stripe' })).toBeTruthy();
+	});
+});

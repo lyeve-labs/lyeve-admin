@@ -286,6 +286,8 @@
 		return url.length > max ? url.slice(0, max) + '...' : url;
 	}
 
+	// The webhook plugin serves create, update, delete and rotate to a super
+	// admin only. An admin reads, tests and replays, and is told the rest.
 	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
 </script>
 
@@ -304,7 +306,7 @@
 			</Button>
 		</form>
 		<!-- A list that could not be read offers no write against it. -->
-		{#if data.webhooks.ok}
+		{#if data.webhooks.ok && isSuperAdmin}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} />
 				New webhook
@@ -320,6 +322,10 @@
 		</Alert>
 	{/if}
 
+	{#if data.webhooks.ok && !isSuperAdmin}
+		<Alert tone="brand">Your role reads and tests webhooks. Creating, changing or deleting one takes a super admin.</Alert>
+	{/if}
+
 	{#if !data.webhooks.ok}
 		<GateNotice
 			gate={data.webhooks.gate}
@@ -333,10 +339,12 @@
 		>
 			{#snippet iconSnippet()}<WebhookIcon size={ICON.lg} />{/snippet}
 			{#snippet action()}
-				<Button variant="secondary" onclick={openCreate}>
-					<Plus size={ICON.sm} />
-					New webhook
-				</Button>
+				{#if isSuperAdmin}
+					<Button variant="secondary" onclick={openCreate}>
+						<Plus size={ICON.sm} />
+						New webhook
+					</Button>
+				{/if}
 			{/snippet}
 		</EmptyState>
 	{:else}
@@ -435,8 +443,7 @@
 											<KeyRound size={ICON.sm} />
 										</Button>
 									</form>
-								{/if}
-								<Button
+									<Button
 									variant="ghost"
 									size="sm"
 									onclick={() => openEdit(wh)}
@@ -464,6 +471,7 @@
 								>
 									<Trash2 size={ICON.sm} class="text-danger" />
 								</Button>
+								{/if}
 							</div>
 
 							{#if testResults[wh.id]}

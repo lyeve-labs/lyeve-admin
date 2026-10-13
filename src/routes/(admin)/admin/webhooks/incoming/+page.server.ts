@@ -8,7 +8,7 @@ import {
 	updateIncomingWebhook,
 	deleteIncomingWebhook
 } from '@lyeve-labs/client-rest';
-import { authedClient, requireUser } from '$lib/server/authz';
+import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { sessionToken } from '$lib/server/session-cookie';
 import { section } from '$lib/api/gate';
@@ -39,7 +39,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 
 export const actions: Actions = {
 	create: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const { request } = event;
 		const client = authedClient(event);
 		const data = await request.formData();
@@ -78,7 +79,8 @@ export const actions: Actions = {
 	},
 
 	update: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const { request } = event;
 		const client = authedClient(event);
 		const data = await request.formData();
@@ -119,7 +121,8 @@ export const actions: Actions = {
 	},
 
 	delete: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const { request } = event;
 		const client = authedClient(event);
 		const data = await request.formData();

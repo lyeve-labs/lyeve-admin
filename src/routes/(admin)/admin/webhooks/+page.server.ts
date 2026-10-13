@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
-import { authedClient, requireUser } from '$lib/server/authz';
+import { authedClient, requireRole, requireUser } from '$lib/server/authz';
 import type { DeadLetter, Webhook } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { deleteWebhook, testWebhook, listDeliveries, rotateSecret, retryDelivery, replayDeadLetter, dismissDeadLetter, deleteDeadLetter } from '@lyeve-labs/client-rest';
@@ -70,7 +70,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 
 export const actions: Actions = {
 	create: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const parsed = webhookBodyFrom(await event.request.formData());
 		if ('error' in parsed) {
 			return fail(400, { error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
@@ -83,7 +84,8 @@ export const actions: Actions = {
 	},
 
 	update: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
 		const parsed = webhookBodyFrom(data);
@@ -98,7 +100,8 @@ export const actions: Actions = {
 	},
 
 	delete: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const { request } = event;
 		const client = authedClient(event);
 		const data = await request.formData();
@@ -142,7 +145,8 @@ export const actions: Actions = {
 		},
 
 		'rotate-secret': async (event) => {
-			await requireUser(event);
+			// The plugin serves this write to a super admin only.
+			await requireRole(event, ['super_admin']);
 			const { request } = event;
 			const client = authedClient(event);
 			const data = await request.formData();

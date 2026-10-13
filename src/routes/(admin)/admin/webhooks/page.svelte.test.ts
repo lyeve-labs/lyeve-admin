@@ -37,9 +37,12 @@ const webhook = {
 	created_at: '2026-01-01T00:00:00Z',
 };
 
-function setup() {
+function setup(roles: string[] = ['super_admin']) {
 	return render(WebhooksPage, {
-		props: { data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements }, form: null } as never,
+		props: {
+			data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements, user: { roles } },
+			form: null,
+		} as never,
 	});
 }
 
@@ -117,5 +120,32 @@ describe('the webhook list when it could not be read', () => {
 		const { container } = failed({ state: 'forbidden' });
 		expect(container.textContent).toContain('Your role cannot open Webhooks.');
 		expect(container.textContent).not.toContain('No webhooks configured yet');
+	});
+});
+
+/*
+ * The webhook plugin serves create, update, delete and rotate to a super admin
+ * only. An admin offered them meets a refusal after filling the form in.
+ */
+describe('the webhook controls by role', () => {
+	it('offers an admin the reads and tests, and says who may change a webhook', () => {
+		const { container, queryByRole, getByRole } = setup(['admin']);
+		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
+		expect(queryByRole('button', { name: 'Edit Ship it' })).toBeNull();
+		expect(queryByRole('button', { name: 'Duplicate Ship it' })).toBeNull();
+		expect(queryByRole('button', { name: 'Delete Ship it' })).toBeNull();
+		expect(queryByRole('button', { name: /rotate the signing secret/i })).toBeNull();
+		expect(getByRole('button', { name: 'Test Ship it' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Delivery history for Ship it' })).toBeTruthy();
+		expect(container.textContent).toContain('Creating, changing or deleting one takes a super admin.');
+	});
+
+	it('offers a super admin every write', () => {
+		const { container, getByRole, getAllByRole } = setup();
+		expect(getAllByRole('button', { name: /new webhook/i })).toHaveLength(1);
+		expect(getByRole('button', { name: 'Edit Ship it' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Delete Ship it' })).toBeTruthy();
+		expect(getByRole('button', { name: /rotate the signing secret/i })).toBeTruthy();
+		expect(container.textContent).not.toContain('takes a super admin');
 	});
 });

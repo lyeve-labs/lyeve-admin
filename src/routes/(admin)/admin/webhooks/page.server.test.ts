@@ -209,3 +209,41 @@ describe('admin/webhooks/+page.server.ts dead-letters action', () => {
 		expect(all.seen.find((u) => u.includes('/webhook-dead-letters'))).not.toContain('status=');
 	});
 });
+
+/*
+ * The plugin serves create, update, delete and rotate to a super admin only, so
+ * an admin's direct POST stops here before it reaches the engine.
+ */
+describe('admin/webhooks/+page.server.ts writes by role', () => {
+	function writeEvent(roles: string[]) {
+		const seen: string[] = [];
+		const fetch = vi.fn(async (url: string) => {
+			seen.push(String(url));
+			if (String(url).includes('/auth/me')) return json({ id: 'u1', roles, disabled: false });
+			return json({});
+		}) as unknown as typeof globalThis.fetch;
+		const form = new FormData();
+		form.set('id', 'w1');
+		return {
+			seen,
+			event: {
+				fetch,
+				cookies: mockCookies(),
+				request: { formData: async () => form },
+				url: new URL('http://localhost/admin/webhooks'),
+			} as never,
+		};
+	}
+
+	it.each(['create', 'update', 'delete', 'rotate-secret'] as const)('refuses %s to an admin', async (name) => {
+		const { event, seen } = writeEvent(['admin']);
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(seen.filter((u) => !u.includes('/auth/me'))).toEqual([]);
+	});
+
+	it('lets a super admin delete', async () => {
+		const { event, seen } = writeEvent(['super_admin']);
+		await actions.delete(event);
+		expect(seen.some((u) => u.includes('/api/admin/webhooks/w1'))).toBe(true);
+	});
+});
