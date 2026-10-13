@@ -186,7 +186,7 @@
 			<div class="pt-2">
 				<Checkbox
 					label="Discover content types"
-					description="List the schemas and their fields at /api/v1/schemas."
+					description="List the schemas and their fields at /api/v1/schemas. A schema is listed only when this key can also read its content."
 					checked={access.discoverSchemas}
 					onchange={(on) => (access = { ...access, discoverSchemas: on })}
 				/>
