@@ -202,6 +202,18 @@
 				title="Audit log"
 				absent="The audit plugin is not in this build, so there is no audit log to read."
 			/>
+		{:else if data.entries.value.length === 0 && (data.total ?? 0) > 0}
+			<!-- The count and the rows were read apart, so a page can come back
+			     empty while the log is not. Neither empty state is true then. -->
+			<EmptyState
+				iconSnippet={emptyIcon}
+				title="Nothing on this page"
+				description={`The log holds ${data.total} ${data.total === 1 ? 'entry' : 'entries'}, but this page came back empty. Entries may have been pruned since the count was taken.`}
+			>
+				{#snippet action()}
+					<Button variant="secondary" href={pageHref(0)}>Go to the first page</Button>
+				{/snippet}
+			</EmptyState>
 		{:else if data.entries.value.length === 0 && filtered}
 			<EmptyState
 				iconSnippet={emptyIcon}

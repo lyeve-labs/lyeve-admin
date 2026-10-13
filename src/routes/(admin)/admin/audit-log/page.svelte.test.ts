@@ -301,3 +301,28 @@ describe('Audit log failed read', () => {
 		expect(container.textContent).toContain('Your role cannot open Audit log');
 	});
 });
+
+/*
+ * The count and the rows are two answers. Once a past-end page has been
+ * corrected, the rows can still come back empty under a count above zero,
+ * and the first-run state would then contradict the count beside it.
+ */
+describe('Audit log empty page under a count', () => {
+	it('says the page is empty, not the log, and links to the first page', () => {
+		const { container } = render(AuditLogPage, {
+			props: { data: data({ entries: [], total: 120, offset: 100 }) as never, form: null as never },
+		});
+		expect(container.textContent).not.toContain('No audit entries yet');
+		expect(container.textContent).toContain('Nothing on this page');
+		expect(container.textContent).toContain('The log holds 120 entries');
+		const first = [...container.querySelectorAll('a')].find((a) => a.textContent?.includes('Go to the first page'));
+		expect(first?.getAttribute('href')).toBe('/admin/audit-log');
+	});
+
+	it('keeps the first-run state for a log that holds nothing', () => {
+		const { container } = render(AuditLogPage, {
+			props: { data: data({ entries: [], total: 0 }) as never, form: null as never },
+		});
+		expect(container.textContent).toContain('No audit entries yet');
+	});
+});
