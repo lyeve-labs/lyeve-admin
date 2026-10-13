@@ -195,6 +195,29 @@ describe('Setup page: create the first admin', () => {
 		}
 	});
 
+	// An install can change the engine's password policy, so the page states
+	// no length of its own. The engine names the rule it refuses a password for.
+	it('leaves the password rules to the engine', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}));
+		try {
+			const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
+			const password = container.querySelector('#password') as HTMLInputElement;
+			expect(container.querySelector('#password-hint')?.textContent).toContain('password policy');
+			expect(password.getAttribute('placeholder') ?? '').not.toMatch(/\d/);
+
+			(container.querySelector('#setup_token') as HTMLInputElement).value = 'from-the-log';
+			(container.querySelector('#email') as HTMLInputElement).value = 'a@b.test';
+			password.value = 'short';
+			(container.querySelector('#confirm') as HTMLInputElement).value = 'short';
+			await fireEvent.submit(container.querySelector('form')!);
+
+			expect(container.querySelector('#password-error')).toBeNull();
+			expect(fetchSpy).toHaveBeenCalledTimes(1);
+		} finally {
+			fetchSpy.mockRestore();
+		}
+	});
+
 	it('refuses a confirmation that does not match', async () => {
 		const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
 

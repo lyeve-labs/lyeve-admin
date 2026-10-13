@@ -80,8 +80,10 @@
 		const found: Record<string, string> = {};
 		if (!setupToken) found.setup_token = 'Setup token is required';
 		if (!email) found.email = 'Email is required';
+		// The rules are the engine's password policy, which an install can
+		// change. The engine names the rule a refused password broke, so the
+		// page states no rule of its own that could disagree with it.
 		if (!password) found.password = 'Password is required';
-		else if (password.length < 8) found.password = 'Password must be at least 8 characters';
 		if (!confirm) found.confirm = 'Confirm password is required';
 		else if (password && confirm !== password) found.confirm = 'Passwords do not match';
 
@@ -274,9 +276,9 @@
 						id="password"
 						name="password"
 						label="Password"
-						placeholder="At least 12 characters"
 						autocomplete="new-password"
 						required
+						hint="The engine's password policy sets the rules. If it refuses this password, the refusal names the rule it broke."
 						error={errors.password}
 					/>
 
