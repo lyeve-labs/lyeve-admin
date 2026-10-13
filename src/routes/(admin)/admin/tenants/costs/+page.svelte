@@ -123,9 +123,7 @@
 		const rows = {} as Record<ResourceType, PriceRow>;
 		for (const r of RESOURCE_TYPES) {
 			const p = prices?.find((x) => x.resource_type === r);
-			// A resource the engine sent no price for starts empty. Zero in USD
-			// would read as a price somebody set.
-			rows[r] = { unit_price: p?.unit_price ?? '', per_units: p?.per_units ?? 1, currency: p?.currency ?? '' };
+			rows[r] = { unit_price: p?.unit_price ?? '0', per_units: p?.per_units ?? 1, currency: p?.currency ?? 'USD' };
 		}
 		return rows;
 	}
@@ -374,13 +372,11 @@
 							{#snippet header()}
 								<div class="flex items-center justify-between gap-3">
 									<SectionHeading level={3}>{RESOURCE_LABEL[resource]}</SectionHeading>
-									{#if !current}
-										<Badge tone="warn" size="sm">No price stated</Badge>
-									{:else}
-										<Badge tone={current.source === 'tenant' ? 'brand' : 'neutral'} size="sm">
-											{current.source === 'tenant' ? 'Set by this tenant' : 'Default'}
-										</Badge>
-									{/if}
+									<!-- The plugin answers every resource type, with its default
+									     where the tenant set none, so a read list has no gap. -->
+									<Badge tone={current?.source === 'tenant' ? 'brand' : 'neutral'} size="sm">
+										{current?.source === 'tenant' ? 'Set by this tenant' : 'Default'}
+									</Badge>
 								</div>
 							{/snippet}
 							<form

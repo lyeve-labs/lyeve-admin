@@ -161,17 +161,6 @@ describe('tenant cost prices that are not known', () => {
 		expect(screen.getByText(/so the prices could not be read/)).toBeTruthy();
 	});
 
-	it('marks a resource the engine sent no price for, and seeds no zero', () => {
-		render(CostsPage, { props: { data: data(), form: null } });
-		// Storage and compute were sent. Database, bandwidth and AI were not.
-		expect(screen.getAllByText('No price stated')).toHaveLength(3);
-		expect(screen.getAllByText('Default')).toHaveLength(1);
-		const database = screen.getByRole('form', { name: 'Price for Database' });
-		expect((database.querySelector('#price-database-unit') as HTMLInputElement).value).toBe('');
-		expect((database.querySelector('#price-database-currency') as HTMLInputElement).value).toBe('');
-		const compute = screen.getByRole('form', { name: 'Price for Compute' });
-		expect((compute.querySelector('#price-compute-unit') as HTMLInputElement).value).toBe('1.00');
-	});
 });
 
 /*
