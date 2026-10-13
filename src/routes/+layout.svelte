@@ -4,9 +4,13 @@
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import { asset } from '$app/paths';
+	import { onNavigate } from '$app/navigation';
+	import { fadeRouteChange } from '$lib/page-transition';
 	import { pageBrand } from '$lib/brand';
 
 	let { children }: { children: Snippet } = $props();
+
+	onNavigate(fadeRouteChange);
 
 	// The nearest layout's brand decides the tab icon: the session tenant's
 	// inside the admin, the public one outside it. Without one the product's
