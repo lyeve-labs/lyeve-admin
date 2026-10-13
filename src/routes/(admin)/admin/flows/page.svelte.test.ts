@@ -28,7 +28,7 @@ afterEach(cleanup);
 
 const licensed: Entitlements = { plan: 'example', state: 'active', features: ['flow'], tenant_quota: 1 };
 
-function setup(overrides: Record<string, unknown> = {}, entitlements = licensed) {
+function setup(overrides: Record<string, unknown> = {}, entitlements = licensed, form: unknown = null) {
 	return render(FlowsPage, {
 		props: {
 			data: {
@@ -45,7 +45,7 @@ function setup(overrides: Record<string, unknown> = {}, entitlements = licensed)
 				entitlements,
 				...overrides,
 			},
-			form: null,
+			form,
 		} as never,
 	});
 }
@@ -211,22 +211,43 @@ describe('flows list page', () => {
 		expect(form.querySelector('[role="toolbar"]')?.className).toContain('items-center');
 	});
 
-	it('lists validation errors the create action returned', () => {
-		const { container } = render(FlowsPage, {
-			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
-				form: {
-					error: 'The definition did not validate.',
-					errors: [
-						{ node_id: 'join', path: '/config/left_key', message: 'required' },
-						{ path: '/settings/timeout', message: 'not a duration' },
-					] satisfies ValidationError[],
-				},
-			} as never,
-		});
-		expect(container.textContent).toContain('join /config/left_key: required');
-		expect(container.textContent).toContain('/settings/timeout: not a duration');
-		expect(container.textContent).not.toContain('undefined');
+	it('lists the validation errors a create returned inside the create drawer', async () => {
+		const data = { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed };
+		const { container, getAllByText, rerender } = render(FlowsPage, { props: { data, form: null } as never });
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({
+			data,
+			form: {
+				action: 'create',
+				error: 'The definition did not validate.',
+				errors: [
+					{ node_id: 'join', path: '/config/left_key', message: 'required' },
+					{ path: '/settings/timeout', message: 'not a duration' },
+				] satisfies ValidationError[],
+			},
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
+		expect(drawer.textContent).toContain('The definition did not validate.');
+		expect(drawer.textContent).toContain('join /config/left_key: required');
+		expect(drawer.textContent).toContain('/settings/timeout: not a duration');
+		expect(drawer.textContent).not.toContain('undefined');
+	});
+
+	// The drawers and the row's delete share one form result.
+	it('shows a failed delete on the page and not in a drawer opened after it', async () => {
+		const { container, getAllByText, getByText } = setup({ flows: [fixtureFlow] }, licensed, { action: 'delete', error: 'Failed to delete flow' });
+		expect(container.textContent).toContain('Failed to delete flow');
+
+		await fireEvent.click(getAllByText('New flow')[0]);
+		expect((container.ownerDocument.querySelector('#flow-create-form') as HTMLElement).textContent).not.toContain('Failed to delete flow');
+
+		await fireEvent.click(getByText('Import'));
+		expect((container.ownerDocument.querySelector('#flow-import-form') as HTMLElement).textContent).not.toContain('Failed to delete flow');
+	});
+
+	it('keeps a failed import out of the page behind the drawer', () => {
+		const { container } = setup({}, licensed, { action: 'import', error: 'Paste a definition or choose a file.' });
+		expect(container.textContent).not.toContain('Paste a definition or choose a file.');
 	});
 });
 
@@ -245,15 +266,16 @@ describe('flows list row links', () => {
 });
 
 describe('flows list page ceiling', () => {
-	it('shows the refusal with the limit the plugin sent', () => {
-		const { container } = render(FlowsPage, {
-			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
-				form: { error: '7 of 7 flows are in use, the most this instance keeps. Delete one to make room for another.', refusal: { nodeIds: [], limit: 7, current: 7 } },
-			} as never,
-		});
-		expect(container.textContent).toContain('Flow limit reached');
-		expect(container.textContent).toContain('7 of 7 flows are in use');
+	// The ceiling refuses a create, so it shows in the drawer that asked.
+	it('shows the refusal with the limit the plugin sent inside the create drawer', async () => {
+		const { container, getAllByText, rerender } = setup();
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({
+			data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
+			form: { action: 'create', error: '7 of 7 flows are in use, the most this instance keeps. Delete one to make room for another.', refusal: { nodeIds: [], limit: 7, current: 7 } },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
+		expect(drawer.textContent).toContain('7 of 7 flows are in use');
 	});
 });
 
@@ -281,10 +303,10 @@ describe('flows list page role grants', () => {
 		const { container } = render(FlowsPage, {
 			props: {
 				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed, canCreate: true },
-				form: { error: 'permission denied: create on flows', forbidden: true },
+				form: { action: 'delete', error: 'permission denied: delete on flows', forbidden: true },
 			} as never,
 		});
 		expect(container.textContent).toContain('Your role cannot do that');
-		expect(container.textContent).toContain('create on flows');
+		expect(container.textContent).toContain('delete on flows');
 	});
 });

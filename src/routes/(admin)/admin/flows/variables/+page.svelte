@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Alert, Badge, Button, Drawer, EmptyState, Input, PageShell, PasswordInput, Table, Toggle, confirm, Pagination } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Input, PageShell, PasswordInput, Table, Toggle, confirm, Pagination } from '@lyeve-labs/ui-kit';
 	import { Pencil, Plus, Trash2, Variable as VariableIcon } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
@@ -10,6 +10,7 @@
 	import type { Variable } from '$lib/api/flows';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { relativeTime, formatDateTime } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -31,7 +32,23 @@
 	let value = $state('');
 	let secret = $state(false);
 
+	/*
+	 * The drawer and a row's delete share one `form` result. A save shows its
+	 * failure in the drawer and a delete on the page, so a failed delete never
+	 * reads as a failed save in the next drawer opened. Opening the drawer
+	 * clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const saveFailure = $derived(failure?.action === 'put' ? failure.error : undefined);
+	const pageFailure = $derived(failure && failure.action !== 'put' ? failure.error : undefined);
+
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		key = '';
 		value = '';
@@ -40,6 +57,7 @@
 	}
 
 	function openEdit(v: Variable) {
+		cleared = form;
 		editing = v;
 		key = v.key;
 		value = v.is_secret ? '' : (v.value ?? '');
@@ -89,11 +107,7 @@
 			<GateNotice gate={data.gate} title="flow variables" absent="The flow plugin does not serve variables on this instance." />
 		{/if}
 
-		{#if form && 'error' in form && form.error && !open}
-			<Alert tone="danger">
-				{#snippet children()}{form.error}{/snippet}
-			</Alert>
-		{/if}
+		<FormErrors message={pageFailure} />
 
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
@@ -159,11 +173,7 @@
 
 	<Drawer bind:open title={editing ? `Edit vars.${editing.key}` : 'New variable'}>
 		<form method="POST" action="?/put" id="variable-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-			{#if form && 'error' in form && form.error}
-				<Alert tone="danger">
-					{#snippet children()}{form.error}{/snippet}
-				</Alert>
-			{/if}
+			<FormErrors message={saveFailure} />
 			{#if editing}
 				<!-- The key is the variable's name in every expression, so it is not renamed here. -->
 				<input type="hidden" name="key" value={editing.key} />

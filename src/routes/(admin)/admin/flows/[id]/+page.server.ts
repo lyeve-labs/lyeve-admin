@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect, type ActionFailure } from '@sveltejs/kit';
 import { ApiError, createClient } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser } from '$lib/server/authz';
@@ -189,6 +189,14 @@ function definitionField(data: FormData): FlowDefinition | null {
 	}
 }
 
+/**
+ * An import's failure, tagged so the import drawer shows it and the notice
+ * above the canvas does not draw it a second time behind the open drawer.
+ */
+function importFailed<F extends ActionFailure<Record<string, unknown>>>(failure: F) {
+	return fail(failure.status, { ...(failure.data as F['data']), action: 'import' });
+}
+
 function refused(err: unknown, fallback: string) {
 	if (err instanceof ApiError && err.status === 422) {
 		return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.message) });
@@ -324,7 +332,7 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const body = await readImportForm(data);
-		if (!body) return fail(400, { error: 'Paste a definition or choose a file.' });
+		if (!body) return fail(400, { action: 'import', error: 'Paste a definition or choose a file.' });
 		let slug = String(data.get('slug') ?? '').trim();
 		try {
 			if (!slug) slug = (await getFlow(client, event.params.id)).slug;
@@ -335,16 +343,16 @@ export const actions: Actions = {
 			};
 		} catch (err) {
 			if (err instanceof ImportError && err.status === 422) {
-				return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.body) });
+				return fail(422, { action: 'import', error: 'The definition did not validate.', errors: validationErrors(err.body) });
 			}
-			if (err instanceof FlowRefusal) return refusalFailure(err);
+			if (err instanceof FlowRefusal) return importFailed(refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {
-				return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
+				return fail(402, { action: 'import', error: 'Flows are not enabled on this instance.', locked: true });
 			}
 			if (err instanceof ImportError) {
-				return fail(400, { error: err.status < 500 && err.message ? err.message : 'Import failed' });
+				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Import failed' });
 			}
-			return refused(err, 'Import failed');
+			return importFailed(refused(err, 'Import failed'));
 		}
 	},
 

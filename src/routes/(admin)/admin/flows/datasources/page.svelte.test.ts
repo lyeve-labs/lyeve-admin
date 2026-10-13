@@ -233,7 +233,7 @@ describe('datasources page when the plugin says they are not enabled', () => {
 	});
 
 	it('renders a refused write as not enabled, naming no capability', () => {
-		const { container } = unavailable([], { error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
+		const { container } = unavailable([], { action: 'test', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
 		expect(container.textContent).toContain('Datasources are not enabled on this instance, so nothing was changed.');
 		expect(container.textContent).not.toMatch(/capability|license/i);
 	});
@@ -286,5 +286,30 @@ describe('datasources page and the role of the reader', () => {
 		await fireEvent.click(getAllByText('New datasource')[0]);
 		expect((getByLabelText('Allow writes') as HTMLButtonElement).disabled).toBe(false);
 		expect(document.body.textContent).not.toContain('Only a super admin can change this.');
+	});
+});
+
+// The drawer and the row actions share one form result.
+describe('where a datasource failure shows', () => {
+	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
+		const { container, getAllByText } = setup([warehouse], { action: 'delete', error: 'Failed to delete datasource' });
+		expect(container.textContent).toContain('Failed to delete datasource');
+
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		const drawer = container.ownerDocument.querySelector('#datasource-form') as HTMLElement;
+		expect(drawer.textContent).not.toContain('Failed to delete datasource');
+	});
+
+	it('shows a failed save inside the open drawer and not on the page behind it', async () => {
+		const { container, getAllByText, rerender } = setup([warehouse]);
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		await rerender({
+			data: { datasources: [warehouse], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed },
+			form: { action: 'save', error: 'A datasource needs a name.' },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#datasource-form') as HTMLElement;
+		expect(drawer.textContent).toContain('A datasource needs a name.');
+		// Once, in the drawer, and not again on the page behind it.
+		expect(document.body.textContent?.split('A datasource needs a name.').length).toBe(2);
 	});
 });

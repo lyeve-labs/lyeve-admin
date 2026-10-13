@@ -23,6 +23,7 @@
 	import type { ActionData, PageData } from './$types';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { slugify, statusTone, triggerLabel } from '$lib/flow/triggers';
@@ -30,7 +31,7 @@
 	import { flowGrants } from '$lib/flow/permissions';
 	import type { RefusalNotice } from '$lib/flow/types';
 	import { useInstance } from '$lib/instance.svelte';
-	import type { Flow } from '$lib/api/flows';
+	import type { Flow, ValidationError } from '$lib/api/flows';
 	import { listQuery } from '$lib/back';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { relativeTime, formatDateTime } from '$lib/format';
@@ -65,6 +66,7 @@
 	let slugTouched = $state(false);
 
 	function openCreate() {
+		cleared = form;
 		slugTouched = false;
 		createName = '';
 		createSlug = '';
@@ -78,6 +80,11 @@
 
 	let showImport = $state(false);
 	let importMode = $state<string | null>('create');
+
+	function openImport() {
+		cleared = form;
+		showImport = true;
+	}
 
 	// Delete goes through the kit's confirm dialog, then a hidden form, so the
 	// row's button never posts on its own and the action stays a form action.
@@ -96,11 +103,38 @@
 		deleteForm?.requestSubmit();
 	}
 
-	const errorList = $derived(
-		form && 'errors' in form && Array.isArray(form.errors) ? form.errors : []
-	);
+	/*
+	 * The create drawer, the import drawer and a row's delete share one `form`
+	 * result. Each failure names the form that caused it, and each drawer
+	 * shows only its own, so a failed delete never reads as a failed create in
+	 * the next drawer opened. Opening a drawer clears what an earlier attempt
+	 * left.
+	 */
+	interface Failure {
+		action: string;
+		error: string;
+		refusal: RefusalNotice | null;
+		forbidden: boolean;
+		errors: ValidationError[];
+	}
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by((): Failure | null => {
+		const f = form as Record<string, unknown> | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return {
+			action: String(f.action ?? ''),
+			error: f.error,
+			refusal: f.refusal ? (f.refusal as RefusalNotice) : null,
+			forbidden: f.forbidden === true,
+			errors: Array.isArray(f.errors) ? (f.errors as ValidationError[]) : [],
+		};
+	});
+	const createFailure = $derived(failure?.action === 'create' ? failure : null);
+	const importFailure = $derived(failure?.action === 'import' ? failure : null);
+	const pageFailure = $derived(failure && failure.action !== 'create' && failure.action !== 'import' ? failure : null);
+	const errorList = $derived(pageFailure?.errors ?? []);
 	const imported = $derived(form && 'imported' in form ? form.imported : null);
-	const refusal = $derived(form && 'refusal' in form && form.refusal ? (form.refusal as RefusalNotice) : null);
+	const refusal = $derived(pageFailure?.refusal ?? null);
 	const instance = useInstance();
 	const enableLink = $derived(instance.upgradeLink());
 
@@ -155,7 +189,7 @@
 				</Button>
 			{/if}
 			{#if canCreate}
-				<Button variant="secondary" size="sm" onclick={() => (showImport = true)}>
+				<Button variant="secondary" size="sm" onclick={openImport}>
 					<Upload size={ICON.sm} />
 					Import
 				</Button>
@@ -173,7 +207,7 @@
 		{#if refusal}
 			<Alert tone="warn" title={refusal.limit !== null ? 'Flow limit reached' : 'Not enabled on this instance'}>
 				{#snippet children()}
-					{form && 'error' in form ? form.error : ''}
+					{pageFailure?.error ?? ''}
 					{#if enableLink}
 						<a class="ml-1 underline" href={enableLink.href}>{enableLink.label ?? (refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
 					{/if}
@@ -186,14 +220,14 @@
 					{/if}
 				{/snippet}
 			</Alert>
-		{:else if form && 'forbidden' in form && form.forbidden}
+		{:else if pageFailure?.forbidden}
 			<Alert tone="danger" title="Your role cannot do that">
-				{#snippet children()}{form.error}{/snippet}
+				{#snippet children()}{pageFailure.error}{/snippet}
 			</Alert>
-		{:else if form && 'error' in form && form.error}
+		{:else if pageFailure}
 			<Alert tone="danger">
 				{#snippet children()}
-					{form.error}
+					{pageFailure.error}
 					{#if errorList.length > 0}
 						<ul class="mt-1 list-disc pl-5">
 							{#each errorList as err (`${err.node_id ?? ''}${err.path}${err.message}`)}
@@ -334,12 +368,30 @@
 		{/if}
 	</PageShell>
 
+	<!-- A drawer's own failure, first in its form: the sentence, where the
+	     feature is turned on when the plugin refused it, and each problem the
+	     plugin found in the definition. -->
+	{#snippet drawerFailure(f: Failure | null)}
+		<FormErrors message={f?.error} />
+		{#if f?.refusal && enableLink}
+			<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? (f.refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+		{/if}
+		{#if f && f.errors.length > 0}
+			<ul class="list-disc pl-5" aria-label="Problems in the definition">
+				{#each f.errors as err (`${err.node_id ?? ''}${err.path}${err.message}`)}
+					<li class="font-mono text-xs text-danger">{err.node_id ? `${err.node_id} ` : ''}{err.path}: {err.message}</li>
+				{/each}
+			</ul>
+		{/if}
+	{/snippet}
+
 	<!-- The drawer asks for a name and derives the slug, and nothing else. A
 	     template is a question for a reader who has a canvas to put it on, so
 	     the editor asks it, from its empty state, beside the palette and the
 	     import. -->
 	<Drawer bind:open={showCreate} title="New flow">
 		<form method="POST" action="?/create" id="flow-create-form" use:enhance={submit1.enhance} class="flex flex-col gap-4">
+			{@render drawerFailure(createFailure)}
 			<Input
 				id="create-name"
 				name="name"
@@ -374,6 +426,7 @@
 			use:enhance={submit2.enhance}
 			class="flex flex-col gap-4"
 		>
+			{@render drawerFailure(importFailure)}
 			<FileInput
 				id="import-file"
 				name="file"

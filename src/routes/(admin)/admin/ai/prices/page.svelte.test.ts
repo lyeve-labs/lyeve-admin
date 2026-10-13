@@ -61,9 +61,20 @@ describe('AI prices page', () => {
 		expect(saved.getByRole('status').textContent).toContain('Saved.');
 	});
 
-	it('shows a write error on the page once the drawer is shut', () => {
-		const { getByText } = setup({}, { key: 'openai/', error: 'Model is required.' });
-		expect(getByText('Model is required.')).toBeTruthy();
+	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
+		const { container, getByText, getAllByRole } = setup({}, { action: 'delete', key: 'openai/gpt-4o', error: 'Failed to delete the price' });
+		expect(getByText('Failed to delete the price')).toBeTruthy();
+		await fireEvent.click(getAllByRole('button', { name: /new price/i })[0]);
+		const form = container.querySelector('#price-form') as HTMLElement;
+		expect(form.textContent).not.toContain('Failed to delete the price');
+	});
+
+	it('shows a failed save inside the open drawer and not on the page behind it', async () => {
+		const { container, getAllByRole, rerender } = setup();
+		await fireEvent.click(getAllByRole('button', { name: /new price/i })[0]);
+		await rerender({ form: { action: 'save', key: 'openai/', error: 'Model is required.' } } as never);
+		expect((container.querySelector('#price-form') as HTMLElement).textContent).toContain('Model is required.');
+		expect(document.body.textContent?.split('Model is required.').length).toBe(2);
 	});
 
 	it('paints the empty state and the off state', () => {

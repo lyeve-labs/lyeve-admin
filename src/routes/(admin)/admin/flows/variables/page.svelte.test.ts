@@ -107,9 +107,28 @@ describe('variables page', () => {
 		expect((form.querySelector('[name="key"]') as HTMLInputElement).value).toBe('');
 	});
 
-	it('shows the action error', () => {
-		const { container } = setup(variables, { error: 'value too long', key: 'region' });
-		expect(container.textContent).toContain('value too long');
+	it('shows a failed delete on the page', () => {
+		const { container } = setup(variables, { action: 'delete', error: 'Failed to delete variable' });
+		expect(container.textContent).toContain('Failed to delete variable');
+	});
+
+	// The drawer and the delete share one form result.
+	it('keeps a failed delete out of the drawer opened after it', async () => {
+		const { container, getAllByText } = setup(variables, { action: 'delete', error: 'Failed to delete variable' });
+		await fireEvent.click(getAllByText('New variable')[0]);
+		const drawer = container.ownerDocument.querySelector('#variable-form') as HTMLElement;
+		expect(drawer.textContent).not.toContain('Failed to delete variable');
+	});
+
+	it('shows a failed save inside the open drawer', async () => {
+		const { container, getAllByText, rerender } = setup();
+		await fireEvent.click(getAllByText('New variable')[0]);
+		await rerender({
+			data: { variables, locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed },
+			form: { action: 'put', error: 'value too long', key: 'region' },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#variable-form') as HTMLElement;
+		expect(drawer.textContent).toContain('value too long');
 	});
 
 	it('renders the not-enabled state when locked', () => {

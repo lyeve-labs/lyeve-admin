@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
 import { ApiError, createClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
@@ -89,6 +89,15 @@ function validationFailure(err: unknown, fallback: string) {
 	return fail(400, { error: actionError(err, fallback) });
 }
 
+/**
+ * A failure tagged with the form that caused it. The create drawer, the
+ * import drawer and the row's delete share one `form` result, and each shows
+ * only its own failure.
+ */
+function tagged<F extends ActionFailure<Record<string, unknown>>>(action: string, failure: F) {
+	return fail(failure.status, { ...(failure.data as F['data']), action });
+}
+
 export const actions: Actions = {
 	create: async (event) => {
 		await requireUser(event);
@@ -96,7 +105,7 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const name = String(data.get('name') ?? '').trim();
 		const slug = String(data.get('slug') ?? '').trim();
-		if (!name || !slug) return fail(400, { error: 'Name and slug are required.' });
+		if (!name || !slug) return fail(400, { action: 'create', error: 'Name and slug are required.' });
 
 		// A name and a slug, nothing else: the flow starts empty and the editor
 		// offers the palette, the templates and an import once it is open.
@@ -104,7 +113,7 @@ export const actions: Actions = {
 		try {
 			created = await createFlow(client, { name, slug });
 		} catch (err) {
-			return validationFailure(err, 'Failed to create flow');
+			return tagged('create', validationFailure(err, 'Failed to create flow'));
 		}
 		redirect(303, `/admin/flows/${encodeURIComponent(created.id)}`);
 	},
@@ -117,8 +126,8 @@ export const actions: Actions = {
 		try {
 			await deleteFlow(client, id);
 		} catch (err) {
-			if (err instanceof ApiError && err.status === 403) return forbiddenFailure(err);
-			return fail(400, { error: actionError(err, 'Failed to delete flow') });
+			if (err instanceof ApiError && err.status === 403) return tagged('delete', forbiddenFailure(err));
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete flow') });
 		}
 	},
 
@@ -129,22 +138,22 @@ export const actions: Actions = {
 		const slug = String(data.get('slug') ?? '').trim() || undefined;
 
 		const body = await readImportForm(data);
-		if (!body) return fail(400, { error: 'Paste a definition or choose a file.' });
-		if (mode === 'replace' && !slug) return fail(400, { error: 'Replace needs the slug of the flow to replace.' });
+		if (!body) return fail(400, { action: 'import', error: 'Paste a definition or choose a file.' });
+		if (mode === 'replace' && !slug) return fail(400, { action: 'import', error: 'Replace needs the slug of the flow to replace.' });
 
 		let result: ImportResult;
 		try {
 			result = await importFlow(event.fetch, { ...body, mode, slug }, flowAuthHeaders(event));
 		} catch (err) {
-			if (err instanceof FlowRefusal) return refusalFailure(err);
+			if (err instanceof FlowRefusal) return tagged('import', refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {
-				return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
+				return fail(402, { action: 'import', error: 'Flows are not enabled on this instance.', locked: true });
 			}
 			if (err instanceof ImportError) {
-				if (err.status === 422) return validationFailure(err, 'Import failed');
-				return fail(400, { error: err.status < 500 && err.message ? err.message : 'Import failed' });
+				if (err.status === 422) return tagged('import', validationFailure(err, 'Import failed'));
+				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Import failed' });
 			}
-			return fail(400, { error: 'Import failed' });
+			return fail(400, { action: 'import', error: 'Import failed' });
 		}
 		const unresolved = result.unresolved_datasources ?? [];
 		if (unresolved.length > 0) {

@@ -19,6 +19,8 @@
 	import type { Snippet } from 'svelte';
 	import { effectiveGate, type AiGate } from '$lib/api/ai';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { ICON } from '$lib/icon';
 
 	export type AiTab = 'providers' | 'prompts' | 'transcripts' | 'prices' | 'settings';
@@ -53,6 +55,25 @@
 	const blocked = $derived(effective.state !== 'ok' && !(tab === 'settings' && effective.state === 'off'));
 
 	let switchForm = $state<HTMLFormElement | null>(null);
+
+	/*
+	 * The switch posts to the settings page's action from whatever tab is open.
+	 * Its failure is kept here and shown under the switch, because the tab's
+	 * own `form` belongs to the tab's forms and only one tab drew it. A success
+	 * reloads the layout, which reads the switch on again.
+	 */
+	let switchError = $state('');
+	const flip: SubmitFunction = () => {
+		switchError = '';
+		return async ({ result, update }) => {
+			if (result.type === 'failure') {
+				const said = (result.data as { error?: unknown } | undefined)?.error;
+				switchError = typeof said === 'string' && said ? said : 'The setting could not be saved.';
+				return;
+			}
+			await update();
+		};
+	};
 </script>
 
 <!-- Wrapping, because five tabs on one line are wider than a phone and the
@@ -89,10 +110,11 @@
 			bind:this={switchForm}
 			method="POST"
 			action="/admin/ai/settings?/save"
-			use:enhance
+			use:enhance={flip}
 			class="mt-3 flex flex-col items-center gap-3"
 			data-testid="ai-off-switch"
 		>
+			<FormErrors message={switchError || undefined} />
 			<input type="hidden" name="enabled" value="true" />
 			<Toggle id="ai-off-toggle" label="AI for this tenant" checked={false} onchange={() => switchForm?.requestSubmit()} />
 			<Button variant="secondary" type="submit">Turn AI on</Button>

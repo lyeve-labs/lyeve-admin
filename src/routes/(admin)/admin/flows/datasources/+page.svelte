@@ -26,6 +26,7 @@
 	import type { Datasource, DatasourceKind } from '$lib/api/flows';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { useInstance } from '$lib/instance.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { formatDuration } from '$lib/flow/time';
@@ -87,7 +88,23 @@
 		return typeof v === 'string' || typeof v === 'number' ? String(v) : '';
 	}
 
+	/*
+	 * The drawer and the row actions share one `form` result. A save shows its
+	 * failure in the drawer, and a delete or a test on the page, so a failed
+	 * delete never reads as a failed save in the next drawer opened. Opening
+	 * the drawer clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown; refused?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return { action: String(f.action ?? ''), error: f.error, refused: f.refused === true };
+	});
+	const saveFailure = $derived(failure?.action === 'save' ? failure : null);
+	const pageFailure = $derived(failure && failure.action !== 'save' ? failure : null);
+
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		kind = 'postgres';
 		host = '';
@@ -106,6 +123,7 @@
 	}
 
 	function openEdit(ds: Datasource) {
+		cleared = form;
 		editing = ds;
 		kind = ds.kind;
 		host = str(ds.config.host);
@@ -250,18 +268,18 @@
 			<GateNotice gate={data.gate} title="datasources" absent="The flow plugin does not serve datasources on this instance." />
 		{/if}
 
-		{#if form && 'refused' in form && form.refused}
+		{#if pageFailure?.refused}
 			<Alert tone="warn" title="Not enabled on this instance">
 				{#snippet children()}
-					{'error' in form ? form.error : ''}
+					{pageFailure.error}
 					{#if enableLink}
 						<a class="ml-1 underline" href={enableLink.href}>{enableLink.label ?? 'How to enable it'}</a>
 					{/if}
 				{/snippet}
 			</Alert>
-		{:else if form && 'error' in form && form.error}
+		{:else if pageFailure}
 			<Alert tone="danger">
-				{#snippet children()}{form.error}{/snippet}
+				{#snippet children()}{pageFailure.error}{/snippet}
 			</Alert>
 		{/if}
 
@@ -353,6 +371,10 @@
 			use:enhance={submit.enhance}
 			class="flex flex-col gap-4"
 		>
+			<FormErrors message={saveFailure?.error} />
+			{#if saveFailure?.refused && enableLink}
+				<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? 'How to enable it'}</a>
+			{/if}
 			{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 			<Input id="ds-name" name="name" label="Name" hint="How a node refers to it." value={editing?.name ?? ''} required />
 			<Select

@@ -73,6 +73,7 @@
 	import FlowGuide from '$lib/components/flow/FlowGuide.svelte';
 	import AssistantPanel from '$lib/components/flow/AssistantPanel.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { useInstance } from '$lib/instance.svelte';
@@ -472,6 +473,19 @@
 	}
 
 	let showImport = $state(false);
+	// The import drawer shows an import's failure, so the notice above the
+	// canvas leaves it out. Opening the drawer clears what an earlier attempt
+	// left, and no other action's failure is drawn in it.
+	let importCleared = $state<unknown>(null);
+	const importFailure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		return f && f !== importCleared && f.action === 'import' && typeof f.error === 'string' ? f.error : undefined;
+	});
+	const importTagged = $derived(!!form && 'action' in form && form.action === 'import');
+	function openImport() {
+		importCleared = form;
+		showImport = true;
+	}
 	let showDelete = $state(false);
 	let disableForm = $state<HTMLFormElement | undefined>();
 
@@ -707,7 +721,7 @@
 	const overflow = $derived([
 		...(hasFlowCanvas ? [{ label: 'Auto layout', icon: LayoutGrid, onclick: () => canvas?.autoLayout() }] : []),
 		...(can.update ? [{ label: 'Use a template', icon: LayoutTemplate, onclick: () => (showGallery = true) }] : []),
-		...(can.update ? [{ label: 'Import', icon: Upload, onclick: () => (showImport = true) }] : []),
+		...(can.update ? [{ label: 'Import', icon: Upload, onclick: openImport }] : []),
 		{ label: 'Export', icon: Download, onclick: openExport },
 		{ label: 'Shortcuts', icon: Keyboard, onclick: () => (showKeys = !showKeys) },
 		{
@@ -981,7 +995,9 @@
 					</Alert>
 				</div>
 			{/if}
-			{#if refusal}
+			{#if importTagged}
+				<!-- The import drawer says it. -->
+			{:else if refusal}
 				<!-- The refusal is drawn where a validation problem is: the ids
 				     are in the problems list and on the canvas, and this says
 				     what they have in common and where the feature is turned on. -->
@@ -1052,7 +1068,7 @@
 											Use a template
 										</Button>
 										{#if can.update}
-											<Button variant="secondary" full onclick={() => (showImport = true)}>
+											<Button variant="secondary" full onclick={openImport}>
 												<Upload size={ICON.sm} />
 												Import YAML or JSON
 											</Button>
@@ -1339,6 +1355,7 @@
 			use:enhance={submit.enhance}
 			class="flex flex-col gap-4"
 		>
+			<FormErrors message={importFailure} />
 			<input type="hidden" name="slug" value={data.flow.slug} />
 			<p class="text-sm text-muted">The imported definition replaces the draft of this flow. The published version is not touched until you publish again.</p>
 			<FileInput id="import-file" name="file" label="Definition file" accept=".json,.yaml,.yml,application/json,application/yaml" />

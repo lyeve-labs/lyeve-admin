@@ -239,8 +239,9 @@ describe('admin/flows create action', () => {
 		const form = new FormData();
 		form.set('slug', 'x');
 		const { event, calls } = actionEvent({}, form);
-		const result = (await actions.create(event)) as { status: number };
+		const result = (await actions.create(event)) as { status: number; data: { action: string } };
 		expect(result.status).toBe(400);
+		expect(result.data.action).toBe('create');
 		expect(calls.filter((c) => !c.url.includes('/auth/me'))).toHaveLength(0);
 	});
 });
@@ -259,9 +260,10 @@ describe('admin/flows delete action', () => {
 		const form = new FormData();
 		form.set('id', 'f9');
 		const { event } = actionEvent({ '/api/admin/flows/f9': () => json({ error: 'super_admin required' }, 403) }, form);
-		const result = (await actions.delete(event)) as { status: number; data: { error: string; forbidden: boolean } };
+		const result = (await actions.delete(event)) as { status: number; data: { error: string; forbidden: boolean; action: string } };
 		expect(result.status).toBe(403);
 		expect(result.data.forbidden).toBe(true);
+		expect(result.data.action).toBe('delete');
 		expect(result.data.error).toBe('super_admin required');
 	});
 });
@@ -337,7 +339,9 @@ describe('admin/flows import action', () => {
 
 	it('refuses an empty import and a replace with no slug before calling the engine', async () => {
 		const empty = actionEvent({}, new FormData());
-		expect(((await actions.import(empty.event)) as { status: number }).status).toBe(400);
+		const refused = (await actions.import(empty.event)) as { status: number; data: { action: string } };
+		expect(refused.status).toBe(400);
+		expect(refused.data.action).toBe('import');
 
 		const form = new FormData();
 		form.set('text', '{}');

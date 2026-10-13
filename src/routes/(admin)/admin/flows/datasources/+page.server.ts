@@ -126,17 +126,19 @@ function bodyFrom(data: FormData): DatasourceBody | string {
 	};
 }
 
+// Each failure names its action. The drawer shows a save's, and the page
+// shows a delete's or a test's.
 export const actions: Actions = {
 	create: async (event) => {
 		await requireUser(event);
 		const client = flowClient(event);
 		const body = bodyFrom(await event.request.formData());
-		if (typeof body === 'string') return fail(400, { error: body });
+		if (typeof body === 'string') return fail(400, { action: 'save', error: body });
 		try {
 			await createDatasource(client, body);
 		} catch (err) {
-			if (isRefused(err)) return fail(402, REFUSED);
-			return fail(400, { error: actionError(err, 'Failed to create datasource') });
+			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
+			return fail(400, { action: 'save', error: actionError(err, 'Failed to create datasource') });
 		}
 	},
 
@@ -146,12 +148,12 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const id = text(data, 'id');
 		const body = bodyFrom(data);
-		if (typeof body === 'string') return fail(400, { error: body });
+		if (typeof body === 'string') return fail(400, { action: 'save', error: body });
 		try {
 			await updateDatasource(client, id, body);
 		} catch (err) {
-			if (isRefused(err)) return fail(402, REFUSED);
-			return fail(400, { error: actionError(err, 'Failed to update datasource') });
+			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
+			return fail(400, { action: 'save', error: actionError(err, 'Failed to update datasource') });
 		}
 	},
 
@@ -162,7 +164,7 @@ export const actions: Actions = {
 		try {
 			await deleteDatasource(client, text(data, 'id'));
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete datasource') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete datasource') });
 		}
 	},
 
@@ -175,8 +177,8 @@ export const actions: Actions = {
 			const result = await testDatasource(client, id);
 			return { testResult: { id, ...result } };
 		} catch (err) {
-			if (isRefused(err)) return fail(402, REFUSED);
-			return fail(400, { error: actionError(err, 'Failed to test datasource') });
+			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'test' });
+			return fail(400, { action: 'test', error: actionError(err, 'Failed to test datasource') });
 		}
 	},
 };

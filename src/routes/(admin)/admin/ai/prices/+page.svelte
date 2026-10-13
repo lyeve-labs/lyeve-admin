@@ -1,12 +1,13 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Alert, Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, Select, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, Select, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { tracked } from '$lib/forms.svelte';
 	import { Coins, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 	import type { ModelPrice } from '$lib/api/ai';
 	import AiSection from '$lib/components/ai/AiSection.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { PROVIDER_KINDS, providerKindLabel } from '$lib/api/ai';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
@@ -26,7 +27,23 @@
 	let output = $state(0);
 	let image = $state(0);
 
+	/*
+	 * The drawer and a row's delete share one `form` result. A save shows its
+	 * failure in the drawer and a delete on the page, so a failed delete never
+	 * reads as a failed save in the next drawer opened. Opening the drawer
+	 * clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const saveFailure = $derived(failure?.action === 'save' ? failure.error : undefined);
+	const pageFailure = $derived(failure && failure.action !== 'save' ? failure.error : undefined);
+
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		kind = 'openai';
 		model = '';
@@ -37,6 +54,7 @@
 	}
 
 	function openEdit(p: ModelPrice) {
+		cleared = form;
 		editing = p;
 		kind = p.kind;
 		model = p.model;
@@ -90,9 +108,7 @@
 	{/snippet}
 
 	<AiSection tab="prices" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prices">
-		{#if form?.error && !open}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={pageFailure} />
 
 		{#if data.prices.length === 0}
 			<EmptyState
@@ -160,9 +176,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.model}` : 'New price'}>
 	<form method="POST" action="?/save" id="price-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if form?.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={saveFailure} />
 		{#if editing}
 			<input type="hidden" name="kind" value={editing.kind} />
 			<input type="hidden" name="model" value={editing.model} />

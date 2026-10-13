@@ -174,6 +174,24 @@ describe('flow editor page', () => {
 		expect((form.querySelector('[name="slug"]') as HTMLInputElement).value).toBe(fixtureFlow.slug);
 	});
 
+	// The import drawer and the rest of the editor share one form result.
+	it('keeps a failed save out of the import drawer opened after it', async () => {
+		const { container, getByRole } = setup({ error: 'A flow needs a name.' });
+		expect(container.textContent).toContain('A flow needs a name.');
+		await pickOverflow(getByRole, 'Import');
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('A flow needs a name.');
+	});
+
+	it('shows a failed import inside the import drawer and not above the canvas', async () => {
+		const { container, getByRole, rerender } = setup();
+		await pickOverflow(getByRole, 'Import');
+		await rerender({ form: { action: 'import', error: 'Paste a definition or choose a file.' } } as never);
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Paste a definition or choose a file.');
+		expect(document.body.textContent?.split('Paste a definition or choose a file.').length).toBe(2);
+	});
+
 	it('validates the draft 500 ms after a change through the flow endpoint', async () => {
 		vi.useFakeTimers();
 		try {
