@@ -85,6 +85,15 @@ describe('FieldInput', () => {
 		expect(getByRole('button', { name: 'Choose from library' })).toBeTruthy();
 	});
 
+	it('hands a library read that failed to the picker, which says so', async () => {
+		const { getByRole, findByText, queryByText } = render(FieldInput, {
+			props: { field: field('media'), value: '', mediaChoices: null },
+		});
+		await fireEvent.click(getByRole('button', { name: 'Choose from library' }));
+		expect(await findByText('The library could not be read')).toBeTruthy();
+		expect(queryByText('No published files')).toBeNull();
+	});
+
 	// The server assigns a uid. An editable box could only be used to type a
 	// value the write would refuse.
 	it('renders a readonly monospace input for a uid field', () => {

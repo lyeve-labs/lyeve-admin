@@ -61,9 +61,10 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url, parent
 	const relations = await readRelationChoices(fetch, token, schemaDef.fields ?? []);
 
 	// Published library files, for a media field's picker. Read only when
-	// the schema has one.
-	const mediaChoices = schemaDef.fields.some((f) => f.field_type === 'media')
-		? await Promise.resolve().then(() => listMediaChoices(client)).catch((): MediaChoice[] => [])
+	// the schema has one. A read that fails is null, so the picker says the
+	// library could not be read instead of claiming nothing is published.
+	const mediaChoices: MediaChoice[] | null = schemaDef.fields.some((f) => f.field_type === 'media')
+		? await Promise.resolve().then(() => listMediaChoices(client)).catch(() => null)
 		: [];
 
 	return { schemaDef, relations, locales, mediaChoices };

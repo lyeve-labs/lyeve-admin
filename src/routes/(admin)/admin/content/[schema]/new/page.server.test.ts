@@ -200,6 +200,19 @@ describe('opening the new entry form', () => {
 		});
 	});
 
+	it('hands the media picker null when the library could not be read', async () => {
+		const withMedia = { name: 'surveys', display_name: 'Surveys', fields: [{ name: 'cover', field_type: 'media' }] };
+		rest.getSchema.mockResolvedValueOnce(withMedia as never);
+		reads.get.mockRejectedValueOnce(new FakeApiError('down', 503));
+		const failed = (await open([])) as unknown as { mediaChoices: unknown };
+		expect(failed.mediaChoices).toBeNull();
+
+		rest.getSchema.mockResolvedValueOnce(withMedia as never);
+		reads.get.mockResolvedValueOnce({ data: [] });
+		const empty = (await open([])) as unknown as { mediaChoices: unknown };
+		expect(empty.mediaChoices).toEqual([]);
+	});
+
 	it('reports an outage as an outage, not as a schema that is not there', async () => {
 		rest.getSchema.mockRejectedValueOnce(new FakeApiError('down', 503) as never);
 
