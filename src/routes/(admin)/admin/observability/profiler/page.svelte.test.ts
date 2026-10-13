@@ -82,8 +82,7 @@ describe('the profiler page', () => {
 	});
 
 	it('says the ring holds nothing for a selection it has no sample of', () => {
-		const empty = ok({ endpoint: '/nothing', methods: null, total_count: 0, limit: 100, offset: 0 });
-		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/nothing', detail: empty })));
+		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/nothing', detail: ok(null) })));
 		expect(getByTestId('profiler-detail').textContent).toContain('No data for this endpoint');
 	});
 

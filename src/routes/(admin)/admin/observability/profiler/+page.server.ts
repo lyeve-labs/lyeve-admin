@@ -32,9 +32,12 @@ export interface ProfilerPage {
 	slowest: Section<EndpointStats[]>;
 	plugins: Section<PluginBreakdown[]>;
 	memory: Section<MemoryTrend | null>;
-	/** The endpoint the URL selected, and its detail. Null when none is selected. */
+	/**
+	 * The endpoint the URL selected, and its detail. Null when none is
+	 * selected. The value is null when the ring holds no sample of it.
+	 */
 	selected: string | null;
-	detail: Section<EndpointDetail> | null;
+	detail: Section<EndpointDetail | null> | null;
 }
 
 /** What each view says when its read failed for a reason it cannot name. */
@@ -44,6 +47,20 @@ const FAILED = {
 	memory: 'The memory snapshots could not be read.',
 	detail: 'This endpoint could not be read. This is not a report that it has no samples.',
 } as const;
+
+/**
+ * The plugin answers 404 for a path its ring holds no sample of, which is an
+ * answer and not a missing plugin. A missing plugin also refuses every other
+ * view on the page, and those say so.
+ */
+async function sampled(read: Promise<EndpointDetail>): Promise<EndpointDetail | null> {
+	try {
+		return await read;
+	} catch (err) {
+		if (err instanceof ApiError && err.status === 404) return null;
+		throw err;
+	}
+}
 
 export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const { user } = await parent();
@@ -63,7 +80,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 		section(listSlowest(client), FAILED.endpoints),
 		section(listPlugins(client), FAILED.plugins),
 		section(readMemoryTrend(client), FAILED.memory),
-		selected ? section(readEndpoint(client, selected), FAILED.detail) : Promise.resolve(null),
+		selected ? section(sampled(readEndpoint(client, selected)), FAILED.detail) : Promise.resolve(null),
 	]);
 
 	const page: ProfilerPage = { endpoints, slowest, plugins, memory, selected, detail };

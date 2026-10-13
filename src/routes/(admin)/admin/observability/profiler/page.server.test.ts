@@ -109,7 +109,29 @@ describe('profiler load', () => {
 		expect(result.memory).toEqual({ ok: false, gate: { state: 'unavailable' } });
 		expect(result.slowest).toEqual({ ok: true, value: [STATS] });
 		expect(result.selected).toBe('/nothing');
-		expect(result.detail?.ok).toBe(false);
+		expect(result.detail).toEqual({ ok: true, value: null });
+	});
+
+	// The plugin answers 404 for a path its ring holds no sample of. Read as
+	// a missing route, the page said the profiler was not in this build.
+	it('reads a 404 for the selected endpoint as no samples, not as a missing plugin', async () => {
+		const { event } = loadEvent(
+			{ ...views, '/debug/profiler/endpoint/': () => json({ error: 'no data for endpoint: /nothing' }, 404) },
+			['super_admin'],
+			'?endpoint=nothing',
+		);
+		const result = (await load(event)) as Loaded;
+		expect(result.detail).toEqual({ ok: true, value: null });
+	});
+
+	it('keeps any other failure of the selected endpoint as a gate', async () => {
+		const { event } = loadEvent(
+			{ ...views, '/debug/profiler/endpoint/': () => json({ error: 'down' }, 503) },
+			['super_admin'],
+			'?endpoint=nothing',
+		);
+		const result = (await load(event)) as Loaded;
+		expect(result.detail).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 
 	// The ring describes every tenant's traffic and the exports carry process
