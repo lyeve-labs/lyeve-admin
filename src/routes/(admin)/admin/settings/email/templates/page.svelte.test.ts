@@ -5,6 +5,29 @@ import TemplatesPage from './+page.svelte';
 import type { PageData } from './$types';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/**
+ * Press a row's delete, accept the question, and return its title and what
+ * the hidden form held when it was sent. The value has to be in the form by
+ * then, which is what waiting on the next render before sending is for.
+ */
+async function pressDelete(button: HTMLElement, field: string): Promise<{ title: string; sent: string }> {
+	let sent = '';
+	const spy = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(function (this: HTMLFormElement) {
+		sent = (this.querySelector(`input[name="${field}"]`) as HTMLInputElement | null)?.value ?? '';
+	});
+	kit.confirm.mockClear();
+	await fireEvent.click(button);
+	await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+	spy.mockRestore();
+	return { title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''), sent };
+}
+
 
 afterEach(cleanup);
 
@@ -102,5 +125,22 @@ describe('email templates page', () => {
 		expect(container.textContent).toContain('The template could not be rendered.');
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit spring-sale' }));
 		expect(drawerText()).not.toContain('could not be rendered');
+	});
+});
+
+describe('email template delete', () => {
+	it('names the template and sends its id', async () => {
+		render(TemplatesPage, { props: { data: data(), form: null } });
+		const out = await pressDelete(screen.getByRole('button', { name: 'Delete spring-sale' }), 'id');
+		expect(out.title).toBe('Delete template spring-sale');
+		expect(out.sent).toBe('t2');
+	});
+
+	it('offers the ready-made templates in a searchable list', async () => {
+		render(TemplatesPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'New template' }));
+		const trigger = document.body.querySelector('#template-starter') as HTMLElement;
+		await fireEvent.click(trigger);
+		expect(screen.getByRole('combobox', { name: 'Search Start from' })).toBeTruthy();
 	});
 });

@@ -9,8 +9,8 @@
 		EmptyState,
 		Input,
 		PageShell,
+		RadioGroup,
 		SectionHeading,
-		Select,
 		Stat,
 		Table,
 		Toggle,
@@ -76,9 +76,16 @@
 	 */
 	const canChange = (r: RateRule) => data.superAdmin || Boolean(r.tenant_id);
 
+	// Each way of counting needs its sentence, so the choice is a radio group
+	// that shows both rather than a list that hides one.
 	const KEY_OPTIONS = [
-		{ value: 'ip', label: 'Per address' },
-		{ value: 'user', label: 'Per signed-in account' },
+		{ value: 'ip', label: 'Per address', description: 'Each address a request comes from has a budget of its own.' },
+		{
+			value: 'user',
+			label: 'Per signed-in account',
+			description:
+				'One budget across every address an account calls from. A caller who is not signed in is counted by address.',
+		},
 	];
 
 	let open = $state(false);
@@ -199,7 +206,7 @@
 	function removeRule(r: RateRule): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete the rule for ${r.endpoint}?`,
+				`Delete rule ${r.endpoint}`,
 				r.enforced
 					? 'That endpoint stops being limited by it immediately.'
 					: 'The rule is not being enforced, so nothing changes for callers.',
@@ -695,14 +702,7 @@
 				hint="Leave empty for every caller. anonymous matches callers who are not signed in."
 				bind:value={role}
 			/>
-			<Select
-				id="rl-key"
-				name="key_by"
-				label="Count"
-				hint="Per account shares one budget across every address an account calls from. A caller who is not signed in is counted by address."
-				bind:value={keyBy}
-				options={KEY_OPTIONS}
-			/>
+			<RadioGroup label="Count" name="key_by" bind:value={keyBy} options={KEY_OPTIONS} />
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Input
 					id="rl-rate"
@@ -784,19 +784,19 @@
 				</p>
 			{/if}
 			<div class="grid gap-4 sm:grid-cols-2">
-			<Input
-				id="rl-protection-requests"
-				name="requests"
-				label="Requests"
-				hint="At least one. Zero would lock everyone out."
-				bind:value={protectionRequests}
-			/>
-			<Input
-				id="rl-protection-window"
-				name="window_minutes"
-				label="Window in minutes"
-				hint="At most a day."
-				bind:value={protectionMinutes}
+				<Input
+					id="rl-protection-requests"
+					name="requests"
+					label="Requests"
+					hint="At least one. Zero would lock everyone out."
+					bind:value={protectionRequests}
+				/>
+				<Input
+					id="rl-protection-window"
+					name="window_minutes"
+					label="Window in minutes"
+					hint="At most a day."
+					bind:value={protectionMinutes}
 				/>
 			</div>
 		</div>

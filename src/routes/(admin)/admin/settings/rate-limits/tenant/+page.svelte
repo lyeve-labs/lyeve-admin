@@ -21,7 +21,6 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Gauge, Plus, ShieldBan, Trash2 } from '@lucide/svelte';
@@ -147,14 +146,10 @@
 		};
 	};
 
-	// The window follows the address, so going back shows the window it named.
-	let hours = $state('24');
-	$effect(() => {
-		hours = String(data.hours);
-	});
-	function showWindow(value: string) {
-		void goto(`?hours=${value}`, { keepFocus: true, noScroll: true });
-	}
+	// The window is the address, so the server render already marks the one
+	// it read, the links work before the page hydrates, and going back shows
+	// the window that address named.
+	const windows = HISTORY_WINDOWS.map((w) => ({ value: w.value, label: w.label, href: `?hours=${w.value}` }));
 </script>
 
 <PageTitle title="Tenant rate limits" />
@@ -311,13 +306,7 @@
 		<section class="flex flex-col gap-4" aria-label="Refusal history">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<SectionHeading level={2}>Refusal history</SectionHeading>
-				<SegmentedControl
-					label="Window"
-					labelHidden
-					bind:value={hours}
-					options={HISTORY_WINDOWS.map((w) => ({ value: w.value, label: w.label }))}
-					onchange={showWindow}
-				/>
+				<SegmentedControl label="Window" labelHidden value={String(data.hours)} options={windows} />
 			</div>
 			{#if !data.history.ok}
 				<GateNotice

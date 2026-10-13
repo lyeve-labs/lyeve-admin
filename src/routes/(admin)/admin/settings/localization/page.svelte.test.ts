@@ -69,3 +69,11 @@ describe('locales page', () => {
 		expect(screen.getByText('Locales saved.')).toBeTruthy();
 	});
 });
+
+describe('the fallback picker', () => {
+	it('lets the locale to append be searched', async () => {
+		render(LocalesPage, { props: { data: data({ locales: { ok: true, value: { ...LOCALES, fallback_chain: [] } } }), form: null } });
+		await fireEvent.click(document.body.querySelector('#chain-pick') as HTMLElement);
+		expect(screen.getByRole('combobox', { name: 'Search Append a locale' })).toBeTruthy();
+	});
+});

@@ -3,6 +3,29 @@ import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/**
+ * Press a row's delete, accept the question, and return its title and what
+ * the hidden form held when it was sent. The value has to be in the form by
+ * then, which is what waiting on the next render before sending is for.
+ */
+async function pressDelete(button: HTMLElement, field: string): Promise<{ title: string; sent: string }> {
+	let sent = '';
+	const spy = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(function (this: HTMLFormElement) {
+		sent = (this.querySelector(`input[name="${field}"]`) as HTMLInputElement | null)?.value ?? '';
+	});
+	kit.confirm.mockClear();
+	await fireEvent.click(button);
+	await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+	spy.mockRestore();
+	return { title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''), sent };
+}
+
 
 import GraphqlPage from './+page.svelte';
 
@@ -103,5 +126,15 @@ describe('the register drawer', () => {
 		expect(container.textContent).toContain('The query could not be deleted.');
 		await fireEvent.click(getByRole('button', { name: 'New persisted query' }));
 		expect(drawerText()).not.toContain('could not be deleted');
+	});
+});
+
+describe('persisted query delete', () => {
+	it('names the query and sends its hash', async () => {
+		const query = { query_hash: 'abc123', query: '{ posts { id } }', operation_name: 'Posts', description: '', enabled: true, auto_registered: false };
+		const { getByRole } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] } }) });
+		const out = await pressDelete(getByRole('button', { name: 'Delete Posts' }), 'hash');
+		expect(out.title).toBe('Delete persisted query Posts');
+		expect(out.sent).toBe('abc123');
 	});
 });

@@ -16,6 +16,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { Braces, FlaskConical, Plus, Power, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -51,19 +52,19 @@
 
 	async function askDelete(q: PersistedQuery) {
 		const ok = await confirm(
-			'Delete persisted query',
-			`Delete ${q.operation_name || q.query_hash.slice(0, 12)}? A client that sends only its hash is refused from then on.`,
+			`Delete persisted query ${q.operation_name || q.query_hash.slice(0, 12)}`,
+			'A client that sends only its hash is refused from then on.',
 			{ confirmLabel: 'Delete' },
 		);
 		if (!ok) return;
 		hash = q.query_hash;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
 	async function toggle(q: PersistedQuery) {
 		hash = q.query_hash;
-		await Promise.resolve();
+		await tick();
 		toggleForm?.requestSubmit();
 	}
 

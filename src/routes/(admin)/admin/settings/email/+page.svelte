@@ -14,6 +14,7 @@
 		PasswordInput,
 		SectionHeading,
 		Card,
+		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
@@ -25,6 +26,7 @@
 	import SettingRow from '$lib/components/SettingRow.svelte';
 	import type { ConfigSetting } from './+page.server';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 	import { API_METHODS, BODY_PLACEHOLDERS, WEBHOOK_EVENTS, webhookPath, type EmailProvider } from '$lib/api/email';
 	import { submitter } from '$lib/forms.svelte';
@@ -91,8 +93,8 @@
 
 	let open = $state(false);
 	let editing = $state<EmailProvider | null>(null);
-	let transport = $state<string | null>('smtp');
-	let status = $state<string | null>('active');
+	let transport = $state('smtp');
+	let status = $state('active');
 	let host = $state('');
 	let port = $state('587');
 	// The name is state rather than read from `editing`: a duplicate has a
@@ -101,7 +103,7 @@
 	let username = $state('');
 	let useTLS = $state(true);
 	let apiBaseUrl = $state('');
-	let apiMethod = $state<string | null>('POST');
+	let apiMethod = $state('POST');
 	let apiPath = $state('');
 	let apiHeaders = $state<Row[]>([]);
 	let apiBody = $state('');
@@ -215,12 +217,12 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(p: EmailProvider) {
-		const ok = await confirm(`Delete ${p.name}?`, 'Sends that rotate onto it will go to the next provider.', {
+		const ok = await confirm(`Delete provider ${p.name}`, 'Sends that rotate onto it will go to the next provider.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		deleteId = p.id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -421,15 +423,10 @@
 			<input type="hidden" name="stored_transport" value={editing.transport} />
 		{/if}
 		<Input id="ep-name" name="name" label="Name" hint="A label for the pool, such as Primary or Marketing." bind:value={providerName} required />
-		<Select
-			id="ep-transport"
-			name="transport"
-			label="Transport"
-			options={TRANSPORT_OPTIONS}
-			value={transport}
-			hint="SMTP talks to a mail server; a provider API sends over HTTPS with a key."
-			onvaluechange={(v) => (transport = v)}
-		/>
+		<div class="flex flex-col gap-1">
+			<SegmentedControl label="Transport" name="transport" options={TRANSPORT_OPTIONS} bind:value={transport} />
+			<p class="text-xs text-muted">SMTP talks to a mail server. A provider API sends over HTTPS with a key.</p>
+		</div>
 		<Input id="ep-from" name="from_addr" label="From address" placeholder="noreply@example.com" value={editing?.from_addr ?? ''} required />
 
 		{#if isApi}
@@ -445,7 +442,10 @@
 					bind:value={apiBaseUrl}
 					required
 				/>
-				<Select id="ep-api-method" name="api_method" label="Method" options={METHOD_OPTIONS} value={apiMethod} hint="The verb of the send request; POST for nearly every provider." onvaluechange={(v) => (apiMethod = v)} />
+				<div class="flex flex-col gap-1">
+					<SegmentedControl label="Method" name="api_method" options={METHOD_OPTIONS} bind:value={apiMethod} />
+					<p class="text-xs text-muted">The verb of the send request. POST for nearly every provider.</p>
+				</div>
 				<Input id="ep-api-path" name="api_path" label="Path" placeholder="/v3/messages" hint="Appended to the base URL. Starts with / and carries no query string." bind:value={apiPath} />
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-xs font-semibold uppercase tracking-wide text-faint">Headers</legend>
@@ -526,7 +526,7 @@
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 			<Input id="ep-priority" name="priority" label="Priority" inputmode="numeric" hint="0 sends first." value={String(editing?.priority ?? 0)} />
 			<Input id="ep-max-per-hour" name="max_per_hour" label="Max per hour" inputmode="numeric" hint="0 is unlimited." value={String(editing?.max_per_hour ?? 0)} />
-			<Select id="ep-status" name="status" label="Status" options={STATUS_OPTIONS} value={status} onvaluechange={(v) => (status = v)} />
+			<SegmentedControl label="Status" name="status" options={STATUS_OPTIONS} bind:value={status} />
 		</div>
 	</form>
 	{#snippet footer()}

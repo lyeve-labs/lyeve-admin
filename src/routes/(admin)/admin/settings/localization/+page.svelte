@@ -235,6 +235,7 @@
 								label="Append a locale"
 								placeholder="Pick a locale"
 								options={addable}
+								searchable
 								bind:value={chainPick}
 								disabled={addable.length === 0}
 							/>

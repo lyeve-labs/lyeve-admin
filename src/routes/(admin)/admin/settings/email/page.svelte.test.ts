@@ -1,10 +1,33 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProvidersPage from './+page.svelte';
 import type { EmailProvider } from '$lib/api/email';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/**
+ * Press a row's delete, accept the question, and return its title and what
+ * the hidden form held when it was sent. The value has to be in the form by
+ * then, which is what waiting on the next render before sending is for.
+ */
+async function pressDelete(button: HTMLElement, field: string): Promise<{ title: string; sent: string }> {
+	let sent = '';
+	const spy = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(function (this: HTMLFormElement) {
+		sent = (this.querySelector(`input[name="${field}"]`) as HTMLInputElement | null)?.value ?? '';
+	});
+	kit.confirm.mockClear();
+	await fireEvent.click(button);
+	await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+	spy.mockRestore();
+	return { title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''), sent };
+}
+
 
 afterEach(cleanup);
 
@@ -75,9 +98,13 @@ const API_FIELDS = [
 	'api_webhook_reason_path',
 ];
 
+function segment(container: HTMLElement, group: string, label: string): HTMLElement {
+	const radios = container.querySelector(`[role="radiogroup"][aria-label="${group}"]`) as HTMLElement;
+	return within(radios).getByRole('radio', { name: label });
+}
+
 async function chooseTransport(container: HTMLElement, label: string) {
-	await fireEvent.click(container.querySelector('#ep-transport') as HTMLElement);
-	await fireEvent.click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent?.trim() === label) as HTMLElement);
+	await fireEvent.click(segment(container, 'Transport', label));
 }
 
 describe('email providers page', () => {
@@ -141,9 +168,10 @@ describe('email providers page', () => {
 		expect(container.textContent).toContain('{{to_first}}');
 		expect(container.textContent).toContain('{{to_objects}}');
 		expect(container.textContent).toContain('{{message_id}}');
-		await fireEvent.click(container.querySelector('#ep-api-method') as HTMLElement);
-		expect([...document.querySelectorAll('[role="option"]')].map((o) => o.textContent?.trim())).toEqual(['POST', 'PUT', 'PATCH']);
-		await fireEvent.click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent?.trim() === 'PUT') as HTMLElement);
+		const methods = container.querySelector('[role="radiogroup"][aria-label="Method"]') as HTMLElement;
+		expect(within(methods).getAllByRole('radio').map((o) => o.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+		expect(within(methods).getByRole('radio', { name: 'PATCH' })).toBeTruthy();
+		await fireEvent.click(segment(container, 'Method', 'PUT'));
 		expect((form.querySelector('input[name="api_method"]') as HTMLInputElement).value).toBe('PUT');
 
 		await chooseTransport(container, 'SMTP');
@@ -251,5 +279,29 @@ describe('email page fallback transport', () => {
 		const { container } = setup([smtp], { mail: null });
 		expect(container.querySelector('#set-SMTP_HOST')).toBeNull();
 		expect(container.textContent).not.toContain('Fallback transport');
+	});
+});
+
+describe('email provider controls', () => {
+	it('offers the transport, the method and the status as segments, with every option in sight', async () => {
+		const { getAllByText, container } = setup([]);
+		await fireEvent.click(getAllByText('New provider')[0]);
+		await chooseTransport(container, 'Provider API');
+		for (const group of ['Transport', 'Method', 'Status']) {
+			expect(container.querySelector(`[role="radiogroup"][aria-label="${group}"]`), group).toBeTruthy();
+		}
+		expect(container.querySelector('#ep-transport')).toBeNull();
+		expect(container.querySelector('#ep-status')).toBeNull();
+		await fireEvent.click(segment(container, 'Status', 'Paused'));
+		expect((formEl(container).querySelector('input[name="status"]') as HTMLInputElement).value).toBe('paused');
+	});
+});
+
+describe('email provider delete', () => {
+	it('names the provider and sends its id', async () => {
+		const { getByLabelText } = setup([smtp]);
+		const out = await pressDelete(getByLabelText('Delete Primary'), 'id');
+		expect(out.title).toBe('Delete provider Primary');
+		expect(out.sent).toBe('p1');
 	});
 });

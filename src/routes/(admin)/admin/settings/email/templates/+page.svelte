@@ -6,6 +6,7 @@
 	import { Alert, Badge, Button, Drawer, EmptyState, Input, Modal, PageShell, SegmentedControl, Select, Table, Textarea, confirm } from '@lyeve-labs/ui-kit';
 	import { Eye, Lock, Mail, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { ActionData, PageData } from './$types';
@@ -102,10 +103,10 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(t: EmailTemplate) {
-		const ok = await confirm('Delete template', `Delete ${t.key}? A trigger or a flow that sends it stops sending.`, { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete template ${t.key}`, 'A trigger or a flow that sends it stops sending.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteId = t.id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -124,7 +125,7 @@
 
 	async function askPreview(t: EmailTemplate) {
 		previewKey = t.key;
-		await Promise.resolve();
+		await tick();
 		previewForm?.requestSubmit();
 	}
 
@@ -236,6 +237,7 @@
 				id="template-starter"
 				label="Start from"
 				options={starterOptions}
+				searchable
 				value={starter}
 				onvaluechange={pickStarter}
 				hint={data.starters.ok

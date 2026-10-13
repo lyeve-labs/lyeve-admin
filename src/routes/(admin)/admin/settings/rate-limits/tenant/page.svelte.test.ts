@@ -3,7 +3,6 @@ import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 import TenantPage from './+page.svelte';
 
@@ -147,5 +146,16 @@ describe('tenant rate limit drawers', () => {
 		expect(drawerText('address-form')).toContain('already on the allow list');
 		await fireEvent.click(screen.getByRole('button', { name: 'Set a limit' }));
 		expect(drawerText('tenant-limit-form')).not.toContain('already on the allow list');
+	});
+});
+
+describe('the history window', () => {
+	it('marks the window the address named on the first render, as links', () => {
+		render(TenantPage, { props: props({ hours: 168 }) });
+		const group = screen.getByRole('group', { name: 'Window' });
+		const current = group.querySelector('[aria-current="page"]');
+		expect(current?.textContent).toContain('Last week');
+		expect(current?.getAttribute('href')).toBe('?hours=168');
+		expect(group.querySelectorAll('a[href^="?hours="]')).toHaveLength(3);
 	});
 });

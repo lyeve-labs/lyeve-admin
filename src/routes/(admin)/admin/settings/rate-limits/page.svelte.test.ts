@@ -2,9 +2,32 @@
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a delete and read the question it asks.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
 vi.mock('$app/forms', () => ({
-	enhance: () => ({ destroy() {} }),
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy() {} };
+	},
 }));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/** The title of the question the first delete form on the page asks. */
+async function deleteTitle(): Promise<string> {
+	const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/delete' && f.node.isConnected);
+	const submit = entry?.submit as ((input: { cancel: () => void }) => Promise<unknown>) | undefined;
+	if (!submit) throw new Error('no delete form registered a submit function');
+	kit.confirm.mockClear();
+	await submit({ cancel: () => {} });
+	return String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? '');
+}
 
 import RateLimitsPage from './+page.svelte';
 
@@ -185,5 +208,22 @@ describe('rate-limits drawers', () => {
 		const { getAllByRole } = setup({ customEnabled: true, form: { action: 'rule', error: 'The rule could not be saved.' } });
 		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
 		expect(drawerText('rate-rule-form')).not.toContain('could not be saved');
+	});
+});
+
+describe('rate-limits controls', () => {
+	it('names the rule in the delete confirmation', async () => {
+		setup({ customEnabled: true, rules: [{ ...customRule, enforced: true }] });
+		expect(await deleteTitle()).toBe('Delete rule GET /api/content/{schema}');
+	});
+
+	it('offers the two ways of counting as radios, each with its sentence', async () => {
+		const { getAllByRole } = setup({ customEnabled: true });
+		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
+		const group = document.body.querySelector('form#rate-rule-form [role="radiogroup"]') as HTMLElement;
+		expect(group).toBeTruthy();
+		expect(group.textContent).toContain('Each address a request comes from has a budget of its own.');
+		expect(group.textContent).toContain('One budget across every address an account calls from.');
+		expect(document.body.querySelector('#rl-key')).toBeNull();
 	});
 });

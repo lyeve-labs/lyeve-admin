@@ -6,6 +6,7 @@
 	import { Alert, Badge, Button, Drawer, EmptyState, Input, PageShell, Select, Table, Textarea, Toggle, confirm } from '@lyeve-labs/ui-kit';
 	import { MailPlus, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { TRIGGER_EVENT_LABELS, type EmailTrigger } from '$lib/api/email-triggers';
@@ -82,10 +83,10 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(t: EmailTrigger) {
-		const ok = await confirm('Delete trigger', `Delete ${t.name}? Mail stops going out for this event.`, { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete trigger ${t.name}`, 'Mail stops going out for this event.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteId = t.id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -186,11 +187,12 @@
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
 		<Input id="trigger-name" name="name" label="Name" required placeholder="Order confirmation" bind:value={name} />
-		<Select id="trigger-event" name="event" label="When" required options={eventOptions} value={eventName} onvaluechange={(v) => (eventName = v)} />
+		<Select id="trigger-event" name="event" label="When" required searchable options={eventOptions} value={eventName} onvaluechange={(v) => (eventName = v)} />
 		<Select
 			id="trigger-schema"
 			name="schema"
 			label="In"
+			searchable
 			options={schemaOptions}
 			value={schema}
 			onvaluechange={(v) => (schema = v)}
@@ -203,6 +205,7 @@
 			name="template_key"
 			label="Template"
 			required
+			searchable
 			options={templateOptions}
 			value={templateKey}
 			onvaluechange={(v) => (templateKey = v)}
