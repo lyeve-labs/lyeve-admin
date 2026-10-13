@@ -3,7 +3,7 @@
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { Alert, Badge, Button, Drawer, EmptyState, Input, Modal, PageShell, SegmentedControl, Select, Table, Textarea, confirm } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Drawer, EmptyState, Input, Modal, PageShell, SegmentedControl, Select, Table, Textarea, confirm, toast } from '@lyeve-labs/ui-kit';
 	import { Eye, Lock, Mail, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
@@ -115,11 +115,16 @@
 	let previewOpen = $state(false);
 	const preview = $derived(form && 'preview' in form ? form.preview : null);
 	// The preview opens only on a rendered answer. A failed render shows above
-	// the list, where a modal with nothing in it would hide it.
+	// the list, where a modal with nothing in it would hide it, and as a toast,
+	// because the reader pressed Preview on a row that may be far below it.
 	const showPreview: SubmitFunction = () => {
 		return async ({ result, update }) => {
 			await update({ reset: false });
 			if (result.type === 'success') previewOpen = true;
+			else if (result.type === 'failure') {
+				const said = (result.data as { error?: unknown } | undefined)?.error;
+				toast.error(typeof said === 'string' && said ? said : 'The template could not be rendered.');
+			}
 		};
 	};
 

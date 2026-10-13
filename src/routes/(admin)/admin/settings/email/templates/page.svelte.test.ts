@@ -4,12 +4,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import TemplatesPage from './+page.svelte';
 import type { PageData } from './$types';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
-const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
-vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
-	...(await importOriginal<Record<string, unknown>>()),
-	confirm: kit.confirm,
+// enhance hands each form's submit function over here, so a test can play a
+// result back through the one behind the preview.
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy() {} };
+	},
 }));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true), toastError: vi.fn() }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
+	const real = await importOriginal<Record<string, unknown>>();
+	return { ...real, confirm: kit.confirm, toast: { ...(real.toast as object), error: kit.toastError } };
+});
 
 /**
  * Press a row's delete, accept the question, and return its title and what
@@ -142,5 +150,17 @@ describe('email template delete', () => {
 		const trigger = document.body.querySelector('#template-starter') as HTMLElement;
 		await fireEvent.click(trigger);
 		expect(screen.getByRole('combobox', { name: 'Search Start from' })).toBeTruthy();
+	});
+});
+
+describe('a failed preview', () => {
+	it('says so in a toast as well as above the list, and opens no empty preview', async () => {
+		render(TemplatesPage, { props: { data: data(), form: null } });
+		const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/preview' && f.node.isConnected);
+		const submit = entry?.submit as () => (input: { result: unknown; update: () => Promise<void> }) => Promise<void>;
+		kit.toastError.mockClear();
+		await submit()({ result: { type: 'failure', status: 400, data: { action: 'preview', error: 'The template could not be rendered.' } }, update: async () => {} });
+		expect(kit.toastError).toHaveBeenCalledWith('The template could not be rendered.');
+		expect(document.body.querySelector('[data-testid="template-preview"]')).toBeNull();
 	});
 });
