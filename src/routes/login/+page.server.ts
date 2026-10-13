@@ -4,10 +4,13 @@ import type { PageServerLoad, Actions } from './$types';
 import { createClient, ApiError } from '@lyeve-labs/client';
 import { mfaVerify, isMFAChallenge, type LoginResponse } from '@lyeve-labs/client-rest';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { secondFactorFailure } from '$lib/server/second-factor';
 import { clearSessionCookie, setSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import { adminReturnPath } from '$lib/server/local-path';
 import { LANDING } from '$lib/landing';
 import { challengeFrom } from '$lib/captcha';
+
+const SIGN_IN_UNAVAILABLE = 'Sign-in is unavailable right now. Please try again shortly.';
 
 /**
  * The page a sign-in returns to: the `next` query when it is an admin page,
@@ -93,17 +96,8 @@ export const actions: Actions = {
 				const res = await mfaVerify(challengeToken, code, createClient(fetch));
 				setSessionCookie(event, res.token);
 			} catch (e) {
-				// The engine returns 429 for both MFA lockout and challenge
-				// exhaustion. Calling either an invalid code tells the user to
-				// keep retrying the one thing that cannot work.
-				if (e instanceof ApiError && e.status === 429) {
-					return fail(429, {
-						error: 'Too many verification attempts. Please wait before trying again.',
-						mfa_required: true,
-						challenge_token: challengeToken,
-					});
-				}
-				return { error: 'Invalid code.', mfa_required: true, challenge_token: challengeToken };
+				const failed = secondFactorFailure(e);
+				return fail(failed.status, { error: failed.error, mfa_required: true, challenge_token: challengeToken });
 			}
 			redirect(302, returnTo(event.url));
 		}
@@ -135,7 +129,8 @@ export const actions: Actions = {
 			// Only a rejected credential should read as a rejected credential.
 			// The engine rate-limits this endpoint at 5 attempts, and reporting
 			// that as a bad password sends people to reset a password that was
-			// never wrong. A 5xx reported the same way hides an outage.
+			// never wrong. A 5xx reported the same way hides an outage, and so
+			// does an engine that never answered.
 			if (e instanceof ApiError) {
 				// After repeated failures the engine asks for a challenge. A 400
 				// carrying it means the token was missing or refused. A 401
@@ -157,8 +152,10 @@ export const actions: Actions = {
 					return fail(429, { error: 'Too many attempts. Please try again in a moment.' });
 				}
 				if (e.status >= 500) {
-					return fail(e.status, { error: 'Sign-in is unavailable right now. Please try again shortly.' });
+					return fail(e.status, { error: SIGN_IN_UNAVAILABLE });
 				}
+			} else {
+				return fail(503, { error: SIGN_IN_UNAVAILABLE });
 			}
 			return { error: 'Invalid email or password.' };
 		}

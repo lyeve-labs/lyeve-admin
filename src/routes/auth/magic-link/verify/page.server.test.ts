@@ -90,11 +90,39 @@ describe('auth/magic-link/verify actions', () => {
 		expect(JSON.parse(String(init.body))).toEqual({ challenge_token: 'ch', code: '123456' });
 	});
 
-	it('keeps the challenge on a wrong code', async () => {
-		const fetch = vi.fn(async () => json({ error: 'invalid code' }, 401)) as unknown as typeof globalThis.fetch;
+	it.each([
+		[422, 'invalid code'],
+		[401, 'challenge expired'],
+	])('keeps the challenge and calls a %i a wrong code', async (status, message) => {
+		const fetch = vi.fn(async () => json({ error: message }, status)) as unknown as typeof globalThis.fetch;
 		const result = (await actions.mfa(event({ challenge_token: 'ch', code: '000000' }, fetch))) as {
+			status: number;
 			data: Record<string, unknown>;
 		};
+		expect(result.status).toBe(400);
 		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch' });
+	});
+
+	// A code the engine never checked may be right, so it is not called wrong.
+	it.each([
+		['answers 503', async () => json({ error: 'session store unavailable' }, 503)],
+		[
+			'does not answer',
+			async (): Promise<Response> => {
+				throw new TypeError('fetch failed');
+			},
+		],
+	])('keeps the challenge and says the code was not checked when the engine %s', async (_case, answer) => {
+		const fetch = vi.fn(answer) as unknown as typeof globalThis.fetch;
+		const result = (await actions.mfa(event({ challenge_token: 'ch', code: '123456' }, fetch))) as {
+			status: number;
+			data: Record<string, unknown>;
+		};
+		expect(result.status).toBe(503);
+		expect(result.data).toEqual({
+			error: 'The engine did not answer, so the code was not checked. Try again in a moment.',
+			mfa_required: true,
+			challenge_token: 'ch',
+		});
 	});
 });
