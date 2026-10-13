@@ -133,7 +133,7 @@ describe('permissions page', () => {
 		await tick();
 		// A destructive confirmation has to say which object it means.
 		const [title, message, options] = kit.confirm.mock.calls[0] as unknown as [string, string, { confirmLabel: string }];
-		expect(title).toBe('Remove permission');
+		expect(title).toBe('Delete rule for editor on article');
 		expect(message).toContain('editor');
 		expect(message).toContain('article');
 		expect(options.confirmLabel).toBe('Delete');

@@ -21,6 +21,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { Asterisk, ChevronRight, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import type { PageData, ActionData } from './$types';
@@ -381,10 +382,12 @@
 		} else if (inherited.length > 0) {
 			message += ` The ${parentLabel(target.schema_name)} for ${target.role} then applies to this ${isFlowResource(target.schema_name) ? 'flow' : 'schema'} and grants ${inherited.join(', ')}.`;
 		}
-		const ok = await confirmDialog('Remove permission', message, { confirmLabel: 'Delete' });
+		const ok = await confirmDialog(`Delete rule for ${target.role} on ${where}`, message, { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteId = target.id;
-		await Promise.resolve();
+		// The hidden field takes the id on the next render, and the form posts
+		// what the field holds, so the submit waits for that render.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 

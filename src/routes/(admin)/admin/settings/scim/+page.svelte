@@ -9,8 +9,9 @@
 		Input,
 		PageShell,
 		PasswordInput,
+		RadioGroup,
+		SearchInput,
 		SectionHeading,
-		Select,
 		Stat,
 		Table,
 		Toggle,
@@ -25,6 +26,8 @@
 	import { KeyRound, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import { narrows } from '$lib/narrow';
 	import {
 		MIN_TOKEN_LENGTH,
 		SCIM_BASE_PATH,
@@ -45,6 +48,24 @@
 	// An admin may read the connections. Every write is the super admin's, so an
 	// admin is shown the list and no control that would only be refused.
 	const canWrite = $derived(data.user.roles.includes('super_admin'));
+
+	// The endpoint takes no search, so the box narrows the page on screen and
+	// the pager below still walks every connection.
+	let query = $state('');
+	const visible = $derived(data.providers.filter((p) => narrows(query, p.name)));
+
+	const DEPROVISION_OPTIONS = [
+		{
+			value: 'disable',
+			label: 'Disable the account',
+			description: 'The account stays, with its history, and can no longer sign in.',
+		},
+		{
+			value: 'delete',
+			label: 'Delete the account',
+			description: 'The account and its history are removed. This cannot be undone.',
+		},
+	];
 
 	let creating = $state(false);
 	let name = $state('');
@@ -96,7 +117,7 @@
 	function removeConnection(p: ScimProvider): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
+				`Delete SCIM connection ${p.name}`,
 				'The identity provider stops being able to create or remove accounts here. Accounts it already created are left as they are.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -179,6 +200,18 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				<ListToolbar label="Filter connections">
+					{#snippet search()}
+						<label for="scim-search" class="sr-only">Narrow this page</label>
+						<SearchInput id="scim-search" bind:value={query} placeholder="Connection name on this page" />
+					{/snippet}
+				</ListToolbar>
+				{#if visible.length === 0}
+					<EmptyState
+						title="No connection on this page matches"
+						description="Clear the search, or turn the page: the box narrows what is on screen."
+					/>
+				{:else}
 				<Table label="Connections">
 					<thead>
 						<tr>
@@ -189,7 +222,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.providers as p (p.id)}
+						{#each visible as p (p.id)}
 							<tr>
 								<td data-cell="nowrap">
 									<div class="flex items-center gap-2">
@@ -235,6 +268,7 @@
 						{/each}
 					</tbody>
 				</Table>
+				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
@@ -271,16 +305,11 @@
 				bind:value={token}
 				required
 			/>
-			<Select
-				id="scim-deprovision-action"
+			<RadioGroup
 				name="deprovision_action"
 				label="When the directory removes somebody"
-				hint="Disabling keeps the account and its history. Deleting does not, and cannot be undone."
 				bind:value={action}
-				options={[
-					{ value: 'disable', label: 'Disable the account' },
-					{ value: 'delete', label: 'Delete the account' },
-				]}
+				options={DEPROVISION_OPTIONS}
 			/>
 			<!-- Toggle renders a button, and a button submits nothing. The action
 			     reads an absent field as false, which would silently store a

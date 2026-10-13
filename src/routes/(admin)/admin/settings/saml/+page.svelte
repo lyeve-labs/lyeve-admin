@@ -140,7 +140,7 @@
 	function removeProvider(p: SamlProvider): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
+				`Delete SAML provider ${p.name}`,
 				'Anyone who signs in through this provider will lose access, and the private key is deleted with it.',
 				{ confirmLabel: 'Delete' },
 			);

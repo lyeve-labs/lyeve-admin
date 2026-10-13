@@ -12,11 +12,14 @@
 		confirm as confirmDialog,
 		toast,
 		Pagination,
+		SearchInput,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { MonitorSmartphone, Trash2 } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import { narrows } from '$lib/narrow';
 	import { deviceLabel, deviceName, looksLikeThisDevice, type Device } from '$lib/api/devices';
 	import { formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
@@ -31,6 +34,13 @@
 
 	const thisOne = $derived(
 		data.devices.find((d) => looksLikeThisDevice(d, data.userAgent)) ?? null,
+	);
+
+	// The endpoint takes no search, so the box narrows the page on screen and
+	// the pager below still walks every device.
+	let query = $state('');
+	const visible = $derived(
+		data.devices.filter((d) => narrows(query, deviceLabel(d), d.user_agent ? deviceName(d.user_agent) : '')),
 	);
 
 	const trustThis: SubmitFunction = () => {
@@ -131,6 +141,18 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				<ListToolbar label="Filter devices">
+					{#snippet search()}
+						<label for="device-search" class="sr-only">Narrow this page</label>
+						<SearchInput id="device-search" bind:value={query} placeholder="Name or browser on this page" />
+					{/snippet}
+				</ListToolbar>
+				{#if visible.length === 0}
+					<EmptyState
+						title="No device on this page matches"
+						description="Clear the search, or turn the page: the box narrows what is on screen."
+					/>
+				{:else}
 				<Table label="Remembered devices">
 					<thead>
 						<tr>
@@ -141,7 +163,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.devices as d (d.id)}
+						{#each visible as d (d.id)}
 							<tr>
 								<td data-cell="nowrap">
 									<div class="flex items-center gap-2">
@@ -184,6 +206,7 @@
 						{/each}
 					</tbody>
 				</Table>
+				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}

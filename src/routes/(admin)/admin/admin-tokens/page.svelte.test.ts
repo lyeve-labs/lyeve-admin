@@ -132,4 +132,18 @@ describe('admin tokens page', () => {
 		expect(document.body.textContent).toContain('Tenants could not be read');
 	});
 
+	it('offers the five statuses as chips', () => {
+		const { getByRole } = setup({ tokens: [token({})], total: 1 });
+		const chips = getByRole('group', { name: 'Status' });
+		expect(chips.querySelectorAll('button')).toHaveLength(5);
+	});
+
+	it('opens the rotate form in a drawer', async () => {
+		const { getByRole } = setup({ tokens: [token({})], total: 1 });
+		await fireEvent.click(getByRole('button', { name: 'Rotate ci-deploy' }));
+		const dialog = getByRole('dialog', { name: 'Rotate ci-deploy' });
+		expect(dialog.querySelector('form#rotate-form')).toBeTruthy();
+		// The kit's drawer is a full-height panel. Its modal is a centered card.
+		expect(dialog.classList.contains('h-full')).toBe(true);
+	});
 });

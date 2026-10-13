@@ -9,12 +9,12 @@
 		CopyField,
 		Drawer,
 		EmptyState,
+		FilterChips,
 		Input,
 		Modal,
 		PageShell,
 		Pagination,
 		SearchInput,
-		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
@@ -282,7 +282,7 @@
 				<SearchInput id="token-search" bind:value={query} placeholder="Name, prefix, owner or grant on this page" />
 			{/snippet}
 			{#snippet filters()}
-				<SegmentedControl label="Status" labelHidden bind:value={status} options={STATUSES} />
+				<FilterChips label="Status" bind:value={status} options={STATUSES} />
 			{/snippet}
 		</ListToolbar>
 
@@ -495,7 +495,9 @@
 </Drawer>
 
 {#if rotating}
-	<Modal
+	<!-- A drawer like the create form: rotating asks for an expiry and the
+	     step-up, and a form of several fields reads as one panel here. -->
+	<Drawer
 		open
 		title="Rotate {rotating.name}"
 		description="A new token replaces this one, with the same grants and addresses. The old token keeps working until {formatDateTime(oldTokenUntil)}, seven days at most, so a deployment can switch without a gap."
@@ -515,7 +517,7 @@
 				Rotate
 			</Button>
 		{/snippet}
-	</Modal>
+	</Drawer>
 {/if}
 
 {#if issued}

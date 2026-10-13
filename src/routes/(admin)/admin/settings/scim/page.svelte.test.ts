@@ -153,4 +153,25 @@ describe('the drawers', () => {
 		expect(form?.textContent).toContain('The token could not be rotated.');
 	});
 
+	it('offers the deprovision choice as radios that say deleting cannot be undone', async () => {
+		render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		const radios = [...document.body.querySelectorAll<HTMLInputElement>('input[type="radio"][name="deprovision_action"]')];
+		expect(radios.map((r) => r.value)).toEqual(['disable', 'delete']);
+		expect(document.body.textContent).toContain('This cannot be undone.');
+	});
+});
+
+describe('the search', () => {
+	it('narrows the page and keeps the pager when nothing matches', async () => {
+		const { container } = render(ScimPage, {
+			props: props({ providers: [provider(), provider({ id: 'c2', name: 'Okta' })], total: 40, hasMore: true }),
+		});
+		await fireEvent.input(screen.getByPlaceholderText('Connection name on this page'), { target: { value: 'okta' } });
+		expect(said(container)).toContain('Okta');
+		expect(said(container)).not.toContain('Azure AD');
+		await fireEvent.input(screen.getByPlaceholderText('Connection name on this page'), { target: { value: 'nothing like it' } });
+		expect(said(container)).toContain('No connection on this page matches');
+		expect(container.querySelector('a[href="/admin/settings/scim?limit=25&offset=25"]')).toBeTruthy();
+	});
 });

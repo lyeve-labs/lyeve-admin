@@ -161,7 +161,7 @@
 	function deleteKey(name: string): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Permanently delete key ${name}?`,
+				`Delete API key ${name}`,
 				'Anything signing with it stops working, and the key leaves the list.',
 				{ confirmLabel: 'Delete' }
 			);

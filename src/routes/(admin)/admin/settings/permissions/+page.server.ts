@@ -10,6 +10,7 @@ import type { FlowOption } from '$lib/flow/types';
 import { isFlowResource } from '$lib/flow/permissions';
 import { getRoleLimits, type RoleLimits } from '$lib/api/permissions';
 import { sessionToken } from '$lib/server/session-cookie';
+import { actionError } from '$lib/server/action-error';
 import { section } from '$lib/api/gate';
 
 // Static text. The engine's own message can carry driver or upstream detail
@@ -98,7 +99,7 @@ export const actions: Actions = {
 				const refused = refusalOf(e);
 				return fail(402, { roleCapReached: true, refused });
 			}
-			return fail(400, { error: e instanceof Error ? e.message : 'Save failed' });
+			return fail(400, { error: actionError(e, 'The rule could not be saved.') });
 		}
 		return { success: true };
 	},
@@ -112,7 +113,7 @@ export const actions: Actions = {
 		try {
 			await deletePermission(id, client);
 		} catch (e: unknown) {
-			return fail(400, { error: e instanceof Error ? e.message : 'Delete failed' });
+			return fail(400, { error: actionError(e, 'The rule could not be removed.') });
 		}
 		return { success: true };
 	},

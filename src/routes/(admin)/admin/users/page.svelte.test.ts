@@ -316,3 +316,12 @@ describe('Users read failures', () => {
 		expect(container.ownerDocument.body.textContent).toContain('Tenants could not be read');
 	});
 });
+
+describe('Users role filter', () => {
+	it('offers the roles as chips', () => {
+		const { getByRole } = render(UsersPage, { props: props() });
+
+		expect(getByRole('group', { name: 'Role' })).toBeTruthy();
+		expect(getByRole('button', { name: 'super_admin' })).toBeTruthy();
+	});
+});

@@ -117,7 +117,7 @@
 		<section class="flex flex-col gap-4" aria-label="Tenant settings">
 			<SectionHeading level={2}>Tenant settings</SectionHeading>
 			{#if !settings.licensed}
-				<p class="text-sm text-muted">
+				<p class="text-sm text-muted" id="captcha-license-note">
 					Saving or changing tenant captcha settings needs a license this install does not hold. Settings already
 					saved keep applying, and clearing them is always allowed.
 				</p>
@@ -160,7 +160,17 @@
 						/>
 					{/if}
 					<div class="flex flex-wrap items-center gap-2">
-						<Button variant="primary" type="submit" loading={save.pending}>Save</Button>
+						<!-- The plugin refuses an unlicensed save, so the button is off and
+						     points at the note above that says why. -->
+						<Button
+							variant="primary"
+							type="submit"
+							loading={save.pending}
+							disabled={!settings.licensed}
+							aria-describedby={settings.licensed ? undefined : 'captcha-license-note'}
+						>
+							Save
+						</Button>
 					</div>
 				</form>
 				{#if tenant}

@@ -8,12 +8,12 @@
 		Drawer,
 		Select,
 		EmptyState,
+		FilterChips,
 		Input,
 		PageShell,
 		PasswordInput,
 		Pagination,
 		SearchInput,
-		SegmentedControl,
 		Table,
 		confirm as confirmDialog,
 		toast,
@@ -80,7 +80,7 @@
 	function deleteAccount(email: string): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Permanently delete ${email}?`,
+				`Delete user ${email}`,
 				'Their sessions end at once and their audit trail stays.',
 				{ confirmLabel: 'Delete' }
 			);
@@ -214,7 +214,7 @@
 				<SearchInput id="user-search" bind:value={query} placeholder="Email or role on this page" />
 			{/snippet}
 			{#snippet filters()}
-				<SegmentedControl label="Role" labelHidden bind:value={role} options={ROLE_FILTERS} />
+				<FilterChips label="Role" bind:value={role} options={ROLE_FILTERS} />
 			{/snippet}
 		</ListToolbar>
 
