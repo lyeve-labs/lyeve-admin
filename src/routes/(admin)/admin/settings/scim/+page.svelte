@@ -41,6 +41,10 @@
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const deprovisioning = $derived(data.providers.filter((p) => p.deprovision_on_delete).length);
 
+	// An admin may read the connections. Every write is the super admin's, so an
+	// admin is shown the list and no control that would only be refused.
+	const canWrite = $derived(data.user.roles.includes('super_admin'));
+
 	let creating = $state(false);
 	let name = $state('');
 	let token = $state('');
@@ -118,7 +122,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		{#if data.gate.state === 'ok'}
+		{#if data.gate.state === 'ok' && canWrite}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} /> New connection
 			</Button>
@@ -134,6 +138,9 @@
 	{:else}
 		{#if formError}
 			<Alert tone="danger">{formError}</Alert>
+		{/if}
+		{#if !canWrite}
+			<Alert tone="brand">Only a super admin can add or remove a connection, or rotate its token.</Alert>
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-2">
@@ -157,15 +164,17 @@
 			{#if data.providers.length === 0}
 				<EmptyState
 					title="No directory is connected"
-					description="Add a connection to let an identity provider manage accounts here."
+					description={canWrite ? 'Add a connection to let an identity provider manage accounts here.' : 'A super admin adds a connection to let an identity provider manage accounts here.'}
 				>
 					{#snippet iconSnippet()}
 						<KeyRound size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openCreate}>
-							<Plus size={ICON.sm} /> New connection
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openCreate}>
+								<Plus size={ICON.sm} /> New connection
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -196,28 +205,30 @@
 									{formatDateTime(p.created_at)}
 								</td>
 								<td data-cell="nowrap">
-									<div class="flex items-center justify-end gap-1">
-										<Button
-											variant="ghost"
-											size="sm"
-											aria-label="Rotate the token for {p.name}"
-											title="Rotate token"
-											onclick={() => openRotate(p)}
-										>
-											<RefreshCw size={ICON.sm} />
-										</Button>
-										<form method="POST" action="?/delete" use:enhance={removeConnection(p)}>
-											<input type="hidden" name="id" value={p.id} />
+									{#if canWrite}
+										<div class="flex items-center justify-end gap-1">
 											<Button
 												variant="ghost"
 												size="sm"
-												type="submit"
-												aria-label="Delete {p.name}"
+												aria-label="Rotate the token for {p.name}"
+												title="Rotate token"
+												onclick={() => openRotate(p)}
 											>
-												<Trash2 size={ICON.sm} class="text-danger" />
+												<RefreshCw size={ICON.sm} />
 											</Button>
-										</form>
-									</div>
+											<form method="POST" action="?/delete" use:enhance={removeConnection(p)}>
+												<input type="hidden" name="id" value={p.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Delete {p.name}"
+												>
+													<Trash2 size={ICON.sm} class="text-danger" />
+												</Button>
+											</form>
+										</div>
+									{/if}
 								</td>
 							</tr>
 						{/each}

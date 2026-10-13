@@ -47,6 +47,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		hasMore: false,
 		gate: { state: 'ok' },
 		licensed: true,
+		user: { id: 'u1', email: 'root@b.test', roles: ['super_admin'] },
 		...over,
 	} as never,
 	form: form as never,
@@ -170,6 +171,23 @@ describe('the form', () => {
 			props: props({}, { error: 'The provider could not be created.' }),
 		});
 		expect(said(container)).toContain('The provider could not be created.');
+	});
+});
+
+describe('the role', () => {
+	it('shows an admin the providers and no control that only a super admin may use', () => {
+		const { container } = render(SamlPage, {
+			props: props({
+				user: { id: 'u2', email: 'admin@b.test', roles: ['admin'] },
+				providers: [provider({ sp_cert_next: 'X' })],
+			}),
+		});
+		expect(said(container)).toContain('Okta');
+		expect(said(container)).toContain('Only a super admin can add, change or remove');
+		expect(screen.queryByRole('button', { name: 'New provider' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Edit Okta' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Delete Okta' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Promote' })).toBeNull();
 	});
 });
 

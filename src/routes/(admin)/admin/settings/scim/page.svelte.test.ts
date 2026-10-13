@@ -37,6 +37,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		hasMore: false,
 		gate: { state: 'ok' },
 		licensed: true,
+		user: { id: 'u1', email: 'root@b.test', roles: ['super_admin'] },
 		...over,
 	} as never,
 	form: form as never,
@@ -121,5 +122,18 @@ describe('the empty state', () => {
 	it('says what a connection is for rather than that a read failed', () => {
 		const { container } = render(ScimPage, { props: props({ providers: [] }) });
 		expect(said(container)).toContain('No directory is connected');
+	});
+});
+
+describe('the role', () => {
+	it('shows an admin the connections and no control that only a super admin may use', () => {
+		const { container } = render(ScimPage, {
+			props: props({ user: { id: 'u2', email: 'admin@b.test', roles: ['admin'] } }),
+		});
+		expect(said(container)).toContain('Azure AD');
+		expect(said(container)).toContain('Only a super admin can add or remove a connection');
+		expect(screen.queryByRole('button', { name: /new connection/i })).toBeNull();
+		expect(screen.queryByLabelText('Rotate the token for Azure AD')).toBeNull();
+		expect(screen.queryByLabelText('Delete Azure AD')).toBeNull();
 	});
 });

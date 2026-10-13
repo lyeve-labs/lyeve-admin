@@ -42,6 +42,10 @@
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 
+	// An admin may read the providers. Every write is the super admin's, so an
+	// admin is shown the list and no control that would only be refused.
+	const canWrite = $derived(data.user.roles.includes('super_admin'));
+
 	let narrow = $state('');
 	const visible = $derived(
 		narrow.trim()
@@ -183,7 +187,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		{#if data.gate.state === 'ok'}
+		{#if data.gate.state === 'ok' && canWrite}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} /> New provider
 			</Button>
@@ -199,6 +203,9 @@
 	{:else}
 		{#if formError}
 			<Alert tone="danger">{formError}</Alert>
+		{/if}
+		{#if !canWrite}
+			<Alert tone="brand">Only a super admin can add, change or remove an identity provider, or renew its certificate.</Alert>
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
@@ -233,10 +240,12 @@
 								</div>
 								<div class="flex items-center gap-2">
 									<CopyButton value={p.sp_cert_next ?? ''} label="Copy certificate" />
-									<form method="POST" action="?/rollover" use:enhance={promote(p)}>
-										<input type="hidden" name="id" value={p.id} />
-										<Button variant="primary" size="sm" type="submit">Promote</Button>
-									</form>
+									{#if canWrite}
+										<form method="POST" action="?/rollover" use:enhance={promote(p)}>
+											<input type="hidden" name="id" value={p.id} />
+											<Button variant="primary" size="sm" type="submit">Promote</Button>
+										</form>
+									{/if}
 								</div>
 							</div>
 						</div>
@@ -251,15 +260,17 @@
 			{#if data.providers.length === 0}
 				<EmptyState
 					title="No identity provider is configured"
-					description="Add one to put a sign-in button on the login page."
+					description={canWrite ? 'Add one to put a sign-in button on the login page.' : 'A super admin adds one to put a sign-in button on the login page.'}
 				>
 					{#snippet iconSnippet()}
 						<KeyRound size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openCreate}>
-							<Plus size={ICON.sm} /> New provider
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openCreate}>
+								<Plus size={ICON.sm} /> New provider
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -321,41 +332,43 @@
 										<div class="text-xs text-faint">{expiryLabel(p.idp_cert_expires_at)}</div>
 									</td>
 									<td data-cell="nowrap">
-										<div class="flex items-center justify-end gap-1">
-											{#if !p.sp_cert_next}
-												<form method="POST" action="?/prepare" use:enhance>
+										{#if canWrite}
+											<div class="flex items-center justify-end gap-1">
+												{#if !p.sp_cert_next}
+													<form method="POST" action="?/prepare" use:enhance>
+														<input type="hidden" name="id" value={p.id} />
+														<Button
+															variant="ghost"
+															size="sm"
+															type="submit"
+															aria-label="Prepare a new certificate for {p.name}"
+															title="Prepare a new certificate"
+														>
+															<RefreshCw size={ICON.sm} />
+														</Button>
+													</form>
+												{/if}
+												<Button
+													variant="ghost"
+													size="sm"
+													aria-label="Edit {p.name}"
+													onclick={() => openEdit(p)}
+												>
+													<Pencil size={ICON.sm} />
+												</Button>
+												<form method="POST" action="?/delete" use:enhance={removeProvider(p)}>
 													<input type="hidden" name="id" value={p.id} />
 													<Button
 														variant="ghost"
 														size="sm"
 														type="submit"
-														aria-label="Prepare a new certificate for {p.name}"
-														title="Prepare a new certificate"
+														aria-label="Delete {p.name}"
 													>
-														<RefreshCw size={ICON.sm} />
+														<Trash2 size={ICON.sm} class="text-danger" />
 													</Button>
 												</form>
-											{/if}
-											<Button
-												variant="ghost"
-												size="sm"
-												aria-label="Edit {p.name}"
-												onclick={() => openEdit(p)}
-											>
-												<Pencil size={ICON.sm} />
-											</Button>
-											<form method="POST" action="?/delete" use:enhance={removeProvider(p)}>
-												<input type="hidden" name="id" value={p.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													aria-label="Delete {p.name}"
-												>
-													<Trash2 size={ICON.sm} class="text-danger" />
-												</Button>
-											</form>
-										</div>
+											</div>
+										{/if}
 									</td>
 								</tr>
 							{/each}
