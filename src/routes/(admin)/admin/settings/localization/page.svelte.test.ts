@@ -9,10 +9,11 @@ import LocalesPage from './+page.svelte';
 
 afterEach(cleanup);
 
+const LOCALES = { default_locale: 'en', enabled_locales: ['en', 'fr', 'de'], fallback_chain: ['fr', 'de'] };
+
 function data(overrides: Record<string, unknown> = {}): PageData {
 	return {
-		unavailable: false,
-		locales: { default_locale: 'en', enabled_locales: ['en', 'fr', 'de'], fallback_chain: ['fr', 'de'] },
+		locales: { ok: true, value: LOCALES },
 		...overrides,
 	} as unknown as PageData;
 }
@@ -23,8 +24,15 @@ function hidden(name: string): string[] {
 
 describe('locales page', () => {
 	it('says the plugin did not answer, and draws no form', () => {
-		render(LocalesPage, { props: { data: data({ unavailable: true }), form: null } });
-		expect(screen.getByText('The localization plugin did not answer')).toBeTruthy();
+		render(LocalesPage, { props: { data: data({ locales: { ok: false, gate: { state: 'unavailable' } } }), form: null } });
+		expect(screen.getByText(/so Locales could not be read/)).toBeTruthy();
+		expect(screen.queryByText('No locale enabled yet.')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+	});
+
+	it('tells a role the plugin refuses that it cannot open the locales', () => {
+		render(LocalesPage, { props: { data: data({ locales: { ok: false, gate: { state: 'forbidden' } } }), form: null } });
+		expect(screen.getByText(/Your role cannot open Locales/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
 	});
 
@@ -57,7 +65,15 @@ describe('locales page', () => {
 		render(LocalesPage, { props: { data: data(), form: { error: 'The fallback chain names de, which is not an enabled locale.', saved: false } as never } });
 		expect(screen.getByText(/names de/)).toBeTruthy();
 		cleanup();
-		render(LocalesPage, { props: { data: data(), form: { saved: true, error: null, locales: data().locales } as never } });
+		render(LocalesPage, { props: { data: data(), form: { saved: true, error: null, locales: LOCALES } as never } });
 		expect(screen.getByText('Locales saved.')).toBeTruthy();
+	});
+});
+
+describe('the fallback picker', () => {
+	it('lets the locale to append be searched', async () => {
+		render(LocalesPage, { props: { data: data({ locales: { ok: true, value: { ...LOCALES, fallback_chain: [] } } }), form: null } });
+		await fireEvent.click(document.body.querySelector('#chain-pick') as HTMLElement);
+		expect(screen.getByRole('combobox', { name: 'Search Append a locale' })).toBeTruthy();
 	});
 });

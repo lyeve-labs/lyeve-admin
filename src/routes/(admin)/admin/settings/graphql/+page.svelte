@@ -16,15 +16,31 @@
 	} from '@lyeve-labs/ui-kit';
 	import { Braces, FlaskConical, Plus, Power, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { GRAPHQL_HTTP, GRAPHQL_WS, type PersistedQuery, type RootField } from '$lib/api/graphql';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * The drawer and the row actions report through the one `form`, so each
+	 * failure names the action that caused it. The drawer shows only a failed
+	 * register, and only one that came back after it opened, so a failed delete
+	 * never reads as a failure of the next form opened. The page shows the rest.
+	 */
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const registerError = $derived(failure?.action === 'register' && form !== openedOver ? (failure.error ?? '') : '');
+	const formError = $derived(failure?.action === 'toggle' || failure?.action === 'delete' ? (failure.error ?? '') : '');
+
+	function openRegister() {
+		openedOver = form;
+		open = true;
+	}
 	const curl = `curl -X POST ${GRAPHQL_HTTP} \\\n  -H 'Authorization: Bearer <token>' \\\n  -H 'Content-Type: application/json' \\\n  -d '{"query":"{ __typename }"}'`;
 
 	let open = $state(false);
@@ -36,28 +52,31 @@
 
 	async function askDelete(q: PersistedQuery) {
 		const ok = await confirm(
-			'Delete persisted query',
-			`Delete ${q.operation_name || q.query_hash.slice(0, 12)}? A client that sends only its hash is refused from then on.`,
+			`Delete persisted query ${q.operation_name || q.query_hash.slice(0, 12)}`,
+			'A client that sends only its hash is refused from then on.',
 			{ confirmLabel: 'Delete' },
 		);
 		if (!ok) return;
 		hash = q.query_hash;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
 	async function toggle(q: PersistedQuery) {
 		hash = q.query_hash;
-		await Promise.resolve();
+		await tick();
 		toggleForm?.requestSubmit();
 	}
 
+	const schemaRoots = $derived(data.schema.ok ? data.schema.value.roots : null);
+	const refused = $derived(data.schema.ok ? data.schema.value.refused : null);
+	const persisted = $derived(data.persisted.ok ? data.persisted.value : []);
 	const roots = $derived(
-		data.roots
+		schemaRoots
 			? ([
-					['Queries', data.roots.query],
-					['Mutations', data.roots.mutation],
-					['Subscriptions', data.roots.subscription],
+					['Queries', schemaRoots.query],
+					['Mutations', schemaRoots.mutation],
+					['Subscriptions', schemaRoots.subscription],
 				] as [string, RootField[]][])
 			: [],
 	);
@@ -76,7 +95,7 @@
 		</Button>
 	{/snippet}
 
-	{#if formError && !open}
+	{#if formError}
 		<Alert tone="danger">{formError}</Alert>
 	{/if}
 
@@ -118,13 +137,15 @@
 
 		<section class="flex flex-col gap-3">
 			<SectionHeading level={2}>Schema</SectionHeading>
-			{#if data.refused}
+			{#if !data.schema.ok}
+				<GateNotice gate={data.schema.gate} title="GraphQL schema" absent="This version of the GraphQL plugin does not describe its schema." />
+			{:else if refused}
 				<Alert tone="warn">
-					The engine refused to describe its schema: {data.refused} The graphql.introspection setting limits
+					The engine refused to describe its schema: {refused} The graphql.introspection setting limits
 					introspection to admins by default and can turn it off. The schema is served either way.
 				</Alert>
-			{:else if !data.roots}
-				<Alert tone="danger">The schema could not be read.</Alert>
+			{:else if !schemaRoots}
+				<Alert tone="danger">The schema could not be read. This is not a report that it is empty.</Alert>
 			{:else}
 				<p class="text-xs text-muted">
 					Generated from the content types, so a schema you add in the Schema builder appears here as its own
@@ -167,19 +188,26 @@
 		<section class="flex flex-col gap-3">
 			<div class="flex items-center justify-between gap-2">
 				<SectionHeading level={2}>Persisted queries</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={() => (open = true)}>
-					<Plus size={ICON.sm} /> New persisted query
-				</Button>
+				{#if data.persisted.ok}
+					<Button variant="secondary" size="sm" onclick={openRegister}>
+						<Plus size={ICON.sm} /> New persisted query
+					</Button>
+				{/if}
 			</div>
 			<p class="text-xs text-muted">
 				A client sends the hash of a query instead of its text. Queries on this list answer by hash. One a client
 				registered itself is marked automatic, and a disabled one is refused until it is switched back on.
 			</p>
-			{#if data.persistedError}
-				<Alert tone="danger">{data.persistedError}</Alert>
-			{:else if data.persisted.length === 0}
+			{#if !data.persisted.ok}
+				<GateNotice gate={data.persisted.gate} title="Persisted queries" absent="This version of the GraphQL plugin keeps no persisted queries." />
+			{:else if persisted.length === 0}
 				<EmptyState title="No persisted queries" description="Register a query to let clients call it by hash.">
 					{#snippet iconSnippet()}<Braces size={ICON.lg} />{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={openRegister}>
+							<Plus size={ICON.sm} /> New persisted query
+						</Button>
+					{/snippet}
 				</EmptyState>
 			{:else}
 				<Table label="Persisted queries">
@@ -192,7 +220,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.persisted as q (q.query_hash)}
+						{#each persisted as q (q.query_hash)}
 							<tr>
 								<td data-cell="nowrap">
 									<span class="flex items-center gap-2 text-sm text-fg">
@@ -236,9 +264,7 @@
 
 <Drawer bind:open title="New persisted query">
 	<form method="POST" action="?/register" id="persisted-form" use:enhance={register.enhance} class="flex flex-col gap-4">
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={registerError || undefined} />
 		<Textarea
 			id="persisted-query"
 			name="query"

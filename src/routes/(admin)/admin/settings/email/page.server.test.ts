@@ -67,22 +67,25 @@ const sent = (calls: { url: string; init?: RequestInit }[], method: string) =>
 describe('admin/settings/email load', () => {
 	it('lists the providers while the plugin runs', async () => {
 		const result = (await load(loadEvent({ '/email/providers': () => json({ data: [row], total: 1 }) }))) as Loaded;
-		expect(result.providers.map((p: EmailProvider) => p.name)).toEqual(['Primary']);
-		expect(result.unavailable).toBe(false);
+		expect(result.providers.ok && result.providers.value.map((p: EmailProvider) => p.name)).toEqual(['Primary']);
 	});
 
 	it('does not call the plugin while it does not run', async () => {
 		const { fetch } = fetchFor({});
 		const event = { fetch, cookies: mockCookies(), url: new URL('http://localhost/admin/settings/email'), parent: async () => ({ plugins: none }) } as never;
 		const result = (await load(event)) as Loaded;
-		expect(result.providers).toEqual([]);
+		expect(result.providers).toEqual({ ok: false, gate: { state: 'absent' } });
 		expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.some((c) => String(c[0]).includes('/email/'))).toBe(false);
 	});
 
-	it('marks the plugin unavailable when its route does not answer', async () => {
+	it('keeps a provider read that did not answer as an outage, never as an empty pool', async () => {
 		const result = (await load(loadEvent({ '/email/providers': () => json({ error: 'down' }, 503) }))) as Loaded;
-		expect(result.unavailable).toBe(true);
-		expect(result.providers).toEqual([]);
+		expect(result.providers).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('keeps a refused provider read as forbidden', async () => {
+		const result = (await load(loadEvent({ '/email/providers': () => json({ error: 'forbidden' }, 403) }))) as Loaded;
+		expect(result.providers).toEqual({ ok: false, gate: { state: 'forbidden' } });
 	});
 });
 
@@ -169,7 +172,8 @@ describe('admin/settings/email fallback transport', () => {
 			'/admin/config': () => json({ settings: [{ key: 'SMTP_HOST', source: 'admin', value: 'relay', editable: true }] }),
 		});
 		const result = (await load(event)) as Loaded;
-		expect(result.mail?.map((s: ConfigSetting) => s.key)).toEqual([
+		const mail = result.mail?.ok ? result.mail.value : [];
+		expect(mail.map((s: ConfigSetting) => s.key)).toEqual([
 			'SMTP_HOST',
 			'SMTP_PORT',
 			'SMTP_USER',
@@ -177,14 +181,20 @@ describe('admin/settings/email fallback transport', () => {
 			'SMTP_FROM',
 			'SMTP_TLS',
 		]);
-		expect(result.mail?.[0].value).toBe('relay');
-		expect(result.mail?.[1].source).toBe('default');
+		expect(mail[0].value).toBe('relay');
+		expect(mail[1].source).toBe('default');
+	});
+
+	it('says the transport could not be read when the config read fails', async () => {
+		const { event } = asSuperAdmin({ ...noProviders, '/admin/config': () => json({ error: 'down' }, 503) });
+		const result = (await load(event)) as Loaded;
+		expect(result.mail).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 
 	it('hides the section from anyone but a super admin rather than failing the page', async () => {
 		const result = (await load(loadEvent(noProviders))) as Loaded;
 		expect(result.mail).toBeNull();
-		expect(result.unavailable).toBe(false);
+		expect(result.providers.ok).toBe(true);
 	});
 
 	it('carries no value for a setting the engine withholds', async () => {
@@ -193,7 +203,7 @@ describe('admin/settings/email fallback transport', () => {
 			'/admin/config': () => json({ settings: [{ key: 'SMTP_PASS', source: 'admin', editable: true, secret: true }] }),
 		});
 		const result = (await load(event)) as Loaded;
-		const pass = result.mail?.find((s: ConfigSetting) => s.key === 'SMTP_PASS');
+		const pass = (result.mail?.ok ? result.mail.value : []).find((s: ConfigSetting) => s.key === 'SMTP_PASS');
 		expect(pass?.secret).toBe(true);
 		expect(pass?.value).toBeUndefined();
 	});

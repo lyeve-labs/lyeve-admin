@@ -39,9 +39,9 @@ function formEvent(fields: Record<string, string>) {
 	} as never;
 }
 
-function loadEvent(roles: string[]) {
+function loadEvent(roles: string[], search = '') {
 	return {
-		url: new URL('http://admin/admin/settings/rate-limits'),
+		url: new URL(`http://admin/admin/settings/rate-limits${search}`),
 		fetch: vi.fn(),
 		cookies: {},
 		parent: async () => ({ entitlements: { features: ['rate-limit'] }, user: { roles } }),
@@ -73,6 +73,20 @@ describe('rate-limits load', () => {
 		expect(api.listRules).toHaveBeenCalledWith(expect.anything(), 51, 0, 'custom');
 		expect(result.overview).toEqual(overview);
 		expect(result.superAdmin).toBe(false);
+	});
+
+	it('sends an offset past the last rule back to the last page that holds one', async () => {
+		api.listRules.mockResolvedValue({ data: [], total: 60 });
+		await expect(load(loadEvent(['admin'], '?limit=50&offset=200'))).rejects.toMatchObject({
+			status: 307,
+			location: '/admin/settings/rate-limits?limit=50&offset=50',
+		});
+	});
+
+	it('leaves a failed read alone rather than redirecting it', async () => {
+		api.listRules.mockRejectedValue(new Error('down'));
+		const result = (await load(loadEvent(['admin'], '?offset=200'))) as { gate: { state: string } };
+		expect(result.gate.state).toBe('error');
 	});
 
 	it('reports an unread overview as unknown, not as locked', async () => {

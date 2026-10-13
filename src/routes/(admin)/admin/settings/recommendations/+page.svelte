@@ -18,6 +18,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { RefreshCw, Sparkles, UserSearch } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		hasUsers,
 		percent,
@@ -38,10 +39,15 @@
 	// fills the id field, which is what the form posts, so an account past the
 	// first page is reachable by pasting its id there.
 	const readerOptions = $derived(
-		(data.readers ?? []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
+		(data.readers.ok ? data.readers.value : []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
 	);
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// The recompute and the preview report through the one `form`. A failed
+	// preview shows in its own form, beside the id that caused it, and a failed
+	// recompute shows at the top of the page.
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	const formError = $derived(failure?.action === 'preview' ? '' : (failure?.error ?? ''));
+	const previewError = $derived(failure?.action === 'preview' ? (failure.error ?? '') : '');
 	const outcome = $derived(
 		form as { refreshed?: boolean; pairs?: number; trending?: number; feeds?: number; ms?: number } | null,
 	);
@@ -49,7 +55,7 @@
 		(form as { previewFor?: string; feed?: FeedEntry[] } | null)?.feed ?? null,
 	);
 	const previewId = $derived((form as { previewFor?: string } | null)?.previewFor ?? '');
-	const previewFor = $derived((data.readers ?? []).find((r) => r.id === previewId)?.email ?? previewId);
+	const previewFor = $derived((data.readers.ok ? data.readers.value : []).find((r) => r.id === previewId)?.email ?? previewId);
 
 	const stats = $derived(data.stats);
 	const skewed = $derived(splitIsSkewed(stats));
@@ -134,9 +140,13 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Trending now</SectionHeading>
-			{#if !data.trending}
-				<Alert tone="warn">The trending list could not be read.</Alert>
-			{:else if data.trending.length === 0}
+			{#if !data.trending.ok}
+				<GateNotice
+					gate={data.trending.gate}
+					title="Trending entries"
+					absent="This version of the recommendations plugin keeps no trending list."
+				/>
+			{:else if data.trending.value.length === 0}
 				<EmptyState
 					title="Nothing is trending yet"
 					description="An entry trends once readers have been tracked on it and a recompute has run."
@@ -151,7 +161,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.trending as item (item.content_id)}
+						{#each data.trending.value as item (item.content_id)}
 							<tr>
 								<td>
 									<span class="text-sm text-fg">{item.title || item.slug || item.content_id}</span>
@@ -225,7 +235,9 @@
 				<p class="text-xs text-muted">
 					Generates the feed for one reader now. This is the same computation the reader would
 					get, so it shows what they would actually be shown rather than a sample.
-					{#if readerOptions.length > 0}
+					{#if !data.readers.ok}
+						The accounts could not be read, so give the user id as it appears on the Users page.
+					{:else if readerOptions.length > 0}
 						Find a reader by email to fill in their id, or paste the id of any account from the Users
 						page.
 					{:else}
@@ -238,7 +250,8 @@
 				     id field, because a hint there would make the field taller
 				     than the button and align the button with the hint instead of
 				     the input. -->
-				<form method="POST" action="?/preview" use:enhance class="flex flex-col gap-3">
+				<form method="POST" action="?/preview" use:enhance class="flex flex-col gap-3" id="rec-preview-form">
+					<FormErrors message={previewError || undefined} />
 					{#if readerOptions.length > 0}
 						<div class="w-full min-w-0 sm:w-80">
 							<Autocomplete

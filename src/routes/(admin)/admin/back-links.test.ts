@@ -238,7 +238,7 @@ const cases: Case[] = [
 	{
 		route: 'settings/email',
 		component: SettingsEmail,
-		data: { entitled: true, unavailable: false, providers: [] },
+		data: { providers: { ok: true, value: [] }, mail: null },
 		href: '/admin/settings',
 		label: 'Settings',
 	},

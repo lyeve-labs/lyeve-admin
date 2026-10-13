@@ -9,8 +9,8 @@
 		EmptyState,
 		Input,
 		PageShell,
+		RadioGroup,
 		SectionHeading,
-		Select,
 		Stat,
 		Table,
 		Toggle,
@@ -25,6 +25,7 @@
 	import { duplicateRow } from '$lib/duplicate';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		audienceLabel,
 		blocksEverything,
@@ -44,7 +45,22 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Every form here reports through the one `form`, so each failure names the
+	 * action that caused it. A drawer shows only its own action's failure, and
+	 * only one that came back after it opened, so a failed delete never reads
+	 * as a failure of the next form opened. The page shows the row actions'.
+	 */
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const fresh = $derived(form !== openedOver);
+	const failureOf = (action: string) => (fresh && failure?.action === action ? (failure.error ?? '') : '');
+	const ruleError = $derived(failureOf('rule'));
+	const globalError = $derived(failureOf('global'));
+	const protectionError = $derived(failureOf('protection'));
+	const formError = $derived(
+		failure?.action === 'delete' || failure?.action === 'resetProtection' ? (failure.error ?? '') : '',
+	);
 	const blocking = $derived(data.rules.filter(blocksEverything));
 	const spent = $derived(exhausted(data.status));
 	const overview = $derived(data.overview);
@@ -53,9 +69,23 @@
 	const unenforced = $derived(data.rules.filter((r) => !r.enforced));
 	const canEditProtections = $derived(data.superAdmin && customEnabled === true);
 
+	/**
+	 * Whether this reader may change or delete a rule. A rule with no tenant
+	 * applies to every tenant, and the plugin keeps those for a super admin, so
+	 * an admin sees them listed beside their own and cannot change them.
+	 */
+	const canChange = (r: RateRule) => data.superAdmin || Boolean(r.tenant_id);
+
+	// Each way of counting needs its sentence, so the choice is a radio group
+	// that shows both rather than a list that hides one.
 	const KEY_OPTIONS = [
-		{ value: 'ip', label: 'Per address' },
-		{ value: 'user', label: 'Per signed-in account' },
+		{ value: 'ip', label: 'Per address', description: 'Each address a request comes from has a budget of its own.' },
+		{
+			value: 'user',
+			label: 'Per signed-in account',
+			description:
+				'One budget across every address an account calls from. A caller who is not signed in is counted by address.',
+		},
 	];
 
 	let open = $state(false);
@@ -70,6 +100,7 @@
 	let enabled = $state(true);
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		endpoint = '*';
 		tenantId = '';
@@ -82,6 +113,7 @@
 	}
 
 	function openEdit(r: RateRule) {
+		openedOver = form;
 		editing = r;
 		endpoint = r.endpoint;
 		tenantId = r.tenant_id ?? '';
@@ -107,6 +139,7 @@
 	 * rule in this list and what a second rule has to differ in.
 	 */
 	function openDuplicate(r: RateRule) {
+		openedOver = form;
 		const draft = duplicateRow(r as unknown as Record<string, unknown>, {
 			nameField: 'endpoint',
 			taken: data.rules.map((x) => x.endpoint),
@@ -130,6 +163,7 @@
 	let globalEnabled = $state(false);
 
 	function openGlobal() {
+		openedOver = form;
 		const g = overview?.global;
 		globalRate = String(g?.rate ?? 50);
 		globalBurst = String(g?.burst ?? 100);
@@ -143,6 +177,7 @@
 	let protectionMinutes = $state('15');
 
 	function openProtection(p: Protection) {
+		openedOver = form;
 		protection = p;
 		protectionRequests = String(p.requests);
 		protectionMinutes = String(p.window_seconds / 60);
@@ -171,7 +206,7 @@
 	function removeRule(r: RateRule): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete the rule for ${r.endpoint}?`,
+				`Delete rule ${r.endpoint}`,
 				r.enforced
 					? 'That endpoint stops being limited by it immediately.'
 					: 'The rule is not being enforced, so nothing changes for callers.',
@@ -478,7 +513,10 @@
 								<td data-cell="nowrap" class="font-mono text-xs">{r.burst}</td>
 								<td data-cell="nowrap">
 									<div class="flex items-center justify-end gap-1">
-										{#if customEnabled === true}
+										{#if !canChange(r)}
+											<span class="text-xs text-muted">Only a super admin changes a rule for every tenant.</span>
+										{/if}
+										{#if customEnabled === true && canChange(r)}
 											<Button
 												variant="ghost"
 												size="sm"
@@ -487,6 +525,8 @@
 											>
 												<Pencil size={ICON.sm} />
 											</Button>
+										{/if}
+										{#if customEnabled === true}
 											<Button
 												variant="ghost"
 												size="sm"
@@ -496,17 +536,19 @@
 												<Copy size={ICON.sm} />
 											</Button>
 										{/if}
-										<form method="POST" action="?/delete" use:enhance={removeRule(r)}>
-											<input type="hidden" name="id" value={r.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Delete the rule for {r.endpoint}"
-											>
-												<Trash2 size={ICON.sm} class="text-danger" />
-											</Button>
-										</form>
+										{#if canChange(r)}
+											<form method="POST" action="?/delete" use:enhance={removeRule(r)}>
+												<input type="hidden" name="id" value={r.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Delete the rule for {r.endpoint}"
+												>
+													<Trash2 size={ICON.sm} class="text-danger" />
+												</Button>
+											</form>
+										{/if}
 									</div>
 								</td>
 							</tr>
@@ -621,11 +663,11 @@
 		action={editing ? '?/update' : '?/create'}
 		use:enhance={saveRuleSubmit.enhance}
 	>
-		{#if editing}
-			<input type="hidden" name="id" value={editing.id} />
-		{/if}
-
 		<div class="flex flex-col gap-4">
+			<FormErrors message={ruleError || undefined} />
+			{#if editing}
+				<input type="hidden" name="id" value={editing.id} />
+			{/if}
 			<Autocomplete
 				id="rl-route"
 				label="Pick a route"
@@ -660,14 +702,7 @@
 				hint="Leave empty for every caller. anonymous matches callers who are not signed in."
 				bind:value={role}
 			/>
-			<Select
-				id="rl-key"
-				name="key_by"
-				label="Count"
-				hint="Per account shares one budget across every address an account calls from. A caller who is not signed in is counted by address."
-				bind:value={keyBy}
-				options={KEY_OPTIONS}
-			/>
+			<RadioGroup label="Count" name="key_by" bind:value={keyBy} options={KEY_OPTIONS} />
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Input
 					id="rl-rate"
@@ -701,6 +736,7 @@
 <Drawer bind:open={globalOpen} title="Global limit">
 	<form id="rate-global-form" method="POST" action="?/global" use:enhance={saveGlobalSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={globalError || undefined} />
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Input
 					id="rl-global-rate"
@@ -737,6 +773,7 @@
 		use:enhance={saveProtectionSubmit.enhance}
 	>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={protectionError || undefined} />
 			{#if protection}
 				<input type="hidden" name="name" value={protection.name} />
 				<p class="text-xs text-muted">
@@ -747,19 +784,19 @@
 				</p>
 			{/if}
 			<div class="grid gap-4 sm:grid-cols-2">
-			<Input
-				id="rl-protection-requests"
-				name="requests"
-				label="Requests"
-				hint="At least one. Zero would lock everyone out."
-				bind:value={protectionRequests}
-			/>
-			<Input
-				id="rl-protection-window"
-				name="window_minutes"
-				label="Window in minutes"
-				hint="At most a day."
-				bind:value={protectionMinutes}
+				<Input
+					id="rl-protection-requests"
+					name="requests"
+					label="Requests"
+					hint="At least one. Zero would lock everyone out."
+					bind:value={protectionRequests}
+				/>
+				<Input
+					id="rl-protection-window"
+					name="window_minutes"
+					label="Window in minutes"
+					hint="At most a day."
+					bind:value={protectionMinutes}
 				/>
 			</div>
 		</div>

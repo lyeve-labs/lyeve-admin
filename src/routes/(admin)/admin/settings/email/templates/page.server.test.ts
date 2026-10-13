@@ -55,12 +55,12 @@ describe('email templates load', () => {
 	it('reads the list before the count, so the required templates are counted', async () => {
 		const { event, calls } = loadEvent(routes);
 		const out = (await load(event)) as Loaded;
-		expect(out.templates.map((t: { key: string; required: boolean }) => [t.key, t.required])).toEqual([
+		expect(out.templates.ok && out.templates.value.map((t: { key: string; required: boolean }) => [t.key, t.required])).toEqual([
 			['password-reset', true],
 			['spring-sale', false],
 		]);
 		expect(out.limits).toEqual({ limit: 5, current: 2 });
-		expect(out.starters.map((s: { key: string }) => s.key)).toEqual(['welcome']);
+		expect(out.starters.ok && out.starters.value.map((s: { key: string }) => s.key)).toEqual(['welcome']);
 		const order = calls.map((c) => c.url).filter((u) => u.includes('email-templates'));
 		expect(order[0]).toContain('/api/admin/email-templates?limit=200');
 	});
@@ -68,8 +68,14 @@ describe('email templates load', () => {
 	it('says the list failed rather than drawing an empty one', async () => {
 		const { event } = loadEvent({ '/api/admin/email-templates?': () => json({ error: 'db down' }, 503), ...routes });
 		const out = (await load(event)) as Loaded;
-		expect(out.loadError).toBe('The templates could not be loaded.');
-		expect(out.templates).toEqual([]);
+		expect(out.templates).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('keeps a failed starters read apart from a list of none', async () => {
+		const { event } = loadEvent({ ...routes, '/api/admin/email-templates/starters': () => json({ error: 'boom' }, 500) });
+		const out = (await load(event)) as Loaded;
+		expect(out.starters.ok).toBe(false);
+		expect(out.templates.ok).toBe(true);
 	});
 
 	it('asks nothing while the plugin does not run', async () => {
