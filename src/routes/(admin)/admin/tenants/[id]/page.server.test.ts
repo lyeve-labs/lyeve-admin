@@ -28,15 +28,16 @@ const TENANT = {
 	updated_at: '2026-01-01T00:00:00Z',
 };
 
-type Call = { url: string; method: string; body: unknown };
+type Call = { url: string; query: string; method: string; body: unknown };
 
 /** An event whose fetch answers by route and records every call. */
 function event(routes: Record<string, unknown>, form?: FormData) {
 	const calls: Call[] = [];
 	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
 		const method = init?.method ?? 'GET';
-		const path = new URL(String(url), 'http://localhost').pathname;
-		calls.push({ url: path, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+		const asked = new URL(String(url), 'http://localhost');
+		const path = asked.pathname;
+		calls.push({ url: path, query: asked.search, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
 		const hit = routes[`${method} ${path}`];
 		if (hit === undefined) return json({ error: 'not found' }, 404);
 		if (hit instanceof Response) return hit;
@@ -194,7 +195,9 @@ describe('admin/tenants/[id] members paging', () => {
 		(ev as { url: URL }).url = new URL('http://localhost/admin/tenants/t1?limit=50&offset=50');
 		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
 		expect(data.offset).toBe(50);
-		expect(calls.some((c) => c.url === '/api/admin/tenant-members/acme')).toBe(true);
+		const members = calls.find((c) => c.url === '/api/admin/tenant-members/acme');
+		expect(new URLSearchParams(members?.query).get('limit')).toBe('50');
+		expect(new URLSearchParams(members?.query).get('offset')).toBe('50');
 	});
 
 	it('sends a page past the end back to the last page that holds rows', async () => {
