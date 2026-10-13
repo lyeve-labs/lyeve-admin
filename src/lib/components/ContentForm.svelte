@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { fieldKey } from '$lib/utils/content-form';
 	import { humanizeFieldName } from '$lib/utils/entry-identity';
@@ -65,12 +66,14 @@
 	 * A refused submit moves focus to the first field it names. The summary at
 	 * the top says how many need attention, and focus on the field is what lets
 	 * a keyboard reader fix it without hunting down the form. The errors object
-	 * is replaced on every refused submit, so this runs once per refusal.
+	 * is replaced on every refused submit, so this runs once per refusal. The
+	 * fields are read untracked: a page whose data is read again derives them
+	 * anew, and that is no refusal to move focus for.
 	 */
 	$effect(() => {
 		const named = Object.keys(validationErrors);
 		if (named.length === 0 || !root) return;
-		const first = fields.find((f) => named.includes(f.name));
+		const first = untrack(() => fields).find((f) => named.includes(f.name));
 		if (!first) return;
 		const box = root.querySelector(`[data-field-name="${first.name}"]`);
 		const control = box?.querySelector<HTMLElement>(

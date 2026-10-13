@@ -191,4 +191,25 @@ describe('ContentForm failures', () => {
 		await tick();
 		expect(document.activeElement).toBe(container.querySelector('#field-summary'));
 	});
+
+	it('leaves focus where it is when the fields are derived again under the same refusal', async () => {
+		// One props object, the way a page holds them: the refusal stays the
+		// same object while the page's data is read again and its fields are
+		// derived anew.
+		const props = $state({
+			fields,
+			formValues: { title: '', summary: '' } as Record<string, unknown>,
+			validationErrors: {} as Record<string, string>,
+		});
+		const { container } = render(ContentForm, { props });
+		props.validationErrors = { summary: 'Required' };
+		await tick();
+		const title = container.querySelector('#field-title') as HTMLInputElement;
+		title.focus();
+
+		props.fields = fields.map((f) => ({ ...f }));
+		await tick();
+
+		expect(document.activeElement).toBe(title);
+	});
 });
