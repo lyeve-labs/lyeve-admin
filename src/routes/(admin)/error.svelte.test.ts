@@ -3,12 +3,13 @@ import { render, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-	page: { status: 500, error: null as { message: string } | null },
+	page: { status: 500, error: null as { message: string } | null, url: new URL('http://admin.test/admin/content/posts?page=2') },
 }));
 
 vi.mock('$app/state', () => state);
 
 import AdminError from './+error.svelte';
+import { OUTAGE } from '$lib/outage';
 
 afterEach(cleanup);
 
@@ -47,5 +48,14 @@ describe('Admin error page', () => {
 		expect(getByText('Something went wrong')).toBeTruthy();
 		expect(getByText('What the server said')).toBeTruthy();
 		expect(getByText('boom')).toBeTruthy();
+	});
+
+	it('renders the outage face for 503, with a retry of the same address', () => {
+		const { getByText, getByRole, queryByRole } = renderAt(503, 'The customization could not be read.');
+		expect(getByText(OUTAGE.title)).toBeTruthy();
+		expect(getByText(OUTAGE.body)).toBeTruthy();
+		expect(getByRole('link', { name: OUTAGE.action }).getAttribute('href')).toBe('/admin/content/posts?page=2');
+		expect(queryByRole('link', { name: /sign in/i })).toBeNull();
+		expect(document.title).toContain(OUTAGE.title);
 	});
 });

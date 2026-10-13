@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { Badge, Button, EmptyState } from '@lyeve-labs/ui-kit';
-	import { AlertTriangle, ArrowLeft, FileQuestion, Home, Lock, ShieldOff } from '@lucide/svelte';
+	import { AlertTriangle, ArrowLeft, FileQuestion, Home, Lock, RefreshCw, ServerOff, ShieldOff } from '@lucide/svelte';
+	import { page } from '$app/state';
 	import { ICON } from '$lib/icon';
+	import { OUTAGE } from '$lib/outage';
 
 	/**
 	 * What the reader is told when a page cannot be served.
@@ -23,16 +25,27 @@
 
 	let { status, message = '', homeHref, homeLabel }: Props = $props();
 
+	// A 503 is an engine or a database that did not answer. That is temporary
+	// and the session survives it, so it gets its own face rather than the one
+	// for a request that failed.
 	const variant = $derived(
-		status === 401 || status === 403 ? 'auth' : status === 404 ? 'missing' : 'server',
+		status === 401 || status === 403 ? 'auth' : status === 404 ? 'missing' : status === 503 ? 'outage' : 'server',
 	);
 
 	// Derived, not a literal: a plain object is built once and would keep the
 	// status the page first rendered with.
 	const Icon = $derived(
-		variant === 'auth' ? (status === 403 ? ShieldOff : Lock) : variant === 'missing' ? FileQuestion : AlertTriangle,
+		variant === 'auth'
+			? status === 403
+				? ShieldOff
+				: Lock
+			: variant === 'missing'
+				? FileQuestion
+				: variant === 'outage'
+					? ServerOff
+					: AlertTriangle,
 	);
-	const tones = { auth: 'warn', missing: 'neutral', server: 'danger' } as const;
+	const tones = { auth: 'warn', missing: 'neutral', outage: 'warn', server: 'danger' } as const;
 
 	const title = $derived(
 		variant === 'auth'
@@ -41,7 +54,9 @@
 				: 'Access denied'
 			: variant === 'missing'
 				? 'Not found'
-				: 'Something went wrong',
+				: variant === 'outage'
+					? OUTAGE.title
+					: 'Something went wrong',
 	);
 
 	/**
@@ -56,9 +71,14 @@
 				: 'This account cannot open that page.'
 			: variant === 'missing'
 				? message || 'That page or record does not exist.'
-				: 'The request did not complete. Trying again is worth one attempt. The details below are what the server said.',
+				: variant === 'outage'
+					? OUTAGE.body
+					: 'The request did not complete. Trying again is worth one attempt. The details below are what the server said.',
 	);
 
+	// The address that failed, query included. A link rather than a click
+	// handler, so the retry works before the page hydrates.
+	const retryHref = $derived(page.url.pathname + page.url.search);
 </script>
 
 <EmptyState {title} description={hint}>
@@ -94,6 +114,12 @@
 				</Button>
 				<Button variant="secondary" href={homeHref}>
 					<Home size={ICON.sm} aria-hidden="true" /> {homeLabel}
+				</Button>
+			{:else if variant === 'outage'}
+				<!-- The one control is the retry. Every other page needs the same
+				     engine, and signing in again cannot help while it is silent. -->
+				<Button href={retryHref}>
+					<RefreshCw size={ICON.sm} aria-hidden="true" /> {OUTAGE.action}
 				</Button>
 			{:else}
 				<Button href={homeHref}>

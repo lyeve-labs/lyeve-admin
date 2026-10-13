@@ -3,12 +3,13 @@ import { render, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-	page: { status: 500, error: null as { message: string } | null },
+	page: { status: 500, error: null as { message: string } | null, url: new URL('http://admin.test/admin/users?role=editor') },
 }));
 
 vi.mock('$app/state', () => state);
 
 import RootError from './+error.svelte';
+import { OUTAGE } from '$lib/outage';
 
 afterEach(cleanup);
 
@@ -39,5 +40,15 @@ describe('Root error page', () => {
 	it('keeps the server face for 500', () => {
 		const { getByText } = renderAt(500);
 		expect(getByText('Something went wrong')).toBeTruthy();
+	});
+
+	// The shell's own session check fails here, above the admin frame, when the
+	// engine cannot answer it. The reader keeps the session and gets a retry.
+	it('renders the outage face for 503, with a retry of the same address', () => {
+		const { getByText, getByRole } = renderAt(503, OUTAGE.body);
+		expect(getByText(OUTAGE.title)).toBeTruthy();
+		expect(getByText(OUTAGE.body)).toBeTruthy();
+		expect(getByRole('link', { name: OUTAGE.action }).getAttribute('href')).toBe('/admin/users?role=editor');
+		expect(document.title).toContain(OUTAGE.title);
 	});
 });

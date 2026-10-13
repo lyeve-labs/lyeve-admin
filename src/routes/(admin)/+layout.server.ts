@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, sessionUser } from '$lib/server/authz';
 import type { LayoutServerLoad } from './$types';
-import { getMe, getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
+import { getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
 import { NO_ENTITLEMENTS, type LicenseEntitlements } from '$lib/entitlements';
 import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import { pendingMigrations } from '$lib/api/migrate';
@@ -37,7 +37,9 @@ export const load: LayoutServerLoad = async (event) => {
 	}
 
 	const authed = authedClient(event);
-	const user = await getMe(authed).catch(() => null);
+	// Only an engine that says the session is over ends it here. One that
+	// cannot check it throws the outage page, and the cookie outlives the blip.
+	const user = await sessionUser(authed);
 	if (!user) {
 		clearSessionCookie(event);
 		redirect(302, '/login');

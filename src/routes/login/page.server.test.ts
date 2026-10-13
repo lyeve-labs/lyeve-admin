@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { load, actions } from './+page.server';
 import { resetRateLimitStore } from '$lib/server/rate-limit';
+import { OUTAGE } from '$lib/outage';
 
 // helpers
 
@@ -91,6 +92,34 @@ describe('login/+page.server.ts load', () => {
 			secure: true,
 			sameSite: 'strict',
 		});
+	});
+
+	/*
+	 * A cookie the engine could not check has not been rejected. Dropping it
+	 * would sign the reader out through a database blip, and the form could
+	 * not sign them in again until the engine answers anyway.
+	 */
+	it.each([
+		['answers 503', () => json({ error: 'session check unavailable' }, 503)],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('keeps the cookie and shows the outage page when the engine %s', async (_case, me) => {
+		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
+			if (String(url).includes('/api/admin/auth/me')) return me();
+			return json([]);
+		}) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies({ '__Host-sys_session': 'valid-token' });
+
+		const thrown = (await Promise.resolve(load({ fetch, cookies } as never)).then(
+			() => {
+				throw new Error('expected the outage page');
+			},
+			(e: unknown) => e
+		)) as { status?: number; location?: string; body?: { message?: string } };
+
+		expect(cookies.delete).not.toHaveBeenCalled();
+		expect(thrown.location).toBeUndefined();
+		expect(thrown.status).toBe(503);
+		expect(thrown.body?.message).toBe(OUTAGE.body);
 	});
 
 	it('returns no providers when not logged in and no setup required (happy path)', async () => {

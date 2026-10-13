@@ -1,8 +1,9 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
-import { createClient, type HttpClient } from '@lyeve-labs/client';
+import { ApiError, createClient, type HttpClient } from '@lyeve-labs/client';
 import { getMe } from '@lyeve-labs/client-rest';
 import type { User } from '@lyeve-labs/client';
 import { sessionToken } from '$lib/server/session-cookie';
+import { OUTAGE } from '$lib/outage';
 
 // The engine's double-submit CSRF cookie, secure name first.
 const CSRF_COOKIE = '__Host-csrf';
@@ -51,9 +52,31 @@ export function authedClient(event: RequestEvent): HttpClient {
 	);
 }
 
-/** Require a valid session. Returns the authenticated user or throws 401. */
+/**
+ * The account a session belongs to, or null when the engine says the session
+ * is over.
+ *
+ * Only a 401 says that. The engine answers 503 when its database cannot check
+ * a session, so that an outage signs nobody out, and a console that read every
+ * failure as a dead session would undo it: one database blip would send every
+ * reader to the sign-in page. Any other failure, an engine that did not answer
+ * included, throws the outage page and leaves the cookie where it is.
+ */
+export async function sessionUser(client: HttpClient): Promise<User | null> {
+	try {
+		return await getMe(client);
+	} catch (e) {
+		if (e instanceof ApiError && e.status === 401) return null;
+		error(503, OUTAGE.body);
+	}
+}
+
+/**
+ * Require a valid session. Returns the authenticated user, throws 401 when the
+ * engine ended the session, and throws 503 when the engine could not say.
+ */
 export async function requireUser(event: RequestEvent): Promise<User> {
-	const user = await getMe(authedClient(event)).catch(() => null);
+	const user = await sessionUser(authedClient(event));
 	if (!user) {
 		error(401, 'Session invalid or expired');
 	}
@@ -62,7 +85,8 @@ export async function requireUser(event: RequestEvent): Promise<User> {
 
 /**
  * Require the session user to hold at least one of the given roles.
- * Throws 401 if unauthenticated, 403 if authenticated but unauthorized.
+ * Throws 401 if unauthenticated, 403 if authenticated but unauthorized, and
+ * 503 if the engine could not check the session.
  *
  * Defense-in-depth: the Go backend is the authoritative authorization
  * boundary. This guards the UI's server actions so privileged operations

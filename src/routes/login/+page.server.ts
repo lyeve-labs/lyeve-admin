@@ -1,8 +1,8 @@
 import { redirect, fail } from '@sveltejs/kit';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, sessionUser } from '$lib/server/authz';
 import type { PageServerLoad, Actions } from './$types';
 import { createClient, ApiError } from '@lyeve-labs/client';
-import { getMe, mfaVerify, isMFAChallenge, type LoginResponse } from '@lyeve-labs/client-rest';
+import { mfaVerify, isMFAChallenge, type LoginResponse } from '@lyeve-labs/client-rest';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { clearSessionCookie, setSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import { adminReturnPath } from '$lib/server/local-path';
@@ -47,10 +47,12 @@ export const load: PageServerLoad = async (event) => {
 	// Already logged in, or only holding a cookie that says so? A session the
 	// engine has revoked or expired still looks like one from here, and sending
 	// its holder to /admin means bouncing straight back, forever. Ask the engine
-	// before trusting it, and drop what it rejects so the form renders.
+	// before trusting it, and drop what it rejects so the form renders. An
+	// engine that cannot answer has rejected nothing, so the cookie stays and
+	// the reader sees the outage page.
 	const token = sessionToken(event);
 	if (token) {
-		const user = await getMe(authedClient(event)).catch(() => null);
+		const user = await sessionUser(authedClient(event));
 		if (user) {
 			redirect(302, returnTo(event.url));
 		}

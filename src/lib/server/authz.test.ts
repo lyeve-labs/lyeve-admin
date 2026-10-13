@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
 import { authedClient, authedHeaders, requireUser, requireRole, stripProtectedFields } from './authz';
+import { OUTAGE } from '$lib/outage';
 
 // event stub
 
@@ -153,6 +154,30 @@ describe('requireUser', () => {
 			status?: number;
 		};
 		expect(err.status).toBe(401);
+	});
+
+	/*
+	 * The engine answers 503 when its database cannot check a session, so that
+	 * an outage signs nobody out. Reading that as 401 would end the session the
+	 * engine kept, so it surfaces as the outage it is.
+	 */
+	it.each([
+		['the engine cannot check the session', async () => jsonResponse({ error: 'session check unavailable' }, 503)],
+		['the engine refuses for another reason', async () => jsonResponse({ error: 'forbidden' }, 403)],
+		[
+			'the engine does not answer',
+			async (): Promise<Response> => {
+				throw new TypeError('fetch failed');
+			},
+		],
+	])('throws 503 with the outage wording when %s', async (_case, answer) => {
+		const fetchImpl = vi.fn(answer) as unknown as typeof fetch;
+		const err = (await requireUser(stubEvent({ fetchImpl })).catch((e: unknown) => e)) as {
+			status?: number;
+			body?: { message?: string };
+		};
+		expect(err.status).toBe(503);
+		expect(err.body?.message).toBe(OUTAGE.body);
 	});
 });
 
