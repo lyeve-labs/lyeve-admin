@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.20.2] - 2026-10-12
 
+### Added
+
+- Moving to another page fades the page content while the sidebar and header stay in place, and pages outside the console frame, such as sign-in, fade whole. Changing only a filter or a page of results does not fade, reduced motion turns the fade off, and a browser without view transitions changes pages as before.
+
 ### Changed
 
 - The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.36.0.
@@ -18,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Choosing an option in an autocomplete field posts the option's value rather than the label shown in the field. A dismissed notification leaves from where it stood instead of jumping to the corner of the stack. Both come with ui-kit 0.35.2.
 - The console names the person's browser to the engine on every call, so sign-in risk, trusted devices and the audit trail see the real browser instead of the console's server.
 - Remembered devices show the browser when the engine sends one, instead of reading as unrecognized.
+- API keys: the schema catalog switch says it lists only the content types the key may read, so a key with the switch and no content access sees an empty list.
 - Reviews: a stage's escalation user, a review's assignees and the Assignments table name accounts by email, and entries by title, instead of raw ids. A caller who may not list the accounts keeps the typed fields.
 - Releases: Include entry offers the most recently changed entries by title, grouped by collection and searchable, and its button says Include.
 - Media: Build URL keeps the Width, Height and Quality fields, and a focal point click is measured against the image rather than its frame.
