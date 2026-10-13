@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Badge, Button, Drawer, EmptyState, Input, PageShell, Pagination, SegmentedControl, Table, Textarea } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, FilterChips, Input, PageShell, Pagination, Table, Textarea } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { CalendarClock, Plus } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
@@ -31,7 +31,7 @@
 		open = true;
 	}
 
-	// Each segment is a link, so a filtered list is a URL somebody can keep.
+	// Each chip is a link, so a filtered list is a URL somebody can keep.
 	const FILTERS = [
 		{ value: '', label: 'All', href: '/admin/releases' },
 		{ value: 'draft', label: 'Draft', href: '/admin/releases?status=draft' },
@@ -69,7 +69,7 @@
 		{/if}
 		<ListToolbar label="Filter releases">
 			{#snippet filters()}
-				<SegmentedControl label="Status" labelHidden value={data.status} options={FILTERS} />
+				<FilterChips label="Status" value={data.status} options={FILTERS} />
 			{/snippet}
 		</ListToolbar>
 

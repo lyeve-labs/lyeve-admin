@@ -22,8 +22,9 @@ const { FakeApiError } = vi.hoisted(() => ({
 		}
 	},
 }));
+const reads = vi.hoisted(() => ({ get: vi.fn(async (_path: string): Promise<unknown> => ({})) }));
 vi.mock('@lyeve-labs/client', () => ({
-	createClient: vi.fn(() => ({})),
+	createClient: vi.fn(() => reads),
 	ApiError: FakeApiError,
 }));
 
@@ -36,7 +37,6 @@ const rest = vi.hoisted(() => ({
 			{ name: 'active', field_type: 'boolean' },
 		],
 	})),
-	listContent: vi.fn(async () => []),
 }));
 vi.mock('@lyeve-labs/client-rest', () => rest);
 
@@ -49,7 +49,8 @@ const relations = vi.hoisted(() => ({
 }));
 vi.mock('$lib/server/content-relations', () => relations);
 
-import { actions } from './+page.server';
+import { isHttpError } from '@sveltejs/kit';
+import { actions, load } from './+page.server';
 
 function cookies(): Cookies {
 	return { get: vi.fn(() => 'tok') } as unknown as Cookies;
@@ -128,5 +129,115 @@ describe('creating a content entry', () => {
 		client.post.mockRejectedValueOnce(new FakeApiError('slug already in use', 409));
 		const { result } = await create({ title: 'Contact' });
 		expect(JSON.stringify(result)).toContain('slug already in use');
+	});
+});
+
+describe('opening the new entry form', () => {
+	const localizedSchema = { name: 'surveys', display_name: 'Surveys', with_localization: true, fields: [] };
+
+	type Opened = {
+		locales: { ok: boolean; value?: unknown } | null;
+		relations: Record<string, { items: unknown[]; total: number; failed: boolean }>;
+	};
+
+	function open(
+		running: string[],
+		roles: string[] = ['admin'],
+		fetch = vi.fn(async (_path: string) => new Response(JSON.stringify({ data: [] }), { status: 200 })),
+	) {
+		return Promise.resolve(
+			load({
+				fetch,
+				cookies: cookies(),
+				params: { schema: 'surveys' },
+				url: new URL('http://localhost/admin/content/surveys/new'),
+				parent: async () => ({ plugins: { state: 'named', running, withheld: [] }, user: { id: 'u1', roles } }),
+			} as never),
+		) as Promise<Opened>;
+	}
+
+	const relatedSchema = {
+		name: 'surveys',
+		display_name: 'Surveys',
+		fields: [{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' }],
+	};
+
+	beforeEach(() => {
+		reads.get.mockReset();
+		rest.getSchema.mockClear();
+	});
+
+	it('opens a localized schema without the localization plugin, and offers no locale', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+
+		const data = await open([]);
+
+		expect(data.locales).toBeNull();
+		expect(reads.get).not.toHaveBeenCalled();
+	});
+
+	it('keeps the form when the locales cannot be read, and says so', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+		reads.get.mockRejectedValueOnce(new FakeApiError('down', 503));
+
+		const data = await open(['localization']);
+
+		expect(data.locales?.ok).toBe(false);
+	});
+
+	it('offers the enabled locales while the plugin runs', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+		reads.get.mockResolvedValueOnce({ default_locale: 'en', enabled_locales: ['en', 'fr'] });
+
+		const data = await open(['localization']);
+
+		expect(data.locales).toEqual({
+			ok: true,
+			value: [
+				{ code: 'en', name: 'en', is_default: true },
+				{ code: 'fr', name: 'fr', is_default: false },
+			],
+		});
+	});
+
+	it('reports an outage as an outage, not as a schema that is not there', async () => {
+		rest.getSchema.mockRejectedValueOnce(new FakeApiError('down', 503) as never);
+
+		const thrown = await open([]).catch((err: unknown) => err);
+
+		expect(isHttpError(thrown) && thrown.status).toBe(503);
+	});
+
+	it('refuses an editor, whose Create the engine would refuse, before reading anything', async () => {
+		const thrown = await open([], ['editor']).catch((err: unknown) => err);
+
+		expect(isHttpError(thrown) && thrown.status).toBe(403);
+		expect(rest.getSchema).not.toHaveBeenCalled();
+	});
+
+	it('reads each related collection from the admin store, one page of 500', async () => {
+		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
+		const fetch = vi.fn(
+			async (_path: string) =>
+				new Response(JSON.stringify({ data: [{ id: 'a1', title: 'Ada' }], total_count: 900 }), { status: 200 }),
+		);
+
+		const data = await open([], ['admin'], fetch);
+
+		const asked = new URL(String(fetch.mock.calls[0][0]), 'http://localhost');
+		expect(asked.pathname).toBe('/api/admin/content');
+		expect(asked.searchParams.get('schema')).toBe('author');
+		expect(asked.searchParams.get('limit')).toBe('500');
+		expect(data.relations.author).toMatchObject({ total: 900, failed: false });
+		expect(data.relations.author.items).toHaveLength(1);
+	});
+
+	it('marks a related collection whose read failed, rather than calling it empty', async () => {
+		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
+		const fetch = vi.fn(async (_path: string) => new Response(JSON.stringify({ error: 'down' }), { status: 503 }));
+
+		const data = await open([], ['admin'], fetch);
+
+		expect(data.relations.author).toEqual({ items: [], total: 0, failed: true });
 	});
 });

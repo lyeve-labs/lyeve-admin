@@ -9,6 +9,7 @@
 		Card,
 		Drawer,
 		EmptyState,
+		FilterChips,
 		Input,
 		NumberInput,
 		PageShell,
@@ -20,7 +21,9 @@
 		Toggle,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ArrowDown, ArrowUp, ClipboardCheck, Plus, Trash2, X } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -56,8 +59,8 @@
 		published: 'success',
 	};
 
-	// Link segments: the filter is the engine's, so the page reloads with it
-	// in the URL and the choice survives a refresh and a share.
+	// Link chips: the filter is the engine's, so the page reloads with it in
+	// the URL and the choice survives a refresh and a share.
 	const statusOptions = [
 		{ value: '', label: 'All', href: '/admin/reviews' },
 		...REVIEW_STATUSES.filter((s) => s !== 'draft').map((s) => ({
@@ -67,7 +70,13 @@
 		})),
 	];
 
-	let byDefinition = $derived(new Map(data.definitions.map((row) => [row.definition.id, row])));
+	// A failed read draws its gate in place of its section, so these are only
+	// ever rows the engine answered with.
+	let definitionRows = $derived(data.definitions.ok ? data.definitions.value : []);
+	let assignmentRows = $derived(data.assignments.ok ? data.assignments.value : []);
+	let schemaNames = $derived(data.schemas.ok ? data.schemas.value : []);
+
+	let byDefinition = $derived(new Map(definitionRows.map((row) => [row.definition.id, row])));
 
 	function stageName(definitionId: string, stageId: string): string {
 		const row = byDefinition.get(definitionId);
@@ -183,7 +192,7 @@
 	function openCreate() {
 		name = '';
 		slug = '';
-		contentSchema = data.schemas[0] ?? '';
+		contentSchema = schemaNames[0] ?? '';
 		publishOnApprove = true;
 		stages = [blankStage()];
 		open = true;
@@ -212,7 +221,7 @@
 			})),
 		),
 	);
-	let schemaOptions = $derived(data.schemas.map((s) => ({ value: s, label: s })));
+	let schemaOptions = $derived(schemaNames.map((s) => ({ value: s, label: s })));
 
 	// The accounts an escalation can go to, by email. A stage saved with an
 	// account the directory no longer lists keeps it as an option, so the field
@@ -239,7 +248,9 @@
 		);
 		if (!ok) return;
 		deleteId = id;
-		await Promise.resolve();
+		// The hidden form reads the id from the DOM, so it waits for Svelte to
+		// write it there.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 </script>
@@ -253,7 +264,7 @@
 >
 	{#snippet actions()}
 		<Badge tone="violet" size="sm">Beta</Badge>
-		{#if data.operator}
+		{#if data.operator && data.definitions.ok}
 			<Button variant="primary" size="sm" onclick={openCreate} disabled={atCeiling}>
 				<Plus size={ICON.sm} />
 				New definition
@@ -267,12 +278,6 @@
 		<Alert tone="success" autoDismiss>Definition created.</Alert>
 	{:else if form && 'deleted' in form && form.deleted}
 		<Alert tone="success" autoDismiss>Definition deleted.</Alert>
-	{/if}
-	{#if data.unavailable}
-		<Alert tone="warn" title="The review plugin did not answer">
-			It is compiled into this instance, but its routes are not responding. What is shown here
-			may be short.
-		</Alert>
 	{/if}
 
 	<div class="flex flex-col gap-6">
@@ -290,9 +295,13 @@
 				{#if ceilingRefusal}
 					<RefusalNotice refusal={ceilingRefusal} />
 				{/if}
-				{#if data.definitionsForbidden}
-					<Alert tone="warn">The engine refused the definition list to your roles.</Alert>
-				{:else if data.definitions.length === 0}
+				{#if !data.definitions.ok}
+					<GateNotice
+						gate={data.definitions.gate}
+						title="Review definitions"
+						absent="This build serves no review definitions."
+					/>
+				{:else if definitionRows.length === 0}
 					<EmptyState
 						title="No definition yet"
 						description="A definition is an ordered list of stages, each with a required role and an SLA. Content moves through it one stage at a time."
@@ -317,7 +326,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each data.definitions as row (row.definition.id)}
+							{#each definitionRows as row (row.definition.id)}
 								<tr data-testid="definition-row">
 									<td data-cell="nowrap">
 										<span class="font-medium text-fg">{row.definition.name}</span>
@@ -369,14 +378,21 @@
 			<SectionHeading level={2}>Assignments</SectionHeading>
 			<ListToolbar label="Filter assignments">
 				{#snippet filters()}
-					<SegmentedControl label="Status" labelHidden value={data.status} options={statusOptions} />
+					<FilterChips label="Status" value={data.status} options={statusOptions} />
 				{/snippet}
 			</ListToolbar>
-			{#if data.assignmentsForbidden}
+			{#if !data.assignments.ok && data.assignments.gate.state === 'forbidden'}
+				<!-- The rules decide this, not the role, so the notice names them. -->
 				<Alert tone="warn" title="You may not list reviews">
 					The permission rules grant no read on <span class="font-mono">reviews</span> to your roles.
 				</Alert>
-			{:else if data.assignments.length === 0}
+			{:else if !data.assignments.ok}
+				<GateNotice
+					gate={data.assignments.gate}
+					title="Review assignments"
+					absent="This build serves no review assignments."
+				/>
+			{:else if assignmentRows.length === 0}
 				<EmptyState
 					title="Nothing under review"
 					description={data.status
@@ -386,6 +402,11 @@
 					{#snippet iconSnippet()}<ClipboardCheck size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else}
+				{#if !data.entriesNamed}
+					<p class="text-xs text-muted">
+						Entries, definitions and stages are listed by ID. Their names are read through routes only an admin can open.
+					</p>
+				{/if}
 				<Table label="Review assignments">
 					<thead>
 						<tr>
@@ -398,7 +419,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.assignments as a (a.id)}
+						{#each assignmentRows as a (a.id)}
 							{@const href = entryHref(a.definition_id, a.entry_id)}
 							{@const late = overdue(a)}
 							<tr data-testid="assignment-row" data-status={a.status}>
@@ -440,7 +461,7 @@
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
-					count={data.assignments.length}
+					count={assignmentRows.length}
 					total={data.total}
 					noun="assignments"
 					href={(page) => pageHref(pageOffset(page, data.limit))}
@@ -486,6 +507,7 @@
 				label="Content schema"
 				hint="The schema whose entries this definition reviews. Approval publishes the row there."
 				options={schemaOptions}
+				searchable
 				bind:value={contentSchema}
 			/>
 		{:else}
@@ -493,7 +515,9 @@
 				id="definition-schema"
 				name="content_schema"
 				label="Content schema"
-				hint="The schema whose entries this definition reviews."
+				hint={data.schemas.ok
+					? 'The schema whose entries this definition reviews.'
+					: 'The schemas could not be read, so type the name of the schema whose entries this definition reviews.'}
 				value={contentSchema ?? ''}
 				oninput={(e) => (contentSchema = (e.currentTarget as HTMLInputElement).value)}
 				class="font-mono"
@@ -600,7 +624,7 @@
 										hint="The user becomes the assignee when the SLA passes."
 										placeholder="Pick a user"
 										options={escalateOptions(stage.escalate_to)}
-										searchable={peopleOptions.length > 10}
+										searchable
 										disabled={stagesLocked}
 										bind:value={stage.escalate_to}
 									/>

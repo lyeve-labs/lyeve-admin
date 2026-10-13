@@ -7,18 +7,25 @@ const api = vi.hoisted(() => ({
 	getRanking: vi.fn(),
 }));
 
-vi.mock('@lyeve-labs/client', () => ({ createClient: vi.fn(() => ({})) }));
+vi.mock('@lyeve-labs/client', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@lyeve-labs/client')>()),
+	createClient: vi.fn(() => ({})),
+}));
 vi.mock('@lyeve-labs/client-rest', () => api);
 
+import { ApiError } from '@lyeve-labs/client';
 import { load } from './+page.server';
 
 function mockCookies(): Cookies {
 	return { get: vi.fn(() => 'tok') } as unknown as Cookies;
 }
 
+type Read = { ok: true; value: unknown } | { ok: false; gate: { state: string } };
+
 interface SearchLoadResult {
-	results: unknown[];
-	searchFailed: boolean;
+	results: Read | null;
+	ranking: Read;
+	synonyms: Read;
 }
 
 // The load signature widens to `void` once the event is cast, so pin the shape here.
@@ -39,30 +46,27 @@ beforeEach(() => {
 });
 
 describe('admin/search/+page.server.ts load', () => {
-	it('returns hits and no failure flag on success', async () => {
+	it('returns the hits on success', async () => {
 		api.search.mockResolvedValue({ results: [{ entry_id: 'e1' }] });
 
 		const result = await runLoad('cats');
 
-		expect(result.results).toEqual([{ entry_id: 'e1' }]);
-		expect(result.searchFailed).toBe(false);
+		expect(result.results).toEqual({ ok: true, value: [{ entry_id: 'e1' }] });
 	});
 
-	it('flags the failure instead of returning an empty result set', async () => {
+	it('keeps a failed search as a gate instead of an empty result set', async () => {
 		api.search.mockRejectedValue(new Error('search service down'));
 
 		const result = await runLoad('cats');
 
-		expect(result.searchFailed).toBe(true);
-		expect(result.results).toEqual([]);
+		expect(result.results).toMatchObject({ ok: false, gate: { state: 'error' } });
 	});
 
-	it('skips the search call and flags nothing when the query is empty', async () => {
+	it('skips the search call when the query is empty', async () => {
 		const result = await runLoad('');
 
 		expect(api.search).not.toHaveBeenCalled();
-		expect(result.searchFailed).toBe(false);
-		expect(result.results).toEqual([]);
+		expect(result.results).toBeNull();
 	});
 
 	it('treats a missing results array as no hits, not a failure', async () => {
@@ -70,7 +74,22 @@ describe('admin/search/+page.server.ts load', () => {
 
 		const result = await runLoad('cats');
 
-		expect(result.results).toEqual([]);
-		expect(result.searchFailed).toBe(false);
+		expect(result.results).toEqual({ ok: true, value: [] });
+	});
+
+	it('keeps a failed ranking read as a gate, never as the default weights', async () => {
+		api.getRanking.mockRejectedValue(new ApiError(503, 'unavailable'));
+
+		const result = await runLoad('');
+
+		expect(result.ranking).toMatchObject({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('keeps a failed synonym read as a gate, never as no groups', async () => {
+		api.listSynonyms.mockRejectedValue(new ApiError(500, 'internal'));
+
+		const result = await runLoad('');
+
+		expect(result.synonyms).toMatchObject({ ok: false, gate: { state: 'error' } });
 	});
 });

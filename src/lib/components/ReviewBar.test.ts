@@ -210,3 +210,15 @@ describe('ReviewBar, picking the assignees', () => {
 		expect(screen.getByTestId('review-assignee').textContent).toBe('You, mira.costa@example.com');
 	});
 });
+
+describe('ReviewBar with no definitions to offer', () => {
+	it('says the definitions could not be read instead of hiding the start form', () => {
+		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [], definitionsFailed: true } });
+		expect(screen.getByText(/review definitions could not be read/)).toBeTruthy();
+	});
+
+	it('says nothing more for a reader who may not start a review', () => {
+		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [] } });
+		expect(screen.queryByText(/could not be read/)).toBeNull();
+	});
+});

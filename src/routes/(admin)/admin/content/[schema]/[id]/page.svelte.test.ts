@@ -18,7 +18,7 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 			fields: [{ name: 'title', field_type: 'text', required: false, unique: false, indexed: false }],
 		},
 		item: { id: 'e1', created_at: '2026-09-19T10:00:00Z', updated_at: '2026-09-19T10:00:00Z', data: { title: 'One' } },
-		relationItems: {},
+		relations: {},
 		revisions: [],
 		localization: null,
 		review: null,

@@ -6,7 +6,10 @@ vi.mock('$lib/server/authz', () => ({
 	authedClient: vi.fn(() => ({ delete: vi.fn() })),
 }));
 
-vi.mock('@lyeve-labs/client', () => ({ createClient: vi.fn(() => ({})) }));
+vi.mock('@lyeve-labs/client', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@lyeve-labs/client')>()),
+	createClient: vi.fn(() => ({})),
+}));
 
 const rest = vi.hoisted(() => ({
 	getSchemas: vi.fn(async () => [{ name: 'posts', display_name: 'Posts' }]),
@@ -14,6 +17,8 @@ const rest = vi.hoisted(() => ({
 }));
 vi.mock('@lyeve-labs/client-rest', () => rest);
 
+import { ApiError } from '@lyeve-labs/client';
+import { isHttpError, isRedirect } from '@sveltejs/kit';
 import { load } from './+page.server';
 
 /**
@@ -22,7 +27,8 @@ import { load } from './+page.server';
  * here is the one the page consumes.
  */
 type Loaded = {
-	items: unknown[];
+	items: { ok: true; value: { data: Record<string, unknown> }[] } | { ok: false; gate: { state: string } };
+	schemas: { ok: boolean };
 	limit: number;
 	offset: number;
 	total: number;
@@ -68,7 +74,7 @@ async function runLoad(query: string, body: unknown) {
 
 /** The `limit=` value of the single content listing request the load makes. */
 function requestedLimit(fetch: { mock: { calls: unknown[][] } }): number {
-	const requested = new URL(String(fetch.mock.calls[0][0]), 'http://localhost');
+	const requested = new URL(String((fetch.mock.calls[0] as unknown[])[0]), 'http://localhost');
 	return Number(requested.searchParams.get('limit'));
 }
 
@@ -89,7 +95,7 @@ describe('content listing reads the collection total from the envelope', () => {
 		});
 
 		expect(result.total).toBe(4000);
-		expect(result.items).toHaveLength(100);
+		expect(result.items.ok && result.items.value).toHaveLength(100);
 	});
 
 	it('keeps the envelope total on a later page', async () => {
@@ -112,8 +118,12 @@ describe('content listing reads the collection total from the envelope', () => {
 		expect(result.total).toBe(400);
 	});
 
-	it('reports an empty collection when the listing fails', async () => {
-		const fetch = vi.fn(async () => new Response('nope', { status: 503 }));
+	it.each([
+		[503, 'unavailable'],
+		[500, 'error'],
+		[403, 'forbidden'],
+	])('draws a gate, never an empty collection, when the listing answers %i', async (status, state) => {
+		const fetch = vi.fn(async () => new Response('nope', { status }));
 		const result = (await load({
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
@@ -121,8 +131,55 @@ describe('content listing reads the collection total from the envelope', () => {
 			url: new URL('http://localhost/admin/content/posts'),
 		} as never)) as unknown as Loaded;
 
-		expect(result.items).toEqual([]);
+		expect(result.items).toMatchObject({ ok: false, gate: { state } });
 		expect(result.total).toBe(0);
+	});
+
+	it('sends a page past the end back to the last page that holds rows', async () => {
+		const pending = load({
+			fetch: vi.fn(async () => new Response(JSON.stringify({ data: [], total_count: 120 }), { status: 200 })),
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			params: { schema: 'posts' },
+			url: new URL('http://localhost/admin/content/posts?limit=50&offset=500'),
+		} as never);
+
+		const thrown = await Promise.resolve(pending).catch((err: unknown) => err);
+		expect(isRedirect(thrown)).toBe(true);
+		expect((thrown as { location: string }).location).toBe('/admin/content/posts?limit=50&offset=100');
+	});
+});
+
+describe('content listing reads its collection', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('answers 404 only when the engine says the collection does not exist', async () => {
+		rest.getSchema.mockRejectedValueOnce(new ApiError(404, 'not found'));
+		const thrown = await runLoad('', { data: [] }).catch((err: unknown) => err);
+		expect(isHttpError(thrown) && thrown.status).toBe(404);
+	});
+
+	it('reports an outage as an outage, not as a missing collection', async () => {
+		rest.getSchema.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		const thrown = await runLoad('', { data: [] }).catch((err: unknown) => err);
+		expect(isHttpError(thrown) && thrown.status).toBe(503);
+	});
+
+	it('keeps the picker read apart from the entries read', async () => {
+		rest.getSchemas.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		const { result } = await runLoad('', { data: rows(2), total_count: 2 });
+		expect(result.schemas.ok).toBe(false);
+		expect(result.items.ok).toBe(true);
+	});
+
+	it('asks the listing for the status the URL names, and ignores one it does not know', async () => {
+		const { fetch, result } = await runLoad('?status=draft', { data: [], total_count: 0 });
+		expect(new URL(String((fetch.mock.calls[0] as unknown[])[0]), 'http://localhost').searchParams.get('status')).toBe('draft');
+		expect((result as unknown as { status: string | null }).status).toBe('draft');
+
+		const other = await runLoad('?status=famous', { data: [], total_count: 0 });
+		expect(new URL(String((other.fetch.mock.calls[0] as unknown[])[0]), 'http://localhost').searchParams.has('status')).toBe(false);
 	});
 });
 
@@ -147,7 +204,7 @@ describe('content listing clamps the page size to the server maximum', () => {
 		const { fetch, result } = await runLoad('?limit=100', { data: rows(100), total_count: 4000 });
 
 		expect(requestedLimit(fetch)).toBe(100);
-		expect(result.items).toHaveLength(100);
+		expect(result.items.ok && result.items.value).toHaveLength(100);
 	});
 
 	it('asks for exactly 500 at the top of the range, never 501', async () => {
@@ -207,10 +264,11 @@ describe('content listing names linked entries', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 			params: { schema: 'posts' },
 			url: new URL('http://localhost/admin/content/posts'),
-		} as never)) as unknown as { items: { data: Record<string, unknown> }[] };
+		} as never)) as unknown as Loaded;
 
-		expect(result.items[0].data.author).toEqual({ id: 'a1', title: 'Ada Park' });
-		expect(result.items[1].data.author).toBe('missing');
+		if (!result.items.ok) throw new Error('the listing failed');
+		expect(result.items.value[0].data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(result.items.value[1].data.author).toBe('missing');
 		const authorReads = fetch.mock.calls.filter((c) => String(c[0]).includes('schema=author'));
 		expect(authorReads).toHaveLength(1);
 	});

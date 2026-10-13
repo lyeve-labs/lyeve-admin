@@ -93,7 +93,7 @@ const cases: Case[] = [
 	{
 		route: 'content/[schema]',
 		component: ContentCollection,
-		data: { schemas: [], schemaDef: posts, items: [], activeSchema: 'posts', limit: 100, offset: 0, total: 0 },
+		data: { schemas: { ok: true, value: [] }, schemaDef: posts, items: { ok: true, value: [] }, activeSchema: 'posts', status: null, limit: 100, offset: 0, total: 0 },
 		href: '/admin/content',
 		label: 'Content',
 	},
@@ -103,7 +103,7 @@ const cases: Case[] = [
 		data: {
 			schemaDef: posts,
 			item: { id: 'e1', data: {}, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-			relationItems: {},
+			relations: {},
 			revisions: [],
 		},
 		href: '/admin/content/posts',
@@ -115,7 +115,7 @@ const cases: Case[] = [
 		data: {
 			schemaDef: posts,
 			item: { id: 'e1', data: {}, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-			relationItems: {},
+			relations: {},
 			revisions: [],
 		},
 		url: 'http://localhost/admin/content/posts/e1?limit=100&offset=200',
@@ -125,7 +125,7 @@ const cases: Case[] = [
 	{
 		route: 'content/[schema]/new',
 		component: ContentNew,
-		data: { schemaDef: posts, locales: [], relationItems: {} },
+		data: { schemaDef: posts, locales: null, relations: {} },
 		href: '/admin/content/posts',
 		label: 'Posts',
 	},
@@ -286,7 +286,7 @@ describe('every nested page names the way back', () => {
 
 	it('puts the back link ahead of a breadcrumb on the same row', () => {
 		const { container } = render(ContentNew, {
-			props: { data: { schemaDef: posts, locales: [], relationItems: {} }, form: null } as never,
+			props: { data: { schemaDef: posts, locales: null, relations: {} }, form: null } as never,
 		});
 		const back = container.querySelector('[data-testid="page-back"]');
 		const crumb = container.querySelector('nav[aria-label]');
@@ -320,8 +320,8 @@ describe('every nested page names the way back', () => {
 				props: {
 					data: {
 						schemaDef: posts,
-						locales: [],
-						relationItems: {},
+						locales: null,
+						relations: {},
 						revisions: [],
 						item: { id: 'e1', data: {}, created_at: '', updated_at: '' },
 					},

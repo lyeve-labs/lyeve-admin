@@ -39,7 +39,13 @@ vi.mock('@lyeve-labs/client', () => ({
 		}
 	}) as never),
 	ApiError: class ApiError extends Error {
-		status = 500;
+		status: number;
+		body: unknown;
+		constructor(status = 500, message = '', body?: unknown) {
+			super(message);
+			this.status = status;
+			this.body = body;
+		}
 	}
 }));
 
@@ -47,6 +53,7 @@ vi.mock('@lyeve-labs/client-rest', () => ({
 	getSchema: vi.fn(async () => ({ name: 'article', with_draft_publish: true, fields: [] }))
 }));
 
+import { isHttpError } from '@sveltejs/kit';
 import { load, actions } from './+page.server';
 import type { PluginSet } from '$lib/plugins';
 
@@ -156,14 +163,78 @@ describe('content editor load, revisions', () => {
 		expect(result.revisions).toHaveLength(1);
 	});
 
-	it('reports no revisions rather than failing the page when the call errors', async () => {
-		const result = await loadWith({ error: 'nope' }, 503);
+	it('says the history could not be read rather than failing the page when the call errors', async () => {
+		const result = (await loadWith({ error: 'nope' }, 503)) as unknown as { revisions: unknown[]; revisionsFailed: boolean };
 		expect(result.revisions).toEqual([]);
+		expect(result.revisionsFailed).toBe(true);
 	});
 
 	it('reports no revisions when the envelope carries none', async () => {
-		const result = await loadWith({ data: [], total: 0 });
+		const result = (await loadWith({ data: [], total: 0 })) as unknown as { revisions: unknown[]; revisionsFailed: boolean };
 		expect(result.revisions).toEqual([]);
+		expect(result.revisionsFailed).toBe(false);
+	});
+});
+
+describe('content editor load, the entry read', () => {
+	async function entryAnswering(status: number) {
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('/revisions')) return json({ data: [] });
+			if (path.includes('/api/admin/content?')) return json({ data: [] });
+			return json({ error: 'x' }, status);
+		}) as unknown as typeof globalThis.fetch;
+		return Promise.resolve(
+			load({
+				fetch: fetchFn,
+				cookies: mockCookies(),
+				params: { schema: 'article', id: 'e1' },
+				parent: async () => ({ plugins: none })
+			} as never),
+		).catch((err: unknown) => err);
+	}
+
+	it('answers 404 when the engine says the entry does not exist', async () => {
+		const thrown = await entryAnswering(404);
+		expect(isHttpError(thrown) && thrown.status).toBe(404);
+	});
+
+	it('reports an outage as an outage, never as an entry that is not there', async () => {
+		const thrown = await entryAnswering(503);
+		expect(isHttpError(thrown) && thrown.status).toBe(503);
+	});
+
+	it('reports a refused role as a refusal', async () => {
+		const thrown = await entryAnswering(403);
+		expect(isHttpError(thrown) && thrown.status).toBe(403);
+	});
+});
+
+describe('content editor load, relation pickers', () => {
+	it('says when a related collection is larger than the picker, and when its read failed', async () => {
+		const { getSchema } = await import('@lyeve-labs/client-rest');
+		vi.mocked(getSchema).mockResolvedValueOnce({
+			name: 'article',
+			fields: [
+				{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' },
+				{ name: 'tags', field_type: 'relation', relation_type: 'many_to_many', relation_to: 'tag' },
+			],
+		} as never);
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('schema=author')) return json({ data: [{ id: 'a1', title: 'Ada' }], total_count: 900 });
+			if (path.includes('schema=tag')) return json({ error: 'x' }, 503);
+			if (path.includes('/revisions')) return json({ data: [] });
+			return json(entry);
+		}) as unknown as typeof globalThis.fetch;
+		const result = (await load({
+			fetch: fetchFn,
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none })
+		} as never)) as unknown as { relations: Record<string, { items: unknown[]; total: number; failed: boolean }> };
+
+		expect(result.relations.author.total).toBe(900);
+		expect(result.relations.author.items).toHaveLength(1);
+		expect(result.relations.tag.failed).toBe(true);
 	});
 
 	it('flattens the row columns into the one data object the panel reads', async () => {

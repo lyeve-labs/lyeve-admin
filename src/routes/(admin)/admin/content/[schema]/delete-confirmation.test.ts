@@ -36,8 +36,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function data(overrides: Record<string, unknown> = {}): PageData {
+	const { items: rows, ...rest } = overrides;
 	return {
-		schemas: [{ name: 'posts', display_name: 'Posts' }],
+		schemas: { ok: true, value: [{ name: 'posts', display_name: 'Posts' }] },
 		schemaDef: {
 			name: 'posts',
 			display_name: 'Posts',
@@ -45,19 +46,23 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 			with_draft_publish: false,
 			with_updated_at: false,
 		},
-		items: [
-			{
-				id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-				created_at: '2026-01-01T00:00:00Z',
-				updated_at: '2026-01-02T00:00:00Z',
-				data: { title: 'The launch post', _status: 'published' },
-			},
-		],
+		items: {
+			ok: true,
+			value: rows ?? [
+				{
+					id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+					created_at: '2026-01-01T00:00:00Z',
+					updated_at: '2026-01-02T00:00:00Z',
+					data: { title: 'The launch post', _status: 'published' },
+				},
+			],
+		},
 		activeSchema: 'posts',
+		status: null,
 		limit: 100,
 		offset: 0,
 		total: 1,
-		...overrides,
+		...rest,
 	} as unknown as PageData;
 }
 

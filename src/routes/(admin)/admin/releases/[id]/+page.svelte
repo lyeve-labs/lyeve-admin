@@ -11,11 +11,13 @@
 		Input,
 		PageShell,
 		SectionHeading,
+		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { CalendarClock, FileText, Pencil, Plus, Send, Trash2, X } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
@@ -81,9 +83,9 @@
 	let addOpen = $state(false);
 	let entryId = $state('');
 	let picked = $state<string | null>(null);
-	let itemAction = $state('publish');
+	let itemAction = $state<'publish' | 'unpublish'>('publish');
 	const add = submitter(() => (addOpen = false));
-	const ACTIONS = [
+	const ACTIONS: { value: 'publish' | 'unpublish'; label: string }[] = [
 		{ value: 'publish', label: 'Publish it' },
 		{ value: 'unpublish', label: 'Unpublish it' },
 	];
@@ -124,21 +126,26 @@
 	let removeEntry = $state('');
 	let removeForm = $state<HTMLFormElement>();
 
+	// Each question names the release, so a reader with two tabs open can
+	// tell which one the answer goes to.
 	async function ask(action: 'publish' | 'cancel' | 'delete') {
+		const named = release?.name ?? '';
 		const copy = {
-			publish: ['Publish this release now?', 'Every entry in it is published or unpublished at once.', 'Publish now'],
-			cancel: ['Cancel this release?', 'Nothing in it goes out, and it can no longer change.', 'Cancel release'],
-			delete: ['Delete this release?', 'The release and its list of entries are removed. The entries themselves stay.', 'Delete'],
+			publish: [`Publish release ${named} now?`, 'Every entry in it is published or unpublished at once.', 'Publish now'],
+			cancel: [`Cancel release ${named}?`, 'Nothing in it goes out, and it can no longer change.', 'Cancel release'],
+			delete: [`Delete release ${named}?`, 'The release and its list of entries are removed. The entries themselves stay.', 'Delete'],
 		}[action];
 		if (!(await confirmDialog(copy[0], copy[1], { confirmLabel: copy[2] }))) return;
 		confirmAction = action;
-		await Promise.resolve();
+		// The hidden form reads the action from the DOM, so it waits for Svelte
+		// to write it there.
+		await tick();
 		confirmForm?.requestSubmit();
 	}
 
 	async function askRemove(id: string) {
 		removeEntry = id;
-		await Promise.resolve();
+		await tick();
 		removeForm?.requestSubmit();
 	}
 
@@ -332,7 +339,8 @@
 				hint="The most recently changed entries, by collection. Add an older one from its own page."
 			/>
 		{:else}
-			<!-- The entry list could not be read, so the drawer takes an id. -->
+			<!-- The entry list could not be read, so the drawer takes an id and
+			     says why it offers no list. -->
 			<Input
 				id="release-entry"
 				name="entry_id"
@@ -340,17 +348,10 @@
 				required
 				bind:value={entryId}
 				error={errors.entry_id}
-				hint="The ID shown under an entry's title on its page."
+				hint="The entry list could not be read. Enter the ID shown under an entry's title on its page."
 			/>
 		{/if}
-		<Select
-			id="release-action"
-			name="action"
-			label="When the release goes out"
-			options={ACTIONS}
-			value={itemAction}
-			onvaluechange={(v) => (itemAction = v)}
-		/>
+		<SegmentedControl name="action" label="When the release goes out" options={ACTIONS} bind:value={itemAction} />
 	</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (addOpen = false)}>Cancel</Button>

@@ -6,10 +6,10 @@
 		Button,
 		Card,
 		EmptyState,
-		CheckboxGroup,
 		CopyButton,
 		Drawer,
 		Input,
+		MultiSelect,
 		NumberInput,
 		PageShell,
 		SearchInput,
@@ -20,15 +20,17 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageData, ActionData } from './$types';
-	import { ArrowRight, Trash2 } from '@lucide/svelte';
+	import { ArrowRight, Database, Plus, Search, Shuffle, Trash2 } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let publicChoice = $state<string[]>([]);
 	$effect.pre(() => {
-		publicChoice = [...(data.publicSchemas ?? [])];
+		publicChoice = data.publicSchemas.ok ? [...data.publicSchemas.value] : [];
 	});
 	const savePublic: SubmitFunction = () => async ({ update }) => {
 		await update({ reset: false });
@@ -84,33 +86,34 @@
 
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 		<div class="lg:col-span-2">
-			{#if data.q === ''}
+			{#if data.results === null}
 				<EmptyState
 					title="Search the content library"
 					description="Enter a query above to search."
-				/>
-			{:else if data.searchFailed}
-				<Alert tone="danger" title="Search failed">
-					The search service did not respond. Try again in a moment.
-				</Alert>
-			{:else if data.results.length === 0}
+				>
+					{#snippet iconSnippet()}<Search size={ICON.lg} />{/snippet}
+				</EmptyState>
+			{:else if !data.results.ok}
+				<GateNotice gate={data.results.gate} title="Search" absent="This build does not serve content search." />
+			{:else if data.results.value.length === 0}
 				<EmptyState
 					title={`No results for "${data.q}".`}
 					description="Try a broader term, or check the spelling."
 				/>
 			{:else}
+				{@const hits = data.results.value}
 				<div class="space-y-3">
 					<p class="text-xs tracking-wider text-faint uppercase">
-						{data.results.length} result{data.results.length === 1 ? '' : 's'} for "{data.q}"
+						{hits.length} result{hits.length === 1 ? '' : 's'} for "{data.q}"
 					</p>
 					<ul class="space-y-3">
-						{#each data.results as hit (hit.entry_id)}
+						{#each hits as hit (hit.entry_id)}
 							<li>
 								<Card pad="sm">
 									<div class="flex items-start justify-between gap-3">
-										<h3 class="text-sm font-medium text-fg">
+										<SectionHeading level={3}>
 											{hit.title || hit.slug || '(untitled)'}
-										</h3>
+										</SectionHeading>
 										<span class="shrink-0 text-xs text-faint tabular-nums">
 											rank {hit.rank.toFixed(3)}
 										</span>
@@ -148,10 +151,17 @@
 				{#snippet header()}
 					<SectionHeading level={3}>Public search</SectionHeading>
 				{/snippet}
-				{#if data.publicSchemas === null}
-					<Alert tone="warn">The public schema list could not be read.</Alert>
-				{:else if data.schemas.length === 0}
-					<p class="text-sm text-muted">No schemas yet.</p>
+				{#if !data.publicSchemas.ok}
+					<GateNotice gate={data.publicSchemas.gate} title="Public search" absent="This build does not serve public search." />
+				{:else if !data.schemas.ok}
+					<GateNotice gate={data.schemas.gate} title="The schemas" absent="This build does not list schemas." />
+				{:else if data.schemas.value.length === 0}
+					<EmptyState title="No schemas yet" description="Build a schema, then choose here whether anyone may search it.">
+						{#snippet iconSnippet()}<Database size={ICON.lg} />{/snippet}
+						{#snippet action()}
+							<Button variant="secondary" href="/admin/schema">Go to the schema builder</Button>
+						{/snippet}
+					</EmptyState>
 				{:else}
 					<form method="POST" action="?/publicSchemas" class="flex flex-col gap-3" use:enhance={savePublic}>
 						{#if form?.publicError}
@@ -159,13 +169,20 @@
 						{:else if form && 'publicSaved' in form}
 							<Alert tone="success" autoDismiss>Saved.</Alert>
 						{/if}
-						<CheckboxGroup
-							name="schemas"
+						<!-- A searchable picker rather than a box per schema, which grows
+						     into a wall past a dozen. The picks travel as one field each. -->
+						<MultiSelect
+							id="public-schemas"
 							label="Anyone may search"
-							hint="Published entries of a ticked schema answer on your site's own host with no credential: title, slug, tags and a snippet, never the stored body."
-							options={data.schemas.map((n) => ({ value: n, label: n }))}
+							hint="Published entries of a picked schema answer on your site's own host with no credential: title, slug, tags and a snippet, never the stored body."
+							placeholder="Pick schemas"
+							searchable
+							options={data.schemas.value.map((n) => ({ value: n, label: n }))}
 							bind:value={publicChoice}
 						/>
+						{#each publicChoice as name (name)}
+							<input type="hidden" name="schemas" value={name} />
+						{/each}
 						{#if publicChoice.length > 0}
 							<div class="flex items-start gap-1">
 								<code class="min-w-0 flex-1 break-all text-xs text-muted">GET /api/v1/search/{publicChoice[0]}?q=kettle</code>
@@ -181,35 +198,55 @@
 				{#snippet header()}
 					<SectionHeading level={3}>Ranking weights</SectionHeading>
 				{/snippet}
-				<form method="POST" action="?/ranking" class="flex flex-col gap-3" use:enhance>
-					{#if form?.rankingError}
-						<Alert tone="danger">{form.rankingError}</Alert>
-					{:else if form && 'rankingSaved' in form}
-						<Alert tone="success" autoDismiss>Saved.</Alert>
-					{/if}
-					<p class="text-xs text-muted">How much a match in each field counts, for every schema with no weights of its own.</p>
-					<NumberInput id="w-title" name="title_weight" label="Title" min={0} max={10} step={0.1} value={data.ranking.title_weight} />
-					<NumberInput id="w-body" name="body_weight" label="Body" min={0} max={10} step={0.1} value={data.ranking.body_weight} />
-					<NumberInput id="w-tag" name="tag_weight" label="Tags" min={0} max={10} step={0.1} value={data.ranking.tag_weight} />
-					<div><Button variant="primary" size="sm" type="submit">Save</Button></div>
-				</form>
+				<!-- A failed read offers no Save: the boxes would hold weights nobody
+				     read, and saving them would overwrite the real ones. -->
+				{#if !data.ranking.ok}
+					<GateNotice gate={data.ranking.gate} title="Ranking weights" absent="This build does not serve ranking weights." />
+				{:else}
+					{@const ranking = data.ranking.value}
+					<form method="POST" action="?/ranking" class="flex flex-col gap-3" use:enhance>
+						{#if form?.rankingError}
+							<Alert tone="danger">{form.rankingError}</Alert>
+						{:else if form && 'rankingSaved' in form}
+							<Alert tone="success" autoDismiss>Saved.</Alert>
+						{/if}
+						<p class="text-xs text-muted">How much a match in each field counts, for every schema with no weights of its own.</p>
+						<NumberInput id="w-title" name="title_weight" label="Title" min={0} max={10} step={0.1} value={ranking.title_weight} />
+						<NumberInput id="w-body" name="body_weight" label="Body" min={0} max={10} step={0.1} value={ranking.body_weight} />
+						<NumberInput id="w-tag" name="tag_weight" label="Tags" min={0} max={10} step={0.1} value={ranking.tag_weight} />
+						<div><Button variant="primary" size="sm" type="submit">Save</Button></div>
+					</form>
+				{/if}
 			</Card>
 
 			<Card pad="sm">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-2">
 						<SectionHeading level={3}>Synonyms</SectionHeading>
-						<Button variant="secondary" size="sm" onclick={() => (synonymOpen = true)}>New synonym</Button>
+						{#if data.synonyms.ok}
+							<Button variant="secondary" size="sm" onclick={() => (synonymOpen = true)}>
+								<Plus size={ICON.sm} /> New synonym
+							</Button>
+						{/if}
 					</div>
 				{/snippet}
 				{#if form?.synonymError && !synonymOpen}
 					<Alert tone="danger">{form.synonymError}</Alert>
 				{/if}
-				{#if data.synonyms.length === 0}
-					<p class="text-sm text-muted">No synonym groups configured.</p>
+				{#if !data.synonyms.ok}
+					<GateNotice gate={data.synonyms.gate} title="Synonyms" absent="This build does not serve search synonyms." />
+				{:else if data.synonyms.value.length === 0}
+					<EmptyState title="No synonym groups yet" description="A group lets a search for one term also match the others.">
+						{#snippet iconSnippet()}<Shuffle size={ICON.lg} />{/snippet}
+						{#snippet action()}
+							<Button variant="secondary" onclick={() => (synonymOpen = true)}>
+								<Plus size={ICON.sm} /> New synonym
+							</Button>
+						{/snippet}
+					</EmptyState>
 				{:else}
 					<ul class="space-y-2 text-xs">
-						{#each data.synonyms as group (group.id)}
+						{#each data.synonyms.value as group (group.id)}
 							<li class="flex items-center gap-1.5">
 								<span class="font-medium text-muted">{group.base_term}</span>
 								<ArrowRight size={ICON.xs} class="shrink-0 text-faint" />
@@ -230,16 +267,17 @@
 				{#snippet header()}
 					<SectionHeading level={3}>Last 30 days</SectionHeading>
 				{/snippet}
-				{#if data.analytics === null}
-					<p class="text-sm text-muted">Search analytics could not be read.</p>
+				{#if !data.analytics.ok}
+					<GateNotice gate={data.analytics.gate} title="Search analytics" absent="This build does not record search analytics." />
 				{:else}
+					{@const analytics = data.analytics.value}
 					<div class="grid grid-cols-2 gap-3">
-						<Stat size="sm" mono label="Searches" value={data.analytics.total_searches} />
-						<Stat size="sm" mono label="No results" value={`${data.analytics.zero_result_pct.toFixed(1)}%`} />
+						<Stat size="sm" mono label="Searches" value={analytics.total_searches} />
+						<Stat size="sm" mono label="No results" value={`${analytics.zero_result_pct.toFixed(1)}%`} />
 					</div>
-					{#if data.analytics.top_queries.length > 0}
+					{#if analytics.top_queries.length > 0}
 						<ul class="mt-3 space-y-1 text-xs">
-							{#each data.analytics.top_queries.slice(0, 10) as tq (tq.query_text)}
+							{#each analytics.top_queries.slice(0, 10) as tq (tq.query_text)}
 								<li class="flex justify-between gap-2 text-muted">
 									<span class="truncate">{tq.query_text}</span>
 									<span class="tabular-nums text-faint">{tq.count}</span>
@@ -272,9 +310,7 @@
 
 <Drawer bind:open={synonymOpen} title="New synonym">
 	<form method="POST" action="?/createSynonym" id="synonym-form" class="flex flex-col gap-4" use:enhance={saveSynonym}>
-		{#if form?.synonymError && synonymOpen}
-			<Alert tone="danger">{form.synonymError}</Alert>
-		{/if}
+		<FormErrors message={synonymOpen ? (form?.synonymError ?? undefined) : undefined} fields={synonymOpen ? synFields : {}} />
 		<Input id="syn-base" name="base_term" label="Term" required hint="A search for exactly this term also matches the terms below." bind:value={baseTerm} error={synFields.base_term} />
 		<Input id="syn-terms" name="synonyms" label="Also matches" required hint="Separated by commas." bind:value={terms} error={synFields.synonyms} />
 	</form>

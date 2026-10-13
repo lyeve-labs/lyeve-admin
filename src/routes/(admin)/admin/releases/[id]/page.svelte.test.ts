@@ -4,6 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async (..._args: unknown[]) => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
 import ReleasePage from './+page.svelte';
 
 afterEach(cleanup);
@@ -82,5 +88,34 @@ describe('including an entry', () => {
 		const { getByRole } = setup({ choices: null });
 		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
 		expect(getByRole('textbox', { name: /Entry ID/ })).toBeTruthy();
+	});
+});
+
+describe('confirmed release actions', () => {
+	it('names the release in the delete question', async () => {
+		const { getByRole } = setup();
+		await fireEvent.click(getByRole('button', { name: /Delete/ }));
+		expect(kit.confirm.mock.calls[0][0]).toBe('Delete release Launch?');
+	});
+
+	it('submits the hidden form with the action the dialog confirmed', async () => {
+		kit.confirm.mockResolvedValueOnce(true);
+		const submitted: string[] = [];
+		const spy = vi
+			.spyOn(HTMLFormElement.prototype, 'requestSubmit')
+			.mockImplementation(function (this: HTMLFormElement) {
+				submitted.push(this.getAttribute('action') ?? '');
+			});
+		const { getByRole } = setup();
+		await fireEvent.click(getByRole('button', { name: /Delete/ }));
+		await vi.waitFor(() => expect(submitted).toEqual(['?/delete']));
+		spy.mockRestore();
+	});
+
+	it('offers the two item actions as a segmented control', async () => {
+		const { getByRole } = setup({ choices: [] });
+		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
+		const group = getByRole('radiogroup', { name: 'When the release goes out' });
+		expect(group.querySelectorAll('[role="radio"], input[type="radio"]').length).toBe(2);
 	});
 });
