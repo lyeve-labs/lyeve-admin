@@ -156,6 +156,12 @@ describe('opening the new entry form', () => {
 		) as Promise<Opened>;
 	}
 
+	const relatedSchema = {
+		name: 'surveys',
+		display_name: 'Surveys',
+		fields: [{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' }],
+	};
+
 	beforeEach(() => {
 		reads.get.mockReset();
 		rest.getSchema.mockClear();
@@ -207,5 +213,31 @@ describe('opening the new entry form', () => {
 
 		expect(isHttpError(thrown) && thrown.status).toBe(403);
 		expect(rest.getSchema).not.toHaveBeenCalled();
+	});
+
+	it('reads each related collection from the admin store, one page of 500', async () => {
+		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
+		const fetch = vi.fn(
+			async (_path: string) =>
+				new Response(JSON.stringify({ data: [{ id: 'a1', title: 'Ada' }], total_count: 900 }), { status: 200 }),
+		);
+
+		const data = await open([], ['admin'], fetch);
+
+		const asked = new URL(String(fetch.mock.calls[0][0]), 'http://localhost');
+		expect(asked.pathname).toBe('/api/admin/content');
+		expect(asked.searchParams.get('schema')).toBe('author');
+		expect(asked.searchParams.get('limit')).toBe('500');
+		expect(data.relations.author).toMatchObject({ total: 900, failed: false });
+		expect(data.relations.author.items).toHaveLength(1);
+	});
+
+	it('marks a related collection whose read failed, rather than calling it empty', async () => {
+		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
+		const fetch = vi.fn(async (_path: string) => new Response(JSON.stringify({ error: 'down' }), { status: 503 }));
+
+		const data = await open([], ['admin'], fetch);
+
+		expect(data.relations.author).toEqual({ items: [], total: 0, failed: true });
 	});
 });

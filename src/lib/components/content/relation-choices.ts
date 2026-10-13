@@ -19,11 +19,6 @@ export type RelationChoices = {
 	failed: boolean;
 };
 
-/** Whether a picker shows fewer entries than its collection holds. */
-export function relationCut(read: RelationChoices | undefined): boolean {
-	return !!read && !read.failed && read.total > read.items.length;
-}
-
 type ListedRow = { id: string; title?: string };
 
 async function readOne(fetchFn: typeof fetch, token: string, schema: string): Promise<RelationChoices> {
