@@ -379,6 +379,29 @@ describe('raw-count', () => {
   });
 });
 
+describe('raw-date', () => {
+  it('accepts a moment that goes through the formatter', () => {
+    expect(check('raw-date', '<td>{formatTime(r.at)}</td><td>{formatDateTime(r.created_at)}</td>')).toEqual([]);
+  });
+
+  it('leaves a call that names its locale alone', () => {
+    expect(check('raw-date', "<p>{d.toLocaleDateString('en-US', { month: 'short' })}</p>")).toEqual([]);
+    expect(check('raw-date', "const axis = new Intl.DateTimeFormat('en-US', { hour: '2-digit' });")).toEqual([]);
+  });
+
+  it('leaves a name that only starts like the method alone', () => {
+    expect(check('raw-date', 'const prefs = toLocalePreferences(raw);')).toEqual([]);
+  });
+
+  it('fails a date or a time with no locale, in each spelling', () => {
+    // With no locale the same moment renders 14:32:07 or 2:32:07 PM.
+    expect(check('raw-date', 'received = [{ at: new Date().toLocaleTimeString() }];')).toHaveLength(1);
+    expect(check('raw-date', '<p>{d.toLocaleDateString()}</p>')).toHaveLength(1);
+    expect(check('raw-date', "<p>{d.toLocaleDateString(undefined, { month: 'short' })}</p>")).toHaveLength(1);
+    expect(check('raw-date', 'const fmt = new Intl.DateTimeFormat();')).toHaveLength(1);
+  });
+});
+
 describe('trapped-scroll', () => {
   it('accepts a scrolling pane that may shrink', () => {
     expect(check('trapped-scroll', '<div class="min-h-0 flex-1 overflow-auto p-6">x</div>')).toEqual([]);

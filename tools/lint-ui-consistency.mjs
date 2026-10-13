@@ -735,6 +735,26 @@ export const rules = [
       ),
   },
   {
+    id: 'raw-date',
+    // Dates are formatted in the API wrappers too, and ALL is Svelte only.
+    files: globSync('src/{routes,lib}/**/*.{ts,svelte}'),
+    /**
+     * A date or a time written out with no locale.
+     *
+     * With no locale the browser picks the format, so the same moment reads
+     * 14:32:07 in one browser and 2:32:07 PM in another, in the reader's own
+     * zone and unlabeled. The stream lab stamped each event that way beside a
+     * console that prints UTC everywhere else. `undefined` in the locale's
+     * place is the same call, and so is a formatter built with no locale.
+     * `$lib/format.ts` holds the one presentation: formatDate, formatDateTime
+     * and formatTime.
+     */
+    test: (src) =>
+      [...src.matchAll(/\.(toLocaleDateString|toLocaleTimeString)\(\s*(?:\)|undefined\b)|\b(Intl\.DateTimeFormat)\(\s*(?:\)|undefined\b)/g)].map(
+        (m) => `${m[1] ?? m[2]} with no locale renders per browser; use formatDate, formatDateTime or formatTime from $lib/format`,
+      ),
+  },
+  {
     id: 'trapped-scroll',
     files: ALL,
     /**
