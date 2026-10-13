@@ -30,6 +30,8 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		gate: { state: 'ok' },
 		licensed: true,
 		canRecompute: true,
+		trending: { ok: true, value: [] },
+		readers: { ok: true, value: [] },
 		...over,
 	} as never,
 	form: form as never,
@@ -49,6 +51,16 @@ describe('the gate', () => {
 		});
 		expect(said(container)).toContain('could not be read');
 		expect(said(container)).not.toContain('Nobody has been bucketed yet');
+	});
+});
+
+describe('the trending list', () => {
+	it('says a failed read failed rather than that nothing is trending', () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({ trending: { ok: false, gate: { state: 'forbidden' } } }),
+		});
+		expect(said(container)).toContain('Your role cannot open Trending entries');
+		expect(said(container)).not.toContain('Nothing is trending yet');
 	});
 });
 
@@ -148,7 +160,7 @@ describe('the per-reader preview', () => {
 	// and a pasted id that matched no option was cleared to nothing.
 	it('posts the id field and never the combobox', () => {
 		const { container } = render(RecommendationsPage, {
-			props: props({ readers: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] }),
+			props: props({ readers: { ok: true, value: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] } }),
 		});
 		const posted = [...container.querySelectorAll('form[action="?/preview"] [name]')].map((el) => el.getAttribute('name'));
 		expect(posted).toEqual(['user_id']);
@@ -157,7 +169,7 @@ describe('the per-reader preview', () => {
 
 	it('fills the id field with the reader picked by email', async () => {
 		const { container } = render(RecommendationsPage, {
-			props: props({ readers: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] }),
+			props: props({ readers: { ok: true, value: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] } }),
 		});
 		const search = container.querySelector('#rec-reader') as HTMLInputElement;
 		await fireEvent.input(search, { target: { value: 'mira' } });
@@ -172,7 +184,7 @@ describe('the per-reader preview', () => {
 		const id = '24d6560b-540e-47b6-8957-59934db4021d';
 		const { container } = render(RecommendationsPage, {
 			props: props(
-				{ readers: [{ id, email: 'mira@example.com' }] },
+				{ readers: { ok: true, value: [{ id, email: 'mira@example.com' }] } },
 				{ previewFor: id, feed: [{ id: 'f1', user_id: id, content_id: 'c1', score: 0.5, source: 'trending', created_at: '' }] },
 			),
 		});

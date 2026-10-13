@@ -38,7 +38,7 @@
 	// fills the id field, which is what the form posts, so an account past the
 	// first page is reachable by pasting its id there.
 	const readerOptions = $derived(
-		(data.readers ?? []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
+		(data.readers.ok ? data.readers.value : []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
 	);
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
@@ -49,7 +49,7 @@
 		(form as { previewFor?: string; feed?: FeedEntry[] } | null)?.feed ?? null,
 	);
 	const previewId = $derived((form as { previewFor?: string } | null)?.previewFor ?? '');
-	const previewFor = $derived((data.readers ?? []).find((r) => r.id === previewId)?.email ?? previewId);
+	const previewFor = $derived((data.readers.ok ? data.readers.value : []).find((r) => r.id === previewId)?.email ?? previewId);
 
 	const stats = $derived(data.stats);
 	const skewed = $derived(splitIsSkewed(stats));
@@ -134,9 +134,13 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Trending now</SectionHeading>
-			{#if !data.trending}
-				<Alert tone="warn">The trending list could not be read.</Alert>
-			{:else if data.trending.length === 0}
+			{#if !data.trending.ok}
+				<GateNotice
+					gate={data.trending.gate}
+					title="Trending entries"
+					absent="This version of the recommendations plugin keeps no trending list."
+				/>
+			{:else if data.trending.value.length === 0}
 				<EmptyState
 					title="Nothing is trending yet"
 					description="An entry trends once readers have been tracked on it and a recompute has run."
@@ -151,7 +155,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.trending as item (item.content_id)}
+						{#each data.trending.value as item (item.content_id)}
 							<tr>
 								<td>
 									<span class="text-sm text-fg">{item.title || item.slug || item.content_id}</span>
@@ -225,7 +229,9 @@
 				<p class="text-xs text-muted">
 					Generates the feed for one reader now. This is the same computation the reader would
 					get, so it shows what they would actually be shown rather than a sample.
-					{#if readerOptions.length > 0}
+					{#if !data.readers.ok}
+						The accounts could not be read, so give the user id as it appears on the Users page.
+					{:else if readerOptions.length > 0}
 						Find a reader by email to fill in their id, or paste the id of any account from the Users
 						page.
 					{:else}

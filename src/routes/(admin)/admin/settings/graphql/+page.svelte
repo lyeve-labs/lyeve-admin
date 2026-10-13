@@ -52,12 +52,15 @@
 		toggleForm?.requestSubmit();
 	}
 
+	const schemaRoots = $derived(data.schema.ok ? data.schema.value.roots : null);
+	const refused = $derived(data.schema.ok ? data.schema.value.refused : null);
+	const persisted = $derived(data.persisted.ok ? data.persisted.value : []);
 	const roots = $derived(
-		data.roots
+		schemaRoots
 			? ([
-					['Queries', data.roots.query],
-					['Mutations', data.roots.mutation],
-					['Subscriptions', data.roots.subscription],
+					['Queries', schemaRoots.query],
+					['Mutations', schemaRoots.mutation],
+					['Subscriptions', schemaRoots.subscription],
 				] as [string, RootField[]][])
 			: [],
 	);
@@ -118,13 +121,15 @@
 
 		<section class="flex flex-col gap-3">
 			<SectionHeading level={2}>Schema</SectionHeading>
-			{#if data.refused}
+			{#if !data.schema.ok}
+				<GateNotice gate={data.schema.gate} title="GraphQL schema" absent="This version of the GraphQL plugin does not describe its schema." />
+			{:else if refused}
 				<Alert tone="warn">
-					The engine refused to describe its schema: {data.refused} The graphql.introspection setting limits
+					The engine refused to describe its schema: {refused} The graphql.introspection setting limits
 					introspection to admins by default and can turn it off. The schema is served either way.
 				</Alert>
-			{:else if !data.roots}
-				<Alert tone="danger">The schema could not be read.</Alert>
+			{:else if !schemaRoots}
+				<Alert tone="danger">The schema could not be read. This is not a report that it is empty.</Alert>
 			{:else}
 				<p class="text-xs text-muted">
 					Generated from the content types, so a schema you add in the Schema builder appears here as its own
@@ -167,19 +172,26 @@
 		<section class="flex flex-col gap-3">
 			<div class="flex items-center justify-between gap-2">
 				<SectionHeading level={2}>Persisted queries</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={() => (open = true)}>
-					<Plus size={ICON.sm} /> New persisted query
-				</Button>
+				{#if data.persisted.ok}
+					<Button variant="secondary" size="sm" onclick={() => (open = true)}>
+						<Plus size={ICON.sm} /> New persisted query
+					</Button>
+				{/if}
 			</div>
 			<p class="text-xs text-muted">
 				A client sends the hash of a query instead of its text. Queries on this list answer by hash. One a client
 				registered itself is marked automatic, and a disabled one is refused until it is switched back on.
 			</p>
-			{#if data.persistedError}
-				<Alert tone="danger">{data.persistedError}</Alert>
-			{:else if data.persisted.length === 0}
+			{#if !data.persisted.ok}
+				<GateNotice gate={data.persisted.gate} title="Persisted queries" absent="This version of the GraphQL plugin keeps no persisted queries." />
+			{:else if persisted.length === 0}
 				<EmptyState title="No persisted queries" description="Register a query to let clients call it by hash.">
 					{#snippet iconSnippet()}<Braces size={ICON.lg} />{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={() => (open = true)}>
+							<Plus size={ICON.sm} /> New persisted query
+						</Button>
+					{/snippet}
 				</EmptyState>
 			{:else}
 				<Table label="Persisted queries">
@@ -192,7 +204,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.persisted as q (q.query_hash)}
+						{#each persisted as q (q.query_hash)}
 							<tr>
 								<td data-cell="nowrap">
 									<span class="flex items-center gap-2 text-sm text-fg">

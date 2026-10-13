@@ -16,14 +16,22 @@
 	import { enhance } from '$app/forms';
 	import { ArrowDown, ArrowUp, Plus, X } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const pageRefusal = $derived(formRefusal(form));
 
 	// The saved answer wins over the loaded one: the action returns without a
-	// redirect, so `data` still carries what the page opened with.
-	let loaded = $derived(form && 'locales' in form && form.locales ? form.locales : data.locales);
+	// redirect, so `data` still carries what the page opened with. A read that
+	// failed shows no form, so the empty value below is never drawn.
+	let loaded = $derived(
+		form && 'locales' in form && form.locales
+			? form.locales
+			: data.locales.ok
+				? data.locales.value
+				: { default_locale: '', enabled_locales: [], fallback_chain: [] },
+	);
 
 	// svelte-ignore state_referenced_locally
 	let defaultLocale = $state(loaded.default_locale);
@@ -84,11 +92,12 @@
 		<Badge tone="violet" size="sm">Beta</Badge>
 	{/snippet}
 
-	{#if data.unavailable}
-		<Alert tone="warn" title="The localization plugin did not answer">
-			The engine lists the plugin, but its routes are not responding. Locales cannot be read or
-			written until it is.
-		</Alert>
+	{#if !data.locales.ok}
+		<GateNotice
+			gate={data.locales.gate}
+			title="Locales"
+			absent="The localization plugin is not part of this build, so content is kept in one language."
+		/>
 	{:else}
 		{#if pageRefusal}
 			<RefusalNotice refusal={pageRefusal} />

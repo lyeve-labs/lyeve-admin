@@ -1,6 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
+import { section } from '$lib/api/gate';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
@@ -15,27 +16,18 @@ import { readTriggerForm } from '$lib/server/email-trigger-form';
 
 export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
+	// Each read keeps its own failure. A template list that did not answer is
+	// not a tenant without templates, and a schema list that did not answer is
+	// not an instance without schemas.
 	const [triggers, templates, schemas] = await Promise.all([
-		listEmailTriggers(client).then(
-			(r) => ({ ...r, error: null as string | null, locked: false }),
-			(err) => ({
-				triggers: [],
-				events: [],
-				error: err instanceof ApiError && err.status === 402 ? null : 'The triggers could not be loaded.',
-				locked: err instanceof ApiError && err.status === 402,
-			}),
+		section(listEmailTriggers(client), 'The triggers could not be read. This is not a report that there are none.'),
+		section(listEmailTemplates(client), 'The templates could not be read, so a trigger cannot be given one right now.'),
+		section(
+			getSchemas(client).then((rows: { name: string }[]) => rows.map((s) => s.name).sort()),
+			'The schemas could not be read, so a trigger can only watch every schema right now.',
 		),
-		listEmailTemplates(client).catch(() => []),
-		getSchemas(client).catch(() => []),
 	]);
-	return {
-		triggers: triggers.triggers,
-		events: triggers.events,
-		loadError: triggers.error,
-		locked: triggers.locked,
-		templates,
-		schemas: schemas.map((s: { name: string }) => s.name).sort(),
-	};
+	return { triggers, templates, schemas };
 };
 
 export const actions: Actions = {

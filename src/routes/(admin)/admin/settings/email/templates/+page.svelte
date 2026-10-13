@@ -9,6 +9,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { ActionData, PageData } from './$types';
 	import { REQUIRED_PURPOSE, type EmailTemplate, type TemplateStatus } from '$lib/api/email-templates';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -19,7 +20,9 @@
 	// a read that failed states nothing: the create still answers the ceiling.
 	const limit = $derived(data.limits?.limit ?? 0);
 	const atCeiling = $derived(limit > 0 && (data.limits?.current ?? 0) >= limit);
-	const optionalStarters = $derived(data.starters.filter((s) => !s.required));
+	const templates = $derived(data.templates.ok ? data.templates.value : []);
+	const starters = $derived(data.starters.ok ? data.starters.value : []);
+	const optionalStarters = $derived(starters.filter((s) => !s.required));
 	const starterOptions = $derived([{ value: '', label: 'A blank template' }, ...optionalStarters.map((s) => ({ value: s.key, label: s.key }))]);
 	const STATUS_OPTIONS = [
 		{ value: 'active', label: 'Active' },
@@ -78,7 +81,7 @@
 		if (!key) key = s.key;
 	}
 
-	const linkVariable = $derived(editing?.required ? data.starters.find((s) => s.key === editing?.key)?.link_variable : undefined);
+	const linkVariable = $derived(editing?.required ? starters.find((s) => s.key === editing?.key)?.link_variable : undefined);
 
 	let deleteId = $state('');
 	let deleteForm = $state<HTMLFormElement>();
@@ -125,17 +128,14 @@
 				{limit > 0 ? `${data.limits.current} of ${limit} templates` : `${data.limits.current} templates, no limit`}
 			</span>
 		{/if}
-		<Button variant="primary" size="sm" onclick={openCreate} disabled={atCeiling || Boolean(data.loadError)}>
-			<Plus size={ICON.sm} />
-			New template
-		</Button>
+		{#if data.templates.ok}
+			<Button variant="primary" size="sm" onclick={openCreate} disabled={atCeiling}>
+				<Plus size={ICON.sm} />
+				New template
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if data.loadError}
-		<Alert tone="danger" title="Templates could not be loaded">
-			{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-		</Alert>
-	{/if}
 	{#if pageRefusal && !open}
 		<RefusalNotice refusal={pageRefusal} />
 	{:else if formError && !open}
@@ -147,11 +147,17 @@
 		</Alert>
 	{/if}
 
-	{#if data.loadError}
-		<!-- Nothing: the empty state would say there are none. -->
-	{:else if data.templates.length === 0}
+	{#if !data.templates.ok}
+		<GateNotice gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
+	{:else if templates.length === 0}
 		<EmptyState title="No templates yet" description="A template is the subject and body a mail is sent with.">
 			{#snippet iconSnippet()}<Mail size={ICON.lg} />{/snippet}
+			{#snippet action()}
+				<Button variant="secondary" onclick={openCreate} disabled={atCeiling}>
+					<Plus size={ICON.sm} />
+					New template
+				</Button>
+			{/snippet}
 		</EmptyState>
 	{:else}
 		<Table label="Email templates">
@@ -164,7 +170,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each data.templates as t (t.id)}
+				{#each templates as t (t.id)}
 					<tr>
 						<td data-cell="nowrap">
 							<span class="flex items-center gap-2">
@@ -219,7 +225,9 @@
 				options={starterOptions}
 				value={starter}
 				onvaluechange={pickStarter}
-				hint="A ready-made template to copy. Everything it copies stays yours to change."
+				hint={data.starters.ok
+					? 'A ready-made template to copy. Everything it copies stays yours to change.'
+					: 'The ready-made templates could not be read, so only a blank one is offered.'}
 			/>
 			<Input id="template-key" name="key" label="Name" required mono placeholder="order-shipped" hint="How a trigger or a flow names it. Lower case letters, digits and dashes." bind:value={key} />
 		{/if}

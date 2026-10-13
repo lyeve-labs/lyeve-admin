@@ -5,6 +5,7 @@ import { authedClient, requireUser } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
+import { section, type Section } from '$lib/api/gate';
 import {
 	SAMPLE_VARS,
 	TEMPLATE_KEY,
@@ -26,22 +27,25 @@ const STATUSES: TemplateStatus[] = ['draft', 'active', 'archived'];
 export const load: PageServerLoad = async (event) => {
 	await requireUser(event);
 	const { plugins } = await event.parent();
-	const none = { templates: [] as EmailTemplate[], starters: [] as TemplateStarter[], limits: null as TemplateLimits | null };
 	// The shell says why the page is unavailable while its plugin does not run.
-	if (notRunning(plugins, PLUGIN.email)) return { ...none, loadError: null as string | null };
-	const client = authedClient(event);
-	try {
-		// The list first: it creates the required templates a new tenant does
-		// not hold yet, and the count after it includes them.
-		const templates = await listTemplates(client);
-		const [starters, limits] = await Promise.all([
-			templateStarters(client).catch((): TemplateStarter[] => []),
-			templateLimits(client).catch((): TemplateLimits | null => null),
-		]);
-		return { templates, starters, limits, loadError: null as string | null };
-	} catch {
-		return { ...none, loadError: 'The templates could not be loaded.' };
+	if (notRunning(plugins, PLUGIN.email)) {
+		return {
+			templates: { ok: false, gate: { state: 'absent' } } as Section<EmailTemplate[]>,
+			starters: { ok: true, value: [] } as Section<TemplateStarter[]>,
+			limits: null as TemplateLimits | null,
+		};
 	}
+	const client = authedClient(event);
+	// The list first: it creates the required templates a new tenant does
+	// not hold yet, and the count after it includes them.
+	const templates = await section(listTemplates(client), 'The templates could not be read. This is not a report that there are none.');
+	// A failed limits read states nothing, and the create still answers the
+	// ceiling, so it is left out rather than shown.
+	const [starters, limits] = await Promise.all([
+		section(templateStarters(client), 'The ready-made templates could not be read, so only a blank one is offered.'),
+		templateLimits(client).catch((): TemplateLimits | null => null),
+	]);
+	return { templates, starters, limits };
 };
 
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();

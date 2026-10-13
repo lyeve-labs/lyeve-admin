@@ -4,7 +4,7 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
-import { gateOf, GATE_OK, type Gate } from '$lib/api/gate';
+import { GATE_OK, section, type Gate, type Section } from '$lib/api/gate';
 import { errorCodeOf } from '$lib/api/limits';
 import {
 	ADDRESS_DUPLICATE,
@@ -24,20 +24,6 @@ import {
 	type TenantGlobalRead,
 } from '$lib/api/rate-limit';
 
-/** A read of its own, so one refused section never takes the others with it. */
-interface Section<T> {
-	gate: Gate;
-	value: T | null;
-}
-
-async function section<T>(read: () => Promise<T>, failed: string): Promise<Section<T>> {
-	try {
-		return { gate: GATE_OK, value: await read() };
-	} catch (err) {
-		return { gate: gateOf(err, failed), value: null };
-	}
-}
-
 function windowOf(url: URL): number {
 	const raw = url.searchParams.get('hours') ?? '24';
 	return HISTORY_WINDOWS.some((w) => w.value === raw) ? Number(raw) : 24;
@@ -47,22 +33,28 @@ export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
 	const hours = windowOf(event.url);
 	if (notRunning(plugins, PLUGIN.rateLimit)) {
-		const absent = { gate: { state: 'absent' } as Gate, value: null };
-		return { gate: absent.gate, limit: absent, addresses: absent, history: absent, hours };
+		const gate: Gate = { state: 'absent' };
+		return {
+			gate,
+			limit: { ok: false, gate } as Section<TenantGlobalRead>,
+			addresses: { ok: false, gate } as Section<AddressListRead>,
+			history: { ok: false, gate } as Section<RefusalHistory>,
+			hours,
+		};
 	}
 
 	const client = authedClient(event);
 	const [limit, addresses, history] = await Promise.all([
-		section<TenantGlobalRead>(
-			() => readTenantGlobal(client),
+		section(
+			readTenantGlobal(client),
 			'The tenant limit could not be read. This is not a report that none is set.',
 		),
-		section<AddressListRead>(
-			() => listAddressEntries(client),
+		section(
+			listAddressEntries(client),
 			'The address lists could not be read. This is not a report that they are empty.',
 		),
-		section<RefusalHistory>(
-			() => readRefusalHistory(client, hours),
+		section(
+			readRefusalHistory(client, hours),
 			'The refusal history could not be read. This is not a report that nothing was refused.',
 		),
 	]);

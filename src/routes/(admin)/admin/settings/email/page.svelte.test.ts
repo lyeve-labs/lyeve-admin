@@ -47,7 +47,7 @@ const api: EmailProvider = {
 
 function setup(providers: EmailProvider[] = [smtp, api], overrides: Record<string, unknown> = {}, form: unknown = null) {
 	return render(ProvidersPage, {
-		props: { data: { unavailable: false, providers, ...overrides }, form } as never,
+		props: { data: { providers: { ok: true, value: providers }, mail: null, ...overrides }, form } as never,
 	});
 }
 
@@ -58,6 +58,8 @@ function formEl(container: HTMLElement): HTMLFormElement {
 function names(form: HTMLFormElement): string[] {
 	return [...form.querySelectorAll('[name]')].map((el) => el.getAttribute('name') ?? '');
 }
+
+const down = { ok: false, gate: { state: 'unavailable' } };
 
 const API_FIELDS = [
 	'api_key',
@@ -80,9 +82,16 @@ async function chooseTransport(container: HTMLElement, label: string) {
 
 describe('email providers page', () => {
 	it('says the plugin did not answer, and offers nothing to create', () => {
-		const { getByText, queryByText } = setup([], { unavailable: true });
-		expect(getByText('The email plugin did not answer')).toBeTruthy();
+		const { container, queryByText } = setup([], { providers: down });
+		expect(container.textContent).toContain('Email providers could not be read');
+		expect(queryByText('No providers yet')).toBeNull();
 		expect(queryByText('New provider')).toBeNull();
+	});
+
+	it('tells a role the plugin refuses that it cannot open the providers', () => {
+		const { container, queryByText } = setup([], { providers: { ok: false, gate: { state: 'forbidden' } } });
+		expect(container.textContent).toContain('Your role cannot open Email providers');
+		expect(queryByText('No providers yet')).toBeNull();
 	});
 
 	it('lists transport, endpoint and the webhook path per row and never a key', () => {
@@ -194,13 +203,13 @@ describe('email page fallback transport', () => {
 	];
 
 	it('keeps the engine mail settings, editable or pinned', () => {
-		const { container } = setup([smtp], { mail });
+		const { container } = setup([smtp], { mail: { ok: true, value: mail } });
 		expect(container.querySelector('#set-SMTP_HOST')).toBeTruthy();
 		expect(container.textContent).toContain('Stored, not shown.');
 	});
 
 	it('shows it when the provider pool did not answer', () => {
-		const { container } = setup([], { unavailable: true, mail });
+		const { container } = setup([], { providers: down, mail: { ok: true, value: mail } });
 		expect(container.querySelector('#set-SMTP_HOST')).toBeTruthy();
 		expect(container.textContent).toContain('Fallback transport');
 	});
@@ -208,10 +217,17 @@ describe('email page fallback transport', () => {
 	it('says which of the two sends, so neither reads as the other', () => {
 		// Normalized: the copy wraps, and textContent keeps the newline and the
 		// indent, so a phrase that spans two source lines never matches raw.
-		const text = (setup([smtp], { mail }).container.textContent ?? '').replace(/\s+/g, ' ');
+		const text = (setup([smtp], { mail: { ok: true, value: mail } }).container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('Provider pool');
 		expect(text).toContain('tried first');
 		expect(text).toContain('takes effect at the next restart');
+	});
+
+	it('says the transport could not be read rather than leaving it out', () => {
+		const { container } = setup([smtp], { mail: { ok: false, gate: { state: 'error', message: 'The fallback transport could not be read. This is not a report that it is unset.' } } });
+		expect(container.textContent).toContain('Fallback transport');
+		expect(container.textContent).toContain('This is not a report that it is unset.');
+		expect(container.querySelector('#set-SMTP_HOST')).toBeNull();
 	});
 
 	it('leaves the section out for a session that may not read it', () => {

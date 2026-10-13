@@ -14,6 +14,7 @@ import {
 import { parseProvider } from '$lib/email/provider-form';
 import { ApiError } from '@lyeve-labs/client';
 import { sessionToken } from '$lib/server/session-cookie';
+import { section, type Section } from '$lib/api/gate';
 
 /**
  * The engine config keys that make up the fallback transport.
@@ -53,19 +54,21 @@ interface ConfigRefusal {
  * Read the fallback transport, or null when this session may not see it.
  *
  * Reading it needs a super admin, and the provider pool above it does not, so
- * a missing answer hides that section rather than failing the page: an admin
- * who can manage providers should not be locked out of the page that lists
- * them by a section they cannot read.
+ * the section is left out for anyone else rather than failing the page: an
+ * admin who can manage providers should not be locked out of the page that
+ * lists them by a section they cannot read. A super admin whose read failed is
+ * told so, because a missing section would read as a transport nobody set.
  */
-async function loadMail(event: Parameters<PageServerLoad>[0], superAdmin: boolean) {
+async function loadMail(event: Parameters<PageServerLoad>[0], superAdmin: boolean): Promise<Section<ConfigSetting[]> | null> {
 	if (!superAdmin) return null;
 	if (!sessionToken(event)) return null;
+	return section(
+		authedClient(event).get<ConfigProvenance>('/api/admin/config').then(mailSettings),
+		'The fallback transport could not be read. This is not a report that it is unset.',
+	);
+}
 
-	const provenance = await authedClient(event)
-		.get<ConfigProvenance>('/api/admin/config')
-		.catch(() => null);
-	if (!provenance) return null;
-
+function mailSettings(provenance: ConfigProvenance): ConfigSetting[] {
 	// A key no layer has ever supplied is absent from the provenance list, and
 	// an absent mail setting is the ordinary case on a fresh instance. Fill the
 	// gaps so every field renders, rather than showing a form that grows rows
@@ -79,19 +82,15 @@ async function loadMail(event: Parameters<PageServerLoad>[0], superAdmin: boolea
 export const load: PageServerLoad = async (event) => {
 	const user = await requireUser(event);
 	const { plugins } = await event.parent();
-	const none: EmailProvider[] = [];
 	// The shell says why the page is unavailable while its plugin does not run.
-	if (notRunning(plugins, PLUGIN.email)) return { mail: null, providers: none, unavailable: false };
-	const mail = await loadMail(event, user.roles.includes('super_admin'));
-	try {
-		return {
-			mail,
-			providers: await listEmailProviders(authedClient(event)),
-			unavailable: false,
-		};
-	} catch {
-		return { mail, providers: none, unavailable: true };
+	if (notRunning(plugins, PLUGIN.email)) {
+		return { mail: null, providers: { ok: false, gate: { state: 'absent' } } as Section<EmailProvider[]> };
 	}
+	const [mail, providers] = await Promise.all([
+		loadMail(event, user.roles.includes('super_admin')),
+		section(listEmailProviders(authedClient(event)), 'The providers could not be read. This is not a report that there are none.'),
+	]);
+	return { mail, providers };
 };
 
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();

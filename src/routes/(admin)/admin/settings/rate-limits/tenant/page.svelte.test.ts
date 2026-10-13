@@ -20,7 +20,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		gate: ok,
 		hours: 24,
 		limit: {
-			gate: ok,
+			ok: true,
 			value: {
 				licensed: true,
 				tenant_global: null,
@@ -28,7 +28,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 			},
 		},
 		addresses: {
-			gate: ok,
+			ok: true,
 			value: {
 				licensed: true,
 				limits: { entries: { limit: 500, current: 2 } },
@@ -39,7 +39,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 			},
 		},
 		history: {
-			gate: ok,
+			ok: true,
 			value: {
 				hours: 24,
 				total_refused: 7,
@@ -73,7 +73,7 @@ describe('tenant rate limits', () => {
 		const { container } = render(TenantPage, {
 			props: props({
 				addresses: {
-					gate: ok,
+					ok: true,
 					value: {
 						licensed: true,
 						limits: { entries: { limit: null, current: 1 } },
@@ -104,7 +104,7 @@ describe('tenant rate limits', () => {
 
 	it('shows a locked history beside lists that still read', () => {
 		const { container } = render(TenantPage, {
-			props: props({ history: { gate: { state: 'locked', upgradeUrl: '' }, value: null } }),
+			props: props({ history: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }),
 		});
 		expect(said(container)).toContain('Not enabled on this instance');
 		expect(said(container)).toContain('203.0.113.0/24');
@@ -112,7 +112,7 @@ describe('tenant rate limits', () => {
 
 	it('says what an unlicensed install keeps', () => {
 		const { container } = render(TenantPage, {
-			props: props({ addresses: { gate: ok, value: { licensed: false, limits: { entries: { limit: 500, current: 0 } }, rules: [] } } }),
+			props: props({ addresses: { ok: true, value: { licensed: false, limits: { entries: { limit: 500, current: 0 } }, rules: [] } } }),
 		});
 		expect(said(container)).toContain('Adding an address needs a license');
 		expect(said(container)).toContain('No address is refused');

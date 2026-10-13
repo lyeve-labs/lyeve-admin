@@ -16,7 +16,12 @@ const starters = [
 ];
 
 function data(overrides: Record<string, unknown> = {}): PageData {
-	return { templates: [reset, sale], starters, limits: { limit: 5, current: 2 }, loadError: null, ...overrides } as unknown as PageData;
+	return {
+		templates: { ok: true, value: [reset, sale] },
+		starters: { ok: true, value: starters },
+		limits: { limit: 5, current: 2 },
+		...overrides,
+	} as unknown as PageData;
 }
 
 describe('email templates page', () => {
@@ -38,6 +43,21 @@ describe('email templates page', () => {
 		render(TemplatesPage, { props: { data: data({ limits: { limit: 0, current: 9 } }), form: null } });
 		expect(screen.getByTestId('template-usage').textContent).toContain('9 templates, no limit');
 		expect((screen.getByRole('button', { name: 'New template' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('says the list could not be read rather than drawing a first run', () => {
+		render(TemplatesPage, {
+			props: { data: data({ templates: { ok: false, gate: { state: 'error', message: 'The templates could not be read.' } } }), form: null },
+		});
+		expect(screen.getByText('The templates could not be read.')).toBeTruthy();
+		expect(screen.queryByText('No templates yet')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'New template' })).toBeNull();
+	});
+
+	it('offers the create from the first-run state', () => {
+		render(TemplatesPage, { props: { data: data({ templates: { ok: true, value: [] } }), form: null } });
+		expect(screen.getByText('No templates yet')).toBeTruthy();
+		expect(screen.getAllByRole('button', { name: 'New template' })).toHaveLength(2);
 	});
 
 	it('tells the author which link a required template has to keep', async () => {

@@ -33,8 +33,15 @@ describe('graphql settings load', () => {
 		listPersisted.mockRejectedValue(new Error('down'));
 		const data = (await load(event(['graphql']))) as Record<string, unknown>;
 		expect(data.gate).toEqual({ state: 'ok' });
-		expect(data.roots).not.toBeNull();
-		expect(data.persistedError).toBeTruthy();
+		expect(data.schema).toMatchObject({ ok: true });
+		expect(data.persisted).toMatchObject({ ok: false, gate: { state: 'error' } });
+	});
+
+	it('keeps a refused allowlist as forbidden rather than as no queries', async () => {
+		introspect.mockResolvedValue({ roots: { query: [], mutation: [], subscription: [] }, refused: null });
+		listPersisted.mockRejectedValue(new ApiError(403, 'forbidden'));
+		const data = (await load(event(['graphql']))) as Record<string, unknown>;
+		expect(data.persisted).toEqual({ ok: false, gate: { state: 'forbidden' } });
 	});
 
 	it('says the plugin is absent when neither answers 404', async () => {

@@ -44,15 +44,15 @@
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const lockout = $derived((form as { lockout?: string } | null)?.lockout ?? '');
 
-	const limitRead = $derived(data.limit.value);
+	const limitRead = $derived(data.limit.ok ? data.limit.value : null);
 	const own = $derived(limitRead?.tenant_global ?? null);
 	const install = $derived(limitRead?.install_global ?? null);
-	const addresses = $derived(data.addresses.value);
+	const addresses = $derived(data.addresses.ok ? data.addresses.value : null);
 	const entries = $derived(addresses?.rules ?? []);
 	const entryLimit = $derived(addresses ? addressLimit(addresses) : null);
 	const allow = $derived(entries.filter((e) => e.list === 'allow'));
 	const deny = $derived(entries.filter((e) => e.list === 'deny'));
-	const history = $derived(data.history.value);
+	const history = $derived(data.history.ok ? data.history.value : null);
 	const totals = $derived(refusalTotals(history?.minutes ?? []));
 	const entryCidr = $derived(new Map(entries.map((e) => [e.id, e.cidr])));
 
@@ -222,7 +222,7 @@
 
 		<section class="flex flex-col gap-4" aria-label="Tenant limit">
 			<SectionHeading level={2}>Tenant limit</SectionHeading>
-			{#if data.limit.gate.state !== 'ok'}
+			{#if !data.limit.ok}
 				<GateNotice gate={data.limit.gate} title="Tenant limit" absent="This version of the plugin has no tenant limit." />
 			{:else}
 				<Card pad="md">
@@ -284,7 +284,7 @@
 				An allowed address skips this tenant's rules. A denied one is refused with 403 before any rule is counted.
 				An address on both lists is allowed.
 			</p>
-			{#if data.addresses.gate.state !== 'ok'}
+			{#if !data.addresses.ok}
 				<GateNotice
 					gate={data.addresses.gate}
 					title="Address lists"
@@ -315,7 +315,7 @@
 					onchange={showWindow}
 				/>
 			</div>
-			{#if data.history.gate.state !== 'ok'}
+			{#if !data.history.ok}
 				<GateNotice
 					gate={data.history.gate}
 					title="Refusal history"

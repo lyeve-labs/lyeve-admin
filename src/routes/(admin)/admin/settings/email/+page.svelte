@@ -27,6 +27,7 @@
 	import type { ActionData, PageData } from './$types';
 	import { API_METHODS, BODY_PLACEHOLDERS, WEBHOOK_EVENTS, webhookPath, type EmailProvider } from '$lib/api/email';
 	import { submitter } from '$lib/forms.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -34,7 +35,8 @@
 
 	const submit = submitter(() => (open = false));
 
-	const mail = $derived(data.mail ?? []);
+	const providers = $derived(data.providers.ok ? data.providers.value : []);
+	const mail = $derived(data.mail?.ok ? data.mail.value : []);
 
 	// SettingRow matches a save's outcome to a row by key, and the provider
 	// actions on this page report through the same `form`. A provider failure
@@ -154,7 +156,7 @@
 	 */
 	function openDuplicate(source: EmailProvider) {
 		const draft = duplicateRow(source as unknown as Record<string, unknown>, {
-			taken: data.providers.map((x) => x.name),
+			taken: providers.map((x) => x.name),
 		});
 		editing = null;
 		providerName = String(draft.name ?? source.name);
@@ -219,7 +221,7 @@
 >
 	{#snippet actions()}
 		<Badge tone="violet" size="sm">Beta</Badge>
-		{#if !data.unavailable}
+		{#if data.providers.ok}
 			<Button variant="secondary" size="sm" href="/admin/settings/email/templates">
 				<FileText size={ICON.sm} />
 				Templates
@@ -242,11 +244,8 @@
 			sends first, and a provider saved here joins the rotation straight away.
 		</p>
 
-	{#if data.unavailable}
-		<Alert tone="warn" title="The email plugin did not answer">
-			The engine lists the plugin, but its routes are not responding. Providers cannot be read or
-			written until it is.
-		</Alert>
+	{#if !data.providers.ok}
+		<GateNotice gate={data.providers.gate} title="Email providers" absent="The email plugin is not part of this build, so no provider sends mail." />
 	{:else}
 		{#if pageRefusal}
 			<RefusalNotice refusal={pageRefusal} />
@@ -254,7 +253,7 @@
 			<Alert tone="danger">{form.error}</Alert>
 		{/if}
 
-		{#if data.providers.length === 0}
+		{#if providers.length === 0}
 			<EmptyState
 				title="No providers yet"
 				description="Until one exists, mail goes through the fallback transport below, if it is set."
@@ -282,7 +281,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.providers as p (p.id)}
+					{#each providers as p (p.id)}
 						<tr>
 							<td data-cell="nowrap" class="text-sm text-fg">{p.name}</td>
 							<td data-cell="nowrap">
@@ -321,7 +320,12 @@
 	<!-- Not a second way to configure the pool above. The sign-in and reset
 	     mailers dial these settings themselves when no provider can send, so
 	     the section shows whether or not the pool is available. -->
-	{#if mail.length > 0}
+	{#if data.mail && !data.mail.ok}
+		<section class="flex flex-col gap-4">
+			<SectionHeading level={2}>Fallback transport</SectionHeading>
+			<GateNotice gate={data.mail.gate} title="Fallback transport" absent="This engine does not report its configuration." />
+		</section>
+	{:else if mail.length > 0}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Fallback transport</SectionHeading>
 			<p class="text-sm text-muted">

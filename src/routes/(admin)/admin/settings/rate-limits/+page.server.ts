@@ -1,6 +1,6 @@
 import { readRouteOptions, routeOptions } from '$lib/api/route-options';
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -24,7 +24,7 @@ import {
 	type RateLimitOverview,
 	type RateRule,
 } from '$lib/api/rate-limit';
-import { pageOf, pageWindow, rowsOf } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -60,6 +60,11 @@ export const load: PageServerLoad = async (event) => {
 			gate = rateLimitGate(err);
 		}
 	}
+	// An offset past the last rule draws the empty state, which would say no
+	// rule is configured. Outside the try, so the redirect is not taken for a
+	// failed read.
+	const back = gate.state === 'ok' ? pastEndOffset(rules.length, limit, offset, total) : null;
+	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// The overview says whether custom rules are enabled, which only the engine
 	// can answer: a missing read is shown as unknown, never as locked or
