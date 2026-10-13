@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError, createClient, type Schema } from '@lyeve-labs/client';
 import { getSchemas, getSchemaStats } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole, requireUser } from '$lib/server/authz';
+import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { retryBusy } from '$lib/server/retry-busy';
 import { bundleContentType, flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
@@ -11,6 +11,7 @@ import { applySchemaPreset, deleteSchemaPreset, readSchemaPresets, saveSchemaPre
 import { NO_CANVAS, parsePositions, readCanvasLayout, saveCanvasLayout, type CanvasLayout } from '$lib/api/schema-canvas-layout';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { sessionToken } from '$lib/server/session-cookie';
+import { section, type Gate } from '$lib/api/gate';
 
 /** Every schema write the engine serves takes one of these. */
 const WRITERS = ['admin', 'super_admin'];
@@ -77,33 +78,36 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	// A failed read is said as one, not drawn as an instance with no schemas:
 	// the empty state offers to create the first one, and a table the engine
 	// could not list is not a table that is not there.
-	let schemas: Schema[];
-	try {
-		schemas = await getSchemas(client);
-	} catch {
+	const read = await section(getSchemas(client), 'The schemas could not be read. This is not a report that there are none.');
+	if (!read.ok) {
 		return {
 			schemas: [] as Schema[],
 			rowCounts: Promise.resolve({} as Record<string, number>),
 			presets: [] as SchemaPreset[],
-			presetsError: null,
+			presetsGate: null as Gate | null,
 			canSavePresets: false,
 			canvas: NO_CANVAS as CanvasLayout,
 			canWrite,
 			isSuperAdmin,
-			loadError: true,
+			loadGate: read.gate as Gate | null,
 		};
 	}
+	const schemas = read.value;
 
+	// The presets and the canvas layout are served to an admin only, and the
+	// page offers neither to another role. Reading them for an editor would
+	// only collect a refusal.
+	//
 	// The presets are an offer, not the page: an install that has none, or
 	// cannot list them, still edits the schemas it has. The refusal is kept so
 	// the picker can say why it is empty rather than claim there are none.
 	let presets: SchemaPreset[] = [];
-	let presetsError: string | null = null;
+	let presetsGate: Gate | null = null;
 	let canSavePresets = false;
-	try {
-		({ presets, canSave: canSavePresets } = await readSchemaPresets(client));
-	} catch (err) {
-		presetsError = err instanceof ApiError && err.status === 404 ? null : 'The presets could not be loaded.';
+	if (canWrite) {
+		const offered = await section(readSchemaPresets(client), 'The presets could not be read. This is not a report that there are none.');
+		if (offered.ok) ({ presets, canSave: canSavePresets } = offered.value);
+		else presetsGate = offered.gate;
 	}
 
 	// Streamed: the list paints with the definitions, and the counts arrive
@@ -113,9 +117,19 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	// The plugin says whether this install draws the canvas, with the layout
 	// it saved. A read that fails draws none, which is what an install without
 	// the capability sees, and the list editor still does everything.
-	const canvas = await readCanvasLayout(client).catch(() => NO_CANVAS);
+	const canvas = canWrite ? await readCanvasLayout(client).catch(() => NO_CANVAS) : NO_CANVAS;
 
-	return { schemas, rowCounts, presets, presetsError, canSavePresets, canvas, canWrite, isSuperAdmin, loadError: false };
+	return {
+		schemas,
+		rowCounts,
+		presets,
+		presetsGate,
+		canSavePresets,
+		canvas,
+		canWrite,
+		isSuperAdmin,
+		loadGate: null as Gate | null,
+	};
 };
 
 function parseSchema(raw: FormDataEntryValue | null): Schema | null {
@@ -340,11 +354,11 @@ export const actions: Actions = {
 	},
 
 	preset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '').trim();
-		if (!id) return fail(400, { error: 'Choose a preset.', preset: '' });
+		if (!id) return fail(400, { action: 'preset' as const, error: 'Choose a preset.', preset: '' });
 
 		try {
 			const result = await applySchemaPreset(client, id);
@@ -354,17 +368,17 @@ export const actions: Actions = {
 			// on: a schema of that name is already here. The plugin's sentence
 			// says which, so it is relayed beside the preset it belongs to.
 			if (err instanceof ApiError && err.status === 409) {
-				return fail(409, { error: actionError(err, 'A schema this preset creates already exists.'), preset: id });
+				return fail(409, { action: 'preset' as const, error: actionError(err, 'A schema this preset creates already exists.'), preset: id });
 			}
 			if (err instanceof ApiError && err.status === 404) {
-				return fail(404, { error: 'This install does not ship this preset.', preset: id });
+				return fail(404, { action: 'preset' as const, error: 'This install does not ship this preset.', preset: id });
 			}
-			return fail(400, { error: actionError(err, 'The preset could not be created.'), preset: id });
+			return fail(400, { action: 'preset' as const, error: actionError(err, 'The preset could not be created.'), preset: id });
 		}
 	},
 
 	savePreset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const url = String(data.get('url') ?? '').trim();
@@ -392,7 +406,7 @@ export const actions: Actions = {
 	// The canvas saves after every gesture that moves a node. The page sends
 	// the whole map, and the plugin replaces what it holds with it.
 	saveLayout: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		let positions;
 		try {
@@ -411,15 +425,15 @@ export const actions: Actions = {
 	},
 
 	deletePreset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const id = String((await event.request.formData()).get('id') ?? '').trim();
-		if (!id) return fail(400, { error: 'Choose a preset.', preset: '' });
+		if (!id) return fail(400, { action: 'deletePreset' as const, error: 'Choose a preset.', preset: '' });
 		try {
 			await deleteSchemaPreset(client, id);
 			return { deletedPreset: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The preset could not be deleted.'), preset: id });
+			return fail(400, { action: 'deletePreset' as const, error: actionError(err, 'The preset could not be deleted.'), preset: id });
 		}
 	},
 };

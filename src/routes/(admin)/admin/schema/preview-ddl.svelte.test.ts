@@ -34,9 +34,9 @@ const data = {
 	],
 	rowCounts: { note: 3 },
 	presets: [],
-	presetsError: null,
+	presetsGate: null,
+	loadGate: null,
 	canWrite: true,
-	loadError: false,
 } as unknown as PageData;
 
 /** Runs the preview action's result through the page's own submit handler. */

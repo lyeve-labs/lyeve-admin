@@ -58,6 +58,12 @@ function loadEvent(body: unknown, search = '') {
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
+/** The rows a load answered. A failed read fails the test here, so no assertion reads it as empty. */
+function rows(result: Loaded) {
+	if (!result.items.ok) throw new Error(`the read failed: ${result.items.gate.state}`);
+	return result.items.value;
+}
+
 /*
  * The request always carries a limit and an offset. A library of ten thousand
  * files is a page the browser cannot lay out, and an operator could not reach
@@ -90,7 +96,7 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toHaveLength(60);
+		expect(rows(result)).toHaveLength(60);
 		expect(result.hasMore).toBe(true);
 	});
 
@@ -99,7 +105,7 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toHaveLength(12);
+		expect(rows(result)).toHaveLength(12);
 		expect(result.hasMore).toBe(false);
 	});
 
@@ -110,7 +116,7 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toHaveLength(60);
+		expect(rows(result)).toHaveLength(60);
 	});
 
 	it('states a total only when the endpoint sent one', async () => {
@@ -121,7 +127,7 @@ describe('admin/media/+page.server.ts load', () => {
 		expect(((await load(counted.event)) as Loaded).total).toBe(4210);
 	});
 
-	it('renders an empty library rather than failing when the endpoint errors', async () => {
+	it('keeps a failed read as a failure rather than an empty library', async () => {
 		const fetch = vi.fn(async () => json({ error: 'nope' }, 500)) as unknown as typeof globalThis.fetch;
 		const event = {
 			fetch,
@@ -132,8 +138,24 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toEqual([]);
+		expect(result.items.ok).toBe(false);
+		if (!result.items.ok) expect(result.items.gate.state).toBe('error');
 		expect(result.hasMore).toBe(false);
+		expect(result.total).toBeNull();
+	});
+
+	it('says the role was refused when the engine answers 403', async () => {
+		const fetch = vi.fn(async () => json({ error: 'forbidden' }, 403)) as unknown as typeof globalThis.fetch;
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/media'),
+			parent: async () => ({ user: { roles: ['editor'] } }),
+		} as never;
+
+		const result = (await load(event)) as Loaded;
+
+		expect(result.items).toEqual({ ok: false, gate: { state: 'forbidden' } });
 	});
 
 	/*
@@ -163,7 +185,7 @@ describe('admin/media/+page.server.ts load', () => {
 	it('renders an empty library rather than correcting it', async () => {
 		const { event } = loadEvent({ data: [], total_count: 0 });
 		const result = (await load(event)) as Loaded;
-		expect(result.items).toEqual([]);
+		expect(result.items).toEqual({ ok: true, value: [] });
 	});
 
 	// The list route has no text filter, so a search is a different request
@@ -182,7 +204,7 @@ describe('admin/media/+page.server.ts load', () => {
 			expect(sent.offset).toBe(0);
 			expect(sent.sort_by).toBe('created_at');
 			expect(sent.sort_desc).toBe(true);
-			expect(result.items).toHaveLength(3);
+			expect(rows(result)).toHaveLength(3);
 			expect(result.total).toBe(3);
 			expect(result.q).toBe('invoice');
 		});
@@ -196,7 +218,7 @@ describe('admin/media/+page.server.ts load', () => {
 			expect(result.q).toBe('');
 		});
 
-		it('renders an empty library rather than failing when the search errors', async () => {
+		it('says the outage when the search does not answer', async () => {
 			const fetch = vi.fn(async () => json({ error: 'search failed' }, 503)) as unknown as typeof globalThis.fetch;
 			const event = {
 				fetch,
@@ -207,7 +229,7 @@ describe('admin/media/+page.server.ts load', () => {
 
 			const result = (await load(event)) as Loaded;
 
-			expect(result.items).toEqual([]);
+			expect(result.items).toEqual({ ok: false, gate: { state: 'unavailable' } });
 		});
 	});
 });

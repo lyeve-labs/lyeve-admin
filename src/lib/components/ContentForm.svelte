@@ -22,8 +22,8 @@
 		validationErrors?: Record<string, string>;
 		/** What each related collection's read gave, by collection name. */
 		relations?: Record<string, RelationChoices>;
-		/** Published library files a media field may point at. */
-		mediaChoices?: MediaChoice[];
+		/** Published library files a media field may point at. Null when the library could not be read. */
+		mediaChoices?: MediaChoice[] | null;
 		/** Server-side error message */
 		error?: string | null;
 	} = $props();

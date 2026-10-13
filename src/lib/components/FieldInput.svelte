@@ -38,8 +38,8 @@
 		relationTotal?: number;
 		/** The related schema could not be read, so the picker has nothing to offer. */
 		relationFailed?: boolean;
-		/** Published library files, offered by a media field's picker. */
-		mediaChoices?: MediaChoice[];
+		/** Published library files, offered by a media field's picker. Null when the library could not be read. */
+		mediaChoices?: MediaChoice[] | null;
 		/**
 		 * The id the field's own <Label for=...> points at. Every branch below
 		 * puts it on the control it renders, so the label names the control.

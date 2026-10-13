@@ -237,6 +237,27 @@ describe('content editor load, relation pickers', () => {
 		expect(result.relations.tag.failed).toBe(true);
 	});
 
+	it('hands the media picker null when the library could not be read', async () => {
+		const { getSchema } = await import('@lyeve-labs/client-rest');
+		vi.mocked(getSchema).mockResolvedValueOnce({
+			name: 'article',
+			fields: [{ name: 'cover', field_type: 'media' }],
+		} as never);
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('/api/admin/media')) return json({ error: 'x' }, 503);
+			if (path.includes('/revisions')) return json({ data: [] });
+			return json(entry);
+		}) as unknown as typeof globalThis.fetch;
+		const result = (await load({
+			fetch: fetchFn,
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none })
+		} as never)) as unknown as { mediaChoices: unknown };
+
+		expect(result.mediaChoices).toBeNull();
+	});
+
 	it('flattens the row columns into the one data object the panel reads', async () => {
 		// A revision carries title, body, meta and status as separate columns.
 		// Passed through as they arrive, `data` is absent, and the panel's

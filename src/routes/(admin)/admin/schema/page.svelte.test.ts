@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PageData } from './$types';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+const state = vi.hoisted(() => ({ page: { url: new URL('http://localhost/admin/schema') } }));
+vi.mock('$app/state', () => state);
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 
 // The builder is tested as a build without the diagram, whatever the tree
@@ -45,9 +47,9 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 		],
 		rowCounts: { posts: 12 },
 		presets: [],
-		presetsError: null,
+		presetsGate: null,
 		canWrite: true,
-		loadError: false,
+		loadGate: null,
 		...overrides,
 	} as unknown as PageData;
 }
@@ -109,9 +111,7 @@ describe('schema builder field rows', () => {
 
 		// A relation saved with no type is a relation to nothing, so the field
 		// takes the kind its picker already reads as.
-		expect(screen.getByRole('combobox', { name: 'Relation' }).textContent).toContain(
-			'Belongs to one',
-		);
+		expect(screen.getByRole('radio', { name: 'Belongs to one' }).getAttribute('aria-checked')).toBe('true');
 		expect(screen.getByRole('combobox', { name: 'Target schema' })).toBeTruthy();
 	});
 });
@@ -136,7 +136,7 @@ describe('schema builder relation panel', () => {
 		// exists, which is the whole reason the check is here.
 		await openPosts();
 		await pickType('title', 'relation');
-		await pickOption(screen.getByRole('combobox', { name: 'Relation' }), 'Has many (one to many)');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Has many' }));
 		await pickOption(screen.getByRole('combobox', { name: 'Target schema' }), 'Authors');
 
 		expect(screen.getByTestId('relation-problems')).toBeTruthy();
@@ -179,7 +179,7 @@ describe('schema builder relation panel', () => {
 		expect(req().disabled).toBe(false);
 		expect(idx().disabled).toBe(true);
 
-		await pickOption(screen.getByRole('combobox', { name: 'Relation' }), 'Has many (one to many)');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Has many' }));
 		expect(req().disabled).toBe(true);
 		expect(req().checked).toBe(false);
 	});
@@ -208,9 +208,7 @@ describe('schema builder relation panel', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Add relation' }));
 
-		expect(screen.getByRole('combobox', { name: 'Relation' }).textContent).toContain(
-			'Belongs to one',
-		);
+		expect(screen.getByRole('radio', { name: 'Belongs to one' }).getAttribute('aria-checked')).toBe('true');
 		expect(screen.getByRole('combobox', { name: 'Target schema' })).toBeTruthy();
 	});
 
@@ -507,11 +505,12 @@ describe('schema builder presets', () => {
 
 	it('says why the gallery is empty when the presets could not be read', async () => {
 		render(SchemaPage, {
-			props: { data: data({ presetsError: 'The presets could not be loaded.' }), form: null },
+			props: { data: data({ presetsGate: { state: 'unavailable' } }), form: null },
 		});
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Presets' }));
-		expect(screen.getByText('Presets could not be loaded')).toBeTruthy();
+		expect(screen.getByText(/so Presets could not be read/)).toBeTruthy();
+		expect(screen.queryByText('No presets')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Create' })).toBeNull();
 	});
 
@@ -519,7 +518,7 @@ describe('schema builder presets', () => {
 		render(SchemaPage, {
 			props: {
 				data: data({ presets }),
-				form: { error: 'schema notes already exists', preset: 'notes' },
+				form: { action: 'preset', error: 'schema notes already exists', preset: 'notes' },
 			},
 		});
 
@@ -658,3 +657,94 @@ describe('schema builder localized mark', () => {
 		expect(box().closest('[title]')?.getAttribute('title')).toContain('key');
 	});
 });
+
+describe('schema builder failures stay with their action', () => {
+	it('keeps a failed preset delete out of the cards that create', async () => {
+		const saved = [{ ...presets[0], source: 'saved' }, presets[1]];
+		render(SchemaPage, {
+			props: {
+				data: data({ presets: saved }),
+				form: { action: 'deletePreset', error: 'The preset could not be deleted.', preset: saved[0].id },
+			} as never,
+		});
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Presets' }));
+		const [first] = [...screen.getByTestId('preset-gallery').children];
+		expect(first.textContent).not.toContain('could not be deleted');
+		expect(screen.getByText('The preset could not be deleted.')).toBeTruthy();
+	});
+});
+
+describe('schema builder read failures', () => {
+	it('says the list could not be read and offers no new schema over it', () => {
+		render(SchemaPage, {
+			props: { data: data({ schemas: [], loadGate: { state: 'unavailable' } }), form: null },
+		});
+		expect(screen.getByText(/so Schemas could not be read/)).toBeTruthy();
+		expect(screen.queryByRole('button', { name: 'New schema' })).toBeNull();
+		expect(screen.queryByText('No schemas yet')).toBeNull();
+	});
+});
+
+describe('schema builder relation kind', () => {
+	it('names the cardinality the short label leaves out', async () => {
+		await openPosts();
+		await pickType('title', 'relation');
+		await pickOption(screen.getByRole('combobox', { name: 'Target schema' }), 'Authors');
+		const facts = screen.getByTestId(/^relation-panel-/).querySelector('dl') as HTMLElement;
+		expect(facts.textContent).toContain('Cardinality');
+		expect(facts.textContent).toContain('many to one');
+	});
+
+	it('ties a problem with the kind to its radio group and focuses the chosen radio from the problem list', async () => {
+		await openPosts();
+		await pickType('title', 'relation');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Has many' }));
+		await pickOption(screen.getByRole('combobox', { name: 'Target schema' }), 'Posts');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Belongs to one' }));
+
+		const group = screen.getByRole('radiogroup', { name: 'Relation' });
+		const describedBy = group.getAttribute('aria-describedby') ?? '';
+		expect(document.getElementById(describedBy)?.textContent).toContain('has to be Has many');
+
+		await fireEvent.click(screen.getByRole('button', { name: /problem/ }));
+		const jump = [...document.querySelectorAll<HTMLButtonElement>('[data-problem]')].find((b) =>
+			(b.textContent ?? '').includes('has to be Has many'),
+		) as HTMLButtonElement;
+		await fireEvent.click(jump);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Belongs to one' }));
+	});
+});
+
+describe('schema builder over a failed list read', () => {
+	it('offers no import beside a list it could not read', async () => {
+		render(SchemaPage, {
+			props: { data: data({ schemas: [], isSuperAdmin: true, loadGate: { state: 'unavailable' } }), form: null },
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Import and export' }));
+		expect(screen.getByRole('menuitem', { name: /Export as YAML/ })).toBeTruthy();
+		expect(screen.queryByRole('menuitem', { name: /^Import$/ })).toBeNull();
+	});
+
+	it('says only that the role was refused when an editor cannot read the list', () => {
+		render(SchemaPage, {
+			props: { data: data({ schemas: [], canWrite: false, loadGate: { state: 'forbidden' } }), form: null },
+		});
+		expect(screen.getByText(/Your role cannot open Schemas/)).toBeTruthy();
+		expect(screen.queryByText(/Your role reads schemas/)).toBeNull();
+	});
+});
+
+describe('schema builder transports', () => {
+	it('lays out each transport as its four modes side by side', async () => {
+		await openPosts();
+		await fireEvent.click(screen.getByRole('button', { name: /Table settings/ }));
+		const rest = screen.getByRole('radiogroup', { name: 'REST' });
+		expect([...rest.querySelectorAll('[role=radio], input[type=radio]')].length).toBe(4);
+		expect(screen.getByRole('radiogroup', { name: 'GraphQL' })).toBeTruthy();
+		expect(screen.queryByRole('combobox', { name: 'REST' })).toBeNull();
+		expect(document.getElementById(rest.getAttribute('aria-describedby') ?? '')?.textContent).toBe('The content API.');
+	});
+});
+

@@ -19,6 +19,7 @@
 		SectionHeading,
 		SegmentedControl,
 		Select,
+		Skeleton,
 		Textarea,
 		confirm,
 		toast,
@@ -97,6 +98,8 @@
 	import type { Positions } from '$lib/api/schema-canvas-layout';
 	import type { SchemaCanvasApi } from '$lib/canvas/contract';
 	import ProblemsMenu from '$lib/components/ProblemsMenu.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -177,9 +180,15 @@
 	// The drawer stays open on a refusal so the reason sits beside the card.
 	let showPresets = $state(false);
 	let presetPending = $state('');
-	const presetError = $derived(form && 'preset' in form && 'error' in form && form.error ? form : null);
+	// Applying and deleting a preset share the one `form` result, so each
+	// failure is read by the action that caused it and shown where that
+	// action was asked for.
+	const presetError = $derived(form && 'action' in form && form.action === 'preset' && form.error ? form : null);
+	const presetDeleteError = $derived(form && 'action' in form && form.action === 'deletePreset' && form.error ? String(form.error) : '');
 	const presetCreated = $derived(form && 'created' in form && Array.isArray(form.created) ? form.created : null);
-	const hasPresets = $derived((data.presets?.length ?? 0) > 0 || Boolean(data.presetsError));
+	// A plugin that serves no presets route has none to offer. Any other
+	// failure still opens the drawer, which says why it is empty.
+	const hasPresets = $derived((data.presets?.length ?? 0) > 0 || (data.presetsGate != null && data.presetsGate.state !== 'absent'));
 
 	// A preset the tenant keeps: read from a URL, a file or a pasted document,
 	// and listed with the built-in ones so it can be applied again later.
@@ -325,14 +334,14 @@
 	/**
 	 * The relation kinds, read from the module that knows what each one does.
 	 *
-	 * The label is the cardinality in words and the machine name follows it, so
-	 * a reader who knows `belongs_to` still finds it and a reader who does not
-	 * is told what it means without opening anything.
+	 * Each label is the kind in a few words, short enough for every kind to
+	 * stay in sight in one row. The panel under the row names the chosen
+	 * kind's cardinality and machine name, so a reader who knows `belongs_to`
+	 * still finds it and a reader who does not is told what it means.
 	 */
-	const RELATION_OPTIONS: SelectOption[] = RELATION_KINDS.map((k) => ({
+	const RELATION_OPTIONS: { value: RelationType; label: string }[] = RELATION_KINDS.map((k) => ({
 		value: k.type,
-		label: `${k.label} (${k.cardinality})`,
-		keywords: [k.type, k.storage],
+		label: k.label,
 	}));
 
 	// A schema is served over every transport until it says otherwise, so each
@@ -344,7 +353,7 @@
 		{ key: 'grpc', label: 'gRPC', hint: 'The content and schema services.' },
 	];
 
-	const TRANSPORT_MODE_OPTIONS: SelectOption[] = [
+	const TRANSPORT_MODE_OPTIONS: { value: TransportMode; label: string }[] = [
 		{ value: 'rw', label: 'Read and write' },
 		{ value: 'r', label: 'Read only' },
 		{ value: 'w', label: 'Write only' },
@@ -537,14 +546,39 @@
 			if (saved?.name) schemaCanvas?.reveal(saved.name);
 			await tick();
 		}
-		const el = document.getElementById(target);
+		const found = document.getElementById(target);
+		// A radio group takes focus on its chosen radio, the way Tab enters it.
+		const el =
+			found?.getAttribute('role') === 'radiogroup'
+				? (found.querySelector<HTMLElement>('[aria-checked="true"]') ?? found.querySelector<HTMLElement>('[role="radio"]'))
+				: found;
 		el?.focus();
 		el?.scrollIntoView?.({ block: 'center' });
 	}
 
+	/**
+	 * The kit's segmented control takes neither an id nor a description, so its
+	 * wrapper hands both to the radio group inside it. The problem list finds a
+	 * control by its id, and a screen reader reads the hint or the problem the
+	 * group names when focus enters it.
+	 */
+	const groupNamed: Action<HTMLElement, { id: string; describedBy?: string }> = (node, initial) => {
+		const apply = (p: { id: string; describedBy?: string }) => {
+			const group = node.querySelector('[role="radiogroup"]');
+			if (!group) return;
+			group.id = p.id;
+			if (p.describedBy) group.setAttribute('aria-describedby', p.describedBy);
+			else group.removeAttribute('aria-describedby');
+		};
+		apply(initial);
+		return { update: apply };
+	};
+
 	/** What a save does to columns that already exist, and how many rows they hold. */
 	const change = $derived(selected ? changesOf(saved, selected) : changesOf(null, { name: '', display_name: '', fields: [] }));
-	const rowsAtRisk = $derived(saved ? (rowCounts[saved.name] ?? 0) : 0);
+	// Undefined while the count is on its way or when it could not be read.
+	// Either way it is unknown, and an unknown count is never shown as 0.
+	const rowsAtRisk = $derived<number | undefined>(saved ? rowCounts[saved.name] : undefined);
 
 	/**
 	 * Why a row's localized mark was just cleared, by row id. It stays beside
@@ -727,12 +761,14 @@
 	async function deleteSchema() {
 		if (!saved?.name) return;
 		const name = saved.name;
-		const rows = rowCounts[name] ?? 0;
+		const rows = rowCounts[name];
 		const ok = await confirm(
 			`Delete schema ${name}?`,
-			rows > 0
-				? `This deletes the definition, its table and all ${rows} ${rows === 1 ? 'row' : 'rows'} in it. It cannot be undone.`
-				: 'This deletes the definition and its table. It cannot be undone.',
+			rows === undefined
+				? 'This deletes the definition, its table and every row in it. How many rows it holds could not be read. It cannot be undone.'
+				: rows > 0
+					? `This deletes the definition, its table and all ${rows} ${rows === 1 ? 'row' : 'rows'} in it. It cannot be undone.`
+					: 'This deletes the definition and its table. It cannot be undone.',
 			{ confirmLabel: 'Delete' },
 		);
 		if (ok) deleteForm?.requestSubmit();
@@ -804,6 +840,9 @@
 	let historyOpen = $state(false);
 	let ddlHistory = $state<{ name: string; entries: HistoryEntry[]; pending: number; limit: number } | null>(null);
 	let historyError = $state('');
+	// Kept apart from the read's failure: the read that follows an apply
+	// clears that one, and a failed apply would vanish with it.
+	let applyError = $state('');
 	let historyLoading = $state(false);
 	let applying = $state(false);
 
@@ -812,6 +851,7 @@
 		if (ddlHistory && ddlHistory.name !== saved?.name) {
 			ddlHistory = null;
 			historyError = '';
+			applyError = '';
 		}
 	});
 
@@ -842,10 +882,11 @@
 
 	async function applyQueued() {
 		if (!saved || !ddlHistory?.pending) return;
-		const rows = rowCounts[saved.name] ?? 0;
+		const rows = rowCounts[saved.name];
+		const held = rows === undefined ? 'How many rows the table holds could not be read. It may hold data' : `The table holds ${rows} ${rows === 1 ? 'row' : 'rows'}`;
 		const ok = await confirm(
 			`Apply ${ddlHistory.pending} queued ${ddlHistory.pending === 1 ? 'change' : 'changes'} to ${saved.name}?`,
-			`A queued change is one a save recorded instead of running: a column or table drop, or clearing one tenant's values in a column other tenants keep. The table holds ${rows} ${rows === 1 ? 'row' : 'rows'}, and every tenant that defines ${saved.name} shares it, so the data in a dropped column is gone for all of them. A change whose column a definition uses again is canceled rather than run.`,
+			`A queued change is one a save recorded instead of running: a column or table drop, or clearing one tenant's values in a column other tenants keep. ${held}, and every tenant that defines ${saved.name} shares it, so the data in a dropped column is gone for all of them. A change whose column a definition uses again is canceled rather than run.`,
 			{ confirmLabel: 'Apply' },
 		);
 		if (ok) applyForm?.requestSubmit();
@@ -853,13 +894,14 @@
 
 	const submitApply: SubmitFunction = () => {
 		applying = true;
+		applyError = '';
 		return async ({ result }) => {
 			applying = false;
 			if (result.type === 'success' && result.data && 'applied' in result.data) {
 				toast.success(appliedMessage(Number(result.data.applied), Number((result.data as { canceled?: number }).canceled ?? 0)));
 				loadHistory();
 			} else if (result.type === 'failure') {
-				historyError = String((result.data as { error?: string })?.error ?? 'The queued changes could not be applied.');
+				applyError = String((result.data as { error?: string })?.error ?? 'The queued changes could not be applied.');
 				loadHistory();
 			}
 		};
@@ -891,7 +933,8 @@
 	const transferItems = $derived([
 		{ label: 'Export as YAML', icon: Download, onclick: () => download('/admin/schema/export') },
 		{ label: 'Export as JSON', icon: Download, onclick: () => download('/admin/schema/export?format=json') },
-		...(isSuperAdmin ? [{ label: 'Import', icon: Upload, onclick: openImport }] : []),
+		// Import creates schemas, so it is not offered beside a list that could not be read.
+		...(isSuperAdmin && !data.loadGate ? [{ label: 'Import', icon: Upload, onclick: openImport }] : []),
 	]);
 
 	// Import, in two steps: the engine's plan first, then the run. The file
@@ -1186,17 +1229,23 @@
 							three until it is narrowed here.
 						</span>
 					</div>
-					<div class="flex flex-wrap gap-4">
+					<div class="flex flex-col gap-3">
 						{#each TRANSPORTS as t (t.key)}
-							<Select
-								id="transport-{t.key}"
-								label={t.label}
-								hint={t.hint}
-								options={TRANSPORT_MODE_OPTIONS}
-								value={transportMode(schema, t.key)}
-								onvaluechange={(v) => setTransport(t.key, v as TransportMode)}
-								class="w-48 shrink-0"
-							/>
+							<div
+								class="flex min-w-0 flex-col gap-1"
+								data-testid="transport-{t.key}"
+								use:groupNamed={{ id: `transport-${t.key}`, describedBy: `transport-${t.key}-hint` }}
+							>
+								<SegmentedControl
+									label={t.label}
+									size="sm"
+									class="max-w-full overflow-x-auto"
+									options={TRANSPORT_MODE_OPTIONS}
+									value={transportMode(schema, t.key)}
+									onchange={(v) => setTransport(t.key, v)}
+								/>
+								<span id="transport-{t.key}-hint" class="text-xs text-faint">{t.hint}</span>
+							</div>
 						{/each}
 					</div>
 				</div>
@@ -1358,18 +1407,28 @@
 						data-testid="relation-panel-{rowId}"
 						use:keysStayInRow
 					>
-						<div class="grid gap-3 sm:grid-cols-2">
-							<Select
-								id="relation-type-{rowId}"
+						<!-- The problem list moves focus to the kind's radio group by its
+						     id, and the group names the problem as its description. -->
+						<div
+							class="flex min-w-0 flex-col gap-1"
+							use:groupNamed={{ id: `relation-type-${rowId}`, describedBy: problemAt(`relation-type-${rowId}`) ? `relation-type-${rowId}-problem` : undefined }}
+						>
+							<SegmentedControl
 								label="Relation"
-								error={problemAt(`relation-type-${rowId}`)}
+								size="sm"
+								class="max-w-full overflow-x-auto"
 								options={RELATION_OPTIONS}
 								value={field.relation_type ?? 'belongs_to'}
-								onvaluechange={(v) => {
-									field.relation_type = v as RelationType;
+								onchange={(v) => {
+									field.relation_type = v;
 									dropInertFlags(field);
 								}}
 							/>
+							{#if problemAt(`relation-type-${rowId}`)}
+								<p id="relation-type-{rowId}-problem" class="text-xs text-danger">{problemAt(`relation-type-${rowId}`)}</p>
+							{/if}
+						</div>
+						<div class="grid gap-3 sm:grid-cols-2">
 							<Select
 								id="relation-target-{rowId}"
 								label="Target schema"
@@ -1388,6 +1447,8 @@
 							<p class="text-sm text-fg">{plan.sentence}</p>
 
 							<dl class="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
+								<dt class="text-faint">Cardinality</dt>
+								<dd class="text-muted">{plan.kind.cardinality}</dd>
 								<dt class="text-faint">Stored as</dt>
 								<dd class="font-mono text-muted">{plan.kind.type}</dd>
 								<dt class="text-faint">Key lives in</dt>
@@ -1580,11 +1641,27 @@
 			     instead of running. Read when the section opens. -->
 			<Collapsible label="History" icon={History} bind:open={historyOpen} badge={ddlHistory?.pending ? `${ddlHistory.pending} queued` : undefined}>
 				<div class="flex flex-col gap-3" data-testid="schema-history">
-					{#if historyError}
-						<Alert tone="danger">{historyError}</Alert>
+					{#if applyError}
+						<Alert tone="danger">{applyError}</Alert>
 					{/if}
-					{#if historyLoading && !ddlHistory}
-						<p class="text-sm text-muted">Reading the history.</p>
+					{#if historyError}
+						<!-- A failed read is not an empty history, and opening the
+						     section again does not read it again, so the retry is here. -->
+						<Alert tone="danger" title="The history could not be read">
+							{#snippet children()}
+								<p>{historyError}</p>
+								<div class="mt-3">
+									<Button variant="secondary" size="sm" loading={historyLoading} onclick={loadHistory}>Try again</Button>
+								</div>
+							{/snippet}
+						</Alert>
+					{/if}
+					{#if historyLoading && !ddlHistory && !historyError}
+						<div class="flex flex-col gap-2" aria-busy="true" data-testid="schema-history-loading">
+							<span class="sr-only">Reading the history.</span>
+							<Skeleton height="3.5rem" rounded="rounded-lg" />
+							<Skeleton height="3.5rem" rounded="rounded-lg" />
+						</div>
 					{:else if ddlHistory}
 						{#if ddlHistory.pending > 0}
 							<Alert tone="warn" title="{ddlHistory.pending} queued {ddlHistory.pending === 1 ? 'change' : 'changes'}">
@@ -1681,11 +1758,14 @@
 					/>
 				{/if}
 				{#if canWrite}
-					<!-- The one place a schema is started from. -->
-					<Button variant="secondary" size="sm" onclick={newSchema}>
-						<Plus size={ICON.sm} /> New schema
-					</Button>
-					{#if hasPresets}
+					<!-- The one place a schema is started from. A list that could
+					     not be read offers no create beside it. -->
+					{#if !data.loadGate}
+						<Button variant="secondary" size="sm" onclick={newSchema}>
+							<Plus size={ICON.sm} /> New schema
+						</Button>
+					{/if}
+					{#if hasPresets && !data.loadGate}
 						<Button variant="ghost" size="sm" onclick={() => (showPresets = true)}>
 							<LayoutTemplate size={ICON.sm} /> Presets
 						</Button>
@@ -1765,14 +1845,16 @@
 			</Toolbar>
 		</div>
 
-		{#if data.loadError}
+		{#if data.loadGate}
 			<div class="shrink-0 px-3 pt-3">
-				<Alert tone="danger" title="The schemas could not be read">
-					{#snippet children()}The engine did not answer. This is not a report that there are none. Reload once it does.{/snippet}
-				</Alert>
+				<GateNotice
+					gate={data.loadGate}
+					title="Schemas"
+					absent="The schema plugin does not run on this instance, so there are no schemas to show."
+				/>
 			</div>
 		{/if}
-		{#if !canWrite}
+		{#if !canWrite && !data.loadGate}
 			<div class="shrink-0 px-3 pt-3">
 				<Alert tone="brand">Your role reads schemas. Changing one takes admin or super_admin.</Alert>
 			</div>
@@ -1928,7 +2010,7 @@
 				<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 					{#if selected}
 						{@render editorBody(selected)}
-					{:else if schemas.length === 0 && !data.loadError}
+					{:else if schemas.length === 0 && !data.loadGate}
 						<!-- The offer the flow editor makes from its empty canvas: a way in
 						     that is not a blank form. A preset is a set of content types
 						     the engine ships. New schema in the toolbar stays the other door. -->
@@ -1986,13 +2068,11 @@
 			{#if canSavePresets}
 				<Collapsible label="Save a preset from a URL or a file">
 					<form method="POST" action="?/savePreset" enctype="multipart/form-data" use:enhance={presetSave} class="flex flex-col gap-4 pt-2">
+						<FormErrors message={presetSaveError || undefined} />
 						<p class="text-sm text-muted">A preset document is JSON or YAML with an id, a name, a description and its schemas, each the body a new schema takes. Saved, it is listed here beside the built-in ones. Saving the same id again replaces it, so reading the URL again refreshes it.</p>
 						<Input id="preset-url" name="url" type="url" label="URL" placeholder="https://example.com/presets/blog.json" hint="Read over http or https. Private and loopback addresses are refused." />
 						<FileInput id="preset-file" name="file" label="Or a file" accept=".json,.yaml,.yml,application/json,application/yaml" />
 						<Textarea id="preset-document" name="document" label="Or paste the document" rows={6} class="[&_textarea]:text-xs" mono />
-						{#if presetSaveError}
-							<Alert tone="danger">{presetSaveError}</Alert>
-						{/if}
 						<div class="flex justify-end">
 							<Button variant="primary" type="submit" loading={presetSaving}>Save</Button>
 						</div>
@@ -2005,10 +2085,11 @@
 				</div>
 			{/if}
 		{/if}
-		{#if data.presetsError}
-			<Alert tone="danger" title="Presets could not be loaded">
-				{#snippet children()}{data.presetsError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if presetDeleteError}
+			<Alert tone="danger">{presetDeleteError}</Alert>
+		{/if}
+		{#if data.presetsGate}
+			<GateNotice gate={data.presetsGate} title="Presets" absent="This install ships no presets. Start from New schema instead." />
 		{:else if (data.presets ?? []).length === 0}
 			<EmptyState title="No presets" description="The engine offered none. Start from New schema instead." />
 		{:else}
@@ -2081,6 +2162,7 @@
 		bind:this={importForm}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors message={importError || undefined} />
 		<input type="hidden" name="apply" value={importApply ? 'true' : 'false'} />
 		<Select
 			id="import-source"
@@ -2114,9 +2196,6 @@
 			placeholder={'schemas:\n  - name: articles\n    fields: []'}
 			mono
 		/>
-		{#if importError}
-			<Alert tone="danger">{importError}</Alert>
-		{/if}
 		{#if importPlan}
 			<div class="flex flex-col gap-3" data-testid="import-plan">
 				<SectionHeading level={3}>What importing does</SectionHeading>
@@ -2216,7 +2295,11 @@
 		<div class="flex flex-col gap-4" data-testid="save-risk">
 			<Alert tone={change.drops.length + change.systemDrops.length > 0 ? 'danger' : 'warn'}>
 				{#snippet children()}
-					{saved?.name ?? 'This table'} holds {rowsAtRisk} {rowsAtRisk === 1 ? 'row' : 'rows'}.
+					{#if rowsAtRisk === undefined}
+						How many rows {saved?.name ?? 'this table'} holds could not be read. Treat it as holding data.
+					{:else}
+						{saved?.name ?? 'This table'} holds {rowsAtRisk} {rowsAtRisk === 1 ? 'row' : 'rows'}.
+					{/if}
 					<ul class="mt-1 space-y-0.5">
 						{#each change.renames as r (r.from)}
 							<li>Renames <span class="font-mono">{r.from}</span> to <span class="font-mono">{r.to}</span>. The data moves with it.</li>
@@ -2294,7 +2377,7 @@
 {/if}
 
 <!-- A one-field prompt: the new machine name. -->
-<Modal bind:open={renameOpen} size="sm" title="Rename {saved?.name ?? 'schema'}">
+<Modal bind:open={renameOpen} title="Rename {saved?.name ?? 'schema'}">
 	<form method="POST" action="?/rename" use:enhance={submitRename} id="schema-rename" class="flex flex-col gap-3">
 		<input type="hidden" name="from" value={saved?.name ?? ''} />
 		<Input

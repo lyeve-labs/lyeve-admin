@@ -32,6 +32,32 @@ describe('TransformUrlBuilder', () => {
 		expect(container.textContent).toContain('Stops working');
 	});
 
+	it('lays out each fit as a choice with the sentence that says what it does', () => {
+		const { getByRole } = render(TransformUrlBuilder, { props: { id: 'm1', published: true, focal: null } });
+		const group = getByRole('radiogroup', { name: 'Fit' });
+		const cover = getByRole('radio', { name: /Cover/ }) as HTMLInputElement;
+		expect(group.contains(cover)).toBe(true);
+		expect(cover.name).toBe('fit');
+		expect(group.textContent).toContain('crops what falls outside it');
+		expect((getByRole('radio', { name: /Engine default/ }) as HTMLInputElement).checked).toBe(true);
+	});
+
+	it('lays out the expiry choices side by side, with never only for a published file', () => {
+		const published = render(TransformUrlBuilder, { props: { id: 'm1', published: true, focal: null } });
+		const group = published.getByRole('radiogroup', { name: 'Expires' });
+		expect(group.querySelectorAll('[role="radio"]')).toHaveLength(4);
+		for (const name of ['Never', 'In an hour', 'In a day', 'In a week']) {
+			expect(group.contains(published.getByRole('radio', { name }))).toBe(true);
+		}
+		expect(published.getByRole('radio', { name: 'Never' }).getAttribute('aria-checked')).toBe('true');
+		cleanup();
+
+		const own = render(TransformUrlBuilder, { props: { id: 'm1', published: false, focal: null } });
+		expect(own.queryByRole('radio', { name: 'Never' })).toBeNull();
+		expect(own.getByRole('radio', { name: 'In an hour' }).getAttribute('aria-checked')).toBe('true');
+		expect((own.container.querySelector('input[name="expires_in"]') as HTMLInputElement).value).toBe('3600');
+	});
+
 	it('renders the refusal in place of a URL', () => {
 		const { getByTestId } = render(TransformUrlBuilder, {
 			props: { id: 'm1', published: true, focal: null, refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },
