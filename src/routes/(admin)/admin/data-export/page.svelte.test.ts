@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}), invalidate: vi.fn(async () => {}) }));
@@ -44,8 +44,12 @@ function schedule(over: Partial<ExportSchedule> = {}): ExportSchedule {
 	};
 }
 
-const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
-	data: {
+// A list passed as a plain array is a read that answered. A case passes the
+// failed read itself to draw the page without one.
+const answered = (value: unknown) => (Array.isArray(value) ? { ok: true, value } : value);
+
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => {
+	const data: Record<string, unknown> = {
 		jobs: [job()],
 		schedules: [],
 		total: 1,
@@ -55,9 +59,11 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		licensed: true,
 		schemas: ['article', 'page'],
 		...over,
-	} as never,
-	form: form as never,
-});
+	};
+	data.schedules = answered(data.schedules);
+	data.schemas = answered(data.schemas);
+	return { data: data as never, form: form as never };
+};
 
 describe('Data export gate', () => {
 	it('shows the not-enabled state when the engine refuses the routes', () => {
@@ -157,5 +163,74 @@ describe('Data export while a job runs', () => {
 		});
 		expect(said(container)).toContain('Failed while storing the file');
 		expect(said(container)).toContain('storage put: disk full');
+	});
+});
+
+/*
+ * A schedule list that could not be read is not a report that nothing
+ * recurs. Drawn as one, an operator would create a second nightly export
+ * beside the one that is already running.
+ */
+describe('Data export panels that could not be read', () => {
+	const failed = { ok: false, gate: { state: 'error', message: 'The schedules could not be read. This is not a report that there are none.' } };
+
+	it('says the schedules could not be read instead of that there are none', () => {
+		const { container } = render(ExportPage, { props: props({ schedules: failed }) });
+		expect(said(container)).toContain('The schedules could not be read');
+		expect(said(container)).not.toContain('No recurring export');
+	});
+
+	it('offers no new schedule while the list is unread', () => {
+		const { queryByRole } = render(ExportPage, { props: props({ schedules: failed }) });
+		expect(queryByRole('button', { name: /new schedule/i })).toBeNull();
+	});
+});
+
+describe('Data export empty states', () => {
+	it('offers the action that fills an empty export list', () => {
+		const { getAllByRole } = render(ExportPage, { props: props({ jobs: [], total: 0 }) });
+		expect(getAllByRole('button', { name: /new export/i }).length).toBeGreaterThan(1);
+	});
+
+	it('offers the action that fills an empty schedule list', () => {
+		const { getByRole } = render(ExportPage, { props: props() });
+		expect(getByRole('button', { name: /new schedule/i })).toBeTruthy();
+	});
+});
+
+describe('Data export filter on this page', () => {
+	it('draws no empty table and no pager above a filter that matches nothing', async () => {
+		const { container } = render(ExportPage, { props: props() });
+		const search = container.querySelector('#export-narrow') as HTMLInputElement;
+
+		await fireEvent.input(search, { target: { value: 'nothing like it' } });
+
+		expect(said(container)).toContain('Nothing on this page matches');
+		expect(container.querySelector('table')).toBeNull();
+		const empty = [...container.querySelectorAll('*')].find((el) => el.textContent?.trim() === 'Nothing on this page matches');
+		const pager = container.querySelector('nav');
+		if (empty && pager) {
+			expect(empty.compareDocumentPosition(pager) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		}
+	});
+});
+
+describe('Data export failures stay where they were made', () => {
+	it('shows a failed row action on the page and opens the next drawer clean', async () => {
+		const { getAllByRole, container } = render(ExportPage, {
+			props: props({}, { action: 'cancel', error: 'The export could not be canceled.' }),
+		});
+		expect(said(container)).toContain('The export could not be canceled.');
+		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
+		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('could not be canceled');
+	});
+
+	it('keeps a refused schedule in its own drawer, not on the page or in the export drawer', async () => {
+		const { getAllByRole, container } = render(ExportPage, {
+			props: props({}, { action: 'createSchedule', error: 'Say when the schedule runs.' }),
+		});
+		expect(said(container)).not.toContain('Say when the schedule runs.');
+		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
+		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('Say when');
 	});
 });

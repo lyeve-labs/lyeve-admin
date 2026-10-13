@@ -19,7 +19,8 @@
 		template = $bindable(''),
 	}: {
 		idPrefix: string;
-		schemaNames: string[];
+		/** The tenant's schemas, or null when the list could not be read. */
+		schemaNames: string[] | null;
 		format?: string;
 		schemas?: string[];
 		statuses?: string[];
@@ -29,18 +30,24 @@
 	} = $props();
 
 	const formatOptions = FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f].label }));
-	const schemaOptions = $derived(schemaNames.map((s) => ({ value: s, label: s })));
+	const schemaOptions = $derived((schemaNames ?? []).map((s) => ({ value: s, label: s })));
 	const statusOptions = [
 		{ value: 'published', label: 'Published' },
 		{ value: 'draft', label: 'Draft' },
 		{ value: 'archived', label: 'Archived' },
 	];
 	const formatHint = $derived(FORMAT_LABELS[format as ExportFormat]?.hint ?? '');
-	const schemasHint = $derived(
-		schemas.length === 0
-			? `Every schema${schemaNames.length > 0 ? `, ${schemaNames.length} in this tenant` : ''}.`
-			: `${schemas.length} of ${schemaNames.length} schemas.`,
-	);
+	// An unread list offers nothing to pick, and the hint says why rather than
+	// leaving an empty choice that reads as a tenant with no schemas.
+	const schemasHint = $derived.by(() => {
+		if (schemaNames === null) {
+			return 'The schema list could not be read, so none can be picked. Leave this empty to export every schema.';
+		}
+		if (schemas.length === 0) {
+			return `Every schema${schemaNames.length > 0 ? `, ${schemaNames.length} in this tenant` : ''}.`;
+		}
+		return `${schemas.length} of ${schemaNames.length} schemas.`;
+	});
 </script>
 
 <div class="flex flex-col gap-4">

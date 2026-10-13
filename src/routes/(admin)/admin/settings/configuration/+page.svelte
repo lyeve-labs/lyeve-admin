@@ -13,6 +13,7 @@
 	import type { PageData, ActionData } from './$types';
 	import type { ConfigSetting } from './+page.server';
 	import SettingRow from '$lib/components/SettingRow.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { Lock, FileCode, Terminal, PencilLine } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ICON } from '$lib/icon';
@@ -31,9 +32,10 @@
 	}
 	const result = $derived((form ?? null) as SaveResult | null);
 
-	const settings = $derived(data.provenance?.settings ?? []);
-	const counts = $derived(data.provenance?.counts ?? {});
-	const suppressed = $derived(data.provenance?.suppressed ?? []);
+	const provenance = $derived(data.provenance.ok ? data.provenance.value : null);
+	const settings = $derived(provenance?.settings ?? []);
+	const counts = $derived(provenance?.counts ?? {});
+	const suppressed = $derived(provenance?.suppressed ?? []);
 
 	// Opened for one plugin, only its settings are listed.
 	const scope = $derived(data.plugin ? new Set(data.plugin.keys) : null);
@@ -60,10 +62,12 @@
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
-	{#if !data.provenance}
-		<Alert tone="warn" title="Configuration is unavailable">
-			Reading it needs a super admin session.
-		</Alert>
+	{#if !data.provenance.ok}
+		<GateNotice
+			gate={data.provenance.gate}
+			title="Configuration"
+			absent="This engine does not report where its settings come from."
+		/>
 	{:else}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Where the values come from</SectionHeading>

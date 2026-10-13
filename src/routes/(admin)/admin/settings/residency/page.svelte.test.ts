@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -161,5 +161,28 @@ describe('regions', () => {
 	it('says a region has to exist before a tenant can be placed', () => {
 		const { container } = render(ResidencyPage, { props: props({ regions: [] }) });
 		expect(said(container)).toContain('before a tenant can be placed');
+	});
+});
+
+describe('Data residency region drawer', () => {
+	it('shows a failed save inside the open drawer', async () => {
+		const { getByRole } = render(ResidencyPage, {
+			props: props({}, { action: 'create', error: 'A region with that slug already exists.' }),
+		});
+		await fireEvent.click(getByRole('button', { name: /new region/i }));
+		const form = document.getElementById('region-form') as HTMLFormElement;
+		expect(form.textContent).toContain('A region with that slug already exists.');
+	});
+});
+
+describe('Data residency failures stay where they were made', () => {
+	it('shows a failed delete on the page and opens the region drawer clean', async () => {
+		const { getByRole, container } = render(ResidencyPage, {
+			props: props({}, { action: 'delete', error: 'The region could not be removed.' }),
+		});
+		expect(said(container)).toContain('The region could not be removed.');
+		await fireEvent.click(getByRole('button', { name: /new region/i }));
+		const form = document.getElementById('region-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be removed');
 	});
 });

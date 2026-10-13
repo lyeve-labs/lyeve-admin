@@ -19,6 +19,7 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, HardDrive, Pencil, Plug, Plus, Trash2 } from '@lucide/svelte';
@@ -144,7 +145,7 @@
 	function remove(p: StorageProvider): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
+				`Delete provider ${p.name}`,
 				'Objects already stored there stay where they are, and nothing in this instance can read them afterwards.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -185,6 +186,11 @@
 	{:else}
 		{#if formError}
 			<Alert tone="danger">{formError}</Alert>
+		{/if}
+		{#if !data.canConfigure}
+			<Alert tone="info">
+				Only a super admin can add, change or delete a provider. Any admin can test one.
+			</Alert>
 		{/if}
 
 		{#if broken.length > 0}
@@ -272,6 +278,11 @@
 				{#snippet iconSnippet()}
 					<HardDrive size={ICON.lg} />
 				{/snippet}
+				{#snippet action()}
+					{#if data.canConfigure}
+						<Button variant="secondary" onclick={openCreate}><Plus size={ICON.sm} /> New provider</Button>
+					{/if}
+				{/snippet}
 			</EmptyState>
 		{:else}
 			<Table label="Storage">
@@ -323,17 +334,19 @@
 											<Copy size={ICON.sm} />
 										</Button>
 									{/if}
-									<form method="POST" action="?/delete" use:enhance={remove(p)}>
-										<input type="hidden" name="id" value={p.id} />
-										<Button
-											variant="ghost"
-											size="sm"
-											type="submit"
-											aria-label="Delete {p.name}"
-										>
-											<Trash2 size={ICON.sm} class="text-danger" />
-										</Button>
-									</form>
+									{#if data.canConfigure}
+										<form method="POST" action="?/delete" use:enhance={remove(p)}>
+											<input type="hidden" name="id" value={p.id} />
+											<Button
+												variant="ghost"
+												size="sm"
+												type="submit"
+												aria-label="Delete {p.name}"
+											>
+												<Trash2 size={ICON.sm} class="text-danger" />
+											</Button>
+										</form>
+									{/if}
 								</div>
 							</td>
 						</tr>
@@ -346,9 +359,7 @@
 
 <Drawer bind:open={drawerOpen} title={editing ? `Edit ${editing.name}` : 'New provider'}>
 	<form method="POST" action={editing ? '?/update' : '?/create'} id="provider-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if providerError}
-			<Alert tone="danger">{providerError}</Alert>
-		{/if}
+		<FormErrors message={providerError || undefined} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="use_ssl" value={useSSL ? 'true' : 'false'} />
 		<input type="hidden" name="path_style" value={pathStyle ? 'true' : 'false'} />

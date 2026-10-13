@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
@@ -20,7 +20,8 @@ import {
 	type ExportSchedule,
 } from '$lib/api/data-export';
 import { exportConfigFrom } from '$lib/data-export-form';
-import { pageWindow } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
@@ -34,15 +35,10 @@ export const load: PageServerLoad = async (event) => {
 
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.dataExport)) {
-		return {
-			jobs: [] as ExportJob[],
-			schedules: [] as ExportSchedule[],
-			schemas: [] as string[],
-			total: 0,
-			limit,
-			offset,
-			gate: { state: 'absent' } as ExportGate,
-		};
+		const gate: ExportGate = { state: 'absent' };
+		const schedules: Section<ExportSchedule[]> = { ok: false, gate };
+		const schemas: Section<string[]> = { ok: false, gate };
+		return { jobs: [] as ExportJob[], schedules, schemas, total: 0, limit, offset, gate };
 	}
 
 	const client = authedClient(event);
@@ -53,23 +49,30 @@ export const load: PageServerLoad = async (event) => {
 		const page = await listJobs(client, limit, offset);
 		jobs = page.data;
 		total = Math.max(page.total_count, offset + jobs.length);
+		const back = pastEndOffset(jobs.length, limit, offset, page.total_count);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
+		if (isRedirect(err)) throw err;
 		gate = exportGate(err);
 	}
 
 	// Schedules and the schema list are panels beside the jobs. Losing them
-	// should not lose the jobs, which are what an operator came to check.
-	const [schedules, schemas] =
+	// should not lose the jobs, which are what an operator came to check. Each
+	// keeps its own failure, so an unread list is never drawn as an empty one.
+	const unread = (): Section<never> => ({ ok: false, gate });
+	const [schedules, schemas]: [Section<ExportSchedule[]>, Section<string[]>] =
 		gate.state === 'ok'
 			? await Promise.all([
-					listSchedules(client)
-						.then((p) => p.data)
-						.catch(() => [] as ExportSchedule[]),
-					getSchemas(client)
-						.then((rows) => rows.map((s) => s.name).sort((a, b) => a.localeCompare(b)))
-						.catch(() => [] as string[]),
+					section(
+						listSchedules(client).then((p) => p.data),
+						'The schedules could not be read. This is not a report that there are none.'
+					),
+					section(
+						getSchemas(client).then((rows) => rows.map((s) => s.name).sort((a, b) => a.localeCompare(b))),
+						'The schema list could not be read.'
+					),
 				])
-			: [[] as ExportSchedule[], [] as string[]];
+			: [unread(), unread()];
 
 	return { jobs, schedules, schemas, total, limit, offset, gate };
 };
@@ -82,16 +85,16 @@ export const actions: Actions = {
 
 		const name = String(form.get('name') ?? '').trim();
 		if (!name) {
-			return fail(400, { error: 'Name the export so it can be told apart in the list.' });
+			return fail(400, { action: 'start' as const, error: 'Name the export so it can be told apart in the list.' });
 		}
 		const config = exportConfigFrom(form);
-		if ('error' in config) return fail(400, { error: config.error });
+		if ('error' in config) return fail(400, { action: 'start' as const, error: config.error });
 
 		try {
 			const job = await startExport(client, { name, ...config.config });
 			return { started: job.id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The export could not be started.') });
+			return fail(400, { action: 'start' as const, error: actionError(err, 'The export could not be started.') });
 		}
 	},
 
@@ -100,12 +103,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No export was named.' });
+		if (!id) return fail(400, { action: 'cancel' as const, error: 'No export was named.' });
 		try {
 			await cancelJob(client, id);
 			return { canceled: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The export could not be canceled.') });
+			return fail(400, { action: 'cancel' as const, error: actionError(err, 'The export could not be canceled.') });
 		}
 	},
 
@@ -116,10 +119,10 @@ export const actions: Actions = {
 
 		const name = String(form.get('name') ?? '').trim();
 		const cron = String(form.get('cron_expression') ?? '').trim();
-		if (!name) return fail(400, { error: 'Name the schedule so its exports can be told apart.' });
-		if (!cron) return fail(400, { error: 'Say when the schedule runs.' });
+		if (!name) return fail(400, { action: 'createSchedule' as const, error: 'Name the schedule so its exports can be told apart.' });
+		if (!cron) return fail(400, { action: 'createSchedule' as const, error: 'Say when the schedule runs.' });
 		const config = exportConfigFrom(form);
-		if ('error' in config) return fail(400, { error: config.error });
+		if ('error' in config) return fail(400, { action: 'createSchedule' as const, error: config.error });
 
 		try {
 			await createSchedule(client, {
@@ -130,7 +133,7 @@ export const actions: Actions = {
 			});
 			return { scheduled: name };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The schedule could not be created.') });
+			return fail(400, { action: 'createSchedule' as const, error: actionError(err, 'The schedule could not be created.') });
 		}
 	},
 
@@ -139,13 +142,13 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No schedule was named.' });
+		if (!id) return fail(400, { action: 'toggleSchedule' as const, error: 'No schedule was named.' });
 		const enabled = form.get('enabled') === 'true';
 		try {
 			await setScheduleEnabled(client, id, enabled);
 			return { toggled: id, enabled };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The schedule could not be changed.') });
+			return fail(400, { action: 'toggleSchedule' as const, error: actionError(err, 'The schedule could not be changed.') });
 		}
 	},
 
@@ -154,12 +157,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No schedule was named.' });
+		if (!id) return fail(400, { action: 'deleteSchedule' as const, error: 'No schedule was named.' });
 		try {
 			await deleteSchedule(client, id);
 			return { deleted: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The schedule could not be deleted.') });
+			return fail(400, { action: 'deleteSchedule' as const, error: actionError(err, 'The schedule could not be deleted.') });
 		}
 	},
 };

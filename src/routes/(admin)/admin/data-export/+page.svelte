@@ -82,6 +82,9 @@
 			: data.jobs,
 	);
 
+	// Null while the schema list is unread, so the fields say why the choice is empty.
+	const schemaNames = $derived(data.schemas.ok ? data.schemas.value : null);
+
 	function downloadHref(id: string): string {
 		return `${JOBS_URL}/${encodeURIComponent(id)}/download`;
 	}
@@ -91,6 +94,19 @@
 		if (schemas.length <= 3) return schemas.join(', ');
 		return `${schemas.slice(0, 2).join(', ')} and ${schemas.length - 2} more`;
 	}
+
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action and shown only where that action was made. A
+	// drawer opened after a failure starts clean: the result is set aside.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(
+		form && form !== setAside && 'error' in form ? (form as { action?: string; error?: string }) : null,
+	);
+	const startError = $derived(failure?.action === 'start' ? failure.error : undefined);
+	const scheduleError = $derived(failure?.action === 'createSchedule' ? failure.error : undefined);
+	const rowError = $derived(
+		failure && failure.action !== 'start' && failure.action !== 'createSchedule' ? failure.error : undefined,
+	);
 
 	// Start drawer.
 	let startOpen = $state(false);
@@ -109,6 +125,7 @@
 		includeSchemas = false;
 		includeMedia = false;
 		template = '';
+		setAside = form;
 		startOpen = true;
 	}
 	const start = submitter(() => (startOpen = false));
@@ -137,6 +154,7 @@
 		schIncludeSchemas = false;
 		schIncludeMedia = false;
 		schTemplate = '';
+		setAside = form;
 		scheduleOpen = true;
 	}
 	const createSchedule = submitter(() => (scheduleOpen = false));
@@ -144,7 +162,7 @@
 	function removeSchedule(s: ExportSchedule): SubmitFunction {
 		return async ({ cancel }) => {
 			const ok = await confirmDialog(
-				`Delete the schedule ${s.name}?`,
+				`Delete schedule ${s.name}`,
 				'It stops starting exports. The exports it already started stay in the list.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -179,7 +197,7 @@
 			absent="The data export plugin is not part of this build, so nothing can be exported from here."
 		/>
 	{:else}
-		<FormErrors message={form?.error} />
+		<FormErrors message={rowError} />
 		{#if form?.started}
 			<Alert tone="success" autoDismiss>
 				Export started. It runs in the background, and the list below follows it until it finishes.
@@ -219,10 +237,13 @@
 			{#if data.jobs.length === 0}
 				<EmptyState
 					title="Nothing has been exported"
-					description="Start an export with New export. It runs in the background and appears here while it works."
+					description="An export runs in the background and appears here while it works."
 				>
 					{#snippet iconSnippet()}
 						<Download size={ICON.lg} />
+					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={openStart}><Plus size={ICON.sm} /> New export</Button>
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -236,86 +257,94 @@
 					{/snippet}
 				</ListToolbar>
 
-				<Table label="Exports">
-					<thead>
-						<tr>
-							<th scope="col">Name</th>
-							<th scope="col">What</th>
-							<th scope="col">Status</th>
-							<th scope="col">Entries</th>
-							<th scope="col">Size</th>
-							<th scope="col" class="text-right">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as job (job.id)}
+				{#if visible.length === 0}
+					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
+						{#snippet iconSnippet()}
+							<Search size={ICON.lg} />
+						{/snippet}
+					</EmptyState>
+				{:else}
+					<Table label="Exports">
+						<thead>
 							<tr>
-								<td>
-									{job.name}
-									<div class="text-xs text-faint">{formatDateTime(job.created_at)}</div>
-								</td>
-								<td>
-									<span class="text-sm">{FORMAT_LABELS[job.format]?.label ?? job.format}</span>
-									<div class="text-xs text-faint">
-										{scopeText(job.filter?.schemas)}{job.include_schemas ? ', with definitions' : ''}
-									</div>
-								</td>
-								<td class="min-w-48">
-									<div class="flex flex-col gap-1">
-										<div class="flex items-center gap-2">
-											<Badge tone={jobTone(job.status)}>{job.status}</Badge>
-											{#if !active(job)}
-												<span class="text-xs text-muted">{stageText(job)}</span>
+								<th scope="col">Name</th>
+								<th scope="col">What</th>
+								<th scope="col">Status</th>
+								<th scope="col">Entries</th>
+								<th scope="col">Size</th>
+								<th scope="col" class="text-right">Actions</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as job (job.id)}
+								<tr>
+									<td>
+										{job.name}
+										<div class="text-xs text-faint">{formatDateTime(job.created_at)}</div>
+									</td>
+									<td>
+										<span class="text-sm">{FORMAT_LABELS[job.format]?.label ?? job.format}</span>
+										<div class="text-xs text-faint">
+											{scopeText(job.filter?.schemas)}{job.include_schemas ? ', with definitions' : ''}
+										</div>
+									</td>
+									<td class="min-w-48">
+										<div class="flex flex-col gap-1">
+											<div class="flex items-center gap-2">
+												<Badge tone={jobTone(job.status)}>{job.status}</Badge>
+												{#if !active(job)}
+													<span class="text-xs text-muted">{stageText(job)}</span>
+												{/if}
+											</div>
+											{#if active(job)}
+												<!-- The step is the bar's name, so a reader hears what the
+												     export is doing along with how far it got. -->
+												<Progress
+													value={Math.round(jobProgress(job) * 100)}
+													size="sm"
+													label={stageText(job)}
+													animated={job.rows_total === 0}
+												/>
+											{/if}
+											{#if job.error}
+												<div class="text-xs text-danger">{job.error}</div>
 											{/if}
 										</div>
-										{#if active(job)}
-											<!-- The step is the bar's name, so a reader hears what the
-											     export is doing along with how far it got. -->
-											<Progress
-												value={Math.round(jobProgress(job) * 100)}
-												size="sm"
-												label={stageText(job)}
-												animated={job.rows_total === 0}
-											/>
-										{/if}
-										{#if job.error}
-											<div class="text-xs text-danger">{job.error}</div>
-										{/if}
-									</div>
-								</td>
-								<td data-cell="nowrap" class="text-xs">
-									{formatCount(job.status === 'completed' ? job.rows_written : job.rows_processed)}
-									{#if job.rows_total > 0}<span class="text-faint"> of {formatCount(job.rows_total)}</span>{/if}
-								</td>
-								<td data-cell="nowrap" class="text-xs"
-									>{job.file_size > 0 ? fileSize(job.file_size) : NO_VALUE}</td
-								>
-								<td>
-									<div class="flex items-center justify-end gap-2">
-										{#if downloadable(job)}
-											<Button
-												variant="ghost"
-												size="sm"
-												href={downloadHref(job.id)}
-												aria-label="Download {job.name}"
-											>
-												<Download size={ICON.sm} />
-											</Button>
-										{/if}
-										{#if active(job)}
-											<form method="post" action="?/cancel" use:enhance>
-												<input type="hidden" name="id" value={job.id} />
-												<Button variant="ghost" size="sm" type="submit" aria-label="Cancel {job.name}">
-													<X size={ICON.sm} />
+									</td>
+									<td data-cell="nowrap" class="text-xs">
+										{formatCount(job.status === 'completed' ? job.rows_written : job.rows_processed)}
+										{#if job.rows_total > 0}<span class="text-faint"> of {formatCount(job.rows_total)}</span>{/if}
+									</td>
+									<td data-cell="nowrap" class="text-xs"
+										>{job.file_size > 0 ? fileSize(job.file_size) : NO_VALUE}</td
+									>
+									<td>
+										<div class="flex items-center justify-end gap-2">
+											{#if downloadable(job)}
+												<Button
+													variant="ghost"
+													size="sm"
+													href={downloadHref(job.id)}
+													aria-label="Download {job.name}"
+												>
+													<Download size={ICON.sm} />
 												</Button>
-											</form>
-										{/if}
-									</div>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
+											{/if}
+											{#if active(job)}
+												<form method="post" action="?/cancel" use:enhance>
+													<input type="hidden" name="id" value={job.id} />
+													<Button variant="ghost" size="sm" type="submit" aria-label="Cancel {job.name}">
+														<X size={ICON.sm} />
+													</Button>
+												</form>
+											{/if}
+										</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
@@ -324,31 +353,34 @@
 					noun="exports"
 					href={pageHref('/admin/data-export', data.limit)}
 				/>
-
-				{#if visible.length === 0}
-					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
-						{#snippet iconSnippet()}
-							<Search size={ICON.lg} />
-						{/snippet}
-					</EmptyState>
-				{/if}
 			{/if}
 		</section>
 
 		<section class="flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<SectionHeading level={2}>Schedules</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={openSchedule}>
-					<Plus size={ICON.sm} /> New schedule
-				</Button>
+				{#if data.schedules.ok && data.schedules.value.length > 0}
+					<Button variant="secondary" size="sm" onclick={openSchedule}>
+						<Plus size={ICON.sm} /> New schedule
+					</Button>
+				{/if}
 			</div>
-			{#if data.schedules.length === 0}
+			{#if !data.schedules.ok}
+				<GateNotice
+					gate={data.schedules.gate}
+					title="Export schedules"
+					absent="This build does not run exports on a schedule."
+				/>
+			{:else if data.schedules.value.length === 0}
 				<EmptyState
 					title="No recurring export"
 					description="A schedule starts an export on a timetable, in UTC, and each run appears in the list above."
 				>
 					{#snippet iconSnippet()}
 						<CalendarClock size={ICON.lg} />
+					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={openSchedule}><Plus size={ICON.sm} /> New schedule</Button>
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -365,7 +397,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.schedules as schedule (schedule.id)}
+						{#each data.schedules.value as schedule (schedule.id)}
 							<tr>
 								<td data-cell="nowrap">{schedule.name}</td>
 								<td>
@@ -428,10 +460,11 @@
 >
 	<form id="start-export-form" method="post" action="?/start" use:enhance={start.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={startError} />
 			<Input id="export-name" name="name" label="Name" bind:value={name} required />
 			<ExportConfigFields
 				idPrefix="export"
-				schemaNames={data.schemas}
+				{schemaNames}
 				bind:format
 				bind:schemas
 				bind:statuses
@@ -454,6 +487,7 @@
 >
 	<form id="schedule-form" method="post" action="?/createSchedule" use:enhance={createSchedule.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={scheduleError} />
 			<Input id="schedule-name" name="name" label="Name" bind:value={schName} required />
 			<Select
 				id="schedule-when"
@@ -474,7 +508,7 @@
 			<input type="hidden" name="cron_expression" value={schCron === 'custom' ? schCustom : schCron} />
 			<ExportConfigFields
 				idPrefix="schedule"
-				schemaNames={data.schemas}
+				{schemaNames}
 				bind:format={schFormat}
 				bind:schemas={schSchemas}
 				bind:statuses={schStatuses}

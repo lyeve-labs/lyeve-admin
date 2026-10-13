@@ -1,8 +1,9 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionError } from '$lib/server/action-error';
+import { refusalOf, refusalText } from '$lib/api/refusal';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -25,7 +26,17 @@ import {
 	type ImportRow,
 	type ImportSchema,
 } from '$lib/api/bulk-import';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
+
+/** The job the history's Rows button opened, with the rows it rejected and skipped. */
+export interface ImportDetail {
+	job: ImportJob;
+	rejected: ImportRow[];
+	rejectedTotal: number;
+	skipped: ImportRow[];
+	skippedTotal: number;
+}
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -47,18 +58,23 @@ export const load: PageServerLoad = async (event) => {
 	if (gate.state === 'ok') {
 		try {
 			const page = pageOf(await listJobs(client, limit + 1, offset), limit, offset);
+			const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 			jobs = page.rows;
 			total = page.total;
 			hasMore = page.hasMore;
 		} catch (err) {
+			if (isRedirect(err)) throw err;
 			gate = importGate(err);
 		}
 	}
 
-	const schemas: ImportSchema[] =
+	// The content types an import fills. An unread list is kept as a failure,
+	// so the wizard says why it offers none rather than offering nothing.
+	const schemas: Section<ImportSchema[]> =
 		gate.state === 'ok'
-			? await getSchemas(client)
-					.then((rows) =>
+			? await section(
+					getSchemas(client).then((rows) =>
 						rows
 							.map((s) => ({
 								name: s.name,
@@ -69,25 +85,30 @@ export const load: PageServerLoad = async (event) => {
 								})),
 							}))
 							.sort((a, b) => a.name.localeCompare(b.name))
-					)
-					.catch(() => [])
-			: [];
+					),
+					'The content types could not be read, so there is nothing to import into yet.'
+				)
+			: { ok: false, gate };
 
-	// The job the history's Rows button opened, with the rows it rejected
-	// and skipped. Read here so the panel is a link, not a script.
-	let detail: { job: ImportJob; rejected: ImportRow[]; rejectedTotal: number; skipped: ImportRow[]; skippedTotal: number } | null = null;
+	// Read here so the panel is a link, not a script. A failed read still
+	// opens the panel, which says why it holds no rows.
+	let detail: Section<ImportDetail> | null = null;
 	const jobId = event.url.searchParams.get('job');
 	if (jobId && gate.state === 'ok') {
-		try {
-			const [job, rejected, skipped] = await Promise.all([
+		detail = await section(
+			Promise.all([
 				getJob(client, jobId),
 				listRows(client, jobId, 'errored', DETAIL_ROWS),
 				listRows(client, jobId, 'skipped', DETAIL_ROWS),
-			]);
-			detail = { job, rejected: rejected.rows, rejectedTotal: rejected.total, skipped: skipped.rows, skippedTotal: skipped.total };
-		} catch {
-			detail = null;
-		}
+			]).then(([job, rejected, skipped]) => ({
+				job,
+				rejected: rejected.rows,
+				rejectedTotal: rejected.total,
+				skipped: skipped.rows,
+				skippedTotal: skipped.total,
+			})),
+			'The rows of this import could not be read.'
+		);
 	}
 
 	// The tenant's saved mappings, and whether this install may save one or
@@ -148,16 +169,27 @@ function templateBody(form: FormData): SaveMappingTemplate | string {
 	};
 }
 
+/**
+ * A failed write, tagged with the action that made it. Every form on the page
+ * reports through one result, and the tag is how the template drawer tells
+ * its own failure from a row action's.
+ */
+function failure(action: string, err: unknown, fallback: string) {
+	const refused = refusalOf(err);
+	if (refused) return fail(402, { action, error: refusalText(refused), refused });
+	return fail(400, { action, error: actionError(err, fallback) });
+}
+
 async function saveTemplate(event: Parameters<Actions[string]>[0], id: string | null) {
 	await requireRole(event, ['admin', 'super_admin']);
 	const form = await event.request.formData();
 	const body = templateBody(form);
-	if (typeof body === 'string') return fail(400, { error: body });
+	if (typeof body === 'string') return fail(400, { action: 'saveTemplate', error: body });
 	try {
 		if (id) await updateTemplate(authedClient(event), id, body);
 		else await createTemplate(authedClient(event), body);
 	} catch (err) {
-		return actionFailure(err, 'The template could not be saved.');
+		return failure('saveTemplate', err, 'The template could not be saved.');
 	}
 	return { savedTemplate: body.name };
 }
@@ -168,7 +200,7 @@ export const actions: Actions = {
 	updateTemplate: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No template was named.' });
+		if (!id) return fail(400, { action: 'saveTemplate', error: 'No template was named.' });
 		return saveTemplate(event, id);
 	},
 
@@ -177,11 +209,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No template was named.' });
+		if (!id) return fail(400, { action: 'deleteTemplate', error: 'No template was named.' });
 		try {
 			await deleteTemplate(authedClient(event), id);
 		} catch (err) {
-			return actionFailure(err, 'The template could not be deleted.');
+			return failure('deleteTemplate', err, 'The template could not be deleted.');
 		}
 		return { removedTemplate: id };
 	},
@@ -191,28 +223,29 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No import was named.' });
+		if (!id) return fail(400, { action: 'cancel', error: 'No import was named.' });
 		try {
 			await cancelJob(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The import could not be canceled.') });
+			return fail(400, { action: 'cancel', error: actionError(err, 'The import could not be canceled.') });
 		}
 		return { canceled: id };
 	},
 
 	// Removes the entries the job created. Offered only where there is one to
 	// remove, since a dry run wrote nothing and a rollback of one would be a
-	// no-op dressed as a repair.
+	// no-op dressed as a repair. The engine takes it from any admin, so the
+	// admin who ran a bad import can undo it.
 	rollback: async (event) => {
-		await requireRole(event, ['super_admin']);
+		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No import was named.' });
+		if (!id) return fail(400, { action: 'rollback', error: 'No import was named.' });
 		try {
 			await rollbackJob(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The import could not be rolled back.') });
+			return fail(400, { action: 'rollback', error: actionError(err, 'The import could not be rolled back.') });
 		}
 		return { rolledBack: id };
 	},

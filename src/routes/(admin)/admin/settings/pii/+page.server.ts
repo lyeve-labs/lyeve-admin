@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -17,7 +17,7 @@ import {
 	type PiiGate,
 	type RuleCatalog,
 } from '$lib/api/pii-mask';
-import { pageWindow } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
@@ -56,8 +56,11 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			const page = await listAccessLog(client, limit, offset);
 			entries = page.data ?? [];
+			const back = pastEndOffset(entries.length, limit, offset, page.total_count ?? null);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 			total = Math.max(page.total_count ?? 0, offset + entries.length);
-		} catch {
+		} catch (err) {
+			if (isRedirect(err)) throw err;
 			logFailed = true;
 		}
 	}
@@ -87,7 +90,7 @@ export const actions: Actions = {
 			await createRule(authedClient(event), draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not save the rule.'));
+			return fail(422, { action: 'create', error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -95,12 +98,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'update', error: 'Which rule?' });
 		try {
 			await updateRule(authedClient(event), id, draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not save the rule.'));
+			return fail(422, { action: 'update', error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -108,12 +111,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'delete', error: 'Which rule?' });
 		try {
 			await deleteRule(authedClient(event), id);
 			return { deleted: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not delete the rule.'));
+			return fail(422, { action: 'delete', error: actionError(err, 'The rule could not be deleted.') });
 		}
 	},
 
@@ -131,7 +134,7 @@ export const actions: Actions = {
 			);
 			return { test: result };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not run the pattern.'));
+			return fail(422, { action: 'test', error: actionError(err, 'The pattern could not be run.') });
 		}
 	},
 };

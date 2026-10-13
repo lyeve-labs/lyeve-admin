@@ -401,16 +401,23 @@ async function postImport<T>(fetchFn: typeof fetch, path: string, body: unknown)
 	});
 	if (!res.ok) {
 		const j = (await res.json().catch(() => ({}))) as { error?: string };
-		// An ApiError keeps the body, so a license refusal renders through
-		// RefusalNotice with what the plugin sent.
-		throw new ApiError(res.status, j.error || importFailure(res.status), j);
+		// A refusal's sentence is written for the operator and is shown as
+		// sent. A 5xx body can carry driver detail, so it never reaches the
+		// page, and the status picks the sentence instead. An ApiError keeps
+		// the body, so a license refusal renders through RefusalNotice with
+		// what the plugin sent.
+		const said = res.status < 500 && j.error ? j.error : importFailure(res.status);
+		throw new ApiError(res.status, said, j);
 	}
 	return (await res.json()) as T;
 }
 
 function importFailure(status: number): string {
 	if (status === 413) return 'The file is larger than the 50 MB an import takes. Split it and import the parts.';
-	if (status === 503) return 'The database is unavailable. Try again in a moment.';
+	if (status === 502 || status === 503 || status === 504) {
+		return 'The engine or its database did not answer. Nothing was imported. Try again in a moment.';
+	}
+	if (status >= 500) return 'The engine could not finish the request. Nothing was imported.';
 	return 'The engine refused the request.';
 }
 

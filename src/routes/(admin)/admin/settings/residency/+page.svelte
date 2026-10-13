@@ -19,6 +19,7 @@
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Globe, MapPin, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		REGION_STATE_LABELS,
@@ -37,7 +38,13 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// The region form and the row deletes report through one result, so each
+	// failure is tagged with its action and shown only where it was made. The
+	// drawer opened after a failure starts clean: the result is set aside.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(form && form !== setAside ? (form as { action?: string; error?: string }) : null);
+	const saveError = $derived(failure?.action === 'create' || failure?.action === 'update' ? (failure.error ?? '') : '');
+	const rowError = $derived(failure?.action === 'delete' ? (failure.error ?? '') : '');
 	const summary = $derived(data.report?.summary ?? null);
 	const stranded = $derived(unassigned(data.report));
 	const partial = $derived(reportIsPartial(data.report));
@@ -63,6 +70,7 @@
 		long = '';
 		enabled = true;
 		isDefault = false;
+		setAside = form;
 		open = true;
 	}
 
@@ -75,6 +83,7 @@
 		long = r.coordinates ? String(r.coordinates.long) : '';
 		enabled = r.enabled;
 		isDefault = r.is_default;
+		setAside = form;
 		open = true;
 	}
 
@@ -95,7 +104,7 @@
 	function removeRegion(r: Region): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${r.display_name}?`,
+				`Delete region ${r.display_name}`,
 				'Tenants assigned to it are not moved. Move them first, or the report stops accounting for where their data is.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -141,8 +150,8 @@
 			absent="The data residency plugin is not part of this build, so no region is recorded."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 
 		<section class="flex flex-col gap-4">
@@ -339,6 +348,7 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<FormErrors message={saveError || undefined} />
 			{#if editing}
 				<!-- The slug is copied onto every tenant assignment and onto the
 				     report, so changing it would leave those rows naming a region

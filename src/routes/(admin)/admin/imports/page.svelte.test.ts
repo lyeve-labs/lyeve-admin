@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), goto: vi.fn(async () => {}) }));
@@ -36,7 +36,7 @@ function job(over: Partial<ImportJob> = {}): ImportJob {
 	};
 }
 
-const props = (over: Record<string, unknown> = {}) => ({
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		jobs: [job()],
 		total: 1,
@@ -45,11 +45,12 @@ const props = (over: Record<string, unknown> = {}) => ({
 		hasMore: false,
 		gate: { state: 'ok' },
 		installed: true,
-		schemas: [{ name: 'article', fields: [{ name: 'title', field_type: 'text' }] }],
+		schemas: { ok: true, value: [{ name: 'article', fields: [{ name: 'title', field_type: 'text' }] }] },
+		user: { id: 'u1', roles: ['super_admin'] },
 		detail: null,
 		...over,
 	} as never,
-	form: null as never,
+	form: form as never,
 });
 
 describe('Imports', () => {
@@ -97,5 +98,77 @@ describe('Imports', () => {
 	it('marks a dry run as having written nothing', () => {
 		const { container } = render(ImportsPage, { props: props({ jobs: [job({ dry_run: true })] }) });
 		expect(said(container)).toContain('Dry run, nothing written');
+	});
+});
+
+describe('Imports reads that failed', () => {
+	it('opens the rows panel with the reason when the job could not be read', () => {
+		render(ImportsPage, {
+			props: props({ detail: { ok: false, gate: { state: 'error', message: 'The rows of this import could not be read.' } } }),
+		});
+		expect(document.body.textContent).toContain('The rows of this import could not be read.');
+	});
+
+	it('says an import that no longer exists is gone', () => {
+		render(ImportsPage, { props: props({ detail: { ok: false, gate: { state: 'absent' } } }) });
+		expect(document.body.textContent).toContain('That import no longer exists');
+	});
+
+	it('says why a new template offers no content type when the list was not read', async () => {
+		render(ImportsPage, {
+			props: props({ templates: [], templatesRead: true, schemas: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
+		expect(document.body.textContent).toContain('The content types could not be read');
+	});
+});
+
+describe('Imports rollback by role', () => {
+	const rolled = job({ status: 'completed', inserted_rows: 4 });
+
+	it('offers a rollback to a super admin', () => {
+		const { container } = render(ImportsPage, { props: props({ jobs: [rolled] }) });
+		expect(container.querySelector('[aria-label^="Roll back"]')).not.toBeNull();
+	});
+
+	// The engine takes a rollback from any admin, so the admin who ran a bad
+	// import can undo it.
+	it('offers a rollback to an admin', () => {
+		const { container } = render(ImportsPage, {
+			props: props({ jobs: [rolled], user: { id: 'u2', roles: ['admin'] } }),
+		});
+		expect(container.querySelector('[aria-label^="Roll back"]')).not.toBeNull();
+	});
+});
+
+describe('Imports controls', () => {
+	it('offers the action that fills an empty history', () => {
+		render(ImportsPage, { props: props({ jobs: [], total: 0 }) });
+		expect(screen.getAllByRole('button', { name: /new import/i }).length).toBeGreaterThan(1);
+	});
+
+	it('asks what to do with an existing entry with a sentence on each choice', async () => {
+		render(ImportsPage, { props: props({ templates: [], templatesRead: true }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
+		expect(screen.getByRole('radio', { name: /create only/i })).toBeTruthy();
+		expect(document.body.textContent).toContain('Overwrite the fields of an entry the key finds');
+	});
+});
+
+describe('Imports failures stay where they were made', () => {
+	it('shows a failed row action on the page and opens the template drawer clean', async () => {
+		const { container } = render(ImportsPage, {
+			props: props({ templates: [], templatesRead: true }, { action: 'rollback', error: 'The import could not be rolled back.' }),
+		});
+		expect(said(container)).toContain('The import could not be rolled back.');
+		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
+		expect((document.getElementById('template-form') as HTMLFormElement).textContent).not.toContain('could not be rolled back');
+	});
+
+	it('shows a refused template save in its drawer and not on the page', async () => {
+		const { container } = render(ImportsPage, {
+			props: props({ templates: [], templatesRead: true }, { action: 'saveTemplate', error: 'Map at least one column.' }),
+		});
+		expect(said(container)).not.toContain('Map at least one column.');
 	});
 });

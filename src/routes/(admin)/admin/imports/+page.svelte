@@ -12,8 +12,8 @@
 		Pagination,
 		Input,
 		Progress,
+		RadioGroup,
 		SectionHeading,
-		SegmentedControl,
 		Select,
 		Spinner,
 		Stat,
@@ -41,6 +41,7 @@
 	} from '@lucide/svelte';
 	import ImportWizard from '$lib/components/ImportWizard.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import TransformField from '$lib/components/imports/TransformField.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { tracked } from '$lib/forms.svelte';
@@ -76,8 +77,20 @@
 	/** How often the history re-reads while an import is still going. */
 	const POLL_MS = 2000;
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const refusal = $derived(formRefusal(form));
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action. The template drawer shows only its own, the page
+	// shows the rest, and a drawer opened after a failure starts clean.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(form && form !== setAside && 'error' in form ? form : null);
+	const inDrawer = $derived(failure?.action === 'saveTemplate');
+	const formError = $derived(failure && !inDrawer ? String(failure.error ?? '') : '');
+	const refusal = $derived(failure && !inDrawer ? formRefusal(failure) : null);
+	const templateError = $derived(inDrawer ? String(failure?.error ?? '') : '');
+	const templateRefusal = $derived(inDrawer ? formRefusal(failure) : null);
+	// Null while the content types are unread, so each place that offers one
+	// says why it offers none.
+	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
+	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 	const running = $derived(data.jobs.filter(cancelable));
 	const rejecting = $derived(data.jobs.filter((j) => outcome(j) === 'partial' || outcome(j) === 'nothing'));
 
@@ -157,28 +170,25 @@
 	}
 
 	const detailItems = $derived(
-		data.detail
+		detail
 			? [
-					{ term: 'Content type', value: data.detail.job.content_type },
+					{ term: 'Content type', value: detail.job.content_type },
 					{
 						term: 'Source',
-						value: `${data.detail.job.source_kind === 'url' ? 'Web address' : 'Upload'}, ${data.detail.job.source_format}`,
+						value: `${detail.job.source_kind === 'url' ? 'Web address' : 'Upload'}, ${detail.job.source_format}`,
 					},
 					{
 						term: 'When an entry exists',
-						value: data.detail.job.mode === 'upsert' ? 'Update it' : 'Leave it alone',
+						value: detail.job.mode === 'upsert' ? 'Update it' : 'Leave it alone',
 					},
 					{
 						term: 'Key field',
-						value:
-							data.detail.job.upsert_key === 'entry.slug'
-								? 'Entry slug'
-								: data.detail.job.upsert_key || 'None',
+						value: detail.job.upsert_key === 'entry.slug' ? 'Entry slug' : detail.job.upsert_key || 'None',
 					},
-					{ term: 'Created', value: formatCount(data.detail.job.inserted_rows) },
-					{ term: 'Updated', value: formatCount(data.detail.job.updated_rows) },
-					{ term: 'Skipped', value: formatCount(data.detail.job.skipped_rows) },
-					{ term: 'Rejected', value: formatCount(data.detail.job.errored_rows) },
+					{ term: 'Created', value: formatCount(detail.job.inserted_rows) },
+					{ term: 'Updated', value: formatCount(detail.job.updated_rows) },
+					{ term: 'Skipped', value: formatCount(detail.job.skipped_rows) },
+					{ term: 'Rejected', value: formatCount(detail.job.errored_rows) },
 				]
 			: [],
 	);
@@ -201,7 +211,7 @@
 	let nextRow = 0;
 
 	const templateTargets = $derived(
-		mappingTargets(data.schemas.find((x) => x.name === templateType)?.fields ?? []),
+		mappingTargets((schemaList ?? []).find((x) => x.name === templateType)?.fields ?? []),
 	);
 	const targetOptions = $derived(templateTargets.map((t) => ({ value: t.value, label: t.label })));
 
@@ -226,12 +236,13 @@
 	function openTemplate(t: MappingTemplate | null) {
 		editingTemplate = t;
 		templateName = t?.name ?? '';
-		templateType = t?.content_type ?? (data.schemas.length === 1 ? data.schemas[0].name : '');
+		templateType = t?.content_type ?? (schemaList?.length === 1 ? schemaList[0].name : '');
 		templateMode = t?.mode === 'upsert' ? 'upsert' : 'create';
 		templateKey = t?.upsert_key ?? '';
 		rows = [];
 		for (const m of t?.field_mappings ?? []) addRow(m.source_field, m.target_field, transformDraft(m));
 		if (rows.length === 0) addRow();
+		setAside = form;
 		templateOpen = true;
 	}
 
@@ -248,7 +259,7 @@
 	function removeTemplate(t: MappingTemplate): SubmitFunction {
 		return async ({ cancel: stop }) => {
 			const confirmed = await confirmDialog(
-				`Delete the template ${t.name}?`,
+				`Delete template ${t.name}`,
 				'Imports that already ran with it keep their history. Nothing else changes.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -381,10 +392,13 @@
 			{#if data.jobs.length === 0}
 				<EmptyState
 					title="Nothing has been imported"
-					description="Start one with New import. Each import appears here with what it wrote and what it rejected."
+					description="Each import appears here with what it wrote and what it rejected."
 				>
 					{#snippet iconSnippet()}
 						<Upload size={ICON.lg} />
+					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={() => (wizardOpen = true)}><Plus size={ICON.sm} /> New import</Button>
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -507,9 +521,11 @@
 		<section class="flex flex-col gap-4" aria-label="Mapping templates">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<SectionHeading level={2}>Mapping templates</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={() => openTemplate(null)}>
-					<Plus size={ICON.sm} /> New template
-				</Button>
+				{#if data.templatesRead && data.templates.length > 0}
+					<Button variant="secondary" size="sm" onclick={() => openTemplate(null)}>
+						<Plus size={ICON.sm} /> New template
+					</Button>
+				{/if}
 			</div>
 			<p class="text-sm text-muted">
 				A template keeps a mapping, with its transforms, key and mode, so an import of the same kind of file
@@ -527,6 +543,9 @@
 				<EmptyState title="No mapping template" description="Each import maps its columns from scratch.">
 					{#snippet iconSnippet()}
 						<Rows3 size={ICON.lg} />
+					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={() => openTemplate(null)}><Plus size={ICON.sm} /> New template</Button>
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -577,18 +596,13 @@
 
 <ImportWizard
 	bind:open={wizardOpen}
-	schemas={data.schemas}
+	schemas={schemaList}
 	templates={data.templates}
 	licensed={data.licensed}
 	onstarted={started}
 />
 
 <Drawer bind:open={templateOpen} title={editingTemplate ? `Edit ${editingTemplate.name}` : 'New template'}>
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form
 		id="template-form"
 		method="POST"
@@ -600,22 +614,25 @@
 		{/if}
 		<input type="hidden" name="mappings" value={JSON.stringify(typeof templateMappings === 'string' ? [] : templateMappings)} />
 		<div class="flex flex-col gap-4">
+			<FormErrors message={templateError || undefined} refused={templateRefusal} />
 			<Input id="template-name" name="name" label="Name" bind:value={templateName} required />
 			<Select
 				id="template-type"
 				name="content_type"
 				label="Content type"
 				searchable
+				hint={schemaList === null ? 'The content types could not be read, so none can be chosen. Close this and try again in a moment.' : undefined}
 				bind:value={templateType}
-				options={data.schemas.map((x) => ({ value: x.name, label: x.name }))}
+				options={(schemaList ?? []).map((x) => ({ value: x.name, label: x.name }))}
 			/>
-			<SegmentedControl
+			<RadioGroup
 				label="When an entry already exists"
 				name="mode"
+				hint="The key field decides which entry a row is."
 				bind:value={templateMode}
 				options={[
-					{ value: 'create', label: 'Create only' },
-					{ value: 'upsert', label: 'Create and update' },
+					{ value: 'create', label: 'Create only', description: 'Leave an entry the key finds alone and report the row as skipped.' },
+					{ value: 'upsert', label: 'Create and update', description: 'Overwrite the fields of an entry the key finds, and create the rest.' },
 				]}
 			/>
 			{#if templateMode === 'upsert'}
@@ -624,6 +641,7 @@
 					name="upsert_key"
 					label="Key field"
 					hint="The field that finds the entry a row updates."
+					searchable
 					bind:value={templateKey}
 					options={[
 						{ value: '', label: 'Choose the key field' },
@@ -640,6 +658,7 @@
 							<Select
 								id="template-target-{r.id}"
 								label="Field"
+								searchable
 								bind:value={r.target}
 								options={[{ value: '', label: 'Choose a field' }, ...targetOptions]}
 							/>
@@ -687,23 +706,29 @@
 
 <Drawer
 	bind:open={detailOpen}
-	title={data.detail ? `Import of ${data.detail.job.source_name}` : 'Import'}
-	description={data.detail ? OUTCOME_LABELS[outcome(data.detail.job)] : ''}
+	title={detail ? `Import of ${detail.job.source_name}` : 'Import'}
+	description={detail ? OUTCOME_LABELS[outcome(detail.job)] : ''}
 	onclose={closeDetail}
 >
-	{#if data.detail}
+	{#if data.detail && !data.detail.ok}
+		<GateNotice
+			gate={data.detail.gate}
+			title="this import"
+			absent="That import no longer exists. It may have been removed since the history was read."
+		/>
+	{:else if detail}
 		<div class="flex flex-col gap-5">
 			<DescriptionList items={detailItems} />
 			<div class="flex flex-col gap-3">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<SectionHeading level={3}>Rejected rows</SectionHeading>
-					{#if data.detail.rejectedTotal > 0}
-						<Button variant="secondary" size="sm" href={rejectedHref(data.detail.job.id)}>
-							<Download size={ICON.sm} /> Download all {formatCount(data.detail.rejectedTotal)} as CSV
+					{#if detail.rejectedTotal > 0}
+						<Button variant="secondary" size="sm" href={rejectedHref(detail.job.id)}>
+							<Download size={ICON.sm} /> Download all {formatCount(detail.rejectedTotal)} as CSV
 						</Button>
 					{/if}
 				</div>
-				{#if data.detail.rejected.length === 0}
+				{#if detail.rejected.length === 0}
 					<p class="text-sm text-muted">No row was rejected.</p>
 				{:else}
 					<Table label="Rejected rows of this import">
@@ -714,7 +739,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each data.detail.rejected as r (r.id)}
+							{#each detail.rejected as r (r.id)}
 								<tr>
 									<td data-cell="nowrap" class="font-mono text-xs">{r.row_index + 1}</td>
 									<td class="text-xs">
@@ -725,15 +750,15 @@
 							{/each}
 						</tbody>
 					</Table>
-					{#if data.detail.rejectedTotal > data.detail.rejected.length}
+					{#if detail.rejectedTotal > detail.rejected.length}
 						<p class="text-xs text-muted">
-							The first {formatCount(data.detail.rejected.length)} of {formatCount(data.detail.rejectedTotal)}. The
+							The first {formatCount(detail.rejected.length)} of {formatCount(detail.rejectedTotal)}. The
 							download has them all.
 						</p>
 					{/if}
 				{/if}
 			</div>
-			{#if data.detail.skipped.length > 0}
+			{#if detail.skipped.length > 0}
 				<div class="flex flex-col gap-3">
 					<SectionHeading level={3}>Skipped rows</SectionHeading>
 					<Table label="Skipped rows of this import">
@@ -744,7 +769,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each data.detail.skipped as r (r.id)}
+							{#each detail.skipped as r (r.id)}
 								<tr>
 									<td data-cell="nowrap" class="font-mono text-xs">{r.row_index + 1}</td>
 									<td class="text-xs">{r.error_message || 'Skipped'}</td>

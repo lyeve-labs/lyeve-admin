@@ -63,7 +63,8 @@
 		onstarted,
 	}: {
 		open?: boolean;
-		schemas: ImportSchema[];
+		/** The content types an import can fill, or null when they could not be read. */
+		schemas: ImportSchema[] | null;
 		/** The tenant's saved mappings, offered on the first step. */
 		templates?: MappingTemplate[];
 		/** Whether the plugin said this install may name the paid transforms. Null when it did not say. */
@@ -106,7 +107,17 @@
 	// Step 3.
 	let checked = $state<ValidateResult | null>(null);
 
-	const schemaOptions = $derived(schemas.map((s) => ({ value: s.name, label: s.name })));
+	const known = $derived(schemas ?? []);
+	const schemaOptions = $derived(known.map((s) => ({ value: s.name, label: s.name })));
+	// An empty choice says why it is empty: a list that was not read is not a
+	// tenant with no content types, and neither leaves anything to import into.
+	const schemaHint = $derived(
+		schemas === null
+			? 'The content types could not be read, so none can be chosen. Close this and try again in a moment.'
+			: schemas.length === 0
+				? 'There is no content type yet. Create one before importing into it.'
+				: 'Each row becomes an entry of this type.',
+	);
 	const formatOptions = [
 		{ value: 'auto', label: 'Read it from the file' },
 		...IMPORT_FORMATS.map((f) => ({ value: f, label: IMPORT_FORMAT_LABELS[f] })),
@@ -121,7 +132,7 @@
 			(format === 'auto' &&
 				(kind === 'upload' ? formatFromName(file?.name ?? '') : formatFromName(url.split('?')[0])) === 'xlsx'),
 	);
-	const target = $derived(schemas.find((s) => s.name === contentType));
+	const target = $derived(known.find((s) => s.name === contentType));
 	const targets = $derived(target ? mappingTargets(target.fields) : []);
 	const columnOptions = $derived([
 		{ value: '', label: 'Not imported' },
@@ -152,7 +163,7 @@
 		url = '';
 		format = 'auto';
 		sheet = '';
-		contentType = schemas.length === 1 ? schemas[0].name : '';
+		contentType = known.length === 1 ? known[0].name : '';
 		templateId = '';
 		encoded = '';
 		preview = null;
@@ -175,7 +186,7 @@
 	function chooseTemplate(id: string) {
 		templateId = id;
 		const t = templates.find((x) => x.id === id);
-		if (t?.content_type && schemas.some((s) => s.name === t.content_type)) contentType = t.content_type;
+		if (t?.content_type && known.some((s) => s.name === t.content_type)) contentType = t.content_type;
 	}
 
 	function source(): SourceInput {
@@ -372,7 +383,7 @@
 				<Select
 					id="import-schema"
 					label="Content type"
-					hint="Each row becomes an entry of this type."
+					hint={schemaHint}
 					searchable
 					bind:value={contentType}
 					options={schemaOptions}
@@ -397,6 +408,7 @@
 					id="import-template"
 					label="Mapping template"
 					hint="A saved mapping fills in the columns, their transforms, the key and the mode. You can still change them."
+					searchable
 					value={templateId}
 					onvaluechange={chooseTemplate}
 					options={templateOptions}
@@ -473,6 +485,7 @@
 								<Select
 									id="map-{t.value}"
 									label="Column for {t.label}"
+									searchable
 									bind:value={chosen[t.value]}
 									options={columnOptions}
 								/>
@@ -501,7 +514,7 @@
 					{ value: 'upsert', label: 'Create and update', description: 'Overwrite the fields of an entry the key finds, and create the rest.' },
 				]}
 			/>
-			<Select id="import-key" label="Key field" bind:value={key} options={keyOptions} />
+			<Select id="import-key" label="Key field" searchable bind:value={key} options={keyOptions} />
 		{:else if step === 2 && checked}
 			<div class="grid gap-3 sm:grid-cols-3">
 				<Stat size="sm" mono label="Rows in the file" value={formatCount(checked.total_rows)} />

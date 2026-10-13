@@ -11,7 +11,10 @@ vi.mock('$lib/server/authz', async (importOriginal) => ({
 }));
 
 const engine = vi.hoisted(() => ({ get: vi.fn() }));
-vi.mock('@lyeve-labs/client', () => ({ createClient: vi.fn(() => engine) }));
+vi.mock('@lyeve-labs/client', async (importOriginal) => ({
+	...((await importOriginal()) as object),
+	createClient: vi.fn(() => engine),
+}));
 
 import { actions, load } from './+page.server';
 import { endpointQuery, readFilter } from '$lib/server/audit-filter';
@@ -84,7 +87,7 @@ describe('audit-log load reports the row count the engine sent', () => {
 			url: new URL(`http://localhost/admin/audit-log?offset=${offset}`),
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
-		return (await load(event)) as unknown as { total: number; entries: unknown[] };
+		return (await load(event)) as unknown as { total: number; entries: { ok: true; value: unknown[] } };
 	}
 
 	beforeEach(() => {
@@ -108,8 +111,67 @@ describe('audit-log load reports the row count the engine sent', () => {
 
 		const result = await runLoad(0);
 
-		expect(result.entries).toEqual([]);
+		expect(result.entries).toEqual({ ok: true, value: [] });
 		expect(result.total).toBe(0);
+	});
+});
+
+/*
+ * A log that could not be read is not an empty log. Drawn as one, it tells an
+ * auditor that nothing was ever changed on this instance.
+ */
+describe('audit-log load keeps a failed read apart from an empty log', () => {
+	function event(query = '') {
+		return {
+			fetch: vi.fn() as unknown as typeof globalThis.fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			url: new URL(`http://localhost/admin/audit-log${query}`),
+			parent: async () => ({ user: { roles: ['admin'] } }),
+		} as never;
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		engine.get.mockReset();
+	});
+
+	it('returns a gate and no count when the read fails', async () => {
+		engine.get.mockRejectedValue(new Error('boom'));
+
+		const result = (await load(event())) as unknown as {
+			entries: { ok: boolean; gate?: { state: string } };
+			total: number | null;
+		};
+
+		expect(result.entries.ok).toBe(false);
+		expect(result.entries.gate?.state).toBe('error');
+		expect(result.total).toBeNull();
+	});
+
+	it('sends a page past the end back to the last page', async () => {
+		engine.get.mockResolvedValue({ data: [], total: 120 });
+
+		await expect(load(event('?offset=500'))).rejects.toMatchObject({
+			status: 307,
+			location: '/admin/audit-log?offset=100',
+		});
+	});
+
+	it('snaps an offset from the address to a page boundary', async () => {
+		engine.get.mockResolvedValue({ data: [{ id: 'e1', action: 'x' }], total: 120 });
+
+		const result = (await load(event('?offset=73'))) as unknown as { offset: number };
+
+		expect(result.offset).toBe(50);
+		expect(String(engine.get.mock.calls[0][0])).toContain('offset=50');
+	});
+
+	it('reads a negative offset as the first page', async () => {
+		engine.get.mockResolvedValue({ data: [{ id: 'e1', action: 'x' }], total: 1 });
+
+		const result = (await load(event('?offset=-40'))) as unknown as { offset: number };
+
+		expect(result.offset).toBe(0);
 	});
 });
 
@@ -166,10 +228,10 @@ describe('audit-log search maps to the endpoint filters', () => {
 			url: new URL('http://localhost/admin/audit-log?q=a1b2c3d4-0000-0000-0000-000000000000'),
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
-		const result = (await load(event)) as unknown as { entries: unknown[]; actions: string[] };
+		const result = (await load(event)) as unknown as { entries: { ok: true; value: unknown[] }; actions: string[] };
 		expect(engine.get).toHaveBeenCalledTimes(2);
 		expect(String(engine.get.mock.calls[1][0])).toContain('resource_id=');
-		expect(result.entries).toHaveLength(1);
+		expect(result.entries.value).toHaveLength(1);
 		expect(result.actions).toEqual(['content.delete']);
 	});
 });

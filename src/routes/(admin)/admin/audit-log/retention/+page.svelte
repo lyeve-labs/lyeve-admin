@@ -17,6 +17,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import AuditTabs from '$lib/components/AuditTabs.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -40,10 +41,26 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action and shown only where that action was made. A
+	// drawer opened after a failure starts clean: the result is set aside.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(
+		form && form !== setAside ? (form as { action?: string; error?: string }) : null,
+	);
+	const DRAWER_ACTIONS = ['createPolicy', 'createHold'];
+	const policyError = $derived(failure?.action === 'createPolicy' ? (failure.error ?? '') : '');
+	const holdError = $derived(failure?.action === 'createHold' ? (failure.error ?? '') : '');
+	const rowError = $derived(
+		failure?.action && !DRAWER_ACTIONS.includes(failure.action) ? (failure.error ?? '') : '',
+	);
 	const outcome = $derived((form as { enforced?: boolean; deleted?: number } | null) ?? null);
-	const live = $derived(activeHolds(data.holds));
-	const blocked = $derived(deletionIsBlocked(data.policies, data.holds));
+	const holds = $derived(data.holds.ok ? data.holds.value : []);
+	const live = $derived(activeHolds(holds));
+	const blocked = $derived(deletionIsBlocked(data.policies, holds));
+	// The audit plugin takes every write on this page from a super admin only.
+	// An admin reads the rules and is told who can change them.
+	const canWrite = $derived(data.user.roles.includes('super_admin'));
 
 	let addingPolicy = $state(false);
 	let eventType = $state('');
@@ -68,6 +85,7 @@
 		archival = true;
 		storage = '';
 		pathPrefix = '';
+		setAside = form;
 		addingPolicy = true;
 	}
 
@@ -89,6 +107,7 @@
 		archival = source.archival_enabled ?? true;
 		storage = source.archival_storage ?? '';
 		pathPrefix = source.archival_path_prefix ?? '';
+		setAside = form;
 		addingPolicy = true;
 	}
 
@@ -99,6 +118,7 @@
 		holdResourceType = '';
 		holdResourceId = '';
 		holdTenant = '';
+		setAside = form;
 		addingHold = true;
 	}
 
@@ -122,7 +142,7 @@
 	function removePolicy(p: RetentionPolicy): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				'Delete this policy?',
+				`Delete the policy covering ${policyScope(p)}`,
 				'Entries it covered stop being deleted, so the audit log grows without limit until another policy covers them.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -187,7 +207,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		{#if data.gate.state === 'ok'}
+		{#if data.gate.state === 'ok' && canWrite}
 			<form method="POST" action="?/enforce" use:enhance={enforce}>
 				<Button variant="secondary" size="sm" type="submit">
 					<Trash2 size={ICON.sm} /> Enforce now
@@ -199,7 +219,7 @@
 		{/if}
 	{/snippet}
 
-	<AuditTabs active="retention" rules={data.policies.length + data.holds.length} />
+	<AuditTabs active="retention" rules={data.holds.ok ? data.policies.length + data.holds.value.length : undefined} />
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
@@ -208,8 +228,13 @@
 			absent="Audit retention is not part of this build, so entries are kept indefinitely."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
+		{/if}
+		{#if !canWrite}
+			<Alert tone="info">
+				Only a super admin can change a retention policy, raise or release a hold, or enforce retention.
+			</Alert>
 		{/if}
 		{#if outcome?.enforced}
 			<Alert tone="success" autoDismiss>
@@ -239,9 +264,11 @@
 						<ScrollText size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openPolicy}>
-							<Plus size={ICON.sm} /> New policy
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openPolicy}>
+								<Plus size={ICON.sm} /> New policy
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -275,27 +302,29 @@
 									<Badge tone={archivalTone(p)}>{archivalLabel(p)}</Badge>
 								</td>
 								<td data-cell="nowrap">
-									<div class="flex justify-end">
-										<Button
-											variant="ghost"
-											size="sm"
-											aria-label="Duplicate the policy covering {policyScope(p)}"
-											onclick={() => duplicatePolicy(p)}
-										>
-											<Copy size={ICON.sm} />
-										</Button>
-										<form method="POST" action="?/deletePolicy" use:enhance={removePolicy(p)}>
-											<input type="hidden" name="id" value={p.id} />
+									{#if canWrite}
+										<div class="flex justify-end">
 											<Button
 												variant="ghost"
 												size="sm"
-												type="submit"
-												aria-label="Delete the policy covering {policyScope(p)}"
+												aria-label="Duplicate the policy covering {policyScope(p)}"
+												onclick={() => duplicatePolicy(p)}
 											>
-												<Trash2 size={ICON.sm} class="text-danger" />
+												<Copy size={ICON.sm} />
 											</Button>
-										</form>
-									</div>
+											<form method="POST" action="?/deletePolicy" use:enhance={removePolicy(p)}>
+												<input type="hidden" name="id" value={p.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Delete the policy covering {policyScope(p)}"
+												>
+													<Trash2 size={ICON.sm} class="text-danger" />
+												</Button>
+											</form>
+										</div>
+									{/if}
 								</td>
 							</tr>
 						{/each}
@@ -306,11 +335,12 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Legal holds</SectionHeading>
-			{#if !data.holdsRead}
-				<Alert tone="danger">
-					The holds could not be read, so the policies above cannot be trusted to describe what
-					is actually being deleted.
-				</Alert>
+			{#if !data.holds.ok}
+				<GateNotice
+					gate={data.holds.gate}
+					title="Legal holds"
+					absent="Legal holds are not part of this build."
+				/>
 			{:else if live.length === 0}
 				<EmptyState
 					title="Nothing is held"
@@ -320,9 +350,11 @@
 						<Unlock size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openHold}>
-							<Plus size={ICON.sm} /> New hold
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openHold}>
+								<Plus size={ICON.sm} /> New hold
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -358,29 +390,33 @@
 									{/if}
 								</td>
 								<td data-cell="nowrap">
-									<div class="flex justify-end">
-										<form method="POST" action="?/releaseHold" use:enhance={release(h)}>
-											<input type="hidden" name="id" value={h.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Release {h.name}"
-											>
-												<Unlock size={ICON.sm} />
-											</Button>
-										</form>
-									</div>
+									{#if canWrite}
+										<div class="flex justify-end">
+											<form method="POST" action="?/releaseHold" use:enhance={release(h)}>
+												<input type="hidden" name="id" value={h.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Release {h.name}"
+												>
+													<Unlock size={ICON.sm} />
+												</Button>
+											</form>
+										</div>
+									{/if}
 								</td>
 							</tr>
 						{/each}
 					</tbody>
 				</Table>
-				<div>
-					<Button variant="secondary" size="sm" onclick={openHold}>
-						<Plus size={ICON.sm} /> New hold
-					</Button>
-				</div>
+				{#if canWrite}
+					<div>
+						<Button variant="secondary" size="sm" onclick={openHold}>
+							<Plus size={ICON.sm} /> New hold
+						</Button>
+					</div>
+				{/if}
 			{/if}
 		</section>
 	{/if}
@@ -389,6 +425,7 @@
 <Drawer bind:open={addingPolicy} title="New retention policy">
 	<form id="policy-form" method="POST" action="?/createPolicy" use:enhance={savePolicySubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={policyError || undefined} />
 			<Input
 				id="ret-event"
 				name="event_type"
@@ -442,6 +479,7 @@
 <Drawer bind:open={addingHold} title="New legal hold">
 	<form id="hold-form" method="POST" action="?/createHold" use:enhance={saveHoldSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={holdError || undefined} />
 			<Alert tone="warn">
 				A hold overrides every retention policy for the entries it matches. Leaving every
 				filter empty holds the entire audit log.

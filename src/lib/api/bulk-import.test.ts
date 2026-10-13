@@ -6,6 +6,7 @@ import {
 	importGate,
 	outcome,
 	outcomeTone,
+	previewImport,
 	progress,
 	rejectionRate,
 	rollbackable,
@@ -179,5 +180,38 @@ describe('mapping', () => {
 		expect(formatFromName('Export.JSONL')).toBe('ndjson');
 		expect(formatFromName('a.yml')).toBe('yaml');
 		expect(formatFromName('notes.txt')).toBeNull();
+	});
+});
+
+describe('a refused import call', () => {
+	function answer(status: number, body: unknown): typeof fetch {
+		return (async () =>
+			new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
+	}
+
+	async function refusal(status: number, body: unknown): Promise<ApiError> {
+		try {
+			await previewImport(answer(status, body), { source_url: 'https://example.com/a.csv' });
+		} catch (err) {
+			return err as ApiError;
+		}
+		throw new Error('the call did not fail');
+	}
+
+	it('shows a refusal written for the operator as it was sent', async () => {
+		expect((await refusal(400, { error: 'source_url must be http or https' })).message).toBe('source_url must be http or https');
+	});
+
+	// A 5xx body can carry driver detail, and the outage sentence is the one
+	// that tells the operator what to do.
+	it('keeps the body of an outage off the page and says the engine did not answer', async () => {
+		const err = await refusal(503, { error: 'dial tcp 10.0.0.4:5432: connection refused' });
+		expect(err.message).not.toContain('10.0.0.4');
+		expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+	});
+
+	it('keeps the body of any other engine failure off the page', async () => {
+		const err = await refusal(500, { error: 'pq: relation "import_jobs" does not exist' });
+		expect(err.message).toBe('The engine could not finish the request. Nothing was imported.');
 	});
 });

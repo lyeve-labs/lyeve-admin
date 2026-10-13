@@ -5,6 +5,10 @@ import { ApiError } from '@lyeve-labs/client';
 import { getEntitlements } from '@lyeve-labs/client-rest';
 import type { LicenseEntitlements } from '$lib/entitlements';
 import { sessionToken } from '$lib/server/session-cookie';
+import { actionError } from '$lib/server/action-error';
+import { forbiddenText } from '$lib/api/gate';
+
+const RENEW_FAILED = 'The license could not be applied. The current license is unchanged.';
 
 /** Roles the engine gives the entitlements to. Nobody else has a license to read. */
 const READER_ROLES = ['admin', 'super_admin'];
@@ -12,7 +16,7 @@ const READER_ROLES = ['admin', 'super_admin'];
 export const load: PageServerLoad = async (event) => {
 	const { user } = await event.parent();
 	if (!user.roles.some((role) => READER_ROLES.includes(role))) {
-		error(403, 'Requires admin or super_admin role');
+		error(403, forbiddenText('the license'));
 	}
 
 	// Read here rather than taken from the shell, which kept its answer across
@@ -55,12 +59,11 @@ export const actions: Actions = {
 			});
 			return { success: true, ...result };
 		} catch (e) {
-			// The license module words its refusal for the operator, so it is
-			// shown as it was sent.
-			if (e instanceof ApiError) {
-				return fail(e.status, { error: e.message });
-			}
-			return fail(500, { error: 'Renewal failed' });
+			// The license module words its refusal for the operator, so a
+			// refusal is shown as it was sent. A failure of the engine is not
+			// written for the operator, and its text never reaches the page.
+			const status = e instanceof ApiError ? (e.status < 500 ? e.status : 502) : 500;
+			return fail(status, { error: actionError(e, RENEW_FAILED) });
 		}
 	},
 };

@@ -19,6 +19,7 @@ import {
 	type RetentionPolicy,
 } from '$lib/api/retention';
 import { rowsOf } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -38,14 +39,15 @@ export const load: PageServerLoad = async (event) => {
 	// The two halves have to be read together or the page lies: a policy alone
 	// does not mean entries are being deleted, because a hold overrides it.
 	// An unread hold list is never drawn as no holds.
-	const holds =
+	const holds: Section<LegalHold[]> =
 		gate.state === 'ok'
-			? await listHolds(client)
-					.then((h) => ({ rows: rowsOf(h), read: true }))
-					.catch(() => ({ rows: [] as LegalHold[], read: false }))
-			: { rows: [] as LegalHold[], read: false };
+			? await section(
+					listHolds(client).then((h) => rowsOf(h)),
+					'The holds could not be read, so the policies above cannot be trusted to describe what is actually being deleted.'
+				)
+			: { ok: false, gate };
 
-	return { policies, holds: holds.rows, holdsRead: holds.read, gate };
+	return { policies, holds, gate };
 };
 
 export const actions: Actions = {
@@ -56,12 +58,13 @@ export const actions: Actions = {
 
 		const days = Number(form.get('retention_days'));
 		if (!Number.isFinite(days) || days < 0 || !Number.isInteger(days)) {
-			return fail(400, { error: 'A retention window is a whole number of days, and cannot be negative.' });
+			return fail(400, { action: 'createPolicy' as const, error: 'A retention window is a whole number of days, and cannot be negative.' });
 		}
 		const archival = form.get('archival_enabled') === 'true';
 		const storage = String(form.get('archival_storage') ?? '').trim();
 		if (archival && !storage) {
 			return fail(400, {
+				action: 'createPolicy' as const,
 				error: 'Archival is on but no storage backend is named, so there is nowhere to archive to and the entries would be deleted outright.',
 			});
 		}
@@ -76,7 +79,7 @@ export const actions: Actions = {
 				archival_path_prefix: String(form.get('archival_path_prefix') ?? '').trim(),
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The policy could not be created.') });
+			return fail(400, { action: 'createPolicy' as const, error: actionError(err, 'The policy could not be created.') });
 		}
 		return { saved: 'policy' };
 	},
@@ -86,11 +89,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No policy was named.' });
+		if (!id) return fail(400, { action: 'deletePolicy' as const, error: 'No policy was named.' });
 		try {
 			await deletePolicy(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The policy could not be removed.') });
+			return fail(400, { action: 'deletePolicy' as const, error: actionError(err, 'The policy could not be removed.') });
 		}
 		return { removed: id };
 	},
@@ -101,7 +104,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		if (!name) {
-			return fail(400, { error: 'Name the hold. Somebody has to be able to tell later what it was for.' });
+			return fail(400, { action: 'createHold' as const, error: 'Name the hold. Somebody has to be able to tell later what it was for.' });
 		}
 		try {
 			await createHold(client, {
@@ -113,7 +116,7 @@ export const actions: Actions = {
 				filter_tenant_id: String(form.get('filter_tenant_id') ?? '').trim(),
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The hold could not be created.') });
+			return fail(400, { action: 'createHold' as const, error: actionError(err, 'The hold could not be created.') });
 		}
 		return { saved: name };
 	},
@@ -123,11 +126,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No hold was named.' });
+		if (!id) return fail(400, { action: 'releaseHold' as const, error: 'No hold was named.' });
 		try {
 			await releaseHold(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The hold could not be released.') });
+			return fail(400, { action: 'releaseHold' as const, error: actionError(err, 'The hold could not be released.') });
 		}
 		return { released: id };
 	},
@@ -140,7 +143,7 @@ export const actions: Actions = {
 			const result = await enforceNow(client);
 			return { enforced: true, deleted: result.deleted ?? 0 };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Retention could not be enforced.') });
+			return fail(400, { action: 'enforce' as const, error: actionError(err, 'Retention could not be enforced.') });
 		}
 	},
 };
