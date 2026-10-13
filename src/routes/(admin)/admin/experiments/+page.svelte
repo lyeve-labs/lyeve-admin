@@ -162,7 +162,7 @@
 	function removeExperiment(e: Experiment): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${e.name}?`,
+				`Delete experiment ${e.name}?`,
 				'Its variants, its metrics and every exposure recorded against it go with it.',
 				{ confirmLabel: 'Delete' },
 			);

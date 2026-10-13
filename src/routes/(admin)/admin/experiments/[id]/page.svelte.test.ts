@@ -241,3 +241,16 @@ describe('where a failure shows', () => {
 	});
 
 });
+
+describe('the new metric drawer', () => {
+	// Four short types fit in sight, so they are segments rather than a list
+	// that hides three of them.
+	it('offers the four metric types as segments and submits the chosen one', async () => {
+		const { container, getAllByText } = render(DetailPage, { props: props() });
+		await fireEvent.click(getAllByText('New metric')[0]);
+
+		const drawer = container.ownerDocument.querySelector('#metric-form') as HTMLElement;
+		expect(drawer.querySelectorAll('[role="radio"]').length).toBe(4);
+		expect((drawer.querySelector('input[name="metric_type"]') as HTMLInputElement).value).toBe('conversion');
+	});
+});

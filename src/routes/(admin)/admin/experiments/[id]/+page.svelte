@@ -9,7 +9,7 @@
 		Input,
 		PageShell,
 		SectionHeading,
-		Select,
+		SegmentedControl,
 		Stat,
 		Table,
 		Textarea,
@@ -69,6 +69,8 @@
 	const thin = $derived(underpowered(exp, results));
 	const exposures = $derived(totalSample(results));
 
+	const METRIC_OPTIONS = METRIC_TYPES.map((t) => ({ value: t, label: t }));
+
 	let addingVariant = $state(false);
 	let variantName = $state('');
 	let variantDescription = $state('');
@@ -124,7 +126,7 @@
 	function removeVariant(v: Variant): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Remove ${v.name}?`,
+				`Remove variant ${v.name}?`,
 				'Exposures already recorded against it stay, so the results keep counting people who saw it.',
 				{ confirmLabel: 'Remove' },
 			);
@@ -141,7 +143,7 @@
 
 	function removeMetric(m: Metric): SubmitFunction {
 		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(`Remove ${m.name}?`, 'The events it counted stay recorded.', {
+			const confirmed = await confirmDialog(`Remove metric ${m.name}?`, 'The events it counted stay recorded.', {
 				confirmLabel: 'Remove',
 			});
 			if (!confirmed) {
@@ -428,13 +430,7 @@
 				bind:value={metricEvent}
 				required
 			/>
-			<Select
-				id="metric-type"
-				name="metric_type"
-				label="Type"
-				bind:value={metricKind}
-				options={METRIC_TYPES.map((t) => ({ value: t, label: t }))}
-			/>
+			<SegmentedControl name="metric_type" label="Type" bind:value={metricKind} options={METRIC_OPTIONS} />
 			<Textarea
 				id="metric-description"
 				name="description"

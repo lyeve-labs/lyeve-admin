@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -16,7 +16,7 @@ import {
 	type Experiment,
 	type Transition,
 } from '$lib/api/ab-testing';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -62,10 +62,13 @@ export const load: PageServerLoad = async (event) => {
 	let gate: AbGate = AB_OK;
 	try {
 		const page = pageOf(await listExperiments(client, limit + 1, offset), limit, offset);
+		const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 		experiments = page.rows;
 		total = page.total;
 		hasMore = page.hasMore;
 	} catch (err) {
+		if (isRedirect(err)) throw err;
 		gate = abGate(err);
 	}
 
