@@ -268,9 +268,36 @@
 								</td>
 								<td data-cell="nowrap">
 									<div class="flex items-center justify-end gap-1">
-										<Button variant="ghost" size="sm" aria-label="Edit {r.route_pattern}" onclick={() => openEdit(r)}>
-											<Pencil size={ICON.sm} />
-										</Button>
+										{#if !canCreate && r.enabled}
+											<!-- The plugin refuses any change that leaves a rule enabled on
+											     this license, so the drawer is not offered. Switching the
+											     rule off stays allowed, from the row. -->
+											<Button
+												variant="ghost"
+												size="sm"
+												aria-label="Edit {r.route_pattern}"
+												disabled
+												title="{NOT_INCLUDED}. Switch the rule off or delete it."
+											>
+												<Pencil size={ICON.sm} />
+											</Button>
+											<form method="POST" action="?/updateRule" use:enhance>
+												<input type="hidden" name="from" value="row" />
+												<input type="hidden" name="id" value={r.id} />
+												<input type="hidden" name="route_pattern" value={r.route_pattern} />
+												<input type="hidden" name="method" value={r.method} />
+												<input type="hidden" name="sample_percent" value={String(Math.round(r.sample_rate * 1000) / 10)} />
+												<input type="hidden" name="retention_seconds" value={String(r.retention_seconds)} />
+												<input type="hidden" name="enabled" value="false" />
+												<Button variant="ghost" size="sm" type="submit" aria-label="Switch off {r.route_pattern}">
+													Switch off
+												</Button>
+											</form>
+										{:else}
+											<Button variant="ghost" size="sm" aria-label="Edit {r.route_pattern}" onclick={() => openEdit(r)}>
+												<Pencil size={ICON.sm} />
+											</Button>
+										{/if}
 										<form
 											method="POST"
 											action="?/deleteRule"
@@ -509,7 +536,15 @@
 				options={retentionOptions(editing?.retention_seconds)}
 			/>
 			<input type="hidden" name="enabled" value={ruleEnabled ? 'true' : 'false'} />
-			<Toggle id="capture-enabled" label="Apply this rule" bind:checked={ruleEnabled} />
+			<!-- Applying a rule needs the license. A rule that is off can still
+			     be edited and saved off. -->
+			<Toggle
+				id="capture-enabled"
+				label="Apply this rule"
+				bind:checked={ruleEnabled}
+				disabled={!canCreate && !ruleEnabled}
+				hint={!canCreate && !ruleEnabled ? `${NOT_INCLUDED}, so the rule stays off.` : undefined}
+			/>
 		</div>
 	</form>
 	{#snippet footer()}

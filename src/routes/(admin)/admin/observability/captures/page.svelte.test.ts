@@ -210,3 +210,26 @@ describe('a failed rule save', () => {
 		expect(form.textContent).not.toContain('could not be deleted');
 	});
 });
+
+describe('editing a rule without the license', () => {
+	// The plugin refuses any change that leaves a rule enabled, so the drawer
+	// could only fail. Switching the rule off stays allowed.
+	it('offers no edit of an enabled rule, and offers to switch it off', () => {
+		const { container } = render(CapturesPage, { props: props({ licensed: false }) });
+		const edit = screen.getByRole('button', { name: `Edit ${rule.route_pattern}` }) as HTMLButtonElement;
+		expect(edit.disabled).toBe(true);
+		expect(edit.getAttribute('title')).toContain('Not included in this license');
+		const off = screen.getByRole('button', { name: `Switch off ${rule.route_pattern}` });
+		const form = off.closest('form') as HTMLFormElement;
+		expect(form.getAttribute('action')).toBe('?/updateRule');
+		expect((form.querySelector('input[name="enabled"]') as HTMLInputElement).value).toBe('false');
+		expect((form.querySelector('input[name="from"]') as HTMLInputElement).value).toBe('row');
+		void container;
+	});
+
+	it('keeps Edit live on a licensed install', () => {
+		render(CapturesPage, { props: props({ licensed: true }) });
+		expect((screen.getByRole('button', { name: `Edit ${rule.route_pattern}` }) as HTMLButtonElement).disabled).toBe(false);
+		expect(screen.queryByRole('button', { name: `Switch off ${rule.route_pattern}` })).toBeNull();
+	});
+});
