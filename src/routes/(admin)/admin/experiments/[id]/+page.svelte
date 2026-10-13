@@ -37,6 +37,7 @@
 		type Variant,
 	} from '$lib/api/ab-testing';
 	import { NO_VALUE } from '$lib/format';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
@@ -44,9 +45,11 @@
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const exp = $derived(data.experiment);
-	const soundSplit = $derived(splitIsSound(data.variants));
-	const thin = $derived(underpowered(exp, data.results));
-	const exposures = $derived(totalSample(data.results));
+	const variants = $derived(data.variants.ok ? data.variants.value : []);
+	const results = $derived(data.results.ok ? data.results.value : null);
+	const soundSplit = $derived(splitIsSound(variants));
+	const thin = $derived(underpowered(exp, results));
+	const exposures = $derived(totalSample(results));
 
 	let addingVariant = $state(false);
 	let variantName = $state('');
@@ -67,8 +70,8 @@
 		variantConfig = '';
 		// What is left of a hundred, so a second variant defaults to completing
 		// the split rather than to a number somebody has to work out.
-		variantShare = String(Math.max(0, Math.round((100 - splitTotal(data.variants)) * 10) / 10));
-		variantIsControl = data.variants.length === 0;
+		variantShare = String(Math.max(0, Math.round((100 - splitTotal(variants)) * 10) / 10));
+		variantIsControl = variants.length === 0;
 		addingVariant = true;
 	}
 
@@ -157,9 +160,13 @@
 		<!-- The sentence, not the number. "Not significant" is the most misread
 		     result in the product: it is not a tie, it is an experiment that has
 		     not answered, and reading it as a tie ships changes on noise. -->
-		<Alert tone={hasWinner(data.results) ? 'success' : 'brand'}>
-			{verdict(data.results)}
-		</Alert>
+		{#if data.results.ok}
+			<Alert tone={hasWinner(results) ? 'success' : 'brand'}>
+				{verdict(results)}
+			</Alert>
+		{:else}
+			<GateNotice gate={data.results.gate} title="the results" absent="This experiment is no longer there, so it has no results." />
+		{/if}
 
 		{#if thin}
 			<Alert tone="warn">
@@ -171,12 +178,12 @@
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
-			<Stat size="sm" mono label="Exposures" value={totalSample(data.results)} />
-			<Stat size="sm" mono label="Variants" value={data.variants.length} />
-			<Stat size="sm" mono label="Metrics" value={data.metrics.length} />
+			<Stat size="sm" mono label="Exposures" value={data.results.ok ? exposures : 'unknown'} />
+			<Stat size="sm" mono label="Variants" value={data.variants.ok ? data.variants.value.length : 'unknown'} />
+			<Stat size="sm" mono label="Metrics" value={data.metrics.ok ? data.metrics.value.length : 'unknown'} />
 		</div>
 
-		{#if data.results && data.results.variants.length > 0}
+		{#if results && results.variants.length > 0}
 			<Table label="What the results support">
 				<thead>
 					<tr>
@@ -188,14 +195,14 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.results.variants as v (v.variant_id)}
+					{#each results.variants as v (v.variant_id)}
 						<tr>
 							<td data-cell="nowrap">
 								<span class="font-medium text-fg">{v.variant_name}</span>
 								{#if v.is_control}
 									<Badge tone="neutral">Control</Badge>
 								{/if}
-								{#if hasWinner(data.results) && data.results.winner === v.variant_name}
+								{#if hasWinner(results) && results.winner === v.variant_name}
 									<Badge tone="success">Ahead</Badge>
 								{/if}
 							</td>
@@ -212,17 +219,19 @@
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Variants</SectionHeading>
-		{#if !soundSplit && data.variants.length > 0}
+		{#if !soundSplit && variants.length > 0}
 			<!-- Each variant carries its own percentage and nothing reconciles them,
 			     so a split of 60/60 is storable and means whatever the bucketing
 			     does with it. Nothing else in the product says so. -->
 			<Alert tone="warn">
-				The shares add up to {splitTotal(data.variants)}%, not 100%. Traffic is still split, but
+				The shares add up to {splitTotal(variants)}%, not 100%. Traffic is still split, but
 				not in the proportions written here.
 			</Alert>
 		{/if}
 
-		{#if data.variants.length === 0}
+		{#if !data.variants.ok}
+			<GateNotice gate={data.variants.gate} title="the variants" absent="This experiment is no longer there, so it has no variants." />
+		{:else if variants.length === 0}
 			<EmptyState
 				title="No variant yet"
 				description="An experiment with no variants splits nothing. Add a control and at least one alternative."
@@ -247,7 +256,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.variants as v (v.id)}
+					{#each variants as v (v.id)}
 						<tr>
 							<td data-cell="nowrap">
 								<span class="font-medium text-fg">{v.name}</span>
@@ -286,7 +295,9 @@
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Metrics</SectionHeading>
-		{#if data.metrics.length === 0}
+		{#if !data.metrics.ok}
+			<GateNotice gate={data.metrics.gate} title="the metrics" absent="This experiment is no longer there, so it has no metrics." />
+		{:else if data.metrics.value.length === 0}
 			<EmptyState
 				title="No metric yet"
 				description="Nothing is being counted, so this experiment can never produce a result."
@@ -311,7 +322,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.metrics as m (m.id)}
+					{#each data.metrics.value as m (m.id)}
 						<tr>
 							<td data-cell="nowrap">
 								<span class="font-medium text-fg">{m.name}</span>

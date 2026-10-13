@@ -75,8 +75,8 @@ describe('the experiment load', () => {
 
 		const out = (await load(loadEvent())) as Record<string, unknown>;
 
-		expect(out.variants).toEqual([variant('v1', 'control'), variant('v2', 'green')]);
-		expect(out.metrics).toEqual([metric]);
+		expect(out.variants).toEqual({ ok: true, value: [variant('v1', 'control'), variant('v2', 'green')] });
+		expect(out.metrics).toEqual({ ok: true, value: [metric] });
 	});
 
 	it('asks for every variant and metric in one page', async () => {
@@ -104,8 +104,20 @@ describe('the experiment load', () => {
 
 		const out = (await load(loadEvent())) as Record<string, unknown>;
 
-		expect(out.variants).toEqual([]);
-		expect(out.metrics).toEqual([metric]);
-		expect(out.results).toBeNull();
+		expect(out.variants).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(out.metrics).toEqual({ ok: true, value: [metric] });
+		expect(out.results).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it.each([
+		[403, 403],
+		[402, 402],
+		[404, 404],
+		[429, 429],
+		[503, 503],
+	])('answers an experiment read refused with %i as %i', async (engineStatus, pageStatus) => {
+		route({ [`/experiments/${ID}`]: new ApiError(engineStatus, 'refused', {}) });
+
+		await expect(load(loadEvent())).rejects.toMatchObject({ status: pageStatus });
 	});
 });

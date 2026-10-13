@@ -2,6 +2,8 @@ import type { PageServerLoad, Actions } from './$types';
 import { error, fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
+import { readError } from '$lib/server/read-error';
+import { section } from '$lib/api/gate';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { ApiError } from '@lyeve-labs/client';
@@ -41,17 +43,19 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		experiment = await client.get<Experiment>(`${EXPERIMENTS_URL}/${encodeURIComponent(id)}`);
 	} catch (err) {
-		if (err instanceof ApiError && err.status === 404) error(404, 'No such experiment');
-		error(503, 'The experiment could not be read');
+		// The page has nothing to draw without the experiment, and a plugin this
+		// instance is not enabled for is not an experiment that is missing.
+		if (err instanceof ApiError && err.status === 402) error(402, 'A/B testing is not enabled on this instance.');
+		readError(err, 'No such experiment');
 	}
 
-	// Each panel is read on its own so one failure does not empty the page.
-	// Results in particular fail on an experiment nobody has been exposed to
-	// yet, which is not an error worth losing the variants over.
+	// Each panel is read on its own so one failure does not empty the page,
+	// and keeps its failure, so a panel that could not be read never offers
+	// to add the first row of a list that may already have rows.
 	const [variants, metrics, results] = await Promise.all([
-		listVariants(client, id).catch((): Variant[] => []),
-		listMetrics(client, id).catch((): Metric[] => []),
-		readResults(client, id).catch((): ExperimentResults | null => null),
+		section<Variant[]>(listVariants(client, id), 'The variants could not be read. This is not a report that there are none.'),
+		section<Metric[]>(listMetrics(client, id), 'The metrics could not be read. This is not a report that there are none.'),
+		section<ExperimentResults>(readResults(client, id), 'The results could not be read.'),
 	]);
 
 	const gate: AbGate = AB_OK;

@@ -70,17 +70,27 @@ function results(over: Partial<ExperimentResults> = {}): ExperimentResults {
 	};
 }
 
-const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
-	data: {
-		experiment: experiment(),
-		variants: [variant(), variant({ id: 'v2', name: 'bright', is_control: false })],
-		metrics: [metric()],
-		results: results(),
-		gate: { state: 'ok' },
-		...over,
-	} as never,
-	form: form as never,
-});
+const ok = <T>(value: T) => ({ ok: true, value });
+const down = { ok: false, gate: { state: 'unavailable' } };
+
+/** Each panel answered, unless `over` says otherwise. A bare value is an answered read. */
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => {
+	const panel = (key: string, fallback: unknown) => {
+		const v = key in over ? over[key] : fallback;
+		return v && typeof v === 'object' && 'ok' in v ? v : ok(v);
+	};
+	return {
+		data: {
+			experiment: experiment(),
+			gate: { state: 'ok' },
+			...over,
+			variants: panel('variants', [variant(), variant({ id: 'v2', name: 'bright', is_control: false })]),
+			metrics: panel('metrics', [metric()]),
+			results: panel('results', results()),
+		} as never,
+		form: form as never,
+	};
+};
 
 describe('the verdict', () => {
 	it('names the leader when the engine called it significant', () => {
@@ -167,8 +177,40 @@ describe('the empty states', () => {
 		expect(said(container)).toContain('can never produce a result');
 	});
 
-	it('says there is no result yet rather than reporting one', () => {
-		const { container } = render(DetailPage, { props: props({ results: null }) });
-		expect(said(container)).toContain('No results yet');
+	it('says nobody has been exposed yet when the results answer with no exposure', () => {
+		const { container } = render(DetailPage, { props: props({ results: results({ variants: [], significant: false, winner: null }) }) });
+		expect(said(container)).toContain('Nobody has been exposed to this experiment yet');
 	});
 });
+
+/*
+ * A panel whose read failed is not an empty panel. Offering to add the first
+ * variant over a list that may already have two would duplicate them on the
+ * next try.
+ */
+describe('a panel that could not be read', () => {
+	it('says the variants could not be read and offers no new variant', () => {
+		const { container } = render(DetailPage, { props: props({ variants: down }) });
+		const text = said(container);
+		expect(text).toContain('the variants could not be read');
+		expect(text).not.toContain('splits nothing');
+		expect(text).not.toContain('New variant');
+	});
+
+	it('says the metrics could not be read and offers no new metric', () => {
+		const { container } = render(DetailPage, { props: props({ metrics: down }) });
+		const text = said(container);
+		expect(text).toContain('the metrics could not be read');
+		expect(text).not.toContain('can never produce a result');
+		expect(text).not.toContain('New metric');
+	});
+
+	it('says the results could not be read and counts no exposure', () => {
+		const { container } = render(DetailPage, { props: props({ results: down }) });
+		const text = said(container);
+		expect(text).toContain('the results could not be read');
+		expect(text).not.toContain('Nobody has been exposed');
+		expect(text).toContain('Exposures unknown');
+	});
+});
+
