@@ -16,6 +16,7 @@
 		dismissDialog,
 		openDialog,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { ScrollText, Download, Trash2 } from '@lucide/svelte';
@@ -58,7 +59,8 @@
 			size: 'sm',
 		}).catch(() => false);
 		if (!ok || !pruneDate) return;
-		await Promise.resolve();
+		// The form's field takes the chosen date on the next render.
+		await tick();
 		pruneForm?.requestSubmit();
 	}
 

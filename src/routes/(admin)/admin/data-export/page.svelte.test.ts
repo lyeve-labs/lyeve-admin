@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}), invalidate: vi.fn(async () => {}) }));
@@ -183,5 +183,34 @@ describe('Data export panels that could not be read', () => {
 	it('offers no new schedule while the list is unread', () => {
 		const { queryByRole } = render(ExportPage, { props: props({ schedules: failed }) });
 		expect(queryByRole('button', { name: /new schedule/i })).toBeNull();
+	});
+});
+
+describe('Data export empty states', () => {
+	it('offers the action that fills an empty export list', () => {
+		const { getAllByRole } = render(ExportPage, { props: props({ jobs: [], total: 0 }) });
+		expect(getAllByRole('button', { name: /new export/i }).length).toBeGreaterThan(1);
+	});
+
+	it('offers the action that fills an empty schedule list', () => {
+		const { getByRole } = render(ExportPage, { props: props() });
+		expect(getByRole('button', { name: /new schedule/i })).toBeTruthy();
+	});
+});
+
+describe('Data export filter on this page', () => {
+	it('draws no empty table and no pager above a filter that matches nothing', async () => {
+		const { container } = render(ExportPage, { props: props() });
+		const search = container.querySelector('#export-narrow') as HTMLInputElement;
+
+		await fireEvent.input(search, { target: { value: 'nothing like it' } });
+
+		expect(said(container)).toContain('Nothing on this page matches');
+		expect(container.querySelector('table')).toBeNull();
+		const empty = [...container.querySelectorAll('*')].find((el) => el.textContent?.trim() === 'Nothing on this page matches');
+		const pager = container.querySelector('nav');
+		if (empty && pager) {
+			expect(empty.compareDocumentPosition(pager) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		}
 	});
 });

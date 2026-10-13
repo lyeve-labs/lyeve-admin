@@ -96,7 +96,7 @@
 	function removeRegion(r: Region): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${r.display_name}?`,
+				`Delete region ${r.display_name}`,
 				'Tenants assigned to it are not moved. Move them first, or the report stops accounting for where their data is.',
 				{ confirmLabel: 'Delete' },
 			);

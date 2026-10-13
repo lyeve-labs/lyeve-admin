@@ -408,6 +408,7 @@
 					id="import-template"
 					label="Mapping template"
 					hint="A saved mapping fills in the columns, their transforms, the key and the mode. You can still change them."
+					searchable
 					value={templateId}
 					onvaluechange={chooseTemplate}
 					options={templateOptions}
@@ -484,6 +485,7 @@
 								<Select
 									id="map-{t.value}"
 									label="Column for {t.label}"
+									searchable
 									bind:value={chosen[t.value]}
 									options={columnOptions}
 								/>
@@ -512,7 +514,7 @@
 					{ value: 'upsert', label: 'Create and update', description: 'Overwrite the fields of an entry the key finds, and create the rest.' },
 				]}
 			/>
-			<Select id="import-key" label="Key field" bind:value={key} options={keyOptions} />
+			<Select id="import-key" label="Key field" searchable bind:value={key} options={keyOptions} />
 		{:else if step === 2 && checked}
 			<div class="grid gap-3 sm:grid-cols-3">
 				<Stat size="sm" mono label="Rows in the file" value={formatCount(checked.total_rows)} />

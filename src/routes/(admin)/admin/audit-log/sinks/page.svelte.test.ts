@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
 
 import SinksPage from './+page.svelte';
 
@@ -60,5 +66,22 @@ describe('audit sinks page', () => {
 	it('says why the page is empty when the plugin is not there', () => {
 		const { container } = setup({ gate: { state: 'absent' } });
 		expect(container.textContent).toContain('does not stream the audit log');
+	});
+});
+
+describe('audit sink controls', () => {
+	// Three short kinds are a row of segments, every one in sight at once.
+	it('offers the destination kinds as segments, not a list to open', async () => {
+		setup({ sinks: [sink] });
+		await fireEvent.click(screen.getByRole('button', { name: /new destination/i }));
+		expect(screen.getByRole('radio', { name: 'HTTPS endpoint' })).toBeTruthy();
+		expect(screen.getByRole('radiogroup', { name: 'Destination' })).toBeTruthy();
+	});
+
+	it('names the destination in the delete confirmation title', async () => {
+		setup({ sinks: [sink] });
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete Security SIEM' }));
+		const [title] = kit.confirm.mock.calls[0] as unknown as [string];
+		expect(title).toBe('Delete destination Security SIEM');
 	});
 });

@@ -13,10 +13,11 @@
 		Modal,
 		PageShell,
 		PasswordInput,
-		Select,
+		SegmentedControl,
 		Toggle,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { Pencil, Plus, Radio, Send, Trash2 } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
@@ -121,12 +122,13 @@
 	let targetId = $state('');
 	let deleteForm = $state<HTMLFormElement>();
 	async function askDelete(s: AuditSink) {
-		const ok = await confirmDialog(`Delete ${s.name}?`, 'The destination stops receiving the audit log. Entries already sent stay where they are.', {
+		const ok = await confirmDialog(`Delete destination ${s.name}`, 'The destination stops receiving the audit log. Entries already sent stay where they are.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		targetId = s.id;
-		await Promise.resolve();
+		// The hidden field takes the id on the next render.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 </script>
@@ -230,13 +232,12 @@
 		{#if editing}
 			<Input id="sink-kind" label="Destination" value={SINK_KIND_LABELS[kind]} disabled hint="A destination keeps its kind. Create a new one to change it." />
 		{:else}
-			<Select
-				id="sink-kind"
+			<SegmentedControl
 				name="kind"
 				label="Destination"
 				options={KIND_OPTIONS}
 				value={kind}
-				onvaluechange={(v) => (kind = v as SinkKind)}
+				onchange={(v) => (kind = v)}
 			/>
 		{/if}
 		<Input id="sink-url" name="url" label="URL" type="url" required bind:value={url} error={errors.url} hint={URL_HINTS[kind]} />

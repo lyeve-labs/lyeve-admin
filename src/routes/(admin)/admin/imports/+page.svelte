@@ -12,8 +12,8 @@
 		Pagination,
 		Input,
 		Progress,
+		RadioGroup,
 		SectionHeading,
-		SegmentedControl,
 		Select,
 		Spinner,
 		Stat,
@@ -253,7 +253,7 @@
 	function removeTemplate(t: MappingTemplate): SubmitFunction {
 		return async ({ cancel: stop }) => {
 			const confirmed = await confirmDialog(
-				`Delete the template ${t.name}?`,
+				`Delete template ${t.name}`,
 				'Imports that already ran with it keep their history. Nothing else changes.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -388,10 +388,13 @@
 			{#if data.jobs.length === 0}
 				<EmptyState
 					title="Nothing has been imported"
-					description="Start one with New import. Each import appears here with what it wrote and what it rejected."
+					description="Each import appears here with what it wrote and what it rejected."
 				>
 					{#snippet iconSnippet()}
 						<Upload size={ICON.lg} />
+					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={() => (wizardOpen = true)}><Plus size={ICON.sm} /> New import</Button>
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -514,9 +517,11 @@
 		<section class="flex flex-col gap-4" aria-label="Mapping templates">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<SectionHeading level={2}>Mapping templates</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={() => openTemplate(null)}>
-					<Plus size={ICON.sm} /> New template
-				</Button>
+				{#if data.templatesRead && data.templates.length > 0}
+					<Button variant="secondary" size="sm" onclick={() => openTemplate(null)}>
+						<Plus size={ICON.sm} /> New template
+					</Button>
+				{/if}
 			</div>
 			<p class="text-sm text-muted">
 				A template keeps a mapping, with its transforms, key and mode, so an import of the same kind of file
@@ -534,6 +539,9 @@
 				<EmptyState title="No mapping template" description="Each import maps its columns from scratch.">
 					{#snippet iconSnippet()}
 						<Rows3 size={ICON.lg} />
+					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={() => openTemplate(null)}><Plus size={ICON.sm} /> New template</Button>
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -613,13 +621,14 @@
 				bind:value={templateType}
 				options={(schemaList ?? []).map((x) => ({ value: x.name, label: x.name }))}
 			/>
-			<SegmentedControl
+			<RadioGroup
 				label="When an entry already exists"
 				name="mode"
+				hint="The key field decides which entry a row is."
 				bind:value={templateMode}
 				options={[
-					{ value: 'create', label: 'Create only' },
-					{ value: 'upsert', label: 'Create and update' },
+					{ value: 'create', label: 'Create only', description: 'Leave an entry the key finds alone and report the row as skipped.' },
+					{ value: 'upsert', label: 'Create and update', description: 'Overwrite the fields of an entry the key finds, and create the rest.' },
 				]}
 			/>
 			{#if templateMode === 'upsert'}
@@ -628,6 +637,7 @@
 					name="upsert_key"
 					label="Key field"
 					hint="The field that finds the entry a row updates."
+					searchable
 					bind:value={templateKey}
 					options={[
 						{ value: '', label: 'Choose the key field' },
@@ -644,6 +654,7 @@
 							<Select
 								id="template-target-{r.id}"
 								label="Field"
+								searchable
 								bind:value={r.target}
 								options={[{ value: '', label: 'Choose a field' }, ...targetOptions]}
 							/>

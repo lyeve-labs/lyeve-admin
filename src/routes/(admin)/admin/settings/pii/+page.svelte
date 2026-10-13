@@ -135,8 +135,8 @@
 	async function askDelete(rule: CustomRule) {
 		deleteId = rule.id;
 		const ok = await confirm(
-			'Delete rule',
-			`Delete ${rule.name}? Anything it was hiding is served unmasked from the next request.`,
+			`Delete rule ${rule.name}`,
+			'Anything it was hiding is served unmasked from the next request.',
 			{ confirmLabel: 'Delete' },
 		).catch(() => false);
 		if (ok) deleteForm?.requestSubmit();
@@ -380,31 +380,6 @@
 					{/snippet}
 				</ListToolbar>
 
-				<Table label="Unmasked reads">
-					<thead>
-						<tr>
-							<th scope="col">Read</th>
-							<th scope="col">Kind</th>
-							<th scope="col">Record</th>
-							<th scope="col">Role</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as entry (entry.id)}
-							<tr>
-								<td data-cell="nowrap" class="text-xs text-faint"
-									>{formatDateTime(entry.accessed_at)}</td
-								>
-								<td data-cell="nowrap">{entry.pii_type}</td>
-								<td data-cell="nowrap" class="font-mono text-xs"
-									>{entry.record_type ?? NO_VALUE}</td
-								>
-								<td data-cell="nowrap" class="text-xs">{entry.viewer_role ?? NO_VALUE}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-
 				{#if visible.length === 0}
 					<EmptyState
 						title="Nothing on this page matches"
@@ -414,6 +389,31 @@
 							<Search size={ICON.lg} />
 						{/snippet}
 					</EmptyState>
+				{:else}
+					<Table label="Unmasked reads">
+						<thead>
+							<tr>
+								<th scope="col">Read</th>
+								<th scope="col">Kind</th>
+								<th scope="col">Record</th>
+								<th scope="col">Role</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as entry (entry.id)}
+								<tr>
+									<td data-cell="nowrap" class="text-xs text-faint"
+										>{formatDateTime(entry.accessed_at)}</td
+									>
+									<td data-cell="nowrap">{entry.pii_type}</td>
+									<td data-cell="nowrap" class="font-mono text-xs"
+										>{entry.record_type ?? NO_VALUE}</td
+									>
+									<td data-cell="nowrap" class="text-xs">{entry.viewer_role ?? NO_VALUE}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
 				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}

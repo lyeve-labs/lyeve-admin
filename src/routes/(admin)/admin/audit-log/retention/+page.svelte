@@ -127,7 +127,7 @@
 	function removePolicy(p: RetentionPolicy): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				'Delete this policy?',
+				`Delete the policy covering ${policyScope(p)}`,
 				'Entries it covered stop being deleted, so the audit log grows without limit until another policy covers them.',
 				{ confirmLabel: 'Delete' },
 			);

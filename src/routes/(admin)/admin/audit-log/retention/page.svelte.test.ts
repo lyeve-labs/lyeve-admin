@@ -91,6 +91,17 @@ describe('Retention controls by role', () => {
 	});
 });
 
+describe('Retention policy delete', () => {
+	it('names the policy in the confirmation title', async () => {
+		render(RetentionPage, { props: props(['super_admin']) });
+		const submit = forms.submits.get('?/deletePolicy');
+		expect(submit).toBeTypeOf('function');
+		await submit?.({ cancel: vi.fn() } as never);
+		const [title] = kit.confirm.mock.calls[0] as unknown as [string];
+		expect(title).toBe('Delete the policy covering content.delete on article');
+	});
+});
+
 describe('Retention drawers', () => {
 	it('shows a refused policy inside the open drawer', async () => {
 		const { getAllByRole } = render(RetentionPage, {

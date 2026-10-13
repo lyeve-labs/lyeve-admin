@@ -138,3 +138,17 @@ describe('Imports rollback by role', () => {
 		expect(container.querySelector('[aria-label^="Roll back"]')).toBeNull();
 	});
 });
+
+describe('Imports controls', () => {
+	it('offers the action that fills an empty history', () => {
+		render(ImportsPage, { props: props({ jobs: [], total: 0 }) });
+		expect(screen.getAllByRole('button', { name: /new import/i }).length).toBeGreaterThan(1);
+	});
+
+	it('asks what to do with an existing entry with a sentence on each choice', async () => {
+		render(ImportsPage, { props: props({ templates: [], templatesRead: true }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
+		expect(screen.getByRole('radio', { name: /create only/i })).toBeTruthy();
+		expect(document.body.textContent).toContain('Overwrite the fields of an entry the key finds');
+	});
+});

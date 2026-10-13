@@ -145,7 +145,7 @@
 	function remove(p: StorageProvider): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
+				`Delete provider ${p.name}`,
 				'Objects already stored there stay where they are, and nothing in this instance can read them afterwards.',
 				{ confirmLabel: 'Delete' },
 			);
