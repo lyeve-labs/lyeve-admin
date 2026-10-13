@@ -44,8 +44,12 @@ function schedule(over: Partial<ExportSchedule> = {}): ExportSchedule {
 	};
 }
 
-const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
-	data: {
+// A list passed as a plain array is a read that answered. A case passes the
+// failed read itself to draw the page without one.
+const answered = (value: unknown) => (Array.isArray(value) ? { ok: true, value } : value);
+
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => {
+	const data: Record<string, unknown> = {
 		jobs: [job()],
 		schedules: [],
 		total: 1,
@@ -55,9 +59,11 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		licensed: true,
 		schemas: ['article', 'page'],
 		...over,
-	} as never,
-	form: form as never,
-});
+	};
+	data.schedules = answered(data.schedules);
+	data.schemas = answered(data.schemas);
+	return { data: data as never, form: form as never };
+};
 
 describe('Data export gate', () => {
 	it('shows the not-enabled state when the engine refuses the routes', () => {
@@ -157,5 +163,25 @@ describe('Data export while a job runs', () => {
 		});
 		expect(said(container)).toContain('Failed while storing the file');
 		expect(said(container)).toContain('storage put: disk full');
+	});
+});
+
+/*
+ * A schedule list that could not be read is not a report that nothing
+ * recurs. Drawn as one, an operator would create a second nightly export
+ * beside the one that is already running.
+ */
+describe('Data export panels that could not be read', () => {
+	const failed = { ok: false, gate: { state: 'error', message: 'The schedules could not be read. This is not a report that there are none.' } };
+
+	it('says the schedules could not be read instead of that there are none', () => {
+		const { container } = render(ExportPage, { props: props({ schedules: failed }) });
+		expect(said(container)).toContain('The schedules could not be read');
+		expect(said(container)).not.toContain('No recurring export');
+	});
+
+	it('offers no new schedule while the list is unread', () => {
+		const { queryByRole } = render(ExportPage, { props: props({ schedules: failed }) });
+		expect(queryByRole('button', { name: /new schedule/i })).toBeNull();
 	});
 });

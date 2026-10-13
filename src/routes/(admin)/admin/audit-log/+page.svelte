@@ -20,6 +20,7 @@
 	import { page } from '$app/state';
 	import { ScrollText, Download, Trash2 } from '@lucide/svelte';
 	import AuditTabs from '$lib/components/AuditTabs.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { NO_VALUE, formatDateTime } from '$lib/format';
 	import { listQuery } from '$lib/back';
@@ -120,7 +121,7 @@
 
 <PageShell
 	title="Audit log"
-	description={`${data.total} ${data.total === 1 ? 'entry' : 'entries'}`}
+	description={data.total === null ? undefined : `${data.total} ${data.total === 1 ? 'entry' : 'entries'}`}
 	width="wide"
 >
 	{#snippet actions()}
@@ -144,7 +145,7 @@
 		{/if}
 	{/snippet}
 
-	<AuditTabs active="entries" entries={data.total} />
+	<AuditTabs active="entries" entries={data.total ?? undefined} />
 
 	{#if prunedCount > 0}
 		<Alert tone="success" autoDismiss>
@@ -193,13 +194,19 @@
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Entries</SectionHeading>
 
-		{#if data.entries.length === 0 && filtered}
+		{#if !data.entries.ok}
+			<GateNotice
+				gate={data.entries.gate}
+				title="Audit log"
+				absent="The audit plugin is not in this build, so there is no audit log to read."
+			/>
+		{:else if data.entries.value.length === 0 && filtered}
 			<EmptyState
 				iconSnippet={emptyIcon}
 				title="No audit entries match"
 				description="Widen the dates, clear the action, or search another exact name: the engine matches whole values."
 			/>
-		{:else if data.entries.length === 0}
+		{:else if data.entries.value.length === 0}
 			<EmptyState
 				iconSnippet={emptyIcon}
 				title="No audit entries yet"
@@ -218,7 +225,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.entries as entry (entry.id)}
+						{#each data.entries.value as entry (entry.id)}
 							<tr>
 								<td class="whitespace-nowrap text-xs">
 									<span class="text-faint">{formatDateTime(entry.created_at)}</span>
@@ -243,8 +250,8 @@
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
-					count={data.entries.length}
-					total={data.total}
+					count={data.entries.value.length}
+					total={data.total ?? undefined}
 					noun="entries"
 					href={(page) => pageHref(pageOffset(page, data.limit))}
 				/>

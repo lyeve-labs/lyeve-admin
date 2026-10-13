@@ -18,7 +18,7 @@ const rules = {
 	mask_tags: { email: 'Partial email masking', secret: 'Full redaction to [redacted]' },
 };
 
-const props = (over: Record<string, unknown> = {}) => ({
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		rules,
 		entries: [
@@ -41,7 +41,7 @@ const props = (over: Record<string, unknown> = {}) => ({
 	} as never,
 	// The page reports the outcome of a save, so it takes the form prop every
 	// page with actions takes.
-	form: null as never,
+	form: form as never,
 });
 
 describe('PII masking gate', () => {
@@ -214,5 +214,20 @@ describe('custom PII rules', () => {
 	it('reports a pattern that does not compile', async () => {
 		const container = await withResult({ valid: false, error: 'pattern does not compile as RE2' });
 		expect(said(container)).toContain('does not compile');
+	});
+});
+
+describe('PII unmasked reads pager', () => {
+	it('offers the next page of the access log', () => {
+		const entries = Array.from({ length: 50 }, (_, i) => ({
+			id: `a${i}`,
+			viewer_role: 'admin',
+			pii_type: 'email',
+			record_type: 'user',
+			accessed_at: '2026-09-22T10:00:00Z',
+		}));
+		const { container } = render(PiiPage, { props: props({ entries, total: 120 }) });
+		const next = [...container.querySelectorAll('a')].find((a) => a.getAttribute('aria-label')?.includes('Next'));
+		expect(next?.getAttribute('href')).toBe('/admin/settings/pii?limit=50&offset=50');
 	});
 });

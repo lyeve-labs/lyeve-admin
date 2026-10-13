@@ -82,6 +82,9 @@
 			: data.jobs,
 	);
 
+	// Null while the schema list is unread, so the fields say why the choice is empty.
+	const schemaNames = $derived(data.schemas.ok ? data.schemas.value : null);
+
 	function downloadHref(id: string): string {
 		return `${JOBS_URL}/${encodeURIComponent(id)}/download`;
 	}
@@ -338,11 +341,19 @@
 		<section class="flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<SectionHeading level={2}>Schedules</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={openSchedule}>
-					<Plus size={ICON.sm} /> New schedule
-				</Button>
+				{#if data.schedules.ok}
+					<Button variant="secondary" size="sm" onclick={openSchedule}>
+						<Plus size={ICON.sm} /> New schedule
+					</Button>
+				{/if}
 			</div>
-			{#if data.schedules.length === 0}
+			{#if !data.schedules.ok}
+				<GateNotice
+					gate={data.schedules.gate}
+					title="Export schedules"
+					absent="This build does not run exports on a schedule."
+				/>
+			{:else if data.schedules.value.length === 0}
 				<EmptyState
 					title="No recurring export"
 					description="A schedule starts an export on a timetable, in UTC, and each run appears in the list above."
@@ -365,7 +376,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.schedules as schedule (schedule.id)}
+						{#each data.schedules.value as schedule (schedule.id)}
 							<tr>
 								<td data-cell="nowrap">{schedule.name}</td>
 								<td>
@@ -431,7 +442,7 @@
 			<Input id="export-name" name="name" label="Name" bind:value={name} required />
 			<ExportConfigFields
 				idPrefix="export"
-				schemaNames={data.schemas}
+				{schemaNames}
 				bind:format
 				bind:schemas
 				bind:statuses
@@ -474,7 +485,7 @@
 			<input type="hidden" name="cron_expression" value={schCron === 'custom' ? schCustom : schCron} />
 			<ExportConfigFields
 				idPrefix="schedule"
-				schemaNames={data.schemas}
+				{schemaNames}
 				bind:format={schFormat}
 				bind:schemas={schSchemas}
 				bind:statuses={schStatuses}

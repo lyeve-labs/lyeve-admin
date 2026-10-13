@@ -19,6 +19,7 @@ import {
 	type RetentionPolicy,
 } from '$lib/api/retention';
 import { rowsOf } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -38,14 +39,15 @@ export const load: PageServerLoad = async (event) => {
 	// The two halves have to be read together or the page lies: a policy alone
 	// does not mean entries are being deleted, because a hold overrides it.
 	// An unread hold list is never drawn as no holds.
-	const holds =
+	const holds: Section<LegalHold[]> =
 		gate.state === 'ok'
-			? await listHolds(client)
-					.then((h) => ({ rows: rowsOf(h), read: true }))
-					.catch(() => ({ rows: [] as LegalHold[], read: false }))
-			: { rows: [] as LegalHold[], read: false };
+			? await section(
+					listHolds(client).then((h) => rowsOf(h)),
+					'The holds could not be read, so the policies above cannot be trusted to describe what is actually being deleted.'
+				)
+			: { ok: false, gate };
 
-	return { policies, holds: holds.rows, holdsRead: holds.read, gate };
+	return { policies, holds, gate };
 };
 
 export const actions: Actions = {

@@ -78,6 +78,10 @@
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const refusal = $derived(formRefusal(form));
+	// Null while the content types are unread, so each place that offers one
+	// says why it offers none.
+	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
+	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 	const running = $derived(data.jobs.filter(cancelable));
 	const rejecting = $derived(data.jobs.filter((j) => outcome(j) === 'partial' || outcome(j) === 'nothing'));
 
@@ -157,28 +161,25 @@
 	}
 
 	const detailItems = $derived(
-		data.detail
+		detail
 			? [
-					{ term: 'Content type', value: data.detail.job.content_type },
+					{ term: 'Content type', value: detail.job.content_type },
 					{
 						term: 'Source',
-						value: `${data.detail.job.source_kind === 'url' ? 'Web address' : 'Upload'}, ${data.detail.job.source_format}`,
+						value: `${detail.job.source_kind === 'url' ? 'Web address' : 'Upload'}, ${detail.job.source_format}`,
 					},
 					{
 						term: 'When an entry exists',
-						value: data.detail.job.mode === 'upsert' ? 'Update it' : 'Leave it alone',
+						value: detail.job.mode === 'upsert' ? 'Update it' : 'Leave it alone',
 					},
 					{
 						term: 'Key field',
-						value:
-							data.detail.job.upsert_key === 'entry.slug'
-								? 'Entry slug'
-								: data.detail.job.upsert_key || 'None',
+						value: detail.job.upsert_key === 'entry.slug' ? 'Entry slug' : detail.job.upsert_key || 'None',
 					},
-					{ term: 'Created', value: formatCount(data.detail.job.inserted_rows) },
-					{ term: 'Updated', value: formatCount(data.detail.job.updated_rows) },
-					{ term: 'Skipped', value: formatCount(data.detail.job.skipped_rows) },
-					{ term: 'Rejected', value: formatCount(data.detail.job.errored_rows) },
+					{ term: 'Created', value: formatCount(detail.job.inserted_rows) },
+					{ term: 'Updated', value: formatCount(detail.job.updated_rows) },
+					{ term: 'Skipped', value: formatCount(detail.job.skipped_rows) },
+					{ term: 'Rejected', value: formatCount(detail.job.errored_rows) },
 				]
 			: [],
 	);
@@ -201,7 +202,7 @@
 	let nextRow = 0;
 
 	const templateTargets = $derived(
-		mappingTargets(data.schemas.find((x) => x.name === templateType)?.fields ?? []),
+		mappingTargets((schemaList ?? []).find((x) => x.name === templateType)?.fields ?? []),
 	);
 	const targetOptions = $derived(templateTargets.map((t) => ({ value: t.value, label: t.label })));
 
@@ -226,7 +227,7 @@
 	function openTemplate(t: MappingTemplate | null) {
 		editingTemplate = t;
 		templateName = t?.name ?? '';
-		templateType = t?.content_type ?? (data.schemas.length === 1 ? data.schemas[0].name : '');
+		templateType = t?.content_type ?? (schemaList?.length === 1 ? schemaList[0].name : '');
 		templateMode = t?.mode === 'upsert' ? 'upsert' : 'create';
 		templateKey = t?.upsert_key ?? '';
 		rows = [];
@@ -577,7 +578,7 @@
 
 <ImportWizard
 	bind:open={wizardOpen}
-	schemas={data.schemas}
+	schemas={schemaList}
 	templates={data.templates}
 	licensed={data.licensed}
 	onstarted={started}
@@ -606,8 +607,9 @@
 				name="content_type"
 				label="Content type"
 				searchable
+				hint={schemaList === null ? 'The content types could not be read, so none can be chosen. Close this and try again in a moment.' : undefined}
 				bind:value={templateType}
-				options={data.schemas.map((x) => ({ value: x.name, label: x.name }))}
+				options={(schemaList ?? []).map((x) => ({ value: x.name, label: x.name }))}
 			/>
 			<SegmentedControl
 				label="When an entry already exists"
@@ -687,23 +689,29 @@
 
 <Drawer
 	bind:open={detailOpen}
-	title={data.detail ? `Import of ${data.detail.job.source_name}` : 'Import'}
-	description={data.detail ? OUTCOME_LABELS[outcome(data.detail.job)] : ''}
+	title={detail ? `Import of ${detail.job.source_name}` : 'Import'}
+	description={detail ? OUTCOME_LABELS[outcome(detail.job)] : ''}
 	onclose={closeDetail}
 >
-	{#if data.detail}
+	{#if data.detail && !data.detail.ok}
+		<GateNotice
+			gate={data.detail.gate}
+			title="this import"
+			absent="That import no longer exists. It may have been removed since the history was read."
+		/>
+	{:else if detail}
 		<div class="flex flex-col gap-5">
 			<DescriptionList items={detailItems} />
 			<div class="flex flex-col gap-3">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<SectionHeading level={3}>Rejected rows</SectionHeading>
-					{#if data.detail.rejectedTotal > 0}
-						<Button variant="secondary" size="sm" href={rejectedHref(data.detail.job.id)}>
-							<Download size={ICON.sm} /> Download all {formatCount(data.detail.rejectedTotal)} as CSV
+					{#if detail.rejectedTotal > 0}
+						<Button variant="secondary" size="sm" href={rejectedHref(detail.job.id)}>
+							<Download size={ICON.sm} /> Download all {formatCount(detail.rejectedTotal)} as CSV
 						</Button>
 					{/if}
 				</div>
-				{#if data.detail.rejected.length === 0}
+				{#if detail.rejected.length === 0}
 					<p class="text-sm text-muted">No row was rejected.</p>
 				{:else}
 					<Table label="Rejected rows of this import">
@@ -714,7 +722,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each data.detail.rejected as r (r.id)}
+							{#each detail.rejected as r (r.id)}
 								<tr>
 									<td data-cell="nowrap" class="font-mono text-xs">{r.row_index + 1}</td>
 									<td class="text-xs">
@@ -725,15 +733,15 @@
 							{/each}
 						</tbody>
 					</Table>
-					{#if data.detail.rejectedTotal > data.detail.rejected.length}
+					{#if detail.rejectedTotal > detail.rejected.length}
 						<p class="text-xs text-muted">
-							The first {formatCount(data.detail.rejected.length)} of {formatCount(data.detail.rejectedTotal)}. The
+							The first {formatCount(detail.rejected.length)} of {formatCount(detail.rejectedTotal)}. The
 							download has them all.
 						</p>
 					{/if}
 				{/if}
 			</div>
-			{#if data.detail.skipped.length > 0}
+			{#if detail.skipped.length > 0}
 				<div class="flex flex-col gap-3">
 					<SectionHeading level={3}>Skipped rows</SectionHeading>
 					<Table label="Skipped rows of this import">
@@ -744,7 +752,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each data.detail.skipped as r (r.id)}
+							{#each detail.skipped as r (r.id)}
 								<tr>
 									<td data-cell="nowrap" class="font-mono text-xs">{r.row_index + 1}</td>
 									<td class="text-xs">{r.error_message || 'Skipped'}</td>

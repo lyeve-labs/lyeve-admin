@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), goto: vi.fn(async () => {}) }));
@@ -45,7 +45,8 @@ const props = (over: Record<string, unknown> = {}) => ({
 		hasMore: false,
 		gate: { state: 'ok' },
 		installed: true,
-		schemas: [{ name: 'article', fields: [{ name: 'title', field_type: 'text' }] }],
+		schemas: { ok: true, value: [{ name: 'article', fields: [{ name: 'title', field_type: 'text' }] }] },
+		user: { id: 'u1', roles: ['super_admin'] },
 		detail: null,
 		...over,
 	} as never,
@@ -97,5 +98,27 @@ describe('Imports', () => {
 	it('marks a dry run as having written nothing', () => {
 		const { container } = render(ImportsPage, { props: props({ jobs: [job({ dry_run: true })] }) });
 		expect(said(container)).toContain('Dry run, nothing written');
+	});
+});
+
+describe('Imports reads that failed', () => {
+	it('opens the rows panel with the reason when the job could not be read', () => {
+		render(ImportsPage, {
+			props: props({ detail: { ok: false, gate: { state: 'error', message: 'The rows of this import could not be read.' } } }),
+		});
+		expect(document.body.textContent).toContain('The rows of this import could not be read.');
+	});
+
+	it('says an import that no longer exists is gone', () => {
+		render(ImportsPage, { props: props({ detail: { ok: false, gate: { state: 'absent' } } }) });
+		expect(document.body.textContent).toContain('That import no longer exists');
+	});
+
+	it('says why a new template offers no content type when the list was not read', async () => {
+		render(ImportsPage, {
+			props: props({ templates: [], templatesRead: true, schemas: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
+		expect(document.body.textContent).toContain('The content types could not be read');
 	});
 });

@@ -66,8 +66,9 @@ function entries(count: number, from = 0) {
 }
 
 function data(overrides: Record<string, unknown> = {}) {
-	return {
+	const merged: Record<string, unknown> = {
 		entitlements,
+		user: { id: 'u1', roles: ['super_admin'] },
 		entries: entries(50),
 		total: 13043,
 		offset: 0,
@@ -77,6 +78,10 @@ function data(overrides: Record<string, unknown> = {}) {
 		actions: ['create.content'],
 		...overrides,
 	};
+	// The load hands the rows over as a read that answered, unless a case
+	// passes the failed read itself.
+	if (Array.isArray(merged.entries)) merged.entries = { ok: true, value: merged.entries };
+	return merged;
 }
 
 function pager(container: HTMLElement, label: string): HTMLAnchorElement | undefined {
@@ -259,5 +264,40 @@ describe('Audit log regions', () => {
 		});
 
 		expect(headings(container)).toContain('Entries');
+	});
+});
+
+/*
+ * A failed read says so. The first-run state would tell the reader that
+ * nothing on this instance has ever been recorded, which is the one thing an
+ * audit log must never claim without having read it.
+ */
+describe('Audit log failed read', () => {
+	const failed = {
+		entries: { ok: false, gate: { state: 'error', message: 'The audit log could not be read. This is not a report that it is empty.' } },
+		total: null,
+		actions: [],
+	};
+
+	it('shows the failure in place of the first-run state', () => {
+		const { container } = render(AuditLogPage, { props: { data: data(failed) as never, form: null as never } });
+
+		expect(container.textContent).toContain('The audit log could not be read');
+		expect(container.textContent).not.toContain('No audit entries yet');
+		expect(container.querySelector('table')).toBeNull();
+	});
+
+	it('states no entry count it did not read', () => {
+		const { container } = render(AuditLogPage, { props: { data: data(failed) as never, form: null as never } });
+
+		expect(container.textContent).not.toContain('0 entries');
+	});
+
+	it('names the role refusal for an admin the engine refused', () => {
+		const { container } = render(AuditLogPage, {
+			props: { data: data({ ...failed, entries: { ok: false, gate: { state: 'forbidden' } } }) as never, form: null as never },
+		});
+
+		expect(container.textContent).toContain('Your role cannot open Audit log');
 	});
 });

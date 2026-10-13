@@ -8,6 +8,7 @@
 		EmptyState,
 		Input,
 		PageShell,
+		Pagination,
 		SearchInput,
 		SectionHeading,
 		Stat,
@@ -32,6 +33,7 @@
 	import { NO_VALUE, formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
+	import { pageHref, pageNumber } from '$lib/api/list';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -412,6 +414,14 @@
 						{/snippet}
 					</EmptyState>
 				{/if}
+				<Pagination
+					page={pageNumber(data.offset, data.limit)}
+					perPage={data.limit}
+					count={data.entries.length}
+					total={data.total}
+					noun="reads"
+					href={pageHref('/admin/settings/pii', data.limit)}
+				/>
 			{/if}
 		</section>
 	{/if}

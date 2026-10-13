@@ -42,8 +42,9 @@
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
 	const outcome = $derived((form as { enforced?: boolean; deleted?: number } | null) ?? null);
-	const live = $derived(activeHolds(data.holds));
-	const blocked = $derived(deletionIsBlocked(data.policies, data.holds));
+	const holds = $derived(data.holds.ok ? data.holds.value : []);
+	const live = $derived(activeHolds(holds));
+	const blocked = $derived(deletionIsBlocked(data.policies, holds));
 
 	let addingPolicy = $state(false);
 	let eventType = $state('');
@@ -199,7 +200,7 @@
 		{/if}
 	{/snippet}
 
-	<AuditTabs active="retention" rules={data.policies.length + data.holds.length} />
+	<AuditTabs active="retention" rules={data.holds.ok ? data.policies.length + data.holds.value.length : undefined} />
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
@@ -306,11 +307,12 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Legal holds</SectionHeading>
-			{#if !data.holdsRead}
-				<Alert tone="danger">
-					The holds could not be read, so the policies above cannot be trusted to describe what
-					is actually being deleted.
-				</Alert>
+			{#if !data.holds.ok}
+				<GateNotice
+					gate={data.holds.gate}
+					title="Legal holds"
+					absent="Legal holds are not part of this build."
+				/>
 			{:else if live.length === 0}
 				<EmptyState
 					title="Nothing is held"

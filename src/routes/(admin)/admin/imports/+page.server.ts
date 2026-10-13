@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
@@ -25,7 +25,17 @@ import {
 	type ImportRow,
 	type ImportSchema,
 } from '$lib/api/bulk-import';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
+
+/** The job the history's Rows button opened, with the rows it rejected and skipped. */
+export interface ImportDetail {
+	job: ImportJob;
+	rejected: ImportRow[];
+	rejectedTotal: number;
+	skipped: ImportRow[];
+	skippedTotal: number;
+}
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -47,18 +57,23 @@ export const load: PageServerLoad = async (event) => {
 	if (gate.state === 'ok') {
 		try {
 			const page = pageOf(await listJobs(client, limit + 1, offset), limit, offset);
+			const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 			jobs = page.rows;
 			total = page.total;
 			hasMore = page.hasMore;
 		} catch (err) {
+			if (isRedirect(err)) throw err;
 			gate = importGate(err);
 		}
 	}
 
-	const schemas: ImportSchema[] =
+	// The content types an import fills. An unread list is kept as a failure,
+	// so the wizard says why it offers none rather than offering nothing.
+	const schemas: Section<ImportSchema[]> =
 		gate.state === 'ok'
-			? await getSchemas(client)
-					.then((rows) =>
+			? await section(
+					getSchemas(client).then((rows) =>
 						rows
 							.map((s) => ({
 								name: s.name,
@@ -69,25 +84,30 @@ export const load: PageServerLoad = async (event) => {
 								})),
 							}))
 							.sort((a, b) => a.name.localeCompare(b.name))
-					)
-					.catch(() => [])
-			: [];
+					),
+					'The content types could not be read, so there is nothing to import into yet.'
+				)
+			: { ok: false, gate };
 
-	// The job the history's Rows button opened, with the rows it rejected
-	// and skipped. Read here so the panel is a link, not a script.
-	let detail: { job: ImportJob; rejected: ImportRow[]; rejectedTotal: number; skipped: ImportRow[]; skippedTotal: number } | null = null;
+	// Read here so the panel is a link, not a script. A failed read still
+	// opens the panel, which says why it holds no rows.
+	let detail: Section<ImportDetail> | null = null;
 	const jobId = event.url.searchParams.get('job');
 	if (jobId && gate.state === 'ok') {
-		try {
-			const [job, rejected, skipped] = await Promise.all([
+		detail = await section(
+			Promise.all([
 				getJob(client, jobId),
 				listRows(client, jobId, 'errored', DETAIL_ROWS),
 				listRows(client, jobId, 'skipped', DETAIL_ROWS),
-			]);
-			detail = { job, rejected: rejected.rows, rejectedTotal: rejected.total, skipped: skipped.rows, skippedTotal: skipped.total };
-		} catch {
-			detail = null;
-		}
+			]).then(([job, rejected, skipped]) => ({
+				job,
+				rejected: rejected.rows,
+				rejectedTotal: rejected.total,
+				skipped: skipped.rows,
+				skippedTotal: skipped.total,
+			})),
+			'The rows of this import could not be read.'
+		);
 	}
 
 	// The tenant's saved mappings, and whether this install may save one or

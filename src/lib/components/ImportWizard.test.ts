@@ -21,6 +21,16 @@ const template = {
 };
 
 describe('the import wizard', () => {
+	it('says why no content type is offered when the list was not read', () => {
+		render(ImportWizard, { props: { open: true, schemas: null, onstarted: vi.fn() } });
+		expect(document.body.textContent).toContain('The content types could not be read');
+	});
+
+	it('says there is no content type yet when the tenant has none', () => {
+		render(ImportWizard, { props: { open: true, schemas: [], onstarted: vi.fn() } });
+		expect(document.body.textContent).toContain('There is no content type yet');
+	});
+
 	it('takes a workbook and states the column and cell limits before the upload', () => {
 		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
 		const text = document.body.textContent ?? '';

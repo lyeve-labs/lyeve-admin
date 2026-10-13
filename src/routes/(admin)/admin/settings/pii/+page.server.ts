@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -17,7 +17,7 @@ import {
 	type PiiGate,
 	type RuleCatalog,
 } from '$lib/api/pii-mask';
-import { pageWindow } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
@@ -56,8 +56,11 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			const page = await listAccessLog(client, limit, offset);
 			entries = page.data ?? [];
+			const back = pastEndOffset(entries.length, limit, offset, page.total_count ?? null);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 			total = Math.max(page.total_count ?? 0, offset + entries.length);
-		} catch {
+		} catch (err) {
+			if (isRedirect(err)) throw err;
 			logFailed = true;
 		}
 	}
