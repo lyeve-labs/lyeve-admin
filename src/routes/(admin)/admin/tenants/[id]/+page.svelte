@@ -44,9 +44,26 @@
 		{ term: 'Created', value: formatDate(tenant.created_at) },
 	]);
 
-	let available = $state<string[]>([]);
+	/*
+	 * The picks are seeded from what the engine stores and reseeded only when
+	 * that changes. Turning a members page reruns the load and hands back an
+	 * equal list as a new object, which must not undo a pick not yet saved.
+	 */
+	function storedPicks(): string[] {
+		return (data.choices.ok ? data.choices.value : []).filter((c) => c.available).map((c) => c.name);
+	}
+	function choicesKey(): string {
+		return JSON.stringify(data.choices.ok ? data.choices.value : null);
+	}
+	// svelte-ignore state_referenced_locally
+	let available = $state<string[]>(storedPicks());
+	// svelte-ignore state_referenced_locally
+	let seededFrom = choicesKey();
 	$effect.pre(() => {
-		available = (data.choices.ok ? data.choices.value : []).filter((c) => c.available).map((c) => c.name);
+		const key = choicesKey();
+		if (key === seededFrom) return;
+		seededFrom = key;
+		available = storedPicks();
 	});
 	const featureOptions = $derived((data.choices.ok ? data.choices.value : []).map((c) => ({ value: c.name, label: c.name })));
 	let savingFeatures = $state(false);

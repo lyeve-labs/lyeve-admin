@@ -102,3 +102,44 @@ describe('the members of a large tenant', () => {
 		expect(document.body.textContent).toContain('of 230');
 	});
 });
+
+/*
+ * The members pager reruns the load, which hands back an equal choice list as
+ * a new object. Reseeding the picks from it undid a change not yet saved.
+ */
+describe('unsaved plugin picks', () => {
+	const choices = () => ({
+		ok: true,
+		value: [
+			{ name: 'flow', available: true },
+			{ name: 'ai', available: true },
+		],
+	});
+	const kept = () =>
+		[...document.querySelectorAll('input[type="hidden"][name="available"]')].map((i) => (i as HTMLInputElement).value);
+
+	it('survive a turn of the members page', async () => {
+		const { rerender } = render(TenantPage, { props: props({ choices: choices() }) });
+		await fireEvent.click(screen.getByRole('button', { name: 'Remove flow' }));
+		expect(kept()).toEqual(['ai']);
+		await rerender(props({ choices: choices(), offset: 50 }));
+		expect(kept()).toEqual(['ai']);
+	});
+
+	it('follow what the engine stores once it changes', async () => {
+		const { rerender } = render(TenantPage, { props: props({ choices: choices() }) });
+		await fireEvent.click(screen.getByRole('button', { name: 'Remove flow' }));
+		await rerender(
+			props({
+				choices: {
+					ok: true,
+					value: [
+						{ name: 'flow', available: true },
+						{ name: 'ai', available: false },
+					],
+				},
+			}),
+		);
+		expect(kept()).toEqual(['flow']);
+	});
+});
