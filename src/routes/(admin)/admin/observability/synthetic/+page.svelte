@@ -96,11 +96,14 @@
 			reveal = form.signingSecret;
 		}
 	});
-	const failing = $derived(data.probes.filter((p) => probeHealth(p) === 'failing').length);
-	const paused = $derived(data.probes.filter((p) => probeHealth(p) === 'paused').length);
-	// The plugin counts probes but not their states, so the state tiles count
-	// the rows read. They cover every probe only when every probe is on this page.
-	const wholeList = $derived(data.offset === 0 && !data.hasMore);
+	// The load counts the states across every probe when it read them all.
+	// Otherwise the state tiles count the rows read, and say so unless every
+	// probe is on this page.
+	const failing = $derived(
+		data.counts?.failing ?? data.probes.filter((p) => probeHealth(p) === 'failing').length,
+	);
+	const paused = $derived(data.counts?.paused ?? data.probes.filter((p) => probeHealth(p) === 'paused').length);
+	const wholeList = $derived(!!data.counts || (data.offset === 0 && !data.hasMore));
 	const pageNote = $derived(wholeList ? undefined : `of the ${data.probes.length} on this page`);
 
 	let narrow = $state('');

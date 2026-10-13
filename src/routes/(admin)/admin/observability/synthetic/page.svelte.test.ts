@@ -327,3 +327,16 @@ describe('a failed row action', () => {
 		expect(form.textContent).not.toContain('could not be deleted');
 	});
 });
+
+describe('tiles counted across every probe', () => {
+	it('states the load\'s counts without a page note', () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ probes: [probe()], total: 40, offset: 25, hasMore: false, counts: { failing: 7, paused: 2 } }),
+		});
+		const tile = (label: string) =>
+			[...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === label)?.nextElementSibling?.textContent?.trim();
+		expect(tile('Failing')).toBe('7');
+		expect(tile('Paused')).toBe('2');
+		expect(said(container)).not.toContain('on this page');
+	});
+});

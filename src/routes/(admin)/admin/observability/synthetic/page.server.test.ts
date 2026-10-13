@@ -171,6 +171,37 @@ describe('the probe list load', () => {
 	});
 });
 
+describe('a plugin that answers every probe', () => {
+	// The plugin ignores the window and answers a bare array of every probe.
+	// Read as one page, page two repeated page one.
+	const many = Array.from({ length: 30 }, (_, i) => ({ ...PROBE, id: `p${i}`, name: `probe ${i}`, enabled: i % 10 !== 0 }));
+
+	it('cuts the page from every probe and counts them all', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.includes('/probes')) return many;
+			if (url.includes('/alerts')) return { data: [] };
+			throw new ApiError(404, 'not found', {});
+		});
+		const out = (await load(loadEvent('?limit=25&offset=25'))) as Loaded;
+		expect(out.probes.map((p: { id: string }) => p.id)).toEqual(['p25', 'p26', 'p27', 'p28', 'p29']);
+		expect(out.total).toBe(30);
+		expect(out.hasMore).toBe(false);
+		expect(out.counts?.paused).toBe(3);
+	});
+
+	it('sends an offset past every probe back to the last page', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.includes('/probes')) return many;
+			if (url.includes('/alerts')) return { data: [] };
+			throw new ApiError(404, 'not found', {});
+		});
+		await expect(load(loadEvent('?limit=25&offset=100'))).rejects.toMatchObject({
+			status: 307,
+			location: expect.stringContaining('offset=25'),
+		});
+	});
+});
+
 describe('which surface a failure belongs to', () => {
 	it('tags a failed probe save for the probe drawer', async () => {
 		const out = (await actions.create(actionEvent({ name: '' }))) as { data: Record<string, unknown> };

@@ -12,6 +12,7 @@ import {
 	getProbeChannels,
 	listOpenAlerts,
 	listProbes,
+	probeHealth,
 	probeType,
 	putProbeChannels,
 	readProbeLimits,
@@ -40,6 +41,12 @@ type ChannelsFor = { probe: Probe; read: ProbeChannels | null; gate: Gate } | nu
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const NO_ALERTS: Section<ProbeAlert[]> = { ok: true, value: [] };
+
+/** The probes failing and paused across every probe, when every probe was read. */
+interface ProbeCounts {
+	failing: number;
+	paused: number;
+}
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -105,19 +112,38 @@ export const load: PageServerLoad = async (event) => {
 			gate: { state: 'absent' } as SyntheticGate,
 			channelsFor: null as ChannelsFor,
 			limits: null as ProbeLimits | null,
+			counts: null as ProbeCounts | null,
 		};
 	}
 
 	const client = authedClient(event);
 	let probes: Probe[] = [];
+	let every: Probe[] = [];
+	let counts: ProbeCounts | null = null;
 	let total: number | null = null;
 	let hasMore = false;
 	let gate: SyntheticGate = SYNTHETIC_OK;
 	try {
-		const page = pageOf(await listProbes(client, limit + 1, offset), limit, offset);
-		probes = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
+		const read = await listProbes(client, limit + 1, offset);
+		if (Array.isArray(read)) {
+			// The plugin answers every probe as a bare array and ignores the
+			// window it was asked for, so the page is cut here, and every count
+			// covers every probe rather than the rows on this page.
+			every = read;
+			total = read.length;
+			probes = read.slice(offset, offset + limit);
+			hasMore = offset + probes.length < total;
+			counts = {
+				failing: read.filter((p) => probeHealth(p) === 'failing').length,
+				paused: read.filter((p) => probeHealth(p) === 'paused').length,
+			};
+		} else {
+			const page = pageOf(read, limit, offset);
+			every = page.rows;
+			probes = page.rows;
+			total = page.total;
+			hasMore = page.hasMore;
+		}
 		const back = pastEndOffset(probes.length, limit, offset, total);
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
@@ -140,7 +166,7 @@ export const load: PageServerLoad = async (event) => {
 	// channels are a read of their own, so they are asked for only then.
 	let channelsFor: ChannelsFor = null;
 	const channelsId = event.url.searchParams.get('channels');
-	const probe = channelsId ? probes.find((p) => p.id === channelsId) : undefined;
+	const probe = channelsId ? every.find((p) => p.id === channelsId) : undefined;
 	if (gate.state === 'ok' && probe) {
 		try {
 			channelsFor = { probe, read: await getProbeChannels(client, probe.id), gate: { state: 'ok' } };
@@ -153,7 +179,7 @@ export const load: PageServerLoad = async (event) => {
 	// floor that may not be this install's.
 	const limits = gate.state === 'ok' ? await readProbeLimits(client).catch(() => null) : null;
 
-	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor, limits };
+	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor, limits, counts };
 };
 
 async function save(event: Parameters<Actions[string]>[0], id: string | null) {
