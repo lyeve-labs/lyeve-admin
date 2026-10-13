@@ -9,11 +9,12 @@ import {
 	createKey,
 	keyExpiryProblem,
 	keyScopeProblem,
+	keyUsage,
 	listKeys,
 	parseLimits,
 	setLimits,
 } from '$lib/api/api-keys';
-import { cleanScopes, type KeyScopeCatalog } from '$lib/api/key-access';
+import { cleanScopes, fetchKeyScopeCatalog } from '$lib/api/key-access';
 import { listSchemaNames } from '$lib/api/search-settings';
 import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
@@ -59,9 +60,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	await Promise.all(
 		rows.map(async (key) => {
 			const u = await section(
-				client.get<UsageSummary>(
-					`/api/admin/usage/api-key/${encodeURIComponent(key.id)}?period=${encodeURIComponent(month)}`
-				),
+				keyUsage<UsageSummary>(client, key.id, month),
 				'The usage could not be read.'
 			);
 			if (u.ok) {
@@ -77,12 +76,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	// route narrows the drawer. A failed read narrows it too, and the drawer
 	// says which part could not be read.
 	const [catalogRead, schemaRead] = await Promise.all([
-		section(
-			client
-				.get<KeyScopeCatalog>('/api/admin/api-key-scopes')
-				.then((c) => (c && Array.isArray(c.routes) ? c : null)),
-			'The route catalog could not be read.'
-		),
+		section(fetchKeyScopeCatalog(client), 'The route catalog could not be read.'),
 		section(listSchemaNames(client), 'The schemas could not be read.'),
 	]);
 	const catalog = catalogRead.ok ? catalogRead.value : null;

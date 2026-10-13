@@ -66,4 +66,25 @@ describe('API keys load', () => {
 		expect(out.catalogFailed).toBe(true);
 		expect(out.schemasFailed).toBe(true);
 	});
+
+	it('says the route catalog could not be read when its answer has no route list', async () => {
+		const answer = (path: string) => {
+			if (path.startsWith('/api/admin/api-keys?')) return json({ data: [key], total_count: 1 });
+			if (path.startsWith('/api/admin/api-key-scopes')) return json({ actions: ['read'] });
+			return json([]);
+		};
+		const out = (await load(event(answer))) as Loaded;
+		expect(out.catalog).toBeNull();
+		expect(out.catalogFailed).toBe(true);
+	});
+
+	it('offers no catalog and says nothing when the engine does not serve one', async () => {
+		const answer = (path: string) => {
+			if (path.startsWith('/api/admin/api-keys?')) return json({ data: [key], total_count: 1 });
+			if (path.startsWith('/api/admin/api-key-scopes')) return json({ error: 'not found' }, 404);
+			return json([]);
+		};
+		const out = (await load(event(answer))) as Loaded;
+		expect(out.catalogFailed).toBe(false);
+	});
 });

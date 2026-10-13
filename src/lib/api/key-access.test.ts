@@ -117,9 +117,14 @@ describe('fetchKeyScopeCatalog', () => {
 		expect(get).toHaveBeenCalledWith('/api/admin/api-key-scopes');
 	});
 
-	it('answers null from an engine that does not serve one', async () => {
-		const get = vi.fn().mockRejectedValue(new Error('404'));
-		await expect(fetchKeyScopeCatalog({ get } as unknown as HttpClient)).resolves.toBeNull();
+	it('rejects when the read fails', async () => {
+		const get = vi.fn().mockRejectedValue(new Error('down'));
+		await expect(fetchKeyScopeCatalog({ get } as unknown as HttpClient)).rejects.toThrow('down');
+	});
+
+	it('rejects an answer without a route list rather than offering no routes', async () => {
+		const get = vi.fn().mockResolvedValue({ actions: ['read'] });
+		await expect(fetchKeyScopeCatalog({ get } as unknown as HttpClient)).rejects.toThrow();
 	});
 });
 

@@ -44,12 +44,15 @@ export interface KeyScopeCatalog {
 	routes: KeyScopeRoute[];
 }
 
-/** The engine's catalog, or null from an engine that does not serve one. */
-export function fetchKeyScopeCatalog(client: HttpClient): Promise<KeyScopeCatalog | null> {
-	return client
-		.get<KeyScopeCatalog>('/api/admin/api-key-scopes')
-		.then((c) => (c && Array.isArray(c.routes) ? c : null))
-		.catch(() => null);
+/**
+ * The engine's catalog. A failed read rejects, and so does an answer without a
+ * route list, because a catalog that cannot be read offers nothing and the
+ * caller has to say so rather than offer fewer choices without a reason.
+ */
+export async function fetchKeyScopeCatalog(client: HttpClient): Promise<KeyScopeCatalog> {
+	const c = await client.get<KeyScopeCatalog>('/api/admin/api-key-scopes');
+	if (!c || !Array.isArray(c.routes)) throw new Error('The route catalog has no route list.');
+	return c;
 }
 
 /** A resource other than content and the schema catalog, with its routes. */
