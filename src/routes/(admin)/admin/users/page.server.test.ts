@@ -487,7 +487,7 @@ describe('the admin seat ceiling', () => {
 	// The numbers and the link are the refusal's, so the page holds no ceiling
 	// and no address of its own.
 	const expected =
-		'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Add more with a license, or remove the admin role from an account. Editors and viewers take no seat.';
+		'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.';
 	const refused = { kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: 'https://shop.example.com/pricing?utm_campaign=admin.seats' };
 
 	it('says the seats are full when creating an admin is refused', async () => {

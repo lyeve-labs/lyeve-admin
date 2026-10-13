@@ -9,26 +9,33 @@
 	import { Alert, Button } from '@lyeve-labs/ui-kit';
 	import { useInstance } from '$lib/instance.svelte';
 	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
-	import { LICENSE_PAGE, refusalText, refusalTitle, type Refusal } from '$lib/api/refusal';
+	import { LICENSE_PAGE, refusalText, refusalTitle, upgradeLabel, type Refusal } from '$lib/api/refusal';
 
 	let { refusal }: { refusal: Refusal } = $props();
 
 	const instance = useInstance();
 	// The license page is always offered. A link the engine or the license
-	// module names goes beside it, because that is where the license changes.
-	// For a cap that link is where a license allowing more is bought.
+	// module names elsewhere is where more is bought or the feature turned
+	// on, so it is the way forward and leads, named by what it opens.
 	const upgrade = $derived(instance.upgradeLink(refusal.upgradeUrl || null));
-	const fallbackLabel = $derived(refusal.kind === 'cap' ? 'How to raise the limit' : 'How to enable it');
+	const offered = $derived(
+		upgrade !== null && upgrade.href !== LICENSE_PAGE
+			? {
+					href: upgrade.href,
+					label: upgradeLabel(upgrade.href) ?? upgrade.label ?? (refusal.kind === 'cap' ? 'How to raise the limit' : 'How to enable it'),
+				}
+			: null,
+	);
 </script>
 
 <div data-testid="refusal-notice">
 	<Alert tone="warn" title={refusalTitle(refusal)}>
 		<p>{refusalText(refusal)}</p>
 		<div class="mt-3 flex flex-wrap gap-2">
-			<Button variant="secondary" size="sm" href={LICENSE_PAGE}>View the license</Button>
-			{#if upgrade && upgrade.href !== LICENSE_PAGE}
-				<UpgradeLink link={{ href: upgrade.href, label: upgrade.label ?? fallbackLabel }} variant="ghost" size="sm" />
+			{#if offered}
+				<UpgradeLink link={offered} variant="primary" size="sm" />
 			{/if}
+			<Button variant="secondary" size="sm" href={LICENSE_PAGE}>View the license</Button>
 		</div>
 	</Alert>
 </div>

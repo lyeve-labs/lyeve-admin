@@ -263,7 +263,7 @@ describe('admin/flows create action', () => {
 		const result = (await actions.create(event)) as { status: number; data: { error: string; refusal: unknown } };
 		expect(result.status).toBe(402);
 		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: link });
-		expect(result.data.error).toContain('Add more with a license');
+		expect(result.data.error).toContain('A license that allows more lifts the limit.');
 	});
 
 	it('refuses a blank name before calling the engine', async () => {

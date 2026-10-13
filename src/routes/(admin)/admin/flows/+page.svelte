@@ -32,6 +32,7 @@
 	import type { RefusalNotice } from '$lib/flow/types';
 	import { useInstance } from '$lib/instance.svelte';
 	import { isExternalHref } from '$lib/links';
+	import { upgradeLabel } from '$lib/api/refusal';
 	import type { Flow, ValidationError } from '$lib/api/flows';
 	import { listQuery } from '$lib/back';
 	import { pageHref, pageNumber } from '$lib/api/list';
@@ -218,7 +219,7 @@
 				{#snippet children()}
 					{pageFailure?.error ?? ''}
 					{#if enableLink}
-						<a class="ml-1 underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{enableLink.label ?? (refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+						<a class="ml-1 underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{upgradeLabel(enableLink.href) ?? enableLink.label ?? (refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
 					{/if}
 					{#if errorList.length > 0}
 						<ul class="mt-1 list-disc pl-5">
@@ -390,7 +391,7 @@
 			{@const link = instance.upgradeLink(f.refusal.upgradeUrl || null)}
 			{#if link}
 				{@const away = isExternalHref(link.href)}
-				<a class="text-sm underline" href={link.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{link.label ?? (f.refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+				<a class="text-sm underline" href={link.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{upgradeLabel(link.href) ?? link.label ?? (f.refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
 			{/if}
 		{/if}
 		{#if f && f.errors.length > 0}

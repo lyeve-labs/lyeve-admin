@@ -9,7 +9,7 @@ describe('refusalFailure', () => {
 		const result = refusalFailure(new FlowRefusal([], 7, 7)) as unknown as Failure;
 		expect(result.status).toBe(402);
 		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: '' });
-		expect(result.data.error).toBe('7 of 7 flows are in use, the most this instance keeps. Add more with a license, or delete one to make room.');
+		expect(result.data.error).toBe('7 of 7 flows are in use, the most this instance keeps. A license that allows more lifts the limit. Deleting one also makes room.');
 	});
 
 	it('carries the link a ceiling refusal names for more flows', () => {
@@ -20,7 +20,7 @@ describe('refusalFailure', () => {
 
 	it('quotes the limit alone when the refusal carries no count', () => {
 		const result = refusalFailure(new FlowRefusal([], 12)) as unknown as Failure;
-		expect(result.data.error).toBe('This instance keeps at most 12 flows. Add more with a license, or delete one to make room.');
+		expect(result.data.error).toBe('This instance keeps at most 12 flows. A license that allows more lifts the limit. Deleting one also makes room.');
 	});
 
 	it('lists the nodes a definition refusal names and keeps their problems', () => {

@@ -394,8 +394,8 @@ describe('Users admin seat refusal', () => {
 
 		const dialog = within(rendered.container.ownerDocument.body.querySelector('[role="dialog"]') as HTMLElement);
 		expect(dialog.getByText(/3 of 3 are in use/)).toBeTruthy();
-		expect(dialog.getByText(/Add more with a license/)).toBeTruthy();
-		const more = dialog.getByRole('link', { name: 'How to raise the limit' });
+		expect(dialog.getByText(/A license that allows more lifts the limit\./)).toBeTruthy();
+		const more = dialog.getByRole('link', { name: 'View the plan' });
 		expect(more.getAttribute('href')).toBe(link);
 		expect(more.getAttribute('target')).toBe('_blank');
 	});
