@@ -13,14 +13,17 @@
 		Modal,
 		PageShell,
 		SectionHeading,
-		Select,
 		Stat,
 		Table,
 		Toggle,
 		confirm as confirmDialog,
 		toast,
 		Pagination,
+		RadioGroup,
+		SearchInput,
+		SegmentedControl,
 	} from '@lyeve-labs/ui-kit';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { submitter, tracked } from '$lib/forms.svelte';
@@ -92,6 +95,16 @@
 	// the rows read. They cover every probe only when every probe is on this page.
 	const wholeList = $derived(data.offset === 0 && !data.hasMore);
 	const pageNote = $derived(wholeList ? undefined : `of the ${data.probes.length} on this page`);
+
+	let narrow = $state('');
+	let showing = $state<'all' | 'failing' | 'paused'>('all');
+	const visible = $derived(
+		data.probes.filter((p) => {
+			if (showing !== 'all' && probeHealth(p) !== showing) return false;
+			const term = narrow.trim().toLowerCase();
+			return !term || `${p.name} ${probeTarget(p)}`.toLowerCase().includes(term);
+		}),
+	);
 
 	let open = $state(false);
 	let editing = $state<Probe | null>(null);
@@ -233,9 +246,9 @@
 			absent="The synthetic monitoring plugin is not part of this build, so nothing is being probed."
 		/>
 	{:else}
-		{#if pageRefusal}
+		{#if pageRefusal && !open}
 			<RefusalNotice refusal={pageRefusal} />
-		{:else if formError}
+		{:else if formError && !open}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -310,6 +323,24 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				<ListToolbar label="Filter probes">
+					{#snippet search()}
+						<SearchInput id="probe-narrow" bind:value={narrow} placeholder="Name or target on this page" />
+					{/snippet}
+					{#snippet filters()}
+						<SegmentedControl
+							label="Show"
+							labelHidden
+							size="sm"
+							bind:value={showing}
+							options={[
+								{ value: 'all', label: 'All' },
+								{ value: 'failing', label: 'Failing' },
+								{ value: 'paused', label: 'Paused' },
+							]}
+						/>
+					{/snippet}
+				</ListToolbar>
 				<Table label="Probes">
 					<thead>
 						<tr>
@@ -321,7 +352,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.probes as p (p.id)}
+						{#each visible as p (p.id)}
 							<tr>
 								<td>
 									<div class="font-medium text-fg">{p.name}</div>
@@ -403,34 +434,42 @@
 					noun="probes"
 					href={pageHref('/admin/observability/synthetic', data.limit)}
 				/>
+				{#if visible.length === 0}
+					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
+						{#snippet iconSnippet()}
+							<Radar size={ICON.lg} />
+						{/snippet}
+						{#snippet action()}
+							<Button variant="secondary" onclick={() => { narrow = ''; showing = 'all'; }}>Clear the filter</Button>
+						{/snippet}
+					</EmptyState>
+				{/if}
 			{/if}
 		</section>
 	{/if}
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New probe'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		id="probe-form"
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
 		use:enhance={saveProbeSubmit.enhance}
 	>
+		<FormErrors message={formError || undefined} refused={pageRefusal} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}
 
 		<div class="flex flex-col gap-4">
 			<Input id="probe-name" name="name" label="Name" bind:value={name} required />
-			<Select
-				id="probe-type"
+			<!-- Each type needs a sentence to tell it from the others, so every
+			     option carries its own rather than one hint that changes. -->
+			<RadioGroup
 				name="type"
 				label="What it checks"
-				hint={PROBE_TYPE_HINTS[type]}
 				bind:value={type}
-				options={PROBE_TYPES.map((t) => ({ value: t, label: PROBE_TYPE_LABELS[t] }))}
+				options={PROBE_TYPES.map((t) => ({ value: t, label: PROBE_TYPE_LABELS[t], description: PROBE_TYPE_HINTS[t] }))}
 			/>
 
 			<!-- The four probe types take different settings, so only the ones

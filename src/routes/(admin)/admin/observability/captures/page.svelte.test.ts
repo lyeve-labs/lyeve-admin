@@ -182,3 +182,14 @@ describe('the gate', () => {
 		expect(said(container)).not.toContain('No request is kept');
 	});
 });
+
+describe('a failed rule save', () => {
+	// The message went to the page behind the drawer, so the open panel said
+	// nothing about why the save did not happen.
+	it('is said at the top of the open form', async () => {
+		render(CapturesPage, { props: props({}, { error: 'A route is an absolute path.' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
+		expect(form.textContent).toContain('A route is an absolute path.');
+	});
+});

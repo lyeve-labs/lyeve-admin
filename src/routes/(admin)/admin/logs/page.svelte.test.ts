@@ -241,3 +241,12 @@ describe('figures that could not be read', () => {
 		expect(container.textContent).toContain('Could not be read.');
 	});
 });
+
+describe('page size', () => {
+	it('offers the sizes as segments that submit with the filter', () => {
+		const { container } = render(LogsPage, { props: props([entry()]) });
+
+		expect(container.querySelector('select[name="limit"]')).toBeNull();
+		expect(container.querySelector<HTMLInputElement>('input[name="limit"]')?.value).toBe('100');
+	});
+});

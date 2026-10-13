@@ -95,6 +95,13 @@ describe('cache load', () => {
 		expect(result.entries).toEqual([]);
 	});
 
+	it('sends an offset past the stored entries back to the first page', async () => {
+		api.listEntries.mockResolvedValue({ data: [], total_count: 0 });
+		const event = loadEvent(['super_admin']) as unknown as { url: URL };
+		event.url = new URL('http://admin/admin/observability/cache?offset=100');
+		await expect(load(event as never)).rejects.toMatchObject({ status: 307 });
+	});
+
 	// The counters and stored keys describe every tenant, so a tenant admin's
 	// page never asks for them, and their absence is not an error.
 	it('reads the rules and providers for a tenant admin and never the instance counters', async () => {

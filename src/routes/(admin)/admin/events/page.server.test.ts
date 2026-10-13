@@ -45,4 +45,12 @@ describe('the events load', () => {
 		const out = (await load(loadEvent())) as Loaded;
 		expect(out.runs).toEqual({ ok: true, value: { rows: [{ run_id: 'r1' }], total: 37 } });
 	});
+
+	it('sends an offset past the end back to the last page', async () => {
+		route({ '/events/replay': { data: [], total_count: 0 }, '/events?': { data: [], total_count: 60 } });
+		await expect(load(loadEvent('?limit=50&offset=500'))).rejects.toMatchObject({
+			status: 307,
+			location: expect.stringContaining('offset=50'),
+		});
+	});
 });

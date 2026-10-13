@@ -339,9 +339,7 @@ describe('Live log tail filters', () => {
 		await tick();
 		const first = StubEventSource.last as StubEventSource;
 
-		await fireEvent.click(container.querySelector('#tail-level') as HTMLElement);
-		await tick();
-		const option = [...document.querySelectorAll('[role="option"]')].find((el) => el.textContent?.trim() === 'ERROR');
+		const option = [...container.querySelectorAll('#tail-level [role="radio"]')].find((el) => el.textContent?.includes('ERROR'));
 		expect(option).toBeTruthy();
 		await fireEvent.click(option as HTMLElement);
 		await tick();
@@ -605,6 +603,19 @@ describe('Goroutine engine', () => {
 		expect(forms[0].textContent).not.toContain('Applied');
 	});
 
+	// The confirmation clears itself, so the caveat it carried would clear with
+	// it. The caveat is a standing fact and stays outside the alert.
+	it('keeps the restart caveat outside the confirmation that clears itself', () => {
+		const { container } = render(ObservabilityPage, {
+			props: props({}, { form: 'pool', saved: true, view: POOL_VIEW }),
+		});
+		const form = [...section(container).querySelectorAll('form')][0];
+		const alert = [...form.querySelectorAll('[role="status"], [role="alert"]')].map((el) => el.textContent ?? '').join(' ');
+		expect(alert).toContain('Applied');
+		expect(alert).not.toContain('holds until the engine restarts');
+		expect(form.textContent).toContain('The change holds until the engine restarts.');
+	});
+
 	it('says the engine did not answer instead of drawing empty tiles', () => {
 		const { container } = render(ObservabilityPage, {
 			props: props({ goroutineEngine: engine({ snapshot: null, pool: null, parallel: null, asyncHooks: null, byOwner: [] }) }),
@@ -637,5 +648,20 @@ describe('reads that failed', () => {
 		expect(container.textContent).toContain('did not answer');
 		expect(container.textContent).not.toContain('The pooler may not be configured');
 		expect(container.textContent).not.toContain('No check time reported');
+	});
+});
+
+describe('latency depth', () => {
+	it('offers each depth as a link that keeps the place on the page', () => {
+		const { container } = render(ObservabilityPage, { props: props() });
+		const links = [...container.querySelectorAll<HTMLAnchorElement>('#latency-top a')];
+		expect(links.map((a) => a.getAttribute('href'))).toEqual([
+			'/admin/observability?top=10',
+			'/admin/observability?top=20',
+			'/admin/observability?top=50',
+			'/admin/observability?top=100',
+		]);
+		expect(links.find((a) => a.getAttribute('aria-current') === 'page')?.textContent).toContain('Top 20');
+		expect(container.querySelector('#latency-top')?.hasAttribute('data-sveltekit-noscroll')).toBe(true);
 	});
 });

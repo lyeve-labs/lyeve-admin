@@ -11,7 +11,14 @@ vi.mock('$lib/server/authz', async (importOriginal) => ({
 	}),
 }));
 
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
+
+function loadEvent(query = '') {
+	return {
+		url: new URL(`http://localhost/admin/observability/idempotency${query}`),
+		parent: async () => ({ plugins: { state: 'named', running: ['idempotency'], withheld: [] } }),
+	} as never;
+}
 
 function actionEvent(fields: Record<string, string>) {
 	const data = new FormData();
@@ -37,5 +44,17 @@ describe('releasing a key', () => {
 	it('refuses a reader who is not an admin', async () => {
 		authz.roles = ['editor'];
 		await expect(actions.release(actionEvent({ key: 'order-17' }))).rejects.toThrow('403');
+	});
+});
+
+describe('the key list', () => {
+	it('sends an offset past the end back to the last page', async () => {
+		engine.get.mockImplementation(async (url: string) =>
+			url.includes('/stats') ? { total: 3, completed: 3, in_flight: 0 } : { data: [], total_count: 60 },
+		);
+		await expect(load(loadEvent('?limit=50&offset=500'))).rejects.toMatchObject({
+			status: 307,
+			location: expect.stringContaining('offset=50'),
+		});
 	});
 });

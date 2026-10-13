@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -14,7 +14,7 @@ import {
 	type IdempotencyKey,
 	type IdempotencyStats,
 } from '$lib/api/idempotency';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -35,7 +35,10 @@ export const load: PageServerLoad = async (event) => {
 			keys = page.rows;
 			total = page.total;
 			hasMore = page.hasMore;
+			const back = pastEndOffset(keys.length, limit, offset, total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 		} catch (err) {
+			if (isRedirect(err)) throw err;
 			gate = idempotencyGate(err);
 		}
 	}

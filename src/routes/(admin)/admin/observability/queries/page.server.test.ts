@@ -41,4 +41,12 @@ describe('the slow queries load', () => {
 		const out = (await load(loadEvent())) as Loaded;
 		expect(out.gate).toEqual({ state: 'unavailable' });
 	});
+
+	it('sends an offset past the end back to the last page', async () => {
+		engine.get.mockResolvedValue({ data: [], total_count: 60 });
+		await expect(load(loadEvent('?limit=50&offset=500'))).rejects.toMatchObject({
+			status: 307,
+			location: expect.stringContaining('offset=50'),
+		});
+	});
 });

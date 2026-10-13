@@ -8,6 +8,7 @@
 		Pagination,
 		SearchInput,
 		SectionHeading,
+		SegmentedControl,
 		Select,
 		Stat,
 		Table,
@@ -176,13 +177,13 @@
 							value={data.level}
 							class="w-40"
 						/>
-						<label for="log-limit" class="sr-only">Per page</label>
-						<Select
-							id="log-limit"
+						<SegmentedControl
+							label="Per page"
+							labelHidden
 							name="limit"
-							options={LOG_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} per page` }))}
+							size="sm"
+							options={LOG_PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))}
 							value={String(data.limit)}
-							class="w-36"
 						/>
 					{/snippet}
 				</ListToolbar>

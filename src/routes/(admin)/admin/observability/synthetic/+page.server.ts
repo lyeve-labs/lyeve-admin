@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -37,7 +37,7 @@ const CHANNEL_PREFIX = 'channel_';
  * A refused or failed read is said in the drawer rather than as no channels.
  */
 type ChannelsFor = { probe: Probe; read: ProbeChannels | null; gate: Gate } | null;
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const NO_ALERTS: Section<ProbeAlert[]> = { ok: true, value: [] };
 
@@ -118,7 +118,10 @@ export const load: PageServerLoad = async (event) => {
 		probes = page.rows;
 		total = page.total;
 		hasMore = page.hasMore;
+		const back = pastEndOffset(probes.length, limit, offset, total);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
+		if (isRedirect(err)) throw err;
 		gate = syntheticGate(err);
 	}
 

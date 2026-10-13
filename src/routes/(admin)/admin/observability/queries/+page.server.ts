@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
@@ -13,7 +13,7 @@ import {
 	type QueryLogEntry,
 } from '$lib/api/query-monitor';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
-import { pageWindow } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 /**
  * Why the capture log was not read. Beside every shared state, the plugin can
@@ -79,14 +79,20 @@ export const load: PageServerLoad = async (event) => {
 	let entries: QueryLogEntry[] = [];
 	let total = 0;
 	let gate: CaptureGate = GATE_OK;
+	let stated: number | null = null;
 	try {
 		const page = await listQueryLog(client, limit, offset);
 		entries = page.data ?? [];
+		stated = page.total_count ?? null;
 		// The envelope carries the collection count. Keeping what has been read
 		// as the floor answers the case where it omits one.
 		total = Math.max(page.total_count ?? 0, offset + entries.length);
 	} catch (err) {
 		gate = captureGate(err);
+	}
+	if (gate.state === 'ok') {
+		const back = pastEndOffset(entries.length, limit, offset, stated);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
 	// Analysis runs only when a dialect is asked for. It is EXPLAIN against a

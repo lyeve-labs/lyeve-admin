@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup, screen } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -142,5 +142,16 @@ describe('stored entries', () => {
 		});
 		expect(said(container)).toContain('The stored entries could not be read.');
 		expect(said(container)).not.toContain('Nothing is cached');
+	});
+});
+
+describe('a failed rule save', () => {
+	// The message went to the page behind the drawer, so the open panel said
+	// nothing about why the save did not happen.
+	it('is said at the top of the open form', async () => {
+		render(CachePage, { props: props({}, { error: 'A rule needs a route pattern.' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#cache-rule-form') as HTMLFormElement;
+		expect(form.textContent).toContain('A rule needs a route pattern.');
 	});
 });

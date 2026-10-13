@@ -151,7 +151,7 @@
 
 	const removeDest: SubmitFunction = async ({ cancel }) => {
 		const confirmed = await confirmDialog(
-			'Remove the destination?',
+			destination ? `Delete the destination ${destination.url}?` : 'Delete the destination?',
 			"This tenant's series stop being pushed there, and its stored headers are deleted.",
 			{ confirmLabel: 'Delete' },
 		);
@@ -315,7 +315,7 @@
 			{#if !data.destination.licensed}
 				<p class="text-sm text-muted" id="destination-unlicensed">
 					Setting or changing a destination needs a license this install does not hold. A destination already
-					saved keeps receiving, and removing it is always allowed.
+					saved keeps receiving, and deleting it is always allowed.
 				</p>
 			{/if}
 
@@ -430,7 +430,7 @@
 				</form>
 				{#if destination}
 					<form method="POST" action="?/removeDestination" class="mt-4 border-t border-line pt-4" use:enhance={removeDest}>
-						<Button variant="secondary" size="sm" type="submit">Remove destination</Button>
+						<Button variant="secondary" size="sm" type="submit">Delete destination</Button>
 					</form>
 				{/if}
 			</Card>

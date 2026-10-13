@@ -145,3 +145,13 @@ describe('assign', () => {
 		expect(out).toEqual({ assigned: 'a1', assignee: '' });
 	});
 });
+
+describe('the alert pager', () => {
+	it('sends an offset past the end back to the last page', async () => {
+		route({ '/alerts': { data: [], limit: 50, offset: 500, total_count: 60 }, '/codes': { data: [] }, '/events': { data: [] } });
+		await expect(load(loadEvent('?limit=50&offset=500'))).rejects.toMatchObject({
+			status: 307,
+			location: expect.stringContaining('offset=50'),
+		});
+	});
+});

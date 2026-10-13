@@ -11,14 +11,14 @@
 		NumberInput,
 		PageShell,
 		SectionHeading,
-		Select,
+		SegmentedControl,
 		Stat,
 		Table,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		Activity,
 		Cpu,
@@ -71,14 +71,13 @@
 		}
 	}
 
-	function setLatencyTop(top: string) {
-		void goto(`/admin/observability?top=${top}`, {
-			replaceState: true,
-			keepFocus: true,
-			noScroll: true,
-			invalidateAll: true,
-		});
-	}
+	// Each depth is a link, so the ranking a person is looking at is an
+	// address and the choice works before the page hydrates.
+	const topOptions = LATENCY_TOP_CHOICES.map((c) => ({
+		value: String(c),
+		label: `Top ${c}`,
+		href: `/admin/observability?top=${c}`,
+	}));
 
 	function fmtUs(us: number): string {
 		if (us >= 1_000_000) return `${(us / 1_000_000).toFixed(2)}s`;
@@ -304,7 +303,10 @@
 	{:else if note?.error}
 		<Alert tone="danger">{note.error}</Alert>
 	{:else if note?.saved}
-		<Alert tone="success" autoDismiss>Applied. The change holds until the engine restarts.</Alert>
+		<!-- The confirmation clears itself. The caveat is a standing fact about
+		     the value now in force, so it stays beside the form. -->
+		<Alert tone="success" autoDismiss>Applied.</Alert>
+		<p class="text-xs text-muted">The change holds until the engine restarts.</p>
 	{/if}
 {/snippet}
 
@@ -658,14 +660,11 @@
 				{/if}
 			{/snippet}
 			{#snippet filters()}
-				<label for="latency-top" class="sr-only">Rows</label>
-				<Select
-					id="latency-top"
-					options={LATENCY_TOP_CHOICES.map((c) => ({ value: String(c), label: `Top ${c}` }))}
-					value={String(data.top)}
-					onvaluechange={setLatencyTop}
-					class="w-32"
-				/>
+				<!-- A depth is a page address. It replaces the entry in the history
+				     and keeps the reader where they were on the page. -->
+				<div id="latency-top" data-sveltekit-noscroll data-sveltekit-replacestate>
+					<SegmentedControl label="Rows" labelHidden size="sm" options={topOptions} value={String(data.top)} />
+				</div>
 			{/snippet}
 		</ListToolbar>
 
@@ -761,14 +760,16 @@
 					<Input id="tail-keyword" bind:value={logKeyword} placeholder="Keyword, then Enter" onkeydown={applyKeyword} />
 				{/snippet}
 				{#snippet filters()}
-					<label for="tail-level" class="sr-only">Minimum level</label>
-					<Select
-						id="tail-level"
-						options={LOG_LEVELS.map((lv) => ({ value: lv, label: lv }))}
-						value={logMinLevel}
-						onvaluechange={setMinLevel}
-						class="w-36"
-					/>
+					<div id="tail-level">
+						<SegmentedControl
+							label="Minimum level"
+							labelHidden
+							size="sm"
+							options={LOG_LEVELS.map((lv) => ({ value: lv, label: lv }))}
+							value={logMinLevel}
+							onchange={setMinLevel}
+						/>
+					</div>
 					<Button variant={logPaused ? 'primary' : 'secondary'} onclick={() => { logPaused = !logPaused; }}>
 						{logPaused ? 'Resume' : 'Pause'}
 					</Button>

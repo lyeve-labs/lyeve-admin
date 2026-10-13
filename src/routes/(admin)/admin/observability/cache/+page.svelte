@@ -17,6 +17,7 @@
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { enhance } from '$app/forms';
@@ -191,9 +192,9 @@
 			absent="The cache plugin is not part of this build, so nothing is cached."
 		/>
 	{:else}
-		{#if refusal}
+		{#if refusal && !ruleOpen}
 			<RefusalNotice {refusal} />
-		{:else if formError}
+		{:else if formError && !ruleOpen}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -519,12 +520,8 @@
 </PageShell>
 
 <Drawer bind:open={ruleOpen} title={editing ? 'Edit rule' : 'New rule'}>
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="cache-rule-form" method="POST" action={editing ? '?/updateRule' : '?/createRule'} use:enhance={saveRule.enhance}>
+		<FormErrors message={formError || undefined} refused={refusal} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}

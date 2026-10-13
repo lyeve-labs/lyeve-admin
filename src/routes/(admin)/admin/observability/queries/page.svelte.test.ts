@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({
@@ -197,5 +197,19 @@ describe('Slow queries analysis', () => {
 
 		expect(container.textContent).toContain('could not explain these statements as mssql');
 		expect(container.textContent).not.toContain('Nothing to suggest');
+	});
+});
+
+describe('Slow queries filter', () => {
+	// The table head and the pager stood above the empty state, so an empty
+	// table read as a page of rows that failed to draw.
+	it('draws no table or pager when nothing on the page matches', async () => {
+		const { container } = render(QueriesPage, { props: props() });
+		const input = container.querySelector('#query-narrow') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'no such statement' } });
+
+		expect(container.textContent).toContain('Nothing on this page matches');
+		expect(container.querySelector('table')).toBeNull();
+		expect(container.querySelector('nav[aria-label*="agination" i]')).toBeNull();
 	});
 });

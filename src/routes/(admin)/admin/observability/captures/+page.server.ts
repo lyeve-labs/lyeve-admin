@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { errorCodeOf } from '$lib/api/limits';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
@@ -29,7 +29,7 @@ import {
 	type ReplaySet,
 	type RuleMethod,
 } from '$lib/api/request-capture';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -68,6 +68,8 @@ export const load: PageServerLoad = async (event) => {
 		gate = captureGate(err);
 	}
 	if (gate.state !== 'ok') return { ...empty, gate };
+	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// The rules and the sets are their own reads. Losing one says so in its
 	// section and never reads as having none.

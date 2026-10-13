@@ -3,7 +3,19 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+const forms = vi.hoisted(() => ({ submits: new Map<string, unknown>() }));
+vi.mock('$app/forms', () => ({
+	enhance: (form: HTMLFormElement, submit: unknown) => {
+		forms.submits.set(form.getAttribute('action') ?? '', submit);
+		return { destroy() {} };
+	},
+}));
+
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
+	const actual = await importOriginal<Record<string, unknown>>();
+	return { ...actual, confirm: kit.confirm };
+});
 
 import TelemetryPage from './+page.svelte';
 
@@ -59,13 +71,13 @@ describe('the tenant destination', () => {
 		render(TelemetryPage, props({ destination: null, licensed: true }));
 		expect(screen.queryByText('Keep the stored headers')).toBeNull();
 		expect(screen.getByRole('button', { name: /Add header/ })).toBeTruthy();
-		expect(screen.queryByRole('button', { name: 'Remove destination' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Delete destination' })).toBeNull();
 	});
 
 	it('says what an unlicensed install keeps', () => {
 		const { container } = render(TelemetryPage, props({ destination: STORED, licensed: false }));
 		expect(said(container)).toContain('needs a license this install does not hold');
-		expect(screen.getByRole('button', { name: 'Remove destination' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Delete destination' })).toBeTruthy();
 	});
 
 	// The form stayed live with Save enabled, so an unlicensed reader filled it
@@ -76,12 +88,23 @@ describe('the tenant destination', () => {
 		expect(save.disabled).toBe(true);
 		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).matches(':disabled')).toBe(true);
 		expect(said(container)).toContain('Not enabled on this instance.');
-		expect((screen.getByRole('button', { name: 'Remove destination' }) as HTMLButtonElement).disabled).toBe(false);
+		expect((screen.getByRole('button', { name: 'Delete destination' }) as HTMLButtonElement).disabled).toBe(false);
 	});
 
 	it('keeps the save live on a licensed install', () => {
 		render(TelemetryPage, props({ destination: STORED, licensed: true }));
 		expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('names the destination in the delete confirmation', async () => {
+		render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		const submit = forms.submits.get('?/removeDestination') as (i: { cancel: () => void }) => Promise<unknown>;
+		await submit({ cancel: vi.fn() });
+		expect(kit.confirm).toHaveBeenCalledWith(
+			'Delete the destination https://otlp.example.com/v1/metrics?',
+			expect.any(String),
+			{ confirmLabel: 'Delete' },
+		);
 	});
 
 	it('renders a refused save through the refusal notice', () => {

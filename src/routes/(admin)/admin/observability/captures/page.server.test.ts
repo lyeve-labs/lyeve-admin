@@ -90,6 +90,15 @@ describe('captures load', () => {
 	});
 });
 
+describe('the captures pager', () => {
+	it('sends an offset past the end back to the last page', async () => {
+		api.listCaptures.mockResolvedValue({ data: [], total_count: 60, licensed: true });
+		const event = loadEvent() as unknown as { url: URL };
+		event.url = new URL('http://admin/admin/observability/captures?limit=50&offset=500');
+		await expect(load(event as never)).rejects.toMatchObject({ status: 307, location: expect.stringContaining('offset=50') });
+	});
+});
+
 describe('capture rule actions', () => {
 	it('sends the sample as a fraction and the retention in seconds', async () => {
 		api.createCaptureRule.mockResolvedValue({});

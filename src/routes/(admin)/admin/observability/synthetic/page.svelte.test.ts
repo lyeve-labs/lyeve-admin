@@ -279,3 +279,39 @@ describe('the tiles', () => {
 		expect(said(container)).not.toContain('on this page');
 	});
 });
+
+describe('the probe toolbar', () => {
+	it('narrows the rows on this page by name', async () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ probes: [probe({ id: 'a', name: 'Homepage' }), probe({ id: 'b', name: 'Checkout' })], total: 2 }),
+		});
+		const input = container.querySelector('#probe-narrow') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'check' } });
+		const rows = [...container.querySelectorAll('tbody tr')].map((r) => r.textContent ?? '');
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toContain('Checkout');
+	});
+});
+
+describe('the probe type', () => {
+	it('offers each type with the sentence that tells it apart', async () => {
+		const { container, getAllByRole } = render(SyntheticPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new probe/i })[0]);
+		const radios = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"][name="type"]')];
+		expect(radios).toHaveLength(4);
+		expect(said(document.body)).toContain('Fetches a URL and checks the status code.');
+		expect(said(document.body)).toContain('Sends a webhook and waits for the receipt.');
+		void container;
+	});
+});
+
+describe('a failed save', () => {
+	// The message went to the page behind the drawer, so the open panel said
+	// nothing about why the save did not happen.
+	it('is said at the top of the open form', async () => {
+		render(SyntheticPage, { props: props({}, { error: 'Name the probe so an alert can say which one fired.' }) });
+		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
+		const form = document.querySelector('#probe-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Name the probe so an alert can say which one fired.');
+	});
+});

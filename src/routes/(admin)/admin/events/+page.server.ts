@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -15,7 +15,7 @@ import {
 	type ReplayRun,
 } from '$lib/api/events';
 import { section, type Section } from '$lib/api/gate';
-import { pageWindow } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { instantFromWallClock } from '$lib/utils/wall-clock';
 
 const DEFAULT_LIMIT = 50;
@@ -55,8 +55,11 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		const page = await listEvents(client, limit, offset);
 		events = page.data ?? [];
+		const back = pastEndOffset(events.length, limit, offset, page.total_count ?? null);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 		total = Math.max(page.total_count ?? 0, offset + events.length);
 	} catch (err) {
+		if (isRedirect(err)) throw err;
 		gate = eventsGate(err);
 	}
 

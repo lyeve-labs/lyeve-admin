@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -21,7 +21,7 @@ import {
 	type ErrorGate,
 	type EventPage,
 } from '$lib/api/error-tracking';
-import { pageWindow, rowsOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -49,6 +49,10 @@ export const load: PageServerLoad = async (event) => {
 			({ alerts, total } = await listAlerts(client, limit, offset, status));
 		} catch (err) {
 			gate = errorGate(err);
+		}
+		if (gate.state === 'ok') {
+			const back = pastEndOffset(alerts.length, limit, offset, total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 		}
 	}
 

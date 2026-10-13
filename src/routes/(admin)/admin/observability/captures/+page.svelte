@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -188,7 +189,7 @@
 			absent="The request capture plugin is not part of this build, so no request is kept."
 		/>
 	{:else}
-		{#if refusal}
+		{#if refusal && !ruleOpen && !setOpen}
 			<RefusalNotice {refusal} />
 		{:else if needsWrites}
 			{@const s = data.sets.find((x) => x.id === needsWrites)}
@@ -202,7 +203,7 @@
 					</form>
 				{/if}
 			</Alert>
-		{:else if formError}
+		{:else if formError && !ruleOpen && !setOpen}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -463,12 +464,8 @@
 </PageShell>
 
 <Drawer bind:open={ruleOpen} title={editing ? 'Edit rule' : 'New rule'}>
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="capture-rule-form" method="POST" action={editing ? '?/updateRule' : '?/createRule'} use:enhance={saveRule.enhance}>
+		<FormErrors message={formError || undefined} refused={refusal} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}
@@ -516,12 +513,8 @@
 </Drawer>
 
 <Drawer bind:open={setOpen} title="New replay set">
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="replay-set-form" method="POST" action="?/createSet" use:enhance={saveSet.enhance}>
+		<FormErrors message={formError || undefined} refused={refusal} />
 		{#each selected as id (id)}
 			<input type="hidden" name="capture_id" value={id} />
 		{/each}

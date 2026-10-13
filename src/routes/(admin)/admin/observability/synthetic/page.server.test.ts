@@ -157,4 +157,16 @@ describe('the probe list load', () => {
 		expect(out.alerts).toEqual({ ok: false, gate: { state: 'unavailable' } });
 		expect(out.probes).toHaveLength(1);
 	});
+
+	it('sends an offset past the end back to the last page', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.includes('/probes')) return { data: [], total_count: 30 };
+			if (url.includes('/alerts')) return { data: [] };
+			throw new ApiError(404, 'not found', {});
+		});
+		await expect(load(loadEvent('?limit=25&offset=200'))).rejects.toMatchObject({
+			status: 307,
+			location: expect.stringContaining('offset=25'),
+		});
+	});
 });

@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -31,7 +31,7 @@ import {
 	type Limit,
 } from '$lib/api/cache';
 import { gateOf, type Gate } from '$lib/api/gate';
-import { pageOf, pageWindow, rowsOf } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 /** What the response cache rules read answered, beside the rest of the page. */
 export interface RulesState {
@@ -112,6 +112,10 @@ export const load: PageServerLoad = async (event) => {
 			entries = pageOf(await listEntries(client, limit + 1, offset), limit, offset);
 		} catch (err) {
 			entriesGate = gateOf(err, 'The stored entries could not be read. This is not a report that nothing is cached.');
+		}
+		if (!entriesGate) {
+			const back = pastEndOffset(entries.rows.length, limit, offset, entries.total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 		}
 	}
 

@@ -223,52 +223,6 @@
 					{/snippet}
 				</ListToolbar>
 
-				<Table label="Captured statements">
-					<thead>
-						<tr>
-							<th scope="col">Statement</th>
-							<th scope="col">Took</th>
-							<th scope="col">Rows</th>
-							<th scope="col">Caller</th>
-							<th scope="col">Captured</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as entry (entry.id)}
-							<tr>
-								<td>
-									<code class="text-xs">{oneLine(entry.query_text)}</code>
-									{#if planFlags(entry).length > 0}
-										<div class="mt-1 flex flex-wrap gap-1">
-											{#each planFlags(entry) as flag (flag)}
-												<Badge tone="warn">{flag}</Badge>
-											{/each}
-										</div>
-									{/if}
-								</td>
-								<td data-cell="nowrap">
-									<Badge tone={durationTone(entry.duration_ms)}>{ms(entry.duration_ms)}</Badge>
-								</td>
-								<td data-cell="nowrap" class="text-xs">{entry.rows_returned ?? NO_VALUE}</td>
-								<td data-cell="nowrap" class="font-mono text-xs text-faint"
-									>{callerOf(entry) ?? NO_VALUE}</td
-								>
-								<td data-cell="nowrap" class="text-xs text-faint"
-									>{formatDateTime(entry.captured_at)}</td
-								>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-				<Pagination
-					page={pageNumber(data.offset, data.limit)}
-					perPage={data.limit}
-					count={data.entries.length}
-					total={data.total ?? undefined}
-					noun="queries"
-					href={pageHref('/admin/observability/queries', data.limit)}
-				/>
-
 				{#if visible.length === 0}
 					<EmptyState
 						title="Nothing on this page matches"
@@ -277,7 +231,56 @@
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}
+						{#snippet action()}
+							<Button variant="secondary" onclick={() => (narrow = '')}>Clear the filter</Button>
+						{/snippet}
 					</EmptyState>
+				{:else}
+					<Table label="Captured statements">
+						<thead>
+							<tr>
+								<th scope="col">Statement</th>
+								<th scope="col">Took</th>
+								<th scope="col">Rows</th>
+								<th scope="col">Caller</th>
+								<th scope="col">Captured</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as entry (entry.id)}
+								<tr>
+									<td>
+										<code class="text-xs">{oneLine(entry.query_text)}</code>
+										{#if planFlags(entry).length > 0}
+											<div class="mt-1 flex flex-wrap gap-1">
+												{#each planFlags(entry) as flag (flag)}
+													<Badge tone="warn">{flag}</Badge>
+												{/each}
+											</div>
+										{/if}
+									</td>
+									<td data-cell="nowrap">
+										<Badge tone={durationTone(entry.duration_ms)}>{ms(entry.duration_ms)}</Badge>
+									</td>
+									<td data-cell="nowrap" class="text-xs">{entry.rows_returned ?? NO_VALUE}</td>
+									<td data-cell="nowrap" class="font-mono text-xs text-faint"
+										>{callerOf(entry) ?? NO_VALUE}</td
+									>
+									<td data-cell="nowrap" class="text-xs text-faint"
+										>{formatDateTime(entry.captured_at)}</td
+									>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+					<Pagination
+						page={pageNumber(data.offset, data.limit)}
+						perPage={data.limit}
+						count={data.entries.length}
+						total={data.total ?? undefined}
+						noun="queries"
+						href={pageHref('/admin/observability/queries', data.limit)}
+					/>
 				{/if}
 			{/if}
 		</section>
