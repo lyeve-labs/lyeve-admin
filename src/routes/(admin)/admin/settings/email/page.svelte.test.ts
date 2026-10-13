@@ -187,9 +187,26 @@ describe('email providers page', () => {
 		expect(container.textContent).toContain('transport changed');
 	});
 
-	it('reports a refusal', () => {
-		const { getByText } = setup([smtp], {}, { error: 'An API key is required.' });
-		expect(getByText('An API key is required.')).toBeTruthy();
+	const drawerText = (container: HTMLElement) => formEl(container)?.textContent ?? '';
+
+	it('reports a refused save inside the open drawer', async () => {
+		const { getAllByText, container, rerender } = setup([smtp]);
+		await fireEvent.click(getAllByText('New provider')[0]);
+		await rerender({ data: { providers: { ok: true, value: [smtp] }, mail: null }, form: { action: 'provider', error: 'An API key is required.' } } as never);
+		expect(drawerText(container)).toContain('An API key is required.');
+	});
+
+	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const { getAllByText, container } = setup([smtp], {}, { action: 'delete', error: 'Failed to delete the provider.' });
+		expect(container.textContent).toContain('Failed to delete the provider.');
+		await fireEvent.click(getAllByText('New provider')[0]);
+		expect(drawerText(container)).not.toContain('Failed to delete');
+	});
+
+	it('keeps a mail setting failure out of the provider drawer', async () => {
+		const { getAllByText, container } = setup([smtp], {}, { key: 'SMTP_HOST', error: 'Not a mail setting' });
+		await fireEvent.click(getAllByText('New provider')[0]);
+		expect(drawerText(container)).not.toContain('Not a mail setting');
 	});
 });
 

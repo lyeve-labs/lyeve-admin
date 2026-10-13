@@ -53,7 +53,7 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const query = String(data.get('query') ?? '').trim();
-		if (!query) return fail(400, { error: 'Paste the query to allow.' });
+		if (!query) return fail(400, { action: 'register', error: 'Paste the query to allow.' });
 		try {
 			await registerPersisted(authedClient(event), {
 				query,
@@ -62,31 +62,31 @@ export const actions: Actions = {
 			});
 			return { registered: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The query could not be registered.') });
+			return fail(400, { action: 'register', error: actionError(err, 'The query could not be registered.') });
 		}
 	},
 
 	toggle: async (event) => {
 		await requireUser(event);
 		const hash = await hashOf(event);
-		if (!hash) return fail(400, { error: 'Choose a query.' });
+		if (!hash) return fail(400, { action: 'toggle', error: 'Choose a query.' });
 		try {
 			await togglePersisted(authedClient(event), hash);
 			return { toggled: hash };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The query could not be switched.') });
+			return fail(400, { action: 'toggle', error: actionError(err, 'The query could not be switched.') });
 		}
 	},
 
 	delete: async (event) => {
 		await requireUser(event);
 		const hash = await hashOf(event);
-		if (!hash) return fail(400, { error: 'Choose a query.' });
+		if (!hash) return fail(400, { action: 'delete', error: 'Choose a query.' });
 		try {
 			await deletePersisted(authedClient(event), hash);
 			return { deleted: hash };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The query could not be deleted.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The query could not be deleted.') });
 		}
 	},
 };

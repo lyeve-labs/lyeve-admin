@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup, screen } from '@testing-library/svelte';
+import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -94,12 +94,13 @@ describe('tenant rate limits', () => {
 		expect(said(container)).toContain('7 requests refused');
 	});
 
-	it('explains the self-lockout refusal and the way out', () => {
-		const { container } = render(TenantPage, {
-			props: props({}, { error: 'this entry would refuse the address you are calling from', lockout: '0.0.0.0/0' }),
-		});
-		expect(said(container)).toContain('That entry would lock you out');
-		expect(said(container)).toContain('Add your own address to the allow list first');
+	it('explains the self-lockout refusal and the way out inside the address drawer', async () => {
+		const { rerender } = render(TenantPage, { props: props() });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New address' })[1]);
+		await rerender(props({}, { action: 'address', error: 'That entry would lock you out.', lockout: '0.0.0.0/0' }));
+		const drawer = document.body.querySelector('form#address-form')?.textContent ?? '';
+		expect(drawer.replace(/\s+/g, ' ')).toContain('Add your own address to the allow list first');
+		expect(drawer).toContain('0.0.0.0/0 covers the address you are signed in from');
 	});
 
 	it('shows a locked history beside lists that still read', () => {
@@ -116,5 +117,35 @@ describe('tenant rate limits', () => {
 		});
 		expect(said(container)).toContain('Adding an address needs a license');
 		expect(said(container)).toContain('No address is refused');
+	});
+});
+
+describe('tenant rate limit drawers', () => {
+	const drawerText = (id: string) => document.body.querySelector(`form#${id}`)?.textContent ?? '';
+
+	it('shows a refused limit save inside the limit drawer', async () => {
+		const { rerender } = render(TenantPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: 'Set a limit' }));
+		await rerender(props({}, { action: 'limit', error: 'The tenant limit could not be saved.' }));
+		expect(drawerText('tenant-limit-form')).toContain('The tenant limit could not be saved.');
+		expect(drawerText('address-form')).not.toContain('could not be saved');
+	});
+
+	it('leaves a newly opened address drawer clean after a failed delete', async () => {
+		const { container } = render(TenantPage, {
+			props: props({}, { action: 'deleteAddress', error: 'The entry could not be removed.' }),
+		});
+		expect(said(container)).toContain('The entry could not be removed.');
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New address' })[0]);
+		expect(drawerText('address-form')).not.toContain('could not be removed');
+	});
+
+	it('keeps a refused address out of the limit drawer', async () => {
+		const { rerender } = render(TenantPage, { props: props() });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New address' })[0]);
+		await rerender(props({}, { action: 'address', error: '198.51.100.7/32 is already on the allow list.' }));
+		expect(drawerText('address-form')).toContain('already on the allow list');
+		await fireEvent.click(screen.getByRole('button', { name: 'Set a limit' }));
+		expect(drawerText('tenant-limit-form')).not.toContain('already on the allow list');
 	});
 });

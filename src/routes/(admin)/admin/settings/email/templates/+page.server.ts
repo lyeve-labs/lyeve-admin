@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, type ActionFailure } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
@@ -48,6 +48,14 @@ export const load: PageServerLoad = async (event) => {
 	return { templates, starters, limits };
 };
 
+/**
+ * The failure marked with the action that caused it. The drawer shows only a
+ * failed save, and a failed delete or preview shows above the list.
+ */
+function tagged<T extends Record<string, unknown>>(action: string, failure: ActionFailure<T>) {
+	return fail(failure.status, { ...failure.data, action });
+}
+
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();
 
 function status(data: FormData): TemplateStatus {
@@ -63,7 +71,7 @@ export const actions: Actions = {
 		const subject = text(data, 'subject');
 		// The body is the author's to the byte, so it is not trimmed.
 		const body = String(data.get('mjml_source') ?? '');
-		if (!subject) return fail(400, { error: 'Enter a subject.' });
+		if (!subject) return fail(400, { action: 'save', error: 'Enter a subject.' });
 		const client = authedClient(event);
 		try {
 			if (id) {
@@ -72,39 +80,39 @@ export const actions: Actions = {
 			}
 			const key = text(data, 'key');
 			if (!TEMPLATE_KEY.test(key)) {
-				return fail(400, { error: 'A name is lower case letters, digits and dashes, and starts with a letter.' });
+				return fail(400, { action: 'save', error: 'A name is lower case letters, digits and dashes, and starts with a letter.' });
 			}
 			const created = await createTemplate(client, { key, subject, mjml_source: body, status: status(data) });
 			return { saved: created.id };
 		} catch (err) {
 			// 409 on a create is a name the tenant already holds. The plugin's
 			// sentence for a refused body (422) is written for the author.
-			if (err instanceof ApiError && err.status === 409) return fail(409, { error: 'A template with that name already exists.' });
-			return actionFailure(err, 'The template could not be saved.', err instanceof ApiError && err.status === 422 ? 422 : 400);
+			if (err instanceof ApiError && err.status === 409) return fail(409, { action: 'save', error: 'A template with that name already exists.' });
+			return tagged('save', actionFailure(err, 'The template could not be saved.', err instanceof ApiError && err.status === 422 ? 422 : 400));
 		}
 	},
 
 	delete: async (event) => {
 		await requireUser(event);
 		const id = text(await event.request.formData(), 'id');
-		if (!id) return fail(400, { error: 'Choose a template.' });
+		if (!id) return fail(400, { action: 'delete', error: 'Choose a template.' });
 		try {
 			await deleteTemplate(authedClient(event), id);
 			return { deleted: id };
 		} catch (err) {
-			return actionFailure(err, 'The template could not be deleted.', err instanceof ApiError && err.status === 409 ? 409 : 400);
+			return tagged('delete', actionFailure(err, 'The template could not be deleted.', err instanceof ApiError && err.status === 409 ? 409 : 400));
 		}
 	},
 
 	preview: async (event) => {
 		await requireUser(event);
 		const key = text(await event.request.formData(), 'key');
-		if (!key) return fail(400, { error: 'Choose a template.' });
+		if (!key) return fail(400, { action: 'preview', error: 'Choose a template.' });
 		try {
 			const out = await previewTemplate(authedClient(event), key, SAMPLE_VARS);
 			return { preview: { key, subject: out.subject, html: out.html } };
 		} catch (err) {
-			return actionFailure(err, 'The template could not be rendered. Check the body for an unclosed tag or a misspelled variable.');
+			return tagged('preview', actionFailure(err, 'The template could not be rendered. Check the body for an unclosed tag or a misspelled variable.'));
 		}
 	},
 };

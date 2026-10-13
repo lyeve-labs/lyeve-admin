@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { Alert, Badge, Button, Drawer, EmptyState, Input, Modal, PageShell, SegmentedControl, Select, Table, Textarea, confirm } from '@lyeve-labs/ui-kit';
 	import { Eye, Lock, Mail, Pencil, Plus, Trash2 } from '@lucide/svelte';
@@ -13,8 +14,20 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
-	const formError = $derived(form && 'error' in form && typeof form.error === 'string' ? form.error : '');
+
+	/*
+	 * The drawer, the delete and the preview report through the one `form`, so
+	 * each failure names the action that caused it. The drawer shows only a
+	 * failed save, and only one that came back after it opened, so a failed
+	 * delete never reads as a failure of the next form opened. A failed delete
+	 * or preview shows above the list.
+	 */
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const saveFailure = $derived(failure?.action === 'save' && form !== openedOver ? failure : null);
+	const pageFailure = $derived(failure?.action === 'delete' || failure?.action === 'preview' ? failure : null);
+	const pageRefusal = $derived(pageFailure ? formRefusal(pageFailure) : null);
+	const formError = $derived(pageFailure?.error ?? '');
 
 	// The plugin states the ceiling and the count. A limit of 0 is none, and
 	// a read that failed states nothing: the create still answers the ceiling.
@@ -55,6 +68,7 @@
 		subject = '';
 		body = BLANK;
 		status = 'active';
+		openedOver = form;
 		open = true;
 	}
 
@@ -64,6 +78,7 @@
 		subject = t.subject;
 		body = t.mjml_source;
 		status = t.status;
+		openedOver = form;
 		open = true;
 	}
 
@@ -98,10 +113,12 @@
 	let previewForm = $state<HTMLFormElement>();
 	let previewOpen = $state(false);
 	const preview = $derived(form && 'preview' in form ? form.preview : null);
+	// The preview opens only on a rendered answer. A failed render shows above
+	// the list, where a modal with nothing in it would hide it.
 	const showPreview: SubmitFunction = () => {
-		return async ({ update }) => {
+		return async ({ result, update }) => {
 			await update({ reset: false });
-			previewOpen = true;
+			if (result.type === 'success') previewOpen = true;
 		};
 	};
 
@@ -136,9 +153,9 @@
 		{/if}
 	{/snippet}
 
-	{#if pageRefusal && !open}
+	{#if pageRefusal}
 		<RefusalNotice refusal={pageRefusal} />
-	{:else if formError && !open}
+	{:else if formError}
 		<Alert tone="danger">{#snippet children()}{formError}{/snippet}</Alert>
 	{/if}
 	{#if atCeiling}
@@ -211,11 +228,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.key}` : 'New template'}>
 	<form method="POST" action="?/save" id="template-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if formError}
-			<Alert tone="danger">{#snippet children()}{formError}{/snippet}</Alert>
-		{/if}
+		<FormErrors message={saveFailure?.error} refused={saveFailure ? formRefusal(saveFailure) : null} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{:else}

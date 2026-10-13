@@ -2,6 +2,7 @@
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -40,9 +41,21 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const refusal = $derived(formRefusal(form));
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const lockout = $derived((form as { lockout?: string } | null)?.lockout ?? '');
+	/*
+	 * Every form here reports through the one `form`, so each failure names the
+	 * action that caused it. A drawer shows only its own action's failure, and
+	 * only one that came back after it opened, so a failed delete never reads
+	 * as a failure of the next form opened. The page shows the row actions'.
+	 */
+	const failure = $derived(form as { action?: string; error?: string; lockout?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const fresh = $derived(form !== openedOver);
+	const inDrawer = $derived(failure?.action === 'limit' || failure?.action === 'address');
+	const refusal = $derived(inDrawer ? null : formRefusal(form));
+	const formError = $derived(inDrawer ? '' : (failure?.error ?? ''));
+	const limitFailure = $derived(fresh && failure?.action === 'limit' ? failure : null);
+	const addressFailure = $derived(fresh && failure?.action === 'address' ? failure : null);
+	const lockout = $derived(addressFailure?.lockout ?? '');
 
 	const limitRead = $derived(data.limit.ok ? data.limit.value : null);
 	const own = $derived(limitRead?.tenant_global ?? null);
@@ -62,6 +75,7 @@
 	let limitEnabled = $state(true);
 
 	function openLimit() {
+		openedOver = form;
 		rate = String(own?.rate ?? install?.rate ?? 10);
 		burst = String(own?.burst ?? install?.burst ?? 20);
 		limitEnabled = own?.enabled ?? true;
@@ -80,6 +94,7 @@
 	let note = $state('');
 
 	function openAddress(which: AddressList) {
+		openedOver = form;
 		cidr = '';
 		list = which;
 		note = '';
@@ -205,17 +220,6 @@
 	{:else}
 		{#if refusal}
 			<RefusalNotice {refusal} />
-		{:else if lockout}
-			<Alert tone="danger" title="That entry would lock you out">
-				<p>
-					{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it
-					would refuse this console to you, and only an operator of the install could undo that.
-				</p>
-				<p class="mt-2">
-					Add your own address to the allow list first, then deny the range. An allowed address is served
-					whatever the deny list says.
-				</p>
-			</Alert>
 		{:else if formError}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
@@ -359,13 +363,9 @@
 </PageShell>
 
 <Drawer bind:open={limitOpen} title="Tenant limit">
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="tenant-limit-form" method="POST" action="?/setLimit" use:enhance={saveLimit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={limitFailure?.error} refused={limitFailure ? formRefusal(limitFailure) : null} />
 			<Input
 				id="tenant-rate"
 				name="rate"
@@ -393,13 +393,24 @@
 </Drawer>
 
 <Drawer bind:open={addressOpen} title="New address">
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="address-form" method="POST" action="?/addAddress" use:enhance={saveAddress.enhance}>
 		<div class="flex flex-col gap-4">
+			{#if lockout}
+				<!-- The plugin's sentence says only that it was refused. This says why,
+				     and how to proceed, beside the entry that caused it. -->
+				<Alert tone="danger" title="That entry would lock you out">
+					<p>
+						{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it
+						would refuse this console to you, and only an operator of the install could undo that.
+					</p>
+					<p class="mt-2">
+						Add your own address to the allow list first, then deny the range. An allowed address is served
+						whatever the deny list says.
+					</p>
+				</Alert>
+			{:else}
+				<FormErrors message={addressFailure?.error} refused={addressFailure ? formRefusal(addressFailure) : null} />
+			{/if}
 			<SegmentedControl
 				label="List"
 				name="list"

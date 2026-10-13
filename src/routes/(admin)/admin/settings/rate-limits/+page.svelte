@@ -25,6 +25,7 @@
 	import { duplicateRow } from '$lib/duplicate';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		audienceLabel,
 		blocksEverything,
@@ -44,7 +45,22 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Every form here reports through the one `form`, so each failure names the
+	 * action that caused it. A drawer shows only its own action's failure, and
+	 * only one that came back after it opened, so a failed delete never reads
+	 * as a failure of the next form opened. The page shows the row actions'.
+	 */
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const fresh = $derived(form !== openedOver);
+	const failureOf = (action: string) => (fresh && failure?.action === action ? (failure.error ?? '') : '');
+	const ruleError = $derived(failureOf('rule'));
+	const globalError = $derived(failureOf('global'));
+	const protectionError = $derived(failureOf('protection'));
+	const formError = $derived(
+		failure?.action === 'delete' || failure?.action === 'resetProtection' ? (failure.error ?? '') : '',
+	);
 	const blocking = $derived(data.rules.filter(blocksEverything));
 	const spent = $derived(exhausted(data.status));
 	const overview = $derived(data.overview);
@@ -77,6 +93,7 @@
 	let enabled = $state(true);
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		endpoint = '*';
 		tenantId = '';
@@ -89,6 +106,7 @@
 	}
 
 	function openEdit(r: RateRule) {
+		openedOver = form;
 		editing = r;
 		endpoint = r.endpoint;
 		tenantId = r.tenant_id ?? '';
@@ -114,6 +132,7 @@
 	 * rule in this list and what a second rule has to differ in.
 	 */
 	function openDuplicate(r: RateRule) {
+		openedOver = form;
 		const draft = duplicateRow(r as unknown as Record<string, unknown>, {
 			nameField: 'endpoint',
 			taken: data.rules.map((x) => x.endpoint),
@@ -137,6 +156,7 @@
 	let globalEnabled = $state(false);
 
 	function openGlobal() {
+		openedOver = form;
 		const g = overview?.global;
 		globalRate = String(g?.rate ?? 50);
 		globalBurst = String(g?.burst ?? 100);
@@ -150,6 +170,7 @@
 	let protectionMinutes = $state('15');
 
 	function openProtection(p: Protection) {
+		openedOver = form;
 		protection = p;
 		protectionRequests = String(p.requests);
 		protectionMinutes = String(p.window_seconds / 60);
@@ -635,11 +656,11 @@
 		action={editing ? '?/update' : '?/create'}
 		use:enhance={saveRuleSubmit.enhance}
 	>
-		{#if editing}
-			<input type="hidden" name="id" value={editing.id} />
-		{/if}
-
 		<div class="flex flex-col gap-4">
+			<FormErrors message={ruleError || undefined} />
+			{#if editing}
+				<input type="hidden" name="id" value={editing.id} />
+			{/if}
 			<Autocomplete
 				id="rl-route"
 				label="Pick a route"
@@ -715,6 +736,7 @@
 <Drawer bind:open={globalOpen} title="Global limit">
 	<form id="rate-global-form" method="POST" action="?/global" use:enhance={saveGlobalSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={globalError || undefined} />
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Input
 					id="rl-global-rate"
@@ -751,6 +773,7 @@
 		use:enhance={saveProtectionSubmit.enhance}
 	>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={protectionError || undefined} />
 			{#if protection}
 				<input type="hidden" name="name" value={protection.name} />
 				<p class="text-xs text-muted">

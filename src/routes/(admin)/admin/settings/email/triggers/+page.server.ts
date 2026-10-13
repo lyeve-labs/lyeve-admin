@@ -36,7 +36,7 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const read = readTriggerForm(data);
-		if ('error' in read) return fail(400, { error: read.error });
+		if ('error' in read) return fail(400, { action: 'save', error: read.error });
 		const id = String(data.get('id') ?? '').trim();
 		try {
 			if (id) await updateEmailTrigger(client, id, read.input);
@@ -44,6 +44,7 @@ export const actions: Actions = {
 			return { saved: true };
 		} catch (err) {
 			return fail(err instanceof ApiError && err.status === 422 ? 422 : 400, {
+				action: 'save',
 				error: actionError(err, 'The trigger could not be saved.'),
 			});
 		}
@@ -53,12 +54,13 @@ export const actions: Actions = {
 		await requireUser(event);
 		const client = authedClient(event);
 		const id = String((await event.request.formData()).get('id') ?? '').trim();
-		if (!id) return fail(400, { error: 'Choose a trigger.' });
+		if (!id) return fail(400, { action: 'delete', error: 'Choose a trigger.' });
 		try {
 			await deleteEmailTrigger(client, id);
 			return { deleted: id };
 		} catch (err) {
-			return actionFailure(err, 'The trigger could not be deleted.');
+			const failed = actionFailure(err, 'The trigger could not be deleted.');
+			return fail(failed.status, { ...failed.data, action: 'delete' });
 		}
 	},
 };

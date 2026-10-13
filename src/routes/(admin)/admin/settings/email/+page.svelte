@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -31,7 +32,23 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * The provider drawer, the delete and every mail setting report through the
+	 * one `form`. The drawer shows only a failed save, and only one that came
+	 * back after it opened, so a failed delete never reads as a failure of the
+	 * next form opened. A failed delete shows above the list. A setting's
+	 * outcome carries its key, and its own row shows it.
+	 */
+	const failure = $derived(form as { action?: string; error?: string; key?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const saveFailure = $derived(failure?.action === 'provider' && form !== openedOver ? failure : null);
+	// A setting's failure that names no key, such as an ended session, has no
+	// row to show in, so it shows above the list with a failed delete.
+	const deleteFailure = $derived(
+		failure?.action === 'delete' || (failure && !failure.action && !failure.key) ? failure : null,
+	);
+	const pageRefusal = $derived(deleteFailure ? formRefusal(deleteFailure) : null);
 
 	const submit = submitter(() => (open = false));
 
@@ -119,6 +136,7 @@
 		webhookMessageIdPath = '';
 		webhookReasonPath = '';
 		eventMap = [];
+		openedOver = form;
 		open = true;
 	}
 
@@ -142,6 +160,7 @@
 		webhookMessageIdPath = p.api_webhook_message_id_path ?? '';
 		webhookReasonPath = p.api_webhook_reason_path ?? '';
 		eventMap = rows(p.api_webhook_event_map);
+		openedOver = form;
 		open = true;
 	}
 
@@ -177,6 +196,7 @@
 		webhookMessageIdPath = source.api_webhook_message_id_path ?? '';
 		webhookReasonPath = source.api_webhook_reason_path ?? '';
 		eventMap = rows(source.api_webhook_event_map);
+		openedOver = form;
 		open = true;
 	}
 
@@ -249,8 +269,8 @@
 	{:else}
 		{#if pageRefusal}
 			<RefusalNotice refusal={pageRefusal} />
-		{:else if form?.error}
-			<Alert tone="danger">{form.error}</Alert>
+		{:else if deleteFailure?.error}
+			<Alert tone="danger">{deleteFailure.error}</Alert>
 		{/if}
 
 		{#if providers.length === 0}
@@ -388,9 +408,6 @@
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New provider'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
@@ -398,6 +415,7 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors message={saveFailure?.error} refused={saveFailure ? formRefusal(saveFailure) : null} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 			<input type="hidden" name="stored_transport" value={editing.transport} />

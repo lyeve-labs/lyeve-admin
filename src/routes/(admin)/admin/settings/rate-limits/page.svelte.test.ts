@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({
@@ -37,52 +37,57 @@ const protection = {
 	customized: false,
 };
 
-function setup(over: { customEnabled?: boolean | null; superAdmin?: boolean; rules?: unknown[] } = {}) {
+type Over = { customEnabled?: boolean | null; superAdmin?: boolean; rules?: unknown[]; form?: unknown };
+
+function setup(over: Over = {}) {
+	return render(RateLimitsPage, { props: props(over) });
+}
+
+function props(over: Over = {}) {
 	const customEnabled = over.customEnabled === undefined ? false : over.customEnabled;
-	return render(RateLimitsPage, {
-		props: {
-			data: {
-				rules: over.rules ?? [customRule],
-				total: 1,
-				limit: 50,
-				offset: 0,
-				hasMore: false,
-				overview:
-					customEnabled === null
-						? null
-						: {
-								custom_licensed: customEnabled,
-								global: {
-									...customRule,
-									id: 'g1',
-									endpoint: '*',
-									kind: 'global',
-									role: null,
-									key_by: 'ip',
-									enabled: false,
-									enforced: false,
-								},
-								protections: [protection],
-								engine: [
-									{
-										scope: 'public',
-										endpoint: 'POST /api/admin/auth/login',
-										rate: 5,
-										burst: 10,
-										source: 'environment',
-										setting: 'PUBLIC_RATE_LIMITS',
-									},
-								],
+	return {
+		data: {
+			routes: [],
+			rules: over.rules ?? [customRule],
+			total: 1,
+			limit: 50,
+			offset: 0,
+			hasMore: false,
+			overview:
+				customEnabled === null
+					? null
+					: {
+							custom_licensed: customEnabled,
+							global: {
+								...customRule,
+								id: 'g1',
+								endpoint: '*',
+								kind: 'global',
+								role: null,
+								key_by: 'ip',
+								enabled: false,
+								enforced: false,
 							},
-				superAdmin: over.superAdmin ?? true,
-				status: [],
-				statusRead: true,
-				gate: { state: 'ok' },
-				installed: true,
-			},
-			form: null,
-		} as never,
-	});
+							protections: [protection],
+							engine: [
+								{
+									scope: 'public',
+									endpoint: 'POST /api/admin/auth/login',
+									rate: 5,
+									burst: 10,
+									source: 'environment',
+									setting: 'PUBLIC_RATE_LIMITS',
+								},
+							],
+						},
+			superAdmin: over.superAdmin ?? true,
+			status: [],
+			statusRead: true,
+			gate: { state: 'ok' },
+			installed: true,
+		},
+		form: over.form ?? null,
+	} as never;
 }
 
 describe('rate-limits page', () => {
@@ -139,5 +144,46 @@ describe('rate-limits page', () => {
 		const { getByText, queryByText } = setup({ customEnabled: null });
 		expect(getByText(/whether they are enforced is unknown/)).toBeTruthy();
 		expect(queryByText('Custom rate limits')).toBeNull();
+	});
+});
+
+describe('rate-limits drawers', () => {
+	const drawerText = (id: string) => document.body.querySelector(`form#${id}`)?.textContent ?? '';
+	const deleted = { action: 'delete', error: 'The rule could not be removed.' };
+
+	it('shows a refused rule save inside the open drawer', async () => {
+		const { getAllByRole, rerender } = setup({ customEnabled: true });
+		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
+		await rerender(props({ customEnabled: true, form: { action: 'rule', error: 'The rule could not be saved.' } }));
+		expect(drawerText('rate-rule-form')).toContain('The rule could not be saved.');
+	});
+
+	it('leaves a newly opened rule drawer clean after a failed delete', async () => {
+		const { container, getAllByRole } = setup({ customEnabled: true, form: deleted });
+		expect(container.textContent).toContain('The rule could not be removed.');
+		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
+		expect(drawerText('rate-rule-form')).not.toContain('could not be removed');
+	});
+
+	it('shows a refused global save in its own drawer and in no other', async () => {
+		const { getByRole, rerender, container } = setup({ customEnabled: true });
+		await fireEvent.click(getByRole('button', { name: 'Edit the global limit' }));
+		await rerender(props({ customEnabled: true, form: { action: 'global', error: 'The global limit could not be saved.' } }));
+		expect(drawerText('rate-global-form')).toContain('The global limit could not be saved.');
+		expect(drawerText('rate-rule-form')).not.toContain('could not be saved');
+		expect(container.textContent?.split('The global limit could not be saved.').length).toBe(2);
+	});
+
+	it('shows a refused protection save inside the protection drawer', async () => {
+		const { getByRole, rerender } = setup({ customEnabled: true });
+		await fireEvent.click(getByRole('button', { name: /Edit POST \/api\/admin\/auth\/login/ }));
+		await rerender(props({ customEnabled: true, form: { action: 'protection', error: 'The protection could not be saved.' } }));
+		expect(drawerText('rate-protection-form')).toContain('The protection could not be saved.');
+	});
+
+	it('leaves a reopened drawer clean of the failure it showed before', async () => {
+		const { getAllByRole } = setup({ customEnabled: true, form: { action: 'rule', error: 'The rule could not be saved.' } });
+		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
+		expect(drawerText('rate-rule-form')).not.toContain('could not be saved');
 	});
 });

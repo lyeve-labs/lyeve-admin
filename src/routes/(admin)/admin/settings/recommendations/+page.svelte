@@ -18,6 +18,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { RefreshCw, Sparkles, UserSearch } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		hasUsers,
 		percent,
@@ -41,7 +42,12 @@
 		(data.readers.ok ? data.readers.value : []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
 	);
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// The recompute and the preview report through the one `form`. A failed
+	// preview shows in its own form, beside the id that caused it, and a failed
+	// recompute shows at the top of the page.
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	const formError = $derived(failure?.action === 'preview' ? '' : (failure?.error ?? ''));
+	const previewError = $derived(failure?.action === 'preview' ? (failure.error ?? '') : '');
 	const outcome = $derived(
 		form as { refreshed?: boolean; pairs?: number; trending?: number; feeds?: number; ms?: number } | null,
 	);
@@ -244,7 +250,8 @@
 				     id field, because a hint there would make the field taller
 				     than the button and align the button with the hint instead of
 				     the input. -->
-				<form method="POST" action="?/preview" use:enhance class="flex flex-col gap-3">
+				<form method="POST" action="?/preview" use:enhance class="flex flex-col gap-3" id="rec-preview-form">
+					<FormErrors message={previewError || undefined} />
 					{#if readerOptions.length > 0}
 						<div class="w-full min-w-0 sm:w-80">
 							<Autocomplete

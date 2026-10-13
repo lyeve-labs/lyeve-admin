@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -17,14 +17,14 @@ const ROOTS = {
 	subscription: [],
 };
 
-const props = (over: Record<string, unknown> = {}) => ({
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		gate: { state: 'ok' },
 		schema: { ok: true, value: { roots: ROOTS, refused: null } },
 		persisted: { ok: true, value: [] },
 		...over,
 	} as never,
-	form: null as never,
+	form: form as never,
 });
 
 function nameCell(container: HTMLElement, name: string): HTMLTableCellElement {
@@ -82,5 +82,26 @@ describe('Persisted queries', () => {
 		const { getByText, getAllByRole } = render(GraphqlPage, { props: props() });
 		expect(getByText('No persisted queries')).toBeTruthy();
 		expect(getAllByRole('button', { name: 'New persisted query' })).toHaveLength(2);
+	});
+});
+
+describe('the register drawer', () => {
+	const drawerText = () => document.body.querySelector('form#persisted-form')?.textContent ?? '';
+	const query = { query_hash: 'abc123', query: '{ posts { id } }', operation_name: 'Posts', description: '', enabled: true, auto_registered: false };
+
+	it('shows a refused register inside the open drawer', async () => {
+		const { getAllByRole, rerender } = render(GraphqlPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: 'New persisted query' })[0]);
+		await rerender(props({}, { action: 'register', error: 'The query could not be registered.' }));
+		expect(drawerText()).toContain('The query could not be registered.');
+	});
+
+	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const { container, getByRole } = render(GraphqlPage, {
+			props: props({ persisted: { ok: true, value: [query] } }, { action: 'delete', error: 'The query could not be deleted.' }),
+		});
+		expect(container.textContent).toContain('The query could not be deleted.');
+		await fireEvent.click(getByRole('button', { name: 'New persisted query' }));
+		expect(drawerText()).not.toContain('could not be deleted');
 	});
 });

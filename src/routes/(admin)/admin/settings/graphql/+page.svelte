@@ -18,13 +18,28 @@
 	import { enhance } from '$app/forms';
 	import { submitter } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { GRAPHQL_HTTP, GRAPHQL_WS, type PersistedQuery, type RootField } from '$lib/api/graphql';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * The drawer and the row actions report through the one `form`, so each
+	 * failure names the action that caused it. The drawer shows only a failed
+	 * register, and only one that came back after it opened, so a failed delete
+	 * never reads as a failure of the next form opened. The page shows the rest.
+	 */
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const registerError = $derived(failure?.action === 'register' && form !== openedOver ? (failure.error ?? '') : '');
+	const formError = $derived(failure?.action === 'toggle' || failure?.action === 'delete' ? (failure.error ?? '') : '');
+
+	function openRegister() {
+		openedOver = form;
+		open = true;
+	}
 	const curl = `curl -X POST ${GRAPHQL_HTTP} \\\n  -H 'Authorization: Bearer <token>' \\\n  -H 'Content-Type: application/json' \\\n  -d '{"query":"{ __typename }"}'`;
 
 	let open = $state(false);
@@ -79,7 +94,7 @@
 		</Button>
 	{/snippet}
 
-	{#if formError && !open}
+	{#if formError}
 		<Alert tone="danger">{formError}</Alert>
 	{/if}
 
@@ -173,7 +188,7 @@
 			<div class="flex items-center justify-between gap-2">
 				<SectionHeading level={2}>Persisted queries</SectionHeading>
 				{#if data.persisted.ok}
-					<Button variant="secondary" size="sm" onclick={() => (open = true)}>
+					<Button variant="secondary" size="sm" onclick={openRegister}>
 						<Plus size={ICON.sm} /> New persisted query
 					</Button>
 				{/if}
@@ -188,7 +203,7 @@
 				<EmptyState title="No persisted queries" description="Register a query to let clients call it by hash.">
 					{#snippet iconSnippet()}<Braces size={ICON.lg} />{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={() => (open = true)}>
+						<Button variant="secondary" onclick={openRegister}>
 							<Plus size={ICON.sm} /> New persisted query
 						</Button>
 					{/snippet}
@@ -248,9 +263,7 @@
 
 <Drawer bind:open title="New persisted query">
 	<form method="POST" action="?/register" id="persisted-form" use:enhance={register.enhance} class="flex flex-col gap-4">
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={registerError || undefined} />
 		<Textarea
 			id="persisted-query"
 			name="query"

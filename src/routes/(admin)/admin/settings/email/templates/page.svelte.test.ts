@@ -24,6 +24,8 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 	} as unknown as PageData;
 }
 
+const drawerText = () => document.body.querySelector('form#template-form')?.textContent ?? '';
+
 describe('email templates page', () => {
 	it('marks the required templates and offers no delete for them', () => {
 		render(TemplatesPage, { props: { data: data(), form: null } });
@@ -67,10 +69,38 @@ describe('email templates page', () => {
 		expect(screen.getByText('{{.Vars.reset_link}}')).toBeTruthy();
 	});
 
-	it('shows the ceiling refusal with its numbers', () => {
-		render(TemplatesPage, {
-			props: { data: data(), form: { error: 'x', refused: { kind: 'cap', cap: 'email.templates', limit: 5, current: 5, upgradeUrl: '' } } as never },
+	it('shows the ceiling refusal with its numbers inside the open drawer', async () => {
+		const { rerender } = render(TemplatesPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'New template' }));
+		await rerender({
+			data: data(),
+			form: { action: 'save', error: 'x', refused: { kind: 'cap', cap: 'email.templates', limit: 5, current: 5, upgradeUrl: '' } } as never,
 		});
-		expect(screen.getByTestId('refusal-notice').textContent).toContain('5 of 5 templates');
+		expect(drawerText()).toContain('5 of 5 templates');
+	});
+
+	it('shows a refused save inside the open drawer', async () => {
+		const { rerender } = render(TemplatesPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'New template' }));
+		await rerender({ data: data(), form: { action: 'save', error: 'A template with that name already exists.' } as never });
+		expect(drawerText()).toContain('A template with that name already exists.');
+	});
+
+	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const { container } = render(TemplatesPage, {
+			props: { data: data(), form: { action: 'delete', error: 'The template could not be deleted.' } as never },
+		});
+		expect(container.textContent).toContain('The template could not be deleted.');
+		await fireEvent.click(screen.getByRole('button', { name: 'New template' }));
+		expect(drawerText()).not.toContain('could not be deleted');
+	});
+
+	it('shows a failed preview above the list rather than in the drawer', async () => {
+		const { container } = render(TemplatesPage, {
+			props: { data: data(), form: { action: 'preview', error: 'The template could not be rendered.' } as never },
+		});
+		expect(container.textContent).toContain('The template could not be rendered.');
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit spring-sale' }));
+		expect(drawerText()).not.toContain('could not be rendered');
 	});
 });

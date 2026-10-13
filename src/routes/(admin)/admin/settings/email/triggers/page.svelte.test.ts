@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EmailTrigger } from '$lib/api/email-triggers';
 
@@ -64,5 +64,23 @@ describe('email triggers page', () => {
 		render(TriggersPage, { props: props({ triggers: { ok: true, value: { triggers: [], events: [] } } }) });
 		expect(screen.getByText('No triggers yet')).toBeTruthy();
 		expect(screen.getAllByRole('button', { name: 'New trigger' })).toHaveLength(2);
+	});
+});
+
+describe('email trigger drawer', () => {
+	const drawerText = () => document.body.querySelector('form#trigger-form')?.textContent ?? '';
+
+	it('shows a refused save inside the open drawer', async () => {
+		const { rerender } = render(TriggersPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
+		await rerender(props({}, { action: 'save', error: 'The trigger could not be saved.' }));
+		expect(drawerText()).toContain('The trigger could not be saved.');
+	});
+
+	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const { container } = render(TriggersPage, { props: props({}, { action: 'delete', error: 'The trigger could not be deleted.' }) });
+		expect(container.textContent).toContain('The trigger could not be deleted.');
+		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
+		expect(drawerText()).not.toContain('could not be deleted');
 	});
 });

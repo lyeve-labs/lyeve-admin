@@ -98,7 +98,7 @@ describe('the recompute', () => {
 	// operator looking for a fault that is not there.
 	it('shows an already running recompute as information, not a failure', () => {
 		const { container } = render(RecommendationsPage, {
-			props: props({}, { error: 'A recompute is already running. Wait for it rather than starting a second.' }),
+			props: props({}, { action: 'refresh', error: 'A recompute is already running. Wait for it rather than starting a second.' }),
 		});
 		expect(said(container)).toContain('already running');
 	});
@@ -198,5 +198,16 @@ describe('what the page says recommendations do', () => {
 		const text = said(container);
 		expect(text).toContain('each reader gets');
 		expect(text).not.toContain('the plugin works out');
+	});
+});
+
+describe('the preview failure', () => {
+	it('shows a refused preview inside the preview form, not at the top of the page', () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({}, { action: 'preview', error: 'That is not a user id.' }),
+		});
+		const formText = container.querySelector('form#rec-preview-form')?.textContent ?? '';
+		expect(formText).toContain('That is not a user id.');
+		expect(said(container).split('That is not a user id.').length).toBe(2);
 	});
 });

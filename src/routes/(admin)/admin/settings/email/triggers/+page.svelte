@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { Alert, Badge, Button, Drawer, EmptyState, Input, PageShell, Select, Table, Textarea, Toggle, confirm } from '@lyeve-labs/ui-kit';
 	import { MailPlus, Pencil, Plus, Trash2 } from '@lucide/svelte';
@@ -12,7 +13,18 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * The drawer and the delete report through the one `form`, so each failure
+	 * names the action that caused it. The drawer shows only a failed save, and
+	 * only one that came back after it opened, so a failed delete never reads
+	 * as a failure of the next form opened. A failed delete shows above the list.
+	 */
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const saveFailure = $derived(failure?.action === 'save' && form !== openedOver ? failure : null);
+	const deleteFailure = $derived(failure?.action === 'delete' ? failure : null);
+	const pageRefusal = $derived(deleteFailure ? formRefusal(deleteFailure) : null);
 
 	const eventLabel = (e: string) => TRIGGER_EVENT_LABELS[e] ?? e;
 	const triggers = $derived(data.triggers.ok ? data.triggers.value.triggers : []);
@@ -48,6 +60,7 @@
 		toField = 'email';
 		locale = '';
 		enabled = true;
+		openedOver = form;
 		open = true;
 	}
 
@@ -61,6 +74,7 @@
 		toField = t.to_field;
 		locale = t.locale;
 		enabled = t.enabled;
+		openedOver = form;
 		open = true;
 	}
 
@@ -103,8 +117,8 @@
 
 	{#if pageRefusal}
 		<RefusalNotice refusal={pageRefusal} />
-	{:else if form && 'error' in form && form.error && !open}
-		<Alert tone="danger">{#snippet children()}{form.error}{/snippet}</Alert>
+	{:else if deleteFailure?.error}
+		<Alert tone="danger">{#snippet children()}{deleteFailure.error}{/snippet}</Alert>
 	{/if}
 	{#if data.triggers.ok && !data.templates.ok}
 		<GateNotice gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
@@ -168,11 +182,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New trigger'}>
 	<form method="POST" action="?/save" id="trigger-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if form && 'error' in form && form.error}
-			<Alert tone="danger">{#snippet children()}{form.error}{/snippet}</Alert>
-		{/if}
+		<FormErrors message={saveFailure?.error} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
 		<Input id="trigger-name" name="name" label="Name" required placeholder="Order confirmation" bind:value={name} />

@@ -111,6 +111,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	const endpoint = String(form.get('endpoint') ?? '').trim();
 	if (!endpointIsSound(endpoint)) {
 		return fail(400, {
+			action: 'rule',
 			error: 'An endpoint is "*" for every request, or a method and a path such as GET /api/v1/content/{schema}. A segment may be a {name} placeholder and the last one may be *.',
 		});
 	}
@@ -118,15 +119,15 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	const rate = num(form.get('rate'));
 	const burst = Math.floor(num(form.get('burst')));
 	if (!Number.isFinite(rate) || rate <= 0) {
-		return fail(400, { error: 'The rate is requests per second and must be more than zero.' });
+		return fail(400, { action: 'rule', error: 'The rate is requests per second and must be more than zero.' });
 	}
 	if (!Number.isFinite(burst) || burst < 1) {
-		return fail(400, { error: 'The burst is a number of requests and must be at least one.' });
+		return fail(400, { action: 'rule', error: 'The burst is a number of requests and must be at least one.' });
 	}
 
 	const role = String(form.get('role') ?? '').trim();
 	if (role && !roleIsSound(role)) {
-		return fail(400, { error: 'A role is 1 to 64 letters, digits or _ . : -' });
+		return fail(400, { action: 'rule', error: 'A role is 1 to 64 letters, digits or _ . : -' });
 	}
 	const keyBy = form.get('key_by') === 'user' ? 'user' : 'ip';
 
@@ -153,7 +154,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		return fail(400, { error: actionError(err, 'The rule could not be saved.') });
+		return fail(400, { action: 'rule', error: actionError(err, 'The rule could not be saved.') });
 	}
 	return { saved: endpoint };
 }
@@ -164,7 +165,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { action: 'rule', error: 'No rule was named.' });
 		return save(event, id);
 	},
 
@@ -173,11 +174,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'No rule was named.' });
 		try {
 			await deleteRule(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The rule could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The rule could not be removed.') });
 		}
 		return { removed: id };
 	},
@@ -189,15 +190,15 @@ export const actions: Actions = {
 		const rate = num(form.get('rate'));
 		const burst = Math.floor(num(form.get('burst')));
 		if (!Number.isFinite(rate) || rate <= 0) {
-			return fail(400, { error: 'The rate is requests per second and must be more than zero.' });
+			return fail(400, { action: 'global', error: 'The rate is requests per second and must be more than zero.' });
 		}
 		if (!Number.isFinite(burst) || burst < 1) {
-			return fail(400, { error: 'The burst must be at least one request.' });
+			return fail(400, { action: 'global', error: 'The burst must be at least one request.' });
 		}
 		try {
 			await updateGlobal(client, { rate, burst, enabled: form.get('enabled') === 'true' });
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The global limit could not be saved.') });
+			return fail(400, { action: 'global', error: actionError(err, 'The global limit could not be saved.') });
 		}
 		return { savedGlobal: true };
 	},
@@ -209,14 +210,15 @@ export const actions: Actions = {
 		const name = String(form.get('name') ?? '');
 		const requests = Math.floor(num(form.get('requests')));
 		const minutes = num(form.get('window_minutes'));
-		if (!name) return fail(400, { error: 'No protection was named.' });
+		if (!name) return fail(400, { action: 'protection', error: 'No protection was named.' });
 		if (!Number.isFinite(requests) || requests < 1 || requests > 100000) {
 			return fail(400, {
+				action: 'protection',
 				error: 'Requests must be between 1 and 100000. Zero would lock every caller out of signing in.',
 			});
 		}
 		if (!Number.isFinite(minutes) || minutes <= 0 || minutes > MAX_WINDOW_MINUTES) {
-			return fail(400, { error: 'The window is in minutes, more than zero and at most a day.' });
+			return fail(400, { action: 'protection', error: 'The window is in minutes, more than zero and at most a day.' });
 		}
 		try {
 			await setProtection(client, {
@@ -225,7 +227,7 @@ export const actions: Actions = {
 				window_seconds: Math.max(1, Math.round(minutes * 60)),
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The protection could not be saved.') });
+			return fail(400, { action: 'protection', error: actionError(err, 'The protection could not be saved.') });
 		}
 		return { savedProtection: name };
 	},
@@ -235,11 +237,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '');
-		if (!name) return fail(400, { error: 'No protection was named.' });
+		if (!name) return fail(400, { action: 'resetProtection', error: 'No protection was named.' });
 		try {
 			await resetProtection(client, name);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The protection could not be reset.') });
+			return fail(400, { action: 'resetProtection', error: actionError(err, 'The protection could not be reset.') });
 		}
 		return { resetProtection: name };
 	},

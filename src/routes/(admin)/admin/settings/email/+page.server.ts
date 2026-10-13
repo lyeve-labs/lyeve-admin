@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, type ActionFailure } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -93,17 +93,25 @@ export const load: PageServerLoad = async (event) => {
 	return { mail, providers };
 };
 
+/**
+ * The failure marked with the action that caused it. The drawer shows only a
+ * failed save, and a failed delete shows above the list.
+ */
+function tagged<T extends Record<string, unknown>>(action: string, failure: ActionFailure<T>) {
+	return fail(failure.status, { ...failure.data, action });
+}
+
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();
 
 export const actions: Actions = {
 	create: async (event) => {
 		await requireUser(event);
 		const parsed = parseProvider(await event.request.formData(), false);
-		if ('error' in parsed) return fail(400, { error: parsed.error });
+		if ('error' in parsed) return fail(400, { action: 'provider', error: parsed.error });
 		try {
 			await createEmailProvider(authedClient(event), parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to create the provider.');
+			return tagged('provider', actionFailure(err, 'Failed to create the provider.'));
 		}
 	},
 
@@ -111,13 +119,13 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const id = text(data, 'id');
-		if (!id) return fail(400, { error: 'Which provider to update is missing.' });
+		if (!id) return fail(400, { action: 'provider', error: 'Which provider to update is missing.' });
 		const parsed = parseProvider(data, true);
-		if ('error' in parsed) return fail(400, { error: parsed.error });
+		if ('error' in parsed) return fail(400, { action: 'provider', error: parsed.error });
 		try {
 			await updateEmailProvider(authedClient(event), id, parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to update the provider.');
+			return tagged('provider', actionFailure(err, 'Failed to update the provider.'));
 		}
 	},
 
@@ -127,7 +135,7 @@ export const actions: Actions = {
 		try {
 			await deleteEmailProvider(authedClient(event), text(data, 'id'));
 		} catch (err) {
-			return actionFailure(err, 'Failed to delete the provider.');
+			return tagged('delete', actionFailure(err, 'Failed to delete the provider.'));
 		}
 	},
 

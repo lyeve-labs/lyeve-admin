@@ -107,10 +107,11 @@ export const actions: Actions = {
 		} catch (err) {
 			if (isAlreadyRunning(err)) {
 				return fail(409, {
+					action: 'refresh',
 					error: 'A recompute is already running. Wait for it rather than starting a second.',
 				});
 			}
-			return fail(400, { error: actionError(err, 'The recompute could not be started.') });
+			return fail(400, { action: 'refresh', error: actionError(err, 'The recompute could not be started.') });
 		}
 	},
 
@@ -119,15 +120,15 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const userId = String(form.get('user_id') ?? '').trim();
-		if (!userId) return fail(400, { error: 'Name the user whose feed you want to see.' });
+		if (!userId) return fail(400, { action: 'preview', error: 'Name the user whose feed you want to see.' });
 		if (!isUserId(userId)) {
-			return fail(400, { error: 'That is not a user id. Pick a reader by email, or paste the id from the Users page.' });
+			return fail(400, { action: 'preview', error: 'That is not a user id. Pick a reader by email, or paste the id from the Users page.' });
 		}
 		try {
 			const entries = await generateFeed(client, userId);
 			return { previewFor: userId, feed: entries ?? [] };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'That feed could not be generated.') });
+			return fail(400, { action: 'preview', error: actionError(err, 'That feed could not be generated.') });
 		}
 	},
 };
