@@ -168,7 +168,7 @@
 			<GateNotice
 				gate={data.choices.gate}
 				title="this tenant's features"
-				absent="The multitenant plugin does not serve per-tenant features on this instance."
+				absent="This instance does not serve per-tenant features."
 			/>
 		{:else if data.choices.value.length === 0}
 			<EmptyState title="Nothing to withhold" description="This instance serves no plugin this tenant could be refused." />
