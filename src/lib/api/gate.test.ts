@@ -47,6 +47,11 @@ describe('gateOf', () => {
 		expect(gateOf(new ApiError(503, 'pq: connection refused'), FAILED)).toEqual({ state: 'unavailable' });
 	});
 
+	it('reads a proxy that could not reach the engine as the same outage', () => {
+		expect(gateOf(new ApiError(502, 'bad gateway'), FAILED)).toEqual({ state: 'unavailable' });
+		expect(gateOf(new ApiError(504, 'gateway timeout'), FAILED)).toEqual({ state: 'unavailable' });
+	});
+
 	it('reads a read that never reached the engine as the same outage', () => {
 		expect(gateOf(unreachable(), FAILED)).toEqual({ state: 'unavailable' });
 		expect(gateOf(new TypeError('Failed to fetch'), FAILED)).toEqual({ state: 'unavailable' });
@@ -54,7 +59,7 @@ describe('gateOf', () => {
 	});
 
 	it('reports anything else as a failed read in the page\'s own words', () => {
-		for (const status of [400, 401, 409, 500, 502, 504]) {
+		for (const status of [400, 401, 409, 500, 501]) {
 			expect(gateOf(new ApiError(status, 'boom'), FAILED)).toEqual({ state: 'error', message: FAILED });
 		}
 		expect(gateOf(new Error('network'), FAILED)).toEqual({ state: 'error', message: FAILED });
@@ -70,14 +75,14 @@ describe('gateOf', () => {
 });
 
 describe('isOutage', () => {
-	it('is a 503 or a read that got no answer', () => {
-		expect(isOutage(new ApiError(503, 'unavailable'))).toBe(true);
+	it('is a 502, a 503, a 504 or a read that got no answer', () => {
+		for (const status of [502, 503, 504]) expect(isOutage(new ApiError(status, 'x'))).toBe(true);
 		expect(isOutage(unreachable())).toBe(true);
 		expect(isOutage(timedOut())).toBe(true);
 	});
 
 	it('is nothing else', () => {
-		for (const status of [403, 404, 429, 500, 502]) expect(isOutage(new ApiError(status, 'x'))).toBe(false);
+		for (const status of [403, 404, 429, 500, 501]) expect(isOutage(new ApiError(status, 'x'))).toBe(false);
 		expect(isOutage(new Error('network'))).toBe(false);
 		expect(isOutage(new DOMException('aborted', 'AbortError'))).toBe(false);
 		expect(isOutage(null)).toBe(false);

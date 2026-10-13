@@ -104,4 +104,15 @@ describe('ErrorPanel', () => {
 			expect(mount(500, 'boom').getByText('What the server said')).toBeTruthy();
 		});
 	});
+
+	// A client-side retry would run only the load that failed again and keep
+	// what the shell read during the outage, so both retries reload the page.
+	it('asks for a fresh document from either retry', () => {
+		for (const status of [503, 429]) {
+			const link = mount(status).getByRole('link', { name: OUTAGE.action });
+			// The two values the router reads as on.
+			expect(['', 'true']).toContain(link.getAttribute('data-sveltekit-reload'));
+			cleanup();
+		}
+	});
 });

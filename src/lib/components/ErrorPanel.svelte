@@ -107,7 +107,9 @@
 	);
 
 	// The address that failed, query included. A link rather than a click
-	// handler, so the retry works before the page hydrates.
+	// handler, so the retry works before the page hydrates. After it hydrates,
+	// the link asks for a fresh document: the router would run only the load
+	// that failed again, and keep whatever the shell read during the outage.
 	const retryHref = $derived(page.url.pathname + page.url.search);
 </script>
 
@@ -148,7 +150,7 @@
 			{:else if variant === 'outage' || variant === 'busy'}
 				<!-- The one control is the retry. Every other page needs the same
 				     engine, and signing in again cannot help until it answers. -->
-				<Button href={retryHref}>
+				<Button href={retryHref} data-sveltekit-reload>
 					<RefreshCw size={ICON.sm} aria-hidden="true" /> {OUTAGE.action}
 				</Button>
 			{:else}

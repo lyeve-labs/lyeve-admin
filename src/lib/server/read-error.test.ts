@@ -25,6 +25,8 @@ describe('readError', () => {
 	it('keeps an outage an outage, never a missing record', () => {
 		const outage = { status: 503, message: OUTAGE.title };
 		expect(thrown(new ApiError(503, 'pq: connection refused'))).toEqual(outage);
+		expect(thrown(new ApiError(502, 'bad gateway'))).toEqual(outage);
+		expect(thrown(new ApiError(504, 'gateway timeout'))).toEqual(outage);
 		expect(thrown(new TypeError('fetch failed'))).toEqual(outage);
 		expect(thrown(new DOMException('The operation timed out', 'TimeoutError'))).toEqual(outage);
 	});
@@ -61,7 +63,7 @@ describe('readError', () => {
 		for (const err of [
 			new ApiError(500, 'pq: relation "sys_webhooks" does not exist'),
 			new ApiError(400, 'invalid input syntax for type uuid'),
-			new ApiError(502, 'bad gateway'),
+			new ApiError(409, 'duplicate key value violates unique constraint "sys_webhooks_name_key"'),
 			new Error('Cannot read properties of undefined'),
 			new SyntaxError('Unexpected token < in JSON at position 0'),
 		]) {

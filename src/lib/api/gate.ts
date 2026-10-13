@@ -12,8 +12,9 @@
  *   403  the reader's role may not read it. Another role may.
  *   429  the engine refused for the request rate. It answered, so this is not
  *        an outage, and the same read succeeds once the window passes.
- *   503  the engine or its database did not answer. A read that never reached
- *        the engine is the same outage seen from this side.
+ *   503  the engine or its database did not answer. A 502 or a 504 is the
+ *        same outage reported by a proxy in front of the engine, and so is a
+ *        read that never reached the engine at all.
  *   else the read failed, and a failed read is never a report that there is
  *        nothing to show.
  */
@@ -64,9 +65,16 @@ function unanswered(err: unknown): boolean {
 	return typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'TimeoutError';
 }
 
+/**
+ * The statuses that say no working engine answered. The engine sends a 503
+ * when its database does not answer. A proxy in front of it sends a 502 when
+ * it cannot reach the engine and a 504 when it gave up waiting.
+ */
+const OUTAGE_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
+
 /** Whether a read failed because the engine or its database did not answer. */
 export function isOutage(err: unknown): boolean {
-	if (err instanceof ApiError) return err.status === 503;
+	if (err instanceof ApiError) return OUTAGE_STATUSES.has(err.status);
 	return unanswered(err);
 }
 
