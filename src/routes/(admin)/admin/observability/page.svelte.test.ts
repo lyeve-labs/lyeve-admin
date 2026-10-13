@@ -17,10 +17,14 @@ import ObservabilityPage from './+page.svelte';
  * same path the engine's stream uses.
  */
 class StubEventSource {
+	static CONNECTING = 0;
+	static OPEN = 1;
+	static CLOSED = 2;
 	static last: StubEventSource | null = null;
 	static all: StubEventSource[] = [];
 	listeners = new Map<string, ((e: MessageEvent) => void)[]>();
 	closed = false;
+	readyState = StubEventSource.CONNECTING;
 
 	constructor(public url: string) {
 		StubEventSource.last = this;
@@ -39,6 +43,7 @@ class StubEventSource {
 
 	close() {
 		this.closed = true;
+		this.readyState = StubEventSource.CLOSED;
 	}
 }
 
@@ -65,9 +70,11 @@ const POOL_STATS = {
 	max_lifetime_closed: 0,
 };
 
+const ok = <T,>(value: T) => ({ ok: true as const, value });
+
 function data(overrides: Record<string, unknown> = {}) {
 	return {
-		poolHealth: {
+		poolHealth: ok({
 			engine: 'postgres',
 			healthy: true,
 			pool_stats: POOL_STATS,
@@ -75,11 +82,12 @@ function data(overrides: Record<string, unknown> = {}) {
 			checked_at: '2026-01-01T00:00:00Z',
 			errors: [],
 			pooler_config: 'pgbouncer',
-		},
-		latency: { slowest: [], total: 0 },
+		}),
+		latency: ok({ slowest: [], total: 0 }),
 		top: 20,
 		goroutines: 42,
 		goroutineEngine: engine(),
+		logTail: true,
 		...overrides,
 	};
 }
@@ -122,7 +130,7 @@ const props = (over: Record<string, unknown> = {}, form: Record<string, unknown>
 });
 
 const health = (over: Record<string, unknown>) => ({
-	poolHealth: { engine: 'postgres', healthy: true, ...over },
+	poolHealth: ok({ engine: 'postgres', healthy: true, ...over }),
 });
 
 describe('Pool health badge', () => {
@@ -251,7 +259,7 @@ describe('Live log tail', () => {
  */
 describe('Live log tail filters', () => {
 	const badge = (container: HTMLElement) =>
-		[...container.querySelectorAll('span')].find((el) => /^(Connected|Reconnecting)$/.test(el.textContent?.trim() ?? ''))?.textContent?.trim();
+		[...container.querySelectorAll('span')].find((el) => /^(Connected|Connecting|Refused)$/.test(el.textContent?.trim() ?? ''))?.textContent?.trim();
 
 	function connect() {
 		StubEventSource.last?.emit('open', null);
@@ -269,7 +277,7 @@ describe('Live log tail filters', () => {
 		const { container } = render(ObservabilityPage, { props: props() });
 		expect(StubEventSource.all).toHaveLength(1);
 		expect(StubEventSource.last?.url).toBe('/api/admin/logs/stream?min_level=info');
-		expect(badge(container)).toBe('Reconnecting');
+		expect(badge(container)).toBe('Connecting');
 
 		connect();
 		await tick();
@@ -298,7 +306,7 @@ describe('Live log tail filters', () => {
 		expect(StubEventSource.all).toHaveLength(2);
 		expect(StubEventSource.last?.url).toContain('keyword=err');
 		expect(StubEventSource.last?.url).toContain('min_level=info');
-		expect(badge(container)).toBe('Reconnecting');
+		expect(badge(container)).toBe('Connecting');
 
 		connect();
 		await tick();
@@ -341,7 +349,7 @@ describe('Live log tail filters', () => {
 		expect(first.closed).toBe(true);
 		expect(StubEventSource.all).toHaveLength(2);
 		expect(StubEventSource.last?.url).toBe('/api/admin/logs/stream?min_level=error');
-		expect(badge(container)).toBe('Reconnecting');
+		expect(badge(container)).toBe('Connecting');
 
 		// Lines keep arriving on the new stream.
 		connect();
@@ -366,22 +374,53 @@ describe('Live log tail filters', () => {
 		expect(StubEventSource.all).toHaveLength(1);
 	});
 
-	it('retries after a dropped stream, but not after unmount', async () => {
-		const { unmount } = render(ObservabilityPage, { props: props() });
+	// The browser retries a stream that dropped after it opened. Opening a
+	// second one beside it would hold two tails open.
+	it('leaves a dropped stream to the browser to reopen', async () => {
+		const { container } = render(ObservabilityPage, { props: props() });
 		const first = StubEventSource.last as StubEventSource;
+		connect();
+		await tick();
 
+		first.readyState = StubEventSource.CONNECTING;
 		first.emit('error', null);
 		await tick();
-		expect(first.closed).toBe(true);
-		vi.advanceTimersByTime(3000);
+		vi.advanceTimersByTime(5000);
 		await tick();
-		expect(StubEventSource.all).toHaveLength(2);
 
-		(StubEventSource.last as StubEventSource).emit('error', null);
-		unmount();
-		vi.advanceTimersByTime(3000);
+		expect(first.closed).toBe(false);
+		expect(StubEventSource.all).toHaveLength(1);
+		expect(badge(container)).toBe('Connecting');
+	});
+
+	// A refused stream is closed for good. Retrying it on a timer repeated the
+	// refusal every three seconds and read as a connection about to come back.
+	it('says a refused stream was refused and waits for the reader to try again', async () => {
+		const { container, getByRole } = render(ObservabilityPage, { props: props() });
+		const first = StubEventSource.last as StubEventSource;
+
+		first.readyState = StubEventSource.CLOSED;
+		first.emit('error', null);
+		await tick();
+		vi.advanceTimersByTime(10_000);
+		await tick();
+
+		expect(StubEventSource.all).toHaveLength(1);
+		expect(badge(container)).toBe('Refused');
+		expect(container.textContent).toContain('The engine refused the log tail');
+
+		await fireEvent.click(getByRole('button', { name: /try again/i }));
 		await tick();
 		expect(StubEventSource.all).toHaveLength(2);
+		expect(StubEventSource.last?.url).toBe('/api/admin/logs/stream?min_level=info');
+	});
+
+	it('opens no stream while the logging plugin does not run', async () => {
+		const { container } = render(ObservabilityPage, { props: props({ logTail: false }) });
+		await tick();
+
+		expect(StubEventSource.all).toHaveLength(0);
+		expect(container.textContent).toContain('The logging plugin is not running on this instance');
 	});
 });
 
@@ -417,7 +456,7 @@ describe('Page shape', () => {
 	});
 
 	it('keeps the row count in the rankings toolbar', () => {
-		const { container } = render(ObservabilityPage, { props: props({ latency: { slowest: [], total: 7 } }) });
+		const { container } = render(ObservabilityPage, { props: props({ latency: ok({ slowest: [], total: 7 }) }) });
 		const bar = [...container.querySelectorAll('[role="toolbar"]')].find((el) => el.getAttribute('aria-label') === 'Latency rankings');
 		expect(bar?.querySelector('#latency-top')).toBeTruthy();
 		expect(bar?.textContent).toContain('7 endpoints tracked');
@@ -572,5 +611,31 @@ describe('Goroutine engine', () => {
 		});
 		expect(section(container).textContent).toContain('Goroutine engine unavailable');
 		expect(section(container).querySelector('form')).toBeNull();
+	});
+});
+
+/*
+ * A read that failed is said to have failed. Drawn as its empty answer, it
+ * read as an engine that had timed nothing and as a pool with no pooler.
+ */
+describe('reads that failed', () => {
+	const failed = (message: string) => ({ ok: false, gate: { state: 'error', message } });
+
+	it('says the latency rankings could not be read', () => {
+		const { container } = render(ObservabilityPage, {
+			props: props({ latency: failed('The latency rankings could not be read.') }),
+		});
+		expect(container.textContent).toContain('The latency rankings could not be read.');
+		expect(container.textContent).not.toContain('No latency data yet');
+		expect(container.textContent).not.toContain('endpoints tracked');
+	});
+
+	it('names an outage of the pool health read as an outage', () => {
+		const { container } = render(ObservabilityPage, {
+			props: props({ poolHealth: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		expect(container.textContent).toContain('did not answer');
+		expect(container.textContent).not.toContain('The pooler may not be configured');
+		expect(container.textContent).not.toContain('No check time reported');
 	});
 });

@@ -94,6 +94,16 @@ describe('analytics destinations', () => {
 		expect(document.body.textContent).toContain('could not be read');
 	});
 
+	it('says more deliveries are owed than the list holds', () => {
+		setup({ moreDeliveries: true, deliveryLimit: 50 });
+		expect(screen.getByTestId('more-deliveries').textContent).toContain('The 50 newest are listed and more are owed');
+	});
+
+	it('names an outage of the delivery read as an outage', () => {
+		setup({ deliveries: null, deliveriesGate: { state: 'unavailable' } });
+		expect(document.body.textContent).toContain('did not answer');
+	});
+
 	it('says nothing is owed when the queue is empty', () => {
 		setup({ deliveries: { data: [], licensed: true } });
 		expect(document.body.textContent).toContain('Nothing is owed');

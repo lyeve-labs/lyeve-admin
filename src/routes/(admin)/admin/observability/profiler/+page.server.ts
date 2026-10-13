@@ -15,6 +15,7 @@ import {
 	type MemoryTrend,
 	type PluginBreakdown,
 } from '$lib/api/profiler';
+import { section, type Section } from '$lib/api/gate';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { sessionToken } from '$lib/server/session-cookie';
@@ -22,18 +23,27 @@ import { sessionToken } from '$lib/server/session-cookie';
 /**
  * What the page renders. Every view is the profiler plugin's, under
  * /api/admin/debug/profiler, super_admin only: the ring describes every
- * tenant's traffic. A view the plugin did not answer is null on its own so
- * the page says so in place rather than rendering a measurement of nothing.
+ * tenant's traffic. A view the plugin did not answer keeps the reason on its
+ * own, so the page says so in place rather than rendering a measurement of
+ * nothing.
  */
 export interface ProfilerPage {
-	endpoints: EndpointStats[] | null;
-	slowest: EndpointStats[] | null;
-	plugins: PluginBreakdown[] | null;
-	memory: MemoryTrend | null;
-	/** The endpoint the URL selected, and its detail when the ring holds it. */
+	endpoints: Section<EndpointStats[]>;
+	slowest: Section<EndpointStats[]>;
+	plugins: Section<PluginBreakdown[]>;
+	memory: Section<MemoryTrend | null>;
+	/** The endpoint the URL selected, and its detail. Null when none is selected. */
 	selected: string | null;
-	detail: EndpointDetail | null;
+	detail: Section<EndpointDetail> | null;
 }
+
+/** What each view says when its read failed for a reason it cannot name. */
+const FAILED = {
+	endpoints: 'The endpoint statistics could not be read. This is not a report that nothing was sampled.',
+	plugins: 'The per-plugin statistics could not be read. This is not a report that nothing was sampled.',
+	memory: 'The memory snapshots could not be read.',
+	detail: 'This endpoint could not be read. This is not a report that it has no samples.',
+} as const;
 
 export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const { user } = await parent();
@@ -49,11 +59,11 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const selected = asked ? '/' + asked.replace(/^\/+/, '') : null;
 
 	const [endpoints, slowest, plugins, memory, detail] = await Promise.all([
-		listEndpoints(client).catch(() => null),
-		listSlowest(client).catch(() => null),
-		listPlugins(client).catch(() => null),
-		readMemoryTrend(client).catch(() => null),
-		selected ? readEndpoint(client, selected).catch(() => null) : Promise.resolve(null),
+		section(listEndpoints(client), FAILED.endpoints),
+		section(listSlowest(client), FAILED.endpoints),
+		section(listPlugins(client), FAILED.plugins),
+		section(readMemoryTrend(client), FAILED.memory),
+		selected ? section(readEndpoint(client, selected), FAILED.detail) : Promise.resolve(null),
 	]);
 
 	const page: ProfilerPage = { endpoints, slowest, plugins, memory, selected, detail };

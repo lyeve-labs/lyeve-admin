@@ -116,7 +116,7 @@
 		</Button>
 	{/snippet}
 
-	{#if data.gate.state === 'unavailable'}
+	{#if data.gate.state === 'capture_store'}
 		<Alert tone="warn">
 			The capture store did not answer. Sampling writes to its own table, which a pending
 			migration can leave absent.

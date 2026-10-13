@@ -15,6 +15,7 @@
 		Stat,
 		Table,
 	} from '@lyeve-labs/ui-kit';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
@@ -94,7 +95,8 @@
 
 	// The engine sends the counts only where a pooler is configured, so their
 	// absence is a deployment fact rather than a fetch that went wrong.
-	const poolStats = $derived(data.poolHealth.pool_stats);
+	const pool = $derived(data.poolHealth.ok ? data.poolHealth.value : null);
+	const poolStats = $derived(pool?.pool_stats);
 
 	const ge = $derived(data.goroutineEngine);
 	const geAnswered = $derived(Boolean(ge.snapshot || ge.pool || ge.parallel || ge.asyncHooks));
@@ -142,7 +144,7 @@
 	 * string "Invalid Date" beside the badge, which reads as a value the engine
 	 * sent rather than as one it did not.
 	 */
-	const checkedAt = $derived(formatDateTime(data.poolHealth.checked_at, '') || null);
+	const checkedAt = $derived(formatDateTime(pool?.checked_at, '') || null);
 
 	// Same guard for the tail: an entry whose timestamp will not parse keeps its
 	// raw value, which is at least what arrived, rather than "Invalid Date".
@@ -169,8 +171,16 @@
 		sequence: number;
 	}
 
+	/**
+	 * Where the tail stands. The browser retries a stream that dropped after it
+	 * opened, and reports that as a connection being made again. A stream the
+	 * engine refused is closed and stays closed, so retrying it on a timer only
+	 * repeats the refusal. It waits for the reader to try again.
+	 */
+	type TailState = 'connecting' | 'open' | 'refused';
+
 	let logEntries = $state<LogEntry[]>([]);
-	let logConnected = $state(false);
+	let logState = $state<TailState>('connecting');
 	let logPaused = $state(false);
 	let logMinLevel = $state('INFO');
 	let logKeyword = $state('');
@@ -185,19 +195,14 @@
 	const KEYWORD_DEBOUNCE_MS = 300;
 
 	let logEs: EventSource | null = null;
-	let logRetry: ReturnType<typeof setTimeout> | null = null;
 	let logDestroyed = false;
 
 	// The badge tells the truth: Connected only while a stream is open, and
-	// Reconnecting from the moment one is closed until the next one opens.
+	// Connecting from the moment one is closed until the next one opens.
 	function closeLogStream() {
-		if (logRetry !== null) {
-			clearTimeout(logRetry);
-			logRetry = null;
-		}
 		logEs?.close();
 		logEs = null;
-		logConnected = false;
+		logState = 'connecting';
 	}
 
 	// A live tail is a stream, not a page read, so it stays on the client. The
@@ -214,7 +219,7 @@
 		logEs = es;
 
 		es.addEventListener('open', () => {
-			if (logEs === es) logConnected = true;
+			if (logEs === es) logState = 'open';
 		});
 
 		es.addEventListener('log', (e: MessageEvent) => {
@@ -229,9 +234,17 @@
 		// the connection that is still current, and a stale one is ignored.
 		es.addEventListener('error', () => {
 			if (logEs !== es) return;
-			closeLogStream();
-			if (!logDestroyed) logRetry = setTimeout(() => connectLogStream(minLevel, keyword), 3000);
+			if (es.readyState === EventSource.CLOSED) {
+				logEs = null;
+				logState = 'refused';
+			} else {
+				logState = 'connecting';
+			}
 		});
+	}
+
+	function retryLogStream() {
+		connectLogStream(logMinLevel, appliedKeyword);
 	}
 
 	function setMinLevel(level: string) {
@@ -258,6 +271,7 @@
 		const minLevel = logMinLevel;
 		const keyword = appliedKeyword;
 		logEntries = [];
+		if (!data.logTail) return;
 		connectLogStream(minLevel, keyword);
 		return () => closeLogStream();
 	});
@@ -318,8 +332,8 @@
 		{#snippet header()}
 			<div class="flex flex-wrap items-center gap-2">
 				<SectionHeading level={2}>Connection pool</SectionHeading>
-				{#if data.poolHealth.engine}
-					{#if !data.poolHealth.healthy}
+				{#if pool?.engine}
+					{#if !pool.healthy}
 						<Badge tone="danger" class="shrink-0 whitespace-nowrap"><AlertTriangle size={ICON.xs} /> Unhealthy</Badge>
 					{:else if poolStats}
 						<Badge tone="success" class="shrink-0 whitespace-nowrap"><CheckCircle size={ICON.xs} /> Healthy</Badge>
@@ -327,17 +341,25 @@
 						<Badge tone="warn" class="shrink-0 whitespace-nowrap"><AlertTriangle size={ICON.xs} /> Health unconfirmed</Badge>
 					{/if}
 				{/if}
-				<span class="ms-auto text-xs text-faint">
-					{#if checkedAt}Last checked {checkedAt}{:else}No check time reported{/if}
-					{#if data.poolHealth.pooler_config}, pooler {data.poolHealth.pooler_config}{/if}
-				</span>
+				{#if pool}
+					<span class="ms-auto text-xs text-faint">
+						{#if checkedAt}Last checked {checkedAt}{:else}No check time reported{/if}
+						{#if pool.pooler_config}, pooler {pool.pooler_config}{/if}
+					</span>
+				{/if}
 			</div>
 		{/snippet}
 
-		{#if data.poolHealth.engine}
+		{#if !data.poolHealth.ok}
+			<GateNotice
+				gate={data.poolHealth.gate}
+				title="the pool health"
+				absent="This engine does not report pool health."
+			/>
+		{:else if pool?.engine}
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7" data-testid="pool-stats">
-				<Stat size="sm" label="Engine" value={data.poolHealth.engine} />
-				<Stat size="sm" label="Ping latency" mono value={data.poolHealth.latency ? fmtUs(data.poolHealth.latency) : NO_VALUE} />
+				<Stat size="sm" label="Engine" value={pool.engine} />
+				<Stat size="sm" label="Ping latency" mono value={pool.latency ? fmtUs(pool.latency) : NO_VALUE} />
 				<Stat size="sm" label="Goroutines" mono value={data.goroutines ?? NO_VALUE} />
 				{#if poolStats}
 					<Stat size="sm" label="Open" mono value={poolStats.open_connections} />
@@ -355,11 +377,11 @@
 					configured answers this way.
 				</p>
 			{/if}
-			{#if data.poolHealth.errors && data.poolHealth.errors.length > 0}
+			{#if pool.errors && pool.errors.length > 0}
 				<div class="mt-3">
 					<Alert tone="danger" title="Pool reported errors">
 						<ul class="flex flex-col gap-1">
-							{#each data.poolHealth.errors as err (err)}
+							{#each pool.errors as err (err)}
 								<li>{err}</li>
 							{/each}
 						</ul>
@@ -631,7 +653,9 @@
 
 		<ListToolbar label="Latency rankings">
 			{#snippet search()}
-				<span class="text-xs text-muted">{data.latency.total} endpoints tracked</span>
+				{#if data.latency.ok}
+					<span class="text-xs text-muted">{data.latency.value.total} endpoints tracked</span>
+				{/if}
 			{/snippet}
 			{#snippet filters()}
 				<label for="latency-top" class="sr-only">Rows</label>
@@ -645,7 +669,13 @@
 			{/snippet}
 		</ListToolbar>
 
-		{#if data.latency.slowest.length === 0}
+		{#if !data.latency.ok}
+			<GateNotice
+				gate={data.latency.gate}
+				title="the latency rankings"
+				absent="This engine does not time its endpoints."
+			/>
+		{:else if data.latency.value.slowest.length === 0}
 			<EmptyState
 				iconSnippet={noLatency}
 				title="No latency data yet"
@@ -668,7 +698,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.latency.slowest as entry, i (`${entry.method} ${entry.path}`)}
+					{#each data.latency.value.slowest as entry, i (`${entry.method} ${entry.path}`)}
 						<tr>
 							<td data-cell="nowrap"><span class="text-faint">{i + 1}</span></td>
 							<td><Badge tone="neutral">{entry.method}</Badge></td>
@@ -692,67 +722,95 @@
 	<section class="flex flex-col gap-4">
 		<div class="flex items-center gap-2">
 			<SectionHeading level={2}>Live log tail</SectionHeading>
-			{#if logConnected}
+			{#if !data.logTail}
+				<Badge tone="neutral" dot>Not running</Badge>
+			{:else if logState === 'open'}
 				<Badge tone="success" dot>Connected</Badge>
+			{:else if logState === 'refused'}
+				<Badge tone="danger" dot>Refused</Badge>
 			{:else}
-				<Badge tone="warn" dot>Reconnecting</Badge>
+				<Badge tone="warn" dot>Connecting</Badge>
 			{/if}
-			<span class="text-xs text-faint">{logEntries.length} entries</span>
+			{#if data.logTail}
+				<span class="text-xs text-faint">{logEntries.length} entries</span>
+			{/if}
 		</div>
 
-		<ListToolbar label="Filter the log tail">
-			{#snippet search()}
-				<label for="tail-keyword" class="sr-only">Filter</label>
-				<Input id="tail-keyword" bind:value={logKeyword} placeholder="Keyword, then Enter" onkeydown={applyKeyword} />
-			{/snippet}
-			{#snippet filters()}
-				<label for="tail-level" class="sr-only">Minimum level</label>
-				<Select
-					id="tail-level"
-					options={LOG_LEVELS.map((lv) => ({ value: lv, label: lv }))}
-					value={logMinLevel}
-					onvaluechange={setMinLevel}
-					class="w-36"
-				/>
-				<Button variant={logPaused ? 'primary' : 'secondary'} onclick={() => { logPaused = !logPaused; }}>
-					{logPaused ? 'Resume' : 'Pause'}
-				</Button>
-				<Button variant="secondary" onclick={() => { logEntries = []; }}>
-					<Trash2 size={ICON.sm} /> Clear
-				</Button>
-			{/snippet}
-		</ListToolbar>
-
-		{#if logEntries.length === 0}
-			<EmptyState
-				iconSnippet={noLogEntries}
-				title="Waiting for log entries"
-				description="Entries at the selected level appear here as the engine emits them."
-			/>
+		{#if !data.logTail}
+			<Alert tone="brand">
+				The logging plugin is not running on this instance, so there is no log tail to follow.
+			</Alert>
 		{:else}
-			<div class="max-h-96 overflow-y-auto overscroll-contain rounded-xl">
-				<Table hoverable label="Live log tail">
-					<tbody>
-						{#each logEntries as entry (entry.sequence)}
-							<tr class="align-top">
-								<td class="whitespace-nowrap font-mono text-xs">
-									<span class="text-faint">{fmtTime(entry.timestamp)}</span>
-								</td>
-								<td class="whitespace-nowrap">
-									<Badge tone={logLevelTone(entry.level)}>{logLevelLabel(entry.level)}</Badge>
-								</td>
-								<td class="font-mono text-xs">{entry.message}</td>
-								<td class="whitespace-nowrap text-xs">
-									<span class="text-faint">
-										{#if entry.tenant_id}<span class="mr-2">tenant {entry.tenant_id}</span>{/if}
-										{#if entry.plugin}<span>plugin {entry.plugin}</span>{/if}
-									</span>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-			</div>
+			{#if logState === 'refused'}
+				<Alert tone="warn" title="The engine refused the log tail">
+					<p>
+						The stream closed before it opened and the browser will not retry it. Your role may not
+						read the logs, or the engine did not answer.
+					</p>
+					<div class="mt-3">
+						<Button variant="secondary" size="sm" onclick={retryLogStream}>
+							<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again
+						</Button>
+					</div>
+				</Alert>
+			{/if}
+
+			<ListToolbar label="Filter the log tail">
+				{#snippet search()}
+					<label for="tail-keyword" class="sr-only">Filter</label>
+					<Input id="tail-keyword" bind:value={logKeyword} placeholder="Keyword, then Enter" onkeydown={applyKeyword} />
+				{/snippet}
+				{#snippet filters()}
+					<label for="tail-level" class="sr-only">Minimum level</label>
+					<Select
+						id="tail-level"
+						options={LOG_LEVELS.map((lv) => ({ value: lv, label: lv }))}
+						value={logMinLevel}
+						onvaluechange={setMinLevel}
+						class="w-36"
+					/>
+					<Button variant={logPaused ? 'primary' : 'secondary'} onclick={() => { logPaused = !logPaused; }}>
+						{logPaused ? 'Resume' : 'Pause'}
+					</Button>
+					<Button variant="secondary" onclick={() => { logEntries = []; }}>
+						<Trash2 size={ICON.sm} /> Clear
+					</Button>
+				{/snippet}
+			</ListToolbar>
+
+			{#if logEntries.length === 0}
+				{#if logState !== 'refused'}
+					<EmptyState
+						iconSnippet={noLogEntries}
+						title="Waiting for log entries"
+						description="Entries at the selected level appear here as the engine emits them."
+					/>
+				{/if}
+			{:else}
+				<div class="max-h-96 overflow-y-auto overscroll-contain rounded-xl">
+					<Table hoverable label="Live log tail">
+						<tbody>
+							{#each logEntries as entry (entry.sequence)}
+								<tr class="align-top">
+									<td class="whitespace-nowrap font-mono text-xs">
+										<span class="text-faint">{fmtTime(entry.timestamp)}</span>
+									</td>
+									<td class="whitespace-nowrap">
+										<Badge tone={logLevelTone(entry.level)}>{logLevelLabel(entry.level)}</Badge>
+									</td>
+									<td class="font-mono text-xs">{entry.message}</td>
+									<td class="whitespace-nowrap text-xs">
+										<span class="text-faint">
+											{#if entry.tenant_id}<span class="mr-2">tenant {entry.tenant_id}</span>{/if}
+											{#if entry.plugin}<span>plugin {entry.plugin}</span>{/if}
+										</span>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+				</div>
+			{/if}
 		{/if}
 	</section>
 </PageShell>

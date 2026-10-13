@@ -88,6 +88,13 @@ beforeEach(() => {
 });
 
 describe('cache load', () => {
+	it('keeps a failed read of the stored entries as a gate rather than an empty cache', async () => {
+		api.listEntries.mockRejectedValue(new ApiError(503, 'down', {}));
+		const result = (await load(loadEvent(['super_admin']))) as Loaded;
+		expect(result.entriesGate).toEqual({ state: 'unavailable' });
+		expect(result.entries).toEqual([]);
+	});
+
 	// The counters and stored keys describe every tenant, so a tenant admin's
 	// page never asks for them, and their absence is not an error.
 	it('reads the rules and providers for a tenant admin and never the instance counters', async () => {

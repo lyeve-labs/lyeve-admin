@@ -27,7 +27,7 @@ import {
 	type SyntheticGate,
 } from '$lib/api/synthetic';
 import { channelsFrom, hasChannels } from '$lib/api/alert-channels';
-import { gateOf, type Gate } from '$lib/api/gate';
+import { gateOf, section, type Gate, type Section } from '$lib/api/gate';
 
 /** What the notice channels drawer posts its fields under. */
 const CHANNEL_PREFIX = 'channel_';
@@ -38,6 +38,8 @@ const CHANNEL_PREFIX = 'channel_';
  */
 type ChannelsFor = { probe: Probe; read: ProbeChannels | null; gate: Gate } | null;
 import { pageOf, pageWindow } from '$lib/api/list';
+
+const NO_ALERTS: Section<ProbeAlert[]> = { ok: true, value: [] };
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -95,7 +97,7 @@ export const load: PageServerLoad = async (event) => {
 	if (notRunning(plugins, PLUGIN.syntheticMonitoring)) {
 		return {
 			probes: [] as Probe[],
-			alerts: [] as ProbeAlert[],
+			alerts: NO_ALERTS,
 			total: null as number | null,
 			limit,
 			offset,
@@ -121,14 +123,15 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	// Alerts are a band above the list. Losing them must not lose the probes,
-	// but an unread alert list is never rendered as "nothing is wrong": the
-	// page shows the band only when the read succeeded.
+	// and an unread alert list is never rendered as "nothing is wrong": the
+	// band says the read failed.
 	const alerts =
 		gate.state === 'ok'
-			? await listOpenAlerts(client)
-					.then((p) => p.data ?? [])
-					.catch((): ProbeAlert[] => [])
-			: [];
+			? await section(
+					listOpenAlerts(client).then((p) => p.data ?? []),
+					'The open alerts could not be read. This is not a report that no probe is alerting.'
+				)
+			: NO_ALERTS;
 
 	// `?channels=<id>` opens the notice channels drawer on that probe. The
 	// channels are a read of their own, so they are asked for only then.

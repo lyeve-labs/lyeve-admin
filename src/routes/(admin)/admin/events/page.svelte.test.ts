@@ -47,13 +47,15 @@ function run(over: Partial<ReplayRun> = {}): ReplayRun {
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		events: [row()],
-		runs: [],
 		total: 1,
 		limit: 50,
 		offset: 0,
 		gate: { state: 'ok' },
 		licensed: true,
 		...over,
+		runs: Array.isArray(over.runs)
+			? { ok: true, value: { rows: over.runs, total: over.runs.length } }
+			: (over.runs ?? { ok: true, value: { rows: [], total: 0 } }),
 	} as never,
 	form: form as never,
 });
@@ -146,5 +148,33 @@ describe('Events log', () => {
 			props: props({ events: [row(), row({ id: 'e2', error: 'boom' })], total: 2 }),
 		});
 		expect(said(container)).toContain('Carrying an error');
+	});
+});
+
+describe('figures that cover one page or failed', () => {
+	// The engine counts no errors of its own, so the tile says it read one page.
+	it('says the error count covers this page only', () => {
+		const { container } = render(EventsPage, {
+			props: props({ events: [row(), row({ id: 'e2', error: 'boom' })], total: 900 }),
+		});
+		expect(said(container)).toContain('of the 2 on this page');
+	});
+
+	it('counts every replay rather than the rows the panel shows', () => {
+		const { container } = render(EventsPage, {
+			props: props({ runs: { ok: true, value: { rows: [run()], total: 37 } } }),
+		});
+		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
+		expect(tile?.nextElementSibling?.textContent?.trim()).toBe('37');
+	});
+
+	it('does not count zero replays when the run list failed', () => {
+		const { container } = render(EventsPage, {
+			props: props({ runs: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		const text = said(container);
+		expect(text).toContain('did not answer');
+		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
+		expect(tile?.nextElementSibling?.textContent?.trim()).not.toBe('0');
 	});
 });

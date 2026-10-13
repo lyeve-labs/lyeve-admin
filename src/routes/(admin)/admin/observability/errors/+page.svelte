@@ -49,6 +49,11 @@
 	const open = $derived(unacknowledged(data.alerts));
 	const fresh = $derived(firstSeenWithin(data.alerts, 24));
 	const ordered = $derived(triageOrder(data.alerts));
+	// The plugin counts the alerts but not how many are unacknowledged or new,
+	// so those two count the rows read. They cover every alert only when every
+	// alert is on this page.
+	const wholeList = $derived(data.offset === 0 && (data.total === null ? data.alerts.length < data.limit : data.total <= data.alerts.length));
+	const pageNote = $derived(wholeList ? undefined : `of the ${data.alerts.length} on this page`);
 
 	const bySeverity = $derived(
 		new Map(data.codes.map((c) => [c.id, { severity: c.severity, title: c.title }])),
@@ -148,10 +153,17 @@
 				mono
 				label="Unacknowledged failures"
 				value={open.length}
+				sub={pageNote}
 				tone={open.length > 0 ? 'danger' : 'neutral'}
 			/>
-			<Stat size="sm" mono label="New in the last day" value={fresh.length} />
-			<Stat size="sm" mono label="Distinct failures tracked" value={data.alerts.length} />
+			<Stat size="sm" mono label="New in the last day" value={fresh.length} sub={pageNote} />
+			<Stat
+				size="sm"
+				mono
+				label="Distinct failures tracked"
+				value={data.total ?? data.alerts.length}
+				sub={data.total === null ? pageNote : undefined}
+			/>
 		</div>
 		<p class="text-xs text-muted">
 			Each row is a group of errors that share a source location, not a single occurrence.

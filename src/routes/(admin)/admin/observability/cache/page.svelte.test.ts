@@ -32,6 +32,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		inactive: [],
 		rules: { gate: { state: 'ok' }, rows: [rule], licensed: false, limit: { limit: 10, current: 1 } },
 		entries: [],
+		entriesGate: null,
 		total: 0,
 		limit: 50,
 		offset: 0,
@@ -126,5 +127,20 @@ describe('response cache rules', () => {
 	it('keeps the instance flush off a tenant admin page', () => {
 		const { container } = render(CachePage, { props: props() });
 		expect(said(container)).not.toContain('Flush everything');
+	});
+});
+
+describe('stored entries', () => {
+	// The counter above read thousands while the list said nothing was cached.
+	it('says the entries could not be read rather than that nothing is cached', () => {
+		const { container } = render(CachePage, {
+			props: props({
+				superAdmin: true,
+				stats: { hits: 1, misses: 1, sets: 0, deletes: 0, flushes: 0, evictions: 0, entries: 4200, max_size: 0 },
+				entriesGate: { state: 'error', message: 'The stored entries could not be read. This is not a report that nothing is cached.' },
+			}),
+		});
+		expect(said(container)).toContain('The stored entries could not be read.');
+		expect(said(container)).not.toContain('Nothing is cached');
 	});
 });

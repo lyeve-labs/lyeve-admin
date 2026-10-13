@@ -41,13 +41,15 @@ function method(key: string, request_count: number) {
 	};
 }
 
+const ok = <T,>(value: T) => ({ ok: true as const, value });
+
 const props = (over: Record<string, unknown> = {}) => ({
 	data: {
-		summary,
-		endpoints: { items: [], total: 0 },
-		methods: { items: [method('GET', 1731), method('POST', 171), method('PUT', 10), method('PATCH', 1)], total: 4 },
-		agents: { items: [], total: 0 },
-		anomalies: { anomalies: [], window_hours: 0, z_threshold: 0 },
+		summary: ok(summary),
+		endpoints: ok({ items: [], total: 0 }),
+		methods: ok({ items: [method('GET', 1731), method('POST', 171), method('PUT', 10), method('PATCH', 1)], total: 4 }),
+		agents: ok({ items: [], total: 0 }),
+		anomalies: ok({ anomalies: [], window_hours: 0, z_threshold: 0 }),
 		...over,
 	} as never,
 });
@@ -83,5 +85,47 @@ describe('HTTP methods', () => {
 		expect(got.POST).toBe('9%');
 		expect(got.PUT).toBe('1%');
 		expect(got.PATCH).toBe('0%');
+	});
+});
+
+describe('a read that failed', () => {
+	const failed = (message: string) => ({ ok: false, gate: { state: 'error', message } });
+
+	// Drawn as zeros, a failed summary read looked like an instance nobody
+	// called, and a failed anomaly read looked like a healthy one.
+	it('says the summary could not be read instead of drawing zeros', () => {
+		const { container } = render(AnalyticsPage, {
+			props: props({ summary: failed('The request summary could not be read.') }),
+		});
+		const text = said(container);
+		expect(text).toContain('The request summary could not be read.');
+		expect(text).not.toContain('Total requests');
+	});
+
+	it('does not report no anomalies when the anomaly read failed', () => {
+		const { container } = render(AnalyticsPage, {
+			props: props({ anomalies: failed('The anomalies could not be read.') }),
+		});
+		const text = said(container);
+		expect(text).toContain('The anomalies could not be read.');
+		expect(text).not.toContain('No anomalies detected');
+	});
+
+	it('names an outage as an outage', () => {
+		const { container } = render(AnalyticsPage, {
+			props: props({ endpoints: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		const text = said(container);
+		expect(text).toContain('did not answer');
+		expect(text).not.toContain('No endpoint data yet');
+	});
+
+	it('says once that the plugin is missing', () => {
+		const absent = { ok: false, gate: { state: 'absent' } };
+		const { container } = render(AnalyticsPage, {
+			props: props({ summary: absent, endpoints: absent, methods: absent, agents: absent, anomalies: absent }),
+		});
+		const text = said(container);
+		expect(text.split('not part of this build').length - 1).toBe(1);
 	});
 });

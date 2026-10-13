@@ -48,8 +48,12 @@ export function couldBeId(term: string): boolean {
  * up as a request id and as a trace id. The first lookup with a match answers,
  * in that order, and the message search answers otherwise. The order is fixed,
  * so every page of one search reads the same list.
+ *
+ * The id lookups are guesses at what the term is, so one that fails counts as
+ * no match. The plain search is the answer itself, so its failure is thrown
+ * and never passed off as a search that found nothing.
  */
-export async function searchLogEntries(client: HttpClient, query: LogQuery): Promise<LogSearchResponse | null> {
+export async function searchLogEntries(client: HttpClient, query: LogQuery): Promise<LogSearchResponse> {
 	// Built here rather than through the client's searchLogs(), which sends no offset.
 	const base = new URLSearchParams({ limit: String(query.limit), offset: String(query.offset) });
 	if (query.level) base.set('level', query.level);
@@ -57,17 +61,18 @@ export async function searchLogEntries(client: HttpClient, query: LogQuery): Pro
 	const run = (key?: string, value?: string) => {
 		const qs = new URLSearchParams(base);
 		if (key && value) qs.set(key, value);
-		return client.get<LogSearchResponse>(`${LOG_SEARCH_URL}?${qs}`).catch(() => null);
+		return client.get<LogSearchResponse>(`${LOG_SEARCH_URL}?${qs}`);
 	};
+	const guess = (key: string, value: string) => run(key, value).catch(() => null);
 
 	const term = query.q.trim();
 	if (!term) return run();
 	if (!couldBeId(term)) return run('query', term);
 
 	const [byRequest, byTrace, byText] = await Promise.all([
-		run('request_id', term),
-		run('trace_id', term),
+		guess('request_id', term),
+		guess('trace_id', term),
 		run('query', term),
 	]);
-	return [byRequest, byTrace].find((res) => (res?.total ?? 0) > 0) ?? byText;
+	return [byRequest, byTrace].find((res): res is LogSearchResponse => (res?.total ?? 0) > 0) ?? byText;
 }

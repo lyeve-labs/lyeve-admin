@@ -54,7 +54,6 @@ function alert(over: Partial<ProbeAlert> = {}): ProbeAlert {
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		probes: [probe()],
-		alerts: [],
 		total: 1,
 		limit: 25,
 		offset: 0,
@@ -62,6 +61,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		gate: { state: 'ok' },
 		licensed: true,
 		...over,
+		alerts: Array.isArray(over.alerts) ? { ok: true, value: over.alerts } : (over.alerts ?? { ok: true, value: [] }),
 	} as never,
 	form: form as never,
 });
@@ -134,6 +134,15 @@ describe('alerts', () => {
 	it('shows no alert band when nothing is outstanding', () => {
 		const { container } = render(SyntheticPage, { props: props() });
 		expect(said(container)).not.toContain('Unacknowledged alerts');
+	});
+
+	// A hidden band read as nothing alerting while the read had failed.
+	it('says the alerts could not be read rather than hiding the band', () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ alerts: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		expect(said(container)).toContain('did not answer');
+		expect(said(container)).toContain('the open alerts');
 	});
 });
 
@@ -247,5 +256,26 @@ describe('notice channels', () => {
 			props: props({}, { channelsSaved: 'p1', signingSecret: 'f'.repeat(64) }),
 		});
 		expect(said(container.ownerDocument.body)).toContain('Webhook signing secret');
+	});
+});
+
+describe('the tiles', () => {
+	const failingProbe = (id: string) => probe({ id, name: id, last_status: 'fail' });
+
+	// The plugin counts probes but not their states, so a state tile that read
+	// one page of a longer list had to say so.
+	it('says the state counts cover this page when more probes exist', () => {
+		const { container } = render(SyntheticPage, {
+			props: props({ probes: [failingProbe('a'), probe({ id: 'b', name: 'b' })], total: 60, hasMore: true }),
+		});
+		const text = said(container);
+		expect(text).toContain('of the 2 on this page');
+		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Probes');
+		expect(tile?.nextElementSibling?.textContent?.trim()).toBe('60');
+	});
+
+	it('states the counts plainly when every probe is on the page', () => {
+		const { container } = render(SyntheticPage, { props: props() });
+		expect(said(container)).not.toContain('on this page');
 	});
 });

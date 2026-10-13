@@ -62,10 +62,22 @@ describe('Slow queries gate', () => {
 
 	it('names the store when the capture table did not answer', () => {
 		const { container } = render(QueriesPage, {
-			props: props({ gate: { state: 'unavailable' }, entries: [] }),
+			props: props({ gate: { state: 'capture_store' }, entries: [] }),
 		});
 
 		expect(container.textContent).toContain('capture store did not answer');
+	});
+
+	// The shared outage state once landed in the capture store warning, which
+	// sent the reader to look for a pending migration while the engine was down.
+	it('reads an outage as an outage rather than as the capture store', () => {
+		const { container } = render(QueriesPage, {
+			props: props({ gate: { state: 'unavailable' }, entries: [] }),
+		});
+
+		expect(container.textContent).toContain('did not answer');
+		expect(container.textContent).not.toContain('capture store');
+		expect(container.textContent).toContain('Try again');
 	});
 });
 

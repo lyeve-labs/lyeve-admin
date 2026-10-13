@@ -88,6 +88,10 @@
 	});
 	const failing = $derived(data.probes.filter((p) => probeHealth(p) === 'failing').length);
 	const paused = $derived(data.probes.filter((p) => probeHealth(p) === 'paused').length);
+	// The plugin counts probes but not their states, so the state tiles count
+	// the rows read. They cover every probe only when every probe is on this page.
+	const wholeList = $derived(data.offset === 0 && !data.hasMore);
+	const pageNote = $derived(wholeList ? undefined : `of the ${data.probes.length} on this page`);
 
 	let open = $state(false);
 	let editing = $state<Probe | null>(null);
@@ -236,22 +240,29 @@
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
-			<Stat size="sm" mono label="Probes" value={data.probes.length} />
+			<Stat size="sm" mono label="Probes" value={data.total ?? data.probes.length} sub={data.total === null ? pageNote : undefined} />
 			<Stat
 				size="sm"
 				mono
 				label="Failing"
 				value={failing}
+				sub={pageNote}
 				tone={failing > 0 ? 'danger' : 'neutral'}
 			/>
-			<Stat size="sm" mono label="Paused" value={paused} />
+			<Stat size="sm" mono label="Paused" value={paused} sub={pageNote} />
 		</div>
 
-		{#if data.alerts.length > 0}
+		{#if !data.alerts.ok}
+			<GateNotice
+				gate={data.alerts.gate}
+				title="the open alerts"
+				absent="This version of the synthetic monitoring plugin keeps no alert list."
+			/>
+		{:else if data.alerts.value.length > 0}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Unacknowledged alerts</SectionHeading>
 				<div class="flex flex-col gap-3">
-					{#each data.alerts as a (a.id)}
+					{#each data.alerts.value as a (a.id)}
 						<div class="rounded border border-line bg-surface-2 p-3">
 							<div class="flex flex-wrap items-start justify-between gap-2">
 								<div class="min-w-0">

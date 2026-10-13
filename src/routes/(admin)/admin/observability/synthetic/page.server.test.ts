@@ -145,3 +145,16 @@ describe('saving a probe', () => {
 		);
 	});
 });
+
+describe('the probe list load', () => {
+	it('keeps a failed alert read as a gate rather than no alerts', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.includes('/probes')) return { data: [PROBE], total_count: 1 };
+			if (url.includes('/alerts')) throw new ApiError(503, 'down', {});
+			throw new ApiError(404, 'not found', {});
+		});
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.alerts).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(out.probes).toHaveLength(1);
+	});
+});

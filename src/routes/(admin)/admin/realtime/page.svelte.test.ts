@@ -104,6 +104,27 @@ describe('Realtime transports', () => {
 	});
 });
 
+describe('a transport that did not answer', () => {
+	// The load reads each transport on its own and keeps the reason, so one
+	// that failed is never drawn as a transport nobody uses.
+	it('says the read failed rather than that nobody uses it', () => {
+		const { container } = render(RealtimePage, {
+			props: props({ socket: null, socketGate: { state: 'unavailable' } }),
+		});
+		const text = said(container);
+		expect(text).toContain('did not answer');
+		expect(text).not.toContain('not a fault');
+		expect(text).not.toContain('Nothing is connected');
+	});
+
+	it('keeps the other transport drawn', () => {
+		const { container } = render(RealtimePage, {
+			props: props({ socket: null, socketGate: { state: 'unavailable' } }),
+		});
+		expect(said(container)).toMatch(/Accepted in \d+[smhd]/);
+	});
+});
+
 describe('Realtime tenant roster', () => {
 	it('is not drawn for a tenant admin', () => {
 		const { container } = render(RealtimePage, { props: props() });
@@ -124,9 +145,17 @@ describe('Realtime tenant roster', () => {
 
 	it('says the roster failed without implying the counters above did', () => {
 		const { container } = render(RealtimePage, {
-			props: props({ superAdmin: true, platform: null }),
+			props: props({
+				superAdmin: true,
+				platform: null,
+				platformGate: {
+					state: 'error',
+					message: "The per-tenant roster could not be read. The counters above are this tenant's and are unaffected.",
+				},
+			}),
 		});
-		expect(said(container)).toContain('roster did not answer');
+		expect(said(container)).toContain('roster could not be read');
 		expect(said(container)).toContain('unaffected');
+		expect(said(container)).not.toContain('No tenant has a connection open');
 	});
 });

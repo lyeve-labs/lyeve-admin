@@ -102,3 +102,22 @@ describe('recent events', () => {
 		expect(container.textContent).toContain('could not be read');
 	});
 });
+
+describe('the tiles', () => {
+	const tile = (container: HTMLElement, label: string) =>
+		[...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === label)?.nextElementSibling?.textContent?.trim();
+
+	// The count of distinct failures was the length of the page, so a list of
+	// three hundred read as fifty.
+	it('counts every failure the plugin tracks, not the rows on this page', () => {
+		const { container } = setup({ alerts: [alert(), alert({ id: 'a2' })], total: 300 });
+		expect(tile(container, 'Distinct failures tracked')).toBe('300');
+		expect(container.textContent).toContain('of the 2 on this page');
+	});
+
+	it('states the counts plainly when every failure is on the page', () => {
+		const { container } = setup();
+		expect(tile(container, 'Distinct failures tracked')).toBe('1');
+		expect(container.textContent).not.toContain('on this page');
+	});
+});

@@ -6,35 +6,19 @@ import {
 	getEndpoints,
 	getMethods,
 	getAgents,
-	getAnomalies,
-	type Summary,
-	type BreakdownResponse,
-	type AnomalyResponse
+	getAnomalies
 } from '@lyeve-labs/client-rest';
+import { section } from '$lib/api/gate';
 import { sessionToken } from '$lib/server/session-cookie';
 
-const emptySummary: Summary = {
-	from: '',
-	to: '',
-	total_requests: 0,
-	total_2xx: 0,
-	total_4xx: 0,
-	total_5xx: 0,
-	error_rate: 0,
-	avg_latency_p50_ms: 0,
-	avg_latency_p95_ms: 0,
-	avg_latency_p99_ms: 0,
-	max_latency_p99_ms: 0,
-	avg_request_size_bytes: 0,
-	max_request_size_bytes: 0,
-	unique_endpoints: 0,
-	unique_tenants: 0,
-	unique_methods: 0,
-	unique_user_agents: 0
-};
-
-const emptyBreakdown: BreakdownResponse = { items: [], total: 0 };
-const emptyAnomalies: AnomalyResponse = { anomalies: [], window_hours: 0, z_threshold: 0 };
+/** What each part of the page says when its read failed for a reason it cannot name. */
+const FAILED = {
+	summary: 'The request summary could not be read. This is not a report that there was no traffic.',
+	endpoints: 'The endpoint breakdown could not be read. This is not a report that no endpoint was called.',
+	methods: 'The method breakdown could not be read. This is not a report that there were no requests.',
+	agents: 'The user agent breakdown could not be read. This is not a report that no client called.',
+	anomalies: 'The anomalies could not be read. This is not a report that there are none.',
+} as const;
 
 export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	const { user } = await parent();
@@ -54,11 +38,11 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	const from = new Date(Date.now() - 24 * 3_600_000).toISOString();
 
 	const [summary, endpoints, methods, agents, anomalies] = await Promise.all([
-		getSummary({ from }, client).catch(() => emptySummary),
-		getEndpoints({ from, limit: 20 }, client).catch(() => emptyBreakdown),
-		getMethods({ from }, client).catch(() => emptyBreakdown),
-		getAgents({ from, limit: 10 }, client).catch(() => emptyBreakdown),
-		getAnomalies(undefined, client).catch(() => emptyAnomalies)
+		section(getSummary({ from }, client), FAILED.summary),
+		section(getEndpoints({ from, limit: 20 }, client), FAILED.endpoints),
+		section(getMethods({ from }, client), FAILED.methods),
+		section(getAgents({ from, limit: 10 }, client), FAILED.agents),
+		section(getAnomalies(undefined, client), FAILED.anomalies)
 	]);
 
 	return { summary, endpoints, methods, agents, anomalies };

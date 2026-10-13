@@ -36,6 +36,7 @@
 		type EndpointStats,
 	} from '$lib/api/profiler';
 	import { NO_VALUE, formatDateTime, formatTime } from '$lib/format';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
@@ -57,8 +58,10 @@
 	let flameSeconds = $state<number>(PROFILE_SECONDS.default);
 	let cpuSeconds = $state<number>(PROFILE_SECONDS.default);
 
-	const memory = $derived(data.memory);
+	const memory = $derived(data.memory.ok ? data.memory.value : null);
+	const ABSENT = 'The profiler plugin is not part of this build, so nothing is sampled.';
 	const latest = $derived(memory?.snapshots.at(-1) ?? null);
+	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 
 	// The flamegraph is the last action's answer while the page holds it. It
 	// is drawn as an image from a data URL rather than inlined as markup: the
@@ -184,8 +187,10 @@
 				<span class="ms-auto text-xs text-faint">{memory.snapshots.length} snapshots</span>
 			{/if}
 		</div>
-		{#if !memory}
-			<EmptyState iconSnippet={noMemory} title="Memory trend unavailable" description="The engine did not answer with its memory snapshots." />
+		{#if !data.memory.ok}
+			<GateNotice gate={data.memory.gate} title="the memory trend" absent={ABSENT} />
+		{:else if !memory}
+			<EmptyState iconSnippet={noMemory} title="No memory trend" description="The engine answered with no memory snapshots." />
 		{:else if !latest}
 			<EmptyState iconSnippet={noMemory} title="No snapshot yet" description="The sampler takes a snapshot on a schedule. The first one has not been taken." />
 		{:else}
@@ -209,14 +214,17 @@
 	<section class="flex flex-col gap-4" data-testid="profiler-slowest">
 		<div class="flex flex-wrap items-center gap-2">
 			<SectionHeading level={2}>Slowest endpoints</SectionHeading>
-			<span class="text-xs text-faint">By p95, the twenty slowest. {data.endpoints?.length ?? 0} endpoints sampled.</span>
+			<span class="text-xs text-faint">
+				By p95, the twenty slowest.{#if data.endpoints.ok}
+					{data.endpoints.value.length} endpoints sampled.{/if}
+			</span>
 		</div>
-		{#if !data.slowest}
-			<EmptyState iconSnippet={noEndpoints} title="Profiler unavailable" description="The engine did not answer with its endpoint statistics." />
-		{:else if data.slowest.length === 0}
+		{#if !data.slowest.ok}
+			<GateNotice gate={data.slowest.gate} title="the endpoint statistics" absent={ABSENT} />
+		{:else if data.slowest.value.length === 0}
 			<EmptyState iconSnippet={noEndpoints} title="Nothing sampled yet" description="Endpoints appear here once the sampler has timed some requests." />
 		{:else}
-			{@render endpointRows(data.slowest, 'Slowest endpoints')}
+			{@render endpointRows(data.slowest.value, 'Slowest endpoints')}
 		{/if}
 	</section>
 
@@ -224,16 +232,18 @@
 		<section class="flex flex-col gap-4" data-testid="profiler-detail">
 			<div class="flex flex-wrap items-center gap-2">
 				<SectionHeading level={2}><span class="font-mono">{data.selected}</span></SectionHeading>
-				{#if data.detail}
-					<span class="text-xs text-faint">{data.detail.total_count} entries in the ring</span>
+				{#if detail}
+					<span class="text-xs text-faint">{detail.total_count} entries in the ring</span>
 				{/if}
 				<a href="/admin/observability/profiler" class="ms-auto text-xs text-muted underline-offset-2 transition-colors hover:text-fg hover:underline">Clear selection</a>
 			</div>
-			{#if !data.detail}
+			{#if data.detail && !data.detail.ok}
+				<GateNotice gate={data.detail.gate} title="this endpoint" absent={ABSENT} />
+			{:else if !detail || !detail.methods?.length}
 				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="The ring holds no sample for it. It may have been reset, or the path is not one the engine served." />
 			{:else}
-				{@render endpointRows(data.detail.methods.map((m) => m.stats), `Methods for ${data.selected}`)}
-				{#each data.detail.methods as method (method.method)}
+				{@render endpointRows(detail.methods.map((m) => m.stats), `Methods for ${data.selected}`)}
+				{#each detail.methods as method (method.method)}
 					<Card>
 						{#snippet header()}
 							<div class="flex flex-wrap items-center gap-2">
@@ -275,9 +285,9 @@
 		<div class="flex flex-wrap items-center gap-2">
 			<SectionHeading level={2}>By plugin</SectionHeading>
 		</div>
-		{#if !data.plugins}
-			<EmptyState iconSnippet={noPlugins} title="Plugin breakdown unavailable" description="The engine did not answer with its per-plugin statistics." />
-		{:else if data.plugins.length === 0}
+		{#if !data.plugins.ok}
+			<GateNotice gate={data.plugins.gate} title="the plugin breakdown" absent={ABSENT} />
+		{:else if data.plugins.value.length === 0}
 			<EmptyState iconSnippet={noPlugins} title="Nothing sampled yet" description="Plugins appear here once a request has been served through one." />
 		{:else}
 			<Table label="By plugin">
@@ -291,7 +301,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.plugins as p (p.plugin)}
+					{#each data.plugins.value as p (p.plugin)}
 						<tr>
 							<td data-cell="nowrap" class="font-mono text-xs">{p.plugin}</td>
 							<td data-cell="nowrap" class="text-right text-xs"><span class="text-faint">{p.count}</span></td>

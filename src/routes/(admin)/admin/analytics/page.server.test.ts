@@ -20,11 +20,13 @@ function mockCookies(): Cookies {
 	} as unknown as Cookies;
 }
 
-function loadEvent(roles: string[]) {
+function loadEvent(roles: string[], status: (path: string) => number = () => 200) {
 	const queries: Record<string, URLSearchParams> = {};
 	const fetch = vi.fn(async (url: string) => {
 		const u = new URL(String(url), 'http://x');
 		queries[u.pathname] = u.searchParams;
+		const code = status(u.pathname);
+		if (code !== 200) return json({ error: 'refused' }, code);
 		return json({ items: [], total: 0, anomalies: [] });
 	}) as unknown as typeof globalThis.fetch;
 	return {
@@ -64,5 +66,16 @@ describe('admin/analytics/+page.server.ts load', () => {
 		const { event } = loadEvent(['editor']);
 
 		await expect(load(event)).rejects.toMatchObject({ status: 403 });
+	});
+
+	it('keeps a failed read as a gate rather than an empty value', async () => {
+		const { event } = loadEvent(['admin'], (path) => (path.endsWith('/anomalies') ? 503 : path.endsWith('/summary') ? 500 : 200));
+
+		const out = (await load(event)) as Record<string, { ok: boolean; gate?: { state: string } }>;
+
+		expect(out.anomalies).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(out.summary.ok).toBe(false);
+		expect(out.summary.gate?.state).toBe('error');
+		expect(out.endpoints.ok).toBe(true);
 	});
 });

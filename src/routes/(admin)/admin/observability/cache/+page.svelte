@@ -463,7 +463,13 @@
 				{/each}
 			</div>
 
-			{#if data.entries.length === 0}
+			{#if data.entriesGate}
+				<GateNotice
+					gate={data.entriesGate}
+					title="the stored entries"
+					absent="This version of the cache plugin does not list its stored entries."
+				/>
+			{:else if data.entries.length === 0}
 				<EmptyState
 					title="Nothing is cached"
 					description="Either nothing has been asked for yet, or every entry has expired."

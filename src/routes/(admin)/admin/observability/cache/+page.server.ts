@@ -103,12 +103,17 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	const entries =
-		gate.state === 'ok' && superAdmin
-			? await listEntries(client, limit + 1, offset)
-					.then((p) => pageOf(p, limit, offset))
-					.catch(() => ({ rows: [] as CacheEntry[], limit, offset, total: null, hasMore: false }))
-			: { rows: [] as CacheEntry[], limit, offset, total: null, hasMore: false };
+	// A failed read of the stored keys keeps its reason. Drawn as no rows, it
+	// said nothing is cached beside a counter of thousands of entries.
+	let entries: { rows: CacheEntry[]; total: number | null; hasMore: boolean } = { rows: [], total: null, hasMore: false };
+	let entriesGate: Gate | null = null;
+	if (gate.state === 'ok' && superAdmin) {
+		try {
+			entries = pageOf(await listEntries(client, limit + 1, offset), limit, offset);
+		} catch (err) {
+			entriesGate = gateOf(err, 'The stored entries could not be read. This is not a report that nothing is cached.');
+		}
+	}
 
 	return {
 		superAdmin,
@@ -119,6 +124,7 @@ export const load: PageServerLoad = async (event) => {
 		inactive: providers.inactive,
 		rules,
 		entries: entries.rows,
+		entriesGate,
 		total: entries.total,
 		limit,
 		offset,
