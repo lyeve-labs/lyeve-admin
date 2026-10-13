@@ -25,17 +25,7 @@ import {
 	type SearchAnalytics,
 } from '$lib/api/search-settings';
 import { sessionToken } from '$lib/server/session-cookie';
-
-const DEFAULT_RANKING: RankingConfig = {
-	id: '',
-	schema_name: '*',
-	title_weight: 1.0,
-	body_weight: 0.4,
-	tag_weight: 0.2,
-	boost_rules: [],
-	created_at: '',
-	updated_at: ''
-};
+import { section, type Section } from '$lib/api/gate';
 
 /** Runs f so that a synchronous throw lands in the same catch as a rejection. */
 const attempt = <T>(f: () => Promise<T>): Promise<T> => Promise.resolve().then(f);
@@ -49,32 +39,29 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const q = url.searchParams.get('q')?.trim() ?? '';
 
 	// Only hit the search endpoint when a query is present. The backend
-	// rejects requests with no criterion (400).
-	let results: SearchResult[] = [];
-	let searchFailed = false;
-	if (q) {
-		try {
-			results = (await search(q, client)).results ?? [];
-		} catch {
-			// A swallowed failure would render as "no results", which reads to the
-			// operator as an empty index rather than an outage.
-			searchFailed = true;
-		}
-	}
+	// rejects requests with no criterion (400). A failed search is a gate, so
+	// it never renders as "no results", which reads as an empty index.
+	const results: Section<SearchResult[]> | null = q
+		? await section(
+				search(q, client).then((res) => res.results ?? []),
+				'The search could not be run. This is not a report that nothing matched.',
+			)
+		: null;
 
 	// Each panel is read on its own, so one the engine refuses does not blank
-	// the others. A null is drawn as "could not be read", never as empty.
+	// the others. A failed read is drawn as its gate, never as empty. The
+	// plugin answers its default weights when none are set, so a failed
+	// ranking read is a failure and never the defaults.
 	const [synonyms, ranking, publicSchemas, schemas, analytics] = await Promise.all([
-		listSynonyms(client).catch((): SynonymGroup[] => []),
-		getRanking(client, '*').catch(() => DEFAULT_RANKING),
-		attempt(() => getPublicSchemas(client)).catch(() => null),
-		attempt(() => listSchemaNames(client)).catch((): string[] => []),
-		attempt(() => getSearchAnalytics(client)).catch((): SearchAnalytics | null => null),
+		section<SynonymGroup[]>(listSynonyms(client), 'The synonym groups could not be read. This is not a report that there are none.'),
+		section<RankingConfig>(getRanking(client, '*'), 'The ranking weights could not be read, so they are not shown or offered for change.'),
+		section(attempt(() => getPublicSchemas(client)), 'The public schema list could not be read.'),
+		section(attempt(() => listSchemaNames(client)), 'The schemas could not be read. This is not a report that there are none.'),
+		section<SearchAnalytics>(attempt(() => getSearchAnalytics(client)), 'Search analytics could not be read.'),
 	]);
 
 	return {
 		results,
-		searchFailed,
 		synonyms,
 		ranking,
 		q,
