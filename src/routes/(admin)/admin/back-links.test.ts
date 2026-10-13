@@ -125,7 +125,7 @@ const cases: Case[] = [
 	{
 		route: 'content/[schema]/new',
 		component: ContentNew,
-		data: { schemaDef: posts, locales: [], relationItems: {} },
+		data: { schemaDef: posts, locales: null, relations: {} },
 		href: '/admin/content/posts',
 		label: 'Posts',
 	},
@@ -286,7 +286,7 @@ describe('every nested page names the way back', () => {
 
 	it('puts the back link ahead of a breadcrumb on the same row', () => {
 		const { container } = render(ContentNew, {
-			props: { data: { schemaDef: posts, locales: [], relationItems: {} }, form: null } as never,
+			props: { data: { schemaDef: posts, locales: null, relations: {} }, form: null } as never,
 		});
 		const back = container.querySelector('[data-testid="page-back"]');
 		const crumb = container.querySelector('nav[aria-label]');
@@ -320,7 +320,7 @@ describe('every nested page names the way back', () => {
 				props: {
 					data: {
 						schemaDef: posts,
-						locales: [],
+						locales: null,
 						relations: {},
 						revisions: [],
 						item: { id: 'e1', data: {}, created_at: '', updated_at: '' },
