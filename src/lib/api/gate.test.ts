@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { error, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { forbiddenText, fullText, gateOf, isOutage } from './gate';
+import { forbiddenText, fullText, gateOf, isOutage, section } from './gate';
 
 const FAILED = 'The list could not be read. This is not a report that it is empty.';
 
@@ -80,6 +81,40 @@ describe('isOutage', () => {
 		expect(isOutage(new Error('network'))).toBe(false);
 		expect(isOutage(new DOMException('aborted', 'AbortError'))).toBe(false);
 		expect(isOutage(null)).toBe(false);
+	});
+});
+
+describe('section', () => {
+	it('carries what the read answered, an empty list included', async () => {
+		expect(await section(Promise.resolve([1, 2]), FAILED)).toEqual({ ok: true, value: [1, 2] });
+		expect(await section(Promise.resolve([]), FAILED)).toEqual({ ok: true, value: [] });
+	});
+
+	it('keeps a failure as its gate and never as an empty value', async () => {
+		expect(await section(Promise.reject(new ApiError(503, 'down')), FAILED)).toEqual({
+			ok: false,
+			gate: { state: 'unavailable' },
+		});
+		expect(await section(Promise.reject(new ApiError(403, 'insufficient permissions')), FAILED)).toEqual({
+			ok: false,
+			gate: { state: 'forbidden' },
+		});
+		expect(await section(Promise.reject(new ApiError(500, 'boom')), FAILED)).toEqual({
+			ok: false,
+			gate: { state: 'error', message: FAILED },
+		});
+	});
+
+	it('answers plain data a load can return', async () => {
+		const read = await section(Promise.reject(unreachable()), FAILED);
+		expect(JSON.parse(JSON.stringify(read))).toEqual(read);
+	});
+
+	it('lets a redirect or an HTTP error thrown on purpose end the load', async () => {
+		const away = (async () => redirect(302, '/login'))();
+		await expect(section(away, FAILED)).rejects.toMatchObject({ status: 302, location: '/login' });
+		const refused = (async () => error(401, 'Session invalid or expired'))();
+		await expect(section(refused, FAILED)).rejects.toMatchObject({ status: 401 });
 	});
 });
 

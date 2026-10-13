@@ -17,6 +17,7 @@
  *   else the read failed, and a failed read is never a report that there is
  *        nothing to show.
  */
+import { isHttpError, isRedirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 
 export type Gate =
@@ -89,6 +90,26 @@ export function gateOf(err: unknown, failed: string): Gate {
 	}
 	if (isOutage(err)) return { state: 'unavailable' };
 	return { state: 'error', message: failed };
+}
+
+/**
+ * One read as load data: the value it answered, or the gate that says why
+ * there is none. A failure never becomes an empty value, so a page cannot draw
+ * its first-run state for a read that did not answer.
+ */
+export type Section<T> = { ok: true; value: T } | { ok: false; gate: Gate };
+
+/**
+ * Await a read and keep its failure as a gate. A redirect or an HTTP error
+ * thrown on purpose is not a failed read, so it still ends the load.
+ */
+export async function section<T>(read: Promise<T>, failed: string): Promise<Section<T>> {
+	try {
+		return { ok: true, value: await read };
+	} catch (err) {
+		if (isRedirect(err) || isHttpError(err)) throw err;
+		return { ok: false, gate: gateOf(err, failed) };
+	}
 }
 
 /** The sentence a page shows for a gate at a ceiling. */
