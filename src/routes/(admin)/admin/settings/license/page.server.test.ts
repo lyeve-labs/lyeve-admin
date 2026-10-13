@@ -326,7 +326,36 @@ describe('license +page.server.ts actions.renew', () => {
 		});
 
 		const result = await actions.renew({ request, fetch, cookies } as never);
-		expect(result).toMatchObject({ status: 500, data: { error: 'Renewal failed' } });
+		expect(result).toMatchObject({
+			status: 500,
+			data: { error: 'The license could not be applied. The current license is unchanged.' },
+		});
+	});
+
+	it('keeps the text of an engine failure off the page', async () => {
+		const { actions } = await import('./+page.server');
+		mockedCreateClient.mockReturnValue({
+			post: vi.fn(async () => {
+				throw new ApiError(500, 'pq: could not write sys_license');
+			}),
+		} as never);
+
+		const formData = new FormData();
+		formData.set('license_key', 'some-key');
+		const request = new Request('http://localhost/admin/settings/license?/renew', {
+			method: 'POST',
+			body: formData,
+		});
+
+		const result = await actions.renew({
+			request,
+			fetch: mockFetch({}),
+			cookies: mockCookies({ '__Host-sys_session': 'valid' }),
+		} as never);
+		expect(result).toMatchObject({
+			status: 502,
+			data: { error: 'The license could not be applied. The current license is unchanged.' },
+		});
 	});
 });
 

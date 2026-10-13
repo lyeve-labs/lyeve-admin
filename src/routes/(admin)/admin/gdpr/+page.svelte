@@ -29,6 +29,9 @@
 	const eraseResult = $derived(
 		form?.action === 'erase' && form.ok ? (form.result as DsarEraseResult) : null
 	);
+	// A plugin that failed to erase still holds the subject's data. The rows
+	// erased elsewhere do not make the request complete.
+	const eraseFailures = $derived(eraseResult?.errors ?? []);
 
 	const exportJson = $derived(exportResult ? JSON.stringify(exportResult, null, 2) : '');
 	const exportHref = $derived(
@@ -185,16 +188,30 @@
 			</div>
 		</Card>
 
-		{#if eraseResult}
-			<Alert tone="success" title="Erasure complete" autoDismiss={!eraseResult.errors?.length}>
+		{#if eraseResult && eraseFailures.length > 0}
+			<!-- Stays until dismissed: data is still held, and the reader has to act on it. -->
+			<Alert tone="warn" title="Erasure incomplete">
+				<p>
+					Erased <span class="font-medium">{eraseResult.total_rows}</span>
+					{eraseResult.total_rows === 1 ? 'row' : 'rows'} for
+					<span class="font-mono text-xs">{eraseResult.identifier}</span>, but
+					{eraseFailures.length === 1 ? 'one part' : `${eraseFailures.length} parts`} of the instance
+					could not erase. Data for this subject is still held there. Run the erasure again once the
+					cause is fixed.
+				</p>
+				<ul class="mt-2 list-disc pl-5 text-xs">
+					{#each eraseFailures as failure, i (i)}
+						<li>{failure}</li>
+					{/each}
+				</ul>
+			</Alert>
+		{:else if eraseResult}
+			<Alert tone="success" title="Erasure complete" autoDismiss>
 				<p>
 					Erased <span class="font-medium">{eraseResult.total_rows}</span>
 					{eraseResult.total_rows === 1 ? 'row' : 'rows'} for
 					<span class="font-mono text-xs">{eraseResult.identifier}</span>.
 				</p>
-				{#if eraseResult.errors && eraseResult.errors.length > 0}
-					<p class="mt-1 text-xs text-warn">{eraseResult.errors.join('; ')}</p>
-				{/if}
 			</Alert>
 		{/if}
 	</section>

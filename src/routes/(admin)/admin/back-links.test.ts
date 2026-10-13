@@ -231,7 +231,7 @@ const cases: Case[] = [
 	{
 		route: 'settings/configuration',
 		component: SettingsConfiguration,
-		data: { provenance: null },
+		data: { provenance: { ok: false, gate: { state: 'forbidden' } } },
 		href: '/admin/settings',
 		label: 'Settings',
 	},
