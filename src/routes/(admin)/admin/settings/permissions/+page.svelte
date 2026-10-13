@@ -21,6 +21,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { Asterisk, ChevronRight, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import type { PageData, ActionData } from './$types';
 	import type { Permission, Schema } from '@lyeve-labs/client';
@@ -30,6 +31,10 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const pageRefusal = $derived(formRefusal(form));
+	const formErrorText = $derived.by(() => {
+		const said = (form as Record<string, unknown> | null)?.error;
+		return typeof said === 'string' ? said : undefined;
+	});
 
 	const KNOWN_ROLES = ['super_admin', 'admin', 'editor'];
 	// Activate is the fifth action and belongs to flows alone: publish,
@@ -719,6 +724,9 @@
 			use:enhance={saveRule.enhance}
 			class="space-y-4"
 		>
+			<!-- A refused save keeps the drawer open, so the reason has to be in
+			     it and not behind the panel on the page. -->
+			<FormErrors message={formErrorText} refused={pageRefusal} />
 			<input type="hidden" name="role" value={role} />
 
 			{#if schema === null}
@@ -828,9 +836,7 @@
 		use:enhance={saveRole.enhance}
 		class="space-y-4"
 	>
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{/if}
+		<FormErrors message={formErrorText} refused={pageRefusal} />
 		<!-- The matrix lists a role only where a rule names it, so a new role
 		     is a wildcard rule with no actions: it grants nothing until a
 		     rule is edited. -->

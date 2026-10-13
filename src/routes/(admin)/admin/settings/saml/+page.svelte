@@ -23,6 +23,7 @@
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { KeyRound, Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
@@ -401,6 +402,9 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<!-- A refused save keeps the drawer open, so the reason has to be in
+			     it and not behind the panel on the page. -->
+			<FormErrors message={formError || undefined} />
 			<Input
 				id="saml-name"
 				name="name"

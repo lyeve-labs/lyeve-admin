@@ -50,4 +50,10 @@ describe('OAuth providers page', () => {
 		expect(queryByRole('button', { name: 'New provider' })).toBeNull();
 	});
 
+	it('shows a refused save inside the open drawer', async () => {
+		const { getByRole } = setup([provider('google')], { error: 'The provider could not be saved.' });
+		await fireEvent.click(getByRole('button', { name: 'New provider' }));
+		const form = document.body.querySelector('form#provider-form');
+		expect(form?.textContent).toContain('The provider could not be saved.');
+	});
 });

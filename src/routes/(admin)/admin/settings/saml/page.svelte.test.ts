@@ -191,6 +191,15 @@ describe('the role', () => {
 	});
 });
 
+describe('the drawer', () => {
+	it('shows a refused save inside the open drawer', async () => {
+		render(SamlPage, { props: props({}, { error: 'The provider could not be saved.' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		const form = document.body.querySelector('form#saml-provider-form');
+		expect(form?.textContent).toContain('The provider could not be saved.');
+	});
+});
+
 describe('the pager', () => {
 	it('stays when nothing on this page matches the search', async () => {
 		const { container } = render(SamlPage, { props: props({ total: 60, hasMore: true }) });

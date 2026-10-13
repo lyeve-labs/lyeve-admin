@@ -23,6 +23,7 @@
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { KeyRound, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		MIN_TOKEN_LENGTH,
@@ -251,6 +252,9 @@
 <Drawer bind:open={creating} title="New connection">
 	<form id="scim-connection-form" method="POST" action="?/create" use:enhance={saveConnectionSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<!-- A refused save keeps the drawer open, so the reason has to be in
+			     it and not behind the panel on the page. -->
+			<FormErrors message={formError || undefined} />
 			<Input
 				id="scim-name"
 				name="name"
@@ -308,6 +312,7 @@
 	<form id="scim-rotate-form" method="POST" action="?/rotate" use:enhance={saveTokenSubmit.enhance}>
 		<input type="hidden" name="id" value={rotating?.id ?? ''} />
 		<div class="flex flex-col gap-4">
+			<FormErrors message={formError || undefined} />
 			<Alert tone="warn">
 				The old token stops working the moment this one is stored. Provisioning fails until
 				the directory is updated with the new one.

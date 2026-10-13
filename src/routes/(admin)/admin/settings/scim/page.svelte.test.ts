@@ -137,3 +137,20 @@ describe('the role', () => {
 		expect(screen.queryByLabelText('Delete Azure AD')).toBeNull();
 	});
 });
+
+describe('the drawers', () => {
+	it('shows a refused create inside the open drawer', async () => {
+		render(ScimPage, { props: props({}, { error: 'The connection could not be created.' }) });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		const form = document.body.querySelector('form#scim-connection-form');
+		expect(form?.textContent).toContain('The connection could not be created.');
+	});
+
+	it('shows a refused rotation inside the open drawer', async () => {
+		render(ScimPage, { props: props({}, { error: 'The token could not be rotated.' }) });
+		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
+		const form = document.body.querySelector('form#scim-rotate-form');
+		expect(form?.textContent).toContain('The token could not be rotated.');
+	});
+
+});

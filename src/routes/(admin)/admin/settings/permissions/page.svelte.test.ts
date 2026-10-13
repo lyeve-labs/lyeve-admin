@@ -657,6 +657,21 @@ describe('permissions page drawers', () => {
 		});
 	}
 
+	it('shows a refused rule save inside the open rule drawer', async () => {
+		const { container, getAllByRole } = setupWith({ error: 'The rule could not be saved.' });
+		const edit = getAllByRole('button').find((b) => b.getAttribute('aria-label')?.startsWith('Edit rule'));
+		await fireEvent.click(edit!);
+		const ruleForm = container.ownerDocument.querySelector('form#rule-form');
+		expect(ruleForm?.textContent).toContain('The rule could not be saved.');
+	});
+
+	it('shows a refused role inside the open role drawer', async () => {
+		const { container, getAllByRole } = setupWith({ error: 'The rule could not be saved.' });
+		await fireEvent.click(getAllByRole('button').find((b) => b.textContent?.includes('New role'))!);
+		const roleForm = container.ownerDocument.querySelector('form#role-form');
+		expect(roleForm?.textContent).toContain('The rule could not be saved.');
+	});
+
 	it('says in the new rule form that the flows could not be read', async () => {
 		const { container, getAllByRole } = setupWith(null, { flowsFailed: true });
 		const add = getAllByRole('button').find((b) => b.getAttribute('aria-label') === 'Add a schema rule for editor');

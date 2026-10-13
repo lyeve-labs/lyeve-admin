@@ -26,6 +26,7 @@
 	import { tracked } from '$lib/forms.svelte';
 	import { KeyRound, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
@@ -241,9 +242,6 @@
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${providerLabel(editing.name)}` : 'New provider'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
@@ -251,6 +249,9 @@
 		use:enhance={saveProviderSubmit.enhance}
 		class="flex flex-col gap-4"
 	>
+		<!-- A refused save keeps the drawer open, so the reason has to be in it
+		     and not behind the panel on the page. -->
+		<FormErrors message={formError || undefined} refused={pageRefusal} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input
 			id="provider-name"
