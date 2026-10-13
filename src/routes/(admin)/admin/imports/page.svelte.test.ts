@@ -131,11 +131,13 @@ describe('Imports rollback by role', () => {
 		expect(container.querySelector('[aria-label^="Roll back"]')).not.toBeNull();
 	});
 
-	it('withholds the rollback from an admin, whom the page refuses it', () => {
+	// The engine takes a rollback from any admin, so the admin who ran a bad
+	// import can undo it.
+	it('offers a rollback to an admin', () => {
 		const { container } = render(ImportsPage, {
 			props: props({ jobs: [rolled], user: { id: 'u2', roles: ['admin'] } }),
 		});
-		expect(container.querySelector('[aria-label^="Roll back"]')).toBeNull();
+		expect(container.querySelector('[aria-label^="Roll back"]')).not.toBeNull();
 	});
 });
 

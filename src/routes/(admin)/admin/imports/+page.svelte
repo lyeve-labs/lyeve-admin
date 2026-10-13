@@ -87,9 +87,6 @@
 	const refusal = $derived(failure && !inDrawer ? formRefusal(failure) : null);
 	const templateError = $derived(inDrawer ? String(failure?.error ?? '') : '');
 	const templateRefusal = $derived(inDrawer ? formRefusal(failure) : null);
-	// The page takes a rollback from a super admin only, so no other role is
-	// offered one.
-	const canRollback = $derived(data.user.roles.includes('super_admin'));
 	// Null while the content types are unread, so each place that offers one
 	// says why it offers none.
 	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
@@ -496,7 +493,7 @@
 												</Button>
 											</form>
 										{/if}
-										{#if rollbackable(j) && canRollback}
+										{#if rollbackable(j)}
 											<form method="POST" action="?/rollback" use:enhance={rollback(j)}>
 												<input type="hidden" name="id" value={j.id} />
 												<Button variant="ghost" size="sm" type="submit" aria-label="Roll back the import of {j.source_name}">

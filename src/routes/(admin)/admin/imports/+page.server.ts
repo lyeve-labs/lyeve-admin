@@ -234,9 +234,10 @@ export const actions: Actions = {
 
 	// Removes the entries the job created. Offered only where there is one to
 	// remove, since a dry run wrote nothing and a rollback of one would be a
-	// no-op dressed as a repair.
+	// no-op dressed as a repair. The engine takes it from any admin, so the
+	// admin who ran a bad import can undo it.
 	rollback: async (event) => {
-		await requireRole(event, ['super_admin']);
+		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');

@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
 	getJob: vi.fn(),
 	listRows: vi.fn(),
 	listTemplates: vi.fn(),
+	rollbackJob: vi.fn(),
 	createTemplate: vi.fn(),
 	updateTemplate: vi.fn(),
 	deleteTemplate: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('$lib/server/authz', () => ({
 }));
 
 import { load, actions } from './+page.server';
+import { requireRole } from '$lib/server/authz';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
@@ -113,6 +115,16 @@ describe('imports load keeps failed reads apart from empty ones', () => {
 			status: 307,
 			location: '/admin/imports?offset=25',
 		});
+	});
+});
+
+describe('rollback', () => {
+	// The engine admits any admin to the rollback route, so the console asks
+	// for no more than that.
+	it('takes a rollback from an admin', async () => {
+		api.rollbackJob.mockResolvedValue(undefined);
+		expect(await actions.rollback(formEvent({ id: 'j1' }))).toEqual({ rolledBack: 'j1' });
+		expect(requireRole).toHaveBeenCalledWith(expect.anything(), ['admin', 'super_admin']);
 	});
 });
 
