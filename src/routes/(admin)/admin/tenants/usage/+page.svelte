@@ -51,9 +51,18 @@
 		data.user?.roles?.includes('super_admin') ? { href: '/admin/tenants', label: 'Tenants' } : undefined,
 	);
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const errors = $derived(fieldErrors(form));
-	const refused = $derived(formRefusal(form));
+	/*
+	 * Each failure names the action that caused it. The quota drawer shows only
+	 * its own failures, and only one that came back after it was opened, so a
+	 * failed review never reads as a failure of the form opened next. The rest
+	 * show above the tables.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const inDrawer = $derived((form as Failure)?.action === 'quota');
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
+	const errors = $derived(fieldErrors(drawerForm));
 
 	// One drawer for a new quota and an existing one.
 	let editorOpen = $state(false);
@@ -70,6 +79,7 @@
 	const saveQuota = submitter(() => (editorOpen = false));
 
 	function openQuota(q: Quota | null) {
+		openedOver = form;
 		editing = q;
 		tenantId = q?.tenant_id ?? '';
 		requestsLimit = q?.requests_limit ?? 0;
@@ -151,9 +161,7 @@
 			absent="The usage plugin is not part of this build, so nothing is metered or capped."
 		/>
 	{:else}
-		{#if !editorOpen}
-			<FormErrors message={formError || undefined} {refused} />
-		{/if}
+		<FormErrors message={(pageForm as Failure)?.error || undefined} refused={formRefusal(pageForm)} />
 		{#if form && 'quotaSaved' in form}
 			<Alert tone="success" autoDismiss>Quota saved for {form.quotaSaved}.</Alert>
 		{:else if form && 'quotaCleared' in form}
@@ -378,7 +386,11 @@
 
 <Drawer bind:open={editorOpen} title={editing ? `Quota for ${editing.tenant_id}` : 'New quota'}>
 	<form method="POST" action="?/quota" id="quota-form" use:enhance={saveQuota.enhance} class="flex flex-col gap-4">
-		<FormErrors message={formError || undefined} fields={errors} {refused} />
+		<FormErrors
+			message={(drawerForm as Failure)?.error || undefined}
+			fields={errors}
+			refused={formRefusal(drawerForm)}
+		/>
 		{#if editing}
 			<input type="hidden" name="tenant_id" value={editing.tenant_id} />
 		{:else}

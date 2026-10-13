@@ -198,6 +198,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { slug: 'Slug is required' },
 			},
@@ -210,6 +211,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { slug: 'Slug is required', name: 'Display name is required' },
 			},

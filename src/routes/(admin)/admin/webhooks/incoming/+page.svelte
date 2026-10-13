@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -22,7 +22,7 @@
 	import type { PageData, ActionData } from './$types';
 	import type { IncomingWebhook } from '@lyeve-labs/client';
 	import { enhance } from '$app/forms';
-	import { submitter } from '$lib/forms.svelte';
+	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import { Plus, Pencil, Trash2, ArrowDownToLine } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -30,7 +30,19 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * Each failure names the action that caused it. The drawer shows only its
+	 * own writes' failures, and only one that came back after it was opened, so
+	 * a failed delete never reads as a failure of the form opened next. The
+	 * rest show above the list.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
 
 	const submit = submitter(() => (open = false));
 
@@ -58,6 +70,7 @@
 	);
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		name = '';
 		schema = schemaNames[0] ?? '';
@@ -69,6 +82,7 @@
 	}
 
 	function openEdit(wh: IncomingWebhook) {
+		openedOver = form;
 		editing = wh;
 		name = wh.name;
 		schema = wh.schema_name;
@@ -130,13 +144,7 @@
 		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if form && 'error' in form && form.error}
-		<Alert tone="danger">
-			{#snippet children()}{form.error}{/snippet}
-		</Alert>
-	{/if}
+	<FormErrors message={(pageForm as Failure)?.error || undefined} refused={formRefusal(pageForm)} />
 
 	{#if data.incomingWebhooks.ok && !isSuperAdmin}
 		<Alert tone="brand">Your role reads incoming webhooks. Creating, changing or deleting one takes a super admin.</Alert>
@@ -235,9 +243,6 @@
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New incoming webhook'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
@@ -245,6 +250,11 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors
+			message={(drawerForm as Failure)?.error || undefined}
+			fields={fieldErrors(drawerForm)}
+			refused={formRefusal(drawerForm)}
+		/>
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input id="incoming-name" name="name" label="Name" required bind:value={name} placeholder="Stripe events" />
 		{#if !data.schemas.ok}

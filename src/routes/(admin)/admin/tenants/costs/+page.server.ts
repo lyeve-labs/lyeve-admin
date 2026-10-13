@@ -97,11 +97,13 @@ export const actions: Actions = {
 	createBudget: async (event) => {
 		await requireRole(event, OPERATOR_ROLES);
 		const parsed = parseBudget(await event.request.formData());
-		if ('error' in parsed) return fail(400, { form: 'budget', error: parsed.error, locked: false });
+		// The drawer shows a failure tagged as its own, and the list shows the
+		// rest, so a failed delete never reads as a failure of a new budget.
+		if ('error' in parsed) return fail(400, { form: 'budget-new', error: parsed.error, locked: false });
 		try {
 			await createBudget(authedClient(event), parsed.budget);
 		} catch (err) {
-			return refusal('budget', err, 'Failed to create the budget.');
+			return refusal('budget-new', err, 'Failed to create the budget.');
 		}
 		return { form: 'budget', saved: true };
 	},

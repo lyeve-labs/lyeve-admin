@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, type ActionFailure } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import {
 	getSchemas,
@@ -37,6 +37,15 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	return { incomingWebhooks, schemas };
 };
 
+/**
+ * A failure that names the action it came from. The page holds one result for
+ * every form, so the drawer shows only its own writes' failures and the page
+ * shows the rest.
+ */
+function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
+	return fail(failure.status, { ...failure.data, action });
+}
+
 export const actions: Actions = {
 	create: async (event) => {
 		// The plugin serves this write to a super admin only.
@@ -50,13 +59,14 @@ export const actions: Actions = {
 		try {
 			fieldMap = JSON.parse(rawMap);
 		} catch {
-			return fail(400, { error: 'Field map must be valid JSON.' });
+			return fail(400, { action: 'create', error: 'Field map must be valid JSON.' });
 		}
 		// The engine refuses an empty map: every external key has to be mapped to a
 		// schema field explicitly. Catch it here so the operator is told before the
 		// round trip, and so the default value in the form is never silently wrong.
 		if (Object.keys(fieldMap).length === 0) {
 			return fail(400, {
+				action: 'create',
 				error: 'Field map must connect at least one external key to a schema field.',
 			});
 		}
@@ -74,7 +84,7 @@ export const actions: Actions = {
 				client
 			);
 		} catch (err) {
-			return actionFailure(err, 'Failed to create incoming webhook');
+			return tagged('create', actionFailure(err, 'Failed to create incoming webhook'));
 		}
 	},
 
@@ -91,13 +101,14 @@ export const actions: Actions = {
 		try {
 			fieldMap = JSON.parse(rawMap);
 		} catch {
-			return fail(400, { error: 'Field map must be valid JSON.' });
+			return fail(400, { action: 'update', error: 'Field map must be valid JSON.' });
 		}
 		// The engine refuses an empty map: every external key has to be mapped to a
 		// schema field explicitly. Catch it here so the operator is told before the
 		// round trip, and so the default value in the form is never silently wrong.
 		if (Object.keys(fieldMap).length === 0) {
 			return fail(400, {
+				action: 'update',
 				error: 'Field map must connect at least one external key to a schema field.',
 			});
 		}
@@ -116,7 +127,7 @@ export const actions: Actions = {
 				client
 			);
 		} catch (err) {
-			return actionFailure(err, 'Failed to update incoming webhook');
+			return tagged('update', actionFailure(err, 'Failed to update incoming webhook'));
 		}
 	},
 
@@ -131,7 +142,7 @@ export const actions: Actions = {
 		try {
 			await deleteIncomingWebhook(id, client);
 		} catch (err) {
-			return actionFailure(err, 'Failed to delete incoming webhook');
+			return tagged('delete', actionFailure(err, 'Failed to delete incoming webhook'));
 		}
 	}
 };

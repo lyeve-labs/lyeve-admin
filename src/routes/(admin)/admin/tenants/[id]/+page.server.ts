@@ -83,15 +83,15 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '').trim();
 		const userId = String(form.get('user_id') ?? '').trim();
 		const roles = form.getAll('roles').map(String).filter(Boolean);
-		if (!userId && !email) return fail(400, { memberError: 'Name the account by its email.', fields: { email: 'Required' } });
-		if (roles.length === 0) return fail(400, { memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
+		if (!userId && !email) return fail(400, { action: 'grant', memberError: 'Name the account by its email.', fields: { email: 'Required' } });
+		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
 		const client = authedClient(event);
 		try {
 			let id = userId;
 			if (!id) {
 				const found = await findUserByEmail(client, email);
 				if (!found) {
-					return fail(404, { memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
+					return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
 				}
 				id = found.id;
 			}
@@ -99,8 +99,8 @@ export const actions: Actions = {
 			return { memberSaved: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { memberError: full });
-			return fail(400, { memberError: actionError(err, 'The membership could not be saved.') });
+			if (full) return fail(402, { action: 'grant', memberError: full });
+			return fail(400, { action: 'grant', memberError: actionError(err, 'The membership could not be saved.') });
 		}
 	},
 
@@ -112,7 +112,7 @@ export const actions: Actions = {
 			await revokeMembership(authedClient(event), userId, await tenantSlug(event));
 			return { memberRevoked: true };
 		} catch (err) {
-			return fail(400, { memberError: actionError(err, 'The membership could not be removed.') });
+			return fail(400, { action: 'revoke', memberError: actionError(err, 'The membership could not be removed.') });
 		}
 	},
 

@@ -22,6 +22,7 @@
 	import type { ActionData, PageData } from './$types';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { BUDGET_PERIODS, RESOURCE_TYPES, type Price, type ResourceType, costShares } from '$lib/api/cost';
 	import { formatDate, formatDateTime, NO_VALUE } from '$lib/format';
@@ -87,7 +88,12 @@
 	let budgetEnd = $state('');
 	let submitting = $state<string | null>(null);
 
+	// The result a drawer opened over is an older write's, never its own.
+	let openedOver = $state.raw<unknown>(null);
+	const budgetFailure = $derived(failure?.form === 'budget-new' && form !== openedOver ? failure : null);
+
 	function openCreate() {
+		openedOver = form;
 		const now = new Date();
 		const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 		const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
@@ -446,6 +452,7 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors message={budgetFailure?.message} />
 		<input type="hidden" name="period_start" value={budgetStart} />
 		<input type="hidden" name="period_end" value={budgetEnd} />
 		<Input id="budget-name" name="name" label="Name" required bind:value={budgetName} placeholder="Q4 storage" />

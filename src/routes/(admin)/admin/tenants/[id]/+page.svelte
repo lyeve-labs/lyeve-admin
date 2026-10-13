@@ -22,6 +22,8 @@
 	import { formatDate } from '$lib/format';
 	import type { TenantMember } from '$lib/api/tenant-access';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import { fieldErrors } from '$lib/forms.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -52,7 +54,22 @@
 	let memberRoles = $state<string[]>(['editor']);
 	let savingMember = $state(false);
 
+	/*
+	 * A grant and a removal both answer in memberError, and each names its
+	 * action. The drawer shows only a failed grant that came back after it was
+	 * opened, so a failed removal never reads as a failure of the form opened
+	 * next. A failed removal shows above the members.
+	 */
+	type MemberFailure = { action?: string; memberError?: string; fields?: Record<string, string> } | null;
+	let openedOver = $state.raw<unknown>(null);
+	const memberFailure = $derived(form as MemberFailure);
+	const grantError = $derived(
+		memberFailure?.action === 'grant' && form !== openedOver ? memberFailure.memberError : undefined,
+	);
+	const revokeError = $derived(memberFailure?.action === 'revoke' ? memberFailure.memberError : undefined);
+
 	function openNewMember() {
+		openedOver = form;
 		editingMember = null;
 		memberEmail = '';
 		memberRoles = ['editor'];
@@ -60,6 +77,7 @@
 	}
 
 	function openEditMember(m: TenantMember) {
+		openedOver = form;
 		editingMember = m;
 		memberEmail = m.email;
 		memberRoles = m.roles.filter((r) => r !== 'super_admin');
@@ -177,8 +195,8 @@
 				<Button variant="secondary" onclick={openNewMember}>New member</Button>
 			{/if}
 		</div>
-		{#if form?.memberError && !memberOpen}
-			<Alert tone="danger">{form.memberError}</Alert>
+		{#if revokeError}
+			<Alert tone="danger">{revokeError}</Alert>
 		{/if}
 		{#if !data.members.ok}
 			<GateNotice
@@ -243,9 +261,7 @@
 
 <Drawer bind:open={memberOpen} title={editingMember ? `Roles for ${editingMember.email}` : 'New member'}>
 	<form method="post" action="?/grant" id="member-form" use:enhance={saveMember} class="flex flex-col gap-4">
-		{#if form?.memberError && memberOpen}
-			<Alert tone="danger">{form.memberError}</Alert>
-		{/if}
+		<FormErrors message={grantError} fields={grantError ? fieldErrors(form) : {}} />
 		{#if editingMember}
 			<input type="hidden" name="user_id" value={editingMember.id} />
 			<Input id="member-email" label="Account" value={memberEmail} disabled />

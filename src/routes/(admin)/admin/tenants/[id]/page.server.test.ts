@@ -155,6 +155,7 @@ describe('admin/tenants/[id] grant action', () => {
 		expect(result).toEqual({
 			status: 402,
 			data: {
+				action: 'grant',
 				memberError:
 					'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.',
 			},

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -83,5 +83,30 @@ describe('Quotas when the usage could not be read', () => {
 		cleanup();
 		const answered = render(UsagePage, { props: props({ quotas: [quota], quotaTotal: 1, usageRead: true }) });
 		expect(said(answered.container)).not.toContain('could not be read');
+	});
+});
+
+/*
+ * Every form on the page shares one action result. A drawer that read it
+ * whole showed a failed review in the next New quota form as if that form had
+ * failed.
+ */
+describe('the quota drawer and the failures of other actions', () => {
+	const drawerText = () => document.body.querySelector('form#quota-form')?.textContent ?? '';
+
+	it('leaves a newly opened quota drawer clean after a failed review', async () => {
+		const { container, getAllByRole } = render(UsagePage, {
+			props: { ...props(), form: { action: 'review', error: 'The request could not be reviewed.' } as never },
+		});
+		expect(said(container)).toContain('The request could not be reviewed.');
+		await fireEvent.click(getAllByRole('button', { name: /new quota/i })[0]);
+		expect(drawerText()).not.toContain('could not be reviewed');
+	});
+
+	it('shows a failed save inside the open drawer', async () => {
+		const { getAllByRole, rerender } = render(UsagePage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new quota/i })[0]);
+		await rerender({ ...props(), form: { action: 'quota', error: 'The quota could not be saved.' } as never });
+		expect(drawerText()).toContain('The quota could not be saved.');
 	});
 });

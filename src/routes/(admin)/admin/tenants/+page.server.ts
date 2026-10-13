@@ -80,12 +80,12 @@ export const actions: Actions = {
 		if (!slug) fields.slug = 'Slug is required';
 		if (!name) fields.name = 'Display name is required';
 		if (Object.keys(fields).length > 0) {
-			return fail(400, { error: 'Check the highlighted fields.', fields });
+			return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields });
 		}
 		try {
 			await createTenant({ slug, name, plan: plan || undefined }, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to create tenant') });
+			return fail(400, { action: 'create', error: actionError(err, 'Failed to create tenant') });
 		}
 	},
 
@@ -97,11 +97,11 @@ export const actions: Actions = {
 		const id = String(data.get('id') ?? '');
 		const name = String(data.get('name') ?? '').trim();
 		const plan = String(data.get('plan') ?? '').trim();
-		if (!name) return fail(400, { error: 'Check the highlighted fields.', fields: { name: 'Display name is required' } });
+		if (!name) return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { name: 'Display name is required' } });
 		try {
 			await updateTenant(id, { name, plan: plan || undefined }, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to update tenant') });
+			return fail(400, { action: 'update', error: actionError(err, 'Failed to update tenant') });
 		}
 	},
 
@@ -115,7 +115,7 @@ export const actions: Actions = {
 		try {
 			await updateTenant(id, { enabled: !enabled }, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to toggle tenant') });
+			return fail(400, { action: 'toggle', error: actionError(err, 'Failed to toggle tenant') });
 		}
 	},
 
@@ -128,7 +128,7 @@ export const actions: Actions = {
 		try {
 			await deleteTenant(id, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete tenant') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete tenant') });
 		}
 	},
 };

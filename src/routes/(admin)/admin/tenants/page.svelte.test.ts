@@ -172,3 +172,30 @@ describe('Tenants when the list could not be read', () => {
 		expect(container.querySelector('table')).toBeNull();
 	});
 });
+
+/*
+ * Every form on the page shares one action result. A drawer that read it
+ * whole showed a failed delete in the next New tenant form as if that form
+ * had failed.
+ */
+describe('the tenant drawer and the failures of other actions', () => {
+	const drawerText = () => document.body.querySelector('form#tenant-form')?.textContent ?? '';
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container, getAllByRole } = render(TenantsPage, {
+			props: { data: data() as never, form: { action: 'delete', error: 'Failed to delete tenant' } as never },
+		});
+		expect(container.textContent).toContain('Failed to delete tenant');
+		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
+		expect(drawerText()).not.toContain('Failed to delete tenant');
+	});
+
+	it('shows a failed save inside the open drawer and not above the list', async () => {
+		const { container, getAllByRole, rerender } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
+		await rerender({ data: data() as never, form: { action: 'create', error: 'Failed to create tenant' } as never });
+		expect(drawerText()).toContain('Failed to create tenant');
+		const outside = container.textContent?.replace(drawerText(), '') ?? '';
+		expect(outside).not.toContain('Failed to create tenant');
+	});
+});

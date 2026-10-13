@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -68,5 +68,37 @@ describe('the incoming webhook controls by role', () => {
 		expect(getByRole('button', { name: /new incoming webhook/i })).toBeTruthy();
 		expect(getByRole('button', { name: 'Edit Stripe' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Delete Stripe' })).toBeTruthy();
+	});
+});
+
+/*
+ * Every form on the page shares one action result. A drawer that read it
+ * whole showed a failed delete in the next form opened as if that form had
+ * failed.
+ */
+describe('the incoming webhook drawer and the failures of other actions', () => {
+	const drawerText = () => document.body.querySelector('form#incoming-form')?.textContent ?? '';
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container, getByRole } = setup({}, { action: 'delete', error: 'Failed to delete incoming webhook' });
+		expect(container.textContent).toContain('Failed to delete incoming webhook');
+		await fireEvent.click(getByRole('button', { name: /new incoming webhook/i }));
+		expect(drawerText()).not.toContain('Failed to delete incoming webhook');
+	});
+
+	it('shows a failed save inside the open drawer, first in its form', async () => {
+		const { getByRole, rerender } = setup();
+		await fireEvent.click(getByRole('button', { name: 'Edit Stripe' }));
+		await rerender({
+			data: {
+				incomingWebhooks: { ok: true, value: [stripe] },
+				schemas: { ok: true, value: [{ name: 'orders' }] },
+				entitlements,
+				user: { roles: ['super_admin'] },
+			},
+			form: { action: 'update', error: 'Field map must be valid JSON.' },
+		} as never);
+		const form = document.body.querySelector('form#incoming-form') as HTMLFormElement;
+		expect(form.firstElementChild?.textContent).toContain('Field map must be valid JSON.');
 	});
 });

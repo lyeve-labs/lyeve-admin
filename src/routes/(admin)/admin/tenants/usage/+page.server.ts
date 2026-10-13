@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, type ActionFailure } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -100,6 +100,15 @@ export const load: PageServerLoad = async (event) => {
 	};
 };
 
+/**
+ * A failure that names the action it came from. The page holds one result for
+ * every form, so the quota drawer shows only its own failures and the page
+ * shows the rest.
+ */
+function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
+	return fail(failure.status, { ...failure.data, action });
+}
+
 export const actions: Actions = {
 	review: async (event) => {
 		await requireRole(event, ['super_admin']);
@@ -107,14 +116,14 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const decision = String(form.get('decision') ?? '');
-		if (!id) return fail(400, { error: 'No request was named.' });
+		if (!id) return fail(400, { action: 'review', error: 'No request was named.' });
 		if (decision !== 'approve' && decision !== 'deny') {
-			return fail(400, { error: 'A review is either an approval or a denial.' });
+			return fail(400, { action: 'review', error: 'A review is either an approval or a denial.' });
 		}
 		try {
 			await reviewRequest(client, id, decision === 'approve', String(form.get('note') ?? ''));
 		} catch (err) {
-			return actionFailure(err, 'The request could not be reviewed.');
+			return tagged('review', actionFailure(err, 'The request could not be reviewed.'));
 		}
 		return { reviewed: id };
 	},
@@ -124,12 +133,12 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const tenant = String(form.get('tenant_id') ?? '').trim();
 		if (!tenant) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { tenant_id: 'Tenant is required' } });
+			return fail(400, { action: 'quota', error: 'Check the highlighted fields.', fields: { tenant_id: 'Tenant is required' } });
 		}
 		try {
 			await upsertQuota(authedClient(event), tenant, quotaFrom(form));
 		} catch (err) {
-			return actionFailure(err, 'The quota could not be saved.');
+			return tagged('quota', actionFailure(err, 'The quota could not be saved.'));
 		}
 		return { quotaSaved: tenant };
 	},
@@ -138,11 +147,11 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const form = await event.request.formData();
 		const tenant = String(form.get('tenant_id') ?? '').trim();
-		if (!tenant) return fail(400, { error: 'No tenant was named.' });
+		if (!tenant) return fail(400, { action: 'clearQuota', error: 'No tenant was named.' });
 		try {
 			await deleteQuota(authedClient(event), tenant);
 		} catch (err) {
-			return actionFailure(err, 'The quota could not be removed.');
+			return tagged('clearQuota', actionFailure(err, 'The quota could not be removed.'));
 		}
 		return { quotaCleared: tenant };
 	},

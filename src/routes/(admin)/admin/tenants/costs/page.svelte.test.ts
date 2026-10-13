@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PageData } from './$types';
 
@@ -165,5 +165,29 @@ describe('tenant cost prices that are not known', () => {
 		expect((database.querySelector('#price-database-currency') as HTMLInputElement).value).toBe('');
 		const compute = screen.getByRole('form', { name: 'Price for Compute' });
 		expect((compute.querySelector('#price-compute-unit') as HTMLInputElement).value).toBe('1.00');
+	});
+});
+
+/*
+ * Every form on the page shares one action result. The budget drawer showed
+ * nothing of a failed create, and a failed delete is no failure of the next
+ * budget opened.
+ */
+describe('the budget drawer and the failures of other actions', () => {
+	const drawerText = () => document.body.querySelector('form#budget-form')?.textContent ?? '';
+
+	it('leaves a newly opened budget drawer clean after a failed delete', async () => {
+		render(CostsPage, { props: { data: data(), form: { form: 'budget', error: 'Failed to delete the budget.', locked: false } as never } });
+		expect(screen.getAllByText('Failed to delete the budget.')).toHaveLength(1);
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		expect(drawerText()).not.toContain('Failed to delete the budget.');
+	});
+
+	it('shows a failed create inside the open drawer, first in its form', async () => {
+		const { rerender } = render(CostsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		await rerender({ data: data(), form: { form: 'budget-new', error: 'The amount is a decimal.', locked: false } as never });
+		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
+		expect(form.firstElementChild?.textContent).toContain('The amount is a decimal.');
 	});
 });

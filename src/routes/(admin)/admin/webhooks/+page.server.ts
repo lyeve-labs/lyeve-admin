@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireRole, requireUser } from '$lib/server/authz';
 import type { DeadLetter, Webhook } from '@lyeve-labs/client';
@@ -68,18 +68,27 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	};
 };
 
+/**
+ * A failure that names the action it came from. The page holds one result for
+ * every form, so the drawer shows only its own writes' failures and the page
+ * shows the rest.
+ */
+function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
+	return fail(failure.status, { ...failure.data, action });
+}
+
 export const actions: Actions = {
 	create: async (event) => {
 		// The plugin serves this write to a super admin only.
 		await requireRole(event, ['super_admin']);
 		const parsed = webhookBodyFrom(await event.request.formData());
 		if ('error' in parsed) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
+			return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
 		}
 		try {
 			await createWebhookRecord(authedClient(event), parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to create webhook');
+			return tagged('create', actionFailure(err, 'Failed to create webhook'));
 		}
 	},
 
@@ -90,12 +99,12 @@ export const actions: Actions = {
 		const id = String(data.get('id') ?? '');
 		const parsed = webhookBodyFrom(data);
 		if ('error' in parsed) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
+			return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
 		}
 		try {
 			await updateWebhookRecord(authedClient(event), id, parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to update webhook');
+			return tagged('update', actionFailure(err, 'Failed to update webhook'));
 		}
 	},
 
@@ -110,7 +119,7 @@ export const actions: Actions = {
 		try {
 			await deleteWebhook(id, client);
 		} catch (err) {
-			return actionFailure(err, 'Failed to delete webhook');
+			return tagged('delete', actionFailure(err, 'Failed to delete webhook'));
 		}
 	},
 

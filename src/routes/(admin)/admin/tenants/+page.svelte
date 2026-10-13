@@ -36,7 +36,19 @@
 	// refused. Editing, disabling and deleting a tenant stay open either way.
 	const canProvision = $derived(data.canProvision);
 
-	const errors = $derived(fieldErrors(form));
+	/*
+	 * Each failure names the action that caused it. The drawer shows only its
+	 * own writes' failures, and only one that came back after it was opened, so
+	 * a failed delete never reads as a failure of the form opened next. The
+	 * rest show above the list.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
+	const errors = $derived(fieldErrors(drawerForm));
 
 	// One drawer for both writes: a null target is a new tenant.
 	let open = $state(false);
@@ -82,6 +94,7 @@
 	let plan = $state('');
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		slug = '';
 		name = '';
@@ -90,6 +103,7 @@
 	}
 
 	function openEdit(tenant: Tenant) {
+		openedOver = form;
 		editing = tenant;
 		slug = tenant.slug;
 		name = tenant.name;
@@ -163,7 +177,7 @@
 		{/if}
 	{/snippet}
 
-	<FormErrors message={form?.error} fields={errors} />
+	<FormErrors message={(pageForm as Failure)?.error || undefined} />
 
 	{#if data.tenants.ok && !canProvision}
 		<NotEnabled
@@ -301,7 +315,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New tenant'}>
 	<form method="post" action={editing ? '?/update' : '?/create'} id="tenant-form" use:enhance={saveTenantSubmit.enhance} class="flex flex-col gap-4">
-		<FormErrors message={form?.error} fields={errors} />
+		<FormErrors message={(drawerForm as Failure)?.error || undefined} fields={errors} />
 
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />

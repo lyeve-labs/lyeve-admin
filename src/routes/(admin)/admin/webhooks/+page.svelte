@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { filtersText, keptJSON, type WebhookRecord } from '$lib/api/webhook-options';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -51,7 +51,23 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * Each failure names the action that caused it. The drawer shows only its
+	 * own writes' failures, and only one that came back after it was opened, so
+	 * a failed delete never reads as a failure of the form opened next. The
+	 * rest show above the list.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
+	const drawerError = $derived((drawerForm as Failure)?.error || undefined);
+	const pageError = $derived((pageForm as Failure)?.error || undefined);
+	const drawerRefusal = $derived(formRefusal(drawerForm));
+	const pageRefusal = $derived(formRefusal(pageForm));
 
 	const submit = submitter(() => (open = false));
 
@@ -105,9 +121,10 @@
 		retryDelay = wh?.retry_delay_seconds != null ? String(wh.retry_delay_seconds) : '';
 		kept = keptJSON(wh);
 	}
-	const formErrors = $derived(fieldErrors(form));
+	const formErrors = $derived(fieldErrors(drawerForm));
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		name = '';
 		url = '';
@@ -120,6 +137,7 @@
 	}
 
 	function openEdit(wh: Webhook) {
+		openedOver = form;
 		editing = wh;
 		name = wh.name;
 		url = wh.url;
@@ -143,6 +161,7 @@
 		const draft = duplicateRow(wh as unknown as Record<string, unknown>, {
 			taken: rows.map((w) => w.name),
 		});
+		openedOver = form;
 		editing = null;
 		name = String(draft.name ?? wh.name);
 		url = wh.url;
@@ -314,13 +333,7 @@
 		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if form && 'error' in form && form.error}
-		<Alert tone="danger">
-			{#snippet children()}{form.error}{/snippet}
-		</Alert>
-	{/if}
+	<FormErrors message={pageError} refused={pageRefusal} />
 
 	{#if data.webhooks.ok && !isSuperAdmin}
 		<Alert tone="brand">Your role reads and tests webhooks. Creating, changing or deleting one takes a super admin.</Alert>
@@ -517,11 +530,7 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if form && 'error' in form && form.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={drawerError} fields={formErrors} refused={drawerRefusal} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="kept" value={kept} />
 		<Input id="webhook-name" name="name" label="Name" bind:value={name} placeholder="Slack notifier" required />

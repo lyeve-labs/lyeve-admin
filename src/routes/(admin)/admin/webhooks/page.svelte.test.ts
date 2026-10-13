@@ -149,3 +149,37 @@ describe('the webhook controls by role', () => {
 		expect(container.textContent).not.toContain('takes a super admin');
 	});
 });
+
+/*
+ * Every form on the page shares one action result. A drawer that read it
+ * whole showed a failed delete in the next New webhook form as if that form
+ * had failed.
+ */
+describe('the webhook drawer and the failures of other actions', () => {
+	const props = (form: unknown) =>
+		({
+			data: {
+				webhooks: { ok: true, value: [webhook] },
+				schemas: { ok: true, value: [] },
+				entitlements,
+				user: { roles: ['super_admin'] },
+			},
+			form,
+		}) as never;
+	const drawerText = () => document.body.querySelector('form#webhook-form')?.textContent ?? '';
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container, getByRole } = render(WebhooksPage, { props: props({ action: 'delete', error: 'Failed to delete webhook' }) });
+		expect(container.textContent).toContain('Failed to delete webhook');
+		await fireEvent.click(getByRole('button', { name: /new webhook/i }));
+		expect(drawerText()).not.toContain('Failed to delete webhook');
+	});
+
+	it('shows a failed save inside the open drawer, first in its form', async () => {
+		const { getByRole, rerender } = render(WebhooksPage, { props: props(null) });
+		await fireEvent.click(getByRole('button', { name: /new webhook/i }));
+		await rerender(props({ action: 'create', error: 'Failed to create webhook' }));
+		const form = document.body.querySelector('form#webhook-form') as HTMLFormElement;
+		expect(form.firstElementChild?.textContent).toContain('Failed to create webhook');
+	});
+});

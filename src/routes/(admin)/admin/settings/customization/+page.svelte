@@ -22,6 +22,7 @@
 	import { ICON } from '$lib/icon';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import BrandImageCard, { type ImageNotice } from './BrandImageCard.svelte';
 	import { accentShades, parseAccent, slugify, ROLE_CHOICES } from '$lib/api/customization';
 	import { formatDateTime } from '$lib/format';
@@ -97,6 +98,18 @@
 	let slugTouched = $state(false);
 	let pageRoles = $state<string[]>([]);
 	const suggestedSlug = $derived(slugTouched ? pageSlug : slugify(pageTitle));
+
+	// Each drawer reads only its own action's failure key. The result it was
+	// opened over is an older write's, so a reopened drawer starts clean.
+	let openedOver = $state.raw<unknown>(null);
+	function openLink() {
+		openedOver = form;
+		linkOpen = true;
+	}
+	function openPage() {
+		openedOver = form;
+		pageOpen = true;
+	}
 
 	const keep: SubmitFunction = () => async ({ update }) => update({ reset: false });
 
@@ -235,7 +248,7 @@
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-2">
 						<SectionHeading level={3}>Pages</SectionHeading>
-						<Button variant="secondary" size="sm" onclick={() => (pageOpen = true)}>
+						<Button variant="secondary" size="sm" onclick={openPage}>
 							<Plus size={ICON.sm} /> New page
 						</Button>
 					</div>
@@ -314,7 +327,7 @@
 			{#snippet header()}
 				<div class="flex items-center justify-between gap-2">
 					<SectionHeading level={3}>Links</SectionHeading>
-					<Button variant="secondary" size="sm" onclick={() => (linkOpen = true)}>
+					<Button variant="secondary" size="sm" onclick={openLink}>
 						<Plus size={ICON.sm} /> New link
 					</Button>
 				</div>
@@ -349,9 +362,7 @@
 
 <Drawer bind:open={linkOpen} title="New link">
 	<form method="POST" action="?/addLink" id="link-form" class="flex flex-col gap-4" use:enhance={closeOnSuccess(() => (linkOpen = false))}>
-		{#if form?.linkError && linkOpen}
-			<Alert tone="danger">{form.linkError}</Alert>
-		{/if}
+		<FormErrors message={form !== openedOver ? form?.linkError : undefined} fields={form !== openedOver && form?.linkError ? fields : {}} />
 		<Input id="link-label" name="label" label="Label" required error={fields.label} />
 		<Input id="link-url" name="url" label="Address" mono required placeholder="https://" hint="An https URL, or an admin path such as /admin/media." error={fields.url} />
 		<CheckboxGroup name="roles" label="Seen by" hint="Leave empty for everyone." options={roleOptions} bind:value={linkRoles} />
@@ -364,9 +375,7 @@
 
 <Drawer bind:open={pageOpen} title="New page">
 	<form method="POST" action="?/createPage" id="page-form" class="flex flex-col gap-4" use:enhance>
-		{#if form?.pageError && pageOpen}
-			<Alert tone="danger">{form.pageError}</Alert>
-		{/if}
+		<FormErrors message={form !== openedOver ? form?.pageError : undefined} fields={form !== openedOver && form?.pageError ? fields : {}} />
 		<Input id="page-title" name="title" label="Title" required bind:value={pageTitle} error={fields.title} />
 		<Input
 			id="page-slug"
