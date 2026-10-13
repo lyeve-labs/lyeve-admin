@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 function data(overrides: Record<string, unknown> = {}) {
 	return {
-		schemas: [{ name: 'post', display_name: 'Post', fields: [] }],
+		schemas: { ok: true, value: [{ name: 'post', display_name: 'Post', fields: [] }] },
 		isAdmin: true,
 		offers: { schema: true, content: true, analytics: true, jobs: true, logs: true, webhooks: true, audit: true },
 		entries: [],
@@ -29,7 +29,15 @@ function data(overrides: Record<string, unknown> = {}) {
 	} as never;
 }
 
-const empty = data({ schemas: [], entryTotal: null });
+const empty = data({ schemas: { ok: true, value: [] }, entryTotal: null });
+
+/** Every tile read and answered, with nothing wrong. */
+const quiet = {
+	requests: { total: 10, errorRate: 0, p95: 5 },
+	jobs: { enabled: 1, failed: [] },
+	errorsLogged: 0,
+	webhooks: { total: 1, unhealthy: 0, pendingDlq: 0 },
+};
 
 /*
  * The migration control sits in the shell header on every screen and posts to
@@ -94,7 +102,7 @@ describe('dashboard tiles', () => {
 
 	it('draws no tile and no list for a plugin that does not run', () => {
 		const none = { schema: false, content: false, analytics: false, jobs: false, logs: false, webhooks: false, audit: false };
-		const { container } = render(DashboardPage, { props: { data: data({ schemas: [], offers: none }), form: null } });
+		const { container } = render(DashboardPage, { props: { data: data({ schemas: null, offers: none }), form: null } });
 
 		const text = container.textContent ?? '';
 		for (const gone of ['Collections', 'Entries', 'Requests, 24h', 'Failed jobs', 'Errors logged', 'Webhooks failing', 'What changed', 'No schemas yet']) {
@@ -126,6 +134,41 @@ describe('dashboard tiles', () => {
 		expect(text).not.toContain('Requests, 24h');
 		expect(text).not.toContain('Recent audit entries');
 		expect(text).toContain('Recent entries');
+	});
+
+	it('keeps the dashboard and says unknown when the schemas could not be read', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+
+		const text = container.textContent ?? '';
+		expect(text).not.toContain('No schemas yet');
+		expect(text).toContain('Right now');
+		expect(text).toContain('schemas unavailable');
+	});
+
+	it('says each list could not be read rather than that it is empty', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ entries: null, audit: null, deadLetters: null, errors: null }), form: null },
+		});
+
+		const text = container.textContent ?? '';
+		expect(text).toContain('The recent entries could not be read.');
+		expect(text).toContain('The audit log could not be read.');
+		expect(text).toContain('The dead letter queue could not be read.');
+		expect(text).toContain('The log could not be read.');
+		expect(text).not.toContain('No entries yet.');
+		expect(text).not.toContain('No delivery is waiting');
+	});
+
+	it('says each list is empty when its read answered with nothing', () => {
+		const { container } = render(DashboardPage, { props: { data: data(), form: null } });
+
+		const text = container.textContent ?? '';
+		expect(text).toContain('No entries yet.');
+		expect(text).toContain('Nothing recorded yet.');
+		expect(text).toContain('No delivery is waiting in the dead letter queue.');
+		expect(text).toContain('No error has been logged in the last 24 hours.');
 	});
 
 	it('links each recent entry to its editor', () => {
@@ -180,9 +223,17 @@ describe('dashboard window', () => {
  */
 describe('needs attention', () => {
 	it('says so when nothing does', () => {
-		const { container } = render(DashboardPage, { props: { data: data(), form: null } });
+		const { container } = render(DashboardPage, { props: { data: data(quiet), form: null } });
 
 		expect(container.textContent).toContain('Nothing needs attention in the last 24 hours.');
+	});
+
+	it('does not call the instance quiet when a tile could not be read', () => {
+		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, jobs: null }), form: null } });
+
+		const text = container.textContent ?? '';
+		expect(text).not.toContain('Nothing needs attention in the last 24 hours.');
+		expect(text).toContain('Nothing needs attention in what could be read.');
 	});
 
 	it('lists each item with its link', () => {

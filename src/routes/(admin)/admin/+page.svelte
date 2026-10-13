@@ -41,13 +41,27 @@
 	const ms = (n: number) => `${formatCount(Math.round(n))} ms`;
 	const whenever = (ts: string | null | undefined) => (ts ? formatDateTime(ts, ts) : NO_VALUE);
 
+	const schemas = $derived(data.schemas?.ok ? data.schemas.value : null);
+
 	/** What the collections carry, from the list already in hand. */
 	const collectionsSub = $derived.by(() => {
-		const staged = data.schemas.filter((s) => s.with_draft_publish).length;
+		if (!schemas) return 'schemas unavailable';
+		const staged = schemas.filter((s) => s.with_draft_publish).length;
 		return staged > 0
 			? `${formatCount(staged)} with draft and publish`
 			: 'none with draft and publish';
 	});
+
+	/*
+	 * Whether a tile drawn above could not be read. Nothing needing attention
+	 * then covers only what was read, and the line says so.
+	 */
+	const unread = $derived(
+		(data.offers.analytics && !data.requests) ||
+			(data.offers.jobs && !data.jobs) ||
+			(data.offers.logs && data.errorsLogged === null) ||
+			(data.offers.webhooks && !data.webhooks)
+	);
 
 	const entriesSub = $derived(
 		data.entriesByStatus
@@ -106,7 +120,7 @@
 		{:else}
 			<DashboardWidgets widgets={data.composed} now={new Date(data.now)} />
 		{/if}
-	{:else if data.offers.schema && data.schemas.length === 0}
+	{:else if schemas && schemas.length === 0}
 		<EmptyState title="No schemas yet" description="A content type is the first thing to make.">
 			{#snippet action()}
 				<Button variant="secondary" href="/admin/schema">
@@ -121,7 +135,12 @@
 
 				<!-- The tiles say how many. This says which, and where to fix it. -->
 				<Card pad="none">
-					{#if data.attention.length === 0}
+					{#if data.attention.length === 0 && unread}
+						<p class="flex items-center gap-2 px-card py-card-sm text-sm text-muted">
+							<TriangleAlert size={ICON.md} class="shrink-0 text-warn" aria-hidden="true" />
+							Nothing needs attention in what could be read. A tile below says unknown where its read failed.
+						</p>
+					{:else if data.attention.length === 0}
 						<p class="flex items-center gap-2 px-card py-card-sm text-sm text-muted">
 							<CircleCheck size={ICON.md} class="shrink-0 text-success" aria-hidden="true" />
 							Nothing needs attention in the last {WINDOW_LABEL[data.window]}.
@@ -163,7 +182,7 @@
 							class="h-full"
 							label="Collections"
 							accent="neutral"
-							value={formatCount(data.schemas.length)}
+							value={schemas ? formatCount(schemas.length) : 'unknown'}
 							sub={collectionsSub}
 						/>
 					</a>
@@ -174,7 +193,7 @@
 							label="Entries"
 							accent="neutral"
 							value={data.entryTotal === null ? 'unknown' : formatCount(data.entryTotal)}
-							sub={entriesSub ?? 'across every collection'}
+							sub={data.entryTotal === null ? 'entries unavailable' : (entriesSub ?? 'across every collection')}
 						/>
 					</a>
 				{/if}
@@ -301,7 +320,9 @@
 									<a href="/admin/content" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">All collections</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.entries.length === 0}
+							{#if !data.entries}
+								<p class="mt-3 text-sm text-faint">The recent entries could not be read.</p>
+							{:else if data.entries.length === 0}
 								<p class="mt-3 text-sm text-muted">No entries yet.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
@@ -335,8 +356,10 @@
 									<a href="/admin/audit-log" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">Audit log</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.audit.length === 0}
-								<p class="mt-3 text-sm text-muted">Nothing recorded, or the audit log is unavailable.</p>
+							{#if !data.audit}
+								<p class="mt-3 text-sm text-faint">The audit log could not be read.</p>
+							{:else if data.audit.length === 0}
+								<p class="mt-3 text-sm text-muted">Nothing recorded yet.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
 									{#each data.audit as entry (entry.id)}
@@ -363,7 +386,9 @@
 									<a href="/admin/webhooks" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">Webhooks</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.deadLetters.length === 0}
+							{#if !data.deadLetters}
+								<p class="mt-3 text-sm text-faint">The dead letter queue could not be read.</p>
+							{:else if data.deadLetters.length === 0}
 								<p class="mt-3 text-sm text-muted">No delivery is waiting in the dead letter queue.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
@@ -395,8 +420,10 @@
 									<a href="/admin/logs?level=ERROR" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">Logs</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.errors.length === 0}
-								<p class="mt-3 text-sm text-muted">No error has been logged, or the log is unavailable.</p>
+							{#if !data.errors}
+								<p class="mt-3 text-sm text-faint">The log could not be read.</p>
+							{:else if data.errors.length === 0}
+								<p class="mt-3 text-sm text-muted">No error has been logged in the last {WINDOW_LABEL[data.window]}.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
 									{#each data.errors as entry, i (entry.timestamp + i)}
