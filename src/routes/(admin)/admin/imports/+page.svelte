@@ -77,14 +77,22 @@
 	/** How often the history re-reads while an import is still going. */
 	const POLL_MS = 2000;
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const refusal = $derived(formRefusal(form));
-	// Null while the content types are unread, so each place that offers one
-	// says why it offers none.
-	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action. The template drawer shows only its own, the page
+	// shows the rest, and a drawer opened after a failure starts clean.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(form && form !== setAside && 'error' in form ? form : null);
+	const inDrawer = $derived(failure?.action === 'saveTemplate');
+	const formError = $derived(failure && !inDrawer ? String(failure.error ?? '') : '');
+	const refusal = $derived(failure && !inDrawer ? formRefusal(failure) : null);
+	const templateError = $derived(inDrawer ? String(failure?.error ?? '') : '');
+	const templateRefusal = $derived(inDrawer ? formRefusal(failure) : null);
 	// The page takes a rollback from a super admin only, so no other role is
 	// offered one.
 	const canRollback = $derived(data.user.roles.includes('super_admin'));
+	// Null while the content types are unread, so each place that offers one
+	// says why it offers none.
+	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
 	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 	const running = $derived(data.jobs.filter(cancelable));
 	const rejecting = $derived(data.jobs.filter((j) => outcome(j) === 'partial' || outcome(j) === 'nothing'));
@@ -237,6 +245,7 @@
 		rows = [];
 		for (const m of t?.field_mappings ?? []) addRow(m.source_field, m.target_field, transformDraft(m));
 		if (rows.length === 0) addRow();
+		setAside = form;
 		templateOpen = true;
 	}
 
@@ -294,9 +303,7 @@
 			absent="The bulk import plugin is not part of this build, so content is created one entry at a time."
 		/>
 	{:else}
-		{#if templateOpen}
-			<!-- The open drawer shows the failure inside its own form. -->
-		{:else if refusal}
+		{#if refusal}
 			<RefusalNotice {refusal} />
 		{:else if formError}
 			<Alert tone="danger">{formError}</Alert>
@@ -610,7 +617,7 @@
 		{/if}
 		<input type="hidden" name="mappings" value={JSON.stringify(typeof templateMappings === 'string' ? [] : templateMappings)} />
 		<div class="flex flex-col gap-4">
-			<FormErrors message={formError || undefined} refused={refusal} />
+			<FormErrors message={templateError || undefined} refused={templateRefusal} />
 			<Input id="template-name" name="name" label="Name" bind:value={templateName} required />
 			<Select
 				id="template-type"

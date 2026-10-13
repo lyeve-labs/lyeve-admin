@@ -95,6 +95,19 @@
 		return `${schemas.slice(0, 2).join(', ')} and ${schemas.length - 2} more`;
 	}
 
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action and shown only where that action was made. A
+	// drawer opened after a failure starts clean: the result is set aside.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(
+		form && form !== setAside && 'error' in form ? (form as { action?: string; error?: string }) : null,
+	);
+	const startError = $derived(failure?.action === 'start' ? failure.error : undefined);
+	const scheduleError = $derived(failure?.action === 'createSchedule' ? failure.error : undefined);
+	const rowError = $derived(
+		failure && failure.action !== 'start' && failure.action !== 'createSchedule' ? failure.error : undefined,
+	);
+
 	// Start drawer.
 	let startOpen = $state(false);
 	let name = $state('');
@@ -112,6 +125,7 @@
 		includeSchemas = false;
 		includeMedia = false;
 		template = '';
+		setAside = form;
 		startOpen = true;
 	}
 	const start = submitter(() => (startOpen = false));
@@ -140,6 +154,7 @@
 		schIncludeSchemas = false;
 		schIncludeMedia = false;
 		schTemplate = '';
+		setAside = form;
 		scheduleOpen = true;
 	}
 	const createSchedule = submitter(() => (scheduleOpen = false));
@@ -182,9 +197,7 @@
 			absent="The data export plugin is not part of this build, so nothing can be exported from here."
 		/>
 	{:else}
-		{#if !startOpen && !scheduleOpen}
-			<FormErrors message={form?.error} />
-		{/if}
+		<FormErrors message={rowError} />
 		{#if form?.started}
 			<Alert tone="success" autoDismiss>
 				Export started. It runs in the background, and the list below follows it until it finishes.
@@ -447,7 +460,7 @@
 >
 	<form id="start-export-form" method="post" action="?/start" use:enhance={start.enhance}>
 		<div class="flex flex-col gap-4">
-			<FormErrors message={form?.error} />
+			<FormErrors message={startError} />
 			<Input id="export-name" name="name" label="Name" bind:value={name} required />
 			<ExportConfigFields
 				idPrefix="export"
@@ -474,7 +487,7 @@
 >
 	<form id="schedule-form" method="post" action="?/createSchedule" use:enhance={createSchedule.enhance}>
 		<div class="flex flex-col gap-4">
-			<FormErrors message={form?.error} />
+			<FormErrors message={scheduleError} />
 			<Input id="schedule-name" name="name" label="Name" bind:value={schName} required />
 			<Select
 				id="schedule-when"

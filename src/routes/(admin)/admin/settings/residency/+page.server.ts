@@ -85,11 +85,12 @@ export const actions: Actions = {
 
 		if (!slugIsSound(slug)) {
 			return fail(400, {
+				action: 'create',
 				error: 'A region slug is lower case letters, digits and hyphens, starting with a letter. It is copied onto every assignment, so it cannot be renamed later.',
 			});
 		}
-		if (!displayName) return fail(400, { error: 'Give the region a name a person can read.' });
-		if (!provider) return fail(400, { error: 'Name who runs it: aws, gcp, azure, on-prem.' });
+		if (!displayName) return fail(400, { action: 'create', error: 'Give the region a name a person can read.' });
+		if (!provider) return fail(400, { action: 'create', error: 'Name who runs it: aws, gcp, azure, on-prem.' });
 
 		try {
 			await createRegion(client, {
@@ -101,7 +102,7 @@ export const actions: Actions = {
 				is_default: form.get('is_default') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The region could not be created.') });
+			return fail(400, { action: 'create', error: actionError(err, 'The region could not be created.') });
 		}
 		return { saved: slug };
 	},
@@ -111,11 +112,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No region was named.' });
+		if (!id) return fail(400, { action: 'update', error: 'No region was named.' });
 
 		const displayName = String(form.get('display_name') ?? '').trim();
 		const provider = String(form.get('provider') ?? '').trim();
-		if (!displayName) return fail(400, { error: 'Give the region a name a person can read.' });
+		if (!displayName) return fail(400, { action: 'update', error: 'Give the region a name a person can read.' });
 
 		// The slug is deliberately not sent. It is denormalized onto every
 		// tenant assignment and onto the report, so changing it here would
@@ -129,7 +130,7 @@ export const actions: Actions = {
 				is_default: form.get('is_default') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The region could not be saved.') });
+			return fail(400, { action: 'update', error: actionError(err, 'The region could not be saved.') });
 		}
 		return { saved: displayName };
 	},
@@ -139,11 +140,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No region was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'No region was named.' });
 		try {
 			await deleteRegion(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The region could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The region could not be removed.') });
 		}
 		return { removed: id };
 	},

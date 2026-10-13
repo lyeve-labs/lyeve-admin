@@ -81,7 +81,7 @@ describe('mapping templates', () => {
 
 	it('renders a refused save through the refusal notice', () => {
 		render(ImportsPage, {
-			props: props({}, { error: 'x', refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } }),
+			props: props({}, { action: 'deleteTemplate', error: 'x', refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } }),
 		});
 		expect(screen.getAllByTestId('refusal-notice').length).toBeGreaterThan(0);
 	});

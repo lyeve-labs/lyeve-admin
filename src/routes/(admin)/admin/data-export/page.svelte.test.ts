@@ -214,3 +214,23 @@ describe('Data export filter on this page', () => {
 		}
 	});
 });
+
+describe('Data export failures stay where they were made', () => {
+	it('shows a failed row action on the page and opens the next drawer clean', async () => {
+		const { getAllByRole, container } = render(ExportPage, {
+			props: props({}, { action: 'cancel', error: 'The export could not be canceled.' }),
+		});
+		expect(said(container)).toContain('The export could not be canceled.');
+		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
+		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('could not be canceled');
+	});
+
+	it('keeps a refused schedule in its own drawer, not on the page or in the export drawer', async () => {
+		const { getAllByRole, container } = render(ExportPage, {
+			props: props({}, { action: 'createSchedule', error: 'Say when the schedule runs.' }),
+		});
+		expect(said(container)).not.toContain('Say when the schedule runs.');
+		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
+		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('Say when');
+	});
+});

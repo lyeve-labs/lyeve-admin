@@ -41,7 +41,19 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action and shown only where that action was made. A
+	// drawer opened after a failure starts clean: the result is set aside.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(
+		form && form !== setAside ? (form as { action?: string; error?: string }) : null,
+	);
+	const DRAWER_ACTIONS = ['createPolicy', 'createHold'];
+	const policyError = $derived(failure?.action === 'createPolicy' ? (failure.error ?? '') : '');
+	const holdError = $derived(failure?.action === 'createHold' ? (failure.error ?? '') : '');
+	const rowError = $derived(
+		failure?.action && !DRAWER_ACTIONS.includes(failure.action) ? (failure.error ?? '') : '',
+	);
 	const outcome = $derived((form as { enforced?: boolean; deleted?: number } | null) ?? null);
 	const holds = $derived(data.holds.ok ? data.holds.value : []);
 	const live = $derived(activeHolds(holds));
@@ -73,6 +85,7 @@
 		archival = true;
 		storage = '';
 		pathPrefix = '';
+		setAside = form;
 		addingPolicy = true;
 	}
 
@@ -94,6 +107,7 @@
 		archival = source.archival_enabled ?? true;
 		storage = source.archival_storage ?? '';
 		pathPrefix = source.archival_path_prefix ?? '';
+		setAside = form;
 		addingPolicy = true;
 	}
 
@@ -104,6 +118,7 @@
 		holdResourceType = '';
 		holdResourceId = '';
 		holdTenant = '';
+		setAside = form;
 		addingHold = true;
 	}
 
@@ -213,8 +228,8 @@
 			absent="Audit retention is not part of this build, so entries are kept indefinitely."
 		/>
 	{:else}
-		{#if formError && !addingPolicy && !addingHold}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 		{#if !canWrite}
 			<Alert tone="info">
@@ -410,7 +425,7 @@
 <Drawer bind:open={addingPolicy} title="New retention policy">
 	<form id="policy-form" method="POST" action="?/createPolicy" use:enhance={savePolicySubmit.enhance}>
 		<div class="flex flex-col gap-4">
-			<FormErrors message={formError || undefined} />
+			<FormErrors message={policyError || undefined} />
 			<Input
 				id="ret-event"
 				name="event_type"
@@ -464,7 +479,7 @@
 <Drawer bind:open={addingHold} title="New legal hold">
 	<form id="hold-form" method="POST" action="?/createHold" use:enhance={saveHoldSubmit.enhance}>
 		<div class="flex flex-col gap-4">
-			<FormErrors message={formError || undefined} />
+			<FormErrors message={holdError || undefined} />
 			<Alert tone="warn">
 				A hold overrides every retention policy for the entries it matches. Leaving every
 				filter empty holds the entire audit log.

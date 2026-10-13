@@ -220,7 +220,7 @@ describe('custom PII rules', () => {
 describe('PII rule drawer', () => {
 	it('shows a refused save inside the open drawer', async () => {
 		const { getAllByRole } = render(PiiPage, {
-			props: props({}, { error: 'pattern does not compile: missing closing )' }),
+			props: props({}, { action: 'create', error: 'pattern does not compile: missing closing )' }),
 		});
 		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
 		const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
@@ -240,5 +240,26 @@ describe('PII unmasked reads pager', () => {
 		const { container } = render(PiiPage, { props: props({ entries, total: 120 }) });
 		const next = [...container.querySelectorAll('a')].find((a) => a.getAttribute('aria-label')?.includes('Next'));
 		expect(next?.getAttribute('href')).toBe('/admin/settings/pii?limit=50&offset=50');
+	});
+});
+
+describe('PII failures stay where they were made', () => {
+	it('shows a failed delete on the page and opens the rule drawer clean', async () => {
+		const { getAllByRole, container } = render(PiiPage, {
+			props: props({}, { action: 'delete', error: 'The rule could not be deleted.' }),
+		});
+		expect(said(container)).toContain('The rule could not be deleted.');
+		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
+		const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be deleted');
+	});
+
+	it('reports a failed dry run under the sample, not as a failed save', async () => {
+		const { getAllByRole } = render(PiiPage, {
+			props: props({}, { action: 'test', error: 'The pattern could not be run.' }),
+		});
+		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
+		const save = document.querySelector('form[action="?/create"]') as HTMLFormElement;
+		expect(save.textContent).not.toContain('could not be run');
 	});
 });

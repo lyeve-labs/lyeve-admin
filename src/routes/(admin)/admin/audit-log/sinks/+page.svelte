@@ -40,9 +40,16 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const errors = $derived(fieldErrors(form));
-	const formError = $derived(form && 'error' in form ? String(form.error) : undefined);
-	const refused = $derived(formRefusal(form));
+	// The drawer and the row actions report through one result, so each
+	// failure is tagged with its action. The drawer shows only a failed create
+	// or save, the page shows a failed delete or test, and a drawer opened
+	// after a failure starts clean: the result is set aside.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(form && form !== setAside && 'error' in form ? form : null);
+	const inDrawer = $derived(failure?.action === 'create' || failure?.action === 'update');
+	const drawerFailure = $derived(inDrawer ? failure : null);
+	const rowFailure = $derived(inDrawer ? null : failure);
+	const errors = $derived(fieldErrors(drawerFailure));
 
 	// One drawer for both writes: a null target is a new destination.
 	let open = $state(false);
@@ -76,6 +83,7 @@
 		datadogTags = '';
 		enabled = true;
 		backfill = false;
+		setAside = form;
 		open = true;
 	}
 
@@ -89,6 +97,7 @@
 		datadogService = s.datadog_service ?? '';
 		datadogTags = s.datadog_tags ?? '';
 		enabled = s.enabled;
+		setAside = form;
 		open = true;
 	}
 
@@ -154,9 +163,7 @@
 		<GateNotice gate={data.gate} title="Audit streaming" absent="This build does not stream the audit log anywhere." />
 	{:else}
 		<div class="flex flex-col gap-4">
-			{#if !open}
-				<FormErrors message={formError} fields={errors} {refused} />
-			{/if}
+			<FormErrors message={rowFailure ? String(rowFailure.error) : undefined} refused={formRefusal(rowFailure)} />
 			{#if success}
 				<Alert tone="success" autoDismiss>{success}</Alert>
 			{/if}
@@ -226,7 +233,11 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New destination'}>
 	<form method="POST" action={editing ? '?/update' : '?/create'} id="sink-form" use:enhance={submit.enhance} class="flex flex-col gap-4">
-		<FormErrors message={formError} fields={errors} {refused} />
+		<FormErrors
+			message={drawerFailure ? String(drawerFailure.error) : undefined}
+			fields={errors}
+			refused={formRefusal(drawerFailure)}
+		/>
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input id="sink-name" name="name" label="Name" required bind:value={name} error={errors.name} placeholder="Security team SIEM" />
 		{#if editing}

@@ -90,7 +90,7 @@ export const actions: Actions = {
 			await createRule(authedClient(event), draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { error: actionError(err, 'The rule could not be saved.') });
+			return fail(422, { action: 'create', error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -98,12 +98,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'update', error: 'Which rule?' });
 		try {
 			await updateRule(authedClient(event), id, draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { error: actionError(err, 'The rule could not be saved.') });
+			return fail(422, { action: 'update', error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -111,12 +111,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'delete', error: 'Which rule?' });
 		try {
 			await deleteRule(authedClient(event), id);
 			return { deleted: true };
 		} catch (err) {
-			return fail(422, { error: actionError(err, 'The rule could not be deleted.') });
+			return fail(422, { action: 'delete', error: actionError(err, 'The rule could not be deleted.') });
 		}
 	},
 
@@ -134,7 +134,7 @@ export const actions: Actions = {
 			);
 			return { test: result };
 		} catch (err) {
-			return fail(422, { error: actionError(err, 'The pattern could not be run.') });
+			return fail(422, { action: 'test', error: actionError(err, 'The pattern could not be run.') });
 		}
 	},
 };

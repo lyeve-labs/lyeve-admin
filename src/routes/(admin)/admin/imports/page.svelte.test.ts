@@ -36,7 +36,7 @@ function job(over: Partial<ImportJob> = {}): ImportJob {
 	};
 }
 
-const props = (over: Record<string, unknown> = {}) => ({
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		jobs: [job()],
 		total: 1,
@@ -50,7 +50,7 @@ const props = (over: Record<string, unknown> = {}) => ({
 		detail: null,
 		...over,
 	} as never,
-	form: null as never,
+	form: form as never,
 });
 
 describe('Imports', () => {
@@ -150,5 +150,23 @@ describe('Imports controls', () => {
 		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
 		expect(screen.getByRole('radio', { name: /create only/i })).toBeTruthy();
 		expect(document.body.textContent).toContain('Overwrite the fields of an entry the key finds');
+	});
+});
+
+describe('Imports failures stay where they were made', () => {
+	it('shows a failed row action on the page and opens the template drawer clean', async () => {
+		const { container } = render(ImportsPage, {
+			props: props({ templates: [], templatesRead: true }, { action: 'rollback', error: 'The import could not be rolled back.' }),
+		});
+		expect(said(container)).toContain('The import could not be rolled back.');
+		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
+		expect((document.getElementById('template-form') as HTMLFormElement).textContent).not.toContain('could not be rolled back');
+	});
+
+	it('shows a refused template save in its drawer and not on the page', async () => {
+		const { container } = render(ImportsPage, {
+			props: props({ templates: [], templatesRead: true }, { action: 'saveTemplate', error: 'Map at least one column.' }),
+		});
+		expect(said(container)).not.toContain('Map at least one column.');
 	});
 });

@@ -2,7 +2,8 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionError } from '$lib/server/action-error';
+import { refusalOf, refusalText } from '$lib/api/refusal';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -168,16 +169,27 @@ function templateBody(form: FormData): SaveMappingTemplate | string {
 	};
 }
 
+/**
+ * A failed write, tagged with the action that made it. Every form on the page
+ * reports through one result, and the tag is how the template drawer tells
+ * its own failure from a row action's.
+ */
+function failure(action: string, err: unknown, fallback: string) {
+	const refused = refusalOf(err);
+	if (refused) return fail(402, { action, error: refusalText(refused), refused });
+	return fail(400, { action, error: actionError(err, fallback) });
+}
+
 async function saveTemplate(event: Parameters<Actions[string]>[0], id: string | null) {
 	await requireRole(event, ['admin', 'super_admin']);
 	const form = await event.request.formData();
 	const body = templateBody(form);
-	if (typeof body === 'string') return fail(400, { error: body });
+	if (typeof body === 'string') return fail(400, { action: 'saveTemplate', error: body });
 	try {
 		if (id) await updateTemplate(authedClient(event), id, body);
 		else await createTemplate(authedClient(event), body);
 	} catch (err) {
-		return actionFailure(err, 'The template could not be saved.');
+		return failure('saveTemplate', err, 'The template could not be saved.');
 	}
 	return { savedTemplate: body.name };
 }
@@ -188,7 +200,7 @@ export const actions: Actions = {
 	updateTemplate: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No template was named.' });
+		if (!id) return fail(400, { action: 'saveTemplate', error: 'No template was named.' });
 		return saveTemplate(event, id);
 	},
 
@@ -197,11 +209,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No template was named.' });
+		if (!id) return fail(400, { action: 'deleteTemplate', error: 'No template was named.' });
 		try {
 			await deleteTemplate(authedClient(event), id);
 		} catch (err) {
-			return actionFailure(err, 'The template could not be deleted.');
+			return failure('deleteTemplate', err, 'The template could not be deleted.');
 		}
 		return { removedTemplate: id };
 	},
@@ -211,11 +223,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No import was named.' });
+		if (!id) return fail(400, { action: 'cancel', error: 'No import was named.' });
 		try {
 			await cancelJob(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The import could not be canceled.') });
+			return fail(400, { action: 'cancel', error: actionError(err, 'The import could not be canceled.') });
 		}
 		return { canceled: id };
 	},
@@ -228,11 +240,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No import was named.' });
+		if (!id) return fail(400, { action: 'rollback', error: 'No import was named.' });
 		try {
 			await rollbackJob(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The import could not be rolled back.') });
+			return fail(400, { action: 'rollback', error: actionError(err, 'The import could not be rolled back.') });
 		}
 		return { rolledBack: id };
 	},

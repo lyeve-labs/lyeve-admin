@@ -85,16 +85,16 @@ export const actions: Actions = {
 
 		const name = String(form.get('name') ?? '').trim();
 		if (!name) {
-			return fail(400, { error: 'Name the export so it can be told apart in the list.' });
+			return fail(400, { action: 'start' as const, error: 'Name the export so it can be told apart in the list.' });
 		}
 		const config = exportConfigFrom(form);
-		if ('error' in config) return fail(400, { error: config.error });
+		if ('error' in config) return fail(400, { action: 'start' as const, error: config.error });
 
 		try {
 			const job = await startExport(client, { name, ...config.config });
 			return { started: job.id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The export could not be started.') });
+			return fail(400, { action: 'start' as const, error: actionError(err, 'The export could not be started.') });
 		}
 	},
 
@@ -103,12 +103,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No export was named.' });
+		if (!id) return fail(400, { action: 'cancel' as const, error: 'No export was named.' });
 		try {
 			await cancelJob(client, id);
 			return { canceled: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The export could not be canceled.') });
+			return fail(400, { action: 'cancel' as const, error: actionError(err, 'The export could not be canceled.') });
 		}
 	},
 
@@ -119,10 +119,10 @@ export const actions: Actions = {
 
 		const name = String(form.get('name') ?? '').trim();
 		const cron = String(form.get('cron_expression') ?? '').trim();
-		if (!name) return fail(400, { error: 'Name the schedule so its exports can be told apart.' });
-		if (!cron) return fail(400, { error: 'Say when the schedule runs.' });
+		if (!name) return fail(400, { action: 'createSchedule' as const, error: 'Name the schedule so its exports can be told apart.' });
+		if (!cron) return fail(400, { action: 'createSchedule' as const, error: 'Say when the schedule runs.' });
 		const config = exportConfigFrom(form);
-		if ('error' in config) return fail(400, { error: config.error });
+		if ('error' in config) return fail(400, { action: 'createSchedule' as const, error: config.error });
 
 		try {
 			await createSchedule(client, {
@@ -133,7 +133,7 @@ export const actions: Actions = {
 			});
 			return { scheduled: name };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The schedule could not be created.') });
+			return fail(400, { action: 'createSchedule' as const, error: actionError(err, 'The schedule could not be created.') });
 		}
 	},
 
@@ -142,13 +142,13 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No schedule was named.' });
+		if (!id) return fail(400, { action: 'toggleSchedule' as const, error: 'No schedule was named.' });
 		const enabled = form.get('enabled') === 'true';
 		try {
 			await setScheduleEnabled(client, id, enabled);
 			return { toggled: id, enabled };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The schedule could not be changed.') });
+			return fail(400, { action: 'toggleSchedule' as const, error: actionError(err, 'The schedule could not be changed.') });
 		}
 	},
 
@@ -157,12 +157,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No schedule was named.' });
+		if (!id) return fail(400, { action: 'deleteSchedule' as const, error: 'No schedule was named.' });
 		try {
 			await deleteSchedule(client, id);
 			return { deleted: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The schedule could not be deleted.') });
+			return fail(400, { action: 'deleteSchedule' as const, error: actionError(err, 'The schedule could not be deleted.') });
 		}
 	},
 };

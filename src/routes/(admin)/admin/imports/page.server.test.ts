@@ -155,6 +155,7 @@ describe('template actions', () => {
 		)) as { status: number; data: { refused: { kind: string } } };
 		expect(out.status).toBe(402);
 		expect(out.data.refused.kind).toBe('feature');
+		expect((out.data as unknown as { action: string }).action).toBe('saveTemplate');
 		expect(api.updateTemplate).toHaveBeenCalledWith(expect.anything(), 't1', expect.anything());
 	});
 

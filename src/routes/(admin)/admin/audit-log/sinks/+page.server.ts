@@ -1,7 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionFailure } from '$lib/server/action-error';
+import { actionError } from '$lib/server/action-error';
+import { refusalOf, refusalText } from '$lib/api/refusal';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
@@ -39,11 +40,22 @@ function common(form: FormData) {
 	};
 }
 
-function missing(body: { name: string; url: string }) {
+/**
+ * A failed write, tagged with the action that made it. Every form on the page
+ * reports through one result, and the tag is how the drawer tells its own
+ * failure from a delete or a test made from a row.
+ */
+function failure(action: string, err: unknown, fallback: string) {
+	const refused = refusalOf(err);
+	if (refused) return fail(402, { action, error: refusalText(refused), refused });
+	return fail(400, { action, error: actionError(err, fallback) });
+}
+
+function missing(action: string, body: { name: string; url: string }) {
 	const fields: Record<string, string> = {};
 	if (!body.name) fields.name = 'Name is required';
 	if (!body.url) fields.url = 'URL is required';
-	return Object.keys(fields).length ? fail(400, { error: 'Check the highlighted fields.', fields }) : null;
+	return Object.keys(fields).length ? fail(400, { action, error: 'Check the highlighted fields.', fields }) : null;
 }
 
 export const actions: Actions = {
@@ -51,13 +63,14 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const kind = text(form, 'kind');
-		if (!isSinkKind(kind)) return fail(400, { error: 'Pick where the log is sent.' });
+		if (!isSinkKind(kind)) return fail(400, { action: 'create', error: 'Pick where the log is sent.' });
 		const body = common(form);
-		const refused = missing(body);
+		const refused = missing('create', body);
 		if (refused) return refused;
 		const secret = text(form, 'secret');
 		if (kind !== 'https' && !secret) {
 			return fail(400, {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { secret: kind === 'splunk' ? 'The HEC token is required' : 'The API key is required' },
 			});
@@ -72,7 +85,7 @@ export const actions: Actions = {
 			// A secret the plugin generated is in this answer and nowhere else.
 			return { created: created.name, secret: created.secret ?? '' };
 		} catch (err) {
-			return actionFailure(err, 'The destination could not be created.');
+			return failure('create', err, 'The destination could not be created.');
 		}
 	},
 
@@ -80,15 +93,15 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const id = text(form, 'id');
-		if (!id) return fail(400, { error: 'No destination was named.' });
+		if (!id) return fail(400, { action: 'update', error: 'No destination was named.' });
 		const body = common(form);
-		const refused = missing(body);
+		const refused = missing('update', body);
 		if (refused) return refused;
 		const secret = text(form, 'secret');
 		try {
 			await updateSink(authedClient(event), id, { ...body, ...(secret ? { secret } : {}) });
 		} catch (err) {
-			return actionFailure(err, 'The destination could not be saved.');
+			return failure('update', err, 'The destination could not be saved.');
 		}
 		return { saved: body.name };
 	},
@@ -97,11 +110,11 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const id = text(form, 'id');
-		if (!id) return fail(400, { error: 'No destination was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'No destination was named.' });
 		try {
 			await deleteSink(authedClient(event), id);
 		} catch (err) {
-			return actionFailure(err, 'The destination could not be deleted.');
+			return failure('delete', err, 'The destination could not be deleted.');
 		}
 		return { deleted: true };
 	},
@@ -110,12 +123,12 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const id = text(form, 'id');
-		if (!id) return fail(400, { error: 'No destination was named.' });
+		if (!id) return fail(400, { action: 'test', error: 'No destination was named.' });
 		try {
 			const res = await testSink(authedClient(event), id);
 			return { tested: id, delivered: res.delivered, testError: res.error ?? '' };
 		} catch (err) {
-			return actionFailure(err, 'The test could not be sent.');
+			return failure('test', err, 'The test could not be sent.');
 		}
 	},
 };

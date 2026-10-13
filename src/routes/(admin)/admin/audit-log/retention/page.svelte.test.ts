@@ -105,11 +105,35 @@ describe('Retention policy delete', () => {
 describe('Retention drawers', () => {
 	it('shows a refused policy inside the open drawer', async () => {
 		const { getAllByRole } = render(RetentionPage, {
-			props: props(['super_admin'], {}, { error: 'A retention window is a whole number of days, and cannot be negative.' }),
+			props: props(['super_admin'], {}, {
+				action: 'createPolicy',
+				error: 'A retention window is a whole number of days, and cannot be negative.',
+			}),
 		});
 		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
 		const form = document.getElementById('policy-form') as HTMLFormElement;
 		expect(form.textContent).toContain('A retention window is a whole number of days');
+	});
+});
+
+describe('Retention failures stay where they were made', () => {
+	it('shows a failed row action on the page and opens the next drawer clean', async () => {
+		const { getAllByRole, container } = render(RetentionPage, {
+			props: props(['super_admin'], {}, { action: 'deletePolicy', error: 'The policy could not be removed.' }),
+		});
+		expect(container.textContent).toContain('The policy could not be removed.');
+		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
+		const form = document.getElementById('policy-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be removed');
+	});
+
+	it('keeps a refused hold out of the policy drawer and off the page', async () => {
+		const { getAllByRole, container } = render(RetentionPage, {
+			props: props(['super_admin'], {}, { action: 'createHold', error: 'Name the hold.' }),
+		});
+		expect(container.textContent).not.toContain('Name the hold.');
+		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
+		expect((document.getElementById('policy-form') as HTMLFormElement).textContent).not.toContain('Name the hold.');
 	});
 });
 

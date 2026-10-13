@@ -73,12 +73,22 @@
 	let open = $state(false);
 	let sample = $state('');
 
-	const testResult = $derived((form as { test?: unknown } | null)?.test ?? null);
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action and shown only where that action was made: a
+	// save in the rule form, a dry run under it, a delete on the page. A
+	// drawer opened after any result starts clean, so the result is set aside.
+	let setAside = $state<unknown>(null);
+	const current = $derived(form && form !== setAside ? (form as { action?: string; error?: string; test?: unknown }) : null);
+	const testResult = $derived(current?.test ?? null);
+	const failedAs = (actions: string[]) => (current?.action && actions.includes(current.action) ? (current.error ?? '') : '');
+	const saveError = $derived(failedAs(['create', 'update']));
+	const testError = $derived(failedAs(['test']));
+	const rowError = $derived(failedAs(['delete']));
 
 	function newRule() {
 		editing = { ...BLANK };
 		sample = '';
+		setAside = form;
 		open = true;
 	}
 
@@ -93,6 +103,7 @@
 			enabled: rule.enabled,
 		};
 		sample = '';
+		setAside = form;
 		open = true;
 	}
 
@@ -126,6 +137,7 @@
 			enabled: false,
 		};
 		sample = '';
+		setAside = form;
 		open = true;
 	}
 
@@ -181,8 +193,8 @@
 			absent="The masking plugin is not part of this build, so responses are served as they are stored."
 		/>
 	{:else}
-		{#if formError && !open}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 		{#if form && 'saved' in form && form.saved}
 			<Alert tone="success" autoDismiss>Saved. It applies from the next request.</Alert>
@@ -449,7 +461,7 @@
 		}}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={formError || undefined} />
+		<FormErrors message={saveError || undefined} />
 		{#if editing.id}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}
@@ -530,7 +542,9 @@
 			</div>
 		</form>
 
-		{#if testResult}
+		{#if testError}
+			<Alert tone="danger">{testError}</Alert>
+		{:else if testResult}
 			{@const result = testResult as
 				| { valid: false; error: string }
 				| { valid: true; matches: string[]; count: number; masked: string }}
