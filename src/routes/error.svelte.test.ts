@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
 vi.mock('$app/state', () => state);
 
 import RootError from './+error.svelte';
-import { OUTAGE } from '$lib/outage';
+import { BUSY, OUTAGE } from '$lib/outage';
 
 afterEach(cleanup);
 
@@ -50,5 +50,16 @@ describe('Root error page', () => {
 		expect(getByText(OUTAGE.body)).toBeTruthy();
 		expect(getByRole('link', { name: OUTAGE.action }).getAttribute('href')).toBe('/admin/users?role=editor');
 		expect(document.title).toContain(OUTAGE.title);
+	});
+
+	// The session check refuses for the rate and for a full instance too. Each
+	// page names its own refusal in the tab, never the outage.
+	it.each([
+		[429, BUSY.title],
+		[402, 'No access'],
+	])('titles the tab for a %i after its own face', (status, title) => {
+		renderAt(status, 'refused');
+		expect(document.title).toContain(title);
+		expect(document.title).not.toContain(OUTAGE.title);
 	});
 });

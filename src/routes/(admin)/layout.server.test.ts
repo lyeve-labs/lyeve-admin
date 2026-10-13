@@ -4,7 +4,7 @@ import type { Cookies } from '@sveltejs/kit';
 // The load function under test. SvelteKit's redirect() throws a Redirect object.
 // We catch it and inspect status/location.
 import { load } from './+layout.server';
-import { OUTAGE } from '$lib/outage';
+import { BUSY, OUTAGE } from '$lib/outage';
 
 // helpers
 
@@ -123,6 +123,24 @@ describe('(admin)/+layout.server.ts load', () => {
 			expect(cookies.delete).not.toHaveBeenCalled();
 			expect(thrown.location).toBeUndefined();
 			expect(thrown.status).toBe(503);
+		});
+
+		// A refusal is an answer, so it gets its own page and never the outage
+		// wording. The session is intact, so the cookie stays for each.
+		it.each([
+			[
+				402,
+				{ error: 'cap_exceeded', cap: 'admin.seats', limit: 3, current: 3, upgrade_url: '' },
+				'Every admin seat is taken. 3 of 3 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.',
+			],
+			[403, { error: 'forbidden' }, 'This account or network cannot reach the admin right now.'],
+			[429, { error: 'rate limit exceeded' }, BUSY.body],
+		])('keeps the cookie and shows its own page for a %i', async (status, body, message) => {
+			const { thrown, cookies } = await outage(() => json(body, status));
+			expect(cookies.delete).not.toHaveBeenCalled();
+			expect(thrown.location).toBeUndefined();
+			expect(thrown.status).toBe(status);
+			expect(thrown.body?.message).toBe(message);
 		});
 	});
 

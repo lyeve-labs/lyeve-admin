@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
 import { authedClient, authedHeaders, requireUser, requireRole, stripProtectedFields } from './authz';
-import { OUTAGE } from '$lib/outage';
+import { BUSY, OUTAGE } from '$lib/outage';
 
 // event stub
 
@@ -163,7 +163,7 @@ describe('requireUser', () => {
 	 */
 	it.each([
 		['the engine cannot check the session', async () => jsonResponse({ error: 'session check unavailable' }, 503)],
-		['the engine refuses for another reason', async () => jsonResponse({ error: 'forbidden' }, 403)],
+		['the engine fails with a status nothing here names', async () => jsonResponse({ error: 'internal error' }, 500)],
 		[
 			'the engine does not answer',
 			async (): Promise<Response> => {
@@ -178,6 +178,45 @@ describe('requireUser', () => {
 		};
 		expect(err.status).toBe(503);
 		expect(err.body?.message).toBe(OUTAGE.body);
+	});
+
+	/*
+	 * Three answers are refusals, not outages. The engine answered, so the
+	 * outage page would mislead, and the session is intact, so neither ends it.
+	 */
+	describe('a refused session check', () => {
+		async function refusedWith(status: number, body: unknown) {
+			const fetchImpl = vi.fn(async () => jsonResponse(body, status)) as unknown as typeof fetch;
+			return (await requireUser(stubEvent({ fetchImpl })).catch((e: unknown) => e)) as {
+				status?: number;
+				body?: { message?: string };
+			};
+		}
+
+		it('throws 402 with the seat count when no admin seat is left', async () => {
+			const err = await refusedWith(402, { error: 'cap_exceeded', cap: 'admin.seats', limit: 5, current: 5, upgrade_url: '' });
+			expect(err.status).toBe(402);
+			expect(err.body?.message).toContain('Every admin seat is taken.');
+			expect(err.body?.message).toContain('5 of 5 are in use');
+		});
+
+		it('throws 402 with the seat sentence when the body names nothing', async () => {
+			const err = await refusedWith(402, {});
+			expect(err.status).toBe(402);
+			expect(err.body?.message).toBe('This instance has no admin seat left for this account.');
+		});
+
+		it('throws 403 for an address rule or a firewall in front of the engine', async () => {
+			const err = await refusedWith(403, { error: 'forbidden' });
+			expect(err.status).toBe(403);
+			expect(err.body?.message).toBe('This account or network cannot reach the admin right now.');
+		});
+
+		it('throws 429 for the request rate, never with the outage wording', async () => {
+			const err = await refusedWith(429, { error: 'rate limit exceeded' });
+			expect(err.status).toBe(429);
+			expect(err.body?.message).toBe(BUSY.body);
+		});
 	});
 });
 
