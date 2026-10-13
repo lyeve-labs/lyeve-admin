@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button, Drawer, EmptyState, SearchInput } from '@lyeve-labs/ui-kit';
+	import { Alert, Button, Drawer, EmptyState, SearchInput } from '@lyeve-labs/ui-kit';
 	import { File, Images } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { mediaFileUrl, mediaKind, type MediaChoice } from '$lib/api/media';
@@ -10,20 +10,24 @@
 	 * are offered, because the field stores the file's public path and a
 	 * private file has none a site could load. The drawer says where to
 	 * publish one.
+	 *
+	 * `choices` is null when the library could not be read. That is said as a
+	 * failure, because an empty picker would tell the reader that nothing is
+	 * published.
 	 */
 	let {
 		choices,
 		onpick,
 		label = 'Choose from library',
 	}: {
-		choices: MediaChoice[];
+		choices: MediaChoice[] | null;
 		onpick: (choice: MediaChoice) => void;
 		label?: string;
 	} = $props();
 
 	let open = $state(false);
 	let query = $state('');
-	const visible = $derived(choices.filter((c) => narrows(query, c.filename, c.alt_text)));
+	const visible = $derived((choices ?? []).filter((c) => narrows(query, c.filename, c.alt_text)));
 
 	function pick(choice: MediaChoice) {
 		onpick(choice);
@@ -36,7 +40,11 @@
 </Button>
 
 <Drawer bind:open title="Choose a file" size="lg">
-	{#if choices.length === 0}
+	{#if choices === null}
+		<Alert tone="warn" title="The library could not be read">
+			This is not a report that no file is published. Reload the page in a moment to try again.
+		</Alert>
+	{:else if choices.length === 0}
 		<EmptyState
 			title="No published files"
 			description="Publish a file from the media library to give it an address, then choose it here."

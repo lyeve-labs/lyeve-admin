@@ -5,6 +5,7 @@ import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 import { describeMedia, importMedia, importRefusal, parseTags, setMediaPublic, updateMediaDetails, type MediaItem, setFocalPoint, signTransformUrl, transformRequestFrom } from '$lib/api/media';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
@@ -23,6 +24,8 @@ const DEFAULT_LIMIT = 60;
  */
 const MAX_LIMIT = 199;
 
+const LIST_FAILED = 'The media library could not be read. This is not a report that it is empty.';
+
 /**
  * The grid renders one window of the library. A library of ten thousand files
  * is a page the browser cannot lay out, and the operator has no way to reach
@@ -37,8 +40,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	// The list route has no text filter. A search goes through the engine's
 	// search endpoint, which answers `items` and `total` rather than the list
 	// envelope, sorted here the way the list is so the two views read alike.
-	const res = q
-		? await client
+	const request = q
+		? client
 				.post<{ items?: MediaItem[] | null; total?: number }>('/api/admin/media/search', {
 					query: q,
 					limit: limit + 1,
@@ -46,22 +49,26 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 					sort_by: 'created_at',
 					sort_desc: true,
 				})
-				.then((r) => ({ data: r.items ?? [], total: r.total }))
-				.catch(() => null)
-		: await client
-				.get<ListEnvelope<MediaItem> | MediaItem[]>(
-					`/api/admin/media?limit=${limit + 1}&offset=${offset}`
-				)
-				.catch(() => null);
+				.then((r): ListEnvelope<MediaItem> => ({ data: r.items ?? [], total: r.total }))
+		: client.get<ListEnvelope<MediaItem> | MediaItem[]>(`/api/admin/media?limit=${limit + 1}&offset=${offset}`);
+	const read = await section(request, LIST_FAILED);
 
-	const page = pageOf<MediaItem>(res, limit, offset);
-	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
-	if (back !== null) redirect(307, withOffset(url, back));
 	// The alt-text suggestion is the AI plugin's. Without it the drawer does
 	// not offer one.
 	const { plugins } = await parent();
 	const aiEnabled = runs(plugins, PLUGIN.ai);
-	return { items: page.rows, limit, offset, total: page.total, hasMore: page.hasMore, q, aiEnabled };
+
+	// Nothing was read, so the page draws the gate in place of the grid and
+	// there is no last page to send the request back to.
+	if (!read.ok) return { items: read, limit, offset, total: null, hasMore: false, q, aiEnabled };
+
+	const page = pageOf<MediaItem>(read.value, limit, offset);
+	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+	if (back !== null) redirect(307, withOffset(url, back));
+	// Typed, because a bare literal widens `ok` to boolean and the page could
+	// no longer tell the two cases apart.
+	const items: Section<MediaItem[]> = { ok: true, value: page.rows };
+	return { items, limit, offset, total: page.total, hasMore: page.hasMore, q, aiEnabled };
 };
 
 export const actions: Actions = {

@@ -11,7 +11,6 @@
 		Pagination,
 		SearchInput,
 		SegmentedControl,
-		Toolbar,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { csrfHeaders } from '$lib/api/csrf';
@@ -32,6 +31,9 @@
 	} from '$lib/components/media/view-preference';
 	import { ICON } from '$lib/icon';
 	import { formRefusal } from '$lib/api/refusal';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -49,7 +51,7 @@
 	 * showing page one. A delete goes back through the action result, which is
 	 * also what keeps the count under the pager honest.
 	 */
-	const items = $derived<MediaItem[]>(data.items ?? []);
+	const items = $derived<MediaItem[]>(data.items.ok ? data.items.value : []);
 	const total = $derived(data.total ?? items.length);
 	let uploading = $state(false);
 	// Import from URL: a file on another site copied into the library through
@@ -102,6 +104,10 @@
 		uploadError = '';
 		let uploaded = 0;
 
+		// The upload goes from the browser to the engine's own route rather than
+		// through a form action. A file can be larger than the body limit the
+		// admin server accepts, and the engine applies the limit that is meant
+		// for uploads.
 		for (const file of Array.from(files)) {
 			const body = new FormData();
 			body.append('file', file);
@@ -137,36 +143,43 @@
 
 <PageTitle title="Media library" />
 
-<PageShell title="Media library" description={`${total} ${total === 1 ? 'file' : 'files'}`} width="wide">
+<PageShell
+	title="Media library"
+	description={data.items.ok ? `${total} ${total === 1 ? 'file' : 'files'}` : undefined}
+	width="wide"
+>
 	{#snippet actions()}
-		<!-- The kit's FileInput is a drop zone, and the library's upload control is
-		     a button in the title row, so the picker stays hidden and the Button
-		     opens it. A Button inside a <label> does not work: the label's
-		     activation behavior is skipped for interactive descendants, so the
-		     picker would never open for a mouse user.
+		<!-- A library that could not be read offers nothing to add to it. -->
+		{#if data.items.ok}
+			<!-- The kit's FileInput is a drop zone, and the library's upload control is
+			     a button in the title row, so the picker stays hidden and the Button
+			     opens it. A Button inside a <label> does not work: the label's
+			     activation behavior is skipped for interactive descendants, so the
+			     picker would never open for a mouse user.
 
-		     Hidden from the eye is not hidden from a screen reader: sr-only keeps
-		     the picker in the accessibility tree, where an input carrying no label
-		     is announced as an unnamed file field. The name says what the picker
-		     does rather than repeating the Button, because the two are reached
-		     separately. -->
-		<input
-			bind:this={picker}
-			type="file"
-			multiple
-			accept="image/*,application/pdf,video/*,audio/*,text/*"
-			aria-label="Choose files to upload"
-			tabindex={-1}
-			class="sr-only"
-			onchange={handleUpload}
-			disabled={uploading}
-		/>
-		<Button variant="secondary" size="sm" onclick={() => (importOpen = true)}>
-			<Link size={ICON.sm} /> Import from URL
-		</Button>
-		<Button variant="primary" size="sm" loading={uploading} onclick={() => picker?.click()}>
-			<Upload size={ICON.sm} /> Upload files
-		</Button>
+			     Hidden from the eye is not hidden from a screen reader: sr-only keeps
+			     the picker in the accessibility tree, where an input carrying no label
+			     is announced as an unnamed file field. The name says what the picker
+			     does rather than repeating the Button, because the two are reached
+			     separately. -->
+			<input
+				bind:this={picker}
+				type="file"
+				multiple
+				accept="image/*,application/pdf,video/*,audio/*,text/*"
+				aria-label="Choose files to upload"
+				tabindex={-1}
+				class="sr-only"
+				onchange={handleUpload}
+				disabled={uploading}
+			/>
+			<Button variant="secondary" size="sm" onclick={() => (importOpen = true)}>
+				<Link size={ICON.sm} /> Import from URL
+			</Button>
+			<Button variant="primary" size="sm" loading={uploading} onclick={() => picker?.click()}>
+				<Upload size={ICON.sm} /> Upload files
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if uploadError}
@@ -178,14 +191,18 @@
 	{/if}
 
 	<form method="GET" data-testid="media-filters">
-		<Toolbar label="Filter media">
-			<label for="media-search" class="sr-only">Search files</label>
-			<SearchInput id="media-search" name="q" bind:value={q} placeholder="File name" class="w-64" />
-			<Button type="submit" variant="secondary">Search</Button>
-			{#if data.q}
-				<Button variant="ghost" href="/admin/media">Clear</Button>
-			{/if}
-			{#snippet actions()}
+		<ListToolbar label="Filter media">
+			{#snippet search()}
+				<div class="flex items-center gap-2">
+					<label for="media-search" class="sr-only">Search files</label>
+					<SearchInput id="media-search" name="q" bind:value={q} placeholder="File name" class="min-w-0 flex-1" />
+					<Button type="submit" variant="secondary">Search</Button>
+					{#if data.q}
+						<Button variant="ghost" href="/admin/media">Clear</Button>
+					{/if}
+				</div>
+			{/snippet}
+			{#snippet filters()}
 				<SegmentedControl
 					label="View"
 					labelHidden
@@ -194,10 +211,16 @@
 					onchange={writeMediaView}
 				/>
 			{/snippet}
-		</Toolbar>
+		</ListToolbar>
 	</form>
 
-	{#if items.length === 0 && data.q}
+	{#if !data.items.ok}
+		<GateNotice
+			gate={data.items.gate}
+			title="Media library"
+			absent="The media plugin does not run on this instance, so there is no library to show."
+		/>
+	{:else if items.length === 0 && data.q}
 		<EmptyState title="No files match" description="Clear the search to see the whole library." />
 	{:else if items.length === 0}
 		<EmptyState title="No files uploaded yet." description="Images, PDFs, video and audio.">
