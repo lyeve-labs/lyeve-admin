@@ -447,6 +447,30 @@ export const rules = [
       ),
   },
   {
+    id: 'style-block',
+    files: ALL,
+    /**
+     * A stylesheet inside a component, where no other rule here can see it.
+     *
+     * Every rule in this file reads class names and markup, so a `<style>`
+     * block takes a literal color, duration or size past all of them. The
+     * admin's rule was no `<style>` blocks. Nothing enforced it, and the rich
+     * text editor shipped one with its heading sizes in rem and its padding in
+     * pixels. Markup the component renders takes utilities. Markup a library
+     * renders, which no class reaches, gets a rule in src/app.css, scoped under
+     * the component's own class and written in the theme's variables.
+     */
+    test: (src) =>
+      // A script may build a document for a preview, and a comment may name
+      // the element. Neither is a stylesheet this page loads.
+      [
+        ...src
+          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .matchAll(/<style\b/g),
+      ].map(() => '<style> block; style with utilities, or with theme variables in src/app.css for markup a library renders'),
+  },
+  {
     id: 'raw-button',
     files: ALL,
     /**

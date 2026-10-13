@@ -127,6 +127,28 @@ describe('raw-color', () => {
   });
 });
 
+describe('style-block', () => {
+  it('passes a component styled through its markup', () => {
+    expect(check('style-block', '<div class="rte bg-surface-2 text-sm">x</div>')).toEqual([]);
+  });
+
+  it('fails a stylesheet in the component, with attributes or inside the head', () => {
+    expect(check('style-block', '<div class="rte">x</div>\n<style>\n  :global(.rte h1) { font-size: 1.5rem; }\n</style>')).toHaveLength(1);
+    expect(check('style-block', '<style lang="postcss">.x { padding: 10px; }</style>')).toHaveLength(1);
+    expect(check('style-block', '<svelte:head><style>body { margin: 0; }</style></svelte:head>')).toHaveLength(1);
+  });
+
+  it('reads the markup and not the script or the comments', () => {
+    // A preview built as a string is not a stylesheet this page loads.
+    expect(check('style-block', "<script>const doc = '<style>p { margin: 0; }</style>';</script><p>ok</p>")).toEqual([]);
+    expect(check('style-block', '<!-- the theme owns the <style> here --><p>ok</p>')).toEqual([]);
+  });
+
+  it('leaves an element whose name only starts like it alone', () => {
+    expect(check('style-block', '<styled-frame>x</styled-frame><Style />')).toEqual([]);
+  });
+});
+
 describe('raw-button', () => {
   it('sees a tone that only the conditional half of the class carries', () => {
     // A scrape stops at the first quote inside the attribute, and an arrow
