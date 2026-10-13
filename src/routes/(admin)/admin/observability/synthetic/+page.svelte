@@ -351,99 +351,6 @@
 						/>
 					{/snippet}
 				</ListToolbar>
-				<Table label="Probes">
-					<thead>
-						<tr>
-							<th scope="col">Probe</th>
-							<th scope="col">State</th>
-							<th scope="col">Runs</th>
-							<th scope="col">Last run</th>
-							<th scope="col"><span class="sr-only">Actions</span></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as p (p.id)}
-							<tr>
-								<td>
-									<div class="font-medium text-fg">{p.name}</div>
-									<div class="text-xs text-faint">
-										{PROBE_TYPE_LABELS[p.type] ?? p.type}
-									</div>
-									<div class="max-w-md truncate font-mono text-xs text-faint" title={probeTarget(p)}>
-										{probeTarget(p)}
-									</div>
-								</td>
-								<td data-cell="nowrap">
-									<Badge tone={probeTone(probeHealth(p))} dot>
-										{PROBE_HEALTH_LABELS[probeHealth(p)]}
-									</Badge>
-									<div class="text-xs text-faint">
-										Alerts after {p.alert_threshold}
-									</div>
-								</td>
-								<td data-cell="nowrap" class="text-xs text-faint">
-									{everyLabel(p.interval_seconds)}
-								</td>
-								<td data-cell="nowrap" class="text-xs text-faint">
-									{p.last_run_at ? formatDateTime(p.last_run_at) : 'Never'}
-								</td>
-								<td data-cell="nowrap">
-									<div class="flex items-center justify-end gap-1">
-										<form method="POST" action="?/run" use:enhance={runNow(p)}>
-											<input type="hidden" name="id" value={p.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Run {p.name} now"
-												title="Run now"
-											>
-												<Play size={ICON.sm} />
-											</Button>
-										</form>
-										<Button
-											variant="ghost"
-											size="sm"
-											href={channelsHref(p.id)}
-											aria-label="Notice channels for {p.name}"
-											title="Notice channels"
-										>
-											<BellRing size={ICON.sm} />
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											aria-label="Edit {p.name}"
-											onclick={() => openEdit(p)}
-										>
-											<Pencil size={ICON.sm} />
-										</Button>
-										<form method="POST" action="?/delete" use:enhance={removeProbe(p)}>
-											<input type="hidden" name="id" value={p.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Delete {p.name}"
-											>
-												<Trash2 size={ICON.sm} class="text-danger" />
-											</Button>
-										</form>
-									</div>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-				<Pagination
-					page={pageNumber(data.offset, data.limit)}
-					perPage={data.limit}
-					count={data.probes.length}
-					total={data.total ?? undefined}
-					hasNext={data.hasMore}
-					noun="probes"
-					href={pageHref('/admin/observability/synthetic', data.limit)}
-				/>
 				{#if visible.length === 0}
 					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
 						{#snippet iconSnippet()}
@@ -453,6 +360,100 @@
 							<Button variant="secondary" onclick={() => { narrow = ''; showing = 'all'; }}>Clear the filter</Button>
 						{/snippet}
 					</EmptyState>
+				{:else}
+					<Table label="Probes">
+						<thead>
+							<tr>
+								<th scope="col">Probe</th>
+								<th scope="col">State</th>
+								<th scope="col">Runs</th>
+								<th scope="col">Last run</th>
+								<th scope="col"><span class="sr-only">Actions</span></th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as p (p.id)}
+								<tr>
+									<td>
+										<div class="font-medium text-fg">{p.name}</div>
+										<div class="text-xs text-faint">
+											{PROBE_TYPE_LABELS[p.type] ?? p.type}
+										</div>
+										<div class="max-w-md truncate font-mono text-xs text-faint" title={probeTarget(p)}>
+											{probeTarget(p)}
+										</div>
+									</td>
+									<td data-cell="nowrap">
+										<Badge tone={probeTone(probeHealth(p))} dot>
+											{PROBE_HEALTH_LABELS[probeHealth(p)]}
+										</Badge>
+										<div class="text-xs text-faint">
+											Alerts after {p.alert_threshold}
+										</div>
+									</td>
+									<td data-cell="nowrap" class="text-xs text-faint">
+										{everyLabel(p.interval_seconds)}
+									</td>
+									<td data-cell="nowrap" class="text-xs text-faint">
+										{p.last_run_at ? formatDateTime(p.last_run_at) : 'Never'}
+									</td>
+									<td data-cell="nowrap">
+										<div class="flex items-center justify-end gap-1">
+											<form method="POST" action="?/run" use:enhance={runNow(p)}>
+												<input type="hidden" name="id" value={p.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Run {p.name} now"
+													title="Run now"
+												>
+													<Play size={ICON.sm} />
+												</Button>
+											</form>
+											<Button
+												variant="ghost"
+												size="sm"
+												href={channelsHref(p.id)}
+												aria-label="Notice channels for {p.name}"
+												title="Notice channels"
+											>
+												<BellRing size={ICON.sm} />
+											</Button>
+											<Button
+												variant="ghost"
+												size="sm"
+												aria-label="Edit {p.name}"
+												onclick={() => openEdit(p)}
+											>
+												<Pencil size={ICON.sm} />
+											</Button>
+											<form method="POST" action="?/delete" use:enhance={removeProbe(p)}>
+												<input type="hidden" name="id" value={p.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Delete {p.name}"
+												>
+													<Trash2 size={ICON.sm} class="text-danger" />
+												</Button>
+											</form>
+										</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+					<Pagination
+						page={pageNumber(data.offset, data.limit)}
+						perPage={data.limit}
+						count={data.probes.length}
+						total={data.total ?? undefined}
+						hasNext={data.hasMore}
+						noun="probes"
+						href={pageHref('/admin/observability/synthetic', data.limit)}
+					/>
 				{/if}
 			{/if}
 		</section>

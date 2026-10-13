@@ -328,6 +328,15 @@ describe('a failed row action', () => {
 	});
 });
 
+describe('a filter that matches nothing', () => {
+	it('draws no table or pager above the empty state', async () => {
+		const { container } = render(SyntheticPage, { props: props() });
+		await fireEvent.input(container.querySelector('#probe-narrow') as HTMLInputElement, { target: { value: 'no such probe' } });
+		expect(said(container)).toContain('Nothing on this page matches');
+		expect(container.querySelector('table')).toBeNull();
+	});
+});
+
 describe('tiles counted across every probe', () => {
 	it('states the load\'s counts without a page note', () => {
 		const { container } = render(SyntheticPage, {
