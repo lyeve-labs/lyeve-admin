@@ -41,6 +41,7 @@
 	} from '@lucide/svelte';
 	import ImportWizard from '$lib/components/ImportWizard.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import TransformField from '$lib/components/imports/TransformField.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { tracked } from '$lib/forms.svelte';
@@ -293,7 +294,9 @@
 			absent="The bulk import plugin is not part of this build, so content is created one entry at a time."
 		/>
 	{:else}
-		{#if refusal}
+		{#if templateOpen}
+			<!-- The open drawer shows the failure inside its own form. -->
+		{:else if refusal}
 			<RefusalNotice {refusal} />
 		{:else if formError}
 			<Alert tone="danger">{formError}</Alert>
@@ -588,11 +591,6 @@
 />
 
 <Drawer bind:open={templateOpen} title={editingTemplate ? `Edit ${editingTemplate.name}` : 'New template'}>
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form
 		id="template-form"
 		method="POST"
@@ -604,6 +602,7 @@
 		{/if}
 		<input type="hidden" name="mappings" value={JSON.stringify(typeof templateMappings === 'string' ? [] : templateMappings)} />
 		<div class="flex flex-col gap-4">
+			<FormErrors message={formError || undefined} refused={refusal} />
 			<Input id="template-name" name="name" label="Name" bind:value={templateName} required />
 			<Select
 				id="template-type"

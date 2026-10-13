@@ -90,7 +90,7 @@ export const actions: Actions = {
 			await createRule(authedClient(event), draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not save the rule.'));
+			return fail(422, { error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -103,7 +103,7 @@ export const actions: Actions = {
 			await updateRule(authedClient(event), id, draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not save the rule.'));
+			return fail(422, { error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -116,7 +116,7 @@ export const actions: Actions = {
 			await deleteRule(authedClient(event), id);
 			return { deleted: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not delete the rule.'));
+			return fail(422, { error: actionError(err, 'The rule could not be deleted.') });
 		}
 	},
 
@@ -134,7 +134,7 @@ export const actions: Actions = {
 			);
 			return { test: result };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not run the pattern.'));
+			return fail(422, { error: actionError(err, 'The pattern could not be run.') });
 		}
 	},
 };

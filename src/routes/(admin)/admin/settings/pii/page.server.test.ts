@@ -37,6 +37,20 @@ beforeEach(() => {
 	api.getRules.mockResolvedValue({ presets: [], mask_tags: {} });
 });
 
+describe('pii rule actions', () => {
+	// The page reads the failure from the error key. A bare string there left
+	// every refused save without a word on screen.
+	it('returns a refused save under the key the page reads', async () => {
+		api.createRule.mockRejectedValue(new ApiError(400, 'pattern does not compile'));
+		const out = (await actions.create(formEvent({ name: 'X', pattern: '(', replacement: '*' }))) as {
+			status: number;
+			data: { error: string };
+		};
+		expect(out.status).toBe(422);
+		expect(out.data.error).toBe('pattern does not compile');
+	});
+});
+
 describe('pii load', () => {
 	it('sends an access log page past the end back to the last page', async () => {
 		api.listAccessLog.mockResolvedValue({ data: [], total_count: 70 });

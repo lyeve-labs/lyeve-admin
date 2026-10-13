@@ -91,6 +91,17 @@ describe('Retention controls by role', () => {
 	});
 });
 
+describe('Retention drawers', () => {
+	it('shows a refused policy inside the open drawer', async () => {
+		const { getAllByRole } = render(RetentionPage, {
+			props: props(['super_admin'], {}, { error: 'A retention window is a whole number of days, and cannot be negative.' }),
+		});
+		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
+		const form = document.getElementById('policy-form') as HTMLFormElement;
+		expect(form.textContent).toContain('A retention window is a whole number of days');
+	});
+});
+
 describe('Retention holds that could not be read', () => {
 	it('says so instead of reporting that nothing is held', () => {
 		const { container } = render(RetentionPage, {

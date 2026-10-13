@@ -19,6 +19,7 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, HardDrive, Pencil, Plug, Plus, Trash2 } from '@lucide/svelte';
@@ -358,9 +359,7 @@
 
 <Drawer bind:open={drawerOpen} title={editing ? `Edit ${editing.name}` : 'New provider'}>
 	<form method="POST" action={editing ? '?/update' : '?/create'} id="provider-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if providerError}
-			<Alert tone="danger">{providerError}</Alert>
-		{/if}
+		<FormErrors message={providerError || undefined} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="use_ssl" value={useSSL ? 'true' : 'false'} />
 		<input type="hidden" name="path_style" value={pathStyle ? 'true' : 'false'} />

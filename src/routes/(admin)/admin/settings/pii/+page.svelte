@@ -22,6 +22,7 @@
 	import { Copy, Eye, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
 		byType,
@@ -180,7 +181,7 @@
 			absent="The masking plugin is not part of this build, so responses are served as they are stored."
 		/>
 	{:else}
-		{#if formError}
+		{#if formError && !open}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 		{#if form && 'saved' in form && form.saved}
@@ -440,12 +441,15 @@
 	<form
 		method="POST"
 		action={editing.id ? '?/update' : '?/create'}
-		use:enhance={() => async ({ update }) => {
+		use:enhance={() => async ({ result, update }) => {
 			await update({ reset: false });
-			open = false;
+			// A refused save keeps the drawer open, with the reason at the top
+			// of the form and the rule as it was typed.
+			if (result.type === 'success' || result.type === 'redirect') open = false;
 		}}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors message={formError || undefined} />
 		{#if editing.id}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}

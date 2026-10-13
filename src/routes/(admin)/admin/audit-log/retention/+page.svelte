@@ -17,6 +17,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import AuditTabs from '$lib/components/AuditTabs.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -212,7 +213,7 @@
 			absent="Audit retention is not part of this build, so entries are kept indefinitely."
 		/>
 	{:else}
-		{#if formError}
+		{#if formError && !addingPolicy && !addingHold}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 		{#if !canWrite}
@@ -409,6 +410,7 @@
 <Drawer bind:open={addingPolicy} title="New retention policy">
 	<form id="policy-form" method="POST" action="?/createPolicy" use:enhance={savePolicySubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={formError || undefined} />
 			<Input
 				id="ret-event"
 				name="event_type"
@@ -462,6 +464,7 @@
 <Drawer bind:open={addingHold} title="New legal hold">
 	<form id="hold-form" method="POST" action="?/createHold" use:enhance={saveHoldSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={formError || undefined} />
 			<Alert tone="warn">
 				A hold overrides every retention policy for the entries it matches. Leaving every
 				filter empty holds the entire audit log.

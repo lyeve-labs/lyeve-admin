@@ -19,6 +19,7 @@
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Globe, MapPin, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		REGION_STATE_LABELS,
@@ -141,7 +142,7 @@
 			absent="The data residency plugin is not part of this build, so no region is recorded."
 		/>
 	{:else}
-		{#if formError}
+		{#if formError && !open}
 			<Alert tone="danger">{formError}</Alert>
 		{/if}
 
@@ -339,6 +340,7 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<FormErrors message={formError || undefined} />
 			{#if editing}
 				<!-- The slug is copied onto every tenant assignment and onto the
 				     report, so changing it would leave those rows naming a region

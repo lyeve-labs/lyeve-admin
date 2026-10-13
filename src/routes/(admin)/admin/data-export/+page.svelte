@@ -182,7 +182,9 @@
 			absent="The data export plugin is not part of this build, so nothing can be exported from here."
 		/>
 	{:else}
-		<FormErrors message={form?.error} />
+		{#if !startOpen && !scheduleOpen}
+			<FormErrors message={form?.error} />
+		{/if}
 		{#if form?.started}
 			<Alert tone="success" autoDismiss>
 				Export started. It runs in the background, and the list below follows it until it finishes.
@@ -439,6 +441,7 @@
 >
 	<form id="start-export-form" method="post" action="?/start" use:enhance={start.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={form?.error} />
 			<Input id="export-name" name="name" label="Name" bind:value={name} required />
 			<ExportConfigFields
 				idPrefix="export"
@@ -465,6 +468,7 @@
 >
 	<form id="schedule-form" method="post" action="?/createSchedule" use:enhance={createSchedule.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={form?.error} />
 			<Input id="schedule-name" name="name" label="Name" bind:value={schName} required />
 			<Select
 				id="schedule-when"

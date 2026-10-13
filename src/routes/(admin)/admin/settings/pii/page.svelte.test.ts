@@ -217,6 +217,17 @@ describe('custom PII rules', () => {
 	});
 });
 
+describe('PII rule drawer', () => {
+	it('shows a refused save inside the open drawer', async () => {
+		const { getAllByRole } = render(PiiPage, {
+			props: props({}, { error: 'pattern does not compile: missing closing )' }),
+		});
+		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
+		const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
+		expect(form.textContent).toContain('pattern does not compile');
+	});
+});
+
 describe('PII unmasked reads pager', () => {
 	it('offers the next page of the access log', () => {
 		const entries = Array.from({ length: 50 }, (_, i) => ({
