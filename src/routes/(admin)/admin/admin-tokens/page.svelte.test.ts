@@ -138,12 +138,20 @@ describe('admin tokens page', () => {
 		expect(chips.querySelectorAll('button')).toHaveLength(5);
 	});
 
-	it('opens the rotate form in a drawer', async () => {
+	it('opens the rotate form as the same side panel as the create form, with its fields and its warning', async () => {
+		const first = setup({ tokens: [token({})], total: 1 });
+		await fireEvent.click(first.getAllByRole('button', { name: /New token/ })[0]);
+		// The panel's width follows its fields, so the overlay around it is what
+		// tells a side panel from a centered card.
+		const createPanel = first.getByRole('dialog', { name: 'New admin token' }).parentElement?.className;
+		first.unmount();
+
 		const { getByRole } = setup({ tokens: [token({})], total: 1 });
 		await fireEvent.click(getByRole('button', { name: 'Rotate ci-deploy' }));
-		const dialog = getByRole('dialog', { name: 'Rotate ci-deploy' });
-		expect(dialog.querySelector('form#rotate-form')).toBeTruthy();
-		// The kit's drawer is a full-height panel. Its modal is a centered card.
-		expect(dialog.classList.contains('h-full')).toBe(true);
+		const panel = getByRole('dialog', { name: 'Rotate ci-deploy' });
+		expect(panel.parentElement?.className, 'rotate opened in another kind of overlay than create').toBe(createPanel);
+		expect(panel.textContent).toContain('The old token keeps working until');
+		expect(panel.textContent).toContain('Your password');
+		expect(panel.querySelector('button[type="submit"][form="rotate-form"]')?.textContent?.trim()).toBe('Rotate');
 	});
 });

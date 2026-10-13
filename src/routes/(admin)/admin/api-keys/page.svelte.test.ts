@@ -3,7 +3,32 @@ import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a delete and read the question it asks.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy: () => {} };
+	},
+}));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/** The title of the question the first delete form on the page asks. */
+async function deleteTitle(): Promise<string> {
+	const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/delete' && f.node.isConnected);
+	const submit = entry?.submit as ((input: { cancel: () => void }) => Promise<unknown>) | undefined;
+	if (!submit) throw new Error('no delete form registered a submit function');
+	kit.confirm.mockClear();
+	await submit({ cancel: () => {} });
+	return String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? '');
+}
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 vi.mock('$app/state', () => ({ page: { url: new URL('http://admin/admin/api-keys') } }));
 
@@ -154,5 +179,10 @@ describe('API keys page', () => {
 		await fireEvent.click(getByRole('radio', { name: 'Chosen schemas' }));
 		expect(document.body.textContent).toContain('The schemas could not be read');
 		expect(document.body.textContent).not.toContain('This instance has no schemas yet');
+	});
+
+	it('names the key in the delete confirmation', async () => {
+		setup([key({})]);
+		expect(await deleteTitle()).toBe('Delete API key deploy');
 	});
 });

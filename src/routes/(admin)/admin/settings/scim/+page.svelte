@@ -226,62 +226,62 @@
 						description="Clear the search, or turn the page: the box narrows what is on screen."
 					/>
 				{:else}
-				<Table label="Connections">
-					<thead>
-						<tr>
-							<th scope="col">Connection</th>
-							<th scope="col">Deprovisioned accounts are</th>
-							<th scope="col">Created</th>
-							<th scope="col"><span class="sr-only">Actions</span></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as p (p.id)}
+					<Table label="Connections">
+						<thead>
 							<tr>
-								<td data-cell="nowrap">
-									<div class="flex items-center gap-2">
-										<span class="font-medium text-fg">{p.name}</span>
-										<Badge tone={p.enabled ? 'success' : 'neutral'} dot>
-											{p.enabled ? 'Enabled' : 'Disabled'}
-										</Badge>
-									</div>
-								</td>
-								<td data-cell="nowrap">
-									<Badge tone={deprovisionTone(p)}>{deprovisionLabel(p)}</Badge>
-								</td>
-								<td data-cell="nowrap" class="text-xs text-faint">
-									{formatDateTime(p.created_at)}
-								</td>
-								<td data-cell="nowrap">
-									{#if canWrite}
-										<div class="flex items-center justify-end gap-1">
-											<Button
-												variant="ghost"
-												size="sm"
-												aria-label="Rotate the token for {p.name}"
-												title="Rotate token"
-												onclick={() => openRotate(p)}
-											>
-												<RefreshCw size={ICON.sm} />
-											</Button>
-											<form method="POST" action="?/delete" use:enhance={removeConnection(p)}>
-												<input type="hidden" name="id" value={p.id} />
+								<th scope="col">Connection</th>
+								<th scope="col">Deprovisioned accounts are</th>
+								<th scope="col">Created</th>
+								<th scope="col"><span class="sr-only">Actions</span></th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as p (p.id)}
+								<tr>
+									<td data-cell="nowrap">
+										<div class="flex items-center gap-2">
+											<span class="font-medium text-fg">{p.name}</span>
+											<Badge tone={p.enabled ? 'success' : 'neutral'} dot>
+												{p.enabled ? 'Enabled' : 'Disabled'}
+											</Badge>
+										</div>
+									</td>
+									<td data-cell="nowrap">
+										<Badge tone={deprovisionTone(p)}>{deprovisionLabel(p)}</Badge>
+									</td>
+									<td data-cell="nowrap" class="text-xs text-faint">
+										{formatDateTime(p.created_at)}
+									</td>
+									<td data-cell="nowrap">
+										{#if canWrite}
+											<div class="flex items-center justify-end gap-1">
 												<Button
 													variant="ghost"
 													size="sm"
-													type="submit"
-													aria-label="Delete {p.name}"
+													aria-label="Rotate the token for {p.name}"
+													title="Rotate token"
+													onclick={() => openRotate(p)}
 												>
-													<Trash2 size={ICON.sm} class="text-danger" />
+													<RefreshCw size={ICON.sm} />
 												</Button>
-											</form>
-										</div>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
+												<form method="POST" action="?/delete" use:enhance={removeConnection(p)}>
+													<input type="hidden" name="id" value={p.id} />
+													<Button
+														variant="ghost"
+														size="sm"
+														type="submit"
+														aria-label="Delete {p.name}"
+													>
+														<Trash2 size={ICON.sm} class="text-danger" />
+													</Button>
+												</form>
+											</div>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
 				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}

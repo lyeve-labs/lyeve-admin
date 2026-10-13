@@ -106,7 +106,12 @@ describe('permissions page', () => {
 		// sends a null `id`, and removing a rule silently never succeeds.
 		const { container, getAllByRole } = setup();
 		const form = container.querySelector('form[action="?/delete"]') as HTMLFormElement;
-		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+		// The id is read when the form posts, so the spy captures it at that
+		// moment. Read afterwards, it would pass even if the post went out first.
+		let posted: string | null = null;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {
+			posted = new FormData(form).get('id') as string | null;
+		});
 		const remove = getAllByRole('button').find((b) =>
 			b.getAttribute('aria-label')?.startsWith('Remove rule'),
 		);
@@ -120,8 +125,8 @@ describe('permissions page', () => {
 		await fireEvent.click(remove!);
 		await tick();
 		await tick();
-		expect(new FormData(form).get('id')).toBe(permission.id);
 		expect(submit).toHaveBeenCalled();
+		expect(posted).toBe(permission.id);
 	});
 
 	it('names the rule it is about to remove', async () => {

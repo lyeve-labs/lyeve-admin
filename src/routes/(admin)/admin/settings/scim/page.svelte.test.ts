@@ -2,7 +2,32 @@
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a delete and read the question it asks.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy: () => {} };
+	},
+}));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/** The title of the question the first delete form on the page asks. */
+async function deleteTitle(): Promise<string> {
+	const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/delete' && f.node.isConnected);
+	const submit = entry?.submit as ((input: { cancel: () => void }) => Promise<unknown>) | undefined;
+	if (!submit) throw new Error('no delete form registered a submit function');
+	kit.confirm.mockClear();
+	await submit({ cancel: () => {} });
+	return String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? '');
+}
 
 import ScimPage from './+page.svelte';
 import type { ScimProvider } from '$lib/api/scim';
@@ -198,5 +223,12 @@ describe('the search', () => {
 		await fireEvent.input(screen.getByPlaceholderText('Connection name on this page'), { target: { value: 'nothing like it' } });
 		expect(said(container)).toContain('No connection on this page matches');
 		expect(container.querySelector('a[href="/admin/settings/scim?limit=25&offset=25"]')).toBeTruthy();
+	});
+});
+
+describe('the delete', () => {
+	it('names the connection in the confirmation', async () => {
+		render(ScimPage, { props: props() });
+		expect(await deleteTitle()).toBe('Delete SCIM connection Azure AD');
 	});
 });
