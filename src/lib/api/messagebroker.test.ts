@@ -100,7 +100,8 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(brokerGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(brokerGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(brokerGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(brokerGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(brokerGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as a healthy broker', () => {

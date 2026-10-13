@@ -68,7 +68,8 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(deviceGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(deviceGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(deviceGate(new ApiError(503, 'database error')).state).toBe('error');
+		expect(deviceGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(deviceGate(new ApiError(503, 'database error')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as an empty list', () => {
