@@ -9,6 +9,7 @@
 		Drawer,
 		EmptyState,
 		Input,
+		MultiSelect,
 		PageShell,
 		SectionHeading,
 		Select,
@@ -21,6 +22,8 @@
 	import { ExternalLink, LayoutDashboard, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import BrandImageCard, { type ImageNotice } from './BrandImageCard.svelte';
 	import { accentShades, parseAccent, slugify, ROLE_CHOICES } from '$lib/api/customization';
 	import { formatDateTime } from '$lib/format';
@@ -31,18 +34,52 @@
 	const roleOptions = ROLE_CHOICES.map((r) => ({ value: r, label: r }));
 	const fields = $derived((form as { fields?: Record<string, string> } | null)?.fields ?? {});
 
-	let name = $state('');
-	let accent = $state('');
-	let welcome = $state('');
-	let hidden = $state<string[]>([]);
-	let pinned = $state<string[]>([]);
-	let homePage = $state('');
+	/*
+	 * Each form is seeded from what the engine stores and reseeded only when
+	 * that form's stored part changes. Every save on this page reruns the load,
+	 * so reseeding on any of them wiped what the other forms held unsaved: a
+	 * new link took the brand name being typed with it.
+	 */
+	const brandKey = () => {
+		const b = data.settings.brand;
+		return JSON.stringify([b.name, b.accent, b.welcome]);
+	};
+	const menuKey = () => JSON.stringify([data.settings.menu.hidden, data.settings.menu.pinned]);
+	const homeKey = () => data.settings.home_page;
+
+	// svelte-ignore state_referenced_locally
+	let name = $state(data.settings.brand.name);
+	// svelte-ignore state_referenced_locally
+	let accent = $state(data.settings.brand.accent);
+	// svelte-ignore state_referenced_locally
+	let welcome = $state(data.settings.brand.welcome);
+	// svelte-ignore state_referenced_locally
+	let hidden = $state<string[]>([...data.settings.menu.hidden]);
+	// svelte-ignore state_referenced_locally
+	let pinned = $state<string[]>([...data.settings.menu.pinned]);
+	// svelte-ignore state_referenced_locally
+	let homePage = $state(data.settings.home_page);
+	// svelte-ignore state_referenced_locally
+	const seeded = { brand: brandKey(), menu: menuKey(), home: homeKey() };
 	$effect.pre(() => {
+		const key = brandKey();
+		if (key === seeded.brand) return;
+		seeded.brand = key;
 		name = data.settings.brand.name;
 		accent = data.settings.brand.accent;
 		welcome = data.settings.brand.welcome;
+	});
+	$effect.pre(() => {
+		const key = menuKey();
+		if (key === seeded.menu) return;
+		seeded.menu = key;
 		hidden = [...data.settings.menu.hidden];
 		pinned = [...data.settings.menu.pinned];
+	});
+	$effect.pre(() => {
+		const key = homeKey();
+		if (key === seeded.home) return;
+		seeded.home = key;
 		homePage = data.settings.home_page;
 	});
 	const accentOk = $derived(parseAccent(accent));
@@ -97,6 +134,18 @@
 	let pageRoles = $state<string[]>([]);
 	const suggestedSlug = $derived(slugTouched ? pageSlug : slugify(pageTitle));
 
+	// Each drawer reads only its own action's failure key. The result it was
+	// opened over is an older write's, so a reopened drawer starts clean.
+	let openedOver = $state.raw<unknown>(null);
+	function openLink() {
+		openedOver = form;
+		linkOpen = true;
+	}
+	function openPage() {
+		openedOver = form;
+		pageOpen = true;
+	}
+
 	const keep: SubmitFunction = () => async ({ update }) => update({ reset: false });
 
 	const closeOnSuccess = (close: () => void): SubmitFunction => () => async ({ result, update }) => {
@@ -123,7 +172,13 @@
 		<Badge tone="violet" size="sm">Beta</Badge>
 	{/snippet}
 
-	{#if !data.entitled}
+	{#if data.gate.state !== 'ok'}
+		<GateNotice
+			gate={data.gate}
+			title="Customization"
+			absent="The multitenant plugin does not serve customization on this instance."
+		/>
+	{:else if !data.entitled}
 		<NotEnabled
 			title="Customization"
 			description="Give each tenant its own name, logo and colors, a dashboard and a menu shaped to what its team uses, and pages built for that team."
@@ -213,6 +268,7 @@
 							<Select
 								id="home-page"
 								label="Page above the dashboard"
+								searchable
 								hint="Shown at the top of the dashboard, above its panels or widgets."
 								options={homeOptions}
 								value={homePage}
@@ -228,13 +284,19 @@
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-2">
 						<SectionHeading level={3}>Pages</SectionHeading>
-						<Button variant="secondary" size="sm" onclick={() => (pageOpen = true)}>
+						<Button variant="secondary" size="sm" onclick={openPage}>
 							<Plus size={ICON.sm} /> New page
 						</Button>
 					</div>
 				{/snippet}
 				{#if data.pages.length === 0}
-					<EmptyState title="No pages yet" description="Build a page for the team from text, callouts, content lists, counts and links. It gets its own entry in the menu." />
+					<EmptyState title="No pages yet" description="Build a page for the team from text, callouts, content lists, counts and links. It gets its own entry in the menu.">
+						{#snippet action()}
+							<Button variant="secondary" onclick={openPage}>
+								<Plus size={ICON.sm} /> New page
+							</Button>
+						{/snippet}
+					</EmptyState>
 				{:else}
 					<Table label="Pages">
 						<thead>
@@ -284,20 +346,33 @@
 					<Alert tone="success" autoDismiss>Saved.</Alert>
 				{/if}
 				<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-					<CheckboxGroup
-						name="hidden"
+					<!-- The menu holds dozens of entries, so each list is searched
+					     rather than drawn as a wall of boxes. Each pick posts its
+					     own value. -->
+					<MultiSelect
+						id="menu-hidden"
 						label="Hidden"
+						placeholder="Nothing hidden"
 						hint="Entries this tenant's team never uses. Hiding one takes it off the menu only. The page stays guarded by its own access rules."
+						searchable
 						options={navOptions}
 						bind:value={hidden}
 					/>
-					<CheckboxGroup
-						name="pinned"
+					<MultiSelect
+						id="menu-pinned"
 						label="Pinned"
+						placeholder="Nothing pinned"
 						hint="Entries shown in a group of their own at the top of the menu."
+						searchable
 						options={pinOptions}
 						bind:value={pinned}
 					/>
+					{#each hidden as id (id)}
+						<input type="hidden" name="hidden" value={id} />
+					{/each}
+					{#each pinned.filter((id) => !hidden.includes(id)) as id (id)}
+						<input type="hidden" name="pinned" value={id} />
+					{/each}
 				</div>
 				<div><Button variant="primary" type="submit">Save</Button></div>
 			</form>
@@ -307,7 +382,7 @@
 			{#snippet header()}
 				<div class="flex items-center justify-between gap-2">
 					<SectionHeading level={3}>Links</SectionHeading>
-					<Button variant="secondary" size="sm" onclick={() => (linkOpen = true)}>
+					<Button variant="secondary" size="sm" onclick={openLink}>
 						<Plus size={ICON.sm} /> New link
 					</Button>
 				</div>
@@ -342,9 +417,7 @@
 
 <Drawer bind:open={linkOpen} title="New link">
 	<form method="POST" action="?/addLink" id="link-form" class="flex flex-col gap-4" use:enhance={closeOnSuccess(() => (linkOpen = false))}>
-		{#if form?.linkError && linkOpen}
-			<Alert tone="danger">{form.linkError}</Alert>
-		{/if}
+		<FormErrors message={form !== openedOver ? form?.linkError : undefined} fields={form !== openedOver && form?.linkError ? fields : {}} />
 		<Input id="link-label" name="label" label="Label" required error={fields.label} />
 		<Input id="link-url" name="url" label="Address" mono required placeholder="https://" hint="An https URL, or an admin path such as /admin/media." error={fields.url} />
 		<CheckboxGroup name="roles" label="Seen by" hint="Leave empty for everyone." options={roleOptions} bind:value={linkRoles} />
@@ -357,9 +430,7 @@
 
 <Drawer bind:open={pageOpen} title="New page">
 	<form method="POST" action="?/createPage" id="page-form" class="flex flex-col gap-4" use:enhance>
-		{#if form?.pageError && pageOpen}
-			<Alert tone="danger">{form.pageError}</Alert>
-		{/if}
+		<FormErrors message={form !== openedOver ? form?.pageError : undefined} fields={form !== openedOver && form?.pageError ? fields : {}} />
 		<Input id="page-title" name="title" label="Title" required bind:value={pageTitle} error={fields.title} />
 		<Input
 			id="page-slug"

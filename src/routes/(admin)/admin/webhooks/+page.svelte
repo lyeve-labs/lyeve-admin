@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { filtersText, keptJSON, type WebhookRecord } from '$lib/api/webhook-options';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -11,6 +11,7 @@
 		Drawer,
 		EmptyState,
 		Input,
+		MultiSelect,
 		PageShell,
 		Pagination,
 		PasswordInput,
@@ -26,6 +27,7 @@
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { Webhook, WebhookDelivery, DeadLetter } from '@lyeve-labs/client';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import {
@@ -44,13 +46,30 @@
 	} from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formatDateTime } from '$lib/format';
 	import { narrows } from '$lib/narrow';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * Each failure names the action that caused it. The drawer shows only its
+	 * own writes' failures, and only one that came back after it was opened, so
+	 * a failed delete never reads as a failure of the form opened next. The
+	 * rest show above the list.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
+	const drawerError = $derived((drawerForm as Failure)?.error || undefined);
+	const pageError = $derived((pageForm as Failure)?.error || undefined);
+	const drawerRefusal = $derived(formRefusal(drawerForm));
+	const pageRefusal = $derived(formRefusal(pageForm));
 
 	const submit = submitter(() => (open = false));
 
@@ -67,9 +86,8 @@
 		'after_delete'
 	].map((value) => ({ value, label: value }));
 
-	const schemaOptions = $derived<ChoiceOption[]>(
-		data.schemas.map((s) => ({ value: s.name, label: s.name }))
-	);
+	const rows = $derived(data.webhooks.ok ? data.webhooks.value : []);
+
 
 	// One drawer for both writes: a null target is a new webhook.
 	let open = $state(false);
@@ -80,6 +98,14 @@
 	let enabled = $state(true);
 	let events = $state<string[]>([]);
 	let schemas = $state<string[]>([]);
+
+	// A schema the webhook already names stays among the options even when the
+	// schema list could not be read, so saving an edit never drops it.
+	const schemaOptions = $derived<ChoiceOption[]>(
+		[...new Set([...(data.schemas.ok ? data.schemas.value.map((s) => s.name) : []), ...schemas])].map(
+			(name) => ({ value: name, label: name })
+		)
+	);
 	// The delivery options. An edit sends back what it read, so an endpoint keeps
 	// them through a change of its name.
 	let template = $state('');
@@ -97,9 +123,10 @@
 		retryDelay = wh?.retry_delay_seconds != null ? String(wh.retry_delay_seconds) : '';
 		kept = keptJSON(wh);
 	}
-	const formErrors = $derived(fieldErrors(form));
+	const formErrors = $derived(fieldErrors(drawerForm));
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		name = '';
 		url = '';
@@ -112,6 +139,7 @@
 	}
 
 	function openEdit(wh: Webhook) {
+		openedOver = form;
 		editing = wh;
 		name = wh.name;
 		url = wh.url;
@@ -133,8 +161,9 @@
 	 */
 	function openDuplicate(wh: Webhook) {
 		const draft = duplicateRow(wh as unknown as Record<string, unknown>, {
-			taken: data.webhooks.map((w) => w.name),
+			taken: rows.map((w) => w.name),
 		});
+		openedOver = form;
 		editing = null;
 		name = String(draft.name ?? wh.name);
 		url = wh.url;
@@ -152,12 +181,13 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(wh: Webhook) {
-		const ok = await confirmDialog('Delete webhook', `Delete ${wh.name}? This cannot be undone.`, {
+		const ok = await confirmDialog(`Delete webhook ${wh.name}`, `Delete ${wh.name}? This cannot be undone.`, {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		deleteId = wh.id;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the value has reached the DOM.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -171,7 +201,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.webhooks.filter(
+		rows.filter(
 			(wh) =>
 				narrows(query, wh.name, wh.url, wh.events.join(' '), wh.schemas.join(' ')) &&
 				(status === '' || (status === 'enabled') === wh.enabled)
@@ -278,6 +308,8 @@
 		return url.length > max ? url.slice(0, max) + '...' : url;
 	}
 
+	// The webhook plugin serves create, update, delete and rotate to a super
+	// admin only. An admin reads, tests and replays, and is told the rest.
 	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
 </script>
 
@@ -295,31 +327,40 @@
 				Dead letters
 			</Button>
 		</form>
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} />
-			New webhook
-		</Button>
+		<!-- A list that could not be read offers no write against it. -->
+		{#if data.webhooks.ok && isSuperAdmin}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} />
+				New webhook
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if form && 'error' in form && form.error}
-		<Alert tone="danger">
-			{#snippet children()}{form.error}{/snippet}
-		</Alert>
+	<FormErrors message={pageError} refused={pageRefusal} />
+
+	{#if data.webhooks.ok && !isSuperAdmin}
+		<Alert tone="brand">Your role reads and tests webhooks. Creating, changing or deleting one takes a super admin.</Alert>
 	{/if}
 
-	{#if data.webhooks.length === 0}
+	{#if !data.webhooks.ok}
+		<GateNotice
+			gate={data.webhooks.gate}
+			title="Webhooks"
+			absent="The webhook plugin is not part of this build, so no callback is sent on a content event."
+		/>
+	{:else if data.webhooks.value.length === 0}
 		<EmptyState
 			title="No webhooks configured yet"
 			description="Add one to receive HTTP callbacks on content events."
 		>
 			{#snippet iconSnippet()}<WebhookIcon size={ICON.lg} />{/snippet}
 			{#snippet action()}
-				<Button variant="secondary" onclick={openCreate}>
-					<Plus size={ICON.sm} />
-					New webhook
-				</Button>
+				{#if isSuperAdmin}
+					<Button variant="secondary" onclick={openCreate}>
+						<Plus size={ICON.sm} />
+						New webhook
+					</Button>
+				{/if}
 			{/snippet}
 		</EmptyState>
 	{:else}
@@ -418,8 +459,7 @@
 											<KeyRound size={ICON.sm} />
 										</Button>
 									</form>
-								{/if}
-								<Button
+									<Button
 									variant="ghost"
 									size="sm"
 									onclick={() => openEdit(wh)}
@@ -447,6 +487,7 @@
 								>
 									<Trash2 size={ICON.sm} class="text-danger" />
 								</Button>
+								{/if}
 							</div>
 
 							{#if testResults[wh.id]}
@@ -475,7 +516,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.webhooks.length}
+			count={data.webhooks.value.length}
 			total={data.total ?? undefined}
 			hasNext={data.hasMore}
 			noun="webhooks"
@@ -492,11 +533,7 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if form && 'error' in form && form.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={drawerError} fields={formErrors} refused={drawerRefusal} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="kept" value={kept} />
 		<Input id="webhook-name" name="name" label="Name" bind:value={name} placeholder="Slack notifier" required />
@@ -509,14 +546,25 @@
 			bind:value={secret}
 		/>
 		<CheckboxGroup name="events" label="Events" orientation="horizontal" options={EVENT_OPTIONS} bind:value={events} />
-		<CheckboxGroup
-			name="schemas"
+		<!-- The schemas are rows from data, so they are searched rather than
+		     listed as boxes. Each pick posts its own value, the way the event
+		     boxes do. -->
+		<MultiSelect
+			id="webhook-schemas"
 			label="Schemas"
-			hint="Leave empty to fire on every schema."
-			orientation="horizontal"
+			placeholder="Every schema"
+			hint={data.schemas.ok
+				? 'Leave empty to fire on every schema.'
+				: editing
+					? 'The schemas could not be read, so only the ones this webhook already names are listed.'
+					: 'The schemas could not be read, so none can be picked. Saved like this, the webhook fires on every schema.'}
+			searchable
 			options={schemaOptions}
 			bind:value={schemas}
 		/>
+		{#each schemas as s (s)}
+			<input type="hidden" name="schemas" value={s} />
+		{/each}
 		<div>
 			<!-- The action reads `enabled` from the body. Without this the
 			     switch posts nothing and every webhook is created disabled. -->

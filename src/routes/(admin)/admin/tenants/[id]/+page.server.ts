@@ -1,9 +1,18 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { archiveTenant, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
+import { section, type Section } from '$lib/api/gate';
+import { readError } from '$lib/server/read-error';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+
+/** The members page size when a request names none. */
+const MEMBERS_LIMIT = 50;
+
+/** The most members one page asks for. */
+const MEMBERS_MAX = 200;
 import {
 	featureChoices,
 	findUserByEmail,
@@ -22,29 +31,46 @@ export const load: PageServerLoad = async (event) => {
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 
-	const tenant = await getTenant(event.params.id, client).catch(() => null);
-	if (!tenant) error(404, 'No tenant has that id.');
+	// Only the engine's 404 says the tenant does not exist. A refusal or an
+	// outage keeps a status of its own.
+	const tenant = await getTenant(event.params.id, client).catch((err: unknown) =>
+		readError(err, 'No tenant has that id.'),
+	);
+
+	// The members are paged rather than capped, so a tenant with more than one
+	// page of accounts shows every one of them a page at a time.
+	const { limit, offset } = pageWindow(event.url, MEMBERS_LIMIT, MEMBERS_MAX);
 
 	// Each half is read on its own: a members list that fails is no reason to
 	// hide what the tenant may use, and the reverse.
 	const [features, members] = await Promise.all([
-		getTenantFeatures(client, tenant.slug).catch(() => null),
-		listTenantMembers(client, tenant.slug, 200, 0).catch(() => null),
+		section(getTenantFeatures(client, tenant.slug), "This tenant's features could not be read."),
+		section(
+			listTenantMembers(client, tenant.slug, limit, offset),
+			"This tenant's members could not be read. This is not a report that it has none.",
+		),
 	]);
 
 	// The entitlements the layout read are the signed-in super admin's, whose
 	// tenant is not this one, so only `features` is read from them: the
 	// license, which is the same for every tenant.
 	const licensed = entitlements?.features ?? [];
-	const choices: FeatureChoice[] | null = features
-		? featureChoices(features.known, licensed, features.withheld)
-		: null;
+	const choices: Section<FeatureChoice[]> = features.ok
+		? { ok: true, value: featureChoices(features.value.known, licensed, features.value.withheld) }
+		: features;
+	if (members.ok) {
+		const back = pastEndOffset(members.value.members?.length ?? 0, limit, offset, members.value.total ?? null);
+		if (back !== null) redirect(307, withOffset(event.url, back));
+	}
+	const people: Section<TenantMember[]> = members.ok ? { ok: true, value: members.value.members ?? [] } : members;
 
 	return {
 		tenant,
 		choices,
-		members: (members?.members ?? null) as TenantMember[] | null,
-		memberTotal: members?.total ?? 0,
+		members: people,
+		memberTotal: members.ok ? members.value.total : 0,
+		limit,
+		offset,
 	};
 };
 
@@ -74,15 +100,15 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '').trim();
 		const userId = String(form.get('user_id') ?? '').trim();
 		const roles = form.getAll('roles').map(String).filter(Boolean);
-		if (!userId && !email) return fail(400, { memberError: 'Name the account by its email.', fields: { email: 'Required' } });
-		if (roles.length === 0) return fail(400, { memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
+		if (!userId && !email) return fail(400, { action: 'grant', memberError: 'Name the account by its email.', fields: { email: 'Required' } });
+		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
 		const client = authedClient(event);
 		try {
 			let id = userId;
 			if (!id) {
 				const found = await findUserByEmail(client, email);
 				if (!found) {
-					return fail(404, { memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
+					return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
 				}
 				id = found.id;
 			}
@@ -90,8 +116,8 @@ export const actions: Actions = {
 			return { memberSaved: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { memberError: full });
-			return fail(400, { memberError: actionError(err, 'The membership could not be saved.') });
+			if (full) return fail(402, { action: 'grant', memberError: full });
+			return fail(400, { action: 'grant', memberError: actionError(err, 'The membership could not be saved.') });
 		}
 	},
 
@@ -103,7 +129,7 @@ export const actions: Actions = {
 			await revokeMembership(authedClient(event), userId, await tenantSlug(event));
 			return { memberRevoked: true };
 		} catch (err) {
-			return fail(400, { memberError: actionError(err, 'The membership could not be removed.') });
+			return fail(400, { action: 'revoke', memberError: actionError(err, 'The membership could not be removed.') });
 		}
 	},
 

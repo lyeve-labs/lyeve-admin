@@ -14,6 +14,7 @@ import {
 	type Widget,
 } from '$lib/api/custom-dashboard';
 import { resolveWidgets } from '$lib/server/dashboard-widgets';
+import { readError } from '$lib/server/read-error';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, customization } = await event.parent();
@@ -23,13 +24,17 @@ export const load: PageServerLoad = async (event) => {
 	if (!customization.entitled) redirect(303, '/admin/settings/customization');
 	const client = authedClient(event);
 	const [layout, schemas] = await Promise.all([
-		getDashboardLayout(client).catch(() => null),
+		// The editor has nothing to draw without the layout, so a failed read
+		// ends in the error page with a status of its own.
+		getDashboardLayout(client).catch((err: unknown) =>
+			readError(err, 'This instance does not serve a dashboard layout.'),
+		),
 		Promise.resolve()
 			.then(() => listSchemaNames(client))
-			.catch((): string[] => []),
+			.then((names) => ({ names, read: true }))
+			.catch(() => ({ names: [] as string[], read: false })),
 	]);
-	if (!layout) error(503, 'The dashboard layout could not be read.');
-	return { layout, schemas };
+	return { layout, schemas: schemas.names, schemasRead: schemas.read };
 };
 
 /** The widgets a form posted, or null when the field is not a widget list. */

@@ -14,8 +14,14 @@
 		Table,
 		Toggle,
 		confirm as confirmDialog,
-		toast, Pagination } from '@lyeve-labs/ui-kit';
+		toast,
+		Pagination,
+		SearchInput,
+	} from '@lyeve-labs/ui-kit';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import { narrows } from '$lib/narrow';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Check, Gauge, Pencil, Plus, X } from '@lucide/svelte';
@@ -51,9 +57,18 @@
 		data.user?.roles?.includes('super_admin') ? { href: '/admin/tenants', label: 'Tenants' } : undefined,
 	);
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const errors = $derived(fieldErrors(form));
-	const refused = $derived(formRefusal(form));
+	/*
+	 * Each failure names the action that caused it. The quota drawer shows only
+	 * its own failures, and only one that came back after it was opened, so a
+	 * failed review never reads as a failure of the form opened next. The rest
+	 * show above the tables.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const inDrawer = $derived((form as Failure)?.action === 'quota');
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
+	const errors = $derived(fieldErrors(drawerForm));
 
 	// One drawer for a new quota and an existing one.
 	let editorOpen = $state(false);
@@ -70,6 +85,7 @@
 	const saveQuota = submitter(() => (editorOpen = false));
 
 	function openQuota(q: Quota | null) {
+		openedOver = form;
 		editing = q;
 		tenantId = q?.tenant_id ?? '';
 		requestsLimit = q?.requests_limit ?? 0;
@@ -86,12 +102,13 @@
 	let clearForm = $state<HTMLFormElement>();
 	async function askClear() {
 		if (!editing) return;
-		const ok = await confirmDialog(`Remove the quota for ${editing.tenant_id}?`, 'The tenant may use as much as it likes, and a block on it is lifted.', {
+		const ok = await confirmDialog(`Delete the quota for ${editing.tenant_id}`, 'The tenant may use as much as it likes, and a block on it is lifted.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		editorOpen = false;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the value has reached the DOM.
+		await tick();
 		clearForm?.requestSubmit();
 	}
 	const waiting = $derived(pending(data.requests));
@@ -99,6 +116,10 @@
 	const reportingOnly = $derived(
 		data.quotas.filter((q) => hasAnyLimit(q) && !enforces(q)),
 	);
+	// The endpoint takes no search, so the box narrows the page on screen and
+	// the pager below still walks every quota.
+	let query = $state('');
+	const visibleQuotas = $derived(data.quotas.filter((q) => narrows(query, q.tenant_id)));
 	const usageByTenant = $derived(new Map(data.usage.map((u) => [u.tenant_id, u])));
 
 	function review(r: QuotaRequest, decision: 'approve' | 'deny'): SubmitFunction {
@@ -151,9 +172,7 @@
 			absent="The usage plugin is not part of this build, so nothing is metered or capped."
 		/>
 	{:else}
-		{#if !editorOpen}
-			<FormErrors message={formError || undefined} {refused} />
-		{/if}
+		<FormErrors message={(pageForm as Failure)?.error || undefined} refused={formRefusal(pageForm)} />
 		{#if form && 'quotaSaved' in form}
 			<Alert tone="success" autoDismiss>Quota saved for {form.quotaSaved}.</Alert>
 		{:else if form && 'quotaCleared' in form}
@@ -201,8 +220,31 @@
 					{#snippet iconSnippet()}
 						<Gauge size={ICON.lg} />
 					{/snippet}
+					{#snippet action()}
+						<Button variant="secondary" onclick={() => openQuota(null)}>
+							<Plus size={ICON.sm} /> New quota
+						</Button>
+					{/snippet}
 				</EmptyState>
 			{:else}
+				<ListToolbar label="Filter quotas">
+					{#snippet search()}
+						<label for="quota-search" class="sr-only">Narrow this page</label>
+						<SearchInput id="quota-search" bind:value={query} placeholder="Tenant on this page" />
+					{/snippet}
+				</ListToolbar>
+				{#if !data.usageRead}
+					<Alert tone="warn">
+						What each tenant used could not be read, so the quotas below show their limits alone.
+						This is not a report that nothing was used.
+					</Alert>
+				{/if}
+				{#if visibleQuotas.length === 0}
+					<EmptyState
+						title="No quota on this page matches"
+						description="Clear the search, or turn the page: the box narrows what is on screen."
+					/>
+				{:else}
 				<Table label="Quotas">
 					<thead>
 						<tr>
@@ -215,7 +257,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.quotas as q (q.id)}
+						{#each visibleQuotas as q (q.id)}
 							{@const used = usageByTenant.get(q.tenant_id)}
 							{@const callPct = used ? usedPct(used.api_calls, q.requests_limit) : null}
 							{@const storePct = used ? usedPct(used.storage_bytes, q.storage_bytes_limit) : null}
@@ -274,6 +316,7 @@
 						{/each}
 					</tbody>
 				</Table>
+				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
@@ -372,7 +415,11 @@
 
 <Drawer bind:open={editorOpen} title={editing ? `Quota for ${editing.tenant_id}` : 'New quota'}>
 	<form method="POST" action="?/quota" id="quota-form" use:enhance={saveQuota.enhance} class="flex flex-col gap-4">
-		<FormErrors message={formError || undefined} fields={errors} {refused} />
+		<FormErrors
+			message={(drawerForm as Failure)?.error || undefined}
+			fields={errors}
+			refused={formRefusal(drawerForm)}
+		/>
 		{#if editing}
 			<input type="hidden" name="tenant_id" value={editing.tenant_id} />
 		{:else}

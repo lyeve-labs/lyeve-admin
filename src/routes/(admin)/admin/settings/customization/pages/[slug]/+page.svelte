@@ -7,9 +7,11 @@
 		Card,
 		CheckboxGroup,
 		Input,
+		MultiSelect,
 		NumberInput,
 		PageShell,
 		SectionHeading,
+		SegmentedControl,
 		Select,
 		Textarea,
 		confirm as confirmDialog,
@@ -38,6 +40,16 @@
 
 	const roleOptions = ROLE_CHOICES.map((r) => ({ value: r, label: r }));
 	const schemaOptions = $derived(data.schemas.map((s) => ({ value: s, label: s })));
+
+	/**
+	 * The schema options with the ones a block already names added, so a block
+	 * keeps its schemas on screen when the list could not be read.
+	 */
+	function withOwn(own: readonly (string | undefined)[]) {
+		const names = new Set(data.schemas);
+		const extra = own.filter((s): s is string => !!s && !names.has(s));
+		return [...schemaOptions, ...extra.map((s) => ({ value: s, label: s }))];
+	}
 	const toneOptions = [
 		{ value: 'brand', label: 'Brand' },
 		{ value: 'neutral', label: 'Neutral' },
@@ -127,6 +139,12 @@
 			<Alert tone="success" autoDismiss>Saved.</Alert>
 		{/if}
 
+		{#if !data.schemasRead}
+			<Alert tone="warn">
+				The schemas could not be read, so no schema can be picked below. A block keeps the schemas it already names.
+			</Alert>
+		{/if}
+
 		<Card pad="md">
 			{#snippet header()}
 				<SectionHeading level={3}>Page</SectionHeading>
@@ -167,12 +185,20 @@
 						<Select id="block-{i}-tone" label="Tone" options={toneOptions} value={block.tone || 'brand'} onvaluechange={(v) => (block.tone = v as Block['tone'])} />
 					{:else if block.type === 'content'}
 						<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-							<Select id="block-{i}-schema" label="Schema" options={schemaOptions} value={block.schema ?? ''} onvaluechange={(v) => (block.schema = v)} />
-							<Select id="block-{i}-status" label="Status" options={statusOptions} value={block.status ?? ''} onvaluechange={(v) => (block.status = v as Block['status'])} />
+							<Select id="block-{i}-schema" label="Schema" searchable options={withOwn([block.schema])} value={block.schema ?? ''} onvaluechange={(v) => (block.schema = v)} />
+							<SegmentedControl label="Status" options={statusOptions} value={block.status ?? ''} onchange={(v) => (block.status = v as Block['status'])} />
 							<NumberInput id="block-{i}-limit" label="Entries" min={1} max={50} bind:value={block.limit} />
 						</div>
 					{:else if block.type === 'stats'}
-						<CheckboxGroup label="Schemas to count" hint="Up to 12." orientation="horizontal" options={schemaOptions} bind:value={block.schemas} />
+						<MultiSelect
+							id="block-{i}-schemas"
+							label="Schemas to count"
+							placeholder="Pick schemas"
+							hint="Up to 12."
+							searchable
+							options={withOwn(block.schemas ?? [])}
+							bind:value={block.schemas}
+						/>
 					{:else if block.type === 'links'}
 						<div class="flex flex-col gap-3">
 							<!-- No field in the row carries a hint, so every control ends on

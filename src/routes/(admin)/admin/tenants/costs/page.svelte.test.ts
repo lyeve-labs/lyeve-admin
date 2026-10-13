@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PageData } from './$types';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
+	const actual = await importOriginal<Record<string, unknown>>();
+	return { ...actual, confirm: kit.confirm };
+});
 
 import CostsPage from './+page.svelte';
 
@@ -50,8 +56,19 @@ const prices = [
 	{ resource_type: 'compute', unit_price: '1.00', per_units: 1000000, currency: 'USD', source: 'default', updated_at: null },
 ];
 
+/** A read that answered. A null override is a read that failed for no reason the page can name. */
+function read(value: unknown) {
+	return value === null ? { ok: false, gate: { state: 'error', message: 'It could not be read.' } } : { ok: true, value };
+}
+
 function data(overrides: Record<string, unknown> = {}): PageData {
-	return { enabled: true, upgradeUrl: '', summary, dashboard, budgets, prices, ...overrides } as unknown as PageData;
+	const reads = { summary, dashboard, budgets, prices };
+	const merged: Record<string, unknown> = { enabled: true, upgradeUrl: '', ...overrides };
+	for (const key of Object.keys(reads) as (keyof typeof reads)[]) {
+		const value = key in overrides ? overrides[key] : reads[key];
+		merged[key] = value !== null && typeof value === 'object' && 'ok' in value ? value : read(value);
+	}
+	return merged as unknown as PageData;
 }
 
 function fieldsets(): HTMLFieldSetElement[] {
@@ -105,8 +122,10 @@ describe('tenant costs page', () => {
 	});
 
 	it('says which read did not answer', () => {
-		render(CostsPage, { props: { data: data({ summary: null }), form: null } });
-		expect(screen.getByText('The split by resource did not answer.')).toBeTruthy();
+		render(CostsPage, {
+			props: { data: data({ summary: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+		expect(screen.getByText(/so the split by resource could not be read/)).toBeTruthy();
 		expect(screen.getByTestId('cost-dashboard')).toBeTruthy();
 	});
 
@@ -124,5 +143,82 @@ describe('tenant costs page', () => {
 			props: { data: data(), form: { form: 'price', error: 'The cost ledger is not enabled on this instance.', locked: true } as never },
 		});
 		expect(screen.getAllByText('The cost ledger is not enabled on this instance.')).toHaveLength(1);
+	});
+});
+
+/*
+ * A price card states what this tenant pays per block of units. Drawn with no
+ * price read, every card claimed the default at 0 USD and offered to save it.
+ */
+describe('tenant cost prices that are not known', () => {
+	it('draws no price card when the prices could not be read', () => {
+		render(CostsPage, {
+			props: { data: data({ prices: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+		expect(screen.queryByTestId('cost-prices')).toBeNull();
+		expect(screen.queryAllByRole('form', { name: /Price for/ })).toHaveLength(0);
+		expect(screen.queryByText('Default')).toBeNull();
+		expect(screen.getByText(/so the prices could not be read/)).toBeTruthy();
+	});
+
+});
+
+/*
+ * Every form on the page shares one action result. The budget drawer showed
+ * nothing of a failed create, and a failed delete is no failure of the next
+ * budget opened.
+ */
+describe('the budget drawer and the failures of other actions', () => {
+	const drawerText = () => document.body.querySelector('form#budget-form')?.textContent ?? '';
+
+	it('leaves a newly opened budget drawer clean after a failed delete', async () => {
+		render(CostsPage, { props: { data: data(), form: { form: 'budget', error: 'Failed to delete the budget.', locked: false } as never } });
+		expect(screen.getAllByText('Failed to delete the budget.')).toHaveLength(1);
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		expect(drawerText()).not.toContain('Failed to delete the budget.');
+	});
+
+	it('keeps the warn tone of a refusal for a ledger that is not enabled', async () => {
+		const { rerender } = render(CostsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		await rerender({
+			data: data(),
+			form: { form: 'budget-new', error: 'The cost ledger is not enabled on this instance.', locked: true } as never,
+		});
+		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
+		const alert = [...form.querySelectorAll('[role="alert"], [role="status"], div')].find(
+			(el) => el.textContent?.trim() === 'The cost ledger is not enabled on this instance.' && el.className.includes('warn'),
+		);
+		expect(alert).toBeTruthy();
+		expect(form.textContent).toContain('The cost ledger is not enabled on this instance.');
+	});
+
+	it('shows a failed create inside the open drawer, first in its form', async () => {
+		const { rerender } = render(CostsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		await rerender({ data: data(), form: { form: 'budget-new', error: 'The amount is a decimal.', locked: false } as never });
+		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
+		expect(form.firstElementChild?.textContent).toContain('The amount is a decimal.');
+	});
+});
+
+describe('the budget controls', () => {
+	it('picks the period from a segmented control that posts it', async () => {
+		render(CostsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		expect(screen.getByRole('radiogroup', { name: 'Period' })).toBeTruthy();
+		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
+		expect(new FormData(form).get('period')).toBe('monthly');
+	});
+
+	it('names the budget in the delete confirmation and posts its id once agreed', async () => {
+		kit.confirm.mockResolvedValue(true);
+		render(CostsPage, { props: { data: data(), form: null } });
+		const form = document.body.querySelector('form[action="?/deleteBudget"]') as HTMLFormElement;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete Storage cap' }));
+		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
+		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap', expect.any(String), { confirmLabel: 'Delete' });
+		expect(new FormData(form).get('id')).toBe('b1');
 	});
 });

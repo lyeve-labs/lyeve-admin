@@ -37,9 +37,12 @@ const webhook = {
 	created_at: '2026-01-01T00:00:00Z',
 };
 
-function setup() {
+function setup(roles: string[] = ['super_admin']) {
 	return render(WebhooksPage, {
-		props: { data: { webhooks: [webhook], schemas: [], entitlements }, form: null } as never,
+		props: {
+			data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements, user: { roles } },
+			form: null,
+		} as never,
 	});
 }
 
@@ -59,7 +62,7 @@ describe('webhooks page', () => {
 
 		await fireEvent.click(getByTitle('Delete'));
 		await tick();
-		expect(kit.confirm).toHaveBeenCalledWith('Delete webhook', expect.stringContaining('Ship it'), {
+		expect(kit.confirm).toHaveBeenCalledWith('Delete webhook Ship it', expect.stringContaining('Ship it'), {
 			confirmLabel: 'Delete',
 		});
 		expect(submit).not.toHaveBeenCalled();
@@ -87,5 +90,96 @@ describe('webhooks page', () => {
 		expect(dialog.textContent).toContain('Edit Ship it');
 		expect((dialog.querySelector('#webhook-url') as HTMLInputElement).value).toBe('https://example.com/hook');
 		expect(dialog.querySelector('button[type="submit"]')?.textContent?.trim()).toBe('Save');
+	});
+});
+
+/*
+ * The first-run state invites the reader to create the first webhook. Drawn
+ * over a read that failed, it tells somebody whose engine is down that no
+ * callback is configured.
+ */
+describe('the webhook list when it could not be read', () => {
+	function failed(gate: Record<string, unknown>) {
+		return render(WebhooksPage, {
+			props: {
+				data: { webhooks: { ok: false, gate }, schemas: { ok: true, value: [] }, entitlements, user: { roles: ['super_admin'] } },
+				form: null,
+			} as never,
+		});
+	}
+
+	it('says the engine did not answer and offers no first webhook', () => {
+		const { container, queryByRole } = failed({ state: 'unavailable' });
+		expect(container.textContent).toContain('so Webhooks could not be read. Nothing was changed.');
+		expect(container.textContent).not.toContain('No webhooks configured yet');
+		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
+		expect(container.querySelector('table')).toBeNull();
+	});
+
+	it('names the role for a refusal', () => {
+		const { container } = failed({ state: 'forbidden' });
+		expect(container.textContent).toContain('Your role cannot open Webhooks.');
+		expect(container.textContent).not.toContain('No webhooks configured yet');
+	});
+});
+
+/*
+ * The webhook plugin serves create, update, delete and rotate to a super admin
+ * only. An admin offered them meets a refusal after filling the form in.
+ */
+describe('the webhook controls by role', () => {
+	it('offers an admin the reads and tests, and says who may change a webhook', () => {
+		const { container, queryByRole, getByRole } = setup(['admin']);
+		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
+		expect(queryByRole('button', { name: 'Edit Ship it' })).toBeNull();
+		expect(queryByRole('button', { name: 'Duplicate Ship it' })).toBeNull();
+		expect(queryByRole('button', { name: 'Delete Ship it' })).toBeNull();
+		expect(queryByRole('button', { name: /rotate the signing secret/i })).toBeNull();
+		expect(getByRole('button', { name: 'Test Ship it' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Delivery history for Ship it' })).toBeTruthy();
+		expect(container.textContent).toContain('Creating, changing or deleting one takes a super admin.');
+	});
+
+	it('offers a super admin every write', () => {
+		const { container, getByRole, getAllByRole } = setup();
+		expect(getAllByRole('button', { name: /new webhook/i })).toHaveLength(1);
+		expect(getByRole('button', { name: 'Edit Ship it' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Delete Ship it' })).toBeTruthy();
+		expect(getByRole('button', { name: /rotate the signing secret/i })).toBeTruthy();
+		expect(container.textContent).not.toContain('takes a super admin');
+	});
+});
+
+/*
+ * Every form on the page shares one action result. A drawer that read it
+ * whole showed a failed delete in the next New webhook form as if that form
+ * had failed.
+ */
+describe('the webhook drawer and the failures of other actions', () => {
+	const props = (form: unknown) =>
+		({
+			data: {
+				webhooks: { ok: true, value: [webhook] },
+				schemas: { ok: true, value: [] },
+				entitlements,
+				user: { roles: ['super_admin'] },
+			},
+			form,
+		}) as never;
+	const drawerText = () => document.body.querySelector('form#webhook-form')?.textContent ?? '';
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container, getByRole } = render(WebhooksPage, { props: props({ action: 'delete', error: 'Failed to delete webhook' }) });
+		expect(container.textContent).toContain('Failed to delete webhook');
+		await fireEvent.click(getByRole('button', { name: /new webhook/i }));
+		expect(drawerText()).not.toContain('Failed to delete webhook');
+	});
+
+	it('shows a failed save inside the open drawer, first in its form', async () => {
+		const { getByRole, rerender } = render(WebhooksPage, { props: props(null) });
+		await fireEvent.click(getByRole('button', { name: /new webhook/i }));
+		await rerender(props({ action: 'create', error: 'Failed to create webhook' }));
+		const form = document.body.querySelector('form#webhook-form') as HTMLFormElement;
+		expect(form.firstElementChild?.textContent).toContain('Failed to create webhook');
 	});
 });

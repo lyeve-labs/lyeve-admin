@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ApiError } from '@lyeve-labs/client';
+import { listMediaChoices } from '$lib/api/media';
 
 const api = vi.hoisted(() => ({
 	getCustomization: vi.fn(),
@@ -67,7 +69,24 @@ describe('customization settings', () => {
 		const data = (await load(event({}))) as { entitled: boolean; navChoices: unknown[]; mediaChoices: unknown[] };
 		expect(data.entitled).toBe(false);
 		expect(data.navChoices).toEqual([]);
-		expect(data.mediaChoices).toEqual([]);
+		expect(data.mediaChoices).toBeNull();
+	});
+
+	// A failed read is said as its gate, never as a tenant that may not shape
+	// its admin and never as a page the shell replaces with an outage.
+	it('keeps a failed customization read as its gate', async () => {
+		api.getCustomization.mockRejectedValue(new ApiError(503, 'unavailable'));
+		const down = (await load(event({}))) as { gate: { state: string }; entitled: boolean };
+		expect(down.gate).toEqual({ state: 'unavailable' });
+		api.getCustomization.mockRejectedValue(new ApiError(403, 'forbidden'));
+		expect(((await load(event({}))) as { gate: unknown }).gate).toEqual({ state: 'forbidden' });
+	});
+
+	it('says the media library was not read rather than that it is empty', async () => {
+		vi.mocked(listMediaChoices).mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		const data = (await load(event({}))) as { mediaChoices: unknown; gate: { state: string } };
+		expect(data.gate).toEqual({ state: 'ok' });
+		expect(data.mediaChoices).toBeNull();
 	});
 
 	it('offers the menu entries of the plugins that run', async () => {

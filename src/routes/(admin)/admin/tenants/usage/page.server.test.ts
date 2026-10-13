@@ -77,3 +77,28 @@ describe('the usage load', () => {
 		expect(out.requestsRead).toBe(true);
 	});
 });
+
+describe('the usage load past the end', () => {
+	it('sends a page of quotas past the end back to the last page that holds rows', async () => {
+		route({
+			'/api/admin/quotas': { data: [], total_count: 60 },
+			'/api/admin/quota-requests': { data: [], total_count: 0 },
+			'/api/admin/usage/tenants': { data: [] },
+			'/api/admin/users': [],
+		});
+		const event = loadEvent() as unknown as { url: URL };
+		event.url = new URL('http://localhost/admin/tenants/usage?limit=50&offset=200');
+		await expect(load(event as never)).rejects.toMatchObject({ status: 307, location: '/admin/tenants/usage?limit=50&offset=50' });
+	});
+
+	it('says the usage was not read rather than that nothing was used', async () => {
+		route({
+			'/api/admin/quotas': { data: [], total_count: 0 },
+			'/api/admin/quota-requests': { data: [], total_count: 0 },
+			'/api/admin/usage/tenants': new ApiError(503, 'down', {}),
+			'/api/admin/users': [],
+		});
+		const out = (await load(loadEvent())) as Record<string, unknown>;
+		expect(out.usageRead).toBe(false);
+	});
+});

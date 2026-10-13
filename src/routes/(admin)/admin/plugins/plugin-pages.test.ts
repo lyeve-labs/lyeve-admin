@@ -101,18 +101,22 @@ describe('plugin pages', () => {
 		const { container } = render(IncomingPage, {
 			props: {
 				data: {
-					incomingWebhooks: [
-						{
-							id: 'i1',
-							name: 'Stripe',
-							schema_name: 'post',
-							enabled: true,
-							field_map: {},
-							allowed_ips: ['10.0.0.0/8']
-						}
-					],
-					schemas: [{ name: 'post' }],
-					entitlements
+					incomingWebhooks: {
+						ok: true,
+						value: [
+							{
+								id: 'i1',
+								name: 'Stripe',
+								schema_name: 'post',
+								enabled: true,
+								field_map: {},
+								allowed_ips: ['10.0.0.0/8']
+							}
+						]
+					},
+					schemas: { ok: true, value: [{ name: 'post' }] },
+					entitlements,
+					user: { roles: ['super_admin'] }
 				},
 				form: null
 			} as never
@@ -124,8 +128,8 @@ describe('plugin pages', () => {
 		const empty = render(IncomingPage, {
 			props: {
 				data: {
-					incomingWebhooks: [],
-					schemas: [],
+					incomingWebhooks: { ok: true, value: [] },
+					schemas: { ok: true, value: [] },
 					entitlements: { plan: '', state: '', features: [], tenant_quota: 1 }
 				},
 				form: null

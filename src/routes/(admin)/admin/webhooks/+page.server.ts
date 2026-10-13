@@ -1,12 +1,13 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
-import { authedClient, requireUser } from '$lib/server/authz';
+import { authedClient, requireRole, requireUser } from '$lib/server/authz';
 import type { DeadLetter, Webhook } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { deleteWebhook, testWebhook, listDeliveries, rotateSecret, retryDelivery, replayDeadLetter, dismissDeadLetter, deleteDeadLetter } from '@lyeve-labs/client-rest';
 import { actionFailure } from '$lib/server/action-error';
 import { createWebhookRecord, updateWebhookRecord, webhookBodyFrom } from '$lib/api/webhook-options';
+import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
 import { sessionToken } from '$lib/server/session-cookie';
 
@@ -21,6 +22,12 @@ const DEFAULT_LIMIT = 50;
  */
 const MAX_LIMIT = 199;
 
+/** What the page says for a list read that failed for no reason it can name. */
+const LIST_FAILED = 'The webhooks could not be read. This is not a report that there are none.';
+
+/** What the drawer says when the schema names could not be read. */
+const SCHEMAS_FAILED = 'The schemas could not be read.';
+
 export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
@@ -32,20 +39,27 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	 * states a total only when the endpoint sends one and falls back to a probe
 	 * row otherwise, so neither branch reports a number nobody measured.
 	 */
-	const [res, schemas] = await Promise.all([
-		client
-			.get<ListEnvelope<Webhook> | Webhook[]>(
+	const [read, schemas] = await Promise.all([
+		section(
+			client.get<ListEnvelope<Webhook> | Webhook[]>(
 				`/api/admin/webhooks?limit=${limit + 1}&offset=${offset}`
-			)
-			.catch(() => null),
-		getSchemas(client).catch(() => [])
+			),
+			LIST_FAILED
+		),
+		section(getSchemas(client), SCHEMAS_FAILED)
 	]);
 
-	const page = pageOf<Webhook>(res, limit, offset);
+	// The page draws the gate in place of the list, so nothing is paged.
+	if (!read.ok) return { webhooks: read, schemas, limit, offset, total: null, hasMore: false };
+
+	const page = pageOf<Webhook>(read.value, limit, offset);
 	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
 	if (back !== null) redirect(307, withOffset(url, back));
+	// Typed, because a bare literal widens `ok` to boolean and the page could
+	// no longer tell the two cases apart.
+	const webhooks: Section<Webhook[]> = { ok: true, value: page.rows };
 	return {
-		webhooks: page.rows,
+		webhooks,
 		schemas,
 		limit,
 		offset,
@@ -54,37 +68,49 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	};
 };
 
+/**
+ * A failure that names the action it came from. The page holds one result for
+ * every form, so the drawer shows only its own writes' failures and the page
+ * shows the rest.
+ */
+function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
+	return fail(failure.status, { ...failure.data, action });
+}
+
 export const actions: Actions = {
 	create: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const parsed = webhookBodyFrom(await event.request.formData());
 		if ('error' in parsed) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
+			return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
 		}
 		try {
 			await createWebhookRecord(authedClient(event), parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to create webhook');
+			return tagged('create', actionFailure(err, 'Failed to create webhook'));
 		}
 	},
 
 	update: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
 		const parsed = webhookBodyFrom(data);
 		if ('error' in parsed) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
+			return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { [parsed.field ?? 'name']: parsed.error } });
 		}
 		try {
 			await updateWebhookRecord(authedClient(event), id, parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to update webhook');
+			return tagged('update', actionFailure(err, 'Failed to update webhook'));
 		}
 	},
 
 	delete: async (event) => {
-		await requireUser(event);
+		// The plugin serves this write to a super admin only.
+		await requireRole(event, ['super_admin']);
 		const { request } = event;
 		const client = authedClient(event);
 		const data = await request.formData();
@@ -93,7 +119,7 @@ export const actions: Actions = {
 		try {
 			await deleteWebhook(id, client);
 		} catch (err) {
-			return actionFailure(err, 'Failed to delete webhook');
+			return tagged('delete', actionFailure(err, 'Failed to delete webhook'));
 		}
 	},
 
@@ -128,7 +154,8 @@ export const actions: Actions = {
 		},
 
 		'rotate-secret': async (event) => {
-			await requireUser(event);
+			// The plugin serves this write to a super admin only.
+			await requireRole(event, ['super_admin']);
 			const { request } = event;
 			const client = authedClient(event);
 			const data = await request.formData();

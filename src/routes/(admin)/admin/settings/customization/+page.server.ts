@@ -7,6 +7,7 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
 import { getDashboardLayout, type DashboardLayout } from '$lib/api/custom-dashboard';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { LOGO_MAX_BYTES, LOGO_TYPES, logoAddressOk } from '$lib/logo';
 import { importMedia, importRefusal, isForeignAddress } from '$lib/api/media';
 import { LogoRejected, uploadLogo } from '$lib/server/logo-upload';
@@ -28,11 +29,13 @@ export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
 	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Requires the admin role');
 	const locked = {
+		gate: GATE_OK as Gate,
 		entitled: false,
 		settings: EMPTY_SETTINGS,
 		pages: [],
 		navChoices: [],
-		mediaChoices: [] as MediaChoice[],
+		// Null is a library that could not be read, never one with nothing in it.
+		mediaChoices: null as MediaChoice[] | null,
 		dashboard: null as DashboardLayout | null,
 	};
 	// The shell says why the page is unavailable while the plugin does not run.
@@ -41,23 +44,30 @@ export const load: PageServerLoad = async (event) => {
 	// Read fresh rather than from the shell, so a save shows what the engine
 	// stored and not what the layout read before it. The plugin's answer also
 	// says whether this tenant may shape its admin at all.
-	const custom = await getCustomization(client).catch(() => null);
-	if (!custom) error(503, 'The customization could not be read.');
+	// A failed read is drawn as its gate, never as a tenant that may not
+	// customize or as settings that are empty.
+	let custom: Awaited<ReturnType<typeof getCustomization>>;
+	try {
+		custom = await getCustomization(client);
+	} catch (err) {
+		return { ...locked, gate: gateOf(err, 'The customization could not be read. Nothing was changed.') };
+	}
 	if (!custom.entitled) return locked;
-	const [mediaChoices, dashboard] = await Promise.all([
+	const [media, dashboard] = await Promise.all([
 		Promise.resolve()
 			.then(() => listMediaChoices(client))
-			.catch((): MediaChoice[] => []),
+			.catch((): MediaChoice[] | null => null),
 		getDashboardLayout(client).catch((): DashboardLayout | null => null),
 	]);
 	return {
+		gate: GATE_OK as Gate,
 		entitled: true,
 		settings: custom.settings,
 		pages: custom.pages,
 		// Chosen from the stock menu this operator sees, so an entry the
 		// tenant hid can be brought back.
 		navChoices: navLeaves(adminNav(user.roles, { plugins })),
-		mediaChoices,
+		mediaChoices: media,
 		dashboard,
 	};
 };

@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, error } from '@sveltejs/kit';
+import { fail, error, redirect } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import {
@@ -12,6 +12,8 @@ import {
 import { actionError } from '$lib/server/action-error';
 import { getProvisioning } from '$lib/api/tenants';
 import { sessionToken } from '$lib/server/session-cookie';
+import { section, type Section } from '$lib/api/gate';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 export type { Tenant };
 
@@ -24,32 +26,41 @@ const DEFAULT_LIMIT = 50;
  */
 const MAX_LIMIT = 500;
 
+/** What the page says for a list read that failed for no reason it can name. */
+const LIST_FAILED = 'The tenants could not be read. This is not a report that there are none.';
+
 export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 
-	const limit = Math.max(
-		1,
-		Math.min(MAX_LIMIT, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT)
-	);
-	const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	// The plugin says whether a create would pass, so the page offers one only
 	// then. A failed read, a plugin without the route among them, offers
 	// none and says creating is not enabled, the way a refusal would.
-	const [result, canProvision] = await Promise.all([
-		listTenants(client, limit, offset).catch((): { items: Tenant[]; total: number } => ({ items: [], total: 0 })),
+	const [read, canProvision] = await Promise.all([
+		section(listTenants(client, limit, offset), LIST_FAILED),
 		getProvisioning(client).catch(() => false),
 	]);
+	// The page draws the gate in place of the list and offers no create.
+	if (!read.ok) return { tenants: read, limit, offset, total: 0, canProvision: false };
+	const result = read.value;
+	// A page past the end is not an instance with no tenants, so the request
+	// goes back to the last page that holds rows.
+	const back = pastEndOffset(result.items.length, limit, offset, result.total > 0 ? result.total : null);
+	if (back !== null) redirect(307, withOffset(url, back));
 
 	// The envelope carries the collection count, so one server page is never
 	// described as the whole instance. What has been read is the floor, for an
 	// answer that omits the count.
 	const total = Math.max(result.total, offset + result.items.length);
 
-	return { tenants: result.items, limit, offset, total, canProvision };
+	// Typed, because a bare literal widens `ok` to boolean and the page could
+	// no longer tell the two cases apart.
+	const tenants: Section<Tenant[]> = { ok: true, value: result.items };
+	return { tenants, limit, offset, total, canProvision };
 };
 
 export const actions: Actions = {
@@ -70,12 +81,12 @@ export const actions: Actions = {
 		if (!slug) fields.slug = 'Slug is required';
 		if (!name) fields.name = 'Display name is required';
 		if (Object.keys(fields).length > 0) {
-			return fail(400, { error: 'Check the highlighted fields.', fields });
+			return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields });
 		}
 		try {
 			await createTenant({ slug, name, plan: plan || undefined }, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to create tenant') });
+			return fail(400, { action: 'create', error: actionError(err, 'Failed to create tenant') });
 		}
 	},
 
@@ -87,11 +98,11 @@ export const actions: Actions = {
 		const id = String(data.get('id') ?? '');
 		const name = String(data.get('name') ?? '').trim();
 		const plan = String(data.get('plan') ?? '').trim();
-		if (!name) return fail(400, { error: 'Check the highlighted fields.', fields: { name: 'Display name is required' } });
+		if (!name) return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { name: 'Display name is required' } });
 		try {
 			await updateTenant(id, { name, plan: plan || undefined }, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to update tenant') });
+			return fail(400, { action: 'update', error: actionError(err, 'Failed to update tenant') });
 		}
 	},
 
@@ -105,7 +116,7 @@ export const actions: Actions = {
 		try {
 			await updateTenant(id, { enabled: !enabled }, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to toggle tenant') });
+			return fail(400, { action: 'toggle', error: actionError(err, 'Failed to toggle tenant') });
 		}
 	},
 
@@ -118,7 +129,7 @@ export const actions: Actions = {
 		try {
 			await deleteTenant(id, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete tenant') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete tenant') });
 		}
 	},
 };

@@ -91,7 +91,7 @@ describe('admin/webhooks/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.webhooks).toHaveLength(50);
+		expect(result.webhooks.ok && result.webhooks.value).toHaveLength(50);
 		expect(result.hasMore).toBe(true);
 	});
 
@@ -117,24 +117,39 @@ describe('admin/webhooks/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.webhooks).toHaveLength(50);
+		expect(result.webhooks.ok && result.webhooks.value).toHaveLength(50);
 	});
 
-	it('still renders when the endpoint fails', async () => {
+	function failing(status: number, schemas = 200, search = '?offset=50') {
 		const fetch = vi.fn(async (url: string) =>
-			String(url).includes('/schemas') ? json([]) : json({ error: 'nope' }, 500)
+			String(url).includes('/schemas')
+				? schemas === 200
+					? json([])
+					: json({ error: 'nope' }, schemas)
+				: json({ error: 'nope' }, status)
 		) as unknown as typeof globalThis.fetch;
-		const event = {
+		return {
 			fetch,
 			cookies: mockCookies(),
-			url: new URL('http://localhost/admin/webhooks'),
+			url: new URL(`http://localhost/admin/webhooks${search}`),
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
+	}
 
-		const result = (await load(event)) as Loaded;
+	// An empty list is the first-run state with an offer to create the first
+	// webhook. A read that failed is a gate, never that state, and it is not
+	// sent back to page one as if the list had ended.
+	it('keeps a failed list read as its gate, never as no webhooks', async () => {
+		const failed = (await load(failing(500))) as Loaded;
+		expect(failed.webhooks).toMatchObject({ ok: false, gate: { state: 'error' } });
+		expect(failed.hasMore).toBe(false);
+		expect(((await load(failing(503))) as Loaded).webhooks).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(((await load(failing(403))) as Loaded).webhooks).toEqual({ ok: false, gate: { state: 'forbidden' } });
+	});
 
-		expect(result.webhooks).toEqual([]);
-		expect(result.hasMore).toBe(false);
+	it('keeps a failed schema read apart from a list of none', async () => {
+		const result = (await load(failing(200, 503, ''))) as Loaded;
+		expect(result.schemas).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 });
 
@@ -192,5 +207,43 @@ describe('admin/webhooks/+page.server.ts dead-letters action', () => {
 		const all = actionEvent({ data: [], total_count: 0 });
 		await actions['dead-letters'](all.event);
 		expect(all.seen.find((u) => u.includes('/webhook-dead-letters'))).not.toContain('status=');
+	});
+});
+
+/*
+ * The plugin serves create, update, delete and rotate to a super admin only, so
+ * an admin's direct POST stops here before it reaches the engine.
+ */
+describe('admin/webhooks/+page.server.ts writes by role', () => {
+	function writeEvent(roles: string[]) {
+		const seen: string[] = [];
+		const fetch = vi.fn(async (url: string) => {
+			seen.push(String(url));
+			if (String(url).includes('/auth/me')) return json({ id: 'u1', roles, disabled: false });
+			return json({});
+		}) as unknown as typeof globalThis.fetch;
+		const form = new FormData();
+		form.set('id', 'w1');
+		return {
+			seen,
+			event: {
+				fetch,
+				cookies: mockCookies(),
+				request: { formData: async () => form },
+				url: new URL('http://localhost/admin/webhooks'),
+			} as never,
+		};
+	}
+
+	it.each(['create', 'update', 'delete', 'rotate-secret'] as const)('refuses %s to an admin', async (name) => {
+		const { event, seen } = writeEvent(['admin']);
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(seen.filter((u) => !u.includes('/auth/me'))).toEqual([]);
+	});
+
+	it('lets a super admin delete', async () => {
+		const { event, seen } = writeEvent(['super_admin']);
+		await actions.delete(event);
+		expect(seen.some((u) => u.includes('/api/admin/webhooks/w1'))).toBe(true);
 	});
 });

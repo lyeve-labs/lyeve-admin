@@ -28,7 +28,7 @@ const stored = {
 
 function mount() {
 	render(EditorPage, {
-		props: { data: { customPage: stored, schemas: ['articles'], user: { roles: ['admin'] } }, form: null } as never,
+		props: { data: { customPage: stored, schemas: ['articles'], schemasRead: true, user: { roles: ['admin'] } }, form: null } as never,
 	});
 }
 
@@ -43,5 +43,23 @@ describe('custom page editor', () => {
 	it('marks the editor as beta', () => {
 		mount();
 		expect(screen.getByText('Beta')).toBeTruthy();
+	});
+});
+
+describe('custom page block controls', () => {
+	it('picks the status from a segmented control and the counted schemas from a searchable list', () => {
+		mount();
+		expect(screen.getByRole('radiogroup', { name: 'Status' })).toBeTruthy();
+		expect(screen.getByRole('radio', { name: 'Any status' }).getAttribute('aria-checked')).toBe('true');
+		expect(document.querySelector('#block-1-status')).toBeNull();
+		expect(document.querySelector('#block-2-schemas')).toBeTruthy();
+	});
+
+	it('keeps the schema a block names on screen when the schema list was not read', () => {
+		render(EditorPage, {
+			props: { data: { customPage: stored, schemas: [], schemasRead: false, user: { roles: ['admin'] } }, form: null } as never,
+		});
+		expect(document.body.textContent).toContain('The schemas could not be read');
+		expect(document.querySelector('#block-2-schemas')?.closest('div')?.parentElement?.textContent).toContain('articles');
 	});
 });

@@ -15,7 +15,6 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import { Building2, Coins, Pencil, Plus, Trash2, ToggleLeft, ToggleRight } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -26,7 +25,9 @@
 	import type { Tenant } from '@lyeve-labs/client-rest';
 	import { formatDate as formatDay, NO_VALUE } from '$lib/format';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
+	import { pageHref, pageNumber } from '$lib/api/list';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -35,7 +36,19 @@
 	// refused. Editing, disabling and deleting a tenant stay open either way.
 	const canProvision = $derived(data.canProvision);
 
-	const errors = $derived(fieldErrors(form));
+	/*
+	 * Each failure names the action that caused it. The drawer shows only its
+	 * own writes' failures, and only one that came back after it was opened, so
+	 * a failed delete never reads as a failure of the form opened next. The
+	 * rest show above the list.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
+	const errors = $derived(fieldErrors(drawerForm));
 
 	// One drawer for both writes: a null target is a new tenant.
 	let open = $state(false);
@@ -81,6 +94,7 @@
 	let plan = $state('');
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		slug = '';
 		name = '';
@@ -89,6 +103,7 @@
 	}
 
 	function openEdit(tenant: Tenant) {
+		openedOver = form;
 		editing = tenant;
 		slug = tenant.slug;
 		name = tenant.name;
@@ -117,7 +132,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.tenants.filter(
+		(data.tenants.ok ? data.tenants.value : []).filter(
 			(t: Tenant) =>
 				narrows(query, t.slug, t.name, t.plan) &&
 				(status === '' || (status === 'enabled') === t.enabled)
@@ -128,18 +143,6 @@
 		return formatDay(iso, 'Unknown');
 	}
 
-	// An offset need not sit on a page boundary: it arrives in the URL and a
-	// delete can leave a hand-edited one behind. Floor it onto the page that
-	// contains it rather than assuming offset / limit divides evenly.
-	const currentPage = $derived(Math.floor(data.offset / data.limit) + 1);
-
-	function goToPage(page: number) {
-		const offset = Math.max(0, (page - 1) * data.limit);
-		const params = new URLSearchParams({ limit: String(data.limit), offset: String(offset) });
-		// A querystring, so the page is linkable and the back button returns to
-		// the previous one.
-		goto(`/admin/tenants?${params}`, { noScroll: true, keepFocus: true });
-	}
 
 	const saveTenantSubmit = tracked(saveTenant);
 </script>
@@ -148,7 +151,7 @@
 
 <PageShell
 	title="Tenants"
-	description={`${data.total} ${data.total === 1 ? 'tenant' : 'tenants'} on this instance`}
+	description={data.tenants.ok ? `${data.total} ${data.total === 1 ? 'tenant' : 'tenants'} on this instance` : 'Every tenant on this instance'}
 	width="wide"
 >
 	{#snippet actions()}
@@ -162,16 +165,22 @@
 		{/if}
 	{/snippet}
 
-	<FormErrors message={form?.error} fields={errors} />
+	<FormErrors message={(pageForm as Failure)?.error || undefined} />
 
-	{#if !canProvision}
+	{#if data.tenants.ok && !canProvision}
 		<NotEnabled
 			title="Tenant provisioning"
 			description="Creating a tenant from this page. The tenants below can still be edited, disabled and deleted."
 		/>
 	{/if}
 
-	{#if data.tenants.length === 0}
+	{#if !data.tenants.ok}
+		<GateNotice
+			gate={data.tenants.gate}
+			title="Tenants"
+			absent="The multitenant plugin is not part of this build, so this instance serves one tenant."
+		/>
+	{:else if data.tenants.value.length === 0}
 		<EmptyState
 			title="No tenants yet"
 			description="Create a tenant to start serving content on this instance."
@@ -288,13 +297,21 @@
 		</Table>
 		{/if}
 
-		<Pagination page={currentPage} total={data.total} perPage={data.limit} onchange={goToPage} />
+		<!-- Links rather than a callback, so a page turns before hydration. -->
+		<Pagination
+			page={pageNumber(data.offset, data.limit)}
+			perPage={data.limit}
+			count={data.tenants.value.length}
+			total={data.total}
+			noun="tenants"
+			href={pageHref('/admin/tenants', data.limit)}
+		/>
 	{/if}
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New tenant'}>
 	<form method="post" action={editing ? '?/update' : '?/create'} id="tenant-form" use:enhance={saveTenantSubmit.enhance} class="flex flex-col gap-4">
-		<FormErrors message={form?.error} fields={errors} />
+		<FormErrors message={(drawerForm as Failure)?.error || undefined} fields={errors} />
 
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />

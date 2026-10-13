@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -19,7 +19,7 @@ import {
 	type TenantUsage,
 	type UsageGate,
 } from '$lib/api/usage';
-import { rowsOf, pageWindow, totalOf } from '$lib/api/list';
+import { rowsOf, pageWindow, pastEndOffset, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
 
 export const load: PageServerLoad = async (event) => {
@@ -36,6 +36,7 @@ export const load: PageServerLoad = async (event) => {
 			offset: 0,
 			requests: [] as QuotaRequest[],
 			usage: [] as TenantUsage[],
+			usageRead: false,
 			requestsRead: false,
 			people: {} as Record<string, string>,
 			gate: USAGE_OK as UsageGate,
@@ -49,6 +50,7 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, 50, 500);
 	let quotas: Quota[] = [];
 	let quotaTotal = 0;
+	let back: number | null = null;
 	// The shell says why the page is unavailable while its plugin does not run.
 	let gate: UsageGate = notRunning(plugins, PLUGIN.usage) ? { state: 'absent' } : USAGE_OK;
 	if (gate.state === 'ok') {
@@ -56,10 +58,13 @@ export const load: PageServerLoad = async (event) => {
 			const res = await listQuotas(client, limit, offset);
 			quotas = rowsOf(res);
 			quotaTotal = Math.max(totalOf(res), offset + quotas.length);
+			// A page past the end is not an instance with no quota set.
+			back = pastEndOffset(quotas.length, limit, offset, statedTotal(res));
 		} catch (err) {
 			gate = usageGate(err);
 		}
 	}
+	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// Pending requests are the queue somebody has to act on, so an unread list
 	// is never drawn as an empty one.
@@ -71,11 +76,13 @@ export const load: PageServerLoad = async (event) => {
 					.then((r) => ({ rows: rowsOf(r), read: true }))
 					.catch(() => ({ rows: [] as QuotaRequest[], read: false }))
 			: Promise.resolve({ rows: [] as QuotaRequest[], read: false }),
+		// A quota row draws its usage beside its limit. An unread usage list is
+		// said once over the table, never drawn as rows that used nothing.
 		gate.state === 'ok'
 			? listTenantUsage(client)
-					.then((u) => rowsOf(u))
-					.catch((): TenantUsage[] => [])
-			: Promise.resolve([] as TenantUsage[]),
+					.then((u) => ({ rows: rowsOf(u), read: true }))
+					.catch(() => ({ rows: [] as TenantUsage[], read: false }))
+			: Promise.resolve({ rows: [] as TenantUsage[], read: false }),
 		gate.state === 'ok' ? listPeople(client) : Promise.resolve([]),
 	]);
 
@@ -86,7 +93,8 @@ export const load: PageServerLoad = async (event) => {
 		offset,
 		requests: requests.rows,
 		requestsRead: requests.read,
-		usage,
+		usage: usage.rows,
+		usageRead: usage.read,
 		people: Object.fromEntries([
 			...people.map((p) => [p.id, p.email] as const),
 			...(user.email ? [[user.id, user.email] as const] : []),
@@ -96,6 +104,15 @@ export const load: PageServerLoad = async (event) => {
 	};
 };
 
+/**
+ * A failure that names the action it came from. The page holds one result for
+ * every form, so the quota drawer shows only its own failures and the page
+ * shows the rest.
+ */
+function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
+	return fail(failure.status, { ...failure.data, action });
+}
+
 export const actions: Actions = {
 	review: async (event) => {
 		await requireRole(event, ['super_admin']);
@@ -103,14 +120,14 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const decision = String(form.get('decision') ?? '');
-		if (!id) return fail(400, { error: 'No request was named.' });
+		if (!id) return fail(400, { action: 'review', error: 'No request was named.' });
 		if (decision !== 'approve' && decision !== 'deny') {
-			return fail(400, { error: 'A review is either an approval or a denial.' });
+			return fail(400, { action: 'review', error: 'A review is either an approval or a denial.' });
 		}
 		try {
 			await reviewRequest(client, id, decision === 'approve', String(form.get('note') ?? ''));
 		} catch (err) {
-			return actionFailure(err, 'The request could not be reviewed.');
+			return tagged('review', actionFailure(err, 'The request could not be reviewed.'));
 		}
 		return { reviewed: id };
 	},
@@ -120,12 +137,12 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const tenant = String(form.get('tenant_id') ?? '').trim();
 		if (!tenant) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { tenant_id: 'Tenant is required' } });
+			return fail(400, { action: 'quota', error: 'Check the highlighted fields.', fields: { tenant_id: 'Tenant is required' } });
 		}
 		try {
 			await upsertQuota(authedClient(event), tenant, quotaFrom(form));
 		} catch (err) {
-			return actionFailure(err, 'The quota could not be saved.');
+			return tagged('quota', actionFailure(err, 'The quota could not be saved.'));
 		}
 		return { quotaSaved: tenant };
 	},
@@ -134,11 +151,11 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const form = await event.request.formData();
 		const tenant = String(form.get('tenant_id') ?? '').trim();
-		if (!tenant) return fail(400, { error: 'No tenant was named.' });
+		if (!tenant) return fail(400, { action: 'clearQuota', error: 'No tenant was named.' });
 		try {
 			await deleteQuota(authedClient(event), tenant);
 		} catch (err) {
-			return actionFailure(err, 'The quota could not be removed.');
+			return tagged('clearQuota', actionFailure(err, 'The quota could not be removed.'));
 		}
 		return { quotaCleared: tenant };
 	},

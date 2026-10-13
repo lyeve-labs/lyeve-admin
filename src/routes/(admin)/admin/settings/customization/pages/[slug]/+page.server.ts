@@ -3,6 +3,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { listSchemaNames } from '$lib/api/search-settings';
+import { readError } from '$lib/server/read-error';
 import {
 	deleteCustomPage,
 	getCustomPage,
@@ -18,13 +19,17 @@ export const load: PageServerLoad = async (event) => {
 	if (!customization.entitled) redirect(303, '/admin/settings/customization');
 	const client = authedClient(event);
 	const [page, schemas] = await Promise.all([
-		getCustomPage(client, event.params.slug).catch(() => null),
+		// Only the engine's 404 says the page does not exist. A refusal or an
+		// outage keeps a status of its own.
+		getCustomPage(client, event.params.slug).catch((err: unknown) =>
+			readError(err, 'No page has that address.'),
+		),
 		Promise.resolve()
 			.then(() => listSchemaNames(client))
-			.catch((): string[] => []),
+			.then((names) => ({ names, read: true }))
+			.catch(() => ({ names: [] as string[], read: false })),
 	]);
-	if (!page) error(404, 'No page has that address.');
-	return { customPage: page, schemas };
+	return { customPage: page, schemas: schemas.names, schemasRead: schemas.read };
 };
 
 export const actions: Actions = {

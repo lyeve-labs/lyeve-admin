@@ -9,18 +9,24 @@
 		Drawer,
 		EmptyState,
 		Input,
+		MultiSelect,
 		PageShell,
+		Pagination,
 		SectionHeading,
 		Table,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { Archive, ArchiveRestore, Pencil, Trash2 } from '@lucide/svelte';
+	import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { roleTone } from '$lib/roles';
+	import { pageHref, pageNumber } from '$lib/api/list';
 	import { formatDate } from '$lib/format';
 	import type { TenantMember } from '$lib/api/tenant-access';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import { fieldErrors } from '$lib/forms.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -38,11 +44,28 @@
 		{ term: 'Created', value: formatDate(tenant.created_at) },
 	]);
 
-	let available = $state<string[]>([]);
+	/*
+	 * The picks are seeded from what the engine stores and reseeded only when
+	 * that changes. Turning a members page reruns the load and hands back an
+	 * equal list as a new object, which must not undo a pick not yet saved.
+	 */
+	function storedPicks(): string[] {
+		return (data.choices.ok ? data.choices.value : []).filter((c) => c.available).map((c) => c.name);
+	}
+	function choicesKey(): string {
+		return JSON.stringify(data.choices.ok ? data.choices.value : null);
+	}
+	// svelte-ignore state_referenced_locally
+	let available = $state<string[]>(storedPicks());
+	// svelte-ignore state_referenced_locally
+	let seededFrom = choicesKey();
 	$effect.pre(() => {
-		available = (data.choices ?? []).filter((c) => c.available).map((c) => c.name);
+		const key = choicesKey();
+		if (key === seededFrom) return;
+		seededFrom = key;
+		available = storedPicks();
 	});
-	const featureOptions = $derived((data.choices ?? []).map((c) => ({ value: c.name, label: c.name })));
+	const featureOptions = $derived((data.choices.ok ? data.choices.value : []).map((c) => ({ value: c.name, label: c.name })));
 	let savingFeatures = $state(false);
 
 	let memberOpen = $state(false);
@@ -51,7 +74,22 @@
 	let memberRoles = $state<string[]>(['editor']);
 	let savingMember = $state(false);
 
+	/*
+	 * A grant and a removal both answer in memberError, and each names its
+	 * action. The drawer shows only a failed grant that came back after it was
+	 * opened, so a failed removal never reads as a failure of the form opened
+	 * next. A failed removal shows above the members.
+	 */
+	type MemberFailure = { action?: string; memberError?: string; fields?: Record<string, string> } | null;
+	let openedOver = $state.raw<unknown>(null);
+	const memberFailure = $derived(form as MemberFailure);
+	const grantError = $derived(
+		memberFailure?.action === 'grant' && form !== openedOver ? memberFailure.memberError : undefined,
+	);
+	const revokeError = $derived(memberFailure?.action === 'revoke' ? memberFailure.memberError : undefined);
+
 	function openNewMember() {
+		openedOver = form;
 		editingMember = null;
 		memberEmail = '';
 		memberRoles = ['editor'];
@@ -59,6 +97,7 @@
 	}
 
 	function openEditMember(m: TenantMember) {
+		openedOver = form;
 		editingMember = m;
 		memberEmail = m.email;
 		memberRoles = m.roles.filter((r) => r !== 'super_admin');
@@ -125,9 +164,13 @@
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>What this tenant may use</SectionHeading>
-		{#if data.choices === null}
-			<Alert tone="warn">The engine did not answer for this tenant's features. Reload to try again.</Alert>
-		{:else if data.choices.length === 0}
+		{#if !data.choices.ok}
+			<GateNotice
+				gate={data.choices.gate}
+				title="this tenant's features"
+				absent="This instance does not serve per-tenant features."
+			/>
+		{:else if data.choices.value.length === 0}
 			<EmptyState title="Nothing to withhold" description="This instance serves no plugin this tenant could be refused." />
 		{:else}
 			{#if form?.featuresError}
@@ -147,17 +190,21 @@
 					};
 				}}
 			>
-				{#each data.choices as c (c.name)}
+				{#each data.choices.value as c (c.name)}
 					<input type="hidden" name="offered" value={c.name} />
 				{/each}
-				<CheckboxGroup
-					name="available"
+				<MultiSelect
+					id="tenant-features"
 					label="Available to this tenant"
-					hint="What the instance serves is the ceiling for every tenant. Clearing a box takes that plugin away from this tenant only: its routes answer 403, its screens leave the tenant's admin, and every capability it owns goes with it."
-					orientation="horizontal"
+					placeholder="Nothing"
+					hint="What the instance serves is the ceiling for every tenant. Removing a plugin here takes it away from this tenant only: its routes answer 403, its screens leave the tenant's admin, and every capability it owns goes with it."
+					searchable
 					options={featureOptions}
 					bind:value={available}
 				/>
+				{#each available as name (name)}
+					<input type="hidden" name="available" value={name} />
+				{/each}
 				<div>
 					<Button variant="primary" type="submit" loading={savingFeatures}>Save</Button>
 				</div>
@@ -168,14 +215,20 @@
 	<section class="flex flex-col gap-4">
 		<div class="flex items-center justify-between gap-4">
 			<SectionHeading level={2}>Members</SectionHeading>
-			<Button variant="secondary" onclick={openNewMember}>New member</Button>
+			{#if data.members.ok}
+				<Button variant="secondary" onclick={openNewMember}><Plus size={ICON.sm} /> New member</Button>
+			{/if}
 		</div>
-		{#if form?.memberError && !memberOpen}
-			<Alert tone="danger">{form.memberError}</Alert>
+		{#if revokeError}
+			<Alert tone="danger">{revokeError}</Alert>
 		{/if}
-		{#if data.members === null}
-			<Alert tone="warn">The engine did not answer for this tenant's members. Reload to try again.</Alert>
-		{:else if data.members.length === 0}
+		{#if !data.members.ok}
+			<GateNotice
+				gate={data.members.gate}
+				title="this tenant's members"
+				absent="The multitenant plugin does not serve tenant members on this instance."
+			/>
+		{:else if data.members.value.length === 0}
 			<EmptyState title="No members" description="No account calls this tenant home or holds a membership in it." />
 		{:else}
 			<Table label="Members">
@@ -188,7 +241,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.members as m (m.id)}
+					{#each data.members.value as m (m.id)}
 						<tr>
 							<td data-cell="nowrap">
 								{m.email}
@@ -223,18 +276,21 @@
 					{/each}
 				</tbody>
 			</Table>
-			{#if data.memberTotal > data.members.length}
-				<p class="text-xs text-faint">Showing {data.members.length} of {data.memberTotal} members.</p>
-			{/if}
+			<Pagination
+				page={pageNumber(data.offset, data.limit)}
+				perPage={data.limit}
+				count={data.members.value.length}
+				total={data.memberTotal}
+				noun="members"
+				href={pageHref(`/admin/tenants/${tenant.id}`, data.limit)}
+			/>
 		{/if}
 	</section>
 </PageShell>
 
 <Drawer bind:open={memberOpen} title={editingMember ? `Roles for ${editingMember.email}` : 'New member'}>
 	<form method="post" action="?/grant" id="member-form" use:enhance={saveMember} class="flex flex-col gap-4">
-		{#if form?.memberError && memberOpen}
-			<Alert tone="danger">{form.memberError}</Alert>
-		{/if}
+		<FormErrors message={grantError} fields={grantError ? fieldErrors(form) : {}} />
 		{#if editingMember}
 			<input type="hidden" name="user_id" value={editingMember.id} />
 			<Input id="member-email" label="Account" value={memberEmail} disabled />
