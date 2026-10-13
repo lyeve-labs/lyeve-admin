@@ -36,7 +36,7 @@ describe('privacy request failures', () => {
 		rest.eraseSubject.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
 		const out = (await actions.erase(formEvent({ subject: 'jane@example.com', confirm: 'jane@example.com' }))) as Failure;
 		expect(out.data.error).not.toContain('10.0.0.4');
-		expect(out.data.error).toContain('The erasure did not complete.');
+		expect(out.data.error).toBe('The erasure was not attempted, so nothing was erased. Try again in a moment.');
 	});
 
 	it('relays a refusal written for the operator', async () => {

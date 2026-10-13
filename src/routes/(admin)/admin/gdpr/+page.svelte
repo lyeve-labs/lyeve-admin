@@ -26,9 +26,21 @@
 	const exportResult = $derived(
 		form?.action === 'export' && form.ok ? (form.result as DsarExportResult) : null
 	);
+	/**
+	 * The engine also names the legal holds that stopped an erasure. The
+	 * client's type does not carry them yet, so the page reads them through
+	 * its own.
+	 */
+	interface HeldErasure extends DsarEraseResult {
+		holds?: { id: string; reason?: string }[];
+	}
+
 	const eraseResult = $derived(
-		form?.action === 'erase' && form.ok ? (form.result as DsarEraseResult) : null
+		form?.action === 'erase' && form.ok ? (form.result as HeldErasure) : null
 	);
+	// An active hold stops the whole erasure before anything is erased. The
+	// answer then carries no rows and no errors, which alone reads as done.
+	const eraseHolds = $derived(eraseResult?.holds ?? []);
 	// A plugin that failed to erase still holds the subject's data. The rows
 	// erased elsewhere do not make the request complete.
 	const eraseFailures = $derived(eraseResult?.errors ?? []);
@@ -188,16 +200,29 @@
 			</div>
 		</Card>
 
-		{#if eraseResult && eraseFailures.length > 0}
+		{#if eraseResult && eraseHolds.length > 0}
+			<!-- Stays until dismissed: nothing was erased, and the reader has to act on it. -->
+			<Alert tone="warn" title="Erasure held">
+				<p>
+					Nothing was erased for <span class="font-mono text-xs">{eraseResult.identifier}</span>, because
+					{eraseHolds.length === 1 ? 'a legal hold covers' : 'legal holds cover'} this subject. Release
+					{eraseHolds.length === 1 ? 'it' : 'them'} under audit retention, then run the erasure again.
+				</p>
+				<ul class="mt-2 list-disc pl-5 text-xs">
+					{#each eraseHolds as hold (hold.id)}
+						<li>{hold.reason || hold.id}</li>
+					{/each}
+				</ul>
+			</Alert>
+		{:else if eraseResult && eraseFailures.length > 0}
 			<!-- Stays until dismissed: data is still held, and the reader has to act on it. -->
 			<Alert tone="warn" title="Erasure incomplete">
 				<p>
 					Erased <span class="font-medium">{eraseResult.total_rows}</span>
 					{eraseResult.total_rows === 1 ? 'row' : 'rows'} for
-					<span class="font-mono text-xs">{eraseResult.identifier}</span>, but
-					{eraseFailures.length === 1 ? 'one part' : `${eraseFailures.length} parts`} of the instance
-					could not erase. Data for this subject is still held there. Run the erasure again once the
-					cause is fixed.
+					<span class="font-mono text-xs">{eraseResult.identifier}</span>, but part of the instance could
+					not erase, so data for this subject is still held there. The engine's log names the part that
+					failed. Run the erasure again once the cause is fixed.
 				</p>
 				<ul class="mt-2 list-disc pl-5 text-xs">
 					{#each eraseFailures as failure, i (i)}

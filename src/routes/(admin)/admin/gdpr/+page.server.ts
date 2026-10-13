@@ -51,7 +51,7 @@ export const actions: Actions = {
 		} catch (err) {
 			return fail(400, {
 				action: 'erase',
-				error: actionError(err, 'The erasure did not complete. Some of the data for this subject may already be erased, so run it again.'),
+				error: actionError(err, 'The erasure was not attempted, so nothing was erased. Try again in a moment.'),
 			});
 		}
 	},
