@@ -330,6 +330,7 @@
 				/>
 				<div class="flex flex-wrap gap-2">
 					{#each PROFILE_TYPES as type (type)}
+						<!-- A download, so it posts to an endpoint and stays a plain form. -->
 						<form method="POST" action="/api/admin/debug/profiler/profile/{type}">
 							{#if type === 'cpu'}
 								<input type="hidden" name="duration_sec" value={cpuSeconds} />
