@@ -6,14 +6,18 @@ const api = vi.hoisted(() => ({
 	getEntitlements: vi.fn(),
 }));
 
-vi.mock('@lyeve-labs/client', () => ({ createClient: vi.fn(() => ({})) }));
+vi.mock('@lyeve-labs/client', async (importOriginal) => ({
+	...((await importOriginal()) as object),
+	createClient: vi.fn(() => ({})),
+}));
 vi.mock('@lyeve-labs/client-rest', () => api);
 
 import { load } from './+page.server';
+import { ApiError } from '@lyeve-labs/client';
 
 interface PluginsLoadResult {
 	plugins: { name: string }[];
-	error: string | null;
+	gate: unknown;
 }
 
 async function runLoad(): Promise<PluginsLoadResult> {
@@ -35,19 +39,28 @@ describe('admin/plugins/+page.server.ts load', () => {
 
 		const result = await runLoad();
 
-		expect(result).toEqual({ plugins: [{ name: 'search' }], error: null });
+		expect(result).toEqual({ plugins: [{ name: 'search' }], gate: { state: 'ok' } });
 		expect(api.getEntitlements).not.toHaveBeenCalled();
 	});
 
 	it('reads a report with no rows as no plugins', async () => {
 		api.getPluginStatus.mockResolvedValue({ compiled: [], entitled: [] });
 
-		expect(await runLoad()).toEqual({ plugins: [], error: null });
+		expect(await runLoad()).toEqual({ plugins: [], gate: { state: 'ok' } });
 	});
 
 	it('says the read failed rather than listing nothing as if the build were empty', async () => {
-		api.getPluginStatus.mockRejectedValue(new Error('engine unreachable'));
+		api.getPluginStatus.mockRejectedValue(new Error('pq: connection refused'));
 
-		expect(await runLoad()).toEqual({ plugins: [], error: 'engine unreachable' });
+		const result = await runLoad();
+		expect(result.plugins).toEqual([]);
+		expect(result.gate).toEqual({ state: 'error', message: expect.stringContaining('could not be read') });
+		expect(JSON.stringify(result)).not.toContain('pq:');
+	});
+
+	it('says a role refusal as one, not as an engine that did not answer', async () => {
+		api.getPluginStatus.mockRejectedValue(new ApiError(403, 'forbidden', {}));
+
+		expect((await runLoad()).gate).toEqual({ state: 'forbidden' });
 	});
 });
