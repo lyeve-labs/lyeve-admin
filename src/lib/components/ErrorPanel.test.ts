@@ -19,6 +19,32 @@ function mount(status: number, message = '', at = 'http://admin.test/admin') {
 }
 
 describe('ErrorPanel', () => {
+	describe('a reader the engine knows and refuses', () => {
+		it('says why, in the words the load gave', () => {
+			const { getByText } = mount(403, 'Requires super_admin role');
+			expect(getByText('Access denied')).toBeTruthy();
+			expect(getByText('Requires super_admin role')).toBeTruthy();
+		});
+
+		it('falls back to a plain refusal when the load gave no words', () => {
+			expect(mount(403).getByText('This account cannot open that page.')).toBeTruthy();
+		});
+
+		it('leads with the dashboard and never offers to sign in', () => {
+			const { getAllByRole, queryByRole } = mount(403, 'Requires the admin role');
+			expect(queryByRole('link', { name: /sign in/i })).toBeNull();
+			const [first] = getAllByRole('link');
+			expect(first.textContent?.trim()).toBe('Dashboard');
+			expect(first.getAttribute('href')).toBe('/admin');
+		});
+	});
+
+	it('still sends an expired session to sign in', () => {
+		const { getByText, getByRole } = mount(401);
+		expect(getByText('Not signed in')).toBeTruthy();
+		expect(getByRole('link', { name: /sign in/i }).getAttribute('href')).toBe('/login');
+	});
+
 	describe('an engine that did not answer', () => {
 		it('says the session survived and nothing changed', () => {
 			const { getByText } = mount(503, OUTAGE.body);

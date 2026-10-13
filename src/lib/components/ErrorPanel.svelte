@@ -25,55 +25,51 @@
 
 	let { status, message = '', homeHref, homeLabel }: Props = $props();
 
-	// A 503 is an engine or a database that did not answer. That is temporary
-	// and the session survives it, so it gets its own face rather than the one
-	// for a request that failed.
-	const variant = $derived(
-		status === 401 || status === 403 ? 'auth' : status === 404 ? 'missing' : status === 503 ? 'outage' : 'server',
-	);
+	/*
+	 * A 401 is a session the engine no longer honors, and signing in again is
+	 * the way back. A 403 is a reader the engine knows and refuses, so the
+	 * session is fine and signing in again would change nothing. A 503 is an
+	 * engine or a database that did not answer. That is temporary and the
+	 * session survives it, so it gets its own face rather than the one for a
+	 * request that failed.
+	 */
+	type Variant = 'signed-out' | 'denied' | 'missing' | 'outage' | 'server';
+	const VARIANTS: Partial<Record<number, Variant>> = { 401: 'signed-out', 403: 'denied', 404: 'missing', 503: 'outage' };
+	const variant = $derived<Variant>(VARIANTS[status] ?? 'server');
 
 	// Derived, not a literal: a plain object is built once and would keep the
 	// status the page first rendered with.
 	const Icon = $derived(
-		variant === 'auth'
-			? status === 403
-				? ShieldOff
-				: Lock
-			: variant === 'missing'
-				? FileQuestion
-				: variant === 'outage'
-					? ServerOff
-					: AlertTriangle,
+		{ 'signed-out': Lock, denied: ShieldOff, missing: FileQuestion, outage: ServerOff, server: AlertTriangle }[variant],
 	);
-	const tones = { auth: 'warn', missing: 'neutral', outage: 'warn', server: 'danger' } as const;
+	const tones = { 'signed-out': 'warn', denied: 'warn', missing: 'neutral', outage: 'warn', server: 'danger' } as const;
 
 	const title = $derived(
-		variant === 'auth'
-			? status === 401
-				? 'Not signed in'
-				: 'Access denied'
-			: variant === 'missing'
-				? 'Not found'
-				: variant === 'outage'
-					? OUTAGE.title
-					: 'Something went wrong',
+		{
+			'signed-out': 'Not signed in',
+			denied: 'Access denied',
+			missing: 'Not found',
+			outage: OUTAGE.title,
+			server: 'Something went wrong',
+		}[variant],
 	);
 
 	/**
 	 * No offer of support, because there is nothing here to reach it by. A
 	 * sentence that tells a reader to contact somebody, and then does not say
 	 * who, spends their patience and gives nothing back.
+	 *
+	 * A refusal keeps the words the load gave it, such as the role a page
+	 * needs, because that is the one thing the reader can act on.
 	 */
 	const hint = $derived(
-		variant === 'auth'
-			? status === 401
-				? 'The session has expired. Sign in again to carry on.'
-				: 'This account cannot open that page.'
-			: variant === 'missing'
-				? message || 'That page or record does not exist.'
-				: variant === 'outage'
-					? OUTAGE.body
-					: 'The request did not complete. Trying again is worth one attempt. The details below are what the server said.',
+		{
+			'signed-out': 'The session has expired. Sign in again to carry on.',
+			denied: message || 'This account cannot open that page.',
+			missing: message || 'That page or record does not exist.',
+			outage: OUTAGE.body,
+			server: 'The request did not complete. Trying again is worth one attempt. The details below are what the server said.',
+		}[variant],
 	);
 
 	// The address that failed, query included. A link rather than a click
@@ -106,7 +102,7 @@
 
 	{#snippet action()}
 		<div class="flex items-center gap-3">
-			{#if variant === 'auth'}
+			{#if variant === 'signed-out'}
 				<!-- There is a right answer here, so one control carries it. Three
 				     equal-weight secondaries offer a choice the reader does not have. -->
 				<Button href="/login">
