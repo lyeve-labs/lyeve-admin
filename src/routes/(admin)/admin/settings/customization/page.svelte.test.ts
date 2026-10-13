@@ -92,3 +92,27 @@ describe('the customization controls', () => {
 		expect(screen.getAllByRole('button', { name: /new page/i })).toHaveLength(2);
 	});
 });
+
+/*
+ * Every save on the page reruns the load. Reseeding every form from it wiped
+ * what the other forms held unsaved, so a new link took the brand name being
+ * typed with it.
+ */
+describe('unsaved customization edits', () => {
+	const withLink = (links: { label: string; url: string }[]) => ({ ...settings, menu: { ...settings.menu, links } });
+
+	it('survive a save of another form', async () => {
+		const { rerender } = render(CustomizationPage, { props: props() });
+		const brandName = document.querySelector('#brand-name') as HTMLInputElement;
+		await fireEvent.input(brandName, { target: { value: 'Acme Labs' } });
+		await rerender(props({ settings: withLink([{ label: 'Wiki', url: 'https://wiki.example.com' }]) }, { linkSaved: true }));
+		expect((document.querySelector('#brand-name') as HTMLInputElement).value).toBe('Acme Labs');
+	});
+
+	it('follow the brand once a brand save stores a new one', async () => {
+		const { rerender } = render(CustomizationPage, { props: props() });
+		await fireEvent.input(document.querySelector('#brand-name') as HTMLInputElement, { target: { value: 'Draft' } });
+		await rerender(props({ settings: { ...settings, brand: { ...settings.brand, name: 'Stored' } } }, { brandSaved: true }));
+		expect((document.querySelector('#brand-name') as HTMLInputElement).value).toBe('Stored');
+	});
+});

@@ -34,18 +34,52 @@
 	const roleOptions = ROLE_CHOICES.map((r) => ({ value: r, label: r }));
 	const fields = $derived((form as { fields?: Record<string, string> } | null)?.fields ?? {});
 
-	let name = $state('');
-	let accent = $state('');
-	let welcome = $state('');
-	let hidden = $state<string[]>([]);
-	let pinned = $state<string[]>([]);
-	let homePage = $state('');
+	/*
+	 * Each form is seeded from what the engine stores and reseeded only when
+	 * that form's stored part changes. Every save on this page reruns the load,
+	 * so reseeding on any of them wiped what the other forms held unsaved: a
+	 * new link took the brand name being typed with it.
+	 */
+	const brandKey = () => {
+		const b = data.settings.brand;
+		return JSON.stringify([b.name, b.accent, b.welcome]);
+	};
+	const menuKey = () => JSON.stringify([data.settings.menu.hidden, data.settings.menu.pinned]);
+	const homeKey = () => data.settings.home_page;
+
+	// svelte-ignore state_referenced_locally
+	let name = $state(data.settings.brand.name);
+	// svelte-ignore state_referenced_locally
+	let accent = $state(data.settings.brand.accent);
+	// svelte-ignore state_referenced_locally
+	let welcome = $state(data.settings.brand.welcome);
+	// svelte-ignore state_referenced_locally
+	let hidden = $state<string[]>([...data.settings.menu.hidden]);
+	// svelte-ignore state_referenced_locally
+	let pinned = $state<string[]>([...data.settings.menu.pinned]);
+	// svelte-ignore state_referenced_locally
+	let homePage = $state(data.settings.home_page);
+	// svelte-ignore state_referenced_locally
+	const seeded = { brand: brandKey(), menu: menuKey(), home: homeKey() };
 	$effect.pre(() => {
+		const key = brandKey();
+		if (key === seeded.brand) return;
+		seeded.brand = key;
 		name = data.settings.brand.name;
 		accent = data.settings.brand.accent;
 		welcome = data.settings.brand.welcome;
+	});
+	$effect.pre(() => {
+		const key = menuKey();
+		if (key === seeded.menu) return;
+		seeded.menu = key;
 		hidden = [...data.settings.menu.hidden];
 		pinned = [...data.settings.menu.pinned];
+	});
+	$effect.pre(() => {
+		const key = homeKey();
+		if (key === seeded.home) return;
+		seeded.home = key;
 		homePage = data.settings.home_page;
 	});
 	const accentOk = $derived(parseAccent(accent));
