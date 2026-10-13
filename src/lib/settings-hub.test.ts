@@ -43,7 +43,7 @@ describe('settings hub', () => {
 	it('offers a reader only the instance pages their sidebar offers', () => {
 		const editor = settingsHub(adminNav(['editor']), { twoFactor: true, trustedDevices: false });
 		expect(editor.map((g) => g.id)).toEqual(['account', 'apis']);
-		expect(editor[1].entries.map((e) => e.id)).toEqual(['api-access', 'grpc', 'graphql']);
+		expect(editor[1].entries.map((e) => e.id)).toEqual(['api-access']);
 		const admin = settingsHub(adminNav(['admin']), { twoFactor: true, trustedDevices: false });
 		expect(admin.find((g) => g.id === 'workspace')?.entries.map((e) => e.id)).toEqual(['customization']);
 		expect(admin.find((g) => g.id === 'instance')).toBeUndefined();

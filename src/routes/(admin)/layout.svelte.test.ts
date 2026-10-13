@@ -139,12 +139,15 @@ describe('admin shell landmarks', () => {
 });
 
 describe('admin shell role gate', () => {
-	it('gives an editor the daily destinations and nothing privileged', async () => {
+	it('gives an editor the daily destinations the engine answers it and nothing privileged', async () => {
 		await mount(EDITOR);
 
 		const names = linkNames();
-		expect(names).toContain('Content');
-		expect(names).toContain('Media library');
+		expect(names).toContain('Schema builder');
+		expect(names).toContain('Reviews');
+		// Both open on admin routes, which the engine refuses an editor.
+		expect(names).not.toContain('Content');
+		expect(names).not.toContain('Media library');
 		expect(names).not.toContain('Users');
 		expect(names).not.toContain('Audit log');
 		expect(names).not.toContain('Tenants');

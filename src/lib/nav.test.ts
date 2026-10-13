@@ -26,12 +26,15 @@ function labels(items: NavTree): string[] {
 }
 
 const EDITOR = ['editor'];
+const VIEWER = ['viewer'];
+// A role the tenant made up. The engine answers it as any signed-in reader.
+const TRANSLATOR = ['translator'];
 const ADMIN = ['admin'];
 const SUPER = ['super_admin'];
 
 describe('adminNav role gate', () => {
-	it('gives every signed-in role the seven daily destinations at depth 0', () => {
-		for (const roles of [EDITOR, ADMIN, SUPER]) {
+	it('gives an admin and a super admin the seven daily destinations at depth 0', () => {
+		for (const roles of [ADMIN, SUPER]) {
 			expect(ids(adminNav(roles)).slice(0, 7)).toEqual([
 				'dashboard',
 				'content',
@@ -62,22 +65,12 @@ describe('adminNav role gate', () => {
 		expect(order.indexOf('reviews')).toBeGreaterThan(order.indexOf('flows'));
 	});
 
-	it('gives a role with neither tier the delivery section and nothing privileged', () => {
+	it('gives a role with neither tier the pages any reader may open and nothing privileged', () => {
 		const tree = adminNav(EDITOR);
-		expect(ids(tree)).toEqual(['dashboard', 'content', 'schema', 'flows', 'reviews', 'media', 'search', 'delivery', 'settings']);
-		// How an app gets in, the read API, then the two directions a webhook
-		// can point: the order is what the sidebar renders.
-		expect(ids(find(tree, 'delivery').children ?? [])).toEqual([
-			'api-access',
-			'api-reference',
-			'api-labs',
-			'grpc',
-			'graphql',
-			'releases',
-			'experiments',
-			'webhooks',
-			'webhooks-incoming',
-		]);
+		expect(ids(tree)).toEqual(['dashboard', 'schema', 'flows', 'reviews', 'delivery', 'settings']);
+		// The token exchange is open to every account. The rest of Delivery
+		// opens on reads the engine serves to an admin.
+		expect(ids(find(tree, 'delivery').children ?? [])).toEqual(['api-access']);
 		// Settings keeps its own destination without the sections only a super
 		// admin may open, so it renders as a plain link.
 		expect(find(tree, 'settings').children).toEqual([]);
@@ -168,6 +161,69 @@ describe('adminNav role gate', () => {
 	});
 });
 
+describe('adminNav reach by role', () => {
+	// Each entry is listed to the roles the engine answers on the read its
+	// page opens with. Listed to anybody else, it would open on a page the
+	// engine refuses, drawn as an empty one.
+	const ADMIN_DAILY = ['dashboard', 'content', 'schema', 'flows', 'reviews', 'media', 'search'];
+	const READER_DAILY = ['dashboard', 'schema', 'flows', 'reviews'];
+	const DELIVERY = [
+		'api-access',
+		'api-reference',
+		'api-labs',
+		'grpc',
+		'graphql',
+		'releases',
+		'experiments',
+		'webhooks',
+		'webhooks-incoming',
+	];
+
+	/** The destinations at depth 0, where the daily work sits. */
+	const daily = (tree: NavTree) => tree.filter((node) => node.children === undefined).map((node) => node.id);
+	const delivery = (tree: NavTree) => ids(find(tree, 'delivery').children ?? []);
+	/** The headings, each drawn only while the role has something under it. */
+	const sections = (tree: NavTree) => tree.filter((node) => node.children !== undefined).map((node) => node.id);
+
+	it('gives a super admin every daily destination and every delivery entry', () => {
+		const tree = adminNav(SUPER);
+		expect(daily(tree)).toEqual(ADMIN_DAILY);
+		// How an app gets in, the read API, then the two directions a webhook
+		// can point: the order is what the sidebar renders.
+		expect(delivery(tree)).toEqual(DELIVERY);
+		expect(sections(tree)).toEqual(['delivery', 'access', 'operations', 'insight', 'settings']);
+	});
+
+	it('gives an admin the same daily work and every delivery entry but the gRPC listener', () => {
+		const tree = adminNav(ADMIN);
+		expect(daily(tree)).toEqual(ADMIN_DAILY);
+		// The listener's status is a super admin route.
+		expect(delivery(tree)).toEqual(DELIVERY.filter((id) => id !== 'grpc'));
+		expect(sections(tree)).toEqual(['delivery', 'access', 'operations', 'insight', 'settings']);
+	});
+
+	it.each([
+		{ who: 'an editor', roles: EDITOR },
+		{ who: 'a viewer', roles: VIEWER },
+		{ who: 'a custom role', roles: TRANSLATOR },
+	])('gives $who only the pages any signed-in reader may open', ({ roles }) => {
+		const tree = adminNav(roles);
+		// Content, the media library and search open on admin routes, and so
+		// does every delivery page but API access.
+		expect(daily(tree)).toEqual(READER_DAILY);
+		expect(delivery(tree)).toEqual(['api-access']);
+		// Access, Operations and Insight hold nothing this role may open, so
+		// none of the three is drawn.
+		expect(sections(tree)).toEqual(['delivery', 'settings']);
+	});
+
+	it('gives a custom role held beside admin what the admin role reaches', () => {
+		const tree = adminNav([...TRANSLATOR, ...ADMIN]);
+		expect(daily(tree)).toEqual(ADMIN_DAILY);
+		expect(delivery(tree)).toEqual(DELIVERY.filter((id) => id !== 'grpc'));
+	});
+});
+
 describe('adminNav plugin gate', () => {
 	// A plugin's entries are listed while the engine names the plugin as
 	// running for this tenant. The engine's own entries are always listed.
@@ -210,14 +266,7 @@ describe('adminNav plugin gate', () => {
 			'observability',
 			'settings',
 		]);
-		expect(present(adminNav(EDITOR, { plugins: kernel }))).toEqual([
-			'dashboard',
-			'delivery',
-			'api-access',
-			'api-reference',
-			'api-labs',
-			'settings',
-		]);
+		expect(present(adminNav(EDITOR, { plugins: kernel }))).toEqual(['dashboard', 'delivery', 'api-access', 'settings']);
 	});
 
 	it('lists only the engine entries when the running list could not be read', () => {
@@ -286,9 +335,10 @@ describe('adminNav plugin gate', () => {
 
 	it('still refuses a privileged entry to a role that may not see it', () => {
 		// The plugin gate narrows. It never widens. Every plugin running does
-		// not give an editor the user list.
+		// not give an editor the user list, the content or the webhooks.
 		const everything = named([...RUNNING, 'search', 'ai', 'audit', 'webhook', 'mfa', 'oauth']);
-		expect(present(adminNav(EDITOR, { plugins: everything }))).not.toContain('users');
+		const items = present(adminNav(EDITOR, { plugins: everything }));
+		for (const id of ['users', 'content', 'media', 'search', 'webhooks']) expect(items, id).not.toContain(id);
 	});
 });
 
