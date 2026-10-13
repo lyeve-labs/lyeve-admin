@@ -159,3 +159,39 @@ describe('the history window', () => {
 		expect(group.querySelectorAll('a[href^="?hours="]')).toHaveLength(3);
 	});
 });
+
+describe('the license', () => {
+	const unlicensed = {
+		limit: {
+			ok: true,
+			value: {
+				licensed: false,
+				tenant_global: { id: 't', endpoint: '*', rate: 5, burst: 10, enabled: true, kind: 'tenant_global', key_by: 'ip', enforced: true },
+				install_global: null,
+			},
+		},
+		addresses: {
+			ok: true,
+			value: {
+				licensed: false,
+				limits: { entries: { limit: 500, current: 1 } },
+				rules: [{ id: 'a1', cidr: '198.51.100.7/32', list: 'allow', note: '', created_at: '2026-10-01T00:00:00Z' }],
+			},
+		},
+	};
+
+	it('holds back a new limit and a new address the plugin would refuse, and keeps clearing and removing live', () => {
+		render(TenantPage, { props: props(unlicensed) });
+		expect((screen.getByRole('button', { name: 'Edit' }) as HTMLButtonElement).disabled).toBe(true);
+		for (const b of screen.getAllByRole('button', { name: 'New address' })) expect((b as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByRole('button', { name: 'Clear' }) as HTMLButtonElement).disabled).toBe(false);
+		expect((screen.getByRole('button', { name: 'Delete 198.51.100.7/32' }) as HTMLButtonElement).disabled).toBe(false);
+		expect(screen.getByText(/Setting or changing this limit needs a license/)).toBeTruthy();
+	});
+
+	it('offers both writes on a licensed install', () => {
+		render(TenantPage, { props: props() });
+		expect((screen.getByRole('button', { name: 'Set a limit' }) as HTMLButtonElement).disabled).toBe(false);
+		for (const b of screen.getAllByRole('button', { name: 'New address' })) expect((b as HTMLButtonElement).disabled).toBe(false);
+	});
+});

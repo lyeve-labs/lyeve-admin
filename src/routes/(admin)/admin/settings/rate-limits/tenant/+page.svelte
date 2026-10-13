@@ -61,6 +61,11 @@
 	const install = $derived(limitRead?.install_global ?? null);
 	const addresses = $derived(data.addresses.ok ? data.addresses.value : null);
 	const entries = $derived(addresses?.rules ?? []);
+	// The plugin refuses a new limit or a new address without the license, so
+	// both stay disabled beside the sentence that says why. Clearing a limit
+	// and removing an entry are always allowed and stay live.
+	const limitLicensed = $derived(limitRead?.licensed !== false);
+	const addressesLicensed = $derived(addresses?.licensed !== false);
 	const entryLimit = $derived(addresses ? addressLimit(addresses) : null);
 	const allow = $derived(entries.filter((e) => e.list === 'allow'));
 	const deny = $derived(entries.filter((e) => e.list === 'deny'));
@@ -159,7 +164,13 @@
 		<div class="flex flex-col gap-3">
 			<div class="flex items-center justify-between gap-2">
 				<SectionHeading level={3}>{title}</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={() => openAddress(which)}>
+				<Button
+					variant="secondary"
+					size="sm"
+					onclick={() => openAddress(which)}
+					disabled={!addressesLicensed}
+					aria-describedby={addressesLicensed ? undefined : 'address-license'}
+				>
 					<Plus size={ICON.sm} /> New address
 				</Button>
 			</div>
@@ -250,14 +261,20 @@
 									<Button variant="secondary" size="sm" type="submit">Clear</Button>
 								</form>
 							{/if}
-							<Button variant="secondary" size="sm" onclick={openLimit}>
+							<Button
+								variant="secondary"
+								size="sm"
+								onclick={openLimit}
+								disabled={!limitLicensed}
+								aria-describedby={limitLicensed ? undefined : 'limit-license'}
+							>
 								<Gauge size={ICON.sm} />
 								{own ? 'Edit' : 'Set a limit'}
 							</Button>
 						</div>
 					</div>
-					{#if limitRead && !limitRead.licensed}
-						<p class="mt-3 text-xs text-faint">
+					{#if !limitLicensed}
+						<p id="limit-license" class="mt-3 text-xs text-faint">
 							Setting or changing this limit needs a license this install does not hold. Clearing it is always
 							allowed.
 						</p>
@@ -290,11 +307,13 @@
 					absent="This version of the plugin keeps no address lists."
 				/>
 			{:else}
-				{#if addresses && !addresses.licensed}
-					<Alert tone="brand">
-						Adding an address needs a license this install does not hold. Entries already saved keep applying, and
-						removing one is always allowed.
-					</Alert>
+				{#if !addressesLicensed}
+					<div id="address-license">
+						<Alert tone="brand">
+							Adding an address needs a license this install does not hold. Entries already saved keep applying, and
+							removing one is always allowed.
+						</Alert>
+					</div>
 				{/if}
 				<div class="grid gap-4 lg:grid-cols-2">
 					{@render addressCard('allow', allow, 'Allow list')}
