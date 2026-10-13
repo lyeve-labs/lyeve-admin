@@ -53,6 +53,13 @@
 	const unenforced = $derived(data.rules.filter((r) => !r.enforced));
 	const canEditProtections = $derived(data.superAdmin && customEnabled === true);
 
+	/**
+	 * Whether this reader may change or delete a rule. A rule with no tenant
+	 * applies to every tenant, and the plugin keeps those for a super admin, so
+	 * an admin sees them listed beside their own and cannot change them.
+	 */
+	const canChange = (r: RateRule) => data.superAdmin || Boolean(r.tenant_id);
+
 	const KEY_OPTIONS = [
 		{ value: 'ip', label: 'Per address' },
 		{ value: 'user', label: 'Per signed-in account' },
@@ -478,7 +485,10 @@
 								<td data-cell="nowrap" class="font-mono text-xs">{r.burst}</td>
 								<td data-cell="nowrap">
 									<div class="flex items-center justify-end gap-1">
-										{#if customEnabled === true}
+										{#if !canChange(r)}
+											<span class="text-xs text-muted">Only a super admin changes a rule for every tenant.</span>
+										{/if}
+										{#if customEnabled === true && canChange(r)}
 											<Button
 												variant="ghost"
 												size="sm"
@@ -487,6 +497,8 @@
 											>
 												<Pencil size={ICON.sm} />
 											</Button>
+										{/if}
+										{#if customEnabled === true}
 											<Button
 												variant="ghost"
 												size="sm"
@@ -496,17 +508,19 @@
 												<Copy size={ICON.sm} />
 											</Button>
 										{/if}
-										<form method="POST" action="?/delete" use:enhance={removeRule(r)}>
-											<input type="hidden" name="id" value={r.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Delete the rule for {r.endpoint}"
-											>
-												<Trash2 size={ICON.sm} class="text-danger" />
-											</Button>
-										</form>
+										{#if canChange(r)}
+											<form method="POST" action="?/delete" use:enhance={removeRule(r)}>
+												<input type="hidden" name="id" value={r.id} />
+												<Button
+													variant="ghost"
+													size="sm"
+													type="submit"
+													aria-label="Delete the rule for {r.endpoint}"
+												>
+													<Trash2 size={ICON.sm} class="text-danger" />
+												</Button>
+											</form>
+										{/if}
 									</div>
 								</td>
 							</tr>

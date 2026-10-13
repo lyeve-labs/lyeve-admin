@@ -108,6 +108,28 @@ describe('rate-limits page', () => {
 		expect(queryByText('Sign-in and reset protections')).toBeNull();
 	});
 
+	it('offers an admin no change to a rule for every tenant, and says why', () => {
+		const own = { ...customRule, id: 'r2', tenant_id: 'acme', endpoint: 'GET /api/own', enforced: true };
+		const { getByText, queryByRole, getByRole } = setup({
+			customEnabled: true,
+			superAdmin: false,
+			rules: [{ ...customRule, enforced: true }, own],
+		});
+		expect(getByText('Only a super admin changes a rule for every tenant.')).toBeTruthy();
+		expect(queryByRole('button', { name: 'Edit the rule for GET /api/content/{schema}' })).toBeNull();
+		expect(queryByRole('button', { name: 'Delete the rule for GET /api/content/{schema}' })).toBeNull();
+		expect(getByRole('button', { name: 'Duplicate the rule for GET /api/content/{schema}' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Edit the rule for GET /api/own' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Delete the rule for GET /api/own' })).toBeTruthy();
+	});
+
+	it('lets a super admin change a rule for every tenant', () => {
+		const { getByRole, queryByText } = setup({ customEnabled: true, rules: [{ ...customRule, enforced: true }] });
+		expect(getByRole('button', { name: 'Edit the rule for GET /api/content/{schema}' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Delete the rule for GET /api/content/{schema}' })).toBeTruthy();
+		expect(queryByText('Only a super admin changes a rule for every tenant.')).toBeNull();
+	});
+
 	it('names the setting behind an engine limit', () => {
 		const { getByText } = setup();
 		expect(getByText('PUBLIC_RATE_LIMITS')).toBeTruthy();
