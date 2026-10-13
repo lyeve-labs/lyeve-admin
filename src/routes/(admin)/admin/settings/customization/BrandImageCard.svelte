@@ -174,11 +174,8 @@
 		</form>
 
 		<div>
-			{#if mediaChoices}
-				<MediaPicker choices={mediaChoices} onpick={(c) => pickFromLibrary(c.public_url)} label="Choose from the library" />
-			{:else}
-				<p class="text-sm text-muted">The media library could not be read, so nothing can be chosen from it. Upload a file or use an address.</p>
-			{/if}
+			<!-- The picker says itself when the library could not be read. -->
+			<MediaPicker choices={mediaChoices} onpick={(c) => pickFromLibrary(c.public_url)} label="Choose from the library" />
 		</div>
 
 		<form bind:this={libraryForm} method="POST" action="?/{copy.address}" class="flex flex-col gap-4" use:enhance={keep}>
