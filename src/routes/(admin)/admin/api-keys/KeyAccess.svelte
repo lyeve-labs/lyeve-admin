@@ -29,12 +29,18 @@
 		groups,
 		privileged = false,
 		error,
+		schemasFailed = false,
+		catalogFailed = false,
 	}: {
 		access: KeyAccess;
 		schemas: string[];
 		groups: ResourceGroup[];
 		privileged?: boolean;
 		error?: string;
+		/** The schema list did not answer, so an empty list means nothing. */
+		schemasFailed?: boolean;
+		/** The route catalog did not answer, so no resource below is offered. */
+		catalogFailed?: boolean;
 	} = $props();
 
 	const scopes = $derived(accessScopes(access));
@@ -133,8 +139,10 @@
 							/>
 						{/each}
 					</div>
+				{:else if schemasFailed}
+					<Alert tone="warn">The schemas could not be read, so none can be chosen now. Reload the page to try again.</Alert>
 				{:else if schemas.length === 0}
-					<p class="text-xs text-faint">This instance has no schemas yet, or they could not be read.</p>
+					<p class="text-xs text-faint">This instance has no schemas yet.</p>
 				{:else}
 					{#if schemas.length > 8}
 						<label for="key-schema-search" class="sr-only">Narrow the schemas</label>
@@ -193,6 +201,10 @@
 			</div>
 		</Collapsible>
 	</div>
+
+	{#if catalogFailed}
+		<Alert tone="warn">The engine's route catalog could not be read, so no other resource can be granted now. Reload the page to try again.</Alert>
+	{/if}
 
 	{#each groups as g (g.resource)}
 		{@const st = resourceState(g.resource)}

@@ -3,7 +3,32 @@ import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a delete and read the question it asks.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy: () => {} };
+	},
+}));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/** The title of the question the first delete form on the page asks. */
+async function deleteTitle(): Promise<string> {
+	const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/delete' && f.node.isConnected);
+	const submit = entry?.submit as ((input: { cancel: () => void }) => Promise<unknown>) | undefined;
+	if (!submit) throw new Error('no delete form registered a submit function');
+	kit.confirm.mockClear();
+	await submit({ cancel: () => {} });
+	return String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? '');
+}
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 vi.mock('$app/state', () => ({ page: { url: new URL('http://admin/admin/api-keys') } }));
 
@@ -23,12 +48,15 @@ function key(over: Record<string, unknown>) {
 	};
 }
 
-function setup(keys: unknown[]) {
+function setup(keys: unknown[] | { ok: false; gate: unknown }, over: Record<string, unknown> = {}) {
 	const data = {
-		keys,
+		keys: Array.isArray(keys) ? { ok: true, value: keys } : keys,
 		usageMap: {},
+		usageUnknown: [],
+		catalogFailed: false,
+		schemasFailed: false,
 		month: '2026-10',
-		total: keys.length,
+		total: Array.isArray(keys) ? keys.length : 0,
 		limit: 50,
 		offset: 0,
 		schemaNames: ['pages', 'posts'],
@@ -39,6 +67,7 @@ function setup(keys: unknown[]) {
 				{ method: 'POST', path: '/api/v1/graphql', resource: 'graphql', action: 'read', scope: 'graphql:read', owner: 'graphql', declared: true },
 			],
 		},
+		...over,
 	};
 	return render(Page, { props: { data, form: null } as never });
 }
@@ -123,5 +152,37 @@ describe('API keys page', () => {
 		await fireEvent.click(getByRole('button', { name: 'Request limits for deploy' }));
 		const value = (id: string) => document.body.querySelector<HTMLInputElement>(`#${id}`)?.value;
 		expect([value('key-limit-hourly_limit'), value('key-limit-daily_limit'), value('key-limit-monthly_limit')]).toEqual(['9', '90', '900']);
+	});
+
+	it('says the keys could not be read instead of inviting a first key', () => {
+		const { container, queryByRole } = setup({ ok: false, gate: { state: 'error', message: 'The API keys could not be read.' } });
+		expect(container.textContent).toContain('The API keys could not be read.');
+		expect(container.textContent).not.toContain('No API keys yet');
+		expect(queryByRole('button', { name: /New key/ })).toBeNull();
+	});
+
+	it('keeps the pager when nothing on this page matches the search', async () => {
+		const { container, getByPlaceholderText } = setup([key({})], { total: 120, offset: 0, limit: 50 });
+		await fireEvent.input(getByPlaceholderText('Name, role or schema on this page'), { target: { value: 'nothing like it' } });
+		expect(container.textContent).toContain('No key on this page matches');
+		expect(container.querySelector('a[href="/admin/api-keys?limit=50&offset=50"]')).toBeTruthy();
+	});
+
+	it('says the usage is unknown when its read failed, not that there was none', () => {
+		const { container } = setup([key({})], { usageUnknown: ['k1'] });
+		expect(container.textContent).toContain('Unknown, the usage could not be read');
+	});
+
+	it('says in the drawer that the schemas could not be read', async () => {
+		const { getAllByRole, getByRole } = setup([key({})], { schemaNames: [], schemasFailed: true });
+		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		await fireEvent.click(getByRole('radio', { name: 'Chosen schemas' }));
+		expect(document.body.textContent).toContain('The schemas could not be read');
+		expect(document.body.textContent).not.toContain('This instance has no schemas yet');
+	});
+
+	it('names the key in the delete confirmation', async () => {
+		setup([key({})]);
+		expect(await deleteTitle()).toBe('Delete API key deploy');
 	});
 });

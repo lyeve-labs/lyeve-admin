@@ -116,14 +116,13 @@ export function limitsOf(key: APIKey): KeyLimits {
 }
 
 /**
- * One key's metered usage for a billing period (YYYY-MM), or null when it
- * cannot be read. The usage plugin meters requests and owns the count a key's
- * monthly limit is enforced against, so the read goes there.
+ * One key's metered usage for a billing period (YYYY-MM). The usage plugin
+ * meters requests and owns the count a key's monthly limit is enforced
+ * against, so the read goes there. A failed read rejects, and the caller tells
+ * an engine without the plugin from a figure that could not be read.
  */
-export function keyUsage<T>(client: HttpClient, id: string, period: string): Promise<T | null> {
-	return client
-		.get<T>(`/api/admin/usage/api-key/${encodeURIComponent(id)}?period=${encodeURIComponent(period)}`)
-		.catch(() => null);
+export function keyUsage<T>(client: HttpClient, id: string, period: string): Promise<T> {
+	return client.get<T>(`/api/admin/usage/api-key/${encodeURIComponent(id)}?period=${encodeURIComponent(period)}`);
 }
 
 /** Roles a key may hold only with an expiry. */

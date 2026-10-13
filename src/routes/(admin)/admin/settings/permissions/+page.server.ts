@@ -10,6 +10,8 @@ import type { FlowOption } from '$lib/flow/types';
 import { isFlowResource } from '$lib/flow/permissions';
 import { getRoleLimits, type RoleLimits } from '$lib/api/permissions';
 import { sessionToken } from '$lib/server/session-cookie';
+import { actionError, actionFailure } from '$lib/server/action-error';
+import { section } from '$lib/api/gate';
 
 // Static text. The engine's own message can carry driver or upstream detail
 // that has no place in a page, and the operator's next step is the same
@@ -33,15 +35,22 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	try {
 		// The flows are resources beside the schemas. An instance without the
 		// flow plugin answers 404 for the list, which is an empty picker, not
-		// a failed read of the rules.
-		const [permissions, schemas, flows] = await Promise.all([listPermissions(client), getSchemas(client), listAllFlows(client).catch((): FlowOption[] => [])]);
-		return { permissions, schemas, flows, roleCap, roleCount, loadError: null as string | null };
+		// a failed read of the rules. Any other failure is said in the rule
+		// form, which then offers the schemas alone.
+		const [permissions, schemas, flowRead] = await Promise.all([
+			listPermissions(client),
+			getSchemas(client),
+			section(listAllFlows(client), 'The flows could not be read.'),
+		]);
+		const flows: FlowOption[] = flowRead.ok ? flowRead.value : [];
+		const flowsFailed = !flowRead.ok && flowRead.gate.state !== 'absent';
+		return { permissions, schemas, flows, flowsFailed, roleCap, roleCount, loadError: null as string | null };
 	} catch {
 		// An empty list alone draws exactly the matrix an instance with no rules
 		// draws. On a 503 or an expired session that would tell the operator
 		// nothing is restricted, and the next click would grant a rule on top of
 		// rules still in the database, so the failure is named.
-		return { permissions: [] as Permission[], schemas: [] as Schema[], flows: [] as FlowOption[], roleCap, roleCount, loadError: LOAD_FAILED };
+		return { permissions: [] as Permission[], schemas: [] as Schema[], flows: [] as FlowOption[], flowsFailed: false, roleCap, roleCount, loadError: LOAD_FAILED };
 	}
 };
 
@@ -66,13 +75,16 @@ export const actions: Actions = {
 		// nothing ever matches it.
 		const role = ((form.get('role') as string) ?? '').trim();
 		const schemaName = ((form.get('schema_name') as string) ?? '').trim();
+		// The rule drawer and the new role drawer both post here. The failure
+		// names the one that posted, so it shows in that drawer only.
+		const action = form.get('drawer') === 'role' ? 'role' : 'rule';
 		if (!role || !schemaName) {
-			return fail(422, { error: 'Role and resource are required' });
+			return fail(422, { action, error: 'Role and resource are required' });
 		}
 		// The engine's validator refuses activate on anything but a flow
 		// resource. Refusing it here keeps the message about the form.
 		if (actions.includes('activate') && !isFlowResource(schemaName)) {
-			return fail(422, { error: 'Activate applies to flows only' });
+			return fail(422, { action, error: 'Activate applies to flows only' });
 		}
 
 		try {
@@ -88,9 +100,12 @@ export const actions: Actions = {
 		} catch (e: unknown) {
 			if (isRoleCapRefusal(e)) {
 				const refused = refusalOf(e);
-				return fail(402, { roleCapReached: true, refused });
+				return fail(402, { action, roleCapReached: true, refused });
 			}
-			return fail(400, { error: e instanceof Error ? e.message : 'Save failed' });
+			// Any other 402 is a license refusal, which the drawer renders with
+			// its numbers and its link rather than as the engine's sentence.
+			const failure = actionFailure(e, 'The rule could not be saved.');
+			return fail(failure.status, { ...failure.data, action });
 		}
 		return { success: true };
 	},
@@ -104,7 +119,7 @@ export const actions: Actions = {
 		try {
 			await deletePermission(id, client);
 		} catch (e: unknown) {
-			return fail(400, { error: e instanceof Error ? e.message : 'Delete failed' });
+			return fail(400, { action: 'delete', error: actionError(e, 'The rule could not be removed.') });
 		}
 		return { success: true };
 	},

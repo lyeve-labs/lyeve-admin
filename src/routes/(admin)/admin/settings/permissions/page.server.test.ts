@@ -32,6 +32,7 @@ vi.mock('$lib/server/authz', () => ({
 
 import { load, actions } from './+page.server';
 import { listPermissions, getSchemas, upsertPermission } from '@lyeve-labs/client-rest';
+import { ApiError } from '@lyeve-labs/client';
 
 const mockedListPermissions = vi.mocked(listPermissions);
 const mockedGetSchemas = vi.mocked(getSchemas);
@@ -182,9 +183,20 @@ describe('permissions +page.server.ts flows as resources', () => {
 	it('reads an instance without the flow plugin as no flows, not a failed read', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([] as never);
-		flows.listAllFlows.mockRejectedValueOnce(new Error('404'));
-		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[] };
+		flows.listAllFlows.mockRejectedValueOnce(new ApiError(404, 'not found'));
+		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
 		expect(result.flows).toEqual([]);
+		expect(result.flowsFailed).toBe(false);
+		expect(result.loadError).toBeNull();
+	});
+
+	it('says the flows could not be read when the list fails for another reason', async () => {
+		mockedListPermissions.mockResolvedValue([permission] as never);
+		mockedGetSchemas.mockResolvedValue([] as never);
+		flows.listAllFlows.mockRejectedValueOnce(new ApiError(500, 'boom'));
+		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
+		expect(result.flows).toEqual([]);
+		expect(result.flowsFailed).toBe(true);
 		expect(result.loadError).toBeNull();
 	});
 
@@ -238,5 +250,28 @@ describe('permissions +page.server.ts actions.upsert', () => {
 
 		expect(result).toMatchObject({ status: 422 });
 		expect(mockedUpsertPermission).not.toHaveBeenCalled();
+	});
+});
+
+describe('permissions +page.server.ts refused writes', () => {
+	type Failed = { status: number; data: Record<string, unknown> };
+
+	it('renders a license refusal that is not the role ceiling as a refusal, not as engine text', async () => {
+		const refusal = Object.assign(new ApiError(402, 'payment_required'), {
+			body: { error: 'payment_required', feature: 'feature:rbac', plugin: 'permissions' },
+		});
+		mockedUpsertPermission.mockRejectedValueOnce(refusal);
+		const result = (await actions.upsert(upsertEvent({ role: 'editor', schema_name: 'article', drawer: 'rule' }))) as Failed;
+		expect(result.status).toBe(402);
+		expect(result.data.refused).toMatchObject({ kind: 'feature' });
+		expect(result.data.roleCapReached).toBeUndefined();
+		expect(result.data.action).toBe('rule');
+	});
+
+	it('names the drawer that posted, so the failure shows in that drawer only', async () => {
+		mockedUpsertPermission.mockRejectedValueOnce(new ApiError(500, 'pq: boom'));
+		const result = (await actions.upsert(upsertEvent({ role: 'reviewer', schema_name: '*', drawer: 'role' }))) as Failed;
+		expect(result.data.action).toBe('role');
+		expect(result.data.error).toBe('The rule could not be saved.');
 	});
 });

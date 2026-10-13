@@ -106,7 +106,12 @@ describe('permissions page', () => {
 		// sends a null `id`, and removing a rule silently never succeeds.
 		const { container, getAllByRole } = setup();
 		const form = container.querySelector('form[action="?/delete"]') as HTMLFormElement;
-		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+		// The id is read when the form posts, so the spy captures it at that
+		// moment. Read afterwards, it would pass even if the post went out first.
+		let posted: string | null = null;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {
+			posted = new FormData(form).get('id') as string | null;
+		});
 		const remove = getAllByRole('button').find((b) =>
 			b.getAttribute('aria-label')?.startsWith('Remove rule'),
 		);
@@ -120,8 +125,8 @@ describe('permissions page', () => {
 		await fireEvent.click(remove!);
 		await tick();
 		await tick();
-		expect(new FormData(form).get('id')).toBe(permission.id);
 		expect(submit).toHaveBeenCalled();
+		expect(posted).toBe(permission.id);
 	});
 
 	it('names the rule it is about to remove', async () => {
@@ -133,7 +138,7 @@ describe('permissions page', () => {
 		await tick();
 		// A destructive confirmation has to say which object it means.
 		const [title, message, options] = kit.confirm.mock.calls[0] as unknown as [string, string, { confirmLabel: string }];
-		expect(title).toBe('Remove permission');
+		expect(title).toBe('Delete rule for editor on article');
 		expect(message).toContain('editor');
 		expect(message).toContain('article');
 		expect(options.confirmLabel).toBe('Delete');
@@ -644,5 +649,74 @@ describe('permissions page flow resources', () => {
 		expect(roleRow(container, 'reviewer').textContent).toContain('reviewer grants read on every schema.');
 		expect(roleRow(container, 'reviewer').textContent).toContain('reviewer grants read on no flow.');
 		expect(roleRow(container, 'reviewer').textContent).toContain('reviewer grants activate on no flow.');
+	});
+});
+
+describe('permissions page drawers', () => {
+	function setupWith(form: unknown, over: Record<string, unknown> = {}) {
+		return render(PermissionsPage, {
+			props: {
+				data: { permissions: [permission], schemas: [{ name: 'article' }], entitlements, loadError: null, ...over },
+				form,
+			} as never,
+		});
+	}
+
+	const dataWith = (over: Record<string, unknown> = {}) => ({
+		permissions: [permission],
+		schemas: [{ name: 'article' }],
+		entitlements,
+		loadError: null,
+		...over,
+	});
+	const ruleText = () => document.body.querySelector('form#rule-form')?.textContent ?? '';
+	const roleText = () => document.body.querySelector('form#role-form')?.textContent ?? '';
+	const editButton = (all: HTMLElement[]) => all.find((b) => b.getAttribute('aria-label')?.startsWith('Edit rule'))!;
+	const newRoleButton = (all: HTMLElement[]) => all.find((b) => b.textContent?.includes('New role'))!;
+
+	it('shows a refused rule save inside the open rule drawer', async () => {
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(editButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
+		expect(ruleText()).toContain('The rule could not be saved.');
+	});
+
+	it('shows a refused role inside the open role drawer', async () => {
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'role', error: 'The rule could not be saved.' } } as never);
+		expect(roleText()).toContain('The rule could not be saved.');
+	});
+
+	it('shows the role ceiling refusal with its numbers in the role drawer', async () => {
+		const refused = { kind: 'cap', cap: 'permissions.roles', limit: 3, current: 3, upgradeUrl: '' };
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'role', roleCapReached: true, refused } } as never);
+		expect(roleText()).toContain('3 of 3 roles are in use');
+	});
+
+	it('leaves newly opened drawers clean after a failed delete', async () => {
+		const { container, getAllByRole } = setupWith({ action: 'delete', error: 'The rule could not be removed.' });
+		expect(container.textContent).toContain('The rule could not be removed.');
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		expect(roleText()).not.toContain('could not be removed');
+		await fireEvent.click(editButton(getAllByRole('button')));
+		expect(ruleText()).not.toContain('could not be removed');
+	});
+
+	it('keeps a failed rule save out of the role drawer', async () => {
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
+		expect(roleText()).not.toContain('could not be saved');
+	});
+
+	it('says in the new rule form that the flows could not be read', async () => {
+		const { container, getAllByRole } = setupWith(null, { flowsFailed: true });
+		const add = getAllByRole('button').find((b) => b.getAttribute('aria-label') === 'Add a schema rule for editor');
+		expect(add, 'no control adds a rule for a new resource').toBeTruthy();
+		await fireEvent.click(add!);
+		expect(container.ownerDocument.body.textContent).toContain('The flows could not be read');
 	});
 });

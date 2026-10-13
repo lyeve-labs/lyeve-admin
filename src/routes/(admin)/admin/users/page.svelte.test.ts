@@ -23,8 +23,11 @@ function accounts(count: number, from = 0) {
 	}));
 }
 
+/** Load data as the load returns it. A bare array stands for a read that answered. */
 function data(overrides: Record<string, unknown> = {}) {
-	return { users: accounts(25), limit: 25, offset: 0, hasMore: false, tenants: [], ...overrides };
+	const answered = (value: unknown) => (Array.isArray(value) ? { ok: true, value } : value);
+	const merged: Record<string, unknown> = { users: accounts(25), limit: 25, offset: 0, hasMore: false, tenants: [], ...overrides };
+	return { ...merged, users: answered(merged.users), tenants: answered(merged.tenants) };
 }
 
 const props = (over: Record<string, unknown> = {}) =>
@@ -294,3 +297,31 @@ describe('Users create, several tenants', () => {
 	});
 });
 
+
+describe('Users read failures', () => {
+	it('says the accounts could not be read instead of inviting a first account', () => {
+		const failed = { ok: false, gate: { state: 'error', message: 'The accounts could not be read.' } };
+		const { container, queryByRole } = render(UsersPage, { props: props({ users: failed }) });
+
+		expect(container.textContent).toContain('The accounts could not be read.');
+		expect(container.textContent).not.toContain('No users yet');
+		expect(queryByRole('button', { name: /new user/i })).toBeNull();
+	});
+
+	it('says in the create form that the tenants could not be read', async () => {
+		const failed = { ok: false, gate: { state: 'unavailable' } };
+		const { getAllByRole, container } = render(UsersPage, { props: props({ tenants: failed }) });
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+
+		expect(container.ownerDocument.body.textContent).toContain('Tenants could not be read');
+	});
+});
+
+describe('Users role filter', () => {
+	it('offers the roles as chips', () => {
+		const { getByRole } = render(UsersPage, { props: props() });
+
+		expect(getByRole('group', { name: 'Role' })).toBeTruthy();
+		expect(getByRole('button', { name: 'super_admin' })).toBeTruthy();
+	});
+});

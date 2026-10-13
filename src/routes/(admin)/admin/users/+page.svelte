@@ -1,18 +1,19 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
+		Alert,
 		Badge,
 		Button,
 		CheckboxGroup,
 		Drawer,
 		Select,
 		EmptyState,
+		FilterChips,
 		Input,
 		PageShell,
 		PasswordInput,
 		Pagination,
 		SearchInput,
-		SegmentedControl,
 		Table,
 		confirm as confirmDialog,
 		toast,
@@ -23,6 +24,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { KeyRound, Pencil, Plus, Trash2, Users } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { fieldErrors, tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
@@ -31,7 +33,7 @@
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
-	type User = PageData['users'][number];
+	type User = Extract<PageData['users'], { ok: true }>['value'][number];
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -47,9 +49,10 @@
 	let tenant = $state('');
 	// A tenant is chosen only on an install with several. With one, the engine
 	// resolves it on its own.
+	const tenants = $derived(data.tenants.ok ? data.tenants.value : []);
 	const tenantOptions = $derived([
 		{ value: '', label: 'Choose a tenant' },
-		...data.tenants.map((t) => ({ value: t.slug, label: t.name && t.name !== t.slug ? `${t.name} (${t.slug})` : t.slug })),
+		...tenants.map((t) => ({ value: t.slug, label: t.name && t.name !== t.slug ? `${t.name} (${t.slug})` : t.slug })),
 	]);
 
 	function openCreate() {
@@ -77,7 +80,7 @@
 	function deleteAccount(email: string): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Permanently delete ${email}?`,
+				`Delete user ${email}`,
 				'Their sessions end at once and their audit trail stays.',
 				{ confirmLabel: 'Delete' }
 			);
@@ -150,8 +153,9 @@
 	let query = $state('');
 	let role = $state('');
 	const ROLE_FILTERS = [{ value: '', label: 'All' }, ...ROLE_OPTIONS];
+	const rows = $derived(data.users.ok ? data.users.value : []);
 	const visible = $derived(
-		data.users.filter(
+		rows.filter(
 			(u) => narrows(query, u.email, u.roles.join(' ')) && (role === '' || u.roles.includes(role))
 		)
 	);
@@ -178,14 +182,18 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New user
-		</Button>
+		{#if data.users.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New user
+			</Button>
+		{/if}
 	{/snippet}
 
 	<FormErrors message={form?.error} fields={errors} />
 
-	{#if data.users.length === 0}
+	{#if !data.users.ok}
+		<GateNotice gate={data.users.gate} title="Users" absent="This engine does not serve the accounts list." />
+	{:else if rows.length === 0}
 		<EmptyState
 			title="No users yet"
 			description="Create an account to give someone access to this instance."
@@ -206,7 +214,7 @@
 				<SearchInput id="user-search" bind:value={query} placeholder="Email or role on this page" />
 			{/snippet}
 			{#snippet filters()}
-				<SegmentedControl label="Role" labelHidden bind:value={role} options={ROLE_FILTERS} />
+				<FilterChips label="Role" bind:value={role} options={ROLE_FILTERS} />
 			{/snippet}
 		</ListToolbar>
 
@@ -285,7 +293,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.users.length}
+			count={rows.length}
 			hasNext={data.hasMore}
 			noun="accounts"
 			href={pageHref('/admin/users', data.limit)}
@@ -330,7 +338,14 @@
 				hint="At least 12 characters, with upper case, lower case and a digit"
 				error={errors.password}
 			/>
-			{#if data.tenants.length > 1}
+			{#if !data.tenants.ok}
+				<!-- Without the roster the form cannot offer the choice. Saying so
+				     here keeps a refusal for a missing tenant from reading as a
+				     fault in the fields the operator filled in. -->
+				<Alert tone="warn" title="Tenants could not be read">
+					This form cannot name the tenant a new account belongs to. On an install with several tenants the engine refuses the account. Reload the page to try again.
+				</Alert>
+			{:else if tenants.length > 1}
 				<input type="hidden" name="tenant_required" value="1" />
 				<Select
 					id="new-tenant"

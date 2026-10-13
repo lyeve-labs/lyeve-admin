@@ -9,12 +9,12 @@
 		CopyField,
 		Drawer,
 		EmptyState,
+		FilterChips,
 		Input,
 		Modal,
 		PageShell,
 		Pagination,
 		SearchInput,
-		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
@@ -28,6 +28,7 @@
 	import { page } from '$app/state';
 	import { Ban, KeySquare, Plus, RefreshCw, ScrollText } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import StepUpField from '$lib/components/admin-tokens/StepUpField.svelte';
 	import TokenExpiryField from '$lib/components/admin-tokens/TokenExpiryField.svelte';
@@ -84,7 +85,9 @@
 	const pageFailure = $derived(failure?.action === 'revoke' ? failure : null);
 
 	const superAdmin = $derived(data.user.roles.includes('super_admin'));
-	const successors = $derived(replacedIds(data.tokens));
+	const tokens = $derived(data.tokens.ok ? data.tokens.value : []);
+	const tenants = $derived(data.tenants.ok ? data.tenants.value : []);
+	const successors = $derived(replacedIds(tokens));
 	const now = new Date();
 	const statusOf = (t: AdminToken): TokenStatus => tokenStatus(t, successors, now);
 
@@ -136,12 +139,12 @@
 	// session acts in. The session does not say which one that is.
 	let tenant = $state('');
 	let createExpiryValid = $state(true);
-	const groups = $derived(groupGrants(data.grants));
+	const groups = $derived(groupGrants(data.grants.ok ? data.grants.value : []));
 	const pickedCount = $derived(Object.values(picked).reduce((n, list) => n + list.length, 0));
 	const ipProblem = $derived(allowedIPsProblem(ipText));
 	const tenantOptions = $derived([
 		{ value: '', label: 'The tenant you act in' },
-		...data.tenants.map((t) => ({ value: t.slug, label: t.name && t.name !== t.slug ? `${t.name} (${t.slug})` : t.slug })),
+		...tenants.map((t) => ({ value: t.slug, label: t.name && t.name !== t.slug ? `${t.name} (${t.slug})` : t.slug })),
 	]);
 
 	function openCreate() {
@@ -203,7 +206,7 @@
 	}
 
 	// The request log drawer, named by the URL so the load reads it.
-	const logToken = $derived(data.log ? (data.tokens.find((t) => t.id === data.log?.token) ?? null) : null);
+	const logToken = $derived(data.log ? (tokens.find((t) => t.id === data.log?.token) ?? null) : null);
 	function closeLog() {
 		const next = new URL(page.url);
 		next.searchParams.delete('log');
@@ -229,7 +232,7 @@
 		{ value: 'revoked', label: 'Revoked' },
 	];
 	const visible = $derived(
-		data.tokens.filter(
+		tokens.filter(
 			(t) =>
 				narrows(query, t.name, t.display_prefix, t.owner_email ?? '', t.grants.join(' ')) &&
 				(status === '' || statusOf(t) === status)
@@ -247,19 +250,18 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New token
-		</Button>
+		{#if data.tokens.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New token
+			</Button>
+		{/if}
 	{/snippet}
 
 	<FormErrors message={pageFailure?.error} />
 
-	{#if data.listError}
-		<Alert tone="danger" title="The tokens could not be read">
-			{data.listError}
-			<a href={page.url.pathname + page.url.search} class="text-brand hover:underline">Reload</a>
-		</Alert>
-	{:else if data.tokens.length === 0 && data.offset === 0}
+	{#if !data.tokens.ok}
+		<GateNotice gate={data.tokens.gate} title="Admin tokens" absent="This engine does not serve admin tokens." />
+	{:else if tokens.length === 0}
 		<EmptyState
 			title="No admin tokens yet"
 			description="An admin token lets a script or a CI job call the admin API with only the grants you give it, and it stops working within {MAX_TOKEN_DAYS} days."
@@ -280,7 +282,7 @@
 				<SearchInput id="token-search" bind:value={query} placeholder="Name, prefix, owner or grant on this page" />
 			{/snippet}
 			{#snippet filters()}
-				<SegmentedControl label="Status" labelHidden bind:value={status} options={STATUSES} />
+				<FilterChips label="Status" bind:value={status} options={STATUSES} />
 			{/snippet}
 		</ListToolbar>
 
@@ -379,7 +381,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.tokens.length}
+			count={tokens.length}
 			total={data.total}
 			noun="tokens"
 			href={pageHref('/admin/admin-tokens', data.limit)}
@@ -413,6 +415,9 @@
 						<p class="text-xs text-danger" role="alert">{createFailure.fields.grants}</p>
 					{/if}
 				</div>
+				{#if !data.grants.ok}
+					<GateNotice gate={data.grants.gate} title="Grants" absent="This engine lists no grants, so no token can be created." />
+				{/if}
 				<div class="grid gap-4 sm:grid-cols-2">
 					{#each groups as group (group.id)}
 						{@const routes = group.grants.flatMap((g) => g.routes.map((r) => ({ grant: g.name, ...r })))}
@@ -455,7 +460,11 @@
 				error={createFailure?.fields.allowed_ips ?? (ipProblem || undefined)}
 			/>
 
-			{#if superAdmin && data.tenants.length > 1}
+			{#if superAdmin && !data.tenants.ok}
+				<Alert tone="warn" title="Tenants could not be read">
+					This form cannot name a tenant, so the token acts in the tenant you act in. Reload the page to choose another.
+				</Alert>
+			{:else if superAdmin && tenants.length > 1}
 				<Select
 					id="token-tenant"
 					name="tenant_id"
@@ -486,7 +495,9 @@
 </Drawer>
 
 {#if rotating}
-	<Modal
+	<!-- A drawer like the create form: rotating asks for an expiry and the
+	     step-up, and a form of several fields reads as one panel here. -->
+	<Drawer
 		open
 		title="Rotate {rotating.name}"
 		description="A new token replaces this one, with the same grants and addresses. The old token keeps working until {formatDateTime(oldTokenUntil)}, seven days at most, so a deployment can switch without a gap."
@@ -506,7 +517,7 @@
 				Rotate
 			</Button>
 		{/snippet}
-	</Modal>
+	</Drawer>
 {/if}
 
 {#if issued}

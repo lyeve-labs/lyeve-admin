@@ -2,14 +2,20 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
+import { section } from '$lib/api/gate';
 
 type Setup = { provisioning_uri: string; secret: string };
 
 export const load: PageServerLoad = async (event) => {
-	const status = await authedClient(event)
-		.get<{ enabled: boolean }>('/api/admin/mfa/status')
-		.catch(() => ({ enabled: false }));
-	return { mfaEnabled: status.enabled };
+	// An unread status is unknown, never off: drawn as off it offers to turn on
+	// a second factor the account may already have.
+	const mfa = await section(
+		authedClient(event)
+			.get<{ enabled: boolean }>('/api/admin/mfa/status')
+			.then((s) => s.enabled === true),
+		'The two-factor state of this account could not be read. This is not a report that it is off.'
+	);
+	return { mfa };
 };
 
 /**

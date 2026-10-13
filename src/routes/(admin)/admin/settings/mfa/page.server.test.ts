@@ -25,11 +25,13 @@ function event(replies: Record<string, Reply>, form: Record<string, string> = {}
 }
 
 describe('mfa load', () => {
-	it('reads the account state and treats an unreadable one as off', async () => {
+	it('reads the account state and keeps an unreadable one unknown, never off', async () => {
 		const on = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: true } } });
-		expect(await load(on.ev)).toEqual({ mfaEnabled: true });
+		expect(await load(on.ev)).toEqual({ mfa: { ok: true, value: true } });
+		const off = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: false } } });
+		expect(await load(off.ev)).toEqual({ mfa: { ok: true, value: false } });
 		const down = event({ '/api/admin/mfa/status': { status: 503, body: { error: 'x' } } });
-		expect(await load(down.ev)).toEqual({ mfaEnabled: false });
+		expect(await load(down.ev)).toEqual({ mfa: { ok: false, gate: { state: 'unavailable' } } });
 	});
 });
 

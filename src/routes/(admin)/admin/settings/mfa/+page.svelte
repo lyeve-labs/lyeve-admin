@@ -5,6 +5,7 @@
 	import { enhance } from '$app/forms';
 	import { Shield, Copy, Check } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { copyText } from '$lib/clipboard';
 	import { tracked } from '$lib/forms.svelte';
@@ -53,7 +54,10 @@
 		};
 	});
 
-	const mfaEnabled = $derived(data.mfaEnabled);
+	const mfaEnabled = $derived(data.mfa.ok && data.mfa.value);
+	const description = $derived(
+		!data.mfa.ok ? 'The state of this account could not be read.' : mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'
+	);
 
 	async function copyBackupCodes() {
 		if (!(await copyText(backupCodes.join('\n')))) {
@@ -69,7 +73,7 @@
 
 <PageShell
 	title="Two-factor authentication"
-	description={mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'}
+	{description}
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -149,6 +153,8 @@
 				</div>
 			</form>
 		</Card>
+	{:else if !data.mfa.ok}
+		<GateNotice gate={data.mfa.gate} title="Two-factor authentication" absent="This engine does not serve two-factor authentication." />
 	{:else if mfaEnabled}
 		<Alert tone="success" title="Two-factor authentication is on">
 			Signing in to this account takes a TOTP code.

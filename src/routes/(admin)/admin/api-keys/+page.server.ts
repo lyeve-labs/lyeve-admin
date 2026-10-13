@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, error } from '@sveltejs/kit';
+import { fail, error, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { createClient } from '@lyeve-labs/client';
 import { revokeAPIKey, deleteAPIKey } from '@lyeve-labs/client-rest';
@@ -16,7 +16,8 @@ import {
 } from '$lib/api/api-keys';
 import { cleanScopes, fetchKeyScopeCatalog } from '$lib/api/key-access';
 import { listSchemaNames } from '$lib/api/search-settings';
-import { pageWindow, rowsOf, totalOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 import { sessionToken } from '$lib/server/session-cookie';
 
 export interface UsageSummary {
@@ -36,30 +37,64 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	// The endpoint pages at fifty, so a read that names no window shows the
 	// first fifty keys as every key the instance has.
 	const { limit, offset } = pageWindow(url, 50, 500);
-	const res = await listKeys(client, limit, offset).catch(() => [] as APIKey[]);
-	const keys = rowsOf(res);
-	const total = Math.max(totalOf(res), offset + keys.length);
+	const read = await section(
+		listKeys(client, limit, offset),
+		'The API keys could not be read. This is not a report that there are none.'
+	);
+	const rows = read.ok ? rowsOf(read.value) : [];
+	if (read.ok) {
+		const back = pastEndOffset(rows.length, limit, offset, statedTotal(read.value));
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
+	const keys: Section<APIKey[]> = read.ok ? { ok: true, value: rows } : read;
+	const total = read.ok ? Math.max(totalOf(read.value), offset + rows.length) : 0;
 
 	// One usage read per key, so the page bound is the request bound too: an
-	// unpaged list would fan out one request per key on every load.
+	// unpaged list would fan out one request per key on every load. A 404 is an
+	// engine without usage metering or a key it does not count, and the cell
+	// says nothing for those. Any other failure leaves the figure unknown,
+	// which the cell says rather than showing no use.
 	const month = new Date().toISOString().slice(0, 7);
 	const usageMap: Record<string, UsageSummary> = {};
+	const usageUnknown: string[] = [];
 	await Promise.all(
-		keys.map(async (key) => {
-			const u = await keyUsage<UsageSummary>(client, key.id, month);
-			if (u) usageMap[key.id] = u;
+		rows.map(async (key) => {
+			const u = await section(
+				keyUsage<UsageSummary>(client, key.id, month),
+				'The usage could not be read.'
+			);
+			if (u.ok) {
+				if (u.value) usageMap[key.id] = u.value;
+			} else if (u.gate.state !== 'absent') {
+				usageUnknown.push(key.id);
+			}
 		}),
 	);
 
 	// What the create drawer offers: the routes a key can call, from the
-	// engine's own catalog, and the schemas a key can be held to. Either one
-	// missing narrows the drawer rather than failing the page.
-	const [catalog, schemaNames] = await Promise.all([
-		fetchKeyScopeCatalog(client),
-		listSchemaNames(client).catch(() => [] as string[]),
+	// engine's own catalog, and the schemas a key can be held to. A missing
+	// route narrows the drawer. A failed read narrows it too, and the drawer
+	// says which part could not be read.
+	const [catalogRead, schemaRead] = await Promise.all([
+		section(fetchKeyScopeCatalog(client), 'The route catalog could not be read.'),
+		section(listSchemaNames(client), 'The schemas could not be read.'),
 	]);
+	const catalog = catalogRead.ok ? catalogRead.value : null;
+	const schemaNames = schemaRead.ok ? schemaRead.value : [];
 
-	return { keys, usageMap, month, total, limit, offset, catalog, schemaNames };
+	return {
+		keys,
+		usageMap,
+		usageUnknown,
+		month,
+		total,
+		limit,
+		offset,
+		catalog,
+		catalogFailed: !catalogRead.ok && catalogRead.gate.state !== 'absent',
+		schemaNames,
+		schemasFailed: !schemaRead.ok,
+	};
 };
 
 export const actions: Actions = {

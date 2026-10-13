@@ -2,7 +2,32 @@
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a delete and read the question it asks.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy: () => {} };
+	},
+}));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/** The title of the question the first delete form on the page asks. */
+async function deleteTitle(): Promise<string> {
+	const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/delete' && f.node.isConnected);
+	const submit = entry?.submit as ((input: { cancel: () => void }) => Promise<unknown>) | undefined;
+	if (!submit) throw new Error('no delete form registered a submit function');
+	kit.confirm.mockClear();
+	await submit({ cancel: () => {} });
+	return String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? '');
+}
 
 import SamlPage from './+page.svelte';
 import type { SamlProvider } from '$lib/api/saml';
@@ -47,6 +72,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		hasMore: false,
 		gate: { state: 'ok' },
 		licensed: true,
+		user: { id: 'u1', email: 'root@b.test', roles: ['super_admin'] },
 		...over,
 	} as never,
 	form: form as never,
@@ -170,5 +196,65 @@ describe('the form', () => {
 			props: props({}, { error: 'The provider could not be created.' }),
 		});
 		expect(said(container)).toContain('The provider could not be created.');
+	});
+});
+
+describe('the role', () => {
+	it('shows an admin the providers and no control that only a super admin may use', () => {
+		const { container } = render(SamlPage, {
+			props: props({
+				user: { id: 'u2', email: 'admin@b.test', roles: ['admin'] },
+				providers: [provider({ sp_cert_next: 'X' })],
+			}),
+		});
+		expect(said(container)).toContain('Okta');
+		expect(said(container)).toContain('Only a super admin can add, change or remove');
+		expect(screen.queryByRole('button', { name: 'New provider' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Edit Okta' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Delete Okta' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Promote' })).toBeNull();
+	});
+});
+
+describe('the drawer', () => {
+	const drawerText = () => document.body.querySelector('form#saml-provider-form')?.textContent ?? '';
+
+	it('shows a refused save inside the open drawer', async () => {
+		const { rerender } = render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		await rerender(props({}, { action: 'create', error: 'The provider could not be created.' }));
+		expect(drawerText()).toContain('The provider could not be created.');
+	});
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container } = render(SamlPage, {
+			props: props({}, { action: 'delete', error: 'The provider could not be removed.' }),
+		});
+		expect(said(container)).toContain('The provider could not be removed.');
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		expect(drawerText()).not.toContain('could not be removed');
+	});
+
+	it('leaves a reopened drawer clean of the failure it showed before', async () => {
+		render(SamlPage, { props: props({}, { action: 'create', error: 'The provider could not be created.' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		expect(drawerText()).not.toContain('could not be created');
+	});
+
+});
+
+describe('the pager', () => {
+	it('stays when nothing on this page matches the search', async () => {
+		const { container } = render(SamlPage, { props: props({ total: 60, hasMore: true }) });
+		await fireEvent.input(screen.getByPlaceholderText('Search providers'), { target: { value: 'nothing like it' } });
+		expect(said(container)).toContain('No provider matches');
+		expect(container.querySelector('a[href="/admin/settings/saml?limit=25&offset=25"]')).toBeTruthy();
+	});
+});
+
+describe('the delete', () => {
+	it('names the provider in the confirmation', async () => {
+		render(SamlPage, { props: props() });
+		expect(await deleteTitle()).toBe('Delete SAML provider Okta');
 	});
 });

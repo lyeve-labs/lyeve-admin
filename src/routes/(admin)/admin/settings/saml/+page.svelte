@@ -23,6 +23,7 @@
 	import { tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { KeyRound, Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
@@ -40,7 +41,25 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Each failure names the action that caused it. A drawer shows only its own
+	 * actions' failures, and only one that came back after it was opened, so a
+	 * failed delete never reads as a failure of the form opened next. The rest
+	 * show above the list.
+	 */
+	const failure = $derived(form as { error?: string; action?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	function failedIn(actions: string[]): string | undefined {
+		if (!failure?.error || form === openedOver) return undefined;
+		return actions.includes(failure.action ?? '') ? failure.error : undefined;
+	}
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const drawerError = $derived(failedIn(DRAWER_ACTIONS));
+	const rowError = $derived(failure?.error && !DRAWER_ACTIONS.includes(failure.action ?? '') ? failure.error : '');
+
+	// An admin may read the providers. Every write is the super admin's, so an
+	// admin is shown the list and no control that would only be refused.
+	const canWrite = $derived(data.user.roles.includes('super_admin'));
 
 	let narrow = $state('');
 	const visible = $derived(
@@ -93,6 +112,7 @@
 		signAuthnRequests = true;
 		encryptAssertions = false;
 		enabled = true;
+		openedOver = form;
 		open = true;
 	}
 
@@ -114,6 +134,7 @@
 		signAuthnRequests = p.sign_authn_requests;
 		encryptAssertions = p.encrypt_assertions;
 		enabled = p.enabled;
+		openedOver = form;
 		open = true;
 	}
 
@@ -135,7 +156,7 @@
 	function removeProvider(p: SamlProvider): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
+				`Delete SAML provider ${p.name}`,
 				'Anyone who signs in through this provider will lose access, and the private key is deleted with it.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -183,7 +204,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		{#if data.gate.state === 'ok'}
+		{#if data.gate.state === 'ok' && canWrite}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} /> New provider
 			</Button>
@@ -197,8 +218,11 @@
 			absent="The SAML plugin is not part of this build, so no identity provider can be configured here."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
+		{/if}
+		{#if !canWrite}
+			<Alert tone="brand">Only a super admin can add, change or remove an identity provider, or renew its certificate.</Alert>
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
@@ -233,10 +257,12 @@
 								</div>
 								<div class="flex items-center gap-2">
 									<CopyButton value={p.sp_cert_next ?? ''} label="Copy certificate" />
-									<form method="POST" action="?/rollover" use:enhance={promote(p)}>
-										<input type="hidden" name="id" value={p.id} />
-										<Button variant="primary" size="sm" type="submit">Promote</Button>
-									</form>
+									{#if canWrite}
+										<form method="POST" action="?/rollover" use:enhance={promote(p)}>
+											<input type="hidden" name="id" value={p.id} />
+											<Button variant="primary" size="sm" type="submit">Promote</Button>
+										</form>
+									{/if}
 								</div>
 							</div>
 						</div>
@@ -251,15 +277,17 @@
 			{#if data.providers.length === 0}
 				<EmptyState
 					title="No identity provider is configured"
-					description="Add one to put a sign-in button on the login page."
+					description={canWrite ? 'Add one to put a sign-in button on the login page.' : 'A super admin adds one to put a sign-in button on the login page.'}
 				>
 					{#snippet iconSnippet()}
 						<KeyRound size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openCreate}>
-							<Plus size={ICON.sm} /> New provider
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openCreate}>
+								<Plus size={ICON.sm} /> New provider
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -321,56 +349,58 @@
 										<div class="text-xs text-faint">{expiryLabel(p.idp_cert_expires_at)}</div>
 									</td>
 									<td data-cell="nowrap">
-										<div class="flex items-center justify-end gap-1">
-											{#if !p.sp_cert_next}
-												<form method="POST" action="?/prepare" use:enhance>
+										{#if canWrite}
+											<div class="flex items-center justify-end gap-1">
+												{#if !p.sp_cert_next}
+													<form method="POST" action="?/prepare" use:enhance>
+														<input type="hidden" name="id" value={p.id} />
+														<Button
+															variant="ghost"
+															size="sm"
+															type="submit"
+															aria-label="Prepare a new certificate for {p.name}"
+															title="Prepare a new certificate"
+														>
+															<RefreshCw size={ICON.sm} />
+														</Button>
+													</form>
+												{/if}
+												<Button
+													variant="ghost"
+													size="sm"
+													aria-label="Edit {p.name}"
+													onclick={() => openEdit(p)}
+												>
+													<Pencil size={ICON.sm} />
+												</Button>
+												<form method="POST" action="?/delete" use:enhance={removeProvider(p)}>
 													<input type="hidden" name="id" value={p.id} />
 													<Button
 														variant="ghost"
 														size="sm"
 														type="submit"
-														aria-label="Prepare a new certificate for {p.name}"
-														title="Prepare a new certificate"
+														aria-label="Delete {p.name}"
 													>
-														<RefreshCw size={ICON.sm} />
+														<Trash2 size={ICON.sm} class="text-danger" />
 													</Button>
 												</form>
-											{/if}
-											<Button
-												variant="ghost"
-												size="sm"
-												aria-label="Edit {p.name}"
-												onclick={() => openEdit(p)}
-											>
-												<Pencil size={ICON.sm} />
-											</Button>
-											<form method="POST" action="?/delete" use:enhance={removeProvider(p)}>
-												<input type="hidden" name="id" value={p.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													aria-label="Delete {p.name}"
-												>
-													<Trash2 size={ICON.sm} class="text-danger" />
-												</Button>
-											</form>
-										</div>
+											</div>
+										{/if}
 									</td>
 								</tr>
 							{/each}
 						</tbody>
 					</Table>
-					<Pagination
-						page={pageNumber(data.offset, data.limit)}
-						perPage={data.limit}
-						count={data.providers.length}
-						total={data.total ?? undefined}
-						hasNext={data.hasMore}
-						noun="providers"
-						href={pageHref('/admin/settings/saml', data.limit)}
-					/>
 				{/if}
+				<Pagination
+					page={pageNumber(data.offset, data.limit)}
+					perPage={data.limit}
+					count={data.providers.length}
+					total={data.total ?? undefined}
+					hasNext={data.hasMore}
+					noun="providers"
+					href={pageHref('/admin/settings/saml', data.limit)}
+				/>
 			{/if}
 		</section>
 	{/if}
@@ -388,6 +418,9 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<!-- A refused save keeps the drawer open, so the reason has to be in
+			     it and not behind the panel on the page. -->
+			<FormErrors message={drawerError} />
 			<Input
 				id="saml-name"
 				name="name"

@@ -2,7 +2,32 @@
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a delete and read the question it asks.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy: () => {} };
+	},
+}));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/** The title of the question the first delete form on the page asks. */
+async function deleteTitle(): Promise<string> {
+	const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/delete' && f.node.isConnected);
+	const submit = entry?.submit as ((input: { cancel: () => void }) => Promise<unknown>) | undefined;
+	if (!submit) throw new Error('no delete form registered a submit function');
+	kit.confirm.mockClear();
+	await submit({ cancel: () => {} });
+	return String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? '');
+}
 
 import ScimPage from './+page.svelte';
 import type { ScimProvider } from '$lib/api/scim';
@@ -37,6 +62,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		hasMore: false,
 		gate: { state: 'ok' },
 		licensed: true,
+		user: { id: 'u1', email: 'root@b.test', roles: ['super_admin'] },
 		...over,
 	} as never,
 	form: form as never,
@@ -121,5 +147,88 @@ describe('the empty state', () => {
 	it('says what a connection is for rather than that a read failed', () => {
 		const { container } = render(ScimPage, { props: props({ providers: [] }) });
 		expect(said(container)).toContain('No directory is connected');
+	});
+});
+
+describe('the role', () => {
+	it('shows an admin the connections and no control that only a super admin may use', () => {
+		const { container } = render(ScimPage, {
+			props: props({ user: { id: 'u2', email: 'admin@b.test', roles: ['admin'] } }),
+		});
+		expect(said(container)).toContain('Azure AD');
+		expect(said(container)).toContain('Only a super admin can add or remove a connection');
+		expect(screen.queryByRole('button', { name: /new connection/i })).toBeNull();
+		expect(screen.queryByLabelText('Rotate the token for Azure AD')).toBeNull();
+		expect(screen.queryByLabelText('Delete Azure AD')).toBeNull();
+	});
+});
+
+describe('the drawers', () => {
+	const createText = () => document.body.querySelector('form#scim-connection-form')?.textContent ?? '';
+	const rotateText = () => document.body.querySelector('form#scim-rotate-form')?.textContent ?? '';
+
+	it('shows a refused create inside the open drawer', async () => {
+		const { rerender } = render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		await rerender(props({}, { action: 'create', error: 'The connection could not be created.' }));
+		expect(createText()).toContain('The connection could not be created.');
+	});
+
+	it('shows a refused rotation inside the open drawer', async () => {
+		const { rerender } = render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
+		await rerender(props({}, { action: 'rotate', error: 'The token could not be rotated.' }));
+		expect(rotateText()).toContain('The token could not be rotated.');
+	});
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container } = render(ScimPage, {
+			props: props({}, { action: 'delete', error: 'The connection could not be removed.' }),
+		});
+		expect(said(container)).toContain('The connection could not be removed.');
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		expect(createText()).not.toContain('could not be removed');
+	});
+
+	it('keeps a failed create out of the rotate drawer, and a failed rotation out of the create drawer', async () => {
+		const { rerender } = render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
+		await rerender(props({}, { action: 'create', error: 'The connection could not be created.' }));
+		expect(rotateText()).not.toContain('could not be created');
+		cleanup();
+
+		const second = render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		await second.rerender(props({}, { action: 'rotate', error: 'The token could not be rotated.' }));
+		expect(createText()).not.toContain('could not be rotated');
+	});
+
+	it('offers the deprovision choice as radios that say deleting cannot be undone', async () => {
+		render(ScimPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		const radios = [...document.body.querySelectorAll<HTMLInputElement>('input[type="radio"][name="deprovision_action"]')];
+		expect(radios.map((r) => r.value)).toEqual(['disable', 'delete']);
+		expect(document.body.textContent).toContain('This cannot be undone.');
+	});
+});
+
+describe('the search', () => {
+	it('narrows the page and keeps the pager when nothing matches', async () => {
+		const { container } = render(ScimPage, {
+			props: props({ providers: [provider(), provider({ id: 'c2', name: 'Okta' })], total: 40, hasMore: true }),
+		});
+		await fireEvent.input(screen.getByPlaceholderText('Connection name on this page'), { target: { value: 'okta' } });
+		expect(said(container)).toContain('Okta');
+		expect(said(container)).not.toContain('Azure AD');
+		await fireEvent.input(screen.getByPlaceholderText('Connection name on this page'), { target: { value: 'nothing like it' } });
+		expect(said(container)).toContain('No connection on this page matches');
+		expect(container.querySelector('a[href="/admin/settings/scim?limit=25&offset=25"]')).toBeTruthy();
+	});
+});
+
+describe('the delete', () => {
+	it('names the connection in the confirmation', async () => {
+		render(ScimPage, { props: props() });
+		expect(await deleteTitle()).toBe('Delete SCIM connection Azure AD');
 	});
 });

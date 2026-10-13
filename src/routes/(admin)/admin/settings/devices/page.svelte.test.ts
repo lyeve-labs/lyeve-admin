@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -115,5 +115,24 @@ describe('the empty state', () => {
 	it('says what having no remembered device means', () => {
 		const { container } = render(DevicesPage, { props: props({ devices: [] }) });
 		expect(said(container)).toContain('treated as coming from somewhere new');
+	});
+});
+
+describe('the search', () => {
+	it('narrows the page to the devices that match and keeps the pager', async () => {
+		const { container, getByPlaceholderText } = render(DevicesPage, {
+			props: props({
+				devices: [device(), device({ id: 'd2', label: 'Edge box', user_agent: EDGE_WIN })],
+				total: 40,
+				hasMore: true,
+			}),
+		});
+		await fireEvent.input(getByPlaceholderText('Name or browser on this page'), { target: { value: 'edge' } });
+		expect(said(container)).toContain('Edge box');
+		expect(said(container)).not.toContain('Work laptop');
+
+		await fireEvent.input(getByPlaceholderText('Name or browser on this page'), { target: { value: 'nothing like it' } });
+		expect(said(container)).toContain('No device on this page matches');
+		expect(container.querySelector('a[href="/admin/settings/devices?limit=25&offset=25"]')).toBeTruthy();
 	});
 });

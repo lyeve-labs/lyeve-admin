@@ -64,6 +64,15 @@ describe('captcha settings', () => {
 		expect(said(container)).toContain('needs a license this install does not hold');
 	});
 
+	it('turns the save off on an unlicensed install and points it at the reason', () => {
+		const { container } = render(CaptchaPage, {
+			props: props({ source: 'instance', tenant: null, instance, licensed: false }),
+		});
+		const save = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Save');
+		expect(save?.hasAttribute('disabled')).toBe(true);
+		expect(save?.getAttribute('aria-describedby')).toBe('captcha-license-note');
+	});
+
 	it('renders a refused save through the refusal notice', () => {
 		render(CaptchaPage, {
 			props: props(
