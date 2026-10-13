@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError, createClient, type Schema } from '@lyeve-labs/client';
 import { getSchemas, getSchemaStats } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole, requireUser } from '$lib/server/authz';
+import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { retryBusy } from '$lib/server/retry-busy';
 import { bundleContentType, flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
@@ -356,7 +356,7 @@ export const actions: Actions = {
 	},
 
 	preset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '').trim();
@@ -380,7 +380,7 @@ export const actions: Actions = {
 	},
 
 	savePreset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const url = String(data.get('url') ?? '').trim();
@@ -408,7 +408,7 @@ export const actions: Actions = {
 	// The canvas saves after every gesture that moves a node. The page sends
 	// the whole map, and the plugin replaces what it holds with it.
 	saveLayout: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		let positions;
 		try {
@@ -427,7 +427,7 @@ export const actions: Actions = {
 	},
 
 	deletePreset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const id = String((await event.request.formData()).get('id') ?? '').trim();
 		if (!id) return fail(400, { action: 'deletePreset' as const, error: 'Choose a preset.', preset: '' });

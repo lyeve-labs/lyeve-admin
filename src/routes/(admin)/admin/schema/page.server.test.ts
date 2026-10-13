@@ -37,14 +37,14 @@ const presets = [
 	{ id: 'notes', name: 'Notes', description: 'Short notes and their tags.', schemas: [{ name: 'notes', fields: [] }, { name: 'note_tags', fields: [] }] },
 ];
 
-function loadEvent(routes: Record<string, Route>) {
+function loadEvent(routes: Record<string, Route>, roles: string[] = ['super_admin']) {
 	const { fetch, calls } = fetchFor(routes);
 	return {
 		calls,
 		event: {
 			fetch,
 			cookies: mockCookies(),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
+			parent: async () => ({ user: { roles } }),
 		} as never,
 	};
 }
@@ -65,7 +65,14 @@ function actionEvent(routes: Record<string, Route>, id: string) {
 	};
 }
 
-type Loaded = { schemas: { name: string }[]; presets: { id: string }[]; presetsError: string | null };
+type Loaded = {
+	schemas: { name: string }[];
+	presets: { id: string }[];
+	presetsGate: { state: string } | null;
+	loadError: boolean;
+	loadGate: { state: string } | null;
+	canvas: { licensed: boolean };
+};
 
 const schemaRoutes: Record<string, Route> = {
 	'/api/admin/schemas/presets': () => json({ presets }),
@@ -80,19 +87,36 @@ describe('admin/schema load', () => {
 		const out = (await load(event)) as unknown as Loaded;
 		expect(out.schemas.map((s) => s.name)).toEqual(['posts']);
 		expect(out.presets.map((p) => p.id)).toEqual(['notes']);
-		expect(out.presetsError).toBeNull();
+		expect(out.presetsGate).toBeNull();
 	});
 
 	it('keeps the page when the presets route is missing, and says so when it fails', async () => {
 		const missing = loadEvent({ ...schemaRoutes, '/api/admin/schemas/presets': () => json({ error: 'not found' }, 404) });
 		const withoutRoute = (await load(missing.event)) as unknown as Loaded;
 		expect(withoutRoute.presets).toEqual([]);
-		expect(withoutRoute.presetsError).toBeNull();
+		expect(withoutRoute.presetsGate).toEqual({ state: 'absent' });
 
 		const failing = loadEvent({ ...schemaRoutes, '/api/admin/schemas/presets': () => json({ error: 'db down' }, 503) });
 		const failed = (await load(failing.event)) as unknown as Loaded;
 		expect(failed.presets).toEqual([]);
-		expect(failed.presetsError).toBe('The presets could not be loaded.');
+		expect(failed.presetsGate).toEqual({ state: 'unavailable' });
+	});
+
+	it('keeps a failed schema list as a gate rather than an empty list', async () => {
+		const { event } = loadEvent({ '/api/admin/schemas': () => json({ error: 'slow down' }, 429) });
+		const out = (await load(event)) as unknown as Loaded;
+		expect(out.loadError).toBe(true);
+		expect(out.loadGate).toEqual({ state: 'busy' });
+	});
+
+	it('reads neither the presets nor the canvas for a role that cannot use them', async () => {
+		const { event, calls } = loadEvent(schemaRoutes, ['editor']);
+		const out = (await load(event)) as unknown as Loaded;
+		expect(out.schemas.map((s) => s.name)).toEqual(['posts']);
+		expect(out.presetsGate).toBeNull();
+		expect(out.presets).toEqual([]);
+		expect(out.canvas.licensed).toBe(false);
+		expect(calls.some((c) => c.url.includes('/presets') || c.url.includes('/canvas-layout'))).toBe(false);
 	});
 });
 
@@ -157,13 +181,34 @@ describe('admin/schema preset action', () => {
 			'notes'
 		);
 		const out = await actions.preset(event);
-		expect(out).toMatchObject({ status: 409, data: { error: 'schema "notes" already exists', preset: 'notes' } });
+		expect(out).toMatchObject({ status: 409, data: { action: 'preset', error: 'schema "notes" already exists', preset: 'notes' } });
 	});
 
 	it('names an unknown preset as one the install does not ship', async () => {
 		const { event } = actionEvent({ '/api/admin/schemas/presets/blog': () => json({ error: 'not found' }, 404) }, 'blog');
 		const out = await actions.preset(event);
 		expect(out).toMatchObject({ status: 404, data: { error: 'This install does not ship this preset.', preset: 'blog' } });
+	});
+
+	it('refuses a role the plugin refuses before asking the engine', async () => {
+		const calls: string[] = [];
+		const fetch = vi.fn(async (url: string) => {
+			calls.push(String(url));
+			if (String(url).includes('/auth/me')) return json({ id: 'u2', roles: ['editor'], disabled: false });
+			return json({ created: ['notes'] }, 201);
+		}) as unknown as typeof globalThis.fetch;
+		const form = new FormData();
+		form.set('id', 'notes');
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			request: { formData: async () => form },
+			url: new URL('http://localhost/admin/schema'),
+			params: {},
+		} as never;
+
+		await expect(actions.preset(event)).rejects.toMatchObject({ status: 403 });
+		expect(calls.filter((c) => c.includes('/presets'))).toEqual([]);
 	});
 
 	it('refuses an empty id before asking the engine', async () => {
