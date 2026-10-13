@@ -357,6 +357,24 @@ describe('Live log tail filters', () => {
 		expect(container.textContent).toContain('after the pick');
 	});
 
+	// A refresh, a latency depth and a saved tunable each hand the page new
+	// data. The tail must not close, empty and reopen on any of them.
+	it('keeps one stream and its entries when the page data changes', async () => {
+		const { container, rerender } = render(ObservabilityPage, { props: props() });
+		connect();
+		StubEventSource.last?.emit('log', { timestamp: '2026-01-01T00:00:00Z', level: 0, message: 'kept across a refresh', sequence: 1 });
+		await tick();
+		const first = StubEventSource.last as StubEventSource;
+
+		await rerender(props({ top: 50, goroutines: 43 }));
+		await tick();
+
+		expect(StubEventSource.all).toHaveLength(1);
+		expect(first.closed).toBe(false);
+		expect(container.textContent).toContain('kept across a refresh');
+		expect(badge(container)).toBe('Connected');
+	});
+
 	it('closes the stream on unmount and does not reopen it', async () => {
 		const { unmount } = render(ObservabilityPage, { props: props() });
 		connect();

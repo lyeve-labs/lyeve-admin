@@ -263,14 +263,20 @@
 		return () => clearTimeout(timer);
 	});
 
-	// This effect tracks only the two filter values. Its cleanup closes the
-	// stream it opened and nothing more, so a filter change is a close followed
-	// by a reopen. The destroyed flag belongs to unmount alone, below.
+	// Read through a derived value, so the effect below reruns only when the
+	// flag changes. Read from `data` itself, every new page data (a refresh, a
+	// latency depth, a saved tunable) would close the tail and empty it.
+	const logTail = $derived(data.logTail);
+
+	// This effect tracks only the two filter values and whether the plugin
+	// runs. Its cleanup closes the stream it opened and nothing more, so a
+	// filter change is a close followed by a reopen. The destroyed flag belongs
+	// to unmount alone, below.
 	$effect(() => {
 		const minLevel = logMinLevel;
 		const keyword = appliedKeyword;
 		logEntries = [];
-		if (!data.logTail) return;
+		if (!logTail) return;
 		connectLogStream(minLevel, keyword);
 		return () => closeLogStream();
 	});
@@ -743,7 +749,7 @@
 			{#if logState === 'refused'}
 				<Alert tone="warn" title="The engine refused the log tail">
 					<p>
-						The stream closed before it opened and the browser will not retry it. Your role may not
+						The engine refused the stream, so the browser will not try it again. Your role may not
 						read the logs, or the engine did not answer.
 					</p>
 					<div class="mt-3">
