@@ -161,7 +161,7 @@ describe('reviews page', () => {
 		render(ReviewsPage, {
 			props: { data: data({ operator: false, definitions: [], entriesNamed: false }), form: null },
 		});
-		expect(screen.getByText(/Entries are listed by ID/)).toBeTruthy();
+		expect(screen.getByText(/Entries, definitions and stages are listed by ID/)).toBeTruthy();
 		const row = screen.getByTestId('assignment-row');
 		expect(row.textContent).toContain('e1e1e1e1');
 		expect(row.querySelector('a')).toBeNull();

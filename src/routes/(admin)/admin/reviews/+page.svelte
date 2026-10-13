@@ -404,7 +404,7 @@
 			{:else}
 				{#if !data.entriesNamed}
 					<p class="text-xs text-muted">
-						Entries are listed by ID. Their titles are read through the content pages, which only an admin can open.
+						Entries, definitions and stages are listed by ID. Their names are read through routes only an admin can open.
 					</p>
 				{/if}
 				<Table label="Review assignments">

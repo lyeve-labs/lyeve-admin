@@ -135,18 +135,31 @@ describe('creating a content entry', () => {
 describe('opening the new entry form', () => {
 	const localizedSchema = { name: 'surveys', display_name: 'Surveys', with_localization: true, fields: [] };
 
-	function open(running: string[]) {
-		const fetch = vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200 }));
-		return load({
-			fetch,
-			cookies: cookies(),
-			params: { schema: 'surveys' },
-			url: new URL('http://localhost/admin/content/surveys/new'),
-			parent: async () => ({ plugins: { state: 'named', running, withheld: [] } }),
-		} as never) as Promise<{ locales: { ok: boolean; value?: unknown } | null }>;
+	type Opened = {
+		locales: { ok: boolean; value?: unknown } | null;
+		relations: Record<string, { items: unknown[]; total: number; failed: boolean }>;
+	};
+
+	function open(
+		running: string[],
+		roles: string[] = ['admin'],
+		fetch = vi.fn(async (_path: string) => new Response(JSON.stringify({ data: [] }), { status: 200 })),
+	) {
+		return Promise.resolve(
+			load({
+				fetch,
+				cookies: cookies(),
+				params: { schema: 'surveys' },
+				url: new URL('http://localhost/admin/content/surveys/new'),
+				parent: async () => ({ plugins: { state: 'named', running, withheld: [] }, user: { id: 'u1', roles } }),
+			} as never),
+		) as Promise<Opened>;
 	}
 
-	beforeEach(() => reads.get.mockReset());
+	beforeEach(() => {
+		reads.get.mockReset();
+		rest.getSchema.mockClear();
+	});
 
 	it('opens a localized schema without the localization plugin, and offers no locale', async () => {
 		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
@@ -187,5 +200,12 @@ describe('opening the new entry form', () => {
 		const thrown = await open([]).catch((err: unknown) => err);
 
 		expect(isHttpError(thrown) && thrown.status).toBe(503);
+	});
+
+	it('refuses an editor, whose Create the engine would refuse, before reading anything', async () => {
+		const thrown = await open([], ['editor']).catch((err: unknown) => err);
+
+		expect(isHttpError(thrown) && thrown.status).toBe(403);
+		expect(rest.getSchema).not.toHaveBeenCalled();
 	});
 });

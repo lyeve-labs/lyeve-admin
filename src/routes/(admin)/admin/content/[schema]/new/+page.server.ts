@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { createClient, type Schema } from '@lyeve-labs/client';
 import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
@@ -9,7 +9,7 @@ import { setRelations } from '$lib/server/content-relations';
 import { entryIdentity } from '$lib/utils/new-entry';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
 import { getLocales } from '$lib/api/localization';
-import { section, type Section } from '$lib/api/gate';
+import { forbiddenText, section, type Section } from '$lib/api/gate';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
 import { readRelationChoices } from '$lib/components/content/relation-choices';
@@ -23,7 +23,13 @@ const LOCALES_FAILED = 'The locales could not be read, so no locale can be picke
 export const load: PageServerLoad = async ({ fetch, cookies, params, url, parent }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
-	const { plugins } = await parent();
+	const { plugins, user } = await parent();
+	// The create route admits an admin and a super admin only. The schema read
+	// admits any signed-in reader, so without this an editor would get a whole
+	// form whose Create the engine then refuses.
+	if (!user.roles.some((role) => role === 'admin' || role === 'super_admin')) {
+		error(403, forbiddenText('the new entry form'));
+	}
 
 	let schemaDef: Schema;
 	try {
