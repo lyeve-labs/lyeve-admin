@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
+import { isRedirect } from '@sveltejs/kit';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
 vi.mock('$lib/server/authz', async (importOriginal) => ({
@@ -59,7 +60,8 @@ describe('the reviews load', () => {
 
 	it('reads each stage paid settings', async () => {
 		const out = (await load(loadEvent())) as ReviewsPage;
-		expect(out.definitions[0].stages[0]).toMatchObject({
+		if (!out.definitions.ok) throw new Error('the definitions read failed');
+		expect(out.definitions.value[0].stages[0]).toMatchObject({
 			quorum: 2,
 			escalate_to_role: 'lead',
 			condition: { field: 'category', op: 'in', values: ['legal', '4'] },
@@ -107,6 +109,48 @@ describe('the assignment names', () => {
 		} as never)) as ReviewsPage;
 		expect(out.people).toEqual({ u1: 'reviewer@example.com' });
 		expect(engine.get.mock.calls.some(([url]) => String(url).startsWith('/api/admin/users'))).toBe(false);
+	});
+
+	it('reads no entry title for a reviewer the content routes refuse', async () => {
+		const out = (await load({
+			url: new URL('http://localhost/admin/reviews'),
+			parent: async () => ({
+				user: { id: 'u1', roles: ['editor'] },
+				plugins: { state: 'named', running: ['review'], withheld: [] },
+			}),
+		} as never)) as ReviewsPage;
+		expect(out.entriesNamed).toBe(false);
+		expect(out.assignments.ok && out.assignments.value).toHaveLength(2);
+		expect(engine.get.mock.calls.some(([url]) => String(url).startsWith('/api/admin/content/'))).toBe(false);
+	});
+});
+
+describe('the reviews load when a read fails', () => {
+	it('keeps each failed read as its own gate', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.startsWith('/api/admin/review/assignments?')) throw new ApiError(503, 'unavailable');
+			if (url.startsWith('/api/admin/review/definitions?')) throw new ApiError(500, 'internal');
+			return { data: [], total_count: 0 };
+		});
+		const out = (await load(loadEvent())) as ReviewsPage;
+		expect(out.assignments).toMatchObject({ ok: false, gate: { state: 'unavailable' } });
+		expect(out.definitions).toMatchObject({ ok: false, gate: { state: 'error' } });
+	});
+
+	it('sends a page past the end back to the last page that holds assignments', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.startsWith('/api/admin/review/assignments?')) return { data: [], total_count: 60 };
+			return { data: [], total_count: 0 };
+		});
+		const thrown = await Promise.resolve(load({
+			url: new URL('http://localhost/admin/reviews?offset=500'),
+			parent: async () => ({
+				user: { id: 'u1', roles: ['admin'] },
+				plugins: { state: 'named', running: ['review'], withheld: [] },
+			}),
+		} as never)).catch((err: unknown) => err);
+		expect(isRedirect(thrown)).toBe(true);
+		expect((thrown as { location: string }).location).toBe('/admin/reviews?offset=50');
 	});
 });
 

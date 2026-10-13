@@ -44,23 +44,28 @@ const assignment = {
 	updated_at: '',
 };
 
+/** A test names each read's rows as an array. The load hands the page a read that succeeded, or the gate of one that failed. */
+function read(value: unknown) {
+	return Array.isArray(value) ? { ok: true, value } : value;
+}
+
 function data(overrides: Record<string, unknown> = {}): PageData {
-	return {
+	const merged: Record<string, unknown> = {
 		operator: true,
 		definitions: [definition],
-		definitionsForbidden: false,
 		assignments: [assignment],
 		total: 1,
 		offset: 0,
 		limit: 50,
 		status: '',
-		assignmentsForbidden: false,
-		unavailable: false,
 		schemas: ['article'],
 		entries: {},
+		entriesNamed: true,
 		people: {},
 		...overrides,
-	} as unknown as PageData;
+	};
+	for (const key of ['definitions', 'assignments', 'schemas']) merged[key] = read(merged[key]);
+	return merged as unknown as PageData;
 }
 
 describe('reviews page', () => {
@@ -152,8 +157,35 @@ describe('reviews page', () => {
 		expect(screen.getByTestId('assignment-row')).toBeTruthy();
 	});
 
+	it('lists an editor reviewer\'s queue by entry id and says why there are no titles', () => {
+		render(ReviewsPage, {
+			props: { data: data({ operator: false, definitions: [], entriesNamed: false }), form: null },
+		});
+		expect(screen.getByText(/Entries are listed by ID/)).toBeTruthy();
+		const row = screen.getByTestId('assignment-row');
+		expect(row.textContent).toContain('e1e1e1e1');
+		expect(row.querySelector('a')).toBeNull();
+	});
+
+	it('names the read that failed in its own section, never the first-run state', () => {
+		render(ReviewsPage, {
+			props: {
+				data: data({
+					assignments: { ok: false, gate: { state: 'unavailable' } },
+					definitions: { ok: false, gate: { state: 'error', message: 'The review definitions could not be read.' } },
+				}),
+				form: null,
+			},
+		});
+		expect(screen.getByText(/Review assignments could not be read/)).toBeTruthy();
+		expect(screen.getByText('The review definitions could not be read.')).toBeTruthy();
+		expect(screen.queryByText('Nothing under review')).toBeNull();
+		expect(screen.queryByText('No definition yet')).toBeNull();
+		expect(screen.queryByRole('button', { name: /New definition/ })).toBeNull();
+	});
+
 	it('says when the rules refuse the assignment list', () => {
-		render(ReviewsPage, { props: { data: data({ assignments: [], assignmentsForbidden: true }), form: null } });
+		render(ReviewsPage, { props: { data: data({ assignments: { ok: false, gate: { state: 'forbidden' } } }), form: null } });
 		expect(screen.getByText('You may not list reviews')).toBeTruthy();
 	});
 

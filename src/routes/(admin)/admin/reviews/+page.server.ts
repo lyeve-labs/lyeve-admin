@@ -1,12 +1,13 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
-import { ApiError } from '@lyeve-labs/client';
+import { fail, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { parseStages } from '$lib/review/definition-form';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
+import { section, type Section } from '$lib/api/gate';
+import { pageOffset, pageNumber, pastEndOffset, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
 import { entryTitle } from '$lib/utils/entry-identity';
 import {
@@ -31,28 +32,34 @@ const LIMIT = 50;
 /** What the page renders. */
 export type ReviewsPage = {
 	operator: boolean;
-	definitions: DefinitionRow[];
+	/** The definitions with their stages. Read for an operator only. */
+	definitions: Section<DefinitionRow[]>;
 	/**
 	 * What the definitions read says this install allows: the paid stage
 	 * settings and the workflow ceiling. Null when the read carried neither.
 	 */
 	limits: ReviewLimits | null;
-	/** The engine refused the definition list to this caller. */
-	definitionsForbidden: boolean;
-	assignments: ReviewAssignment[];
+	assignments: Section<ReviewAssignment[]>;
 	total: number;
 	offset: number;
 	limit: number;
 	status: string;
-	/** The engine refused the assignment list: no read rule on reviews. */
-	assignmentsForbidden: boolean;
-	unavailable: boolean;
-	schemas: string[];
+	/** The schemas a definition can review. Read for an operator only. */
+	schemas: Section<string[]>;
 	/** Each listed entry's title by its id. An entry the read missed is absent. */
 	entries: Record<string, string>;
+	/**
+	 * Whether the titles were read at all. The content routes that hold them
+	 * admit an operator only, so another reviewer's queue lists entries by id.
+	 */
+	entriesNamed: boolean;
 	/** Each account's email by its id. An account the read missed is absent. */
 	people: Record<string, string>;
 };
+
+const DEFINITIONS_FAILED = 'The review definitions could not be read. This is not a report that there are none.';
+const ASSIGNMENTS_FAILED = 'The review assignments could not be read. This is not a report that nothing is under review.';
+const SCHEMAS_FAILED = 'The content schemas could not be read.';
 
 /**
  * The title each listed entry is known by. The assignment list carries only
@@ -77,10 +84,6 @@ async function loadEntryTitles(
 	return Object.fromEntries(named.filter((n) => n !== null));
 }
 
-function forbidden(err: unknown): boolean {
-	return err instanceof ApiError && err.status === 403;
-}
-
 /**
  * The definitions with their stages. The list route answers the definition
  * rows alone and the stages come one definition at a time. A tenant holds a
@@ -102,21 +105,22 @@ export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
 	const operator = user.roles.includes('admin') || user.roles.includes('super_admin');
 	const status = event.url.searchParams.get('status') ?? '';
-	const offset = Math.max(0, Number(event.url.searchParams.get('offset')) || 0);
+	// The pager counts in pages, so an offset between two boundaries snaps
+	// down onto the page that holds it.
+	const offset = pageOffset(pageNumber(Math.max(0, Number(event.url.searchParams.get('offset')) || 0), LIMIT), LIMIT);
+	const none: Section<never[]> = { ok: true, value: [] };
 	const page: ReviewsPage = {
 		operator,
-		definitions: [],
+		definitions: none,
 		limits: null,
-		definitionsForbidden: false,
-		assignments: [],
+		assignments: none,
 		total: 0,
 		offset,
 		limit: LIMIT,
 		status: (REVIEW_STATUSES as readonly string[]).includes(status) ? status : '',
-		assignmentsForbidden: false,
-		unavailable: false,
-		schemas: [],
+		schemas: none,
 		entries: {},
+		entriesNamed: operator,
 		people: {},
 	};
 	// The shell says why the page is unavailable while its plugin does not run.
@@ -125,33 +129,43 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	const [definitions, assignments, schemas, people] = await Promise.all([
 		operator
-			? loadDefinitions(client).then(
-					(read) => ({ ...read, forbidden: false, failed: false }),
-					(err) => ({ rows: [] as DefinitionRow[], limits: null, forbidden: forbidden(err), failed: !forbidden(err) }),
+			? section(loadDefinitions(client), DEFINITIONS_FAILED)
+			: Promise.resolve<Section<{ rows: DefinitionRow[]; limits: ReviewLimits | null }>>({
+					ok: true,
+					value: { rows: [], limits: null },
+				}),
+		section(listAssignments(client, { status: page.status || undefined, limit: LIMIT, offset }), ASSIGNMENTS_FAILED),
+		operator
+			? section(
+					getSchemas(client).then((rows) => rows.map((s) => s.name)),
+					SCHEMAS_FAILED,
 				)
-			: Promise.resolve({ rows: [] as DefinitionRow[], limits: null, forbidden: false, failed: false }),
-		listAssignments(client, { status: page.status || undefined, limit: LIMIT, offset }).then(
-			(res) => ({ ...res, forbidden: false, failed: false }),
-			(err) => ({ items: [] as ReviewAssignment[], total: 0, forbidden: forbidden(err), failed: !forbidden(err) }),
-		),
-		operator ? getSchemas(client).catch(() => []) : Promise.resolve([]),
+			: Promise.resolve<Section<string[]>>({ ok: true, value: [] }),
 		// The directory is an operator's to read. A reviewer sees their own
 		// email and the ids of everyone else.
 		operator ? listPeople(client) : Promise.resolve([]),
 	]);
 
-	page.definitions = definitions.rows;
-	page.limits = definitions.limits;
-	page.definitionsForbidden = definitions.forbidden;
-	page.assignments = assignments.items;
-	page.total = Math.max(assignments.total, offset + assignments.items.length);
-	page.assignmentsForbidden = assignments.forbidden;
-	page.unavailable = definitions.failed || assignments.failed;
-	page.schemas = schemas.map((s) => s.name);
-	page.entries = await loadEntryTitles(
-		client,
-		assignments.items.map((a) => a.entry_id),
-	);
+	if (assignments.ok) {
+		const rows = assignments.value.items;
+		const back = pastEndOffset(rows.length, LIMIT, offset, assignments.value.total);
+		if (back !== null) redirect(307, withOffset(event.url, back));
+		page.assignments = { ok: true, value: rows };
+		page.total = Math.max(assignments.value.total, offset + rows.length);
+		// Titles come from the content routes, which refuse every role but an
+		// operator. Asking for them on another reader's behalf would only
+		// collect a refusal per row.
+		if (operator) page.entries = await loadEntryTitles(client, rows.map((a) => a.entry_id));
+	} else {
+		page.assignments = assignments;
+	}
+	if (definitions.ok) {
+		page.definitions = { ok: true, value: definitions.value.rows };
+		page.limits = definitions.value.limits;
+	} else {
+		page.definitions = definitions;
+	}
+	page.schemas = schemas;
 	page.people = Object.fromEntries([
 		...people.map((p) => [p.id, p.email] as const),
 		...(user.email ? [[user.id, user.email] as const] : []),
