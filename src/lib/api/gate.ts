@@ -1,15 +1,19 @@
 /**
- * What a plugin's page makes of a refused read, the same way for every
- * plugin.
+ * What a page makes of a refused read, the same way for every page.
  *
- * A page never knows how its plugin is licensed or which capability a route
- * needs. It knows what the engine answered:
+ * A page never knows how its plugin is licensed, which role a route needs or
+ * whether the database is up. It knows what the engine answered:
  *
  *   404  the route is not there: the plugin is not in this build, or does not
  *        serve it.
  *   402  the engine refused what this instance is not enabled for. A capacity
  *        refusal says `cap_exceeded` and carries the ceiling and the count, so
  *        a page never holds either number itself.
+ *   403  the reader's role may not read it. Another role may.
+ *   429  the engine refused for the request rate. It answered, so this is not
+ *        an outage, and the same read succeeds once the window passes.
+ *   503  the engine or its database did not answer. A read that never reached
+ *        the engine is the same outage seen from this side.
  *   else the read failed, and a failed read is never a report that there is
  *        nothing to show.
  */
@@ -22,6 +26,12 @@ export type Gate =
 	| { state: 'locked'; upgradeUrl: string }
 	/** At a capacity ceiling. Either number is null when the engine did not send it. */
 	| { state: 'full'; limit: number | null; current: number | null; upgradeUrl: string }
+	/** The reader's role may not read it, which no retry changes. */
+	| { state: 'forbidden' }
+	/** The engine refused for the request rate. The same read succeeds once the window passes. */
+	| { state: 'busy' }
+	/** The engine or its database did not answer. The same read may answer in a moment. */
+	| { state: 'unavailable' }
 	| { state: 'error'; message: string };
 
 export const GATE_OK: Gate = { state: 'ok' };
@@ -43,6 +53,23 @@ function text(value: unknown): string {
 }
 
 /**
+ * Whether a read failed before any answer came back. fetch rejects with a
+ * TypeError when it cannot reach the engine, and the client gives up with a
+ * TimeoutError once the engine has taken too long. The name is read rather
+ * than the class, because a DOMException can come from another realm.
+ */
+function unanswered(err: unknown): boolean {
+	if (err instanceof TypeError) return true;
+	return typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'TimeoutError';
+}
+
+/** Whether a read failed because the engine or its database did not answer. */
+export function isOutage(err: unknown): boolean {
+	if (err instanceof ApiError) return err.status === 503;
+	return unanswered(err);
+}
+
+/**
  * The gate for a read that threw. `failed` is what the page says when the
  * read failed, in words that never pass the failure off as an empty result.
  */
@@ -57,7 +84,10 @@ export function gateOf(err: unknown, failed: string): Gate {
 			}
 			return { state: 'locked', upgradeUrl };
 		}
+		if (err.status === 403) return { state: 'forbidden' };
+		if (err.status === 429) return { state: 'busy' };
 	}
+	if (isOutage(err)) return { state: 'unavailable' };
 	return { state: 'error', message: failed };
 }
 
@@ -68,4 +98,9 @@ export function fullText(gate: Extract<Gate, { state: 'full' }>): string {
 	}
 	if (gate.limit !== null) return `This instance allows at most ${gate.limit}.`;
 	return 'This instance allows no more.';
+}
+
+/** The sentence for a read the reader's role may not make. `what` names what was refused. */
+export function forbiddenText(what: string): string {
+	return `Your role cannot open ${what}. Ask a super admin if you need it.`;
 }

@@ -133,7 +133,8 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(syntheticGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(syntheticGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(syntheticGate(new ApiError(503, 'database error')).state).toBe('error');
+		expect(syntheticGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(syntheticGate(new ApiError(503, 'database error')).state).toBe('unavailable');
 	});
 
 	// An operator reading "nothing is wrong" after a failed read is the worst

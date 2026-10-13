@@ -39,7 +39,7 @@ describe('releases load', () => {
 	});
 
 	it('says a failed read failed, never that there are none', async () => {
-		engine.get.mockRejectedValue(new ApiError(503, 'down'));
+		engine.get.mockRejectedValue(new ApiError(500, 'internal error'));
 		const out = (await load(event())) as { gate: { state: string; message?: string } };
 		expect(out.gate.state).toBe('error');
 		expect(out.gate.message).toContain('not a report that there are none');

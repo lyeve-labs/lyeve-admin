@@ -123,7 +123,8 @@ describe('the gate', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(retentionGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(retentionGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(retentionGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(retentionGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(retentionGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as nothing being deleted', () => {

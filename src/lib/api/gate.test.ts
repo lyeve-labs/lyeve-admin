@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
-import { fullText, gateOf } from './gate';
+import { forbiddenText, fullText, gateOf, isOutage } from './gate';
 
 const FAILED = 'The list could not be read. This is not a report that it is empty.';
+
+/** What fetch rejects with when nothing answers at the engine's address. */
+function unreachable(): TypeError {
+	return new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }) });
+}
+
+/** What the client's own timeout rejects with once the engine takes too long. */
+function timedOut(): DOMException {
+	return new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+}
 
 describe('gateOf', () => {
 	it('calls a 404 absent', () => {
@@ -22,10 +32,54 @@ describe('gateOf', () => {
 		expect(gateOf(bare, FAILED)).toEqual({ state: 'full', limit: null, current: null, upgradeUrl: '' });
 	});
 
+	it('reads a 403 as the role, not as a failed read', () => {
+		expect(gateOf(new ApiError(403, 'insufficient permissions'), FAILED)).toEqual({ state: 'forbidden' });
+		const named = new ApiError(403, 'super_admin role required', { error: 'super_admin role required' });
+		expect(gateOf(named, FAILED)).toEqual({ state: 'forbidden' });
+	});
+
+	it('reads a 429 as the rate, which waiting clears, and not as an outage', () => {
+		expect(gateOf(new ApiError(429, 'rate limit exceeded'), FAILED)).toEqual({ state: 'busy' });
+	});
+
+	it('reads a 503 as an outage, whatever the engine said about it', () => {
+		expect(gateOf(new ApiError(503, 'pq: connection refused'), FAILED)).toEqual({ state: 'unavailable' });
+	});
+
+	it('reads a read that never reached the engine as the same outage', () => {
+		expect(gateOf(unreachable(), FAILED)).toEqual({ state: 'unavailable' });
+		expect(gateOf(new TypeError('Failed to fetch'), FAILED)).toEqual({ state: 'unavailable' });
+		expect(gateOf(timedOut(), FAILED)).toEqual({ state: 'unavailable' });
+	});
+
 	it('reports anything else as a failed read in the page\'s own words', () => {
-		expect(gateOf(new ApiError(503, 'unavailable'), FAILED)).toEqual({ state: 'error', message: FAILED });
-		expect(gateOf(new ApiError(500, 'boom'), FAILED)).toEqual({ state: 'error', message: FAILED });
+		for (const status of [400, 401, 409, 500, 502, 504]) {
+			expect(gateOf(new ApiError(status, 'boom'), FAILED)).toEqual({ state: 'error', message: FAILED });
+		}
 		expect(gateOf(new Error('network'), FAILED)).toEqual({ state: 'error', message: FAILED });
+		expect(gateOf(new SyntaxError('Unexpected token < in JSON'), FAILED)).toEqual({ state: 'error', message: FAILED });
+		expect(gateOf('down', FAILED)).toEqual({ state: 'error', message: FAILED });
+		expect(gateOf(undefined, FAILED)).toEqual({ state: 'error', message: FAILED });
+	});
+
+	it('never carries what the engine said into the gate', () => {
+		const said = JSON.stringify(gateOf(new ApiError(500, 'pq: relation "sys_jobs" does not exist'), FAILED));
+		expect(said).not.toContain('pq:');
+	});
+});
+
+describe('isOutage', () => {
+	it('is a 503 or a read that got no answer', () => {
+		expect(isOutage(new ApiError(503, 'unavailable'))).toBe(true);
+		expect(isOutage(unreachable())).toBe(true);
+		expect(isOutage(timedOut())).toBe(true);
+	});
+
+	it('is nothing else', () => {
+		for (const status of [403, 404, 429, 500, 502]) expect(isOutage(new ApiError(status, 'x'))).toBe(false);
+		expect(isOutage(new Error('network'))).toBe(false);
+		expect(isOutage(new DOMException('aborted', 'AbortError'))).toBe(false);
+		expect(isOutage(null)).toBe(false);
 	});
 });
 
@@ -39,5 +93,11 @@ describe('fullText', () => {
 	it('states only what the refusal carried', () => {
 		expect(fullText({ state: 'full', limit: 5, current: null, upgradeUrl: '' })).toBe('This instance allows at most 5.');
 		expect(fullText({ state: 'full', limit: null, current: null, upgradeUrl: '' })).toBe('This instance allows no more.');
+	});
+});
+
+describe('forbiddenText', () => {
+	it('names what the role cannot open and who can help', () => {
+		expect(forbiddenText('Scheduled jobs')).toBe('Your role cannot open Scheduled jobs. Ask a super admin if you need it.');
 	});
 });

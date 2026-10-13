@@ -61,7 +61,7 @@ describe('the notice channels load', () => {
 	});
 
 	it('keeps the probes when the channels read fails, and says so in the drawer', async () => {
-		route(new ApiError(503, 'down', {}));
+		route(new ApiError(500, 'internal error', {}));
 		const out = (await load(loadEvent('?channels=p1'))) as Loaded;
 		expect(out.probes).toHaveLength(1);
 		expect(out.channelsFor).toMatchObject({ read: null, gate: { state: 'error' } });
