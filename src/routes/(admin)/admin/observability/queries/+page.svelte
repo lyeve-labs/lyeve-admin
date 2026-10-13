@@ -16,6 +16,8 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { Lightbulb, RefreshCw, Search, Timer } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { page } from '$app/state';
+	import { OUTAGE } from '$lib/outage';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
 		ANALYZABLE,
@@ -32,6 +34,8 @@
 	import { ICON } from '$lib/icon';
 
 	let { data }: { data: PageData } = $props();
+
+	const here = $derived(`${page.url.pathname}${page.url.search}`);
 
 	let refreshing = $state(false);
 	async function refresh() {
@@ -118,8 +122,17 @@
 
 	{#if data.gate.state === 'capture_store'}
 		<Alert tone="warn">
-			The capture store did not answer. Sampling writes to its own table, which a pending
-			migration can leave absent.
+			<p>
+				The capture store did not answer. Sampling writes to its own table, which a pending
+				migration can leave absent.
+			</p>
+			<!-- A plain link to this address asks for a fresh document, as the
+			     shared notice's retry does, so it works before hydration. -->
+			<div class="mt-3">
+				<Button variant="secondary" size="sm" href={here} data-sveltekit-reload>
+					<RefreshCw size={ICON.sm} aria-hidden="true" /> {OUTAGE.action}
+				</Button>
+			</div>
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice

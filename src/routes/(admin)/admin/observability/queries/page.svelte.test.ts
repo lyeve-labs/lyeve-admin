@@ -7,6 +7,8 @@ vi.mock('$app/navigation', () => ({
 	invalidateAll: vi.fn(async () => {}),
 }));
 
+vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/observability/queries?offset=50') } }));
+
 import QueriesPage from './+page.svelte';
 import type { AnalysisRead, NoPlansReason, QueryLogEntry } from '$lib/api/query-monitor';
 
@@ -66,6 +68,18 @@ describe('Slow queries gate', () => {
 		});
 
 		expect(container.textContent).toContain('capture store did not answer');
+	});
+
+	// A pending migration is applied while the page is open, so the notice
+	// offers the same retry as every other read that did not answer.
+	it('offers to try the capture store again', () => {
+		const { getByRole } = render(QueriesPage, {
+			props: props({ gate: { state: 'capture_store' }, entries: [] }),
+		});
+
+		const retry = getByRole('link', { name: /Try again/ });
+		expect(retry.getAttribute('href')).toBe('/admin/observability/queries?offset=50');
+		expect(retry.hasAttribute('data-sveltekit-reload')).toBe(true);
 	});
 
 	// The shared outage state once landed in the capture store warning, which
