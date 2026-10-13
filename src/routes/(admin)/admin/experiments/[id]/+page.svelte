@@ -37,13 +37,31 @@
 		type Variant,
 	} from '$lib/api/ab-testing';
 	import { NO_VALUE } from '$lib/format';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * The page's forms share one `form` result. Each failure names the action
+	 * that caused it, and only that action's form shows it: a failed remove
+	 * shows on the page, never in the next New variant drawer. Opening a
+	 * drawer clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string') return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const pageFailure = $derived(
+		failure && (failure.action === 'removeVariant' || failure.action === 'removeMetric') ? failure.error : undefined
+	);
+	const variantFailure = $derived(failure?.action === 'addVariant' ? failure.error : undefined);
+	const metricFailure = $derived(failure?.action === 'addMetric' ? failure.error : undefined);
+
 	const exp = $derived(data.experiment);
 	const variants = $derived(data.variants.ok ? data.variants.value : []);
 	const results = $derived(data.results.ok ? data.results.value : null);
@@ -72,6 +90,7 @@
 		// the split rather than to a number somebody has to work out.
 		variantShare = String(Math.max(0, Math.round((100 - splitTotal(variants)) * 10) / 10));
 		variantIsControl = variants.length === 0;
+		cleared = form;
 		addingVariant = true;
 	}
 
@@ -80,6 +99,7 @@
 		metricDescription = '';
 		metricEvent = '';
 		metricKind = 'conversion';
+		cleared = form;
 		addingMetric = true;
 	}
 
@@ -151,9 +171,7 @@
 		<Badge tone={statusTone(exp.status)} dot>{STATUS_LABELS[exp.status]}</Badge>
 	{/snippet}
 
-	{#if formError}
-		<Alert tone="danger">{formError}</Alert>
-	{/if}
+	<FormErrors message={pageFailure} />
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>What the results support</SectionHeading>
@@ -358,6 +376,7 @@
 <Drawer bind:open={addingVariant} title="New variant">
 	<form id="variant-form" method="POST" action="?/addVariant" use:enhance={saveVariantSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={variantFailure} />
 			<Input id="variant-name" name="name" label="Name" bind:value={variantName} required />
 			<Input
 				id="variant-share"
@@ -399,6 +418,7 @@
 <Drawer bind:open={addingMetric} title="New metric">
 	<form id="metric-form" method="POST" action="?/addMetric" use:enhance={saveMetricSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={metricFailure} />
 			<Input id="metric-name" name="name" label="Name" bind:value={metricName} required />
 			<Input
 				id="metric-event"

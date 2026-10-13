@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -214,3 +214,30 @@ describe('a panel that could not be read', () => {
 	});
 });
 
+/*
+ * The page's forms share one result. A failed remove belongs on the page, and
+ * a failed add in its own drawer.
+ */
+describe('where a failure shows', () => {
+	it('shows a failed remove on the page and not in a drawer opened after it', async () => {
+		const { container, getAllByText } = render(DetailPage, {
+			props: props({}, { action: 'removeVariant', error: 'The variant could not be removed.' }),
+		});
+		expect(said(container)).toContain('The variant could not be removed.');
+
+		await fireEvent.click(getAllByText('New variant')[0]);
+		const drawer = container.ownerDocument.querySelector('#variant-form') as HTMLElement;
+		expect(said(drawer)).not.toContain('could not be removed');
+	});
+
+	it('shows a failed add inside its drawer and not in the other', async () => {
+		const { container, getAllByText } = render(DetailPage, {
+			props: props({}, { action: 'addMetric', error: 'Choose a metric type.' }),
+		});
+		expect(said(container)).not.toContain('Choose a metric type.');
+
+		await fireEvent.click(getAllByText('New variant')[0]);
+		expect(said(container.ownerDocument.querySelector('#variant-form') as HTMLElement)).not.toContain('Choose a metric type.');
+	});
+
+});

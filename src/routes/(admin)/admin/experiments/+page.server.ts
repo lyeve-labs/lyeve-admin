@@ -74,22 +74,26 @@ export const load: PageServerLoad = async (event) => {
 
 async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	await requireRole(event, ['admin', 'super_admin']);
+	// The drawer shows a failure only when it carries this tag, so a failed
+	// delete or move never appears in it.
+	const action = 'save';
 	const client = authedClient(event);
 	const form = await event.request.formData();
 
 	const name = String(form.get('name') ?? '').trim();
-	if (!name) return fail(400, { error: 'Name the experiment so a result can be attributed to it.' });
+	if (!name) return fail(400, { action, error: 'Name the experiment so a result can be attributed to it.' });
 
 	const threshold = numberOr(form.get('significance_threshold'), DEFAULT_CONFIDENCE);
 	if (!Number.isFinite(threshold) || threshold < MIN_CONFIDENCE || threshold > MAX_CONFIDENCE) {
 		return fail(400, {
+			action,
 			error: `The significance threshold is a confidence level. Use a number from ${MIN_CONFIDENCE} to ${MAX_CONFIDENCE}, such as ${DEFAULT_CONFIDENCE}.`,
 		});
 	}
 
 	const minSample = Math.floor(numberOr(form.get('min_sample_size'), 100));
 	if (!Number.isFinite(minSample) || minSample < 1) {
-		return fail(400, { error: 'The minimum sample size has to be at least one exposure.' });
+		return fail(400, { action, error: 'The minimum sample size has to be at least one exposure.' });
 	}
 
 	const body = {
@@ -104,7 +108,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateExperiment(client, id, body);
 		else await createExperiment(client, body);
 	} catch (err) {
-		return fail(400, { error: actionError(err, 'The experiment could not be saved.') });
+		return fail(400, { action, error: actionError(err, 'The experiment could not be saved.') });
 	}
 	return { saved: name };
 }
@@ -115,7 +119,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No experiment was named.' });
+		if (!id) return fail(400, { action: 'save', error: 'No experiment was named.' });
 		return save(event, id);
 	},
 
@@ -124,11 +128,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No experiment was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'No experiment was named.' });
 		try {
 			await deleteExperiment(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The experiment could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The experiment could not be removed.') });
 		}
 		return { removed: id };
 	},
@@ -142,12 +146,12 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const move = String(form.get('move') ?? '') as Transition;
-		if (!id) return fail(400, { error: 'No experiment was named.' });
-		if (!MOVES.includes(move)) return fail(400, { error: 'That is not a move this experiment takes.' });
+		if (!id) return fail(400, { action: 'move', error: 'No experiment was named.' });
+		if (!MOVES.includes(move)) return fail(400, { action: 'move', error: 'That is not a move this experiment takes.' });
 		try {
 			await transition(client, id, move);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The experiment could not be changed.') });
+			return fail(400, { action: 'move', error: actionError(err, 'The experiment could not be changed.') });
 		}
 		return { moved: move };
 	},

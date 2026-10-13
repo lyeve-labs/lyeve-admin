@@ -50,3 +50,17 @@ describe('experiment significance threshold', () => {
 		expect(engine.post).not.toHaveBeenCalled();
 	});
 });
+
+// The drawer reads only a failure tagged as a save, so each failure is tagged.
+describe('experiment action failures', () => {
+	it('tags a failed delete as a delete', async () => {
+		engine.delete.mockRejectedValue(new Error('down'));
+		const out = (await actions.delete(event({ id: 'e1' }))) as { data: { action: string } };
+		expect(out.data.action).toBe('delete');
+	});
+
+	it('tags a refused save as a save', async () => {
+		const out = (await actions.create(event({ name: '' }))) as { data: { action: string } };
+		expect(out.data.action).toBe('save');
+	});
+});
