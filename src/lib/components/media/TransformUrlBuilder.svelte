@@ -3,7 +3,7 @@
 	 * Builds a signed URL for a resized or converted copy of this image. A
 	 * refusal the engine sends renders as a notice.
 	 */
-	import { Alert, CopyField, Button, NumberInput, RadioGroup, SectionHeading, Select, Toggle } from '@lyeve-labs/ui-kit';
+	import { Alert, CopyField, Button, NumberInput, RadioGroup, SectionHeading, SegmentedControl, Select, Toggle } from '@lyeve-labs/ui-kit';
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
@@ -83,8 +83,8 @@
 			<NumberInput id="transform-h" name="h" label="Height" min={0} bind:value={h} hint="0 keeps the original." />
 			<Select id="transform-fmt" name="fmt" label="Format" options={FORMATS} value={fmt} onvaluechange={(v) => (fmt = v)} />
 			<NumberInput id="transform-q" name="q" label="Quality" min={0} max={100} bind:value={q} hint="0 is the engine default." />
-			<Select id="transform-exp" name="expires_in" label="Expires" options={EXPIRY} value={expires} onvaluechange={(v) => (expires = v)} />
 		</div>
+		<SegmentedControl name="expires_in" label="Expires" options={EXPIRY} bind:value={expires} />
 		{#if focal}
 			<Toggle id="transform-focal" label="Center a crop on the focal point" bind:checked={useFocal} />
 		{/if}

@@ -334,9 +334,10 @@
 	/**
 	 * The relation kinds, read from the module that knows what each one does.
 	 *
-	 * The label is the cardinality in words and the machine name follows it, so
-	 * a reader who knows `belongs_to` still finds it and a reader who does not
-	 * is told what it means without opening anything.
+	 * Each label is the kind in a few words, short enough for every kind to
+	 * stay in sight in one row. The panel under the row names the chosen
+	 * kind's cardinality and machine name, so a reader who knows `belongs_to`
+	 * still finds it and a reader who does not is told what it means.
 	 */
 	const RELATION_OPTIONS: { value: RelationType; label: string }[] = RELATION_KINDS.map((k) => ({
 		value: k.type,
@@ -545,10 +546,33 @@
 			if (saved?.name) schemaCanvas?.reveal(saved.name);
 			await tick();
 		}
-		const el = document.getElementById(target);
+		const found = document.getElementById(target);
+		// A radio group takes focus on its chosen radio, the way Tab enters it.
+		const el =
+			found?.getAttribute('role') === 'radiogroup'
+				? (found.querySelector<HTMLElement>('[aria-checked="true"]') ?? found.querySelector<HTMLElement>('[role="radio"]'))
+				: found;
 		el?.focus();
 		el?.scrollIntoView?.({ block: 'center' });
 	}
+
+	/**
+	 * The kit's segmented control takes neither an id nor a description, so its
+	 * wrapper hands both to the radio group inside it. The problem list finds a
+	 * control by its id, and a screen reader reads the hint or the problem the
+	 * group names when focus enters it.
+	 */
+	const groupNamed: Action<HTMLElement, { id: string; describedBy?: string }> = (node, initial) => {
+		const apply = (p: { id: string; describedBy?: string }) => {
+			const group = node.querySelector('[role="radiogroup"]');
+			if (!group) return;
+			group.id = p.id;
+			if (p.describedBy) group.setAttribute('aria-describedby', p.describedBy);
+			else group.removeAttribute('aria-describedby');
+		};
+		apply(initial);
+		return { update: apply };
+	};
 
 	/** What a save does to columns that already exist, and how many rows they hold. */
 	const change = $derived(selected ? changesOf(saved, selected) : changesOf(null, { name: '', display_name: '', fields: [] }));
@@ -1207,7 +1231,11 @@
 					</div>
 					<div class="flex flex-col gap-3">
 						{#each TRANSPORTS as t (t.key)}
-							<div class="flex min-w-0 flex-col gap-1" data-testid="transport-{t.key}">
+							<div
+								class="flex min-w-0 flex-col gap-1"
+								data-testid="transport-{t.key}"
+								use:groupNamed={{ id: `transport-${t.key}`, describedBy: `transport-${t.key}-hint` }}
+							>
 								<SegmentedControl
 									label={t.label}
 									size="sm"
@@ -1216,7 +1244,7 @@
 									value={transportMode(schema, t.key)}
 									onchange={(v) => setTransport(t.key, v)}
 								/>
-								<span class="text-xs text-faint">{t.hint}</span>
+								<span id="transport-{t.key}-hint" class="text-xs text-faint">{t.hint}</span>
 							</div>
 						{/each}
 					</div>
@@ -1379,9 +1407,12 @@
 						data-testid="relation-panel-{rowId}"
 						use:keysStayInRow
 					>
-						<!-- The problem list moves focus to the kind by this id, so the
-						     wrapper takes focus and carries the problem beside it. -->
-						<div id="relation-type-{rowId}" tabindex="-1" class="flex min-w-0 flex-col gap-1 outline-none">
+						<!-- The problem list moves focus to the kind's radio group by its
+						     id, and the group names the problem as its description. -->
+						<div
+							class="flex min-w-0 flex-col gap-1"
+							use:groupNamed={{ id: `relation-type-${rowId}`, describedBy: problemAt(`relation-type-${rowId}`) ? `relation-type-${rowId}-problem` : undefined }}
+						>
 							<SegmentedControl
 								label="Relation"
 								size="sm"
@@ -1394,7 +1425,7 @@
 								}}
 							/>
 							{#if problemAt(`relation-type-${rowId}`)}
-								<p class="text-xs text-danger">{problemAt(`relation-type-${rowId}`)}</p>
+								<p id="relation-type-{rowId}-problem" class="text-xs text-danger">{problemAt(`relation-type-${rowId}`)}</p>
 							{/if}
 						</div>
 						<div class="grid gap-3 sm:grid-cols-2">
@@ -1416,6 +1447,8 @@
 							<p class="text-sm text-fg">{plan.sentence}</p>
 
 							<dl class="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
+								<dt class="text-faint">Cardinality</dt>
+								<dd class="text-muted">{plan.kind.cardinality}</dd>
 								<dt class="text-faint">Stored as</dt>
 								<dd class="font-mono text-muted">{plan.kind.type}</dd>
 								<dt class="text-faint">Key lives in</dt>

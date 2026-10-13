@@ -49,7 +49,6 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 		presets: [],
 		presetsGate: null,
 		canWrite: true,
-		loadError: false,
 		loadGate: null,
 		...overrides,
 	} as unknown as PageData;
@@ -679,11 +678,61 @@ describe('schema builder failures stay with their action', () => {
 describe('schema builder read failures', () => {
 	it('says the list could not be read and offers no new schema over it', () => {
 		render(SchemaPage, {
-			props: { data: data({ schemas: [], loadError: true, loadGate: { state: 'unavailable' } }), form: null },
+			props: { data: data({ schemas: [], loadGate: { state: 'unavailable' } }), form: null },
 		});
 		expect(screen.getByText(/so Schemas could not be read/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: 'New schema' })).toBeNull();
 		expect(screen.queryByText('No schemas yet')).toBeNull();
+	});
+});
+
+describe('schema builder relation kind', () => {
+	it('names the cardinality the short label leaves out', async () => {
+		await openPosts();
+		await pickType('title', 'relation');
+		await pickOption(screen.getByRole('combobox', { name: 'Target schema' }), 'Authors');
+		const facts = screen.getByTestId(/^relation-panel-/).querySelector('dl') as HTMLElement;
+		expect(facts.textContent).toContain('Cardinality');
+		expect(facts.textContent).toContain('many to one');
+	});
+
+	it('ties a problem with the kind to its radio group and focuses the chosen radio from the problem list', async () => {
+		await openPosts();
+		await pickType('title', 'relation');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Has many' }));
+		await pickOption(screen.getByRole('combobox', { name: 'Target schema' }), 'Posts');
+		await fireEvent.click(screen.getByRole('radio', { name: 'Belongs to one' }));
+
+		const group = screen.getByRole('radiogroup', { name: 'Relation' });
+		const describedBy = group.getAttribute('aria-describedby') ?? '';
+		expect(document.getElementById(describedBy)?.textContent).toContain('has to be Has many');
+
+		await fireEvent.click(screen.getByRole('button', { name: /problem/ }));
+		const jump = [...document.querySelectorAll<HTMLButtonElement>('[data-problem]')].find((b) =>
+			(b.textContent ?? '').includes('has to be Has many'),
+		) as HTMLButtonElement;
+		await fireEvent.click(jump);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Belongs to one' }));
+	});
+});
+
+describe('schema builder over a failed list read', () => {
+	it('offers no import beside a list it could not read', async () => {
+		render(SchemaPage, {
+			props: { data: data({ schemas: [], isSuperAdmin: true, loadGate: { state: 'unavailable' } }), form: null },
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Import and export' }));
+		expect(screen.getByRole('menuitem', { name: /Export as YAML/ })).toBeTruthy();
+		expect(screen.queryByRole('menuitem', { name: /^Import$/ })).toBeNull();
+	});
+
+	it('says only that the role was refused when an editor cannot read the list', () => {
+		render(SchemaPage, {
+			props: { data: data({ schemas: [], canWrite: false, loadGate: { state: 'forbidden' } }), form: null },
+		});
+		expect(screen.getByText(/Your role cannot open Schemas/)).toBeTruthy();
+		expect(screen.queryByText(/Your role reads schemas/)).toBeNull();
 	});
 });
 
@@ -695,6 +744,7 @@ describe('schema builder transports', () => {
 		expect([...rest.querySelectorAll('[role=radio], input[type=radio]')].length).toBe(4);
 		expect(screen.getByRole('radiogroup', { name: 'GraphQL' })).toBeTruthy();
 		expect(screen.queryByRole('combobox', { name: 'REST' })).toBeNull();
+		expect(document.getElementById(rest.getAttribute('aria-describedby') ?? '')?.textContent).toBe('The content API.');
 	});
 });
 
