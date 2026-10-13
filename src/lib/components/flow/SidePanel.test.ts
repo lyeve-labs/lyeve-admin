@@ -96,11 +96,11 @@ describe('SidePanel', () => {
 		expect(getByText('body')).toBeTruthy();
 	});
 
-	it('is the toolbar overlay below xl:, hidden until asked for', () => {
-		expect(setup().aside.className).toContain('hidden');
+	it('is the toolbar overlay below xl:, invisible until asked for', () => {
+		expect(setup().aside.className).toMatch(/(^|\s)invisible(\s|$)/);
 		cleanup();
 		const { aside } = setup({ overlay: true });
-		expect(aside.className).not.toMatch(/(^|\s)hidden(\s|$)/);
-		expect(aside.className).toContain('xl:block');
+		expect(aside.className).not.toMatch(/(^|\s)invisible(\s|$)/);
+		expect(aside.className).toContain('xl:visible');
 	});
 });

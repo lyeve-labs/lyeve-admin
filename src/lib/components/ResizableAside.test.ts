@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRawSnippet } from 'svelte';
+import { createRawSnippet, tick } from 'svelte';
 import ResizableAside from './ResizableAside.svelte';
 
 afterEach(cleanup);
@@ -168,19 +168,108 @@ describe('ResizableAside', () => {
 		expect(aside.className).toContain('lg:border-l');
 	});
 
-	it('floats as an overlay under the breakpoint, hidden until asked for', () => {
-		expect(setup({ below: 'overlay' }).aside.className).toMatch(/(^|\s)hidden(\s|$)/);
-		cleanup();
-		const { aside } = setup({ below: 'overlay', overlay: true });
-		expect(aside.className).toContain('absolute');
-		expect(aside.className).not.toMatch(/(^|\s)hidden(\s|$)/);
-		expect(aside.className).toContain('xl:static');
-	});
-
 	it('keeps the caller-supplied meta beside the label', () => {
 		const { getByRole, getByText } = setup({ meta: count });
 		const heading = getByRole('heading', { level: 2 });
 		expect(heading.textContent).toContain('Things');
 		expect(heading.parentElement?.contains(getByText('12'))).toBe(true);
+	});
+});
+
+/** The classes one by one, so a case can name a class without matching its variants. */
+const classesOf = (el: HTMLElement) => el.className.split(/\s+/).filter(Boolean);
+
+describe('ResizableAside as an overlay', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	/** A viewport under every breakpoint or at all of them, which can be resized. */
+	function viewport(wide: boolean) {
+		const listeners = new Set<() => void>();
+		let now = wide;
+		vi.stubGlobal('matchMedia', (media: string) => ({
+			media,
+			get matches() {
+				return media.startsWith('(min-width') && now;
+			},
+			addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+			removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+		}));
+		return {
+			async resize(next: boolean) {
+				now = next;
+				for (const fn of listeners) fn();
+				await tick();
+			},
+		};
+	}
+
+	it('sits closed off its own edge, transparent and invisible, until the page asks for it', () => {
+		expect(classesOf(setup({ below: 'overlay' }).aside)).toEqual(
+			expect.arrayContaining(['absolute', 'invisible', 'opacity-0', '-translate-x-full'])
+		);
+		cleanup();
+		expect(classesOf(setup({ below: 'overlay', side: 'end' }).aside)).toEqual(
+			expect.arrayContaining(['invisible', 'opacity-0', 'translate-x-full'])
+		);
+	});
+
+	it('opens in place, with nothing hiding it or holding it off its edge', () => {
+		const open = classesOf(setup({ below: 'overlay', overlay: true }).aside);
+		expect(open).toContain('absolute');
+		for (const shut of ['invisible', 'opacity-0', '-translate-x-full', 'translate-x-full']) expect(open).not.toContain(shut);
+	});
+
+	it('enters on the slow rung and leaves one rung faster', async () => {
+		const { aside, rerender } = setup({ below: 'overlay' });
+		// Visibility is in the exit's list, so the panel stays visible until it has slid out.
+		expect(classesOf(aside)).toEqual(
+			expect.arrayContaining(['transition-[translate,opacity,visibility]', 'duration-base', 'ease-exit'])
+		);
+		await rerender({ overlay: true });
+		// It is not in the entrance's, so a field inside can take focus on the first frame.
+		expect(classesOf(aside)).toEqual(expect.arrayContaining(['transition-[translate,opacity]', 'duration-slow', 'ease-enter']));
+		expect(classesOf(aside)).not.toContain('duration-base');
+		expect(classesOf(aside)).not.toContain('ease-exit');
+	});
+
+	it('docks at the breakpoint with nothing moving or transitioning, open or closed', () => {
+		for (const overlay of [false, true]) {
+			expect(classesOf(setup({ below: 'overlay', overlay }).aside)).toEqual(
+				expect.arrayContaining(['xl:static', 'xl:visible', 'xl:translate-none', 'xl:opacity-100', 'xl:transition-none'])
+			);
+			cleanup();
+		}
+	});
+
+	it('is inert while closed under the breakpoint, and never at it', async () => {
+		const screen = viewport(false);
+		const { aside, rerender } = setup({ below: 'overlay' });
+		expect(aside.inert).toBe(true);
+		await rerender({ overlay: true });
+		expect(aside.inert).toBe(false);
+		await rerender({ overlay: false });
+		expect(aside.inert).toBe(true);
+		await screen.resize(true);
+		expect(aside.inert).toBe(false);
+	});
+
+	it('keeps what the reader typed through a close, a reopen and the breakpoint', async () => {
+		const screen = viewport(false);
+		const field = createRawSnippet(() => ({ render: () => '<input aria-label="Filter" />' }));
+		const { getByTestId, getByLabelText, rerender } = render(ResizableAside, {
+			props: { storageKey: KEY, label: 'Things', side: 'start', ...BOUNDS, below: 'overlay', overlay: true, children: field },
+		});
+		const aside = getByTestId(`aside-${KEY}`);
+		const input = getByLabelText('Filter') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'http.req' } });
+
+		await rerender({ overlay: false });
+		await rerender({ overlay: true });
+		await screen.resize(true);
+		await screen.resize(false);
+
+		expect(getByTestId(`aside-${KEY}`)).toBe(aside);
+		expect(getByLabelText('Filter')).toBe(input);
+		expect(input.value).toBe('http.req');
 	});
 });

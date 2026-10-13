@@ -127,6 +127,28 @@ describe('raw-color', () => {
   });
 });
 
+describe('style-block', () => {
+  it('passes a component styled through its markup', () => {
+    expect(check('style-block', '<div class="rte bg-surface-2 text-sm">x</div>')).toEqual([]);
+  });
+
+  it('fails a stylesheet in the component, with attributes or inside the head', () => {
+    expect(check('style-block', '<div class="rte">x</div>\n<style>\n  :global(.rte h1) { font-size: 1.5rem; }\n</style>')).toHaveLength(1);
+    expect(check('style-block', '<style lang="postcss">.x { padding: 10px; }</style>')).toHaveLength(1);
+    expect(check('style-block', '<svelte:head><style>body { margin: 0; }</style></svelte:head>')).toHaveLength(1);
+  });
+
+  it('reads the markup and not the script or the comments', () => {
+    // A preview built as a string is not a stylesheet this page loads.
+    expect(check('style-block', "<script>const doc = '<style>p { margin: 0; }</style>';</script><p>ok</p>")).toEqual([]);
+    expect(check('style-block', '<!-- the theme owns the <style> here --><p>ok</p>')).toEqual([]);
+  });
+
+  it('leaves an element whose name only starts like it alone', () => {
+    expect(check('style-block', '<styled-frame>x</styled-frame><Style />')).toEqual([]);
+  });
+});
+
 describe('raw-button', () => {
   it('sees a tone that only the conditional half of the class carries', () => {
     // A scrape stops at the first quote inside the attribute, and an arrow
@@ -354,6 +376,29 @@ describe('raw-count', () => {
     // named here the next number still has to remember.
     expect(check('raw-count', '<p>{n.toLocaleString()}</p>')).toHaveLength(1);
     expect(check('raw-count', "<p>{n.toLocaleString('en-US')}</p>")).toHaveLength(1);
+  });
+});
+
+describe('raw-date', () => {
+  it('accepts a moment that goes through the formatter', () => {
+    expect(check('raw-date', '<td>{formatTime(r.at)}</td><td>{formatDateTime(r.created_at)}</td>')).toEqual([]);
+  });
+
+  it('leaves a call that names its locale alone', () => {
+    expect(check('raw-date', "<p>{d.toLocaleDateString('en-US', { month: 'short' })}</p>")).toEqual([]);
+    expect(check('raw-date', "const axis = new Intl.DateTimeFormat('en-US', { hour: '2-digit' });")).toEqual([]);
+  });
+
+  it('leaves a name that only starts like the method alone', () => {
+    expect(check('raw-date', 'const prefs = toLocalePreferences(raw);')).toEqual([]);
+  });
+
+  it('fails a date or a time with no locale, in each spelling', () => {
+    // With no locale the same moment renders 14:32:07 or 2:32:07 PM.
+    expect(check('raw-date', 'received = [{ at: new Date().toLocaleTimeString() }];')).toHaveLength(1);
+    expect(check('raw-date', '<p>{d.toLocaleDateString()}</p>')).toHaveLength(1);
+    expect(check('raw-date', "<p>{d.toLocaleDateString(undefined, { month: 'short' })}</p>")).toHaveLength(1);
+    expect(check('raw-date', 'const fmt = new Intl.DateTimeFormat();')).toHaveLength(1);
   });
 });
 

@@ -447,6 +447,30 @@ export const rules = [
       ),
   },
   {
+    id: 'style-block',
+    files: ALL,
+    /**
+     * A stylesheet inside a component, where no other rule here can see it.
+     *
+     * Every rule in this file reads class names and markup, so a `<style>`
+     * block takes a literal color, duration or size past all of them. The
+     * admin's rule was no `<style>` blocks. Nothing enforced it, and the rich
+     * text editor shipped one with its heading sizes in rem and its padding in
+     * pixels. Markup the component renders takes utilities. Markup a library
+     * renders, which no class reaches, gets a rule in src/app.css, scoped under
+     * the component's own class and written in the theme's variables.
+     */
+    test: (src) =>
+      // A script may build a document for a preview, and a comment may name
+      // the element. Neither is a stylesheet this page loads.
+      [
+        ...src
+          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .matchAll(/<style\b/g),
+      ].map(() => '<style> block; style with utilities, or with theme variables in src/app.css for markup a library renders'),
+  },
+  {
     id: 'raw-button',
     files: ALL,
     /**
@@ -708,6 +732,26 @@ export const rules = [
       // grouped at the call site, with a locale or without one.
       [...src.matchAll(/\.toLocaleString\(\s*(?:'[^']*'|"[^"]*")?\s*\)/g)].map(
         () => 'toLocaleString groups a number by hand; use formatCount from $lib/format',
+      ),
+  },
+  {
+    id: 'raw-date',
+    // Dates are formatted in the API wrappers too, and ALL is Svelte only.
+    files: globSync('src/{routes,lib}/**/*.{ts,svelte}'),
+    /**
+     * A date or a time written out with no locale.
+     *
+     * With no locale the browser picks the format, so the same moment reads
+     * 14:32:07 in one browser and 2:32:07 PM in another, in the reader's own
+     * zone and unlabeled. The stream lab stamped each event that way beside a
+     * console that prints UTC everywhere else. `undefined` in the locale's
+     * place is the same call, and so is a formatter built with no locale.
+     * `$lib/format.ts` holds the one presentation: formatDate, formatDateTime
+     * and formatTime.
+     */
+    test: (src) =>
+      [...src.matchAll(/\.(toLocaleDateString|toLocaleTimeString)\(\s*(?:\)|undefined\b)|\b(Intl\.DateTimeFormat)\(\s*(?:\)|undefined\b)/g)].map(
+        (m) => `${m[1] ?? m[2]} with no locale renders per browser; use formatDate, formatDateTime or formatTime from $lib/format`,
       ),
   },
   {
