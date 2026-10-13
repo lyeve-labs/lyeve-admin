@@ -16,7 +16,9 @@
 	const instance = useInstance();
 	// The license page is always offered. A link the engine or the license
 	// module names goes beside it, because that is where the license changes.
+	// For a cap that link is where a license allowing more is bought.
 	const upgrade = $derived(instance.upgradeLink(refusal.upgradeUrl || null));
+	const fallbackLabel = $derived(refusal.kind === 'cap' ? 'How to raise the limit' : 'How to enable it');
 </script>
 
 <div data-testid="refusal-notice">
@@ -25,7 +27,7 @@
 		<div class="mt-3 flex flex-wrap gap-2">
 			<Button variant="secondary" size="sm" href={LICENSE_PAGE}>View the license</Button>
 			{#if upgrade && upgrade.href !== LICENSE_PAGE}
-				<UpgradeLink link={upgrade} variant="ghost" size="sm" />
+				<UpgradeLink link={{ href: upgrade.href, label: upgrade.label ?? fallbackLabel }} variant="ghost" size="sm" />
 			{/if}
 		</div>
 	</Alert>

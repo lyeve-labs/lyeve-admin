@@ -8,6 +8,7 @@ import { notRunning } from '$lib/plugins';
 import { actionError } from '$lib/server/action-error';
 import { passwordTooLong, setUserPassword } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
+import { refusalText } from '$lib/api/refusal';
 import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
@@ -113,7 +114,7 @@ export const actions: Actions = {
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { action: 'create', error: full });
+			if (full) return fail(402, { action: 'create', error: refusalText(full), refused: full });
 			// The email is checked above, so a 422 is the password policy.
 			if (err instanceof ApiError && err.status === 422) {
 				return fail(422, {
@@ -144,7 +145,7 @@ export const actions: Actions = {
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { action: 'updateRoles', error: full });
+			if (full) return fail(402, { action: 'updateRoles', error: refusalText(full), refused: full });
 			return fail(400, { action: 'updateRoles', error: actionError(err, 'Failed to update roles') });
 		}
 	},

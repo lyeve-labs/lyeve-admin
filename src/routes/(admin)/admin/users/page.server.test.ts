@@ -480,13 +480,15 @@ describe('the admin seat ceiling', () => {
 				cap: 'admin.seats',
 				limit: 7,
 				current: 7,
-				upgrade_url: '',
+				upgrade_url: 'https://shop.example.com/pricing?utm_campaign=admin.seats',
 			});
 		}) as unknown as typeof globalThis.fetch;
 
-	// The numbers are the refusal's, so the page holds no ceiling of its own.
+	// The numbers and the link are the refusal's, so the page holds no ceiling
+	// and no address of its own.
 	const expected =
-		'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.';
+		'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Add more with a license, or remove the admin role from an account. Editors and viewers take no seat.';
+	const refused = { kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: 'https://shop.example.com/pricing?utm_campaign=admin.seats' };
 
 	it('says the seats are full when creating an admin is refused', async () => {
 		const result = await actions.create(mockEvent({
@@ -495,7 +497,7 @@ describe('the admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 402, data: { action: 'create', error: expected } });
+		expect(result).toEqual({ status: 402, data: { action: 'create', error: expected, refused } });
 	});
 
 	it('says the seats are full when a promotion is refused', async () => {
@@ -505,7 +507,7 @@ describe('the admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 402, data: { action: 'updateRoles', error: expected } });
+		expect(result).toEqual({ status: 402, data: { action: 'updateRoles', error: expected, refused } });
 	});
 
 	it('leaves a refusal at another cap to the usual message', async () => {

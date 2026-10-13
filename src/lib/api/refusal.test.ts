@@ -13,6 +13,12 @@ describe('refusalOf', () => {
 		expect(r).toEqual({ kind: 'cap', cap: 'example.items', limit: 4, current: 4, upgradeUrl: '' });
 	});
 
+	it('keeps the link a cap refusal names for more', () => {
+		const link = 'https://shop.example.com/pricing?utm_source=admin&utm_medium=product&utm_campaign=example.items';
+		const r = refusalOf(refused({ error: 'cap_exceeded', cap: 'example.items', limit: 4, current: 4, upgrade_url: link }));
+		expect(r).toMatchObject({ kind: 'cap', upgradeUrl: link });
+	});
+
 	it('reads a feature refusal by the capability name a license carries', () => {
 		const r = refusalOf(refused({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature', upgrade_url: '' }));
 		expect(r).toEqual({ kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' });
@@ -33,7 +39,7 @@ describe('refusalOf', () => {
 describe('refusalText', () => {
 	it('says the count against the ceiling in the words of the cap', () => {
 		expect(refusalText({ kind: 'cap', cap: 'example.items', limit: 4, current: 4, upgradeUrl: '' })).toBe(
-			'4 of 4 items are in use, which is the most this instance allows. Remove one, or change the license to allow more.',
+			'4 of 4 items are in use, which is the most this instance allows. Add more with a license, or remove one.',
 		);
 	});
 
@@ -43,10 +49,16 @@ describe('refusalText', () => {
 		);
 	});
 
-	it('states the seat count and how to free a seat', () => {
+	it('states the seat count, then more seats with a license, then how to free one', () => {
 		expect(refusalText({ kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: '' })).toBe(
-			'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.',
+			'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Add more with a license, or remove the admin role from an account. Editors and viewers take no seat.',
 		);
+	});
+
+	it('names a license as the way forward before removing one', () => {
+		const text = refusalText({ kind: 'cap', cap: 'example.items', limit: null, current: null, upgradeUrl: '' });
+		expect(text).toBe('This instance allows no more items. Add more with a license, or remove one.');
+		expect(text.indexOf('license')).toBeLessThan(text.indexOf('remove'));
 	});
 
 	it('names the capability a feature refusal needs', () => {

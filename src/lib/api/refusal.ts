@@ -106,7 +106,8 @@ export function refusalTitle(r: Refusal): string {
 
 /**
  * The sentence for a refusal: "7 of 7 items are in use" for a cap, and the
- * capability's name for a feature.
+ * capability's name for a feature. A cap says what happened, then the way
+ * forward: a license that allows more, before removing one.
  */
 export function refusalText(r: Refusal): string {
 	if (r.kind === 'cap') {
@@ -122,9 +123,9 @@ export function refusalText(r: Refusal): string {
 		if (r.cap === ADMIN_SEATS_CAP) {
 			// The heading already names the seats, so the count stands alone.
 			const held = line.replace(` ${noun} are in use`, ' are in use');
-			return `Every admin seat is taken. ${held} Editors and viewers take no seat, so remove the admin role from an account to add another.`;
+			return `Every admin seat is taken. ${held} Add more with a license, or remove the admin role from an account. Editors and viewers take no seat.`;
 		}
-		return `${line} Remove one, or change the license to allow more.`;
+		return `${line} Add more with a license, or remove one.`;
 	}
 	if (!r.feature) return 'This needs a capability this license does not include. Nothing was changed.';
 	return `The license on this instance does not include ${r.feature}. Nothing was changed.`;

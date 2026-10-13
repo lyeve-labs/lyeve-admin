@@ -4,6 +4,7 @@ import { archiveTenant, getEntitlements, getTenant, restoreTenant } from '@lyeve
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
+import { refusalText } from '$lib/api/refusal';
 import { section, type Section } from '$lib/api/gate';
 import { readError } from '$lib/server/read-error';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
@@ -145,7 +146,7 @@ export const actions: Actions = {
 			return { memberSaved: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { action: 'grant', memberError: full });
+			if (full) return fail(402, { action: 'grant', memberError: refusalText(full), refused: full });
 			return fail(400, { action: 'grant', memberError: actionError(err, 'The membership could not be saved.') });
 		}
 	},
