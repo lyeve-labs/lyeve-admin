@@ -12,11 +12,13 @@
 		NumberInput,
 		PageShell,
 		SectionHeading,
+		SegmentedControl,
 		Select,
 		Stat,
 		Table,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { Coins, Plus, RefreshCw, RotateCcw, Trash2 } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
@@ -81,7 +83,7 @@
 	let budgetName = $state('');
 	let budgetAmount = $state('');
 	let budgetCurrency = $state('USD');
-	let budgetPeriod = $state<string | null>('monthly');
+	let budgetPeriod = $state('monthly');
 	let budgetResource = $state<string | null>('');
 	let budgetThresholds = $state('50, 80, 100');
 	let budgetStart = $state('');
@@ -149,12 +151,13 @@
 	let deleteId = $state('');
 
 	async function askDelete(id: string, label: string) {
-		const ok = await confirmDialog('Delete budget', `Delete ${label}? Its threshold history goes with it.`, {
+		const ok = await confirmDialog(`Delete budget ${label}`, `Delete ${label}? Its threshold history goes with it.`, {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		deleteId = id;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the id has reached the DOM.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -477,13 +480,7 @@
 			/>
 		</div>
 		<div class="grid gap-4 sm:grid-cols-2">
-			<Select
-				id="budget-period"
-				name="period"
-				label="Period"
-				options={periodOptions}
-				bind:value={budgetPeriod}
-			/>
+			<SegmentedControl name="period" label="Period" options={periodOptions} bind:value={budgetPeriod} />
 			<Select
 				id="budget-resource"
 				name="resource_type"

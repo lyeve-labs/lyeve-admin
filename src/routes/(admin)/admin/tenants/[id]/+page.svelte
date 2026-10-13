@@ -9,6 +9,7 @@
 		Drawer,
 		EmptyState,
 		Input,
+		MultiSelect,
 		PageShell,
 		SectionHeading,
 		Table,
@@ -16,7 +17,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { Archive, ArchiveRestore, Pencil, Trash2 } from '@lucide/svelte';
+	import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { roleTone } from '$lib/roles';
 	import { formatDate } from '$lib/format';
@@ -173,14 +174,18 @@
 				{#each data.choices.value as c (c.name)}
 					<input type="hidden" name="offered" value={c.name} />
 				{/each}
-				<CheckboxGroup
-					name="available"
+				<MultiSelect
+					id="tenant-features"
 					label="Available to this tenant"
-					hint="What the instance serves is the ceiling for every tenant. Clearing a box takes that plugin away from this tenant only: its routes answer 403, its screens leave the tenant's admin, and every capability it owns goes with it."
-					orientation="horizontal"
+					placeholder="Nothing"
+					hint="What the instance serves is the ceiling for every tenant. Removing a plugin here takes it away from this tenant only: its routes answer 403, its screens leave the tenant's admin, and every capability it owns goes with it."
+					searchable
 					options={featureOptions}
 					bind:value={available}
 				/>
+				{#each available as name (name)}
+					<input type="hidden" name="available" value={name} />
+				{/each}
 				<div>
 					<Button variant="primary" type="submit" loading={savingFeatures}>Save</Button>
 				</div>
@@ -192,7 +197,7 @@
 		<div class="flex items-center justify-between gap-4">
 			<SectionHeading level={2}>Members</SectionHeading>
 			{#if data.members.ok}
-				<Button variant="secondary" onclick={openNewMember}>New member</Button>
+				<Button variant="secondary" onclick={openNewMember}><Plus size={ICON.sm} /> New member</Button>
 			{/if}
 		</div>
 		{#if revokeError}

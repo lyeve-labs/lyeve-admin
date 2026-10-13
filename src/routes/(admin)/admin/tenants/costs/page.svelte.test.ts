@@ -5,6 +5,12 @@ import type { PageData } from './$types';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
+	const actual = await importOriginal<Record<string, unknown>>();
+	return { ...actual, confirm: kit.confirm };
+});
+
 import CostsPage from './+page.svelte';
 
 afterEach(cleanup);
@@ -189,5 +195,26 @@ describe('the budget drawer and the failures of other actions', () => {
 		await rerender({ data: data(), form: { form: 'budget-new', error: 'The amount is a decimal.', locked: false } as never });
 		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
 		expect(form.firstElementChild?.textContent).toContain('The amount is a decimal.');
+	});
+});
+
+describe('the budget controls', () => {
+	it('picks the period from a segmented control that posts it', async () => {
+		render(CostsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
+		expect(screen.getByRole('radiogroup', { name: 'Period' })).toBeTruthy();
+		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
+		expect(new FormData(form).get('period')).toBe('monthly');
+	});
+
+	it('names the budget in the delete confirmation and posts its id once agreed', async () => {
+		kit.confirm.mockResolvedValue(true);
+		render(CostsPage, { props: { data: data(), form: null } });
+		const form = document.body.querySelector('form[action="?/deleteBudget"]') as HTMLFormElement;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete Storage cap' }));
+		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
+		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap', expect.any(String), { confirmLabel: 'Delete' });
+		expect(new FormData(form).get('id')).toBe('b1');
 	});
 });

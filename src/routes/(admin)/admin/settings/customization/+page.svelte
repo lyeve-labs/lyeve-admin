@@ -9,6 +9,7 @@
 		Drawer,
 		EmptyState,
 		Input,
+		MultiSelect,
 		PageShell,
 		SectionHeading,
 		Select,
@@ -233,6 +234,7 @@
 							<Select
 								id="home-page"
 								label="Page above the dashboard"
+								searchable
 								hint="Shown at the top of the dashboard, above its panels or widgets."
 								options={homeOptions}
 								value={homePage}
@@ -254,7 +256,13 @@
 					</div>
 				{/snippet}
 				{#if data.pages.length === 0}
-					<EmptyState title="No pages yet" description="Build a page for the team from text, callouts, content lists, counts and links. It gets its own entry in the menu." />
+					<EmptyState title="No pages yet" description="Build a page for the team from text, callouts, content lists, counts and links. It gets its own entry in the menu.">
+						{#snippet action()}
+							<Button variant="secondary" onclick={openPage}>
+								<Plus size={ICON.sm} /> New page
+							</Button>
+						{/snippet}
+					</EmptyState>
 				{:else}
 					<Table label="Pages">
 						<thead>
@@ -304,20 +312,33 @@
 					<Alert tone="success" autoDismiss>Saved.</Alert>
 				{/if}
 				<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-					<CheckboxGroup
-						name="hidden"
+					<!-- The menu holds dozens of entries, so each list is searched
+					     rather than drawn as a wall of boxes. Each pick posts its
+					     own value. -->
+					<MultiSelect
+						id="menu-hidden"
 						label="Hidden"
+						placeholder="Nothing hidden"
 						hint="Entries this tenant's team never uses. Hiding one takes it off the menu only. The page stays guarded by its own access rules."
+						searchable
 						options={navOptions}
 						bind:value={hidden}
 					/>
-					<CheckboxGroup
-						name="pinned"
+					<MultiSelect
+						id="menu-pinned"
 						label="Pinned"
+						placeholder="Nothing pinned"
 						hint="Entries shown in a group of their own at the top of the menu."
+						searchable
 						options={pinOptions}
 						bind:value={pinned}
 					/>
+					{#each hidden as id (id)}
+						<input type="hidden" name="hidden" value={id} />
+					{/each}
+					{#each pinned.filter((id) => !hidden.includes(id)) as id (id)}
+						<input type="hidden" name="pinned" value={id} />
+					{/each}
 				</div>
 				<div><Button variant="primary" type="submit">Save</Button></div>
 			</form>

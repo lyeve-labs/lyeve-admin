@@ -16,6 +16,7 @@
 		confirm as confirmDialog,
 		toast, Pagination } from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Check, Gauge, Pencil, Plus, X } from '@lucide/svelte';
@@ -96,12 +97,13 @@
 	let clearForm = $state<HTMLFormElement>();
 	async function askClear() {
 		if (!editing) return;
-		const ok = await confirmDialog(`Remove the quota for ${editing.tenant_id}?`, 'The tenant may use as much as it likes, and a block on it is lifted.', {
+		const ok = await confirmDialog(`Delete the quota for ${editing.tenant_id}`, 'The tenant may use as much as it likes, and a block on it is lifted.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		editorOpen = false;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the value has reached the DOM.
+		await tick();
 		clearForm?.requestSubmit();
 	}
 	const waiting = $derived(pending(data.requests));

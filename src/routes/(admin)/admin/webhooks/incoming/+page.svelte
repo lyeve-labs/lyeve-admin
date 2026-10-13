@@ -21,6 +21,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { IncomingWebhook } from '@lyeve-labs/client';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import { Plus, Pencil, Trash2, ArrowDownToLine } from '@lucide/svelte';
@@ -100,13 +101,14 @@
 
 	async function askDelete(wh: IncomingWebhook) {
 		const ok = await confirmDialog(
-			`Delete ${wh.name}?`,
+			`Delete incoming webhook ${wh.name}`,
 			'External services can no longer send payloads to this endpoint.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
 		deleteId = wh.id;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the value has reached the DOM.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -265,6 +267,7 @@
 			name="schema_name"
 			label="Target schema"
 			required
+			searchable
 			options={schemaOptions}
 			value={schema}
 			onvaluechange={(v) => (schema = v)}

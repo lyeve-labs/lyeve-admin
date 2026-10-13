@@ -70,3 +70,26 @@ describe('the member drawer and the failures of other actions', () => {
 		expect(form.firstElementChild?.textContent).toContain('Choose at least one role.');
 	});
 });
+
+describe('what this tenant may use', () => {
+	it('picks the plugins from a searchable list and posts each one kept', () => {
+		const { container } = render(TenantPage, {
+			props: props({
+				choices: {
+					ok: true,
+					value: [
+						{ name: 'flow', available: true },
+						{ name: 'search', available: false },
+						{ name: 'ai', available: true },
+					],
+				},
+			}),
+		});
+		expect(container.querySelectorAll('input[type="checkbox"][name="available"]')).toHaveLength(0);
+		expect(container.querySelector('#tenant-features')).toBeTruthy();
+		const kept = [...container.querySelectorAll('input[type="hidden"][name="available"]')].map((i) => (i as HTMLInputElement).value);
+		expect(kept.sort()).toEqual(['ai', 'flow']);
+		const offered = [...container.querySelectorAll('input[name="offered"]')].map((i) => (i as HTMLInputElement).value);
+		expect(offered.sort()).toEqual(['ai', 'flow', 'search']);
+	});
+});

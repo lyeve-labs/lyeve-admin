@@ -23,8 +23,10 @@ describe('webhooks create drawer posts a real event list', () => {
 
 		const events = container.querySelectorAll('input[type="checkbox"][name="events"]');
 		expect(events).toHaveLength(6);
-		const schemas = container.querySelectorAll('input[type="checkbox"][name="schemas"]');
-		expect(schemas).toHaveLength(1);
+		// The schemas are a searchable pick list. Nothing picked posts no schema,
+		// which the plugin reads as every schema.
+		expect(container.querySelector('#webhook-schemas')).toBeTruthy();
+		expect(container.querySelectorAll('input[name="schemas"]')).toHaveLength(0);
 		expect(container.querySelector('input[type="hidden"][name="enabled"]')).toBeTruthy();
 		expect(container.querySelector('input[type="password"][name="secret"]')).toBeTruthy();
 		expect(container.querySelector('form[action="?/create"]')).toBeTruthy();
@@ -46,5 +48,26 @@ describe('webhooks create drawer posts a real event list', () => {
 		expect(options).toContain(
 			'Leave a field empty to use the default. An option this instance does not enable is refused when you save.'
 		);
+	});
+});
+
+describe('webhooks edit drawer posts the schemas it holds', () => {
+	it('posts each schema the webhook names, also when the schema list was not read', async () => {
+		const hook = { id: 'w1', name: 'Ship it', url: 'https://example.com/hook', events: [], schemas: ['orders', 'posts'], enabled: true };
+		const { container, getByRole } = render(WebhooksPage, {
+			props: {
+				data: {
+					webhooks: { ok: true, value: [hook] },
+					schemas: { ok: false, gate: { state: 'unavailable' } },
+					entitlements,
+					user: { roles: ['super_admin'] },
+				},
+				form: null,
+			} as never,
+		});
+		await fireEvent.click(getByRole('button', { name: 'Edit Ship it' }));
+		const posted = [...container.querySelectorAll('form#webhook-form input[name="schemas"]')].map((i) => (i as HTMLInputElement).value);
+		expect(posted).toEqual(['orders', 'posts']);
+		expect(container.textContent).toContain('The schemas could not be read');
 	});
 });

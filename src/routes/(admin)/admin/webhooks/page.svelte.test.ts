@@ -62,7 +62,7 @@ describe('webhooks page', () => {
 
 		await fireEvent.click(getByTitle('Delete'));
 		await tick();
-		expect(kit.confirm).toHaveBeenCalledWith('Delete webhook', expect.stringContaining('Ship it'), {
+		expect(kit.confirm).toHaveBeenCalledWith('Delete webhook Ship it', expect.stringContaining('Ship it'), {
 			confirmLabel: 'Delete',
 		});
 		expect(submit).not.toHaveBeenCalled();

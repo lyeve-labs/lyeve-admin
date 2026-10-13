@@ -11,6 +11,7 @@
 		Drawer,
 		EmptyState,
 		Input,
+		MultiSelect,
 		PageShell,
 		Pagination,
 		PasswordInput,
@@ -26,6 +27,7 @@
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { Webhook, WebhookDelivery, DeadLetter } from '@lyeve-labs/client';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import {
@@ -179,12 +181,13 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(wh: Webhook) {
-		const ok = await confirmDialog('Delete webhook', `Delete ${wh.name}? This cannot be undone.`, {
+		const ok = await confirmDialog(`Delete webhook ${wh.name}`, `Delete ${wh.name}? This cannot be undone.`, {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		deleteId = wh.id;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the value has reached the DOM.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -543,17 +546,23 @@
 			bind:value={secret}
 		/>
 		<CheckboxGroup name="events" label="Events" orientation="horizontal" options={EVENT_OPTIONS} bind:value={events} />
-		{#if !data.schemas.ok}
-			<p class="text-xs text-muted">The schemas could not be read, so only the ones this webhook already names are listed.</p>
-		{/if}
-		<CheckboxGroup
-			name="schemas"
+		<!-- The schemas are rows from data, so they are searched rather than
+		     listed as boxes. Each pick posts its own value, the way the event
+		     boxes do. -->
+		<MultiSelect
+			id="webhook-schemas"
 			label="Schemas"
-			hint="Leave empty to fire on every schema."
-			orientation="horizontal"
+			placeholder="Every schema"
+			hint={data.schemas.ok
+				? 'Leave empty to fire on every schema.'
+				: 'The schemas could not be read, so only the ones this webhook already names are listed.'}
+			searchable
 			options={schemaOptions}
 			bind:value={schemas}
 		/>
+		{#each schemas as s (s)}
+			<input type="hidden" name="schemas" value={s} />
+		{/each}
 		<div>
 			<!-- The action reads `enabled` from the body. Without this the
 			     switch posts nothing and every webhook is created disabled. -->

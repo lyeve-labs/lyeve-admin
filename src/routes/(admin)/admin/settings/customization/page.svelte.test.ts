@@ -51,7 +51,7 @@ describe('the customization drawers and older failures', () => {
 
 	it('opens the page drawer clean after a failed link save', async () => {
 		render(CustomizationPage, { props: props({}, { linkError: 'The link could not be saved.' }) });
-		await fireEvent.click(screen.getByRole('button', { name: /new page/i }));
+		await fireEvent.click(screen.getAllByRole('button', { name: /new page/i })[0]);
 		expect(pageText()).not.toContain('could not be saved');
 	});
 
@@ -64,5 +64,31 @@ describe('the customization drawers and older failures', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 		await fireEvent.click(screen.getByRole('button', { name: /new link/i }));
 		expect(linkText()).not.toContain('Check the highlighted fields.');
+	});
+});
+
+describe('the customization controls', () => {
+	it('picks hidden and pinned entries from searchable lists and posts each pick', () => {
+		const { container } = render(CustomizationPage, {
+			props: props({
+				settings: { ...settings, menu: { hidden: ['media'], pinned: ['media', 'users'], links: [] } },
+				navChoices: [
+					{ id: 'media', label: 'Media', section: 'Content' },
+					{ id: 'users', label: 'Users', section: 'Access' },
+				],
+			}),
+		});
+		expect(container.querySelectorAll('input[type="checkbox"][name="hidden"]')).toHaveLength(0);
+		expect(container.querySelector('#menu-hidden')).toBeTruthy();
+		const posted = (name: string) =>
+			[...container.querySelectorAll(`input[type="hidden"][name="${name}"]`)].map((i) => (i as HTMLInputElement).value);
+		expect(posted('hidden')).toEqual(['media']);
+		// A hidden entry cannot also be pinned.
+		expect(posted('pinned')).toEqual(['users']);
+	});
+
+	it('offers the first page from the empty pages list', () => {
+		render(CustomizationPage, { props: props() });
+		expect(screen.getAllByRole('button', { name: /new page/i })).toHaveLength(2);
 	});
 });
