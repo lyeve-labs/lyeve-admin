@@ -69,9 +69,38 @@ describe('email triggers page', () => {
 		expect(screen.queryByText('No active template')).toBeNull();
 	});
 
-	it('says the tenant has no active template when the read answered with none', () => {
-		render(TriggersPage, { props: props({ templates: { ok: true, value: [{ ...template, status: 'draft' }] } }) });
+	it('says the tenant has no active template when the read answered with none, and offers no create', () => {
+		render(TriggersPage, {
+			props: props({
+				triggers: { ok: true, value: { triggers: [], events: [] } },
+				templates: { ok: true, value: [{ ...template, status: 'draft' }] },
+			}),
+		});
 		expect(screen.getByText('No active template')).toBeTruthy();
+		expect(screen.getByText('No triggers yet')).toBeTruthy();
+		expect(screen.queryByRole('button', { name: 'New trigger' })).toBeNull();
+	});
+
+	it('offers no create while the templates could not be read', () => {
+		render(TriggersPage, {
+			props: props({ templates: { ok: false, gate: { state: 'error', message: 'The templates could not be read.' } } }),
+		});
+		expect(screen.queryByRole('button', { name: 'New trigger' })).toBeNull();
+	});
+
+	it('shows the stored schema and template when editing after their reads failed', async () => {
+		render(TriggersPage, {
+			props: props({
+				templates: { ok: false, gate: { state: 'unavailable' } },
+				schemas: { ok: false, gate: { state: 'unavailable' } },
+			}),
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit Order confirmation' }));
+		const form = document.body.querySelector('form#trigger-form') as HTMLFormElement;
+		expect((form.querySelector('input[name="schema"]') as HTMLInputElement).value).toBe('orders');
+		expect((form.querySelector('input[name="template_key"]') as HTMLInputElement).value).toBe('order-confirmed');
+		expect(form.querySelector('#trigger-schema')?.textContent).toContain('orders');
+		expect(form.querySelector('#trigger-template')?.textContent).toContain('order-confirmed');
 	});
 
 	it('says a failed trigger read failed and offers no create', () => {

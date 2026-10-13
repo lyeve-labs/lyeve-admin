@@ -32,12 +32,30 @@
 	const events = $derived(data.triggers.ok ? data.triggers.value.events : []);
 	const eventOptions = $derived((events.length ? events : Object.keys(TRIGGER_EVENT_LABELS)).map((e) => ({ value: e, label: eventLabel(e) })));
 	const schemaNames = $derived(data.schemas.ok ? data.schemas.value : []);
-	const schemaOptions = $derived([{ value: '*', label: 'Every schema' }, ...schemaNames.map((s) => ({ value: s, label: s }))]);
+	// The field posts what it holds, so a trigger opened for editing always
+	// finds its own schema and template among the options, even when a read
+	// failed or the template is no longer active. Otherwise the field would
+	// look blank while it sends the stored value.
+	const schemaOptions = $derived.by(() => {
+		const names = [...schemaNames];
+		const current = editing?.schema;
+		if (current && current !== '*' && !names.includes(current)) names.push(current);
+		return [{ value: '*', label: 'Every schema' }, ...names.map((s) => ({ value: s, label: s }))];
+	});
 	// A draft or archived template is refused at send time, so the list offers
 	// the active ones and says so when there are none. A list that did not
 	// answer says nothing about how many there are.
 	const activeTemplates = $derived(data.templates.ok ? data.templates.value.filter((t) => t.status === 'active') : []);
-	const templateOptions = $derived(activeTemplates.map((t) => ({ value: t.key, label: `${t.key}: ${t.subject}` })));
+	const templateOptions = $derived.by(() => {
+		const options = activeTemplates.map((t) => ({ value: t.key, label: `${t.key}: ${t.subject}` }));
+		const current = editing?.template_key;
+		if (current && !options.some((o) => o.value === current)) options.push({ value: current, label: current });
+		return options;
+	});
+	// A new trigger needs an active template to send, so the create is offered
+	// only once the templates answered with one. The notice above the list
+	// says why when it is not.
+	const canCreate = $derived(data.triggers.ok && data.templates.ok && activeTemplates.length > 0);
 
 	// One drawer for both writes. A null target is a new trigger.
 	let open = $state(false);
@@ -108,7 +126,7 @@
 	back={{ href: '/admin/settings/email', label: 'Email' }}
 >
 	{#snippet actions()}
-		{#if data.triggers.ok}
+		{#if canCreate}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} />
 				New trigger
@@ -135,10 +153,12 @@
 		<EmptyState title="No triggers yet" description="A trigger sends a template to fixed addresses or to an address the record holds, each time its event fires.">
 			{#snippet iconSnippet()}<MailPlus size={ICON.lg} />{/snippet}
 			{#snippet action()}
-				<Button variant="secondary" onclick={openCreate}>
-					<Plus size={ICON.sm} />
-					New trigger
-				</Button>
+				{#if canCreate}
+					<Button variant="secondary" onclick={openCreate}>
+						<Plus size={ICON.sm} />
+						New trigger
+					</Button>
+				{/if}
 			{/snippet}
 		</EmptyState>
 	{:else}
