@@ -1,7 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { getMe } from '@lyeve-labs/client-rest';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, sessionUser } from '$lib/server/authz';
 import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import {
 	approveDeviceLogin,
@@ -35,7 +34,9 @@ export const load: PageServerLoad = async (event) => {
 		redirect(302, loginRedirect(url.pathname, url.search));
 	}
 	const client = authedClient(event);
-	const user = await getMe(client).catch(() => null);
+	// Only an engine that says the session is over ends it. One that cannot
+	// check it throws the outage page, and the cookie outlives the blip.
+	const user = await sessionUser(client);
 	if (!user) {
 		clearSessionCookie(event);
 		redirect(302, loginRedirect(url.pathname, url.search));
