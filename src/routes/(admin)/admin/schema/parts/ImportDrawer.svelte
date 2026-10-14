@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Drawer, FileInput, SectionHeading, Select, Textarea, toast } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Collapsible, Drawer, FileInput, SectionHeading, Select, Textarea, toast } from '@lyeve-labs/ui-kit';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
@@ -159,12 +159,9 @@
 								{/if}
 							</div>
 							{#if p.ddl?.length}
-								<details class="mt-2">
-									<summary class="cursor-pointer text-xs text-muted transition-colors hover:text-fg">
-										{p.ddl.length} {p.ddl.length === 1 ? 'statement' : 'statements'}
-									</summary>
+								<Collapsible label={`${p.ddl.length} ${p.ddl.length === 1 ? 'statement' : 'statements'}`} class="mt-2">
 									<pre class="mt-1 overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{p.ddl.join('\n\n')}</pre>
-								</details>
+								</Collapsible>
 							{/if}
 						</li>
 					{/each}

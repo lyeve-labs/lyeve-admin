@@ -5,8 +5,10 @@ import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
+import { refusalOf, refusalText } from '$lib/api/refusal';
 import { readRelationChoices } from '$lib/server/relation-choices';
-import { setRelations } from '$lib/server/content-relations';
+import { setEntryRelations } from '$lib/server/content-relations';
+import { fieldRefusalOf } from '$lib/server/content-validation';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
@@ -119,11 +121,13 @@ type RevisionList = {
 	revisions: EditorRevision[];
 	hiddenOlder: number;
 	windowDays: number | null;
+	/** How many revisions the plugin says the entry has in the window, which can exceed the rows read. */
+	total: number;
 	/** The read failed, so the empty list says nothing about the entry's history. */
 	failed: boolean;
 };
 
-const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: null, failed: true };
+const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: null, total: 0, failed: true };
 
 /**
  * Fetch the entry's revisions.
@@ -137,17 +141,28 @@ const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDa
 /** The revisions as the endpoint answers them: the envelope, or a bare array from an older engine. */
 type RevisionBody =
 	| Record<string, unknown>[]
-	| { data?: Record<string, unknown>[]; hidden_older?: unknown; window_days?: unknown }
+	| { data?: Record<string, unknown>[]; total_count?: unknown; hidden_older?: unknown; window_days?: unknown }
 	| null;
+
+/**
+ * The most rows one read asks for, which is the engine's page ceiling. Left
+ * unnamed, the plugin answers its default of 50, newest first, and the older
+ * ones could not be listed or restored from the panel.
+ */
+const REVISION_LIMIT = 500;
 
 async function listRevisions(client: HttpClient, id: string): Promise<RevisionList> {
 	try {
-		const body = await client.get<RevisionBody>(`/api/admin/content/${encodeURIComponent(id)}/revisions`);
+		const body = await client.get<RevisionBody>(
+			`/api/admin/content/${encodeURIComponent(id)}/revisions?limit=${REVISION_LIMIT}&offset=0`,
+		);
 		const rows = (Array.isArray(body) ? body : (body?.data ?? [])) as Record<string, unknown>[];
 		const hidden = Array.isArray(body) ? 0 : Number(body?.hidden_older ?? 0);
 		const days = Array.isArray(body) ? null : body?.window_days;
+		const counted = Array.isArray(body) ? NaN : Number(body?.total_count);
 		return {
 			revisions: rows.map(toEditorRevision),
+			total: Number.isInteger(counted) && counted > rows.length ? counted : rows.length,
 			hiddenOlder: Number.isInteger(hidden) && hidden > 0 ? hidden : 0,
 			windowDays: typeof days === 'number' && days > 0 ? days : null,
 			failed: false,
@@ -355,12 +370,13 @@ export const load: PageServerLoad = async (event) => {
 		? await Promise.resolve().then(() => listMediaChoices(client)).catch(() => null)
 		: [];
 
-	const { revisions, hiddenOlder, windowDays, failed: revisionsFailed } = revisionList;
+	const { revisions, hiddenOlder, windowDays, total: revisionTotal, failed: revisionsFailed } = revisionList;
 	return {
 		schemaDef,
 		item,
 		relations,
 		revisions,
+		revisionTotal,
 		revisionsFailed,
 		revisionWindow: { hiddenOlder, windowDays },
 		localization,
@@ -382,8 +398,10 @@ export const actions: Actions = {
 		const raw = form.get('data') as string;
 		const m2mRaw = form.get('m2m_relations') as string | null;
 
+		let links: Record<string, string[]> | null = null;
 		try {
 			const data = stripProtectedFields(JSON.parse(raw) as Record<string, unknown>);
+			links = m2mRaw ? (JSON.parse(m2mRaw) as Record<string, string[]>) : null;
 			// title is written twice on purpose. It is a column on the entry, and
 			// the load overlays that column on top of body, so a title only in
 			// body never reads back. It is also a field of the schema, and the
@@ -394,17 +412,23 @@ export const actions: Actions = {
 				...(typeof title === 'string' ? { title } : {}),
 				body: data,
 			});
-
-			if (m2mRaw) {
-				const m2m = JSON.parse(m2mRaw) as Record<string, string[]>;
-				await Promise.all(
-					Object.entries(m2m).map(([fieldName, ids]) =>
-						setRelations(event, params.id, fieldName, ids),
-					),
-				);
-			}
 		} catch (err) {
+			// The fields the form shows are the schema's own, so a refusal names
+			// them against the schema rather than against what the form sent.
+			if (err instanceof ApiError && err.status === 422) {
+				const schemaDef = await getSchema(params.schema, client).catch(() => null);
+				const shown = (schemaDef?.fields ?? []).filter((f) => !f.system).map((f) => f.name);
+				const refused = fieldRefusalOf(err, shown);
+				if (refused) return fail(422, refused);
+			}
 			return fail(400, { error: actionError(err, 'Failed to save entry. Check all fields and try again.') });
+		}
+
+		// The entry is saved by now, so a refused link is reported as such
+		// rather than as a failed save or a finished one.
+		if (links) {
+			const failed = await setEntryRelations(event, params.id, links);
+			if (failed) return fail(400, { error: `The entry was saved, but not every link was. ${failed}` });
 		}
 		redirect(303, `/admin/content/${params.schema}`);
 	},
@@ -462,9 +486,20 @@ export const actions: Actions = {
 			if (exists) {
 				await updateTranslation(client, params.id, locale, input);
 			} else {
+				// The localization plugin refuses a new translation with no title,
+				// so a title left empty saves the source title as it is now. The
+				// panel says so beside the empty box.
+				if (!input.title?.trim()) {
+					const source = await client.get<{ title?: string }>(`/api/admin/content/${encodeURIComponent(params.id)}`);
+					if (source?.title) input.title = source.title;
+				}
 				await createTranslation(client, params.id, locale, input);
 			}
 		} catch (err) {
+			// A 402 is the locale ceiling or a license refusal, which carries
+			// numbers and a link a bare relayed code would drop.
+			const refused = refusalOf(err);
+			if (refused) return fail(402, { error: refusalText(refused), refused, translationLocale: locale });
 			return fail(400, {
 				error: actionError(err, 'Failed to save the translation.'),
 				translationLocale: locale,

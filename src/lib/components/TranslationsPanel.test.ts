@@ -38,6 +38,13 @@ function hidden(name: string): HTMLInputElement {
 }
 
 describe('TranslationsPanel', () => {
+	it('gives the Locales link a touch-sized target', () => {
+		mount([]);
+		const link = screen.getByRole('link', { name: 'Locales' });
+		expect(link.className).toContain('relative');
+		expect(link.className).toContain('hit-area');
+	});
+
 	it('offers every enabled locale but the default as a tab, and wears the beta badge', () => {
 		mount([]);
 		expect(screen.getByText('Beta')).toBeTruthy();
@@ -154,6 +161,33 @@ describe('TranslationsPanel progress and fallback', () => {
 	it('says an empty field falls through to the source', () => {
 		const { container } = panel();
 		expect(container.textContent).toContain('gets the source');
+	});
+
+	it('says a new translation saves the source title as it is now when its title is empty', () => {
+		const { container } = panel();
+		const hint = container.querySelector('[data-field-name="title"]')?.textContent ?? '';
+		expect(hint).toContain(
+			'A new translation needs a title. Left empty, it saves the source title as it is now, and later changes to the source do not reach it.',
+		);
+		expect(hint).not.toContain('gets the source');
+	});
+
+	it('says a saved title stays, and an empty field reads from the source, once the locale has a translation', async () => {
+		const { container } = panel({
+			locales: { default_locale: 'en', enabled_locales: ['en', 'fr', 'es'], fallback_chain: ['es'] },
+			translations: [
+				{ locale: 'fr', title: 'Bonjour', body: { title: 'Bonjour' }, translation_status: 'draft' },
+				{ locale: 'es', title: 'Hola', body: { title: 'Hola', body: 'Texto' }, translation_status: 'translated' },
+			],
+		});
+		await fireEvent.input(document.getElementById('translation-fr-title') as HTMLInputElement, { target: { value: '' } });
+		expect(container.querySelector('[data-field-name="title"]')?.textContent).toContain(
+			'Left empty, the title saved for fr stays as it is.',
+		);
+		// The reader of fr gets the fr row, so an empty body comes from the source, not from es.
+		const body = container.querySelector('[data-field-name="body"]')?.textContent ?? '';
+		expect(body).toContain('gets the source');
+		expect(body).not.toContain('in es');
 	});
 
 	// The chain is the whole reason this is per field rather than per locale.

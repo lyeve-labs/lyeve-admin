@@ -24,7 +24,8 @@ import {
 } from '$lib/api/review';
 
 /** A definition with the stages the list route leaves out. */
-export type DefinitionRow = { definition: ReviewDefinition; stages: ReviewStage[] };
+/** A definition and its stages. Stages are null when their read failed, which is never a definition with none. */
+export type DefinitionRow = { definition: ReviewDefinition; stages: ReviewStage[] | null };
 
 /** The engine's page size for the assignment list. */
 const LIMIT = 50;
@@ -95,7 +96,7 @@ async function loadDefinitions(
 	const { items, limits } = await listDefinitions(client, 100, 0);
 	const rows = await Promise.all(
 		items.map((definition) =>
-			getDefinition(client, definition.id).catch((): DefinitionRow => ({ definition, stages: [] })),
+			getDefinition(client, definition.id).catch((): DefinitionRow => ({ definition, stages: null })),
 		),
 	);
 	return { rows, limits };
@@ -181,9 +182,9 @@ export const actions: Actions = {
 		const slug = String(form.get('slug') ?? '').trim();
 		const contentSchema = String(form.get('content_schema') ?? '').trim();
 		const publishOnApprove = form.get('publish_on_approve') !== 'false';
-		if (!name) return fail(400, { error: 'Check the highlighted fields.', fields: { name: 'Name is required' } });
+		if (!name) return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: { name: 'Name is required' } });
 		const parsed = parseStages(String(form.get('stages') ?? '[]'));
-		if ('error' in parsed) return fail(400, { error: parsed.error });
+		if ('error' in parsed) return fail(400, { action: 'create', error: parsed.error });
 		try {
 			await createDefinition(authedClient(event), {
 				name,
@@ -195,7 +196,8 @@ export const actions: Actions = {
 		} catch (err) {
 			// A 402 is the workflow ceiling or a paid stage setting, and the
 			// drawer renders the plugin's own numbers or capability.
-			return actionFailure(err, 'Failed to create the definition.');
+			const failed = actionFailure(err, 'Failed to create the definition.');
+			return fail(failed.status, { ...failed.data, action: 'create' });
 		}
 		return { created: true };
 	},
@@ -204,11 +206,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '').trim();
-		if (!id) return fail(400, { error: 'Pick a definition to delete.' });
+		if (!id) return fail(400, { action: 'delete', error: 'Pick a definition to delete.' });
 		try {
 			await deleteDefinition(authedClient(event), id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete the definition.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete the definition.') });
 		}
 		return { deleted: true };
 	},

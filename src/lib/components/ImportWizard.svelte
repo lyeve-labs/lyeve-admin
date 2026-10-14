@@ -53,7 +53,7 @@
 		type TransformDraft,
 		type ValidateResult,
 	} from '$lib/api/bulk-import';
-	import { formatCount } from '$lib/format';
+	import { formatBytes, formatCount } from '$lib/format';
 
 	let {
 		open = $bindable(false),
@@ -364,9 +364,9 @@
 				<FileInput
 					id="import-file"
 					label="File"
-					accept=".csv,.json,.ndjson,.jsonl,.yaml,.yml,.xlsx,text/csv,application/json,application/yaml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+					accept=".csv,.json,.ndjson,.jsonl,.yaml,.yml,.xlsx"
 					hint={file
-						? `${file.name}, ${formatCount(Math.ceil(file.size / 1024))} KB`
+						? `${file.name}, ${formatBytes(file.size)}`
 						: 'CSV with a header row, an Excel workbook (XLSX), JSON, NDJSON or YAML, up to 50 MB. A LyEve data export imports as it is.'}
 					onchange={(files) => (file = files?.[0] ?? null)}
 				/>

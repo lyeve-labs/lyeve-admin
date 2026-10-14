@@ -73,14 +73,13 @@
 									{#if e.applied_by}· {e.applied_by}{/if}
 								</span>
 							</div>
-							<details class="mt-2">
-								<summary class="cursor-pointer text-xs text-muted transition-colors hover:text-fg">SQL</summary>
+							<Collapsible label="SQL" class="mt-2">
 								<pre class="mt-1 overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{e.up_sql}</pre>
 								{#if e.down_sql}
 									<p class="mt-2 text-xs text-muted">Undo</p>
 									<pre class="mt-1 overflow-x-auto rounded bg-surface-2/60 p-3 font-mono text-xs whitespace-pre-wrap text-muted">{e.down_sql}</pre>
 								{/if}
-							</details>
+							</Collapsible>
 						</li>
 					{/each}
 				</ol>

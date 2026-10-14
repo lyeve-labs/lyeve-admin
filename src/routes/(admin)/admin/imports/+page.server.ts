@@ -27,7 +27,7 @@ import {
 	type ImportSchema,
 } from '$lib/api/bulk-import';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { section, type Section } from '$lib/api/gate';
+import { section, type Gate, type Section } from '$lib/api/gate';
 
 /** The job the history's Rows button opened, with the rows it rejected and skipped. */
 export interface ImportDetail {
@@ -114,16 +114,20 @@ export const load: PageServerLoad = async (event) => {
 	// The tenant's saved mappings, and whether this install may save one or
 	// name a paid transform. A failed read says so in its section and never
 	// reads as having none.
-	const templates =
+	// The gate is kept, so a role refusal, a lapsed license and an outage each
+	// read as what they are.
+	const read =
 		gate.state === 'ok'
-			? await listTemplates(client)
-					.then((r) => ({
-						rows: r?.templates ?? [],
-						read: true,
-						licensed: typeof r?.licensed === 'boolean' ? r.licensed : null,
-					}))
-					.catch(() => ({ rows: [] as MappingTemplate[], read: false, licensed: null }))
-			: { rows: [] as MappingTemplate[], read: false, licensed: null };
+			? await section(listTemplates(client), 'The templates could not be read. This is not a report that there are none.')
+			: null;
+	const templates = read?.ok
+		? {
+				rows: read.value?.templates ?? [],
+				read: true,
+				licensed: typeof read.value?.licensed === 'boolean' ? read.value.licensed : null,
+				gate: null,
+			}
+		: { rows: [] as MappingTemplate[], read: false, licensed: null, gate: read && !read.ok ? read.gate : null };
 
 	return {
 		jobs,
@@ -136,6 +140,7 @@ export const load: PageServerLoad = async (event) => {
 		detail,
 		templates: templates.rows,
 		templatesRead: templates.read,
+		templatesGate: templates.gate as Gate | null,
 		licensed: templates.licensed as boolean | null,
 	};
 };

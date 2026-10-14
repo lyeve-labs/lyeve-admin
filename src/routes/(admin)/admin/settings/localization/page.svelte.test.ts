@@ -22,7 +22,19 @@ function hidden(name: string): string[] {
 	return JSON.parse((document.querySelector(`input[name="${name}"]`) as HTMLInputElement).value);
 }
 
+/** Each heading level that follows one more than a level shallower, in document order. */
+function skippedLevels(): string[] {
+	const levels = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => ({ level: Number(h.tagName[1]), text: h.textContent?.trim() ?? '' }));
+	return levels.filter((h, i) => i > 0 && h.level > levels[i - 1].level + 1).map((h) => `h${h.level} ${h.text}`);
+}
+
 describe('locales page', () => {
+	it('puts its cards one level under the page title', () => {
+		render(LocalesPage, { props: { data: data(), form: null } });
+		expect(document.querySelector('h1')).not.toBeNull();
+		expect(skippedLevels()).toEqual([]);
+	});
+
 	it('says the plugin did not answer, and draws no form', () => {
 		render(LocalesPage, { props: { data: data({ locales: { ok: false, gate: { state: 'unavailable' } } }), form: null } });
 		expect(screen.getByText(/so Locales could not be read/)).toBeTruthy();

@@ -35,6 +35,16 @@
 		Object.fromEntries(extractM2MRelations(userFields, formValues).map((r) => [r.fieldName, r.ids]))
 	));
 
+	// A value the plugin refused comes back by field, so each control marks its
+	// own message the way a value refused before sending does.
+	$effect(() => {
+		if (form && 'fieldErrors' in form && form.fieldErrors) validationErrors = form.fieldErrors as Record<string, string>;
+	});
+
+	// Set once the create answered but a link did not land. The entry exists,
+	// so the form offers the entry instead of a second Create.
+	let created = $derived(form && 'created' in form && typeof form.created === 'string' ? form.created : '');
+
 	function handleSubmit(e: SubmitEvent) {
 		const errors = validate(userFields, formValues);
 		if (Object.keys(errors).length > 0) {
@@ -112,7 +122,11 @@
 		</Card>
 
 		<div class="mt-5 flex justify-end">
-			<Button type="submit" loading={submitting}>Create</Button>
+			{#if created}
+				<Button href={`/admin/content/${schemaName}/${encodeURIComponent(created)}`}>Open the entry</Button>
+			{:else}
+				<Button type="submit" loading={submitting}>Create</Button>
+			{/if}
 		</div>
 	</form>
 </PageShell>

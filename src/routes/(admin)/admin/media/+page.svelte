@@ -174,7 +174,7 @@
 			<Button variant="secondary" size="sm" onclick={() => (importOpen = true)}>
 				<Link size={ICON.sm} /> Import from URL
 			</Button>
-			<Button variant="primary" size="sm" loading={uploading} onclick={() => picker?.click()}>
+			<Button variant="primary" size="sm" loading={uploading} onclick={() => picker?.click()} data-media-upload>
 				<Upload size={ICON.sm} /> Upload files
 			</Button>
 		{/if}
@@ -289,6 +289,7 @@
 	{deleting}
 	aiEnabled={data.aiEnabled}
 	suggestion={form && 'described' in form && form.described && form.described.id === selected?.id ? form.described.text : ''}
+	deleteError={form && 'deleteError' in form && 'deleteId' in form && form.deleteId === selected?.id ? String(form.deleteError ?? '') : ''}
 	detailsError={form && 'detailsError' in form && 'detailsId' in form && form.detailsId === selected?.id ? String(form.detailsError ?? '') : ''}
 	focalError={form && 'focalError' in form && 'focalId' in form && form.focalId === selected?.id ? String(form.focalError ?? '') : ''}
 	focalSaved={!!form && 'focalSaved' in form && form.focalSaved === selected?.id}
@@ -315,7 +316,13 @@
 			deleting = false;
 			if (result.type === 'success') selectedId = null;
 			await update();
-			if (result.type === 'success') toast.success(`Deleted ${name}`);
+			if (result.type === 'success') {
+				toast.success(`Deleted ${name}`);
+				// The drawer's opener was the deleted file's tile, so focus would
+				// fall to the page body. It goes to the library's own control.
+				await tick();
+				document.querySelector<HTMLElement>('[data-media-upload]')?.focus();
+			}
 		};
 	}}
 >

@@ -11,6 +11,7 @@
 		MultiSelect,
 		NumberInput,
 		PageShell,
+		Pagination,
 		SearchInput,
 		SectionHeading,
 		Stat,
@@ -24,6 +25,8 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { ICON } from '$lib/icon';
+	import { pageHref, pageNumber } from '$lib/api/list';
+	import { formatCount } from '$lib/format';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -55,6 +58,8 @@
 			{ confirmLabel: 'Delete' },
 		);
 	}
+
+	const resultsPage = $derived(pageHref('/admin/search', data.limit, { q: data.q }));
 
 	// Seed the input with the active query so it survives navigation.
 	// svelte-ignore state_referenced_locally
@@ -91,17 +96,18 @@
 				</EmptyState>
 			{:else if !data.results.ok}
 				<GateNotice gate={data.results.gate} title="Search" absent="This build does not serve content search." />
-			{:else if data.results.value.length === 0}
+			{:else if data.results.value.results.length === 0}
 				<EmptyState
 					title={`No results for "${data.q}".`}
 					description="Try a broader term, or check the spelling."
 				/>
 			{:else}
-				{@const hits = data.results.value}
+				{@const hits = data.results.value.results}
+				{@const total = data.results.value.total}
 				<div class="space-y-3">
-					<p class="text-xs tracking-wider text-faint uppercase">
-						{hits.length} result{hits.length === 1 ? '' : 's'} for "{data.q}"
-					</p>
+					<SectionHeading level={2}>
+						{formatCount(total)} result{total === 1 ? '' : 's'} for "{data.q}"
+					</SectionHeading>
 					<ul class="space-y-3">
 						{#each hits as hit (hit.entry_id)}
 							<li>
@@ -138,6 +144,7 @@
 							</li>
 						{/each}
 					</ul>
+					<Pagination page={pageNumber(data.offset, data.limit)} {total} perPage={data.limit} href={resultsPage} />
 				</div>
 			{/if}
 		</div>
@@ -145,7 +152,7 @@
 		<aside class="space-y-6">
 			<Card pad="sm">
 				{#snippet header()}
-					<SectionHeading level={3}>Public search</SectionHeading>
+					<SectionHeading level={2}>Public search</SectionHeading>
 				{/snippet}
 				{#if !data.publicSchemas.ok}
 					<GateNotice gate={data.publicSchemas.gate} title="Public search" absent="This build does not serve public search." />
@@ -192,7 +199,7 @@
 
 			<Card pad="sm">
 				{#snippet header()}
-					<SectionHeading level={3}>Ranking weights</SectionHeading>
+					<SectionHeading level={2}>Ranking weights</SectionHeading>
 				{/snippet}
 				<!-- A failed read offers no Save: the boxes would hold weights nobody
 				     read, and saving them would overwrite the real ones. -->
@@ -218,7 +225,7 @@
 			<Card pad="sm">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-2">
-						<SectionHeading level={3}>Synonyms</SectionHeading>
+						<SectionHeading level={2}>Synonyms</SectionHeading>
 						{#if data.synonyms.ok}
 							<Button variant="secondary" size="sm" onclick={() => (synonymOpen = true)}>
 								<Plus size={ICON.sm} /> New synonym
@@ -226,12 +233,14 @@
 						{/if}
 					</div>
 				{/snippet}
-				{#if form?.synonymError && !synonymOpen}
+				{#if form && 'synonymDeleteError' in form && form.synonymDeleteError}
+					<Alert tone="danger">{form.synonymDeleteError}</Alert>
+				{:else if form?.synonymError && !synonymOpen}
 					<Alert tone="danger">{form.synonymError}</Alert>
 				{/if}
 				{#if !data.synonyms.ok}
 					<GateNotice gate={data.synonyms.gate} title="Synonyms" absent="This build does not serve search synonyms." />
-				{:else if data.synonyms.value.length === 0}
+				{:else if data.synonyms.value.groups.length === 0}
 					<EmptyState title="No synonym groups yet" description="A group lets a search for one term also match the others.">
 						{#snippet iconSnippet()}<Shuffle size={ICON.lg} />{/snippet}
 						{#snippet action()}
@@ -241,8 +250,13 @@
 						{/snippet}
 					</EmptyState>
 				{:else}
+					{#if data.synonyms.value.total > data.synonyms.value.groups.length}
+						<p class="mb-2 text-xs text-muted">
+							The first {formatCount(data.synonyms.value.groups.length)} of {formatCount(data.synonyms.value.total)} groups are listed.
+						</p>
+					{/if}
 					<ul class="space-y-2 text-xs">
-						{#each data.synonyms.value as group (group.id)}
+						{#each data.synonyms.value.groups as group (group.id)}
 							<li class="flex items-center gap-1.5">
 								<span class="font-medium text-muted">{group.base_term}</span>
 								<ArrowRight size={ICON.xs} class="shrink-0 text-faint" />
@@ -261,7 +275,7 @@
 
 			<Card pad="sm">
 				{#snippet header()}
-					<SectionHeading level={3}>Last 30 days</SectionHeading>
+					<SectionHeading level={2}>Last 30 days</SectionHeading>
 				{/snippet}
 				{#if !data.analytics.ok}
 					<GateNotice gate={data.analytics.gate} title="Search analytics" absent="This build does not record search analytics." />
@@ -287,7 +301,7 @@
 			{#if data.canReindex}
 				<Card pad="sm">
 					{#snippet header()}
-						<SectionHeading level={3}>Index</SectionHeading>
+						<SectionHeading level={2}>Index</SectionHeading>
 					{/snippet}
 					<form method="POST" action="?/reindex" class="flex flex-col gap-3" use:enhance>
 						{#if form?.reindexError}

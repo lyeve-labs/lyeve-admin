@@ -161,9 +161,13 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="ghost" size="sm" href="/admin/releases">
-			<CalendarClock size={ICON.sm} /> Releases
-		</Button>
+		<!-- Releases are served by the same plugin, so a role it refuses here
+		     is refused there too. -->
+		{#if data.schemas.ok || data.schemas.gate.state !== 'forbidden'}
+			<Button variant="ghost" size="sm" href="/admin/releases">
+				<CalendarClock size={ICON.sm} /> Releases
+			</Button>
+		{/if}
 		<Button variant="secondary" size="sm" href="/admin/schema">
 			<LayoutGrid size={ICON.sm} /> Schema builder
 		</Button>

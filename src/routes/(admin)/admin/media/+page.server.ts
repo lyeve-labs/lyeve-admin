@@ -6,10 +6,29 @@ import { refusalOf, refusalText } from '$lib/api/refusal';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
 import { describeMedia, importMedia, importRefusal, parseTags, setMediaPublic, updateMediaDetails, type MediaItem, setFocalPoint, signTransformUrl, transformRequestFrom } from '$lib/api/media';
+import { ApiError } from '@lyeve-labs/client';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
 
 export type { MediaItem } from '$lib/api/media';
+
+/**
+ * Why no description came back, in the reader's terms. The AI plugin answers
+ * 503 when no provider is enabled, which is a setting and not an outage, and
+ * 402 both for a license that leaves AI out and for a spent budget, which
+ * only the body tells apart.
+ */
+function describeFailure(err: unknown): string {
+	if (err instanceof ApiError && err.status === 503 && /no enabled ai provider/i.test(err.message)) {
+		return 'No AI provider is enabled, so no description can be written. A super admin can enable one under AI providers.';
+	}
+	if (err instanceof ApiError && err.status === 402 && /budget/i.test(err.message)) {
+		return 'The AI budget for this billing period is spent, so no description can be written until it renews.';
+	}
+	const refused = refusalOf(err);
+	if (refused) return refusalText(refused);
+	return actionError(err, 'No description came back.');
+}
 
 /** The engine's own page size when a request names none. */
 const DEFAULT_LIMIT = 60;
@@ -82,10 +101,13 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const data = await request.formData();
 		const id = String(data.get('id') ?? '');
+		if (!id) return fail(400, { error: NO_FILE });
 		try {
 			await client.delete(`/api/admin/media/${encodeURIComponent(id)}`);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete media') });
+			// The delete is asked from the preview drawer, which stays open on a
+			// refusal, so the failure names its file and shows there.
+			return fail(400, { deleteError: actionError(err, 'The file could not be deleted.'), deleteId: id });
 		}
 	},
 
@@ -179,7 +201,7 @@ export const actions: Actions = {
 		try {
 			return { described: { id, text: await describeMedia(authedClient(event), id) } };
 		} catch (err) {
-			return fail(400, { detailsError: actionError(err, 'No description came back.'), detailsId: id });
+			return fail(400, { detailsError: describeFailure(err), detailsId: id });
 		}
 	},
 };

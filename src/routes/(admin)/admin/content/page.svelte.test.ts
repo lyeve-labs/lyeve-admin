@@ -106,4 +106,15 @@ describe('content index read', () => {
 		expect(container.textContent).toContain('Content could not be read');
 		expect(container.textContent).not.toContain('No schemas yet');
 	});
+
+	it('tells a refused role so and offers neither entries nor releases', () => {
+		const { container } = render(ContentIndex, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'forbidden' } }, total: 0 }) },
+		});
+
+		expect(container.textContent).toContain('Your role cannot open');
+		expect(container.textContent).not.toContain('No schemas yet');
+		expect(container.querySelector('a[href="/admin/releases"]')).toBeNull();
+		expect(container.querySelector('a[aria-label^="New entry"]')).toBeNull();
+	});
 });

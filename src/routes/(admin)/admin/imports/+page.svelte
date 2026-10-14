@@ -179,7 +179,7 @@
 		<div class="grid gap-4 lg:grid-cols-[3fr_2fr]">
 			<Card>
 				<div class="flex flex-col gap-3">
-					<SectionHeading level={3}>How an import works</SectionHeading>
+					<SectionHeading level={2}>How an import works</SectionHeading>
 					<p class="text-sm text-muted">
 						An import reads a file, matches its columns to the fields of one content type, and saves each
 						row as an entry: the same entries the content screens edit, with their history, and the same
@@ -198,7 +198,7 @@
 			</Card>
 			<Card>
 				<div class="flex flex-col gap-3">
-					<SectionHeading level={3}>Sources</SectionHeading>
+					<SectionHeading level={2}>Sources</SectionHeading>
 					<ul class="flex flex-col gap-3">
 						<li class="flex gap-3">
 							<Upload size={ICON.md} class="mt-0.5 shrink-0 text-brand" />
@@ -408,7 +408,11 @@
 				</Alert>
 			{/if}
 			{#if !data.templatesRead}
-				<Alert tone="danger">The templates could not be read. This is not a report that there are none.</Alert>
+				<GateNotice
+					gate={data.templatesGate ?? { state: 'error', message: 'The templates could not be read. This is not a report that there are none.' }}
+					title="Templates"
+					absent="This build does not keep mapping templates."
+				/>
 			{:else if data.templates.length === 0}
 				<EmptyState title="No mapping template" description="Each import maps its columns from scratch.">
 					{#snippet iconSnippet()}

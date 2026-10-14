@@ -33,6 +33,12 @@ describe('DdlPreview', () => {
 		expect(stmt.textContent).toContain('1. drop column x');
 		expect(stmt.textContent).toContain('Queued');
 		expect(stmt.textContent).toContain('Down SQL');
+		// The kit disclosure, not the browser's own details marker.
+		expect(stmt.querySelector('details')).toBeNull();
+		const down = screen.getByRole('button', { name: /Down SQL/ });
+		expect(down.getAttribute('aria-expanded')).toBe('false');
+		await fireEvent.click(down);
+		expect(stmt.textContent).toContain('ALTER TABLE t ADD x');
 		// The dialog's own corner button is named Close too. The footer's says it.
 		const footerClose = screen.getAllByRole('button', { name: 'Close' }).find((b) => b.textContent?.trim() === 'Close') as HTMLElement;
 		await fireEvent.click(footerClose);

@@ -43,6 +43,15 @@
 	const errors = $derived(fieldErrors(form));
 	const formError = $derived(form && 'error' in form ? String(form.error) : undefined);
 	const refused = $derived(formRefusal(form));
+	// Which write failed. The two drawers each show only their own action's
+	// failure, so a refused publish or delete never opens the next drawer as
+	// if its own save had failed.
+	const failedAction = $derived(form && 'action' in form ? String(form.action) : '');
+	function failureOf(action: string) {
+		return failedAction === action
+			? { message: formError, fields: errors, refused }
+			: { message: undefined, fields: {}, refused: null };
+	}
 
 	// A refused schedule or publish carries the conflicts that stopped it,
 	// which are fresher than the ones the page read.
@@ -108,6 +117,11 @@
 		itemAction = 'publish';
 		addOpen = true;
 	}
+
+	// A drawer that is open shows its own failure, so the page banner leaves it out.
+	const drawerFailed = $derived(
+		(editOpen && failedAction === 'update') || (addOpen && failedAction === 'addItem'),
+	);
 
 	// The schedule. The picker answers local time, and the action receives
 	// it as UTC so the server never guesses the operator's zone.
@@ -179,7 +193,7 @@
 		<GateNotice gate={data.gate} title="Releases" absent="This build serves no content releases." />
 	{:else}
 		<div class="flex flex-col gap-5">
-			{#if !editOpen && !addOpen}
+			{#if !drawerFailed}
 				<FormErrors message={formError} fields={errors} {refused} />
 			{/if}
 			{#if success}
@@ -191,7 +205,7 @@
 
 			<Card>
 				{#snippet header()}
-					<SectionHeading level={3}>Schedule</SectionHeading>
+					<SectionHeading level={2}>Schedule</SectionHeading>
 				{/snippet}
 				{#if release.status === 'scheduled' && release.scheduled_at}
 					<div class="flex flex-wrap items-center justify-between gap-3">
@@ -218,11 +232,11 @@
 			</Card>
 
 			{#if !data.conflictsRead && !(form && 'conflicts' in form)}
-				<Alert tone="warn">Conflicts could not be checked. The engine checks again before the release goes out.</Alert>
+				<GateNotice gate={data.conflictsGate} title="Conflicts" absent="This build does not check release conflicts. The engine checks again before the release goes out." />
 			{:else if conflicts.length > 0}
 				<Card>
 					{#snippet header()}
-						<SectionHeading level={3}>Conflicts</SectionHeading>
+						<SectionHeading level={2}>Conflicts</SectionHeading>
 					{/snippet}
 					<p class="mb-3 text-sm text-muted">
 						{blocking.length > 0
@@ -248,7 +262,7 @@
 			<Card pad="none">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-3">
-						<SectionHeading level={3}>Entries ({release.item_count})</SectionHeading>
+						<SectionHeading level={2}>Entries ({release.item_count})</SectionHeading>
 						{#if canEdit}
 							<Button variant="secondary" size="sm" onclick={openAdd}><Plus size={ICON.sm} /> Include entry</Button>
 						{/if}
@@ -308,9 +322,10 @@
 </PageShell>
 
 <Drawer bind:open={editOpen} title="Edit release">
+	{@const own = failureOf('update')}
 	<form method="POST" action="?/update" id="release-edit" use:enhance={save.enhance} class="flex flex-col gap-4">
-		<FormErrors message={formError} fields={errors} {refused} />
-		<Input id="release-name" name="name" label="Name" required bind:value={name} error={errors.name} />
+		<FormErrors message={own.message} fields={own.fields} refused={own.refused} />
+		<Input id="release-name" name="name" label="Name" required bind:value={name} error={own.fields.name} />
 		<Textarea id="release-description" name="description" label="Description" rows={3} bind:value={description} />
 	</form>
 	{#snippet footer()}
@@ -320,8 +335,9 @@
 </Drawer>
 
 <Drawer bind:open={addOpen} title="Include an entry">
+	{@const own = failureOf('addItem')}
 	<form method="POST" action="?/addItem" id="release-add" use:enhance={add.enhance} class="flex flex-col gap-4">
-		<FormErrors message={formError} fields={errors} {refused} />
+		<FormErrors message={own.message} fields={own.fields} refused={own.refused} />
 		{#if data.choices}
 			<Select
 				id="release-entry"
@@ -332,7 +348,7 @@
 				searchable
 				required
 				bind:value={picked}
-				error={errors.entry_id}
+				error={own.fields.entry_id}
 				hint="The most recently changed entries, by collection. Add an older one from its own page."
 			/>
 		{:else}
@@ -344,7 +360,7 @@
 				label="Entry ID"
 				required
 				bind:value={entryId}
-				error={errors.entry_id}
+				error={own.fields.entry_id}
 				hint="The entry list could not be read. Enter the ID shown under an entry's title on its page."
 			/>
 		{/if}

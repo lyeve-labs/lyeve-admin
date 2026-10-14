@@ -86,6 +86,9 @@ export const load: PageServerLoad = async (event) => {
 			presetsGate: null as Gate | null,
 			canSavePresets: false,
 			canvas: NO_CANVAS as CanvasLayout,
+			// The canvas draws the schemas, so it says the same failure rather
+			// than a license that leaves it out.
+			canvasGate: read.gate as Gate | null,
 			canWrite,
 			isSuperAdmin,
 			loadGate: read.gate as Gate | null,
@@ -114,9 +117,20 @@ export const load: PageServerLoad = async (event) => {
 	const rowCounts = countRows(schemas, client);
 
 	// The plugin says whether this install draws the canvas, with the layout
-	// it saved. A read that fails draws none, which is what an install without
-	// the capability sees, and the list editor still does everything.
-	const canvas = canWrite ? await readCanvasLayout(client).catch(() => NO_CANVAS) : NO_CANVAS;
+	// it saved. A read that fails keeps its gate, so an outage or a refusal is
+	// never drawn as a license that leaves the canvas out. The layout route
+	// admits an admin only, so another role is told so without asking.
+	let canvas: CanvasLayout = NO_CANVAS;
+	let canvasGate: Gate | null = { state: 'forbidden' };
+	if (canWrite) {
+		const layout = await section(readCanvasLayout(client), 'The canvas layout could not be read, so the canvas is not drawn.');
+		if (layout.ok) {
+			canvas = layout.value;
+			canvasGate = null;
+		} else {
+			canvasGate = layout.gate;
+		}
+	}
 
 	return {
 		schemas,
@@ -125,6 +139,7 @@ export const load: PageServerLoad = async (event) => {
 		presetsGate,
 		canSavePresets,
 		canvas,
+		canvasGate,
 		canWrite,
 		isSuperAdmin,
 		loadGate: null as Gate | null,

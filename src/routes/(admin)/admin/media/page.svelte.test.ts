@@ -163,6 +163,9 @@ describe('media library preview', () => {
 		await (after as (a: unknown) => Promise<void>)({ result: { type: 'success' }, update });
 		expect(update).toHaveBeenCalled();
 		expect(kit.success).toHaveBeenCalledWith('Deleted clip.webm');
+		// The tile that opened the drawer is gone, so focus goes to a control
+		// that is still there rather than falling to the page body.
+		expect(document.activeElement?.hasAttribute('data-media-upload')).toBe(true);
 
 		await rerender({
 			data: { items: { ok: true, value: [IMAGE, PDF] }, limit: 60, offset: 0, total: 2, hasMore: false, q: '' } as unknown as PageData,
@@ -290,6 +293,18 @@ describe('media library failures stay with their file and form', () => {
 	it('shows a write that named no file at the top of the page', () => {
 		withForm({ error: 'No file was named.' });
 		expect(screen.getByText('No file was named.')).toBeTruthy();
+	});
+
+	it('shows a failed delete in the drawer the delete was asked from', async () => {
+		withForm({ deleteError: 'media is referenced by a content entry', deleteId: IMAGE.id });
+		await open(IMAGE.filename);
+		expect(screen.getByRole('dialog').textContent).toContain('media is referenced by a content entry');
+	});
+
+	it('keeps a failed delete out of another file drawer', async () => {
+		withForm({ deleteError: 'media is referenced by a content entry', deleteId: 'm-video' });
+		await open(IMAGE.filename);
+		expect(screen.queryByText('media is referenced by a content entry')).toBeNull();
 	});
 
 	it('leaves the import drawer clean after a failed delete', async () => {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import OlderHidden from '$lib/components/OlderHidden.svelte';
-	import { Badge, Breadcrumb, Button, Card, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
+	import { Badge, Breadcrumb, Button, Card, NumberInput, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { enhance } from '$app/forms';
@@ -54,6 +54,12 @@
 		),
 	);
 
+	// A value the plugin refused comes back by field, so each control marks its
+	// own message the way a value refused before sending does.
+	$effect(() => {
+		if (form && 'fieldErrors' in form && form.fieldErrors) validationErrors = form.fieldErrors as Record<string, string>;
+	});
+
 	function handleSubmit(e: SubmitEvent) {
 		const errors = validate(userFields, formValues);
 		if (Object.keys(errors).length > 0) {
@@ -99,11 +105,21 @@
 	let hiddenOlder = $derived(data.revisionWindow?.hiddenOlder ?? 0);
 	let windowDays = $derived(data.revisionWindow?.windowDays ?? null);
 	let olderHidden = $derived(hiddenOlder > 0 && windowDays !== null);
+	// One read lists at most the engine's page ceiling. Past it, the count is
+	// the plugin's total and the older revisions open one at a time by number.
+	let revisionTotal = $derived(Math.max(data.revisionTotal ?? 0, revisions.length));
+	let olderUnlisted = $derived(revisionTotal - revisions.length);
 	// The revision just older than the oldest listed. Opening it is how the
 	// panel asks, and the plugin answers 402 when it is outside the window.
 	let nextOlder = $derived(
 		revisions.length > 0 ? Math.min(...revisions.map((r) => r.revision_num)) - 1 : 0,
 	);
+	// The number the opener asks for. It starts at the next older revision and
+	// takes any number down to the first, so every revision can be opened.
+	let openNum = $state(0);
+	$effect(() => {
+		if (openNum < 1 || openNum > nextOlder) openNum = nextOlder;
+	});
 
 	// A refusal from opening or restoring a revision stays in the panel.
 	let revisionError = $derived(form && 'revision' in form && form.revision === true ? (form.error ?? '') : '');
@@ -183,7 +199,7 @@
 						type="button"
 						onclick={() => (showHistory = !showHistory)}
 					>
-						<History size={ICON.sm} /> History ({revisions.length})
+						<History size={ICON.sm} /> History ({revisionTotal})
 					</Button>
 				{/if}
 				{#if data.revisionsFailed}
@@ -319,7 +335,7 @@
 									<form method="POST" action="?/restore" use:enhance class="mt-2">
 										<input type="hidden" name="rev_num" value={rev.revision_num} />
 										<Button variant="secondary" size="sm" type="submit">
-											<RotateCcw size={ICON.xs} /> Restore
+											<RotateCcw size={ICON.sm} /> Restore
 										</Button>
 									</form>
 								{/if}
@@ -334,20 +350,25 @@
 							<form method="POST" action="?/restore" use:enhance class="mt-2">
 								<input type="hidden" name="rev_num" value={openedRevision.revision_num} />
 								<Button variant="secondary" size="sm" type="submit">
-									<RotateCcw size={ICON.xs} /> Restore
+									<RotateCcw size={ICON.sm} /> Restore
 								</Button>
 							</form>
 						</div>
 					{/if}
-					{#if olderHidden || revisionError}
+					{#if olderHidden || olderUnlisted > 0 || revisionError}
 						<div class="flex flex-col gap-3 border-t border-line p-3">
+							{#if olderUnlisted > 0 && !olderHidden}
+								<p class="text-xs text-muted">
+									The newest {revisions.length} of {revisionTotal} revisions are listed. Open an older one by number.
+								</p>
+								{#if nextOlder > 0}
+									{@render revisionOpener()}
+								{/if}
+							{/if}
 							{#if olderHidden}
 								<OlderHidden count={hiddenOlder} noun="revisions" {windowDays}>
-									{#if nextOlder > 0 && !openedRevision}
-										<form method="POST" action="?/openRevision" use:enhance>
-											<input type="hidden" name="rev_num" value={nextOlder} />
-											<Button variant="secondary" size="sm" type="submit">Open revision {nextOlder}</Button>
-										</form>
+									{#if nextOlder > 0}
+										{@render revisionOpener()}
 									{/if}
 								</OlderHidden>
 							{/if}
@@ -361,3 +382,19 @@
 		{/if}
 	</div>
 </PageShell>
+
+<!-- Opens an older revision by number, from one up to the next older than the oldest listed. -->
+{#snippet revisionOpener()}
+	<form method="POST" action="?/openRevision" use:enhance class="flex items-end gap-2" data-testid="open-revision">
+		<NumberInput
+			id="open-revision-num"
+			name="rev_num"
+			label="Revision number"
+			min={1}
+			max={nextOlder}
+			bind:value={openNum}
+			class="min-w-0 flex-1"
+		/>
+		<Button variant="secondary" size="sm" type="submit">Open</Button>
+	</form>
+{/snippet}

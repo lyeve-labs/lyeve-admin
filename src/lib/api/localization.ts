@@ -197,8 +197,11 @@ export function translationValues(t: Translation | undefined, fields: SchemaFiel
  */
 export function translationInput(values: Record<string, unknown>): TranslationInput {
 	const body: Record<string, unknown> = {};
+	// An empty field is left out rather than sent empty. The plugin lays every
+	// body key over the source, so an empty string would reach the reader as an
+	// empty field instead of the source's value.
 	for (const [k, v] of Object.entries(values)) {
-		if (typeof v === 'string') body[k] = v;
+		if (typeof v === 'string' && v.trim() !== '') body[k] = v;
 	}
 	const title = body.title;
 	return { ...(typeof title === 'string' ? { title } : {}), body };

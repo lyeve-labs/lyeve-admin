@@ -36,7 +36,19 @@ function setup(data: Record<string, unknown> = {}, form: unknown = null) {
 	});
 }
 
+/** Each heading level that follows one more than a level shallower, in document order. */
+function skippedLevels(): string[] {
+	const levels = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => ({ level: Number(h.tagName[1]), text: h.textContent?.trim() ?? '' }));
+	return levels.filter((h, i) => i > 0 && h.level > levels[i - 1].level + 1).map((h) => `h${h.level} ${h.text}`);
+}
+
 describe('release page', () => {
+	it('puts its cards one level under the page title', () => {
+		setup();
+		expect(document.querySelector('h1')).not.toBeNull();
+		expect(skippedLevels()).toEqual([]);
+	});
+
 	it('links each entry to its editor by the collection it lives in', () => {
 		const { getByRole } = setup();
 		expect(getByRole('link', { name: 'Hello' }).getAttribute('href')).toBe('/admin/content/posts/e1');
@@ -119,3 +131,28 @@ describe('confirmed release actions', () => {
 		expect(group.querySelectorAll('[role="radio"], input[type="radio"]').length).toBe(2);
 	});
 });
+
+describe('release drawers', () => {
+	it('keeps a failed delete out of the edit drawer', async () => {
+		const { getByRole, getByText, getAllByText } = setup({}, { action: 'delete', error: 'The release could not be deleted.' });
+		expect(getByText('The release could not be deleted.')).toBeTruthy();
+		await fireEvent.click(getByRole('button', { name: /Edit/ }));
+		expect(getAllByText('The release could not be deleted.')).toHaveLength(1);
+		const drawerForm = document.querySelector('form#release-edit') as HTMLFormElement;
+		expect(drawerForm.textContent).not.toContain('The release could not be deleted.');
+	});
+
+	it('shows a failed edit in the edit drawer and not in the include drawer', async () => {
+		const { getByRole } = setup({ choices: [] }, { action: 'update', error: 'name already in use' });
+		await fireEvent.click(getByRole('button', { name: /Edit/ }));
+		expect((document.querySelector('form#release-edit') as HTMLFormElement).textContent).toContain('name already in use');
+		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
+		expect((document.querySelector('form#release-add') as HTMLFormElement).textContent).not.toContain('name already in use');
+	});
+
+	it('says why the conflicts could not be checked', () => {
+		const { getByText } = setup({ conflictsRead: false, conflictsGate: { state: 'forbidden' } });
+		expect(getByText(/Your role cannot open/)).toBeTruthy();
+	});
+});
+

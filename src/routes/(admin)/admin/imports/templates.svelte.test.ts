@@ -67,6 +67,13 @@ describe('mapping templates', () => {
 		expect(said(container)).not.toContain('No mapping template');
 	});
 
+	it('says a role refusal of the templates as one', () => {
+		const { container } = render(ImportsPage, {
+			props: props({ templates: [], templatesRead: false, templatesGate: { state: 'forbidden' } }),
+		});
+		expect(said(container)).toContain('Your role cannot open Templates');
+	});
+
 	it('says what an unlicensed install keeps', () => {
 		const { container } = render(ImportsPage, { props: props({ licensed: false }) });
 		expect(said(container)).toContain('Saving a template and the date, split and lookup transforms need a license');

@@ -40,6 +40,23 @@ describe('the import wizard', () => {
 		expect((document.getElementById('import-file') as HTMLInputElement).accept).toContain('.xlsx');
 	});
 
+	it('accepts by extension alone, the names the format is read from', () => {
+		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
+		expect((document.getElementById('import-file') as HTMLInputElement).accept).toBe(
+			'.csv,.json,.ndjson,.jsonl,.yaml,.yml,.xlsx',
+		);
+	});
+
+	it('writes the chosen file size in the unit the rest of the admin uses', async () => {
+		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
+		const input = document.getElementById('import-file') as HTMLInputElement;
+		const picked = new File([new Uint8Array(3 * 1024 * 1024)], 'orders.csv', { type: 'text/csv' });
+		Object.defineProperty(input, 'files', { value: [picked] });
+		await fireEvent.change(input);
+		await waitFor(() => expect(document.body.textContent).toContain('orders.csv, 3.0 MB'));
+		expect(document.body.textContent).not.toContain('3,072 KB');
+	});
+
 	it('offers the saved templates on the first step', () => {
 		render(ImportWizard, { props: { open: true, schemas, templates: [template], onstarted: vi.fn() } });
 		expect(screen.getByText('Mapping template')).toBeTruthy();

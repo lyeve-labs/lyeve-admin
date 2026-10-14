@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { tick } from 'svelte';
 import type { PageData } from './$types';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -158,6 +159,51 @@ describe('schema builder relation panel', () => {
 		const buttons = screen.getAllByRole('button', { name: 'New schema' });
 		expect(buttons).toHaveLength(1);
 		expect(container.querySelector('aside')?.contains(buttons[0])).toBe(false);
+	});
+
+	it('folds the list to its header below lg once a schema is open, and brings it back', async () => {
+		render(SchemaPage, { props: { data: data(), form: null } });
+		expect(screen.queryByRole('button', { name: 'Show the list' })).toBeNull();
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+		const rail = document.getElementById('schema-rail') as HTMLElement;
+		expect(rail.className).toContain('max-lg:hidden');
+		const show = screen.getByRole('button', { name: 'Show the list' });
+		expect(show.getAttribute('aria-expanded')).toBe('false');
+		await fireEvent.click(show);
+		expect(rail.className).not.toContain('max-lg:hidden');
+		expect(screen.getByRole('button', { name: 'Hide the list' }).getAttribute('aria-expanded')).toBe('true');
+		await fireEvent.click(screen.getByRole('button', { name: 'Authors' }));
+		expect(rail.className).toContain('max-lg:hidden');
+	});
+
+	it('moves focus to the list toggle when a pick below lg folds the list away', async () => {
+		vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+		try {
+			render(SchemaPage, { props: { data: data(), form: null } });
+			const pick = screen.getByRole('button', { name: 'Posts' });
+			pick.focus();
+			await fireEvent.click(pick);
+			await tick();
+			await tick();
+			expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Show the list' }));
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it('leaves focus on the list button when the list stays beside the editor', async () => {
+		vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }));
+		try {
+			render(SchemaPage, { props: { data: data(), form: null } });
+			const pick = screen.getByRole('button', { name: 'Posts' });
+			pick.focus();
+			await fireEvent.click(pick);
+			await tick();
+			await tick();
+			expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Posts' }));
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 
 	it('shows the selected collection its own API, with a request to copy', async () => {

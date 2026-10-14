@@ -44,6 +44,8 @@
 		suggestion?: string;
 		/** Why the last save or suggestion failed. */
 		detailsError?: string;
+		/** Why the last delete of this item failed. The drawer stays open on a refusal. */
+		deleteError?: string;
 		/** Why the last focal point save failed, and whether one just landed. */
 		focalError?: string;
 		focalSaved?: boolean;
@@ -61,6 +63,7 @@
 		aiEnabled = false,
 		suggestion = '',
 		detailsError = '',
+		deleteError = '',
 		focalError = '',
 		focalSaved = false,
 		transform = null,
@@ -168,6 +171,7 @@
 
 			<DescriptionList layout="stacked" items={facts} />
 
+			<FormErrors message={deleteError || undefined} />
 			<div class="flex flex-wrap gap-2">
 				<Button variant="secondary" size="sm" href={fileUrl} download={item.filename}>
 					<Download size={ICON.sm} /> Download

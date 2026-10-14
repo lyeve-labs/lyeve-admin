@@ -61,7 +61,7 @@ describe('the reviews load', () => {
 	it('reads each stage paid settings', async () => {
 		const out = (await load(loadEvent())) as ReviewsPage;
 		if (!out.definitions.ok) throw new Error('the definitions read failed');
-		expect(out.definitions.value[0].stages[0]).toMatchObject({
+		expect(out.definitions.value[0].stages?.[0]).toMatchObject({
 			quorum: 2,
 			escalate_to_role: 'lead',
 			condition: { field: 'category', op: 'in', values: ['legal', '4'] },
@@ -184,3 +184,53 @@ describe('creating a definition', () => {
 		expect(out.data.refused).toMatchObject({ kind: 'feature', feature: 'example-feature' });
 	});
 });
+
+describe('the stages of a definition', () => {
+	it('marks the stages of a definition whose read failed as unread, never as none', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.startsWith('/api/admin/review/definitions?')) return { data: [{ id: 'd1', name: 'Editorial' }], total_count: 1 };
+			if (url.startsWith('/api/admin/review/definitions/')) throw new ApiError(503, 'down');
+			return { data: [], total_count: 0 };
+		});
+		const out = (await load(loadEvent())) as ReviewsPage;
+		expect(out.definitions).toMatchObject({ ok: true, value: [{ definition: { id: 'd1' }, stages: null }] });
+	});
+});
+
+describe('deleting a definition', () => {
+	it('deletes the definition it names', async () => {
+		engine.delete.mockResolvedValue(undefined);
+		expect(await actions.delete(actionEvent({ id: 'd1' }))).toEqual({ deleted: true });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/review/definitions/d1');
+	});
+
+	// The New definition drawer shows create failures only, so a delete names
+	// itself and never opens the next drawer as if the create had failed.
+	it('names the delete on a refusal and relays its reason', async () => {
+		engine.delete.mockRejectedValue(new ApiError(409, 'definition has active assignments'));
+		const out = (await actions.delete(actionEvent({ id: 'd1' }))) as Failure;
+		expect(out.data).toEqual({ action: 'delete', error: 'definition has active assignments' });
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		engine.delete.mockRejectedValue(new ApiError(503, 'pq: down'));
+		expect(((await actions.delete(actionEvent({ id: 'd1' }))) as Failure).data).toEqual({
+			action: 'delete',
+			error: 'Failed to delete the definition.',
+		});
+	});
+
+	it('refuses an editor before it reaches the plugin', async () => {
+		const { requireRole } = await import('$lib/server/authz');
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		await expect(actions.delete(actionEvent({ id: 'd1' }))).rejects.toMatchObject({ status: 403 });
+		expect(engine.delete).not.toHaveBeenCalled();
+	});
+
+	it('names the create on a refused create', async () => {
+		engine.post.mockRejectedValue(new ApiError(409, 'slug already in use'));
+		const out = (await actions.create(actionEvent({ name: 'Editorial', stages: '[{"name":"Legal"}]' }))) as Failure;
+		expect(out.data).toMatchObject({ action: 'create', error: 'slug already in use' });
+	});
+});
+

@@ -161,7 +161,7 @@ export const actions: Actions = {
 		const id = form.get('id') as string;
 		if (!id) return fail(400, { error: 'Missing id.' });
 		try {
-			await client.delete(`/api/admin/content/${id}`);
+			await client.delete(`/api/admin/content/${encodeURIComponent(id)}`);
 			return { ok: true };
 		} catch (err) {
 			return fail(400, { error: actionError(err, 'Failed to delete entry') });

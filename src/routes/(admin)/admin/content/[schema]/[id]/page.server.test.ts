@@ -353,6 +353,18 @@ describe('content editor save, many_to_many fields', () => {
 		expect(calls.some((c) => c.method === 'PUT' && c.path.includes('/relationships'))).toBe(false);
 	});
 
+	it('reports a link the plugin refused instead of redirecting as a success', async () => {
+		const fn = vi.fn(async (path: string, init?: RequestInit) => {
+			if (path.includes('/relationships?')) return json({ data: [], total: 0 });
+			if (init?.method === 'POST') return json({ error: 'failed to create relationship' }, 503);
+			return json({ ok: true });
+		}) as unknown as typeof globalThis.fetch;
+
+		const failure = await runSave(saveEvent(fn, { tags: ['t1'] }));
+
+		expect(failure?.data?.error).toBe('The entry was saved, but not every link was. In tags, 1 link could not be added.');
+	});
+
 	it('leaves a set that has not changed alone', async () => {
 		const { fn, calls } = relationFetch([{ id: 'rel-1', target_id: 't1' }]);
 		await runSave(saveEvent(fn, { tags: ['t1'] }));
@@ -385,6 +397,29 @@ async function runRestore(event: never) {
 		throw e;
 	}
 }
+
+describe('content editor save, a schema refusal', () => {
+	// The plugin answers a value the schema refuses with an errors array and no
+	// error key. Relayed as the client's message, the banner showed the JSON.
+	it('marks each refused field and keeps the body out of the banner', async () => {
+		const { getSchema } = await import('@lyeve-labs/client-rest');
+		vi.mocked(getSchema).mockResolvedValueOnce({
+			name: 'article',
+			fields: [{ name: 'email', field_type: 'email' }],
+		} as never);
+		const errors = [{ field: 'email', message: 'must be a valid email', code: 'email', rule: 'email' }];
+		const fn = vi.fn(async () => json({ errors }, 422)) as unknown as typeof globalThis.fetch;
+
+		const failure = (await runSave(saveEvent(fn, {}))) as {
+			status: number;
+			data: { error: string; fieldErrors: Record<string, string> };
+		};
+
+		expect(failure.status).toBe(422);
+		expect(failure.data.fieldErrors).toEqual({ email: 'must be a valid email' });
+		expect(failure.data.error).toBe('The entry was not saved. Check the highlighted fields.');
+	});
+});
 
 describe('content editor restore', () => {
 	it('names the revision by its number under the key the route reads', async () => {
@@ -519,8 +554,41 @@ describe('content editor translations', () => {
 	it('returns the refusal against the locale it was about', async () => {
 		const fn = vi.fn(async () => json({ error: 'nope' }, 402)) as unknown as typeof globalThis.fetch;
 		const out = await runAction('saveTranslation', translationEvent(fn, { locale: 'fr', exists: 'true', data: '{}' }));
-		expect(out?.status).toBe(400);
+		expect(out?.status).toBe(402);
 		expect(out?.data).toMatchObject({ translationLocale: 'fr' });
 		expect(out?.data?.error).toBeTruthy();
+	});
+
+	// The plugin refuses a new locale past the free ceiling with the bare code
+	// cap_exceeded and the numbers beside it.
+	it('reads the locale ceiling into its numbers instead of the bare code', async () => {
+		const fn = vi.fn(async () =>
+			json({ error: 'cap_exceeded', cap: 'locales', limit: 2, current: 2 }, 402)
+		) as unknown as typeof globalThis.fetch;
+		const out = await runAction('saveTranslation', translationEvent(fn, { locale: 'de', exists: 'false', data: JSON.stringify({ title: 'Eins' }) }));
+		expect(out?.status).toBe(402);
+		expect(out?.data?.error).toContain('2 of 2');
+		expect(out?.data?.error).not.toContain('cap_exceeded');
+		expect(out?.data).toMatchObject({ translationLocale: 'de' });
+	});
+
+	// The plugin refuses a new translation with no title. Left empty, the
+	// locale's reader gets the source, so the first save sends the source title.
+	it('sends the source title on the first save when the title was left empty', async () => {
+		const calls: Call[] = [];
+		const fn = vi.fn(async (path: string, init?: RequestInit) => {
+			calls.push({ method: init?.method ?? 'GET', path, body: typeof init?.body === 'string' ? init.body : undefined });
+			return path === '/api/admin/content/e1' ? json(entry) : json({ ok: true }, 201);
+		}) as unknown as typeof globalThis.fetch;
+		const out = await runAction(
+			'saveTranslation',
+			translationEvent(fn, { locale: 'fr', exists: 'false', data: JSON.stringify({ title: '', body: '<p>Salut</p>' }) })
+		);
+		expect(out).toMatchObject({ status: 303 });
+		const post = calls.find((c) => c.method === 'POST');
+		const sent = JSON.parse(post?.body ?? '{}');
+		expect(sent).toMatchObject({ title: 'One', body: { body: '<p>Salut</p>' } });
+		// An empty title in the body would be laid over the title column.
+		expect(sent.body).not.toHaveProperty('title');
 	});
 });

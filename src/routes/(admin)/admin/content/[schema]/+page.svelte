@@ -267,7 +267,7 @@
 								     not what they scan a page of rows by. -->
 								<a
 									href="/admin/content/{data.activeSchema}/{item.id}{rowQuery}"
-									class="font-medium text-fg transition-colors hover:text-brand"
+									class="relative hit-area font-medium text-fg transition-colors hover:text-brand"
 								>
 									{#if title.source === 'none'}
 										<span class="font-mono">{shortId(item.id)}</span>
