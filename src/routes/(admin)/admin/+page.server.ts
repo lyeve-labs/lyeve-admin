@@ -269,10 +269,10 @@ export const actions: Actions = {
 	 * and nothing moves.
 	 */
 	applyMigrations: async (event) => {
-		// The engine refuses this to anyone else. Checking first keeps a direct
-		// post from a lower-privileged session out, and turns the refusal into a
+		// The engine serves this to a super admin only. Checking first keeps a
+		// direct post from any other session out, and turns the refusal into a
 		// 403 rather than a banner that reads like a migration failure.
-		await requireRole(event, ['admin', 'super_admin']);
+		await requireRole(event, ['super_admin']);
 
 		const form = await event.request.formData();
 		const back = localPath(form.get('redirectTo'), '/admin');
