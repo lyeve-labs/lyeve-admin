@@ -318,3 +318,39 @@ describe('where a datasource failure shows', () => {
 	});
 });
 
+// The plugin refuses an admin who moves the target of a granted row.
+describe('the target of a granted datasource', () => {
+	const granted: Datasource = { ...warehouse, id: 'd9', name: 'ledger', allow_private: true };
+
+	it('is fixed for an admin, with the reason, and still posts the stored values', async () => {
+		const { container, getByLabelText } = setup([granted], null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getByLabelText('Edit ledger'));
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		expect((form.querySelector('#ds-host') as HTMLInputElement).disabled).toBe(true);
+		expect((form.querySelector('#ds-port') as HTMLInputElement).disabled).toBe(true);
+		expect((form.querySelector('input[type="hidden"][name="host"]') as HTMLInputElement).value).toBe('db.example.test');
+		expect((form.querySelector('input[type="hidden"][name="port"]') as HTMLInputElement).value).toBe('5432');
+		expect(form.textContent).toContain('Only a super admin can change this.');
+		// The database and the user are not the target, so they stay open.
+		expect((form.querySelector('[name="database"]') as HTMLInputElement).disabled).toBe(false);
+	});
+
+	it('stays open on a row with no grant', async () => {
+		const { container, getByLabelText } = setup([warehouse], null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getByLabelText('Edit warehouse'));
+		expect((container.querySelector('#ds-host') as HTMLInputElement).disabled).toBe(false);
+	});
+
+	it('stays open for a super admin', async () => {
+		const { container, getByLabelText } = setup([granted]);
+		await fireEvent.click(getByLabelText('Edit ledger'));
+		expect((container.querySelector('#ds-host') as HTMLInputElement).disabled).toBe(false);
+	});
+
+	it('fixes the base URL of a granted http row for an admin', async () => {
+		const { container, getByLabelText } = setup([inventory], null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		expect((container.querySelector('#ds-base-url') as HTMLInputElement).disabled).toBe(true);
+		expect((container.querySelector('input[type="hidden"][name="base_url"]') as HTMLInputElement).value).toBe('https://inventory.example.test');
+	});
+});

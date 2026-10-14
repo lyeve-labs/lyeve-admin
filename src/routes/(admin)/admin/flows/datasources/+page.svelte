@@ -179,6 +179,17 @@
 	const isSql = $derived(sqlKind !== null);
 	const sslOptions = $derived(sqlKind ? SSL_MODES[sqlKind] : []);
 
+	/*
+	 * A row granted writes or private addresses keeps its target for a super
+	 * admin to change: the plugin refuses an admin who moves its host, port or
+	 * any address origin, because the grant was given for that target. Those
+	 * fields are fixed for an admin on such a row, with the reason, and still
+	 * post their stored values.
+	 */
+	const targetFixed = $derived(!!editing && (editing.allow_writes || editing.allow_private) && !superAdmin);
+	// The token URL is a target too, so an OAuth2 row keeps its scheme.
+	const authFixed = $derived(targetFixed && !!editing && authFieldsOf(editing.config).type === 'oauth2_client_credentials');
+
 	// What each TLS mode tells the driver, keyed by the value the driver takes.
 	const SSL_SAYS: Record<string, string> = {
 		require: 'Encrypts the connection and refuses a server that will not.',
@@ -385,6 +396,13 @@
 		{/if}
 	</PageShell>
 
+	<!-- A target field an admin may not move on a granted row: shown, fixed,
+	     with the reason, and posted as stored. -->
+	{#snippet fixedTarget(id: string, name: string, label: string, value: string)}
+		<input type="hidden" {name} {value} />
+		<Input {id} {label} {value} disabled hint={GRANT_HINT} />
+	{/snippet}
+
 	<Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New datasource'}>
 		<form
 			method="POST"
@@ -411,8 +429,13 @@
 			{#if editing}<input type="hidden" name="kind" value={kind} />{/if}
 
 			{#if isSql}
-				<Input id="ds-host" name="host" label="Host" bind:value={host} required />
-				<Input id="ds-port" name="port" label="Port" inputmode="numeric" bind:value={port} />
+				{#if targetFixed}
+					{@render fixedTarget('ds-host', 'host', 'Host', host)}
+					{@render fixedTarget('ds-port', 'port', 'Port', port)}
+				{:else}
+					<Input id="ds-host" name="host" label="Host" bind:value={host} required />
+					<Input id="ds-port" name="port" label="Port" inputmode="numeric" bind:value={port} />
+				{/if}
 				<Input id="ds-database" name="database" label="Database" bind:value={database} required />
 				<Input id="ds-user" name="user" label="User" bind:value={user} />
 				<PasswordInput
@@ -430,7 +453,11 @@
 					onchange={(v) => (ssl = v)}
 				/>
 			{:else if kind === 'http'}
-				<Input id="ds-base-url" name="base_url" label="Base URL" placeholder="https://api.example.com" bind:value={baseUrl} required />
+				{#if targetFixed}
+					{@render fixedTarget('ds-base-url', 'base_url', 'Base URL', baseUrl)}
+				{:else}
+					<Input id="ds-base-url" name="base_url" label="Base URL" placeholder="https://api.example.com" bind:value={baseUrl} required />
+				{/if}
 				<Input
 					id="ds-chat-id"
 					name="chat_id"
@@ -441,12 +468,16 @@
 				/>
 				<div class="flex flex-col gap-3 rounded-md border border-line p-3" data-testid="auth-section">
 					<SectionHeading level={3} variant="eyebrow">Authentication</SectionHeading>
+					{#if authFixed}<input type="hidden" name="auth_type" value={auth.type} />{/if}
 					<RadioGroup
-						name="auth_type"
+						name={authFixed ? undefined : 'auth_type'}
 						label="Type"
-						hint="Sent with every request of an http.request node. An explicit Authorization header on the node wins."
+						hint={authFixed
+							? `Sent with every request of an http.request node. ${GRANT_HINT}`
+							: 'Sent with every request of an http.request node. An explicit Authorization header on the node wins.'}
 						options={authChoices}
 						value={auth.type}
+						disabled={authFixed}
 						onchange={(v) => {
 							if (isAuthType(v)) auth = { ...auth, type: v };
 						}}
@@ -457,7 +488,11 @@
 						<Input id="ds-auth-user" name="auth_user" label="User" bind:value={auth.user} required />
 						<PasswordInput id="ds-auth-password" name="auth_password" label="Password" hint={secretHint} required={!keepSecret} autocomplete="off" />
 					{:else if auth.type === 'oauth2_client_credentials'}
-						<Input id="ds-auth-token-url" name="auth_token_url" label="Token URL" placeholder="https://auth.example.com/oauth/token" bind:value={auth.token_url} required />
+						{#if authFixed}
+							{@render fixedTarget('ds-auth-token-url', 'auth_token_url', 'Token URL', auth.token_url)}
+						{:else}
+							<Input id="ds-auth-token-url" name="auth_token_url" label="Token URL" placeholder="https://auth.example.com/oauth/token" bind:value={auth.token_url} required />
+						{/if}
 						<Input id="ds-auth-client-id" name="auth_client_id" label="Client id" bind:value={auth.client_id} required />
 						<PasswordInput id="ds-auth-client-secret" name="auth_client_secret" label="Client secret" hint={secretHint} required={!keepSecret} autocomplete="off" />
 						<Input id="ds-auth-scopes" name="auth_scopes" label="Scopes" placeholder="read write" hint="Space separated." bind:value={auth.scopes} />
@@ -505,7 +540,11 @@
 					hint={editing?.has_secret ? 'Stored and never shown. Leave blank to keep it.' : 'The key file Google issued for the service account. Encrypted at rest.'}
 					mono
 				/>
-				<Input id="ds-api-base" name="api_base" label="API base (optional)" placeholder="https://sheets.googleapis.com" bind:value={apiBase} />
+				{#if targetFixed}
+					{@render fixedTarget('ds-api-base', 'api_base', 'API base', apiBase)}
+				{:else}
+					<Input id="ds-api-base" name="api_base" label="API base (optional)" placeholder="https://sheets.googleapis.com" bind:value={apiBase} />
+				{/if}
 			{/if}
 
 			<div>
