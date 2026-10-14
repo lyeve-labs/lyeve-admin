@@ -75,7 +75,7 @@ describe('the console frame', () => {
 		const cookies = mockCookies({ '__Host-sys_session': 'expired-token' });
 		const url = new URL('https://admin.example.com/admin/content/posts?offset=40');
 
-		const r = await catchRedirect(() => load({ fetch, cookies, url } as never));
+		const r = await catchRedirect(() => load({ fetch, cookies, url, request: new Request(url) } as never));
 
 		// The delete has to repeat the attributes the cookie was set with. A
 		// __Host- cookie cleared without Secure is discarded by the browser, the
@@ -89,6 +89,22 @@ describe('the console frame', () => {
 		expect(r.status).toBe(302);
 		// The reader returns to the page they were on once they sign in again.
 		expect(r.location).toBe('/login?ended=1&next=%2Fadmin%2Fcontent%2Fposts%3Foffset%3D40');
+	});
+
+	// A form posted without script lands here with the action in its address.
+	// Sending the reader back there would name the action, not the page.
+	it('returns a reader whose form post found the session ended to the page alone', async () => {
+		const fetch = vi.fn(async (url: string, _init: RequestInit) =>
+			String(url).includes('/api/admin/auth/me') ? json({ error: 'unauthorized' }, 401) : json({})
+		) as unknown as typeof globalThis.fetch;
+		const url = new URL('https://admin.example.com/admin/users?/delete');
+		const request = new Request(url, { method: 'POST' });
+
+		const r = await catchRedirect(() =>
+			load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'expired-token' }), url, request } as never)
+		);
+
+		expect(r.location).toBe('/login?ended=1&next=%2Fadmin%2Fusers');
 	});
 
 	// SvelteKit re-runs a load that read the address on every navigation, and

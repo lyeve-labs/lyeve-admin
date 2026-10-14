@@ -4,6 +4,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { createClient, ApiError } from '@lyeve-labs/client';
 import { mfaVerify, isMFAChallenge, type LoginResponse } from '@lyeve-labs/client-rest';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { clientAddressOf } from '$lib/server/engine';
 import { secondFactorFailure } from '$lib/server/second-factor';
 import { clearSessionCookie, setRefreshCookie, setSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import { adminReturnPath } from '$lib/server/local-path';
@@ -95,7 +96,7 @@ export const actions: Actions = {
 		const { request, fetch, cookies } = event;
 
 		// Rate limit login attempts per IP to deter credential stuffing.
-		const ip = event.getClientAddress();
+		const ip = clientAddressOf(event);
 		const limit = checkRateLimit(ip);
 		if (!limit.allowed) {
 			return fail(429, { error: 'Too many attempts. Please try again later.', retryAfterSec: limit.retryAfterSec });

@@ -217,6 +217,27 @@ describe('signing in', () => {
 		expect(result).toEqual({ error: 'Email and password are required.' });
 	});
 
+	// An adapter behind a proxy it was not told about cannot name the
+	// browser's address. Sign-in still has to work there.
+	it('signs in where the adapter cannot tell the address', async () => {
+		const formData = new FormData();
+		formData.set('email', 'a@b.co');
+		formData.set('password', 'correct');
+		const cookies = mockCookies();
+		const r = await catchRedirect(() =>
+			actions.default({
+				getClientAddress: () => {
+					throw new Error('Could not determine clientAddress');
+				},
+				request: { formData: () => Promise.resolve(formData) } as never,
+				fetch: vi.fn(async () => json({ user: { id: 'u1' }, token: 'tok' })) as never,
+				cookies,
+			} as never)
+		);
+		expect(r.status).toBe(302);
+		expect(cookies.set).toHaveBeenCalledWith('__Host-sys_session', 'tok', expect.anything());
+	});
+
 	it('sets session cookie and redirects on successful login', async () => {
 		const token = 'new-session-token';
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>

@@ -260,6 +260,35 @@ describe('trades from one address', () => {
 		expect(fetch).toHaveBeenCalledTimes(20);
 	});
 
+	// A thousand forged cookies sent at once would all be on their way before
+	// the first refusal came back, so a trade counts from the moment it starts.
+	it('are held back during a burst, before any refusal has come back', async () => {
+		const pending: ((r: Response) => void)[] = [];
+		const fetch = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
+		const burst = Array.from({ length: 50 }, (_, i) => refreshSession(event('/settings', expiring(i + 1), fetch)));
+		await Promise.resolve();
+		for (const answer of pending) answer(json({ error: 'token reuse' }, 401));
+		await Promise.all(burst);
+		expect(fetch.mock.calls.length).toBeLessThanOrEqual(10);
+	});
+
+	// An outage is no refusal. A busy address that met one has to keep
+	// reaching the engine once it answers again.
+	it('are not held back after outages', async () => {
+		const answers = [
+			async () => json({ error: 'unavailable' }, 503),
+			async () => json({ error: 'rate limited' }, 429),
+			async () => Promise.reject(new TypeError('fetch failed')),
+		];
+		let call = 0;
+		const fetch = vi.fn(() => answers[call++ % answers.length]());
+		for (let n = 1; n <= 11; n++) await refreshSession(event('/settings', expiring(n), fetch as unknown as typeof globalThis.fetch));
+		expect(fetch).toHaveBeenCalledTimes(11);
+
+		await refreshSession(event('/settings', expiring(12), fetch as unknown as typeof globalThis.fetch));
+		expect(fetch).toHaveBeenCalledTimes(12);
+	});
+
 	it('are held back after ten refusals, and the session is left as it is', async () => {
 		const fetch = vi.fn(async () => json({ error: 'token reuse' }, 401));
 		for (let n = 1; n <= 10; n++) await refreshSession(event('/settings', expiring(n), fetch));
