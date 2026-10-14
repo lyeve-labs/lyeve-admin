@@ -211,4 +211,14 @@ describe('a license without paid quotas', () => {
 		expect(posted.get('requests_limit')).toBe('1000');
 		expect(said(document.body)).toContain('Storage (GiB)');
 	});
+
+	// Every footer in the console leads with the secondary Cancel.
+	it('orders the footer Cancel, Delete, Save', async () => {
+		const { getByRole } = render(UsagePage, { props: props({ quotas: [stored], quotaTotal: 1 }) });
+		await fireEvent.click(getByRole('button', { name: 'Edit the quota for acme' }));
+		const labels = [...document.body.querySelectorAll('button')]
+			.map((b) => b.textContent?.trim())
+			.filter((t) => t === 'Delete' || t === 'Cancel' || t === 'Save');
+		expect(labels).toEqual(['Cancel', 'Delete', 'Save']);
+	});
 });
