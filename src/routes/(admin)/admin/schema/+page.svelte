@@ -694,13 +694,20 @@
 				testId="schema-list"
 			>
 				{#snippet meta()}
-					<span class="text-xs tabular-nums text-faint">{schemas.length}</span>
+					<!-- A count the engine did not answer is not a zero. -->
+					{#if !data.loadGate}
+						<span class="text-xs tabular-nums text-faint">{schemas.length}</span>
+					{/if}
 				{/snippet}
 
 				<SchemaRail {schemas} {rowCounts} current={saved?.name} onselect={selectSchema} />
 			</ResizableAside>
 
-			{#if view === 'canvas' && SchemaCanvas && !canvasLicensed}
+			{#if view === 'canvas' && SchemaCanvas && data.canvasGate}
+				<div class="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6" data-testid="schema-canvas-unread">
+					<GateNotice gate={data.canvasGate} title="Schema canvas" absent="This build does not serve the schema canvas. The list editor does everything." />
+				</div>
+			{:else if view === 'canvas' && SchemaCanvas && !canvasLicensed}
 				<div class="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6" data-testid="schema-canvas-locked">
 					<NotEnabled
 						title="Schema canvas"

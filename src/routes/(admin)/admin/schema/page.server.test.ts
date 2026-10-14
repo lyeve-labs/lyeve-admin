@@ -121,6 +121,9 @@ describe('admin/schema load', () => {
 		expect(out.presetsGate).toBeNull();
 		expect(out.presets).toEqual([]);
 		expect(out.canvas.licensed).toBe(false);
+		// The layout route admits an admin only, so the canvas says the role
+		// cannot open it rather than that the license leaves it out.
+		expect((out as unknown as { canvasGate: unknown }).canvasGate).toEqual({ state: 'forbidden' });
 		expect(calls.some((c) => c.url.includes('/presets') || c.url.includes('/canvas-layout'))).toBe(false);
 	});
 });
@@ -141,9 +144,17 @@ describe('admin/schema load reads what this install allows', () => {
 
 	it('draws no canvas and offers no save when the plugin does not say so', async () => {
 		const { event } = loadEvent({ ...schemaRoutes, '/api/admin/schemas/canvas-layout': () => json({ error: 'db down' }, 503) });
-		const out = (await load(event)) as unknown as Allowed;
+		const out = (await load(event)) as unknown as Allowed & { canvasGate: unknown };
 		expect(out.canSavePresets).toBe(false);
 		expect(out.canvas).toEqual({ positions: {}, licensed: false });
+		// An outage is kept as one, never drawn as a license without the canvas.
+		expect(out.canvasGate).toEqual({ state: 'unavailable' });
+	});
+
+	it('answers no canvas gate for a layout it read', async () => {
+		const { event } = loadEvent(schemaRoutes);
+		const out = (await load(event)) as unknown as { canvasGate: unknown };
+		expect(out.canvasGate).toBeNull();
 	});
 });
 

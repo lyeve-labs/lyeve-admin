@@ -41,6 +41,7 @@ function data(extra: Record<string, unknown>[] = []): PageData {
 		isSuperAdmin: true,
 		loadGate: null,
 		canvas: { licensed: true, positions: {} },
+		canvasGate: null,
 	} as unknown as PageData;
 }
 
@@ -85,3 +86,29 @@ describe('schema builder view switch', () => {
 		// machine has pushed it past the default.
 	}, 20_000);
 });
+
+describe('schema builder canvas that could not be read', () => {
+	it('says the layout read failed instead of that the license leaves the canvas out', async () => {
+		const d = { ...data(), canvas: { licensed: false, positions: {} }, canvasGate: { state: 'unavailable' } } as unknown as PageData;
+		render(SchemaPage, { props: { data: d, form: null } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'Canvas' }));
+		expect(screen.getByTestId('schema-canvas-unread').textContent).toContain('did not answer');
+		expect(screen.queryByTestId('schema-canvas-locked')).toBeNull();
+	});
+
+	it('tells an editor the role cannot open the canvas', async () => {
+		const d = { ...data(), canWrite: false, canvas: { licensed: false, positions: {} }, canvasGate: { state: 'forbidden' } } as unknown as PageData;
+		render(SchemaPage, { props: { data: d, form: null } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'Canvas' }));
+		expect(screen.getByTestId('schema-canvas-unread').textContent).toContain('Your role cannot open');
+	});
+});
+
+describe('schema builder list that could not be read', () => {
+	it('prints no count beside the list', () => {
+		const d = { ...data(), schemas: [], loadGate: { state: 'unavailable' } } as unknown as PageData;
+		render(SchemaPage, { props: { data: d, form: null } });
+		expect(screen.getByTestId('schema-list').textContent).not.toMatch(/\b0\b/);
+	});
+});
+
