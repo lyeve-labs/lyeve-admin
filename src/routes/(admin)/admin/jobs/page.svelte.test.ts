@@ -33,11 +33,11 @@ const job = {
 	updated_at: '2026-01-01T00:00:00Z',
 };
 
-function setup(extra: Record<string, unknown> = {}) {
+function setup(extra: Record<string, unknown> = {}, form: Record<string, unknown> | null = null) {
 	return render(JobsPage, {
 		props: {
 			data: { jobs: { ok: true, value: [job] }, limit: 50, offset: 0, hasMore: false, openNew: false, openJob: null, entitlements, ...extra },
-			form: null,
+			form,
 		} as never,
 	});
 }
@@ -181,5 +181,24 @@ describe('the job list when it could not be read', () => {
 		expect(container.textContent).toContain('No jobs yet');
 		expect(getAllByRole('button', { name: /new job/i })).toHaveLength(2);
 		expect(container.textContent).not.toContain('Temporarily unavailable');
+	});
+});
+
+describe('a failure from one form', () => {
+	// A failed row delete read by the drawer greeted the next job as if its
+	// own save had failed.
+	it('keeps a failed delete out of the next job drawer', async () => {
+		const { getByRole, container } = setup({}, { error: 'Failed to delete job.', action: 'delete' });
+		expect(container.textContent).toContain('Failed to delete job.');
+		await fireEvent.click(getByRole('button', { name: /New job/ }));
+		const form = document.querySelector('#job-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('Failed to delete job.');
+	});
+
+	it('says a failed save inside the open drawer', async () => {
+		const { getByRole } = setup({}, { error: 'Payload must be valid JSON.', action: 'create' });
+		await fireEvent.click(getByRole('button', { name: /New job/ }));
+		const form = document.querySelector('#job-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Payload must be valid JSON.');
 	});
 });

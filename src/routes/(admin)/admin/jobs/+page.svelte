@@ -64,6 +64,10 @@
 		}
 	});
 	const formError = $derived(form && 'error' in form && form.error ? String(form.error) : undefined);
+	// A failed create or update belongs to the drawer. A failed delete belongs
+	// to the page, and read by the drawer it greeted the next job as that
+	// job's failure.
+	const drawerFailed = $derived(!!form && 'action' in form && (form.action === 'create' || form.action === 'update'));
 
 	function openCreate() {
 		editing = null;
@@ -138,7 +142,7 @@
 		{/if}
 	{/snippet}
 
-	{#if !open}
+	{#if !open || !drawerFailed}
 		<FormErrors message={formError} {refused} />
 	{/if}
 
@@ -282,7 +286,7 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={formError} {refused} />
+		<FormErrors message={drawerFailed ? formError : undefined} refused={drawerFailed ? refused : null} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 
 		<Input id="job-name" label="Name" name="name" required placeholder="send-daily-digest" value={editing?.name ?? ''} />
