@@ -19,8 +19,10 @@ function data(overrides: Record<string, unknown> = {}) {
 	return {
 		entitlements,
 		q: 'cats',
-		results: ok([]),
-		synonyms: ok([]),
+		limit: 20,
+		offset: 0,
+		results: ok({ results: [], total: 0 }),
+		synonyms: ok({ groups: [], total: 0 }),
 		ranking: ok({
 			id: '',
 			schema_name: '*',
@@ -98,3 +100,36 @@ describe('Search page settings', () => {
 		expect(getAllByRole('button', { name: /New synonym/ }).length).toBeGreaterThan(0);
 	});
 });
+
+describe('Search page counts', () => {
+	const hit = (n: number) => ({ entry_id: `e${n}`, title: `Entry ${n}`, schema: 'blog', status: 'published', rank: 1 });
+
+	// The plugin answers one page. The count is its total, not the rows held.
+	it('states the total the plugin counted and pages to the rest', () => {
+		const results = ok({ results: Array.from({ length: 20 }, (_, i) => hit(i)), total: 73 });
+		const { getByRole, container } = render(SearchPage, { props: { data: data({ results }) as never, form: null } });
+		expect(getByRole('heading', { level: 2, name: /73 results for "cats"/ })).toBeTruthy();
+		expect(container.querySelector('a[href="/admin/search?q=cats&limit=20&offset=20"]')).toBeTruthy();
+	});
+
+	it('says when more synonym groups exist than were listed', () => {
+		const groups = [{ id: 's1', base_term: 'tv', synonyms: ['telly'] }];
+		const { getByText } = render(SearchPage, {
+			props: { data: data({ synonyms: ok({ groups, total: 612 }) }) as never, form: null },
+		});
+		expect(getByText(/The first 1 of 612 groups are listed/)).toBeTruthy();
+	});
+
+	it('shows a failed delete beside the groups and not in the next New synonym drawer', () => {
+		const groups = [{ id: 's1', base_term: 'tv', synonyms: ['telly'] }];
+		const { getByText, getAllByText } = render(SearchPage, {
+			props: {
+				data: data({ synonyms: ok({ groups, total: 1 }) }) as never,
+				form: { synonymDeleteError: 'The synonym could not be deleted.' } as never,
+			},
+		});
+		expect(getByText('The synonym could not be deleted.')).toBeTruthy();
+		expect(getAllByText('The synonym could not be deleted.')).toHaveLength(1);
+	});
+});
+

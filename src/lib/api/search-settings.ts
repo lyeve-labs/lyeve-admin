@@ -4,6 +4,7 @@
  * others, and what people have been searching for.
  */
 import type { HttpClient } from '@lyeve-labs/client';
+import type { RankWeightBoost, SearchResult, SynonymGroup } from '@lyeve-labs/client-rest';
 
 export interface SearchAnalytics {
 	total_searches: number;
@@ -32,9 +33,58 @@ export function getSearchAnalytics(client: HttpClient): Promise<SearchAnalytics>
 	return client.get<SearchAnalytics>('/api/admin/search/analytics');
 }
 
-/** Weights for every schema that has no row of its own. */
-export function setDefaultRanking(client: HttpClient, w: RankingWeights): Promise<unknown> {
-	return client.put('/api/admin/search/ranking', { schema_name: '*', ...w });
+/**
+ * Weights for every schema that has no row of its own. The plugin replaces
+ * the whole row, so the boost rules the caller read go back beside the
+ * weights. Left out, they would be written as none.
+ */
+export function setDefaultRanking(
+	client: HttpClient,
+	w: RankingWeights,
+	boostRules: RankWeightBoost[] = [],
+): Promise<unknown> {
+	return client.put('/api/admin/search/ranking', { schema_name: '*', ...w, boost_rules: boostRules });
+}
+
+/** One page of search results and how many matched in all. */
+export interface SearchPage {
+	results: SearchResult[];
+	total: number;
+}
+
+/**
+ * One page of a search. The plugin answers 20 rows unless asked for more,
+ * and its total counts every match, which the page states instead of the
+ * rows it holds.
+ */
+export async function searchPage(client: HttpClient, q: string, limit: number, offset: number): Promise<SearchPage> {
+	const query = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
+	const res = await client.get<{ results?: SearchResult[] | null; total?: number }>(`/api/admin/search?${query}`);
+	const results = res.results ?? [];
+	return { results, total: typeof res.total === 'number' ? Math.max(res.total, results.length) : results.length };
+}
+
+/** The most synonym groups one read asks for, which is the engine's page ceiling. */
+export const SYNONYM_LIMIT = 500;
+
+/** The synonym groups one read gave, and how many the plugin holds. */
+export interface SynonymList {
+	groups: SynonymGroup[];
+	total: number;
+}
+
+/**
+ * The tenant's synonym groups, up to the engine's page ceiling. The plugin
+ * answers 50 unless asked, and a group past that could not be seen or
+ * deleted.
+ */
+export async function listSynonymGroups(client: HttpClient): Promise<SynonymList> {
+	const res = await client.get<{ data?: SynonymGroup[] | null; total_count?: number } | SynonymGroup[]>(
+		`/api/admin/search/synonyms?limit=${SYNONYM_LIMIT}&offset=0`,
+	);
+	const groups = Array.isArray(res) ? res : (res.data ?? []);
+	const counted = Array.isArray(res) ? groups.length : res.total_count;
+	return { groups, total: typeof counted === 'number' ? Math.max(counted, groups.length) : groups.length };
 }
 
 export function createSynonym(client: HttpClient, name: string, baseTerm: string, synonyms: string[]): Promise<unknown> {
