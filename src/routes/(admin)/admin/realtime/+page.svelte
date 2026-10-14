@@ -32,6 +32,11 @@
 	const streamUsed = $derived(inUse(data.stream));
 	const socketUsed = $derived(inUse(data.socket));
 	const loads = $derived(tenantLoad(data.platform?.connections_by_tenant));
+	// The plugin's tenant view hard-codes the idle count to zero, so it is no
+	// measurement and is not shown.
+	const socketStates = $derived(
+		Object.entries(data.socket?.connections_by_state ?? {}).filter(([state]) => state !== 'idle'),
+	);
 
 	function pct(share: number): string {
 		return `${Math.round(share * 100)}%`;
@@ -80,15 +85,19 @@
 						label="Accepted in {window_(data.stream)}"
 						value={formatCount(data.stream?.total_connections)}
 					/>
-					<Stat size="sm" mono label="Events pushed" value={formatCount(data.stream?.events_dispatched)} />
+					<Stat size="sm" mono label="Events pushed, whole instance" value={formatCount(data.stream?.events_dispatched)} />
 					<Stat
 						size="sm"
 						mono
-						label="Rejected"
+						label="Rejected, whole instance"
 						value={formatCount(data.stream?.connections_rejected)}
 						tone={(data.stream?.connections_rejected ?? 0) > 0 ? 'warn' : undefined}
 					/>
 				</div>
+				<p class="text-xs text-faint">
+					Open now and accepted count this tenant's connections. The other counters cover every tenant on
+					the instance.
+				</p>
 			{/if}
 		</section>
 
@@ -103,25 +112,22 @@
 				</p>
 			{/if}
 			{#if !data.socketGate}
-				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					<Stat size="sm" mono label="Open now" value={formatCount(data.socket?.active_connections)} />
-					<Stat
-						size="sm"
-						mono
-						label="Idle"
-						value={formatCount(data.socket?.idle_connections)}
-						tone={(data.socket?.idle_connections ?? 0) > 0 ? 'warn' : undefined}
-					/>
-					<Stat size="sm" mono label="Broadcasts" value={formatCount(data.socket?.broadcasts_sent)} />
-					<Stat size="sm" mono label="Reconnections" value={formatCount(data.socket?.reconnections)} />
+					<Stat size="sm" mono label="Broadcasts, whole instance" value={formatCount(data.socket?.broadcasts_sent)} />
+					<Stat size="sm" mono label="Reconnections, whole instance" value={formatCount(data.socket?.reconnections)} />
 				</div>
+				<p class="text-xs text-faint">
+					Open now counts this tenant's sockets. Broadcasts and reconnections cover every tenant on the
+					instance.
+				</p>
 			{/if}
 
-			{#if data.socket?.connections_by_state}
+			{#if socketStates.length > 0}
 				<Card>
 					<div class="flex flex-wrap items-center gap-2">
 						<span class="text-xs text-muted">Sockets by state</span>
-						{#each Object.entries(data.socket.connections_by_state) as [state, count] (state)}
+						{#each socketStates as [state, count] (state)}
 							<Badge tone="neutral">{state} {count}</Badge>
 						{/each}
 					</div>
