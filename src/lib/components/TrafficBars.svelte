@@ -100,7 +100,7 @@
 					<tr>
 						<td>{formatDateTime(h.hour, h.hour)}</td>
 						<td>{h.requests}</td>
-						<td>{(h.errorRate * 100).toFixed(1)}%</td>
+						<td>{formatPercent(h.errorRate)}</td>
 					</tr>
 				{/each}
 			</tbody>
