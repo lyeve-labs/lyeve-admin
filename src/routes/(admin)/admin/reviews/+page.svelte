@@ -19,6 +19,7 @@
 		Table,
 		Toggle,
 		confirm as confirmDialog,
+		type StatusTone,
 	} from '@lyeve-labs/ui-kit';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
@@ -48,7 +49,7 @@
 		rejected: 'Rejected',
 		published: 'Published',
 	};
-	const STATUS_TONE: Record<ReviewStatus, 'neutral' | 'brand' | 'success' | 'warn' | 'danger'> = {
+	const STATUS_TONE: Record<ReviewStatus, StatusTone> = {
 		draft: 'neutral',
 		pending_review: 'brand',
 		in_review: 'brand',

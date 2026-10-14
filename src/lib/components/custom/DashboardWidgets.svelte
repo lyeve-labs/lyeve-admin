@@ -9,7 +9,8 @@
 	import { WIDTH_SPAN } from '$lib/api/custom-dashboard';
 	import { formatSize, mediaKindLabel } from '$lib/api/media';
 	import { WINDOW_LABEL, trafficTone } from '$lib/dashboard';
-	import { formatCount, formatDate, formatDateTime } from '$lib/format';
+	import { formatCount, formatDate, formatDateTime, formatPercent } from '$lib/format';
+	import { entryTone } from '$lib/tones';
 	import type { ResolvedWidget } from '$lib/api/custom-dashboard';
 
 	/**
@@ -21,13 +22,6 @@
 	 */
 	let { widgets, now = new Date() }: { widgets: ResolvedWidget[]; now?: Date } = $props();
 
-	const pct = (fraction: number) => `${(fraction * 100).toFixed(1)}%`;
-
-	function entryTone(status: string): 'success' | 'warn' | 'neutral' {
-		if (status === 'published') return 'success';
-		if (status === 'draft') return 'warn';
-		return 'neutral';
-	}
 </script>
 
 {#snippet unreadable(what: string)}
@@ -145,7 +139,7 @@
 							{:else}
 								<div class="grid grid-cols-3 gap-3">
 									<Stat size="sm" label="Requests, {w.window}" value={formatCount(w.api.total)} />
-									<Stat size="sm" label="Failed" value={pct(w.api.errorRate)} tone={trafficTone(w.api.errorRate)} />
+									<Stat size="sm" label="Failed" value={formatPercent(w.api.errorRate)} tone={trafficTone(w.api.errorRate)} />
 									<Stat size="sm" label="P95" value="{formatCount(Math.round(w.api.p95))} ms" />
 								</div>
 								{#if w.api.hours.length > 0 && w.width !== 'third'}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ActionData, PageData } from './$types';
-	import type { EndpointDoc, EndpointParam, HttpMethod } from '$lib/api/reference';
+	import type { EndpointDoc, EndpointParam } from '$lib/api/reference';
 	import { VALUES_SHOWN } from '$lib/api/openapi';
 	import { curlFor, gateSentence } from '$lib/api/request-preview';
 	import { isWriteMethod, unfilledParameters, type TryResult } from '$lib/api/try-it';
@@ -21,10 +21,12 @@
 		SegmentedControl,
 		Table,
 		Textarea,
+		type AccentTone,
 	} from '@lyeve-labs/ui-kit';
 	import ResizableAside from '$lib/components/ResizableAside.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ICON } from '$lib/icon';
+	import { methodTone } from '$lib/tones';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -101,30 +103,20 @@
 		expandedIds = new Set(expandedIds);
 	}
 
-	type BadgeTone = 'neutral' | 'brand' | 'violet' | 'success' | 'warn' | 'danger';
-
-	const methodTone: Record<HttpMethod, BadgeTone> = {
-		GET: 'brand',
-		POST: 'success',
-		PUT: 'warn',
-		PATCH: 'warn',
-		DELETE: 'danger',
-	};
-
 	const authLabel: Record<string, string> = {
 		none: 'Public',
 		bearer: 'Bearer JWT',
 		cookie: 'Session cookie',
 		'bearer-or-cookie': 'Bearer or cookie',
 	};
-	const authTone: Record<string, BadgeTone> = {
+	const authTone: Record<string, AccentTone> = {
 		none: 'neutral',
 		bearer: 'brand',
 		cookie: 'violet',
 		'bearer-or-cookie': 'warn',
 	};
 
-	const serverTone: Record<string, BadgeTone> = {
+	const serverTone: Record<string, AccentTone> = {
 		admin: 'violet',
 		api: 'success',
 		both: 'neutral',
@@ -167,7 +159,7 @@
      something to disclose and in a plain container when there is not. The two
      differ only in what wraps them. -->
 {#snippet endpointSummary(ep: EndpointDoc)}
-	<Badge tone={methodTone[ep.method]} class="w-16 shrink-0 justify-center font-mono">
+	<Badge tone={methodTone(ep.method)} class="w-16 shrink-0 justify-center font-mono">
 		{ep.method}
 	</Badge>
 

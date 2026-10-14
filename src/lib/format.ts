@@ -156,6 +156,11 @@ export function formatCount(value: number | null | undefined, fallback: string =
 	return COUNT_FORMAT.format(Math.round(value));
 }
 
+/** A fraction as a percentage to one decimal place: `0.0123` reads `1.2%`. */
+export function formatPercent(fraction: number): string {
+	return `${(fraction * 100).toFixed(1)}%`;
+}
+
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 
 /** A unit `formatBytes` can step up to. */

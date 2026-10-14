@@ -14,6 +14,7 @@
 		closeDialog,
 		dismissDialog,
 		openDialog,
+		type StatusTone,
 	} from '@lyeve-labs/ui-kit';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
@@ -36,7 +37,7 @@
 	let pruneForm = $state<HTMLFormElement>();
 	let error = $state<string | null>(null);
 
-	function actionVariant(action: string): 'success' | 'warn' | 'danger' | 'brand' | 'neutral' {
+	function actionVariant(action: string): StatusTone {
 		if (action.startsWith('create')) return 'success';
 		if (action.startsWith('delete') || action.startsWith('drop')) return 'danger';
 		if (action.startsWith('update') || action.startsWith('alter')) return 'warn';

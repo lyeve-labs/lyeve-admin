@@ -15,7 +15,8 @@
 	import { ArrowRight, CircleCheck, OctagonAlert, Pencil, Plus, TriangleAlert } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import TrafficBars from '$lib/components/TrafficBars.svelte';
-	import { NO_VALUE, formatCount, formatDateTime, logLevelTone } from '$lib/format';
+	import { NO_VALUE, formatCount, formatDateTime, formatPercent, logLevelTone } from '$lib/format';
+	import { entryTone } from '$lib/tones';
 	import { WINDOWS, WINDOW_LABEL, trafficTone, type Window } from '$lib/dashboard';
 	import { ICON } from '$lib/icon';
 	import { licenseStateLabel, licenseTone } from '$lib/license-state';
@@ -30,13 +31,6 @@
 
 	const errorRate = $derived(data.requests ? data.requests.errorRate : 0);
 
-	function entryTone(status: string): 'success' | 'warn' | 'neutral' {
-		if (status === 'published') return 'success';
-		if (status === 'draft') return 'warn';
-		return 'neutral';
-	}
-
-	const pct = (fraction: number) => `${(fraction * 100).toFixed(1)}%`;
 	const ms = (n: number) => `${formatCount(Math.round(n))} ms`;
 	const whenever = (ts: string | null | undefined) => (ts ? formatDateTime(ts, ts) : NO_VALUE);
 
@@ -208,7 +202,7 @@
 							<Stat class="h-full"
 								label="Requests, {data.window}"
 								value={data.requests ? formatCount(data.requests.total) : 'unknown'}
-								sub={data.requests ? `${pct(errorRate)} failed` : 'analytics unavailable'}
+								sub={data.requests ? `${formatPercent(errorRate)} failed` : 'analytics unavailable'}
 								tone={data.requests ? trafficTone(errorRate) : 'neutral'}
 							/>
 						</a>
@@ -302,7 +296,7 @@
 										<span class="min-w-0 truncate font-mono text-xs text-fg" title={e.key}>{e.key}</span>
 										<span class="flex shrink-0 items-center gap-2">
 											<span class="text-xs tabular-nums text-muted">{formatCount(e.requests)}</span>
-											<Badge tone={trafficTone(e.errorRate)} size="sm">{pct(e.errorRate)}</Badge>
+											<Badge tone={trafficTone(e.errorRate)} size="sm">{formatPercent(e.errorRate)}</Badge>
 										</span>
 									</li>
 								{/each}

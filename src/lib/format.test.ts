@@ -8,6 +8,7 @@ import {
 	formatDate,
 	formatDateTime,
 	formatMillis,
+	formatPercent,
 	formatTime,
 	hasTrace,
 	logLevelLabel,
@@ -378,5 +379,13 @@ describe('formatGoDuration', () => {
 	it('hands back a string that is not a Go duration, and the fallback for none', () => {
 		expect(formatGoDuration('soon')).toBe('soon');
 		expect(formatGoDuration(null)).toBe(NO_VALUE);
+	});
+});
+
+describe('formatPercent', () => {
+	it('says a fraction as a percentage to one decimal place', () => {
+		expect(formatPercent(0.0123)).toBe('1.2%');
+		expect(formatPercent(0)).toBe('0.0%');
+		expect(formatPercent(1)).toBe('100.0%');
 	});
 });
