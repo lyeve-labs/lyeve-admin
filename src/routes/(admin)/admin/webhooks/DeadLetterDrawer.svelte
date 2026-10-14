@@ -218,6 +218,7 @@
 				/>
 			{/if}
 			<form method="POST" action="?/dead-letters" use:enhance bind:this={pageForm} class="hidden">
+				<input type="hidden" name="turn" value="page" />
 				<input type="hidden" name="offset" value={askedOffset} />
 			</form>
 		{/snippet}

@@ -171,5 +171,6 @@ describe('the queue and its own failures', () => {
 		next?.click();
 		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
 		expect(new FormData(pager).get('offset')).toBe('2');
+		expect(new FormData(pager).get('turn')).toBe('page');
 	});
 });

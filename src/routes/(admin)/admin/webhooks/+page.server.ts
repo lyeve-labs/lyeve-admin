@@ -207,6 +207,9 @@ export const actions: Actions = {
 			const client = authedClient(event);
 			const data = await request.formData();
 			const status = data.get('status');
+			// The open queue's pager says it turned a page, which page 1 alone
+			// cannot tell apart from the first read.
+			const turned = data.get('turn') === 'page';
 			const asked = Number(data.get('offset') ?? 0);
 			const offset = Number.isInteger(asked) && asked > 0 ? asked : 0;
 			const qs = new URLSearchParams({ limit: String(DEAD_LETTER_PAGE), offset: String(offset) });
@@ -225,7 +228,7 @@ export const actions: Actions = {
 			} catch (err) {
 				// A page turned inside the open queue reports there, and the first
 				// read reports above the list, where the button was.
-				return tagged(offset > 0 ? 'dead-letters-page' : 'dead-letters', actionFailure(err, 'Failed to load dead letters'));
+				return tagged(turned ? 'dead-letters-page' : 'dead-letters', actionFailure(err, 'Failed to load dead letters'));
 			}
 		},
 

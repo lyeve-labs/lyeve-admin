@@ -360,8 +360,11 @@ describe('admin/webhooks/+page.server.ts reads and writes an admin makes', () =>
 	});
 
 	it('reports a failed page turn inside the queue and a failed first read above the list', async () => {
-		const turned = postEvent({ offset: '50' }, () => json({ error: 'pq: timeout' }, 503));
+		const turned = postEvent({ turn: 'page', offset: '50' }, () => json({ error: 'pq: timeout' }, 503));
 		expect(await actions['dead-letters'](turned.event)).toMatchObject({ data: { action: 'dead-letters-page' } });
+		// A turn back to the first page is still a turn inside the open queue.
+		const back = postEvent({ turn: 'page', offset: '0' }, () => json({ error: 'pq: timeout' }, 503));
+		expect(await actions['dead-letters'](back.event)).toMatchObject({ data: { action: 'dead-letters-page' } });
 		const first = postEvent({}, () => json({ error: 'pq: timeout' }, 503));
 		expect(await actions['dead-letters'](first.event)).toMatchObject({ data: { action: 'dead-letters' } });
 	});
