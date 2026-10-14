@@ -227,9 +227,10 @@ export const actions: Actions = {
 
 	// Flushing is not a clearing convenience. Every flushed key is recomputed
 	// on its next request, so this is a deliberate load against the database
-	// and the page says so before it happens.
+	// and the page says so before it happens. The plugin admits a tenant admin
+	// and scopes the flush to the tenant.
 	flush: async (event) => {
-		await requireRole(event, ['super_admin']);
+		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const tag = String(form.get('tag') ?? '').trim();

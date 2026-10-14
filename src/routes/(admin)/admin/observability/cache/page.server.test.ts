@@ -212,9 +212,40 @@ describe('cache rule actions', () => {
 		expect(api.purgeResponses).toHaveBeenLastCalledWith(expect.anything(), '');
 	});
 
-	it('keeps the instance flush to a super admin', async () => {
+});
+
+describe('cache flush', () => {
+	// The plugin admits a tenant admin and scopes the flush to the tenant.
+	it('flushes for a tenant admin', async () => {
+		api.flushAll.mockResolvedValue(undefined);
+		expect(await actions.flush(formEvent({}))).toEqual({ flushed: 'everything' });
+		expect(api.flushAll).toHaveBeenCalled();
+	});
+
+	it('flushes one tag', async () => {
+		api.flushTag.mockResolvedValue(undefined);
+		expect(await actions.flush(formEvent({ tag: 'posts' }))).toEqual({ flushed: 'posts' });
+		expect(api.flushTag).toHaveBeenCalledWith(expect.anything(), 'posts');
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
 		await expect(actions.flush(formEvent({}))).rejects.toThrow('403');
 		expect(api.flushAll).not.toHaveBeenCalled();
+	});
+
+	it("relays the plugin's refusal", async () => {
+		api.flushTag.mockRejectedValue(new ApiError(403, "cannot flush another tenant's cache entries", {}));
+		const out = (await actions.flush(formEvent({ tag: 'tenant:other' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe("cannot flush another tenant's cache entries");
+	});
+
+	it('says an outage failed the flush', async () => {
+		api.flushAll.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.flush(formEvent({}))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('The cache could not be flushed.');
 	});
 });
 

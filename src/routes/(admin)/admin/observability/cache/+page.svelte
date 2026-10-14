@@ -170,7 +170,15 @@
 >
 	{#snippet actions()}
 		{#if data.gate.state === 'ok' && rules.gate.state === 'ok'}
-			<Button variant="primary" size="sm" onclick={openCreate}>
+			<!-- At the ceiling a create can only be refused, so the button waits
+			     and the warning beside the rules says why. -->
+			<Button
+				variant="primary"
+				size="sm"
+				onclick={openCreate}
+				disabled={rulesFull}
+				aria-describedby={rulesFull ? 'rules-full' : undefined}
+			>
 				<Plus size={ICON.sm} /> New rule
 			</Button>
 		{/if}
@@ -347,10 +355,12 @@
 				/>
 			{:else}
 				{#if rulesFull}
-					<Alert tone="warn" title="Every rule this install allows is in use">
-						{rules.limit?.current} of {rules.limit?.limit} rules are in use. Delete one to add another, or
-						change the license to allow more. Existing rules keep serving either way.
-					</Alert>
+					<div id="rules-full">
+						<Alert tone="warn" title="Every rule this install allows is in use">
+							{rules.limit?.current} of {rules.limit?.limit} rules are in use. Delete one to add another, or
+							change the license to allow more. Existing rules keep serving either way.
+						</Alert>
+					</div>
 				{/if}
 
 				<div class="flex flex-wrap items-end gap-2">
@@ -434,7 +444,6 @@
 			{/if}
 		</section>
 
-		{#if data.superAdmin}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Stored</SectionHeading>
 			<div class="flex flex-wrap items-center gap-2">
@@ -444,15 +453,21 @@
 						{data.flushScoped ? "Flush this tenant's responses" : 'Flush the cache'}
 					</Button>
 				</form>
-				{#each tags as tag (tag)}
-					<form method="POST" action="?/flush" use:enhance={flushTag(tag)}>
-						<input type="hidden" name="tag" value={tag} />
-						<Button variant="ghost" size="sm" type="submit">Flush {tag}</Button>
-					</form>
-				{/each}
+				{#if data.superAdmin}
+					{#each tags as tag (tag)}
+						<form method="POST" action="?/flush" use:enhance={flushTag(tag)}>
+							<input type="hidden" name="tag" value={tag} />
+							<Button variant="ghost" size="sm" type="submit">Flush {tag}</Button>
+						</form>
+					{/each}
+				{/if}
 			</div>
 
-			{#if data.entriesGate}
+			{#if !data.superAdmin}
+				<p class="text-sm text-muted">
+					The stored keys are listed for super admins only, because the store holds every tenant's keys.
+				</p>
+			{:else if data.entriesGate}
 				<GateNotice
 					gate={data.entriesGate}
 					title="the stored entries"
@@ -511,7 +526,6 @@
 				/>
 			{/if}
 		</section>
-		{/if}
 	{/if}
 </PageShell>
 

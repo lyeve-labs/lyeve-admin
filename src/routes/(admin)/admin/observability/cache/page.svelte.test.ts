@@ -126,15 +126,34 @@ describe('response cache rules', () => {
 		expect(screen.getByRole('button', { name: 'Purge tag' })).toBeTruthy();
 	});
 
-	it('keeps the instance flush off a tenant admin page', () => {
-		const { container } = render(CachePage, { props: props() });
-		expect(said(container)).not.toContain('Flush this tenant');
+	it('waits on New rule at the ceiling, with the warning as its reason', () => {
+		render(CachePage, {
+			props: props({
+				rules: { gate: { state: 'ok' }, rows: [rule], licensed: false, limit: { limit: 10, current: 10 } },
+			}),
+		});
+		const button = screen.getByRole('button', { name: /New rule/ }) as HTMLButtonElement;
+		expect(button.disabled).toBe(true);
+		expect(button.getAttribute('aria-describedby')).toBe('rules-full');
+		expect(document.getElementById('rules-full')?.textContent).toContain('Every rule this install allows is in use');
+	});
+
+	it('leaves New rule live below the ceiling', () => {
+		render(CachePage, { props: props() });
+		expect((screen.getByRole('button', { name: /New rule/ }) as HTMLButtonElement).disabled).toBe(false);
 	});
 });
 
 describe('flush', () => {
-	// The plugin scopes the flush to the tenant the request names. The button
-	// says what goes.
+	// The plugin scopes the flush to the tenant the request names, and it
+	// admits a tenant admin. The button says what goes.
+	it("offers a tenant admin the flush of this tenant's responses", () => {
+		const { container } = render(CachePage, { props: props() });
+		expect(screen.getByRole('button', { name: "Flush this tenant's responses" })).toBeTruthy();
+		expect(said(container)).not.toContain('Flush the cache');
+		expect(said(container)).toContain('listed for super admins only');
+	});
+
 	it('names the whole cache only where the session names no tenant', () => {
 		render(CachePage, { props: props({ superAdmin: true, flushScoped: false }) });
 		expect(screen.getByRole('button', { name: 'Flush the cache' })).toBeTruthy();
