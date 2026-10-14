@@ -899,6 +899,7 @@
 {:else}
 	<PageShell title="Flows" documentTitle={`${data.flow?.name ?? 'Flow'} - Flows`} width="wide">
 		<NotEnabled
+			level={2}
 			title="Flows"
 			description="The engine refused the flow routes."
 		/>

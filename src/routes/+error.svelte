@@ -23,5 +23,5 @@
 <!-- Outside the console's frame, so this one does own the viewport and centers
      itself in it. -->
 <div class="flex min-h-screen items-center justify-center px-page-x py-page-y">
-	<ErrorPanel {status} {message} homeHref="/" homeLabel="Home" />
+	<ErrorPanel level={2} {status} {message} homeHref="/" homeLabel="Home" />
 </div>

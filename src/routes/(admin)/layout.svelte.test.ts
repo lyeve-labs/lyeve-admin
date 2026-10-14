@@ -350,6 +350,11 @@ describe('admin shell plugin gate', () => {
 		expect(screen.getByRole('heading', { name: 'Search', level: 1 })).toBeTruthy();
 	});
 
+	it('heads the reason one level under the page title', async () => {
+		await mountWith('/admin/search', { plugins: kernel }, EDITOR);
+		expect(screen.getByRole('heading', { name: 'Not running', level: 2 })).toBeTruthy();
+	});
+
 	// The tab names the plugin's page and the tenant, as any other page's does.
 	it('titles the tab after the page whose plugin does not run', async () => {
 		setViewport(false);

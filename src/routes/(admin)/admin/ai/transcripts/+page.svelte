@@ -26,7 +26,7 @@
 	description="Every call from a route, a flow node, the editor assistant or another plugin, with what was asked and answered."
 	width="wide"
 >
-	<AiSection tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
+	<AiSection level={2} tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
 		{#if !data.aiSettings?.transcripts_enabled}
 			<p class="text-xs text-warn" role="status">
 				Transcript storage is off for this tenant, so nothing new is written here.

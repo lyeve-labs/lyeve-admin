@@ -469,6 +469,7 @@
 {:else}
 	<PageShell title="Flows" width="wide">
 		<NotEnabled
+			level={2}
 			title="Flows"
 			description="The engine refused the flow routes."
 		/>

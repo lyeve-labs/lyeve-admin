@@ -20,6 +20,14 @@ describe('NotEnabled', () => {
 		expect(getByTestId('not-enabled')).toBeTruthy();
 	});
 
+	it('heads at level 3 unless the caller sits under the page title and asks for 2', () => {
+		const inSection = render(NotEnabled, { props: { title: 'Audit log' } });
+		expect(inSection.getByRole('heading', { name: 'Audit log', level: 3 })).toBeTruthy();
+		cleanup();
+		const underTitle = render(NotEnabled, { props: { title: 'Audit log', level: 2 } });
+		expect(underTitle.getByRole('heading', { name: 'Audit log', level: 2 })).toBeTruthy();
+	});
+
 	it('shows what the feature does when told, and no empty paragraph when not', () => {
 		const told = render(NotEnabled, {
 			props: { title: 'Audit log', description: 'A hash-chained record of every change.' },

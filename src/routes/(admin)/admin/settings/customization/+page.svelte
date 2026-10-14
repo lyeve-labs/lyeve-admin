@@ -178,6 +178,7 @@
 		/>
 	{:else if !data.entitled}
 		<NotEnabled
+			level={2}
 			title="Customization"
 			description="Give each tenant its own name, logo and colors, a dashboard and a menu shaped to what its team uses, and pages built for that team."
 		/>

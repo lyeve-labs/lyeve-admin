@@ -318,7 +318,7 @@
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if !available && data.datasources.length === 0}
-			<NotEnabled title="Datasources" description="A flow that uses one is refused when it is saved." />
+			<NotEnabled level={2} title="Datasources" description="A flow that uses one is refused when it is saved." />
 		{:else if data.datasources.length === 0}
 			<EmptyState
 				level={2}
@@ -589,6 +589,6 @@
 	</form>
 {:else}
 	<PageShell title="Flows" documentTitle="Datasources - Flows" width="wide">
-		<NotEnabled title="Flows" description="Datasources belong to the flow plugin, and the engine refused its routes." />
+		<NotEnabled level={2} title="Flows" description="Datasources belong to the flow plugin, and the engine refused its routes." />
 	</PageShell>
 {/if}

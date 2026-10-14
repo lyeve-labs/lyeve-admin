@@ -159,6 +159,7 @@
 		/>
 	{:else if data.tenants.ok && !canProvision}
 		<NotEnabled
+			level={2}
 			title="Tenant provisioning"
 			description="Creating a tenant from this page. The tenants below can still be edited, disabled and deleted."
 		/>

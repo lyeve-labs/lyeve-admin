@@ -264,7 +264,7 @@
 	{/if}
 	{#if gated}
 		<PageShell title={gated.title} width="wide">
-			<NotRunning title={gated.title} plugin={gated.plugin} reason={gated.reason} {operator} />
+			<NotRunning level={2} title={gated.title} plugin={gated.plugin} reason={gated.reason} {operator} />
 		</PageShell>
 	{:else}
 		{@render children()}

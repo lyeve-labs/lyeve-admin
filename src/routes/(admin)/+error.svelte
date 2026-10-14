@@ -27,5 +27,5 @@
 	titleHidden
 	width="wide"
 >
-	<ErrorPanel {status} {message} homeHref="/admin" homeLabel="Dashboard" />
+	<ErrorPanel level={2} {status} {message} homeHref="/admin" homeLabel="Dashboard" />
 </PageShell>

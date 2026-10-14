@@ -108,7 +108,7 @@
 		{/if}
 	{/snippet}
 
-	<AiSection tab="prices" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prices">
+	<AiSection level={2} tab="prices" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prices">
 		<FormErrors message={pageFailure} />
 
 		{#if data.prices.length === 0}

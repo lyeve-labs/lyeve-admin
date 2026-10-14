@@ -29,7 +29,7 @@
 		{/if}
 	{/snippet}
 
-	<AiSection tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
+	<AiSection level={2} tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
 		{#if data.dashboard}
 			<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
 				<Stat size="sm" mono label="Providers" value="{data.dashboard.enabled_providers}/{data.dashboard.total_providers}" sub="enabled" />

@@ -45,6 +45,13 @@ describe('AiSection', () => {
 		expect(getByText('Not enabled on this instance.')).toBeTruthy();
 	});
 
+	it('heads its blocked state at the level the page asks for', () => {
+		const { getByRole } = render(AiSection, {
+			props: { tab: 'providers', gate: { state: 'absent' }, layoutGate: ok, noun: 'providers', level: 2, children: Body } as never,
+		});
+		expect(getByRole('heading', { name: 'The AI plugin is not installed', level: 2 })).toBeTruthy();
+	});
+
 	it('names the role and the resource when forbidden', () => {
 		const { getByText, queryByTestId } = setup({ state: 'forbidden' });
 		expect(getByText('Your role cannot read AI providers.')).toBeTruthy();

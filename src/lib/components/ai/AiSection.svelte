@@ -30,6 +30,7 @@
 		gate,
 		layoutGate,
 		noun,
+		level = 3,
 		children,
 	}: {
 		tab: AiTab;
@@ -39,6 +40,11 @@
 		layoutGate: AiGate;
 		/** The resource, in the plural, for the forbidden words. */
 		noun: string;
+		/**
+		 * The heading level of the title. 3 by default, for a block inside a
+		 * section. A caller placed straight under the page title passes 2.
+		 */
+		level?: 2 | 3;
 		children: Snippet;
 	} = $props();
 
@@ -85,12 +91,14 @@
 {:else if effective.state === 'locked'}
 	<NotEnabled
 		title="AI"
+		{level}
 		description="Providers, prompts, transcripts and the editor assistant are part of the AI plugin."
 	/>
 {:else if effective.state === 'forbidden'}
 	<Alert tone="danger" title="Not allowed">Your role cannot read AI {noun}.</Alert>
 {:else if effective.state === 'absent'}
 	<EmptyState
+		{level}
 		title="The AI plugin is not installed"
 		description="This instance does not carry the AI plugin, so there is nothing to configure here."
 	>
@@ -100,6 +108,7 @@
 	</EmptyState>
 {:else if effective.state === 'off'}
 	<EmptyState
+		{level}
 		title="AI is switched off for this tenant"
 		description="Every AI surface on this tenant is off: the providers, the editor assistant, the flow nodes and every call another plugin makes. Nothing is sent anywhere while it is off. The switch is the way back."
 	>
@@ -122,6 +131,7 @@
 	</EmptyState>
 {:else if effective.state === 'no_provider'}
 	<EmptyState
+		{level}
 		title="AI has nothing to answer through"
 		description="The plugin answered 503: no enabled provider is configured, or its store did not answer. Add or enable a provider, then try again."
 	>

@@ -236,6 +236,6 @@
 	</form>
 {:else}
 	<PageShell title="Flows" documentTitle="Variables - Flows" width="wide">
-		<NotEnabled title="Flows" description="Variables belong to the flow plugin, and the engine refused its routes." />
+		<NotEnabled level={2} title="Flows" description="Variables belong to the flow plugin, and the engine refused its routes." />
 	</PageShell>
 {/if}
