@@ -214,6 +214,8 @@ describe('the tenant drawer fields', () => {
 		const slug = document.body.querySelector<HTMLInputElement>('#slug');
 		expect(slug?.placeholder).toMatch(/^[a-z][a-z0-9_]{0,62}$/);
 		expect(document.body.textContent).toContain('Lowercase letters, digits and underscores, starting with a letter.');
+		// The plugin allows 63 characters on every database.
+		expect(document.body.textContent).toContain('At most 63 characters. It cannot be changed later.');
 	});
 
 	it('says what an emptied plan is stored as', async () => {

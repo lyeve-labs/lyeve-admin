@@ -314,7 +314,7 @@
 				name="slug"
 				required
 				placeholder="acme_corp"
-				hint="Lowercase letters, digits and underscores, starting with a letter. At most 63 characters, and fewer on some databases. It cannot be changed later."
+				hint="Lowercase letters, digits and underscores, starting with a letter. At most 63 characters. It cannot be changed later."
 				bind:value={slug}
 				error={errors.slug}
 			/>
