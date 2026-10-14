@@ -97,7 +97,7 @@ function setup(form: unknown = null, overrides: Record<string, unknown> = {}, co
 				variables: ['region'],
 				schemas: [],
 				runs: { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 0, total: 1, hasMore: false } },
-				versions: [],
+				versions: { ok: true, value: [] },
 				templates: fixtureTemplates,
 				entitlements: licensed,
 				assistant: 'ready',
@@ -693,7 +693,7 @@ describe('flow editor page', () => {
 		const live = { ...fixtureFlow, status: 'active', version: 2 };
 		const { container, getByRole } = setup(null, {
 			flow: live,
-			versions: [{ flow_id: live.id, version: 2, checksum: 'x', created_by: 'a', created_at: live.updated_at }],
+			versions: { ok: true, value: [{ flow_id: live.id, version: 2, checksum: 'x', created_by: 'a', created_at: live.updated_at }] },
 		});
 		const publish = () => getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
 		expect(publish().disabled).toBe(true);
@@ -742,6 +742,42 @@ describe('flow editor page', () => {
 		expect(container.querySelector('[data-node-id="render"]')?.className).toContain('border-danger');
 		expect(queryByTestId('flow-blocked')).toBeNull();
 		expect(queryByTestId('run-failure')).toBeNull();
+	});
+
+	it('names the nodes this instance does not enable when a test run is refused with 402', async () => {
+		const refusal = {
+			error: 'payment_required',
+			plugin: 'flow',
+			feature: 'feature:flow-pro',
+			upgrade_url: '',
+			ok: false,
+			errors: [{ node_id: 'orders', path: '/type', message: 'db.query needs flow-pro' }],
+		};
+		fetchMock = vi.fn(async (url: string) => {
+			const refused = String(url).endsWith('/test');
+			return new Response(JSON.stringify(refused ? refusal : { ok: true, errors: [] }), {
+				status: refused ? 402 : 200,
+				headers: { 'content-type': 'application/json' },
+			});
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const { getByRole, getByTestId, container, queryByText } = setup(null, { flow: { ...fixtureFlow, status: 'active', version: 1 } });
+		await fireEvent.click(getByRole('button', { name: 'Test' }));
+		await vi.waitFor(() => expect(getByTestId('flow-problems')).toBeTruthy());
+		expect(container.textContent).toContain('One element uses what this instance does not enable: orders.');
+		expect(container.querySelector('[data-node-id="orders"]')?.className).toContain('border-danger');
+		expect(queryByText('payment_required')).toBeNull();
+	});
+
+	it('says the versions could not be read, offers no rollback and never calls the draft unpublished', () => {
+		const live = { ...fixtureFlow, status: 'active', version: 2 };
+		const { getByTestId, queryByRole, getByRole } = setup(null, { flow: live, versions: { ok: false, gate: { state: 'unavailable' } } });
+		expect(getByTestId('versions-unread').textContent).toContain('The versions could not be read');
+		expect(queryByRole('button', { name: 'Roll back' })).toBeNull();
+		const publish = getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
+		expect(publish.disabled).toBe(false);
+		expect(publish.className).not.toContain('bg-brand');
+		expect(publish.parentElement?.textContent).toContain('this draft may already be live');
 	});
 
 	it('seeds the test trigger of a contributed trigger with its type alone and says where the payload keys go', () => {
@@ -958,14 +994,14 @@ describe('flow editor role grants', () => {
 		[...getByRole('toolbar', { name: 'Flow editor' }).querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim());
 
 	it('draws save for a flow the caller may update and hides test, publish, rollback and delete', () => {
-		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'update'] }, versions: [version] });
+		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'update'] }, versions: { ok: true, value: [version] } });
 		expect(toolbarNames(getByRole)).toEqual(['More actions', 'Node palette', 'Inspector', 'Focus mode', 'Save']);
 		expect(queryByRole('button', { name: 'Delete flow' })).toBeNull();
 		expect(queryByRole('button', { name: 'Roll back' })).toBeNull();
 	});
 
 	it('draws publish, test and rollback for a flow the caller may activate', () => {
-		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'activate'] }, versions: [version] });
+		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'activate'] }, versions: { ok: true, value: [version] } });
 		expect(toolbarNames(getByRole)).toEqual(['More actions', 'Node palette', 'Inspector', 'Focus mode', 'Test', 'Publish']);
 		expect(getByRole('button', { name: 'Roll back' })).toBeTruthy();
 		expect(queryByRole('button', { name: 'Save' })).toBeNull();

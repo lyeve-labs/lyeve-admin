@@ -89,7 +89,7 @@
 							Retention is set per instance, not per tenant. An hourly sweeper removes transcripts older than the window
 							on every tenant. The minimum is 1h and the default is 720h, thirty days.
 						</p>
-						{#if retention && instanceTranscripts}
+						{#if data.instanceReadable && retention && instanceTranscripts}
 							<DescriptionList
 								items={[
 									{ term: 'Retention', value: `${retention.value} (${retention.source})` },
@@ -113,9 +113,9 @@
 								Set outside the admin. Change it where it is set.
 							</p>
 						{:else if !data.isSuperAdmin}
-							<p class="text-xs text-faint">A super admin sets the window in the instance configuration.</p>
+							<p class="text-xs text-faint">The instance settings are visible to super admins, who set the window in the instance configuration.</p>
 						{:else}
-							<p class="text-xs text-faint">The instance configuration could not be read. The values shown are the defaults.</p>
+							<p class="text-xs text-faint">The instance configuration could not be read, so this instance's window is not shown.</p>
 						{/if}
 					</div>
 				</Card>

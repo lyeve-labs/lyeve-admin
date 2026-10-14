@@ -1,54 +1,8 @@
 <script lang="ts">
-	import {
-		Alert,
-		Badge,
-		Button,
-		ButtonGroup,
-		Dropdown,
-		EmptyState,
-		Input,
-		Kbd,
-		PageShell,
-		Pagination,
-		SectionHeading,
-		Select,
-		Table,
-		Textarea,
-		Toggle,
-		Toolbar,
-		Tooltip,
-		confirm,
-		toast,
-	} from '@lyeve-labs/ui-kit';
-	import {
-		ArrowLeft,
-		Ban,
-		BookOpen,
-		Database,
-		Download,
-		Ellipsis,
-		Expand,
-		FlaskConical,
-		Keyboard,
-		LayoutGrid,
-		LayoutTemplate,
-		Trash2,
-		PanelLeft,
-		PanelRight,
-		Play,
-		Redo2,
-		Rocket,
-		Save,
-		Shrink,
-		Undo2,
-		Upload,
-		Variable,
-		WandSparkles,
-		Workflow,
-	} from '@lucide/svelte';
+	import { Alert, Badge, Button, EmptyState, PageShell, Pagination, Table, confirm, toast } from '@lyeve-labs/ui-kit';
+	import { BookOpen, Download, Keyboard, LayoutGrid, LayoutTemplate, PanelLeft, Play, Upload, Workflow } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { listBack } from '$lib/back';
-	import { fromFlow } from '$lib/flow/back';
 	import { enhance } from '$app/forms';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { createClient } from '@lyeve-labs/client';
@@ -60,7 +14,9 @@
 	import FlowInspector from '$lib/components/flow/FlowInspector.svelte';
 	import EditorDrawer from '$lib/components/flow/EditorDrawer.svelte';
 	import SidePanel from '$lib/components/flow/SidePanel.svelte';
-	import RunViewer from '$lib/components/flow/RunViewer.svelte';
+	import FlowToolbar from '$lib/components/flow/FlowToolbar.svelte';
+	import FlowVersions from '$lib/components/flow/FlowVersions.svelte';
+	import TestPanel from '$lib/components/flow/TestPanel.svelte';
 	import FlowGuide from '$lib/components/flow/FlowGuide.svelte';
 	import AssistantPanel from '$lib/components/flow/AssistantPanel.svelte';
 	import FlowExportModal from '$lib/components/flow/FlowExportModal.svelte';
@@ -83,21 +39,21 @@
 		type ValidationResult,
 	} from '$lib/api/flows';
 	import { cleanJSON, cloneDefinition, nodeById, normalizeDefinition, specFor } from '$lib/flow/graph';
-	import type { AssistantAnswer, AssistantDraft, AssistantStatus } from '$lib/flow/assistant';
+	import { AssistantState } from '$lib/flow/assistant.svelte';
 	import type { AssistProblem } from '$lib/api/assist';
 	import { emptyDefinition, type FlowDefinition, type FlowStatus, type RefusalNotice, type Selection } from '$lib/flow/types';
 	import { tick, untrack } from 'svelte';
 	import { formatDuration } from '$lib/flow/time';
 	import { defaultTriggerJSON, statusTone, triggerLabel } from '$lib/flow/triggers';
-	import { blockedText, isBlockedMessage, missingPluginOf } from '$lib/flow/blocked';
+	import { blockedText, missingPluginOf } from '$lib/flow/blocked';
 	import { flowGrants } from '$lib/flow/permissions';
 	import { draftIsLive, writeButtons } from '$lib/flow/publish';
 	import { describeError } from '$lib/flow/problems';
-	import ProblemsMenu, { type ProblemItem } from '$lib/components/ProblemsMenu.svelte';
-	import { validationErrors, type ValidationError } from '$lib/api/flows';
+	import type { ProblemItem } from '$lib/components/ProblemsMenu.svelte';
+	import { FlowRefusal, refusalAware, type ValidationError } from '$lib/api/flows';
 	import { formatDateTime, relativeTime } from '$lib/format';
-	import { useShell } from '$lib/shell.svelte';
-	import { readFocus, writeFocus } from '$lib/flow/prefs';
+	import { focusMode } from '$lib/flow/focus.svelte';
+	import { parseTrigger, sampleKey, testFailure, untilOptions } from '$lib/flow/test-run';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -157,8 +113,11 @@
 	// it is not known to be. Publish has nothing to do while the draft on
 	// the canvas is that one and the flow is live.
 	let liveDraft = $state<string | null>(
-		untrack(() => (initial && draftIsLive(initial, data.versions) ? cleanJSON(definition) : null)),
+		untrack(() => (initial && data.versions.ok && draftIsLive(initial, data.versions.value) ? cleanJSON(definition) : null)),
 	);
+	// Without the versions nobody knows whether the saved draft is the live
+	// one, and the toolbar says so rather than calling it unpublished.
+	const versionsUnread = $derived(!data.versions.ok);
 
 	// Validation, 500 ms after the last change. A browser client so the CSRF
 	// cookie is echoed on the write. The saved draft was validated when it was
@@ -182,7 +141,7 @@
 		status = flow.status;
 		version = flow.version;
 		savedAt = flow.updated_at;
-		liveDraft = draftIsLive(flow, data.versions) ? saved : null;
+		liveDraft = data.versions.ok && draftIsLive(flow, data.versions.value) ? saved : null;
 		selected = null;
 		validation = null;
 		runBlocked = false;
@@ -200,7 +159,7 @@
 	 * same role and tenant as it does to the page's own reads.
 	 */
 	function browserClient() {
-		return createClient(fetch, csrfHeaders());
+		return createClient(refusalAware(fetch), csrfHeaders());
 	}
 
 	async function validate(snap: string) {
@@ -208,8 +167,11 @@
 		validating = true;
 		try {
 			validation = await validateFlow(browserClient(), flowId, JSON.parse(snap) as FlowDefinition);
-		} catch {
-			// A refused validation is not a broken draft. The save reports it.
+		} catch (err) {
+			// Nodes this instance does not enable are problems on the canvas,
+			// as the save would mark them.
+			if (err instanceof FlowRefusal && err.errors.length > 0) validation = { ok: false, errors: err.errors };
+			// Any other refused validation is not a broken draft. The save reports it.
 		} finally {
 			validating = false;
 		}
@@ -295,64 +257,18 @@
 	let paletteOpen = $state(true);
 	let inspectorOpen = $state(true);
 
-	// Focus mode: the app's sidebar narrows to its icon rail and the header
-	// goes while the editor is open, and the toolbar keeps the way back. The
-	// page owns the toggle and its memory. The layout only hears the ask
-	// through the shell context, and leaving the page withdraws it so the
-	// next page gets its frame back.
-	const shell = useShell();
-	let focus = $state(false);
-	let focusRestored = false;
-
-	function storage(): Storage | null {
-		try {
-			return typeof localStorage === 'undefined' ? null : localStorage;
-		} catch {
-			return null;
-		}
-	}
-
-	$effect(() => {
-		// Read first and unconditionally, as the sidebar's own memory does: an
-		// effect that only writes on its first pass never depends on the state
-		// and never runs again.
-		const on = focus;
-		if (!focusRestored) {
-			focusRestored = true;
-			focus = readFocus(storage());
-			return;
-		}
-		writeFocus(storage(), on);
-	});
-
-	$effect(() => {
-		if (shell) shell.focus = focus;
-	});
-
-	// The opening fit uses the width the canvas has beside the sidebar and
-	// under the header. Focus mode changes both, so the fit runs again once
-	// the shell has laid out. Under a test there is no shell and no layout.
-	$effect(() => {
-		void focus;
-		if (!shell) return;
-		tick().then(() => canvas?.openingFit());
-	});
-
-	$effect(() => () => {
-		if (shell) shell.focus = false;
-	});
+	// Focus mode hides the shell's frame while the editor is open, and fits
+	// the canvas again once the frame has changed.
+	const focus = focusMode(() => canvas?.openingFit());
 
 	// Test runs
 	let triggerJSON = $state('');
 	let triggerType = $state('');
-	// The kind of an event trigger changes the payload shape as much as the
-	// type does, and a system event's name and scope are part of it, so the
-	// sample follows those and nothing else in the config.
 	$effect(() => {
-		const { type, config } = definition.trigger;
-		const key = type === 'trigger.event' && config.kind === 'system' ? `${type}:system:${String(config.name ?? '')}:${String(config.schema ?? '')}` : `${type}:${String(config.kind ?? '')}`;
+		const key = sampleKey(definition.trigger);
 		if (key !== triggerType) {
 			triggerType = key;
+			const { type, config } = definition.trigger;
 			triggerJSON = defaultTriggerJSON(type, untrack(() => config), specFor(data.catalog, type));
 		}
 	});
@@ -367,24 +283,19 @@
 	// catalog names none of the keys, so the hint says where they go.
 	const contributedTrigger = $derived(specFor(data.catalog, definition.trigger.type)?.plugin !== undefined);
 
-	const nodeOptions = $derived([
-		{ value: '', label: 'Run to the end' },
-		...definition.nodes.map((n) => ({ value: n.id, label: n.name ? `${n.name} (${n.id})` : n.id })),
-	]);
+	const nodeOptions = $derived(untilOptions(definition.nodes));
 
 	async function runTest() {
-		let trigger: unknown;
-		try {
-			trigger = triggerJSON.trim() ? JSON.parse(triggerJSON) : {};
-		} catch {
-			testError = 'The trigger is not valid JSON.';
+		const trigger = parseTrigger(triggerJSON);
+		if (!trigger.ok) {
+			testError = trigger.error;
 			return;
 		}
 		testing = true;
 		testError = '';
 		try {
 			lastRun = await testFlow(browserClient(), flowId, {
-				trigger,
+				trigger: trigger.value,
 				definition: cloneDefinition(definition),
 				live,
 				until_node: untilNode || undefined,
@@ -393,24 +304,17 @@
 			tab = 'test';
 			drawerOpen = true;
 		} catch (err) {
-			const message = err instanceof Error ? err.message : '';
-			// The engine refuses a blocked flow with one static message, and a
-			// definition naming a type no started plugin contributes with the
-			// validation list. Neither is a run that failed: the first is the
-			// banner, the second lands on the node it names.
-			if (isBlockedMessage(message)) {
+			const failure = testFailure(err);
+			if (failure.kind === 'blocked') {
 				runBlocked = true;
 				drawerOpen = false;
 				return;
 			}
-			const refused = validationErrors(message);
-			if (refused.length > 0) {
-				validation = { ok: false, errors: refused };
+			if (failure.errors.length > 0) {
+				validation = { ok: false, errors: failure.errors };
 				showProblems = true;
-				testError = 'The definition did not validate.';
-				return;
 			}
-			testError = message || 'The test run failed.';
+			testError = failure.text;
 		} finally {
 			testing = false;
 		}
@@ -479,43 +383,15 @@
 		{ id: 'guide', label: 'Guide' },
 	]);
 
-	// The assistant. The page holds what the two actions answered. The tab
-	// renders it. A draft is never written anywhere until it is accepted onto
-	// the canvas, and from there it is saved like any other edit.
-	let assistStatus = $state<AssistantStatus>('idle');
-	let assistMessage = $state('');
-	let assistBusy = $state<'draft' | 'answer' | null>(null);
-	let assistPrompt = $state('');
-	let assistDraft = $state<AssistantDraft | null>(null);
-	let assistAnswer = $state<AssistantAnswer | null>(null);
-	let conversationId = $state('');
-	// What the hidden explain form asks about. Set, then submitted on the next tick.
-	let explainTarget = $state<{ node_id: string; problem: string }>({ node_id: '', problem: '' });
-	let explainForm = $state<HTMLFormElement>();
-
-	const assistSubmit: SubmitFunction = () => {
-		assistBusy = 'draft';
-		assistStatus = 'idle';
-		return async ({ update }) => {
-			await update({ reset: false });
-			assistBusy = null;
-		};
-	};
-
-	const explainSubmit: SubmitFunction = () => {
-		assistBusy = 'answer';
-		assistStatus = 'idle';
+	const assistant = new AssistantState(() => {
 		tab = 'assistant';
 		drawerOpen = true;
-		return async ({ update }) => {
-			await update({ reset: false });
-			assistBusy = null;
-		};
-	};
+	});
+	let explainForm = $state<HTMLFormElement>();
 
 	/** Asks about a node or a problem through the hidden explain form. */
 	async function ask(target: { node_id?: string; problem?: ValidationError }) {
-		explainTarget = { node_id: target.node_id ?? '', problem: target.problem ? JSON.stringify(target.problem) : '' };
+		assistant.explainTarget = { node_id: target.node_id ?? '', problem: target.problem ? JSON.stringify(target.problem) : '' };
 		await tick();
 		explainForm?.requestSubmit();
 	}
@@ -527,7 +403,7 @@
 	 * flow's next version, not a new flow.
 	 */
 	async function acceptDraft() {
-		const draft = assistDraft?.draft;
+		const draft = assistant.draft?.draft;
 		if (!draft?.definition || draft.problems.length > 0) return;
 		definition = normalizeDefinition({
 			...draft.definition,
@@ -535,22 +411,10 @@
 			slug: definition.slug,
 		});
 		selected = null;
-		assistDraft = null;
+		assistant.draft = null;
 		await tick();
 		canvas?.fit();
 		toast.success('Draft accepted. Save to keep it.');
-	}
-
-	function discardDraft() {
-		assistDraft = null;
-		conversationId = '';
-	}
-
-	function resetConversation() {
-		assistDraft = null;
-		assistAnswer = null;
-		conversationId = '';
-		assistStatus = 'idle';
 	}
 
 	/** A draft problem names a node. When the canvas has one by that id it is selected. */
@@ -616,30 +480,11 @@
 		if ('errors' in form && Array.isArray(form.errors)) {
 			validation = { ok: false, errors: form.errors };
 		}
-		if ('assist' in form && form.assist) {
-			assistDraft = form.assist;
-			assistStatus = 'idle';
-			assistMessage = '';
-			assistPrompt = '';
-			conversationId = form.assist.draft.conversation_id ?? conversationId;
-			tab = 'assistant';
-			drawerOpen = true;
-		}
-		if ('explain' in form && form.explain) {
-			assistAnswer = form.explain;
-			assistStatus = 'idle';
-			assistMessage = '';
-			conversationId = form.explain.answer.conversation_id ?? conversationId;
-			tab = 'assistant';
-			drawerOpen = true;
-		}
-		if ('assistRefused' in form && form.assistRefused) {
-			const r = form.assistRefused;
-			assistStatus = r.state;
-			assistMessage = 'message' in r ? r.message : '';
-			tab = 'assistant';
-			drawerOpen = true;
-		}
+		assistant.apply({
+			assist: 'assist' in form ? form.assist : null,
+			explain: 'explain' in form ? form.explain : null,
+			assistRefused: 'assistRefused' in form ? form.assistRefused : null,
+		});
 	}
 
 	function onKey(e: KeyboardEvent) {
@@ -649,21 +494,11 @@
 			if (can.update && dirty) saveForm?.requestSubmit();
 		} else if (e.shiftKey && e.key.toLowerCase() === 'f') {
 			e.preventDefault();
-			focus = !focus;
+			focus.on = !focus.on;
 		}
 	}
 
 	let saveForm = $state<HTMLFormElement>();
-
-	// One word for where the flow stands, with the live version beside it.
-	// Draft, published and disabled are the states an editor sets. Blocked
-	// is the engine's, for a published flow whose version names a node type
-	// that no started plugin contributes.
-	const STATUS_WORD: Record<FlowStatus, string> = { draft: 'Draft', active: 'Published', disabled: 'Disabled', blocked: 'Blocked' };
-	const statusLabel = $derived.by(() => {
-		const word = STATUS_WORD[status] ?? 'Draft';
-		return version > 0 ? `${word} v${version}` : word;
-	});
 
 	// A run the engine refused because the flow is blocked. The status the
 	// page loaded with can lag the engine's, so the refusal is a second way
@@ -708,6 +543,7 @@
 		writeButtons({
 			dirty,
 			live: status === 'active' && liveDraft === canonical,
+			liveUnknown: status === 'active' && versionsUnread && liveDraft !== canonical,
 			publishable: canPublish,
 			refusal: blocked ? blockedHint : definition.nodes.length === 0 ? 'Add a node before publishing' : 'Fix the issues before publishing',
 		}),
@@ -775,180 +611,55 @@
 			</form>
 			<form method="POST" action="?/disable" use:enhance={disableFlow.enhance} id="flow-disable" class="hidden" bind:this={disableForm}></form>
 			{#if assistantOn}
-				<form method="POST" action="?/explain" use:enhance={explainSubmit} bind:this={explainForm} id="flow-explain" class="hidden">
+				<form method="POST" action="?/explain" use:enhance={assistant.explainSubmit} bind:this={explainForm} id="flow-explain" class="hidden">
 					<input type="hidden" name="definition" value={definitionJSON} />
-					<input type="hidden" name="node_id" value={explainTarget.node_id} />
-					<input type="hidden" name="problem" value={explainTarget.problem} />
-					<input type="hidden" name="conversation_id" value={conversationId} />
+					<input type="hidden" name="node_id" value={assistant.explainTarget.node_id} />
+					<input type="hidden" name="problem" value={assistant.explainTarget.problem} />
+					<input type="hidden" name="conversation_id" value={assistant.conversationId} />
 				</form>
 			{/if}
 
-			<div class="shrink-0 border-b border-line px-3 py-2">
-				<Toolbar label="Flow editor">
-					<a
-						href={back.href}
-						data-testid="page-back"
-						class="relative hit-area -ms-1 inline-flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-xs text-muted outline-none transition-colors duration-base hover:text-fg focus-visible:ring-2 focus-visible:ring-brand"
-					>
-						<ArrowLeft size={ICON.sm} aria-hidden="true" class="shrink-0" />
-						{back.label}
-					</a>
-					<!-- The row reads as the schema builder's: the page's own tools on
-					     the left, then the thing being edited and its state. A datasource
-					     or a variable is what a node most often turns out to be missing,
-					     so both are a click from the canvas. The words show once the row
-					     has room for them. -->
-					{#if isAdmin}
-						<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/datasources', flowId)} aria-label="Datasources" data-testid="flow-datasources">
-							<Database size={ICON.sm} />
-							<span class="hidden 2xl:inline">Datasources</span>
-						</Button>
-						<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/variables', flowId)} aria-label="Variables" data-testid="flow-variables">
-							<Variable size={ICON.sm} />
-							<span class="hidden 2xl:inline">Variables</span>
-						</Button>
-					{/if}
-					<Dropdown items={overflow} align="left">
-						{#snippet trigger({ open, toggle })}
-							<Button variant="ghost" size="sm" aria-label="More actions" aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
-								<Ellipsis size={ICON.sm} />
-							</Button>
-						{/snippet}
-					</Dropdown>
-					<Input
-						id="flow-name"
-						aria-label="Flow name"
-						value={definition.name}
-						class="w-48 lg:w-56"
-						oninput={(e) => (definition = { ...definition, name: e.currentTarget.value })}
-					/>
-					<Tooltip text={pillHint} position="bottom">
-						<span class="inline-flex items-center gap-2" data-testid="flow-status">
-							{#if definition.slug}
-								<code class="hidden truncate font-mono text-xs text-faint lg:inline">{definition.slug}</code>
-							{/if}
-							<Badge tone={statusTone(status)} dot>{statusLabel}</Badge>
-							{#if dirty}
-								<Badge tone="warn" dot>Unsaved changes</Badge>
-							{:else}
-								<Badge tone="success" dot>Saved</Badge>
-							{/if}
-						</span>
-					</Tooltip>
-					<ProblemsMenu
-						id="flow-problems"
-						title="Fix these before publishing"
-						problems={problemItems}
-						bind:open={showProblems}
-						onjump={(p) => {
+			<FlowToolbar
+				{back}
+				{flowId}
+				shortcuts={isAdmin}
+				{overflow}
+				name={definition.name}
+				onname={(name) => (definition = { ...definition, name })}
+				slug={definition.slug}
+				{status}
+				{version}
+				{dirty}
+				{pillHint}
+				problems={problemItems}
+				bind:showProblems
+				onjump={(p) => {
+					const err = errorOf(p);
+					if (err) focusProblem(err);
+				}}
+				onask={assistantOn
+					? (p) => {
 							const err = errorOf(p);
-							if (err) focusProblem(err);
-						}}
-					>
-						{#snippet action(p)}
-							{#if assistantOn}
-								<Button
-									variant="ghost"
-									size="sm"
-									aria-label="Ask the assistant about this problem"
-									disabled={assistBusy !== null}
-									onclick={() => {
-										const err = errorOf(p);
-										if (err) void ask({ problem: err });
-									}}
-								>
-									<WandSparkles size={ICON.sm} />
-								</Button>
-							{/if}
-						{/snippet}
-					</ProblemsMenu>
-					{#snippet actions()}
-						<!-- The panes are overlays up to xl:. Docked at md: they would leave
-						     a 768px window, with the shell's sidebar, no canvas at all. -->
-						<ButtonGroup class="xl:hidden">
-							<Button variant="ghost" size="sm" aria-label="Node palette" aria-pressed={showPalette} onclick={() => { showPalette = !showPalette; showInspector = false; }}>
-								<PanelLeft size={ICON.sm} />
-							</Button>
-							<Button variant="ghost" size="sm" aria-label="Inspector" aria-pressed={showInspector} onclick={() => { showInspector = !showInspector; showPalette = false; }}>
-								<PanelRight size={ICON.sm} />
-							</Button>
-						</ButtonGroup>
-						<!-- The list editor keeps no history, so it offers no undo. -->
-						{#if hasFlowCanvas}
-							<ButtonGroup>
-								<Button variant="ghost" size="sm" disabled={!history.canUndo} onclick={() => canvas?.undo()} aria-label="Undo" hint="Undo (Ctrl+Z)">
-									<Undo2 size={ICON.sm} />
-								</Button>
-								<Button variant="ghost" size="sm" disabled={!history.canRedo} onclick={() => canvas?.redo()} aria-label="Redo" hint="Redo (Ctrl+Shift+Z)">
-									<Redo2 size={ICON.sm} />
-								</Button>
-							</ButtonGroup>
-						{/if}
-						<Button
-							variant="ghost"
-							size="sm"
-							class="hidden md:inline-flex"
-							aria-label={focus ? 'Exit focus mode' : 'Focus mode'}
-							aria-pressed={focus}
-							hint={focus ? 'Exit focus mode (Ctrl+Shift+F)' : 'Focus mode (Ctrl+Shift+F)'}
-							data-testid="focus-toggle"
-							onclick={() => (focus = !focus)}
-						>
-							{#if focus}<Shrink size={ICON.sm} />{:else}<Expand size={ICON.sm} />{/if}
-						</Button>
-						<!-- The flow's lifecycle, icon-only in the danger tone beside the
-						     primary actions, as the schema builder places its delete. -->
-						{#if status === 'active' && can.activate}
-							<Button variant="ghost" size="sm" class="text-danger" aria-label="Disable flow" hint="Stop serving the published version" onclick={() => disableForm?.requestSubmit()}>
-								<Ban size={ICON.sm} />
-							</Button>
-						{/if}
-						{#if can.delete}
-							<Button variant="ghost" size="sm" class="text-danger" aria-label="Delete flow" hint="Delete the flow, its versions and its runs" onclick={askDelete}>
-								<Trash2 size={ICON.sm} />
-							</Button>
-						{/if}
-						{#if can.activate}
-							<Button variant="secondary" size="sm" onclick={runTest} loading={testing}>
-								<FlaskConical size={ICON.sm} />
-								Test
-							</Button>
-						{/if}
-						{#if can.update}
-							<Button variant={writes.save.variant} size="sm" type="submit" form="flow-save" disabled={writes.save.disabled} hint={writes.save.hint} loading={saveFlow.pending}>
-								<Save size={ICON.sm} />
-								Save
-							</Button>
-						{/if}
-						{#if can.activate}
-							<Button variant={writes.publish.variant} size="sm" type="submit" form="flow-publish" disabled={writes.publish.disabled} hint={writes.publish.hint} loading={publishFlow.pending}>
-								<Rocket size={ICON.sm} />
-								Publish
-							</Button>
-						{/if}
-					{/snippet}
-				</Toolbar>
-				{#if showKeys}
-					<p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint" data-testid="keyboard-hints">
-						{#if hasFlowCanvas}
-							<span><Kbd>Ctrl</Kbd> <Kbd>Z</Kbd> undo</span>
-							<span><Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>Z</Kbd> redo</span>
-						{/if}
-						<span><Kbd>Del</Kbd> remove the selection</span>
-						{#if hasFlowCanvas}
-							<span><Kbd>Shift</Kbd> drag to select several, <Kbd>Shift</Kbd> click to add one</span>
-							<span><Kbd>Space</Kbd> drag to pan</span>
-							<span><Kbd>Alt</Kbd> drag off the grid</span>
-							<span><Kbd>+</Kbd> <Kbd>-</Kbd> zoom, <Kbd>Shift</Kbd> <Kbd>1</Kbd> fit, <Kbd>Shift</Kbd> <Kbd>0</Kbd> 100%</span>
-							<span><Kbd>Tab</Kbd> to a node, <Kbd>Enter</Kbd> to select it, arrows to nudge</span>
-						{:else}
-							<span><Kbd>Tab</Kbd> to a node, <Kbd>Enter</Kbd> to select it</span>
-						{/if}
-						<span><Kbd>Ctrl</Kbd> <Kbd>S</Kbd> save</span>
-						<span><Kbd>Ctrl</Kbd> <Kbd>Shift</Kbd> <Kbd>F</Kbd> focus mode</span>
-					</p>
-				{/if}
-			</div>
+							if (err) void ask({ problem: err });
+						}
+					: undefined}
+				askBusy={assistant.busy !== null}
+				bind:showPalette
+				bind:showInspector
+				{history}
+				onundo={() => canvas?.undo()}
+				onredo={() => canvas?.redo()}
+				bind:focus={focus.on}
+				{can}
+				ondisable={() => disableForm?.requestSubmit()}
+				ondelete={askDelete}
+				ontest={runTest}
+				{testing}
+				{writes}
+				saving={saveFlow.pending}
+				publishing={publishFlow.pending}
+				{showKeys}
+			/>
 
 			{#if data.catalogGate.state !== 'ok'}
 				<!-- The palette and every inspector form come from the node types,
@@ -1076,25 +787,7 @@
 					/>
 					{#if !selected}
 						<div class="flex flex-col gap-3 border-t border-line p-4">
-							{#if data.versions.length > 0}
-								<SectionHeading level={2} variant="eyebrow">Versions</SectionHeading>
-								<ul class="flex flex-col gap-1 text-sm">
-									{#each data.versions as v (v.version)}
-										<li class="flex items-center justify-between gap-2">
-											<span class="text-fg">v{v.version}</span>
-											<span class="text-xs text-faint" title={formatDateTime(v.created_at)}>{relativeTime(v.created_at)}</span>
-											{#if v.version !== version && can.activate}
-												<form method="POST" action="?/rollback" use:enhance>
-													<input type="hidden" name="version" value={v.version} />
-													<Button variant="ghost" size="sm" type="submit">Roll back</Button>
-												</form>
-											{:else if v.version === version}
-												<Badge tone="success" size="sm">live</Badge>
-											{/if}
-										</li>
-									{/each}
-								</ul>
-							{/if}
+							<FlowVersions versions={data.versions} {version} canRollback={can.activate} />
 						</div>
 					{/if}
 				</SidePanel>
@@ -1102,36 +795,18 @@
 
 			<EditorDrawer bind:open={drawerOpen} active={tab} items={tabs} onchange={(id) => (tab = id)}>
 				{#if tab === 'test'}
-					<div class="flex h-full min-h-0 flex-col md:flex-row">
-						<div
-							class="flex shrink-0 flex-col gap-3 overflow-y-auto border-b border-line p-3 md:w-72 md:border-b-0 md:border-r lg:w-80"
-						>
-							<Textarea
-								id="test-trigger"
-								label="Trigger"
-								hint={contributedTrigger
-									? 'What the trigger hands the flow. The plugin puts its payload keys beside type. Add the ones the flow reads.'
-									: 'What the trigger hands the flow. Edit it to test another input.'}
-								rows={6}
-								bind:value={triggerJSON}
-								mono
-							/>
-							<Toggle id="test-live" label="Live side effects" hint="Off runs writes and calls as dry runs." bind:checked={live} />
-							<Select id="test-until" label="Until node" options={nodeOptions} placeholder="Run to the end" searchable bind:value={untilNode} />
-							{#if testError}
-								<Alert tone="danger">
-									{#snippet children()}{testError}{/snippet}
-								</Alert>
-							{/if}
-							<Button variant="primary" onclick={runTest} loading={testing}>
-								<Play size={ICON.sm} />
-								Run test
-							</Button>
-						</div>
-						<div class="min-w-0 flex-1">
-							<RunViewer run={lastRun} focus={focusStep} onrerun={runTest} rerunning={testing} />
-						</div>
-					</div>
+					<TestPanel
+						bind:triggerJSON
+						bind:live
+						bind:untilNode
+						{nodeOptions}
+						contributed={contributedTrigger}
+						error={testError}
+						{testing}
+						run={lastRun}
+						focus={focusStep}
+						onrun={runTest}
+					/>
 				{:else if tab === 'runs'}
 					<div class="flex h-full flex-col gap-3 overflow-y-auto p-3">
 						{#if !data.runs.ok}
@@ -1183,19 +858,19 @@
 					</div>
 				{:else if tab === 'assistant' && assistantOn}
 					<AssistantPanel
-						status={assistStatus}
-						message={assistMessage}
-						busy={assistBusy}
+						status={assistant.status}
+						message={assistant.message}
+						busy={assistant.busy}
 						{definitionJSON}
-						{conversationId}
-						bind:prompt={assistPrompt}
-						draft={assistDraft}
-						answer={assistAnswer}
-						onsubmit={assistSubmit}
+						conversationId={assistant.conversationId}
+						bind:prompt={assistant.prompt}
+						draft={assistant.draft}
+						answer={assistant.answer}
+						onsubmit={assistant.submit}
 						onaccept={() => void acceptDraft()}
-						ondiscard={discardDraft}
-						onclose={() => (assistAnswer = null)}
-						onreset={resetConversation}
+						ondiscard={() => assistant.discard()}
+						onclose={() => (assistant.answer = null)}
+						onreset={() => assistant.reset()}
 						onproblem={focusDraftProblem}
 					/>
 				{:else}

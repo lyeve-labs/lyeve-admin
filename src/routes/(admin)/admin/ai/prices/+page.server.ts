@@ -42,7 +42,7 @@ export const actions: Actions = {
 			await putPrice(authedClient(event), kind, model, { input_per_1k: input, output_per_1k: output, image_per_call: image });
 			return { key, saved: true };
 		} catch (err) {
-			return fail(400, { action: 'save', key, error: aiActionError(err, 'Failed to save the price') });
+			return fail(400, { action: 'save', key, error: aiActionError(err, 'Failed to save the price', 'super_admin') });
 		}
 	},
 
@@ -56,7 +56,7 @@ export const actions: Actions = {
 			await deletePrice(authedClient(event), kind, model);
 			return { key, deleted: true };
 		} catch (err) {
-			return fail(400, { action: 'delete', key, error: aiActionError(err, 'Failed to delete the price') });
+			return fail(400, { action: 'delete', key, error: aiActionError(err, 'Failed to delete the price', 'super_admin') });
 		}
 	},
 };

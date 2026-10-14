@@ -17,14 +17,25 @@ interface ConfigProvenance {
 	settings: { key: string; source: string; value?: string; editable: boolean }[];
 }
 
+interface ConfigRefusal {
+	refused?: { key: string; reason: string; origin?: string }[];
+}
+
+/** The first refusal a config save answered, as a sentence, or null when it refused nothing. */
+function refusalOf(body: unknown): string | null {
+	const r = (body as ConfigRefusal | null | undefined)?.refused?.[0];
+	if (!r || typeof r.reason !== 'string') return null;
+	return r.origin ? `${r.reason} (${r.origin})` : r.reason;
+}
+
 const INSTANCE_KEYS = ['ai_transcript_retention', 'ai_transcripts_enabled'];
 const DEFAULTS: Record<string, string> = { ai_transcript_retention: '720h', ai_transcripts_enabled: 'true' };
 
 /**
  * The switch itself comes from the layout. What this load adds is the
  * instance side of retention: the config route is super_admin only and its
- * absence is not a failure of the page, so a refusal leaves the defaults
- * with their source named.
+ * absence is not a failure of the page. Without a read the values stay
+ * unknown, and the page shows none of them as this instance's.
  */
 export const load: PageServerLoad = async (event) => {
 	const { user } = await event.parent();
@@ -61,7 +72,8 @@ export const actions: Actions = {
 			const settings = await putAiSettings(authedClient(event), body);
 			return { scope: 'switch', settings };
 		} catch (err) {
-			return fail(400, { scope: 'switch', error: aiActionError(err, 'The setting could not be saved') });
+			const status = err instanceof ApiError && err.status === 403 ? 403 : 400;
+			return fail(status, { scope: 'switch', error: aiActionError(err, 'The setting could not be saved') });
 		}
 	},
 
@@ -75,14 +87,18 @@ export const actions: Actions = {
 			return fail(400, { scope: 'config', key, error: 'Retention is a Go duration such as 720h; the minimum is 1h.' });
 		}
 		try {
-			const result = await authedClient(event).put<{ refused?: { key: string; reason: string; origin?: string }[] }>('/api/admin/config', {
+			const result = await authedClient(event).put<ConfigRefusal>('/api/admin/config', {
 				values: { [key]: value },
 			});
-			const refusal = result.refused?.[0];
-			if (refusal) return fail(409, { scope: 'config', key, error: refusal.origin ? `${refusal.reason} (${refusal.origin})` : refusal.reason });
+			const refusal = refusalOf(result);
+			if (refusal) return fail(409, { scope: 'config', key, error: refusal });
 			return { scope: 'config', key, success: true };
 		} catch (err) {
-			if (err instanceof ApiError) return fail(err.status, { scope: 'config', key, error: aiActionError(err, 'Could not save the setting') });
+			// The engine answers a save it refuses whole with 409 and the same
+			// refused list, with no error field to relay.
+			const whole = err instanceof ApiError && err.status === 409 ? refusalOf(err.body) : null;
+			if (whole) return fail(409, { scope: 'config', key, error: whole });
+			if (err instanceof ApiError) return fail(err.status, { scope: 'config', key, error: aiActionError(err, 'Could not save the setting', 'super_admin') });
 			return fail(500, { scope: 'config', key, error: 'Could not save the setting' });
 		}
 	},

@@ -47,3 +47,14 @@ export function missingPluginOf(errors: readonly ValidationError[]): string | nu
 export function blockedText(plugin: string | null = null): string {
 	return plugin ? `${BLOCKED_TEXT} It needs the ${plugin} plugin, which is not started.` : BLOCKED_TEXT;
 }
+
+/**
+ * The sentence for a 402 that names the elements this instance does not
+ * enable, or the routes as a whole when it names none. A save, a publish and
+ * a test run each say it in these words.
+ */
+export function notEnabledText(nodeIds: readonly string[]): string {
+	if (nodeIds.length === 0) return 'Flows are not enabled on this instance.';
+	const named = nodeIds.map((id) => (id === 'trigger' ? 'the trigger' : id)).join(', ');
+	return `${nodeIds.length === 1 ? 'One element uses' : `${nodeIds.length} elements use`} what this instance does not enable: ${named}.`;
+}

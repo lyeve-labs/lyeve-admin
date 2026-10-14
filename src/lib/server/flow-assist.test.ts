@@ -14,6 +14,17 @@ describe('assistRefusal', () => {
 		expect(assistRefusal(new Error('boom'))).toEqual({ state: 'error', message: 'The assistant did not answer. Try again.' });
 	});
 
+	it('reads a spent budget as an error that keeps the prompt live, not as the license', () => {
+		const budget = new ApiError(402, 'ai budget exhausted for this billing period', { error: 'ai budget exhausted for this billing period', code: 'http_402' });
+		const refusal = assistRefusal(budget);
+		expect(refusal.state).toBe('error');
+		expect((refusal as { message: string }).message).toContain('budget for this billing period is spent');
+		const license = new ApiError(402, 'payment_required', { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' });
+		expect(assistRefusal(license)).toEqual({ state: 'locked' });
+		const other = new ApiError(402, 'this request needs a paid plan', { error: 'this request needs a paid plan', code: 'http_402' });
+		expect(assistRefusal(other)).toEqual({ state: 'locked' });
+	});
+
 	it('reads a missing catalog route as unavailable and a 402 on it as locked', () => {
 		expect(assistRefusal(new CatalogError(404, 'not found'))).toMatchObject({ state: 'unavailable' });
 		expect(assistRefusal(new CatalogError(402, 'ai is not enabled'))).toEqual({ state: 'locked' });

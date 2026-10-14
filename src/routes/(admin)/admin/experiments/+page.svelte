@@ -208,7 +208,8 @@
 		{:else}
 			<ListToolbar label="Filter experiments">
 				{#snippet search()}
-					<SearchInput bind:value={narrow} placeholder="Search experiments" />
+					<label for="experiment-search" class="sr-only">Search experiments</label>
+					<SearchInput id="experiment-search" bind:value={narrow} placeholder="Search experiments" />
 				{/snippet}
 			</ListToolbar>
 

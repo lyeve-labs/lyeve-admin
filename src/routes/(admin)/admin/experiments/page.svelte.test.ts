@@ -67,6 +67,11 @@ describe('the gate', () => {
 describe('the moves on a row', () => {
 	// A control that can only answer 409 is worse than no control, so the row
 	// draws the transitions the engine accepts and no others.
+	it('names the search box by a label, not by its placeholder', () => {
+		const { getByLabelText } = render(ExperimentsPage, { props: props() });
+		expect(getByLabelText('Search experiments').tagName).toBe('INPUT');
+	});
+
 	it('offers pause and stop while running, and never resume', () => {
 		const { getAllByRole } = render(ExperimentsPage, { props: props() });
 		const labels = getAllByRole('button').map((b) => (b.textContent ?? '').trim());

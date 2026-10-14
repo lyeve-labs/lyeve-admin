@@ -54,6 +54,24 @@ const props = (over: Record<string, unknown> = {}) => ({
 	} as never,
 });
 
+/** Every heading level in document order, so a test can say none is skipped. */
+function levels(root: HTMLElement): number[] {
+	return [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => Number(h.tagName.slice(1)));
+}
+
+function skips(list: number[]): boolean {
+	return list.some((level, i) => level > (i === 0 ? 1 : list[i - 1]) + 1);
+}
+
+describe('headings', () => {
+	it('puts each section under the title at level 2, with no level skipped', () => {
+		const { container } = render(AnalyticsPage, { props: props() });
+		const list = levels(container);
+		expect(list).toContain(2);
+		expect(skips(list)).toBe(false);
+	});
+});
+
 describe('what the page counts', () => {
 	// The plugin records every request to both APIs, the console's own
 	// included, so the page cannot claim to cover the public one alone.

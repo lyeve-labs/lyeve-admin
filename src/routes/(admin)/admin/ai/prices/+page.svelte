@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, SegmentedControl, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, RadioGroup, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { tracked } from '$lib/forms.svelte';
@@ -8,13 +8,13 @@
 	import type { ModelPrice } from '$lib/api/ai';
 	import AiSection from '$lib/components/ai/AiSection.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import { PROVIDER_KINDS, effectiveGate, providerKindLabel } from '$lib/api/ai';
+	import { PROVIDER_KINDS, effectiveGate, providerKindDescription, providerKindLabel } from '$lib/api/ai';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const kindOptions = PROVIDER_KINDS.map((k) => ({ value: k, label: providerKindLabel(k) }));
+	const kindOptions = PROVIDER_KINDS.map((k) => ({ value: k, label: providerKindLabel(k), description: providerKindDescription(k) }));
 	const keyOf = (kind: string, model: string) => `${kind}/${model}`;
 
 	// One drawer for both writes: a null target is a new price. The kind and
@@ -184,7 +184,7 @@
 			<Input id="price-kind" label="Kind" value={providerKindLabel(editing.kind)} disabled />
 			<Input id="price-model" label="Model" value={editing.model} disabled />
 		{:else}
-			<SegmentedControl name="kind" label="Kind" options={kindOptions} bind:value={kind} />
+			<RadioGroup name="kind" label="Kind" options={kindOptions} bind:value={kind} />
 			<Input id="price-model" name="model" label="Model" required placeholder="gpt-4o-mini" bind:value={model} />
 		{/if}
 		<NumberInput id="price-in" name="input_per_1k" label="Input per 1K" min={0} step={0.0001} bind:value={input} />

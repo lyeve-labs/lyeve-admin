@@ -11,6 +11,7 @@ import { refusalFailure } from '$lib/server/flow-refusal';
 import { assistRefusal, catalogFor, refusalStatus } from '$lib/server/flow-assist';
 import { CatalogError, assistFlow, explainFlow, getLLMCatalog, type AssistProblem } from '$lib/api/assist';
 import { clearSessionCookie } from '$lib/server/session-cookie';
+import { readError } from '$lib/server/read-error';
 import {
 	ImportError,
 	FlowRefusal,
@@ -31,8 +32,10 @@ import {
 	rollbackFlow,
 	saveDraft,
 	validationErrors,
+	type ValidationError,
 	type Flow,
 	type FlowRun,
+	type FlowVersion,
 	deleteTemplate,
 	saveTemplate,
 } from '$lib/api/flows';
@@ -57,25 +60,10 @@ const LOCKED = {
 	flows: [],
 	eventTypes: null,
 	runs: { ok: true, value: { rows: [], limit: RUNS_PER_PAGE, offset: 0, total: 0, hasMore: false } } as Section<PagedList<FlowRun>>,
-	versions: [],
+	versions: { ok: true, value: [] } as Section<FlowVersion[]>,
 	templates: [],
 	assistant: 'hidden' as const,
 };
-
-/**
- * The status a failed read answers with. Only a 404 means the flow is gone.
- * Anything else is the engine, the session or the network, and telling the
- * operator "not found" for a 503 sends them looking for a flow that exists.
- * The message is static so driver text never reaches the page.
- */
-function loadStatus(err: unknown): { status: number; message: string } {
-	if (err instanceof ApiError) {
-		if (err.status === 404) return { status: 404, message: 'Flow not found' };
-		if (err.status === 403) return { status: 403, message: 'Your role cannot read flows' };
-		if (err.status >= 400 && err.status < 600) return { status: err.status, message: 'The flow could not be read from the engine' };
-	}
-	return { status: 502, message: 'The flow could not be read from the engine' };
-}
 
 export const load: PageServerLoad = async (event) => {
 	const { fetch, cookies, params, url } = event;
@@ -91,8 +79,7 @@ export const load: PageServerLoad = async (event) => {
 			clearSessionCookie({ cookies, url });
 			redirect(302, '/login');
 		}
-		const { status, message } = loadStatus(err);
-		error(status, message);
+		readError(err, 'Flow not found');
 	}
 	if (!flow?.id) error(404, 'Flow not found');
 
@@ -138,7 +125,7 @@ export const load: PageServerLoad = async (event) => {
 				),
 				'The runs could not be read. This is not a report that the flow never ran.',
 			),
-			listVersions(client, flow.id).catch(() => []),
+			section(listVersions(client, flow.id), 'The versions could not be read.'),
 			getTemplates(client).catch(() => []),
 			// The assistant's catalog decides whether the tab exists at all: a
 			// 402 there means the assistant is not enabled, and a tab that could
@@ -198,9 +185,25 @@ function importFailed<F extends ActionFailure<Record<string, unknown>>>(failure:
 	return fail(failure.status, { ...(failure.data as F['data']), action: 'import' });
 }
 
+/**
+ * The sentence for a 409 the plugin answered in the validation shape: a slug
+ * another flow holds, or an HTTP path another flow answers.
+ */
+function conflictText(errors: ValidationError[]): string {
+	if (errors.some((e) => e.path === '/slug')) return 'Another flow already uses this slug. Choose another.';
+	if (errors.some((e) => e.path === '/config/path')) return 'Another flow already answers this HTTP path. Choose another path for the trigger.';
+	return 'This conflicts with another flow.';
+}
+
 function refused(err: unknown, fallback: string) {
 	if (err instanceof ApiError && err.status === 422) {
 		return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.message) });
+	}
+	// A conflict comes in the validation shape with no error key, so the list
+	// is read the same way and marks what it names on the canvas.
+	if (err instanceof ApiError && err.status === 409) {
+		const errors = validationErrors(err.message);
+		return fail(409, { error: conflictText(errors), errors });
 	}
 	if (err instanceof FlowRefusal) return refusalFailure(err);
 	if (err instanceof ApiError && err.status === 402) {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { aiActionError, aiBanner, aiGate } from './ai-load';
+import { AI_BUDGET_TEXT, aiActionError, aiBanner, aiGate } from './ai-load';
 
 function cookies(): Cookies {
 	return { get: vi.fn(), set: vi.fn(), delete: vi.fn(), getAll: vi.fn(() => []), serialize: vi.fn(() => '') } as unknown as Cookies;
@@ -33,6 +33,23 @@ describe('aiGate', () => {
 });
 
 describe('aiActionError', () => {
+	it('names the lowest role the route admits on a role refusal', () => {
+		const refused = new ApiError(403, 'insufficient permissions', { error: 'insufficient permissions', code: 'forbidden' });
+		expect(aiActionError(refused, 'f')).toBe('Your role cannot change this. Ask an admin if you need it.');
+		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Your role cannot change this. Ask a super admin if you need it.');
+	});
+
+	it('says the budget is spent only when the 402 names the budget', () => {
+		const budget = new ApiError(402, 'ai budget exhausted for this billing period', { error: 'ai budget exhausted for this billing period', code: 'http_402' });
+		expect(aiActionError(budget, 'f')).toBe(AI_BUDGET_TEXT);
+		const other = new ApiError(402, 'this request needs a paid plan', { error: 'this request needs a paid plan', code: 'http_402' });
+		expect(aiActionError(other, 'f')).toBe('AI is not enabled on this instance.');
+		const ceiling = new ApiError(402, 'cap_exceeded', { error: 'cap_exceeded', cap: 'ai.providers', limit: 2, current: 2, upgrade_url: '' });
+		expect(aiActionError(ceiling, 'f')).toBe('AI is not enabled on this instance.');
+		const license = new ApiError(402, 'payment_required', { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' });
+		expect(aiActionError(license, 'f')).toBe('AI is not enabled on this instance.');
+	});
+
 	it('names each refusal and relays a 4xx reason', () => {
 		expect(aiActionError(new ApiError(402, 'x'), 'f')).toContain('not enabled');
 		expect(aiActionError(new ApiError(404, 'x'), 'f')).toContain('switched off');

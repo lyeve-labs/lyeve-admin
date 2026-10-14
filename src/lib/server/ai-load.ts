@@ -2,7 +2,8 @@
  * What a refused AI read means for the page, sorted by status.
  *
  * The plugin refuses in four distinct ways and each wants different words. A
- * 402 is the feature not enabled, which the locked state already paints. A 403
+ * 402 is the feature not enabled, which the locked state already paints, or a
+ * spent monthly budget, which only a write can meet. A 403
  * is a role that may not read the resource. A 404 is the tenant's own switch:
  * every route but the settings pair answers it while the switch is off, and the
  * way back is that switch. A 503 is the plugin with nothing to answer through:
@@ -50,11 +51,46 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 	return { state: 'error', message: aiBanner(plural) };
 }
 
-/** Words for a refused write, by status. The static fallback for the rest. */
-export function aiActionError(err: unknown, fallback: string): string {
+/** What the reader sees when a provider's monthly budget is spent. */
+export const AI_BUDGET_TEXT =
+	'The AI budget for this billing period is spent. Raise a provider\'s monthly budget, or wait for the next period.';
+
+/**
+ * Whether a 402 is the spent budget rather than the license. The plugin
+ * answers both with 402. The budget refusal is the one sentence that names
+ * the budget ("ai budget exhausted for this billing period"), so that word
+ * decides. Every other 402, a ceiling included, is read as the license, the
+ * state a 402 always meant here.
+ */
+export function aiBudgetSpent(err: unknown): boolean {
+	if (!(err instanceof ApiError) || err.status !== 402) return false;
+	const said = (err.body as { error?: unknown } | null | undefined)?.error;
+	return typeof said === 'string' && /\bbudget\b/i.test(said);
+}
+
+/** The lowest role a refused route admits, which is who the reader can ask. */
+export type AiWriteRole = 'admin' | 'super_admin';
+
+const ROLE_TEXT: Record<AiWriteRole, string> = {
+	admin: 'Your role cannot change this. Ask an admin if you need it.',
+	super_admin: 'Your role cannot change this. Ask a super admin if you need it.',
+};
+
+/**
+ * Words for a refused write, by status. The static fallback for the rest.
+ * `lowest` is the lowest role the route admits, which a role refusal names.
+ */
+export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRole = 'admin'): string {
 	if (err instanceof ApiError) {
+		if (aiBudgetSpent(err)) return AI_BUDGET_TEXT;
 		if (err.status === 402) return 'AI is not enabled on this instance.';
-		if (err.status === 403) return err.message?.trim() || 'Your role cannot do this.';
+		if (err.status === 403) {
+			// The engine's role gate answers a bare "insufficient permissions".
+			// The plugin's own 403 is a sentence about the tenant, worth relaying.
+			const msg = err.message?.trim();
+			if (!msg || msg === 'insufficient permissions' || msg === '403') return ROLE_TEXT[lowest];
+			return msg;
+		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';
 		if (err.status === 503) return 'No enabled AI provider can answer this. Add or enable a provider first.';
 		if (err.status === 409) return 'No configured provider supports this operation.';

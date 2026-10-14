@@ -12,6 +12,7 @@ import {
 	listDatasources,
 	testDatasource,
 	updateDatasource,
+	validationErrors,
 	type Datasource,
 	type DatasourceBody,
 	type DatasourceKind,
@@ -53,13 +54,33 @@ function isRefused(err: unknown): boolean {
 
 const REFUSED = { error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true };
 
+/** The plugin's name rule, in words a reader can act on. */
+const NAME_RULE = 'A name starts with a lower case letter and holds up to 40 lower case letters, digits, dashes and underscores.';
+
+/**
+ * A save the plugin refused as invalid. The 422 body is a list of problems
+ * with no error key, so the client hands over the JSON text. Each problem is
+ * read out of it: the name's at the name field, the rest above the form in
+ * the plugin's own words, which it writes for this form. Null for any other
+ * failure.
+ */
+function invalidFailure(err: unknown) {
+	if (!(err instanceof ApiError) || err.status !== 422) return null;
+	const errors = validationErrors(err.message);
+	const nameError = errors.some((e) => e.path === '/name') ? NAME_RULE : '';
+	const rest = errors.filter((e) => e.path !== '/name').map((e) => e.message);
+	const error = [nameError, ...rest].filter(Boolean).join(' ') || 'The plugin refused the datasource as invalid.';
+	return fail(422, { action: 'save', error, nameError });
+}
+
 const on = (v: FormDataEntryValue | null): boolean => v === 'true' || v === 'on';
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();
 
 /**
  * The body for one kind, split into what the engine stores in the clear and
- * what it encrypts. A blank secret on an update means "keep the stored one",
- * so it is left out rather than sent empty.
+ * what it encrypts. The plugin replaces the stored secret whole whenever a
+ * body carries one, so the secret is sent only when some part of it was
+ * typed. Every blank secret field on an update keeps every stored secret.
  */
 function bodyFrom(data: FormData): DatasourceBody | string {
 	const name = text(data, 'name');
@@ -137,7 +158,7 @@ export const actions: Actions = {
 			await createDatasource(client, body);
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
-			return fail(400, { action: 'save', error: actionError(err, 'Failed to create datasource') });
+			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Failed to create datasource') });
 		}
 	},
 
@@ -152,7 +173,7 @@ export const actions: Actions = {
 			await updateDatasource(client, id, body);
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
-			return fail(400, { action: 'save', error: actionError(err, 'Failed to update datasource') });
+			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Failed to update datasource') });
 		}
 	},
 

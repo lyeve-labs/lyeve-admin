@@ -36,6 +36,15 @@ const stored: AiProvider = {
 };
 
 describe('ProviderForm', () => {
+	it('lists the four kinds as radios with a sentence each, so the long labels fit a phone', async () => {
+		const { container, sent } = setup();
+		const radios = container.querySelectorAll<HTMLInputElement>('input[type="radio"][name="kind"]');
+		expect(radios).toHaveLength(4);
+		expect(screen.getByText('A gateway that speaks the Anthropic API.')).toBeTruthy();
+		await fireEvent.click(screen.getByLabelText(/Anthropic-compatible/));
+		expect(sent().get('kind')).toBe('anthropic_compatible');
+	});
+
 	it('posts a new vendor row enabled, on every modality, with a key required', () => {
 		const { sent } = setup();
 		const out = sent();

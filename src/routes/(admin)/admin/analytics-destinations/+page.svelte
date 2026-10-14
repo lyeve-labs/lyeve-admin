@@ -312,7 +312,8 @@
 			{#if editing}
 				<p class="text-xs text-muted">
 					The stored settings are never shown. Leave every field empty to keep them, or fill them in to replace
-					all of them.
+					all of them. A replacement also returns any setting this form does not show, such as a timeout set
+					through the API, to its default.
 				</p>
 			{/if}
 			{#each fields as f (f.key)}

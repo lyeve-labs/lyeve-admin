@@ -78,7 +78,7 @@
 			<DescriptionList items={facts} />
 
 			<section class="grid gap-4 md:grid-cols-2">
-				<Card heading="Models" headingLevel={3} description="Ask the provider which models it serves. Nothing is stored.">
+				<Card heading="Models" headingLevel={2} description="Ask the provider which models it serves. Nothing is stored.">
 					<form method="POST" action="?/models" use:enhance class="flex flex-col gap-3">
 						<div>
 							<Button variant="secondary" size="sm" type="submit">
@@ -99,7 +99,7 @@
 					</form>
 				</Card>
 
-				<Card heading="Capabilities" headingLevel={3} description="What one model on this row can do, from the driver's own table and this row's modalities. The key is not needed.">
+				<Card heading="Capabilities" headingLevel={2} description="What one model on this row can do, from the driver's own table and this row's modalities. The key is not needed.">
 					<form method="POST" action="?/capabilities" use:enhance={saveCaps.enhance} class="flex flex-col gap-3">
 						<Input id="cap-model" name="model" label="Model" bind:value={capModel} placeholder={p.default_model || 'the default model'} />
 						<div>
