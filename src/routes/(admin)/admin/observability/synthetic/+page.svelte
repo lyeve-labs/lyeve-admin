@@ -330,6 +330,7 @@
 			{:else}
 				<ListToolbar label="Filter probes">
 					{#snippet search()}
+						<label for="probe-narrow" class="sr-only">Narrow this page</label>
 						<SearchInput id="probe-narrow" bind:value={narrow} placeholder="Name or target on this page" />
 					{/snippet}
 					{#snippet filters()}

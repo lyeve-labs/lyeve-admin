@@ -178,3 +178,10 @@ describe('figures that cover one page or failed', () => {
 		expect(tile?.nextElementSibling?.textContent?.trim()).not.toBe('0');
 	});
 });
+
+describe('the search box', () => {
+	it('is named for a screen reader', () => {
+		const { container } = render(EventsPage, { props: props() });
+		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Narrow this page');
+	});
+});

@@ -381,3 +381,10 @@ describe('editing a probe whose secrets no read returns', () => {
 		expect(JSON.parse(kept.value)).toEqual({ config: signIn.config, regions: ['us-east'] });
 	});
 });
+
+describe('the probe search box', () => {
+	it('is named for a screen reader', () => {
+		const { container } = render(SyntheticPage, { props: props() });
+		expect(container.querySelector('label[for="probe-narrow"]')?.textContent).toBe('Narrow this page');
+	});
+});

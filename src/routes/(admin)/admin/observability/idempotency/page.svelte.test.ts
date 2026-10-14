@@ -91,3 +91,10 @@ describe('a refused counters read', () => {
 		expect(container.textContent).toContain('Your role cannot open the counters');
 	});
 });
+
+describe('the key search box', () => {
+	it('is named for a screen reader', () => {
+		const { container } = render(IdempotencyPage, { props: props() });
+		expect(container.querySelector('label[for="key-narrow"]')?.textContent).toBe('Narrow this page');
+	});
+});

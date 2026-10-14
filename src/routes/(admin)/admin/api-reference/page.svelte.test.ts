@@ -269,6 +269,15 @@ describe('try it', () => {
 		expect(container.textContent).toContain('Send');
 	});
 
+	// The native element draws the browser's own marker and cannot be driven
+	// from the page. The kit's disclosure is a button that says its state.
+	it('is the kit disclosure, not the native element', async () => {
+		const { getByRole, container } = withMethod('GET', false);
+		await fireEvent.click(getByRole('button', { name: /GET \/api\/v1\/content\/post/ }));
+		expect(container.querySelector('details')).toBeNull();
+		expect(getByRole('button', { name: /Try it/ }).getAttribute('aria-expanded')).toBe('false');
+	});
+
 	it('marks a write as one before it is opened', async () => {
 		const { getByRole, container } = withMethod('DELETE', true);
 		await fireEvent.click(getByRole('button', { name: /DELETE \/api\/v1\/content\/post/ }));

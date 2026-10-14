@@ -114,7 +114,7 @@
 				<tr>
 					<td><Badge tone="neutral">{row.method}</Badge></td>
 					<td data-cell="nowrap" class="font-mono text-xs">
-						<a href={detailHref(row.endpoint)} class="text-fg underline-offset-2 transition-colors hover:text-brand hover:underline">{row.endpoint}</a>
+						<a href={detailHref(row.endpoint)} class="relative hit-area text-fg underline-offset-2 transition-colors hover:text-brand hover:underline">{row.endpoint}</a>
 					</td>
 					<td data-cell="nowrap" class="text-right text-xs"><span class="text-faint">{row.count}</span></td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.avg_duration_ns)}</td>

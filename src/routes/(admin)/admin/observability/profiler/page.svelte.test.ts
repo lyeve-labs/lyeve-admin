@@ -128,3 +128,13 @@ describe('the profiler page', () => {
 		expect(container.textContent).toContain('flamegraph generation failed');
 	});
 });
+
+describe('the endpoint links on a touch screen', () => {
+	// Each link is the only control in its row, and only 16px tall.
+	it('gives each endpoint link the touch hit area', () => {
+		const { getByTestId } = render(ProfilerPage, props(page()));
+		const link = getByTestId('profiler-slowest').querySelector('a') as HTMLAnchorElement;
+		expect(link.className).toContain('hit-area');
+		expect(link.className).toContain('relative');
+	});
+});
