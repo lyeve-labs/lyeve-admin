@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Database, Plug, Puzzle } from '@lucide/svelte';
-import { categoryIcon, categoryLabel, categoryText, pluginLabel } from './categories';
+import { categoryIcon, categoryLabel, categoryStripe, categoryText, pluginLabel } from './categories';
 
 describe('categories', () => {
 	it('keeps the built-in paint and gives every contributed category the neutral one', () => {
@@ -10,6 +10,7 @@ describe('categories', () => {
 		expect(categoryText('integration')).toBe('text-brand-deep');
 		expect(categoryIcon('device-fingerprint')).toBe(Puzzle);
 		expect(categoryText('device-fingerprint')).toBe('text-muted');
+		expect(categoryStripe('device-fingerprint')).toBe('bg-muted');
 		expect(categoryIcon(undefined)).toBe(Puzzle);
 	});
 

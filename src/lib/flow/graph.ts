@@ -265,6 +265,50 @@ export function updateNode(
 	return { ...def, nodes: def.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) };
 }
 
+// The visual editors the image build checks out beside the admin import this.
+export function updateNote(
+	def: FlowDefinition,
+	id: string,
+	patch: Partial<FlowNote>
+): FlowDefinition {
+	return {
+		...def,
+		notes: (def.notes ?? []).map((n) => (n.id === id ? { ...n, ...patch } : n)),
+	};
+}
+
+// The visual editors the image build checks out beside the admin import this.
+export function moveNodes(
+	def: FlowDefinition,
+	ids: Iterable<string>,
+	dx: number,
+	dy: number,
+	/** Where the trigger is drawn now, for a trigger that has no stored position yet. */
+	triggerAt?: Position
+): FlowDefinition {
+	const moving = new Set(ids);
+	const shift = (p: Position): Position => ({ x: Math.round(p.x + dx), y: Math.round(p.y + dy) });
+	const trigger =
+		moving.has(TRIGGER_ID) && (def.trigger.position ?? triggerAt)
+			? { ...def.trigger, position: shift((def.trigger.position ?? triggerAt) as Position) }
+			: def.trigger;
+	return {
+		...def,
+		trigger,
+		nodes: def.nodes.map((n) => (moving.has(n.id) ? { ...n, position: shift(n.position) } : n)),
+		notes: (def.notes ?? []).map((n) =>
+			moving.has(n.id) ? { ...n, position: shift(n.position) } : n
+		),
+	};
+}
+
+// The visual editors the image build checks out beside the admin import this.
+/** Nodes with no inbound edge. They start at once with the trigger payload. */
+export function rootNodes(def: FlowDefinition): FlowNode[] {
+	const fed = new Set(def.edges.filter((e) => e.from !== TRIGGER_ID).map((e) => e.to));
+	return def.nodes.filter((n) => !fed.has(n.id));
+}
+
 /**
  * Each node's depth: the longest path from a root, which is the column the
  * auto layout puts it in. A node reached only through a cycle keeps depth 0

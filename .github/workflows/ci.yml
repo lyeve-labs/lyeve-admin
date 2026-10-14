@@ -104,3 +104,39 @@ jobs:
           # Build needs *some* origin to satisfy adapter-node. Runtime ORIGIN
           # is supplied by the deployment, this is just to make the build pass.
           ORIGIN: http://localhost:3002
+
+  # The official image carries the visual editors, and they import the admin's
+  # library. The release runs this same suite before it builds, so a change
+  # that breaks the editors fails here, in its own pull request, rather than
+  # at the release. A fork's pull request gets no secrets, so the job runs
+  # only for a branch of this repository.
+  suite-with-editors:
+    name: suite with editors
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/fetch-editors
+        with:
+          repository: ${{ secrets.EDITORS_REPOSITORY }}
+          token: ${{ secrets.EDITORS_READ_TOKEN }}
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check (svelte-check)
+        run: pnpm run check
+
+      - name: Tests
+        run: pnpm test

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { addEdge, addNode, canConnect, cleanJSON, configSummary, freshId, inputsOf, normalizeDefinition, outputsOf, removeNodes, topoDepths, wouldCycle } from './graph';
+import { addEdge, addNode, canConnect, cleanJSON, configSummary, freshId, inputsOf, moveNodes, normalizeDefinition, outputsOf, removeNodes, rootNodes, topoDepths, wouldCycle } from './graph';
+import { TRIGGER_ID } from './types';
 import type { FlowDefinition } from './types';
 import { fixtureCatalog, joinFlow } from './fixtures';
 
@@ -73,8 +74,9 @@ describe('removeNodes', () => {
 	});
 });
 
-describe('topoDepths', () => {
-	it('puts each root at depth zero and a node after them one deeper', () => {
+describe('topoDepths and rootNodes', () => {
+	it('names the roots and their depth', () => {
+		expect(rootNodes(joinFlow).map((n) => n.id)).toEqual(['orders', 'shipments']);
 		const depth = topoDepths(joinFlow);
 		expect(depth.get('orders')).toBe(0);
 		expect(depth.get('join')).toBe(1);
@@ -160,6 +162,18 @@ describe('the trigger position', () => {
 			nodes: [{ id: 'a', type: 'log', position: { x: 300, y: 100 }, config: {} }],
 			edges: [],
 		} as unknown as FlowDefinition);
+
+	it('moves only the trigger when the trigger is dragged, seeding from where it is drawn', () => {
+		const moved = moveNodes(def(), [TRIGGER_ID], 10, 20, { x: 40, y: 100 });
+		expect(moved.trigger.position).toEqual({ x: 50, y: 120 });
+		expect(moved.nodes[0].position).toEqual({ x: 300, y: 100 });
+	});
+
+	it('leaves the trigger unplaced when a node is dragged', () => {
+		const moved = moveNodes(def(), ['a'], 10, 0, { x: 40, y: 100 });
+		expect(moved.trigger.position).toBeUndefined();
+		expect(moved.nodes[0].position).toEqual({ x: 310, y: 100 });
+	});
 
 	it('keeps a stored position through normalizing and ignores one that is not a point', () => {
 		const kept = normalizeDefinition({ ...def(), trigger: { type: 'trigger.manual', config: {}, position: { x: 1, y: 2 } } });
