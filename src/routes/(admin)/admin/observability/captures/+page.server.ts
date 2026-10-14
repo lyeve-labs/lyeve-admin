@@ -2,6 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { errorCodeOf } from '$lib/api/limits';
 import { authedClient, requireRole } from '$lib/server/authz';
+import { sessionTenant } from '$lib/server/session-refresh';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
@@ -41,8 +42,11 @@ export const load: PageServerLoad = async (event) => {
 	// The plugin applies no tenant filter to a super admin's read that names
 	// none, so their list holds every tenant's requests.
 	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	// A replay set holds only captures the session's own tenant sent.
+	const ownTenant = sessionTenant(event);
 	const empty = {
 		superAdmin,
+		ownTenant,
 		captures: [] as Capture[],
 		total: null as number | null,
 		limit,
@@ -101,6 +105,7 @@ export const load: PageServerLoad = async (event) => {
 
 	return {
 		superAdmin,
+		ownTenant,
 		captures: page.rows,
 		total: page.total,
 		limit,

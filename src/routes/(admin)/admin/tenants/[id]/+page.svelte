@@ -40,13 +40,13 @@
 
 	/** A super admin's own home row, which this page leaves alone. */
 	function superHome(m: TenantMember): boolean {
-		return m.home && (m.roles.includes('super_admin') || data.homeSuperAdmins.includes(m.id));
+		return m.home && (m.roles.includes('super_admin') || (data.homeSuperAdmins ?? []).includes(m.id));
 	}
 
 	// A super admin whose home membership already leaves the role out signs in
 	// here without it.
 	const lostSuperAdmin = $derived(
-		data.members.ok ? data.members.value.filter((m) => m.home && !m.roles.includes('super_admin') && data.homeSuperAdmins.includes(m.id)) : [],
+		data.members.ok ? data.members.value.filter((m) => m.home && !m.roles.includes('super_admin') && (data.homeSuperAdmins ?? []).includes(m.id)) : [],
 	);
 
 	const facts = $derived([
@@ -230,6 +230,11 @@
 		{#if revokeError}
 			<Alert tone="danger">{revokeError}</Alert>
 		{/if}
+		{#if data.homeSuperAdmins === null}
+			<Alert tone="warn">
+				The accounts could not be read, so this page cannot say whether a home member signs in here without super admin.
+			</Alert>
+		{/if}
 		{#each lostSuperAdmin as m (m.id)}
 			<Alert tone="warn" title="{m.email} signs in here without super admin">
 				This is the account's home tenant, and its membership here sets roles that leave super admin out. The engine signs it in here with those roles. Neither this page nor the Users page changes a home membership.
@@ -276,7 +281,9 @@
 							<td class="text-xs text-muted">{m.home ? 'Home tenant' : 'Membership'}</td>
 							<td>
 								<div class="flex items-center justify-end gap-2">
-									{#if superHome(m)}
+									{#if lostSuperAdmin.includes(m)}
+										<span class="text-xs text-muted">Neither this page nor the Users page changes this home membership.</span>
+									{:else if superHome(m)}
 										<span class="text-xs text-muted">A super admin's home roles are managed on the Users page.</span>
 									{/if}
 									<Button

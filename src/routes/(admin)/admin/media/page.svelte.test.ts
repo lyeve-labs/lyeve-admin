@@ -259,7 +259,7 @@ describe('media library read failures', () => {
 
 	it('tells a role the engine refused that it cannot open the library', () => {
 		failed({ state: 'forbidden' });
-		expect(screen.getByText(/Your role cannot open Media library/)).toBeTruthy();
+		expect(screen.getByText(/Your role cannot open media library/)).toBeTruthy();
 		expect(screen.queryByText('No files uploaded yet.')).toBeNull();
 	});
 });

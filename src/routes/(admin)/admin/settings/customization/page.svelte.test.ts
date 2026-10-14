@@ -37,7 +37,7 @@ describe('customization when it could not be read', () => {
 		const { container } = render(CustomizationPage, {
 			props: props({ gate: { state: 'unavailable' }, entitled: false }),
 		});
-		expect(container.textContent).toContain('so Customization could not be read');
+		expect(container.textContent).toContain('so customization could not be read');
 		expect(screen.queryByTestId('not-enabled')).toBeNull();
 	});
 });

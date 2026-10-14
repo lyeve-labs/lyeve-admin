@@ -323,7 +323,7 @@ describe('Audit log failed read', () => {
 			props: { data: data({ ...failed, entries: { ok: false, gate: { state: 'forbidden' } } }) as never, form: null as never },
 		});
 
-		expect(container.textContent).toContain('Your role cannot open Audit log');
+		expect(container.textContent).toContain('Your role cannot open audit log');
 	});
 });
 

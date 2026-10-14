@@ -141,7 +141,7 @@ describe('the job list when it could not be read', () => {
 		state.page.url = new URL('http://localhost/admin/jobs?offset=50');
 		const { container, queryByRole, getByRole } = failed({ state: 'unavailable' });
 		expect(container.textContent).toContain('Temporarily unavailable');
-		expect(container.textContent).toContain('so Scheduled jobs could not be read. Nothing was changed.');
+		expect(container.textContent).toContain('so scheduled jobs could not be read. Nothing was changed.');
 		expect(getByRole('link', { name: 'Try again' }).getAttribute('href')).toBe('/admin/jobs?offset=50');
 		expect(container.textContent).not.toContain('No jobs yet');
 		expect(queryByRole('button', { name: /new job/i })).toBeNull();
@@ -149,7 +149,7 @@ describe('the job list when it could not be read', () => {
 
 	it('names the role for a refusal and offers nothing to press', () => {
 		const { container, queryByRole } = failed({ state: 'forbidden' });
-		expect(container.textContent).toContain('Your role cannot open Scheduled jobs. Ask a super admin if you need it.');
+		expect(container.textContent).toContain('Your role cannot open scheduled jobs. Ask a super admin if you need it.');
 		expect(container.textContent).not.toContain('No jobs yet');
 		expect(queryByRole('button', { name: /new job/i })).toBeNull();
 		expect(queryByRole('link', { name: 'Try again' })).toBeNull();
@@ -196,10 +196,41 @@ describe('a failure from one form', () => {
 	});
 
 	it('says a failed save inside the open drawer', async () => {
-		const { getByRole } = setup({}, { error: 'Payload must be valid JSON.', action: 'create' });
-		await fireEvent.click(getByRole('button', { name: /New job/ }));
+		const rendered = setup();
+		await fireEvent.click(rendered.getByRole('button', { name: /New job/ }));
+		await rendered.rerender({ form: { error: 'Payload must be valid JSON.', action: 'create' } } as never);
 		const form = document.querySelector('#job-form') as HTMLFormElement;
 		expect(form.textContent).toContain('Payload must be valid JSON.');
+	});
+
+	it('keeps a failed create out of the edit drawer opened after it', async () => {
+		const rendered = setup();
+		await fireEvent.click(rendered.getByRole('button', { name: /New job/ }));
+		await rendered.rerender({ form: { error: 'Payload must be valid JSON.', action: 'create' } } as never);
+		await fireEvent.click(rendered.getByRole('button', { name: 'Cancel' }));
+		await fireEvent.click(rendered.getByRole('button', { name: 'Edit Nightly purge' }));
+		const form = document.querySelector('#job-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('Payload must be valid JSON.');
+	});
+
+	it('keeps a drawer failure off the page behind another drawer', async () => {
+		const rendered = setup();
+		await fireEvent.click(rendered.getByRole('button', { name: /New job/ }));
+		await rendered.rerender({ form: { error: 'Payload must be valid JSON.', action: 'create' } } as never);
+		await fireEvent.click(rendered.getByRole('button', { name: 'Cancel' }));
+		await fireEvent.click(rendered.getByRole('button', { name: 'Edit Nightly purge' }));
+		expect(document.body.textContent).not.toContain('Payload must be valid JSON.');
+	});
+
+	it('keeps a failed update out of the next New job drawer', async () => {
+		const rendered = setup();
+		await fireEvent.click(rendered.getByRole('button', { name: 'Edit Nightly purge' }));
+		await rendered.rerender({ form: { error: 'Schedule is not a cron expression.', action: 'update' } } as never);
+		const form = () => document.querySelector('#job-form') as HTMLFormElement;
+		expect(form().textContent).toContain('Schedule is not a cron expression.');
+		await fireEvent.click(rendered.getByRole('button', { name: 'Cancel' }));
+		await fireEvent.click(rendered.getAllByRole('button', { name: /New job/ })[0]);
+		expect(form().textContent).not.toContain('Schedule is not a cron expression.');
 	});
 });
 

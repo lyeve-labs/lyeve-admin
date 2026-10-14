@@ -161,7 +161,7 @@ describe('Tenants when the list could not be read', () => {
 		const { container, queryByRole } = render(TenantsPage, {
 			props: props({ tenants: { ok: false, gate: { state: 'unavailable' } }, canProvision: false, total: 0 }),
 		});
-		expect(container.textContent).toContain('so Tenants could not be read. Nothing was changed.');
+		expect(container.textContent).toContain('so tenants could not be read. Nothing was changed.');
 		expect(container.textContent).not.toContain('No tenants yet');
 		expect(container.textContent).not.toContain('0 tenants on this instance');
 		expect(container.textContent).not.toContain('Tenant provisioning');
@@ -206,7 +206,7 @@ describe('Tenants when provisioning could not be read', () => {
 		const { container, queryByTestId, queryByRole } = render(TenantsPage, {
 			props: props({ canProvision: false, provisionGate: { state: 'unavailable' } }),
 		});
-		expect(container.textContent).toContain('so Tenant provisioning could not be read');
+		expect(container.textContent).toContain('so tenant provisioning could not be read');
 		expect(queryByTestId('not-enabled')).toBeNull();
 		expect(queryByRole('button', { name: /new tenant/i })).toBeNull();
 		expect(container.textContent).toContain('tenant-0');

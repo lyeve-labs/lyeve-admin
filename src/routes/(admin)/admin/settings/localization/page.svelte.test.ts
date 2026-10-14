@@ -38,14 +38,14 @@ describe('locales page', () => {
 
 	it('says the plugin did not answer, and draws no form', () => {
 		render(LocalesPage, { props: { data: data({ locales: { ok: false, gate: { state: 'unavailable' } } }), form: null } });
-		expect(screen.getByText(/so Locales could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so locales could not be read/)).toBeTruthy();
 		expect(screen.queryByText('No locale enabled yet.')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
 	});
 
 	it('tells a role the plugin refuses that it cannot open the locales', () => {
 		render(LocalesPage, { props: { data: data({ locales: { ok: false, gate: { state: 'forbidden' } } }), form: null } });
-		expect(screen.getByText(/Your role cannot open Locales/)).toBeTruthy();
+		expect(screen.getByText(/Your role cannot open locales/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
 	});
 

@@ -212,13 +212,16 @@ describe('a license without paid quotas', () => {
 		expect(said(document.body)).toContain('Storage (GiB)');
 	});
 
-	// Every footer in the console leads with the secondary Cancel.
-	it('orders the footer Cancel, Delete, Save', async () => {
+	// The footer ends with Cancel and Save. Delete sits alone at its start
+	// edge, so a hurried press near Save never removes the quota.
+	it('sets Delete apart at the start of the footer, before Cancel and Save', async () => {
 		const { getByRole } = render(UsagePage, { props: props({ quotas: [stored], quotaTotal: 1 }) });
 		await fireEvent.click(getByRole('button', { name: 'Edit the quota for acme' }));
 		const labels = [...document.body.querySelectorAll('button')]
 			.map((b) => b.textContent?.trim())
 			.filter((t) => t === 'Delete' || t === 'Cancel' || t === 'Save');
-		expect(labels).toEqual(['Cancel', 'Delete', 'Save']);
+		expect(labels).toEqual(['Delete', 'Cancel', 'Save']);
+		const remove = [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Delete');
+		expect(remove?.classList.contains('me-auto')).toBe(true);
 	});
 });

@@ -103,7 +103,7 @@ describe('content index read', () => {
 			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } }, total: 0 }) },
 		});
 
-		expect(container.textContent).toContain('Content could not be read');
+		expect(container.textContent).toContain('so content could not be read');
 		expect(container.textContent).not.toContain('No schemas yet');
 	});
 

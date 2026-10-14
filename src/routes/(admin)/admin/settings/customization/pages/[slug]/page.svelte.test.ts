@@ -74,6 +74,13 @@ describe('heading outline', () => {
 		expect(outlineSkips(document.body)).toEqual([]);
 	});
 
+	it('names the schema list in lower case inside the role refusal', () => {
+		render(EditorPage, {
+			props: { data: { customPage: stored, schemas: [], schemasGate: { state: 'forbidden' }, user: { roles: ['admin'] } }, form: null } as never,
+		});
+		expect(document.body.textContent).toContain('Your role cannot open the schema list.');
+	});
+
 	it('steps its headings down one level at a time while the feature is not enabled', () => {
 		const { container } = render(EditorPage, {
 			props: { data: { customPage: stored, schemas: [], schemasGate: { state: 'locked', upgradeUrl: '' }, user: { roles: ['admin'] } }, form: null } as never,

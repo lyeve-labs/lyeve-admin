@@ -185,7 +185,7 @@ describe('the setup gate on a page request', () => {
 	});
 });
 
-describe('hooks.server.ts session refresh', () => {
+describe('a session close to expiry is renewed before the page loads', () => {
 	it('renews a session close to expiry before any load reads it', async () => {
 		resetSetupGateCache();
 		const part = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');

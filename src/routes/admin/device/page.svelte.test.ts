@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 import DevicePage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -74,6 +75,11 @@ describe('the outcome of a decision', () => {
 		render(DevicePage, { props: props({ view, code: 'WDJB-MJHT' }) });
 		expect(screen.getByText(title)).toBeTruthy();
 		expect(screen.getByText('Try another code')).toBeTruthy();
+	});
+
+	it.each(['approved', 'expired', 'unknown'])('heads the %s outcome one level under the page title', (view) => {
+		render(DevicePage, { props: props({ view, code: 'WDJB-MJHT' }, view === 'approved' ? { outcome: view } : null) });
+		expect(outlineSkips()).toEqual([]);
 	});
 
 	it('keeps an unknown code in the field so it can be corrected', () => {

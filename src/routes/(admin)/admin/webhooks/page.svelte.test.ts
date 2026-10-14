@@ -123,7 +123,7 @@ describe('the webhook list when it could not be read', () => {
 
 	it('says the engine did not answer and offers no first webhook', () => {
 		const { container, queryByRole } = failed({ state: 'unavailable' });
-		expect(container.textContent).toContain('so Webhooks could not be read. Nothing was changed.');
+		expect(container.textContent).toContain('so webhooks could not be read. Nothing was changed.');
 		expect(container.textContent).not.toContain('No webhooks configured yet');
 		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
 		// The queue is the same plugin's read, so it is not offered either.
@@ -133,7 +133,7 @@ describe('the webhook list when it could not be read', () => {
 
 	it('names the role for a refusal', () => {
 		const { container } = failed({ state: 'forbidden' });
-		expect(container.textContent).toContain('Your role cannot open Webhooks.');
+		expect(container.textContent).toContain('Your role cannot open webhooks.');
 		expect(container.textContent).not.toContain('No webhooks configured yet');
 	});
 });

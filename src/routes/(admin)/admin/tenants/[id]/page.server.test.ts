@@ -107,6 +107,20 @@ describe('admin/tenants/[id] load', () => {
 		expect(data.homeSuperAdmins).toEqual(['u1']);
 	});
 
+	it('keeps a failed account read as unknown rather than as no super admin', async () => {
+		const { event: ev } = event({
+			'GET /api/admin/tenants/t1': TENANT,
+			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: [], known: [] },
+			'GET /api/admin/tenant-members/acme': {
+				members: [{ id: 'u1', email: 'root@acme.io', disabled: false, home: true, roles: ['editor'] }],
+				total: 1,
+			},
+			'GET /api/admin/users': json({ error: 'database unavailable' }, 503),
+		});
+		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
+		expect(data.homeSuperAdmins).toBeNull();
+	});
+
 	it('keeps the features when the members read fails', async () => {
 		const { event: ev } = event({
 			'GET /api/admin/tenants/t1': TENANT,

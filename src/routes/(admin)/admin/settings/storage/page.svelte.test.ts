@@ -85,6 +85,18 @@ describe('an edit save', () => {
 		const drawer = document.body.querySelector('form#provider-form') as HTMLFormElement;
 		expect(new FormData(drawer).get('cost_weight')).toBe('1');
 	});
+
+	// The plugin replaces the stored endpoint with whatever the save sends, so
+	// an Azure row's custom endpoint has to be on the form to survive a save.
+	it("carries an Azure row's stored endpoint, optional, on its edit form", async () => {
+		const azure = { ...provider, provider_type: 'azure_blob', name: 'Blob store', endpoint: 'https://files.example.com' };
+		const { getByRole } = render(StoragePage, { props: props({ providers: [azure] }) });
+		getByRole('button', { name: 'Edit Blob store' }).click();
+		await new Promise((r) => setTimeout(r, 0));
+		const drawer = document.body.querySelector('form#provider-form') as HTMLFormElement;
+		expect(new FormData(drawer).get('endpoint')).toBe('https://files.example.com');
+		expect((drawer.querySelector('#provider-endpoint') as HTMLInputElement).required).toBe(false);
+	});
 });
 
 // A heading list that jumps from h1 to h3 reads to a screen reader as a

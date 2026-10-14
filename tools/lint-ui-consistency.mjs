@@ -1067,7 +1067,9 @@ export const rules = [
      *            sm, icon only, aria-label, and a Trash2 painted text-danger
      *   footer   inside a Modal or a footer snippet: text only, default size,
      *            secondary, primary or danger. The first of a pair is the
-     *            secondary Cancel
+     *            secondary Cancel. One delete may lead a footer of three
+     *            or more, ahead of that order, so it never sits beside the
+     *            primary
      */
     test: (src, file = '') => {
       const body = markup(src);
@@ -1191,8 +1193,11 @@ export const rules = [
         }
       }
       for (const group of footerGroups.values()) {
-        if (group.length >= 2 && group[0].variant !== 'secondary')
-          hits.push(`footer "${group[0].label}": the first of a pair is the secondary Cancel`);
+        const rest = group.slice(1);
+        const lead = group.length >= 3 && group[0].variant === 'danger' && !rest.some((b) => b.variant === 'danger');
+        const pair = lead ? rest : group;
+        if (pair.length >= 2 && pair[0].variant !== 'secondary')
+          hits.push(`footer "${pair[0].label}": the first of a pair is the secondary Cancel`);
       }
       return hits;
     },

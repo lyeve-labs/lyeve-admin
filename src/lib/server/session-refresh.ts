@@ -31,6 +31,7 @@ import {
 	sessionToken,
 	setRefreshCookie,
 	setSessionCookie,
+	type SessionRead,
 } from '$lib/server/session-cookie';
 
 /** How long before its expiry a session token is traded. */
@@ -120,7 +121,7 @@ export function resetSessionRefresh(): void {
  * The token's claims, read without checking its signature. The engine checks
  * it on every call, so this only decides when to ask for a new one.
  */
-function claims(token: string): { exp?: unknown; sub?: unknown } | null {
+function claims(token: string): { exp?: unknown; sub?: unknown; tenant_id?: unknown } | null {
 	const payload = token.split('.')[1];
 	if (!payload) return null;
 	try {
@@ -129,6 +130,18 @@ function claims(token: string): { exp?: unknown; sub?: unknown } | null {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * The tenant the session token names, which is the tenant the engine resolves
+ * for the session's requests, or null when it names none. The claim is read
+ * without its signature, so it may only choose what a page says or offers.
+ * The engine checks the token and enforces the tenant on every call.
+ */
+export function sessionTenant(event: SessionRead): string | null {
+	const token = sessionToken(event);
+	const tenant = token ? claims(token)?.tenant_id : undefined;
+	return typeof tenant === 'string' && tenant ? tenant : null;
 }
 
 /** Whether the token has expired or has under two minutes left. A token with no readable expiry is left to the engine. */

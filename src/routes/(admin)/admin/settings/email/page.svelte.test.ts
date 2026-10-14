@@ -110,14 +110,14 @@ async function chooseTransport(container: HTMLElement, label: string) {
 describe('email providers page', () => {
 	it('says the plugin did not answer, and offers nothing to create', () => {
 		const { container, queryByText } = setup([], { providers: down });
-		expect(container.textContent).toContain('Email providers could not be read');
+		expect(container.textContent).toContain('so email providers could not be read');
 		expect(queryByText('No providers yet')).toBeNull();
 		expect(queryByText('New provider')).toBeNull();
 	});
 
 	it('tells a role the plugin refuses that it cannot open the providers', () => {
 		const { container, queryByText } = setup([], { providers: { ok: false, gate: { state: 'forbidden' } } });
-		expect(container.textContent).toContain('Your role cannot open Email providers');
+		expect(container.textContent).toContain('Your role cannot open email providers');
 		expect(queryByText('No providers yet')).toBeNull();
 	});
 

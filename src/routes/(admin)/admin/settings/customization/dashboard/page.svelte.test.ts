@@ -71,13 +71,13 @@ describe('dashboard editor page', () => {
 });
 
 describe('dashboard widget controls', () => {
-	function mountWith(widgets: unknown[], schemasRead = true, schemas = ['posts', 'authors']) {
+	function mountWith(widgets: unknown[], schemasRead: boolean | 'forbidden' = true, schemas = ['posts', 'authors']) {
 		return render(EditorPage, {
 			props: {
 				data: {
 					layout: { entitled: true, custom: true, widgets, updated_at: null },
 					schemas,
-					schemasGate: schemasRead ? { state: 'ok' } : { state: 'error', message: 'The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.' },
+					schemasGate: schemasRead === 'forbidden' ? { state: 'forbidden' } : schemasRead ? { state: 'ok' } : { state: 'error', message: 'The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.' },
 					plugins: { state: 'named', running: ['content', 'media', 'audit'], withheld: [] },
 					user: { roles: ['admin'] },
 				},
@@ -96,6 +96,11 @@ describe('dashboard widget controls', () => {
 		expect(container.querySelector('#widget-a-status')).toBeNull();
 		expect(container.querySelector('#widget-b-schemas')).toBeTruthy();
 		expect(container.querySelectorAll('input[type="checkbox"]').length).toBe(6);
+	});
+
+	it('names the schema list in lower case inside the role refusal', () => {
+		const { container } = mountWith([], 'forbidden', []);
+		expect(container.textContent).toContain('Your role cannot open the schema list.');
 	});
 
 	it('keeps the schemas a widget names on screen when the schema list was not read', () => {

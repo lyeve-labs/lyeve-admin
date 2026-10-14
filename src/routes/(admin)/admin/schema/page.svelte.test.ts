@@ -597,7 +597,7 @@ describe('schema builder presets', () => {
 		});
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Presets' }));
-		expect(screen.getByText(/so Presets could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so presets could not be read/)).toBeTruthy();
 		expect(screen.queryByText('No presets')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Create' })).toBeNull();
 	});
@@ -768,7 +768,7 @@ describe('schema builder read failures', () => {
 		render(SchemaPage, {
 			props: { data: data({ schemas: [], loadGate: { state: 'unavailable' } }), form: null },
 		});
-		expect(screen.getByText(/so Schemas could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so schemas could not be read/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: 'New schema' })).toBeNull();
 		expect(screen.queryByText('No schemas yet')).toBeNull();
 	});
@@ -819,7 +819,7 @@ describe('schema builder over a failed list read', () => {
 		render(SchemaPage, {
 			props: { data: data({ schemas: [], canWrite: false, loadGate: { state: 'forbidden' } }), form: null },
 		});
-		expect(screen.getByText(/Your role cannot open Schemas/)).toBeTruthy();
+		expect(screen.getByText(/Your role cannot open schemas/)).toBeTruthy();
 		expect(screen.queryByText(/Your role reads schemas/)).toBeNull();
 	});
 });

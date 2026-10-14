@@ -114,7 +114,7 @@ describe('PresetsDrawer', () => {
 
 	it('says why the gallery is empty when the presets could not be read', () => {
 		setup({ presets: [], presetsGate: { state: 'unavailable' } });
-		expect(screen.getByText(/so Presets could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so presets could not be read/)).toBeTruthy();
 		expect(screen.queryByText('No presets')).toBeNull();
 	});
 });

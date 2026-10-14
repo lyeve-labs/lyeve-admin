@@ -67,6 +67,18 @@ describe('admin/ai/providers/[id] actions', () => {
 		expect(calls.find((c) => c.url.includes('/capabilities'))?.url).toContain('model=gpt-4o');
 	});
 
+	// Saving and deleting a provider are a super admin's alone. The refusal
+	// comes before the engine is asked, so nothing is sent.
+	it.each(['update', 'delete'] as const)('refuses %s to an admin and sends nothing', async (name) => {
+		const { event, calls } = actionEvent(
+			{ [`/api/admin/ai/providers/${id}`]: () => json(fixtureProvider) },
+			formOf({ name: 'renamed', kind: 'openai', modalities: ['text'], priority: '10' }),
+			{ path, params: { id }, roles: ['admin'] }
+		);
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(calls.some((c) => c.init?.method === 'PUT' || c.init?.method === 'DELETE')).toBe(false);
+	});
+
 	it('deletes and returns to the list', async () => {
 		const { event } = actionEvent({ [`/api/admin/ai/providers/${id}`]: () => new Response(null, { status: 204 }) }, new FormData(), { path, params: { id } });
 		await expect(actions.delete(event)).rejects.toMatchObject({ status: 303, location: '/admin/ai/providers' });

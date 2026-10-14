@@ -161,7 +161,7 @@
 			<Button href="/admin/device?code={encodeURIComponent(data.code)}" variant="secondary">Try again</Button>
 		{:else if view !== 'enter'}
 			{@const outcome = outcomes[view]}
-			<EmptyState title={outcome.title} description={outcome.description}>
+			<EmptyState level={2} title={outcome.title} description={outcome.description}>
 				{#snippet iconSnippet()}
 					{#if view === 'approved'}
 						<CircleCheck size={ICON.lg} aria-hidden="true" />

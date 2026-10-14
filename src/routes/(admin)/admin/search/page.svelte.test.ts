@@ -47,8 +47,22 @@ describe('Search page results panel', () => {
 		const { getByText, queryByText } = render(SearchPage, {
 			props: { data: data({ results: { ok: false, gate: { state: 'unavailable' } } }) as never, form: null },
 		});
-		expect(getByText(/Search could not be read/)).toBeTruthy();
+		expect(getByText(/search could not be read/)).toBeTruthy();
 		expect(queryByText('No results for "cats".')).toBeNull();
+	});
+
+	it('names public search in lower case inside the role refusal', () => {
+		const { container } = render(SearchPage, {
+			props: { data: data({ publicSchemas: { ok: false, gate: { state: 'forbidden' } } }) as never, form: null },
+		});
+		expect(container.textContent).toContain('Your role cannot open public search.');
+	});
+
+	it('names the schemas in lower case inside the role refusal', () => {
+		const { container } = render(SearchPage, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'forbidden' } } }) as never, form: null },
+		});
+		expect(container.textContent).toContain('Your role cannot open the schemas.');
 	});
 
 	it('still reports an empty result set when the search succeeded', () => {
@@ -56,7 +70,7 @@ describe('Search page results panel', () => {
 			props: { data: data() as never, form: null },
 		});
 		expect(getByText('No results for "cats".')).toBeTruthy();
-		expect(queryByText(/Search could not be read/)).toBeNull();
+		expect(queryByText(/search could not be read/)).toBeNull();
 	});
 });
 
@@ -91,7 +105,7 @@ describe('Search page settings', () => {
 		const { getByText, queryByLabelText } = render(SearchPage, {
 			props: { data: data({ ranking: { ok: false, gate: { state: 'unavailable' } } }) as never, form: null },
 		});
-		expect(getByText(/Ranking weights could not be read/)).toBeTruthy();
+		expect(getByText(/ranking weights could not be read/)).toBeTruthy();
 		expect(queryByLabelText('Title')).toBeNull();
 	});
 

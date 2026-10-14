@@ -71,7 +71,7 @@ describe('mapping templates', () => {
 		const { container } = render(ImportsPage, {
 			props: props({ templates: [], templatesRead: false, templatesGate: { state: 'forbidden' } }),
 		});
-		expect(said(container)).toContain('Your role cannot open Templates');
+		expect(said(container)).toContain('Your role cannot open templates');
 	});
 
 	it('says what an unlicensed install keeps', () => {
