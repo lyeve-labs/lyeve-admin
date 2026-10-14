@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Button,
@@ -66,8 +65,6 @@
 		return pageHref('/admin/logs', data.limit, params)(1);
 	}
 </script>
-
-<PageTitle title="Logs" />
 
 {#snippet emptyIcon()}
 	<FileText size={ICON.lg} />

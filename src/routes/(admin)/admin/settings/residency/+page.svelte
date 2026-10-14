@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -121,8 +120,6 @@
 
 	const saveRegionSubmit = tracked(saveRegion);
 </script>
-
-<PageTitle title="Data residency" />
 
 <PageShell
 	title="Data residency"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
@@ -137,10 +136,9 @@
 	const save = submitter(() => (open = false));
 </script>
 
-<PageTitle title="Email templates - Settings" />
-
 <PageShell
 	title="Email templates"
+	documentTitle="Email templates - Settings"
 	description="The subject and body each mail is sent with. Edit every word, start from a ready-made template, and preview it with sample values before it goes out."
 	width="wide"
 	back={{ href: '/admin/settings/email', label: 'Email' }}

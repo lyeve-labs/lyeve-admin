@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -809,15 +808,13 @@
 	});
 </script>
 
-<PageTitle title={`${data.flow?.name ?? 'Flow'} - Flows`} />
-
 <svelte:window onkeydown={onKey} onbeforeunload={beforeUnload} />
 
 {#if enabled && data.flow}
 	<!-- The toolbar is the header: the way back and the name live in it, so
 	     the shell's own title row is not rendered and the page has one row
 	     before the canvas. The h1 stays, for assistive technology. -->
-	<PageShell title={definition.name || data.flow.name} fill titleHidden>
+	<PageShell title={definition.name || data.flow.name} documentTitle={`${data.flow?.name ?? 'Flow'} - Flows`} fill titleHidden>
 		<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 			<form
 				method="POST"
@@ -1406,7 +1403,7 @@
 
 	<form method="POST" action="?/delete" use:enhance={deleteFlow.enhance} bind:this={deleteFlowForm} class="hidden"></form>
 {:else}
-	<PageShell title="Flows" width="wide">
+	<PageShell title="Flows" documentTitle={`${data.flow?.name ?? 'Flow'} - Flows`} width="wide">
 		<NotEnabled
 			title="Flows"
 			description="The engine refused the flow routes."

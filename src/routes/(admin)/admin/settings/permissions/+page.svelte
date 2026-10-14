@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -430,8 +429,6 @@
 		await update({ reset: false });
 	});
 </script>
-
-<PageTitle title="Row-level permissions" />
 
 {#snippet summaryCell(role: string, action: Action)}
 	{#if role === EXEMPT_ROLE}

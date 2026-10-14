@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Breadcrumb,
@@ -41,8 +40,6 @@
 
 	const back = { href: '/admin/plugins', label: 'Plugins' };
 </script>
-
-<PageTitle title={`${title} - Plugins`} />
 
 {#snippet stateDetail()}
 	{#if plugin}
@@ -88,6 +85,7 @@
 
 <PageShell
 	{title}
+	documentTitle={`${title} - Plugins`}
 	description={plugin?.description || 'What this plugin is and what it serves on this instance.'}
 	width="wide"
 	{back}

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
@@ -233,10 +232,9 @@
 	const placeholderHint = `A JSON template. ${BODY_PLACEHOLDERS.map((p) => `{{${p}}}`).join(', ')} are substituted at send time; {{to}} is an array of addresses, {{to_first}} its first address and {{to_objects}} the same list as objects with an email key.`;
 </script>
 
-<PageTitle title="Email providers" />
-
 <PageShell
 	title="Email"
+	documentTitle="Email providers"
 	description="How this instance sends mail. The provider pool is tried first, and the fallback transport below it catches anything the pool cannot send."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}

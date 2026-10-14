@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -77,8 +76,6 @@
 		};
 	}
 </script>
-
-<PageTitle title="Idempotency" />
 
 <PageShell
 	title="Idempotency"

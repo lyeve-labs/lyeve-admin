@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, Drawer, EmptyState, FilterChips, Input, PageShell, Pagination, Table, Textarea } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { CalendarClock, Plus } from '@lucide/svelte';
@@ -41,8 +40,6 @@
 		{ value: 'canceled', label: 'Canceled', href: '/admin/releases?status=canceled' },
 	];
 </script>
-
-<PageTitle title="Releases" />
 
 <PageShell
 	title="Releases"

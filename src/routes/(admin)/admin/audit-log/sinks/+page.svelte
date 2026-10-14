@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -142,10 +141,9 @@
 	}
 </script>
 
-<PageTitle title="Audit streaming" />
-
 <PageShell
 	title="Audit log"
+	documentTitle="Audit streaming"
 	description="Stream every audit entry to a security tool outside the instance, delivered at least once and in order."
 	width="wide"
 >

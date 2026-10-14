@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import {
@@ -254,8 +253,6 @@
 		deleteForm?.requestSubmit();
 	}
 </script>
-
-<PageTitle title="Reviews" />
 
 <PageShell
 	title="Reviews"

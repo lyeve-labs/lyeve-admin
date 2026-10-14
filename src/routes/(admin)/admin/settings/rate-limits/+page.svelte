@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Autocomplete,
 		Alert,
@@ -245,8 +244,6 @@
 	const saveGlobalSubmit = tracked(closing(() => (globalOpen = false), 'Saved the global limit'));
 	const saveProtectionSubmit = tracked(closing(() => (protectionOpen = false), 'Saved the protection'));
 </script>
-
-<PageTitle title="Rate limits" />
 
 <PageShell
 	title="Rate limits"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	import type { Schema } from '@lyeve-labs/client';
 	import {
@@ -141,8 +140,6 @@
 		filtered.filter((s: Schema) => data.stats?.[s.name]?.rows === 0).length,
 	);
 </script>
-
-<PageTitle title="Content" />
 
 {#snippet sortHeader(key: CollectionSort, label: string, align: 'left' | 'right')}
 	<th scope="col" aria-sort={ariaSort(key)} class={align === 'right' ? 'text-right' : undefined}>

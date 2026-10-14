@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	/**
 	 * Every plugin the engine reports, with the state it reports.
@@ -105,8 +104,6 @@
 		states = ['failed'];
 	}
 </script>
-
-<PageTitle title="Plugins" />
 
 {#snippet manageLicense()}
 	<Button variant="secondary" size="sm" href="/admin/settings/license">

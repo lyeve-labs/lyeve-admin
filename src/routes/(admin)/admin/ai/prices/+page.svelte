@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, SegmentedControl, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
@@ -95,8 +94,6 @@
 
 	const save = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
-
-<PageTitle title="AI prices" />
 
 <PageShell
 	title="AI prices"

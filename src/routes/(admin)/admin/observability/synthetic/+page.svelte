@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -232,8 +231,6 @@
 
 	const saveProbeSubmit = tracked(saveProbe);
 </script>
-
-<PageTitle title="Synthetic monitoring" />
 
 <PageShell
 	title="Synthetic monitoring"

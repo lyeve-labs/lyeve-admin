@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, EmptyState, Input, PageShell, Pagination, Select, Table } from '@lyeve-labs/ui-kit';
 	import { ChevronRight, MessagesSquare, Search } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -21,8 +20,6 @@
 		...(data.subjectId ? { subject_id: data.subjectId } : {}),
 	});
 </script>
-
-<PageTitle title="AI transcripts" />
 
 <PageShell
 	title="AI transcripts"

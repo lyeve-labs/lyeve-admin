@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -137,8 +136,6 @@
 
 	const saveProviderSubmit = tracked(saveProvider);
 </script>
-
-<PageTitle title="OAuth providers" />
 
 <PageShell
 	title="OAuth providers"

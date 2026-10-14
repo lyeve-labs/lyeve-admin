@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -160,8 +159,6 @@
 	const saveVariantSubmit = tracked(saveVariant);
 	const saveMetricSubmit = tracked(saveMetric);
 </script>
-
-<PageTitle title={exp.name} />
 
 <PageShell
 	title={exp.name}

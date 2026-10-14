@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, Drawer, EmptyState, Input, PageShell, PasswordInput, SearchInput, Table, Toggle, confirm, Pagination } from '@lyeve-labs/ui-kit';
 	import { tick } from 'svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -92,11 +91,10 @@
 	const keep = $derived({ ...(data.q ? { q: data.q } : {}), ...(fromFlow ? { flow: fromFlow } : {}) });
 </script>
 
-<PageTitle title="Variables - Flows" />
-
 {#if enabled}
 	<PageShell
 		title="Variables"
+		documentTitle="Variables - Flows"
 		description="Per-tenant values every flow can read as vars.<key>. A secret is stored encrypted, never shown again, and never written to a run record."
 		width="wide"
 		back={flowBack(page.url)}
@@ -237,7 +235,7 @@
 		<input type="hidden" name="key" value={deleteKey} />
 	</form>
 {:else}
-	<PageShell title="Flows" width="wide">
+	<PageShell title="Flows" documentTitle="Variables - Flows" width="wide">
 		<NotEnabled title="Flows" description="Variables belong to the flow plugin, and the engine refused its routes." />
 	</PageShell>
 {/if}

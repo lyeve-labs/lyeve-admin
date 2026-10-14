@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -46,8 +45,6 @@
 	const guide = $derived(data.status ? connectionGuide(data.status.backend, data.status.topic_prefix) : null);
 	const backendSettings = $derived(data.status ? (BACKEND_SETTINGS[data.status.backend] ?? []) : []);
 </script>
-
-<PageTitle title="Message broker" />
 
 <PageShell
 	title="Message broker"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import OlderHidden from '$lib/components/OlderHidden.svelte';
 	import { Badge, Breadcrumb, Button, Card, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
@@ -144,8 +143,6 @@
 		return keys.length > 3 ? `${shown} and ${keys.length - 3} more` : shown;
 	}
 </script>
-
-<PageTitle title={heading} />
 
 <PageShell title={heading} description={entryId} width="wide" {back}>
 	{#snippet breadcrumb()}

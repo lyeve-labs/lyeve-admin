@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -199,10 +198,9 @@
 	const saveHoldSubmit = tracked(saveHold);
 </script>
 
-<PageTitle title="Retention and holds - Audit log" />
-
 <PageShell
 	title="Audit log"
+	documentTitle="Retention and holds - Audit log"
 	description="How long entries are kept, and what is being held back from deletion."
 	width="wide"
 >

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Card,
@@ -43,8 +42,6 @@
 		return m ? uptimeSince(m.since) : NO_VALUE;
 	}
 </script>
-
-<PageTitle title="Realtime" />
 
 <PageShell
 	title="Realtime"

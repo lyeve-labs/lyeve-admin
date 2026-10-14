@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -173,8 +172,6 @@
 		};
 	};
 </script>
-
-<PageTitle title="API labs" />
 
 {#snippet answer(result: LabResult)}
 	<SectionHeading level={3}>The answer</SectionHeading>

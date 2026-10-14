@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -241,8 +240,6 @@
 
 	const isOwner = (t: AdminToken) => t.owner_user_id === data.user.id;
 </script>
-
-<PageTitle title="Admin tokens" />
 
 <PageShell
 	title="Admin tokens"

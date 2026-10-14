@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
@@ -32,7 +32,10 @@ async function deleteTitle(): Promise<string> {
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 vi.mock('$app/state', () => ({ page: { url: new URL('http://admin/admin/api-keys') } }));
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 
 function key(over: Record<string, unknown>) {
 	return {
@@ -48,7 +51,7 @@ function key(over: Record<string, unknown>) {
 	};
 }
 
-function setup(keys: unknown[] | { ok: false; gate: unknown }, over: Record<string, unknown> = {}) {
+function setup(keys: unknown[] | { ok: false; gate: unknown }, over: Record<string, unknown> = {}, form: unknown = null) {
 	const data = {
 		keys: Array.isArray(keys) ? { ok: true, value: keys } : keys,
 		usageMap: {},
@@ -69,7 +72,7 @@ function setup(keys: unknown[] | { ok: false; gate: unknown }, over: Record<stri
 		},
 		...over,
 	};
-	return render(Page, { props: { data, form: null } as never });
+	return render(Page, { props: { data, form } as never });
 }
 
 describe('API keys page', () => {
@@ -184,5 +187,40 @@ describe('API keys page', () => {
 	it('names the key in the delete confirmation', async () => {
 		setup([key({})]);
 		expect(await deleteTitle()).toBe('Delete API key deploy');
+	});
+
+	it('shows the new key once in a field that copies it and confirms', async () => {
+		vi.useFakeTimers();
+		const writeText = vi.fn(async (_text: string) => {});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		setup([key({})], {}, { created: true, raw_key: 'ly_live_secret', key_name: 'deploy' });
+
+		expect((screen.getByLabelText('API key') as HTMLInputElement).value).toBe('ly_live_secret');
+		await fireEvent.click(screen.getByRole('button', { name: 'Copy key' }));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(writeText).toHaveBeenCalledWith('ly_live_secret');
+		expect(screen.getByText('Copied')).toBeTruthy();
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(screen.queryByText('Copied')).toBeNull();
+	});
+
+	it('keeps the way to copy the key by hand after a copy fails', async () => {
+		vi.useFakeTimers();
+		const writeText = vi.fn(async (_text: string) => {
+			throw new Error('denied');
+		});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		Object.defineProperty(document, 'execCommand', { value: vi.fn(() => false), configurable: true });
+		setup([key({})], {}, { created: true, raw_key: 'ly_live_secret', key_name: 'deploy' });
+		const hint = 'If the copy fails, select the key and copy it yourself.';
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Copy key' }));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(screen.getByText('Copy failed')).toBeTruthy();
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(screen.queryByText('Copy failed')).toBeNull();
+		expect(screen.getByText(hint)).toBeTruthy();
 	});
 });

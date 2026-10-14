@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
@@ -63,8 +62,6 @@
 		};
 	};
 </script>
-
-<PageTitle title="Captcha" />
 
 <PageShell
 	title="Captcha"

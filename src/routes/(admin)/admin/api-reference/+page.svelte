@@ -1,18 +1,18 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { ActionData, PageData } from './$types';
 	import type { EndpointDoc, EndpointParam, HttpMethod } from '$lib/api/reference';
 	import { VALUES_SHOWN } from '$lib/api/openapi';
 	import { curlFor, gateSentence } from '$lib/api/request-preview';
 	import { isWriteMethod, unfilledParameters, type TryResult } from '$lib/api/try-it';
 	import { enhance } from '$app/forms';
-	import { Check, ChevronDown, ChevronRight, Copy, Download, Play } from '@lucide/svelte';
+	import { ChevronDown, ChevronRight, Download, Play } from '@lucide/svelte';
 	import {
 		Alert,
 		Badge,
 		Button,
 		Card,
 		Checkbox,
+		CopyButton,
 		EmptyState,
 		Input,
 		PageShell,
@@ -22,7 +22,6 @@
 		Table,
 		Textarea,
 	} from '@lyeve-labs/ui-kit';
-	import { copyText } from '$lib/clipboard';
 	import ResizableAside from '$lib/components/ResizableAside.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ICON } from '$lib/icon';
@@ -46,7 +45,6 @@
 
 	let query = $state('');
 	let expandedIds = $state(new Set<string>());
-	let copiedPath = $state<string | null>(null);
 	// Parameters whose value list has been opened past the first few.
 	let openedValues = $state(new Set<string>());
 
@@ -101,14 +99,6 @@
 			expandedIds.add(id);
 		}
 		expandedIds = new Set(expandedIds);
-	}
-
-	async function copyPath(path: string) {
-		if (!(await copyText(path))) return;
-		copiedPath = path;
-		setTimeout(() => {
-			copiedPath = null;
-		}, 1500);
 	}
 
 	type BadgeTone = 'neutral' | 'brand' | 'violet' | 'success' | 'warn' | 'danger';
@@ -172,8 +162,6 @@
 	// Plugin rows would fill most of the rail, so they open on demand.
 	let pluginsOpen = $state(false);
 </script>
-
-<PageTitle title="API reference" />
 
 <!-- What a row shows, rendered inside the disclosure button when there is
      something to disclose and in a plain container when there is not. The two
@@ -360,19 +348,12 @@
 											</div>
 										{/if}
 
-										<button
-											type="button"
-											onclick={() => copyPath(ep.path)}
-											class="relative hit-area flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint transition-colors hover:bg-surface-2 hover:text-fg"
-											title="Copy path"
-											aria-label="Copy the path {ep.path}"
-										>
-											{#if copiedPath === ep.path}
-												<Check size={ICON.sm} class="text-success" />
-											{:else}
-												<Copy size={ICON.sm} />
-											{/if}
-										</button>
+										<CopyButton
+											value={ep.path}
+											label="Copy the path {ep.path}"
+											size={ICON.sm}
+											class="shrink-0"
+										/>
 									</div>
 
 									{#if expanded}
@@ -471,20 +452,12 @@
 													{#if ep.requestBody.example}
 														<div class="group/code relative">
 															<pre class="overflow-x-auto rounded-lg border border-line bg-ink p-3 font-mono text-xs leading-relaxed text-fg">{ep.requestBody.example}</pre>
-															<button
-																type="button"
-																onclick={() => copyPath(ep.requestBody!.example)}
-																class="absolute top-2 right-2 hit-area rounded bg-surface-2 p-1 text-faint opacity-0 transition-opacity
-																	group-hover/code:opacity-100 focus-visible:opacity-100 hover:text-fg pointer-coarse:opacity-100"
-																title="Copy the request body"
-																aria-label="Copy the example request body for {ep.method} {ep.path}"
-															>
-																{#if copiedPath === ep.requestBody.example}
-																	<Check size={ICON.xs} class="text-success" />
-																{:else}
-																	<Copy size={ICON.xs} />
-																{/if}
-															</button>
+															<CopyButton
+																value={ep.requestBody.example}
+																label="Copy the example request body for {ep.method} {ep.path}"
+																size={ICON.xs}
+																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
+															/>
 														</div>
 													{/if}
 												</div>
@@ -501,20 +474,12 @@
 													{#if ep.response.example}
 														<div class="group/code relative">
 															<pre class="overflow-x-auto rounded-lg border border-line bg-ink p-3 font-mono text-xs leading-relaxed text-fg">{ep.response.example}</pre>
-															<button
-																type="button"
-																onclick={() => copyPath(ep.response!.example)}
-																class="absolute top-2 right-2 hit-area rounded bg-surface-2 p-1 text-faint opacity-0 transition-opacity
-																	group-hover/code:opacity-100 focus-visible:opacity-100 hover:text-fg pointer-coarse:opacity-100"
-																title="Copy the response body"
-																aria-label="Copy the example response body for {ep.method} {ep.path}"
-															>
-																{#if copiedPath === ep.response.example}
-																	<Check size={ICON.xs} class="text-success" />
-																{:else}
-																	<Copy size={ICON.xs} />
-																{/if}
-															</button>
+															<CopyButton
+																value={ep.response.example}
+																label="Copy the example response body for {ep.method} {ep.path}"
+																size={ICON.xs}
+																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
+															/>
 														</div>
 													{/if}
 												</div>
@@ -527,20 +492,12 @@
 												</p>
 												<div class="group/code relative">
 													<pre class="overflow-x-auto rounded-lg border border-line bg-ink p-3 font-mono text-xs leading-relaxed text-fg">{preview}</pre>
-													<button
-														type="button"
-														onclick={() => copyPath(preview)}
-														class="absolute top-2 right-2 hit-area rounded bg-surface-2 p-1 text-faint opacity-0 transition-opacity
-															group-hover/code:opacity-100 focus-visible:opacity-100 hover:text-fg pointer-coarse:opacity-100"
-														title="Copy the request"
-														aria-label="Copy a curl request for {ep.method} {ep.path}"
-													>
-														{#if copiedPath === preview}
-															<Check size={ICON.xs} class="text-success" />
-														{:else}
-															<Copy size={ICON.xs} />
-														{/if}
-													</button>
+													<CopyButton
+														value={preview}
+														label="Copy a curl request for {ep.method} {ep.path}"
+														size={ICON.xs}
+														class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
+													/>
 												</div>
 											</div>
 										</div>

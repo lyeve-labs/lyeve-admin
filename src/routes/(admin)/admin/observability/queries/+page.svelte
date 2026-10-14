@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -101,8 +100,6 @@
 		return out;
 	}
 </script>
-
-<PageTitle title="Slow queries" />
 
 <PageShell
 	title="Slow queries"

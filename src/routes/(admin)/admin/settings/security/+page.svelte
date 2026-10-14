@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Alert, Badge, Card, PageShell, SectionHeading, Stat, EmptyState } from '@lyeve-labs/ui-kit';
 	import { CircleCheck, CircleAlert, CircleX, CircleDashed } from '@lucide/svelte';
 	import type { PageData } from './$types';
@@ -38,8 +37,6 @@
 	const count = (status: ControlStatus) => controls.filter((c) => c.status === status).length;
 	const label = (c: SecurityControl) => CONTROL_LABEL[c.control] ?? c.control;
 </script>
-
-<PageTitle title="Security" />
 
 <PageShell
 	title="Security"

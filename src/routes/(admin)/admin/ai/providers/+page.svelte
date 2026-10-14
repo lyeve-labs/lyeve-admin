@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, Drawer, EmptyState, PageShell, Pagination, Stat, Table } from '@lyeve-labs/ui-kit';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { enhance } from '$app/forms';
@@ -20,8 +19,6 @@
 
 	const create = submitter(() => (open = false));
 </script>
-
-<PageTitle title="AI providers" />
 
 <PageShell title="AI providers" description="The models this tenant may call, and the keys they are called with." width="wide">
 	{#snippet actions()}

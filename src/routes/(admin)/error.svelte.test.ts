@@ -7,8 +7,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/state', () => state);
+vi.mock('$app/navigation', () => ({ onNavigate: () => {} }));
+vi.mock('$app/paths', () => ({ asset: (path: string) => path }));
 
 import AdminError from './+error.svelte';
+import UnderRootLayout from '../root-layout-page.test.svelte';
 import { OUTAGE } from '$lib/outage';
 
 afterEach(cleanup);
@@ -16,7 +19,8 @@ afterEach(cleanup);
 function renderAt(status: number, message = '') {
 	state.page.status = status;
 	state.page.error = message ? { message } : null;
-	return render(AdminError);
+	// Under the root layout, which states the format the tab title takes.
+	return render(UnderRootLayout, { props: { page: AdminError } });
 }
 
 describe('Admin error page', () => {

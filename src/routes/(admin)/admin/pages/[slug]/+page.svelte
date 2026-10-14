@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Button, EmptyState, PageShell } from '@lyeve-labs/ui-kit';
 	import { LayoutGrid, Pencil } from '@lucide/svelte';
 	import CustomBlocks from '$lib/components/custom/CustomBlocks.svelte';
@@ -9,8 +8,6 @@
 	let { data }: { data: PageData } = $props();
 	const canEdit = $derived(data.user.roles.includes('admin') || data.user.roles.includes('super_admin'));
 </script>
-
-<PageTitle title={data.customPage.title} />
 
 <PageShell title={data.customPage.title} description={data.customPage.description || undefined} width="wide">
 	{#snippet actions()}

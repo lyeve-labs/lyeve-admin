@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import CustomBlocks from '$lib/components/custom/CustomBlocks.svelte';
 	import DashboardWidgets from '$lib/components/custom/DashboardWidgets.svelte';
 	import {
@@ -70,8 +69,6 @@
 			: undefined
 	);
 </script>
-
-<PageTitle title="Dashboard" />
 
 <PageShell
 	title="Dashboard"

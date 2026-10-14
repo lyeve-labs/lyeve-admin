@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { filtersText, keptJSON, type WebhookRecord } from '$lib/api/webhook-options';
 	import { formRefusal } from '$lib/api/refusal';
@@ -312,8 +311,6 @@
 	// admin only. An admin reads, tests and replays, and is told the rest.
 	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
 </script>
-
-<PageTitle title="Webhooks" />
 
 <PageShell
 	title="Webhooks"

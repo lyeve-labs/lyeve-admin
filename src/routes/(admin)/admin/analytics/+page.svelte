@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		Badge,
@@ -115,8 +114,6 @@
 		}
 	}
 </script>
-
-<PageTitle title="API analytics" />
 
 {#snippet noEndpoints()}
 	<Server size={ICON.lg} />

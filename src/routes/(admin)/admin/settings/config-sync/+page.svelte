@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -169,8 +168,6 @@
 		return names && names.length > 0 ? names.map(label).join(', ') : 'None';
 	}
 </script>
-
-<PageTitle title="Config sync" />
 
 <PageShell
 	title="Config sync"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -43,8 +42,6 @@
 	const gaps = $derived(undeclared(data.status));
 	const note = $derived(reflectionNote(data.status));
 </script>
-
-<PageTitle title="gRPC" />
 
 <PageShell
 	title="gRPC"

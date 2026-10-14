@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -53,8 +52,6 @@
 		return 'Not editable.';
 	}
 </script>
-
-<PageTitle title="Configuration" />
 
 <PageShell
 	title="Configuration"

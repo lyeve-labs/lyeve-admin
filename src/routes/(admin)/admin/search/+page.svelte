@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -62,8 +61,6 @@
 	// svelte-ignore state_referenced_locally
 	let query = $state(data.q);
 </script>
-
-<PageTitle title="Search" />
 
 <PageShell
 	title="Search"

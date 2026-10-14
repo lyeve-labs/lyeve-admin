@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -82,10 +81,9 @@
 	);
 </script>
 
-<PageTitle title="GraphQL - Settings" />
-
 <PageShell
 	title="GraphQL"
+	documentTitle="GraphQL - Settings"
 	description="The schema this instance generates from your content types, where it answers, and the queries it allows by hash."
 	width="wide"
 >
