@@ -148,6 +148,7 @@
 
 	{#if !data.jobs.ok}
 		<GateNotice
+			level={2}
 			gate={data.jobs.gate}
 			title="Scheduled jobs"
 			absent="The cron plugin is not part of this build, so no job runs on a schedule."

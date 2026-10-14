@@ -229,6 +229,7 @@
 
 	{#if loadGate}
 		<GateNotice
+			level={2}
 			gate={loadGate}
 			title="Row-level permissions"
 			absent="The permissions plugin is not running on this instance, so it holds no row-level rules to manage."

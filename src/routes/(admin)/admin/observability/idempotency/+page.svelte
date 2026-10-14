@@ -74,6 +74,7 @@
 >
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Idempotency"
 			absent="The idempotency plugin is not part of this build, so a repeated request runs twice."
@@ -101,7 +102,7 @@
 			</p>
 		{:else if !data.statsRead}
 			{#if data.statsGate}
-				<GateNotice gate={data.statsGate} title="the counters" absent="This version of the idempotency plugin keeps no counters." />
+				<GateNotice level={2} gate={data.statsGate} title="the counters" absent="This version of the idempotency plugin keeps no counters." />
 			{:else}
 				<Alert tone="danger">
 					The counters could not be read. The list below is one page, not the whole store.

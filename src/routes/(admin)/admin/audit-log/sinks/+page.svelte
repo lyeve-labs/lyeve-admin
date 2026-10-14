@@ -158,7 +158,7 @@
 	<AuditTabs active="sinks" sinks={data.gate.state === 'ok' ? data.sinks.length : undefined} />
 
 	{#if data.gate.state !== 'ok'}
-		<GateNotice gate={data.gate} title="Audit streaming" absent="This build does not stream the audit log anywhere." />
+		<GateNotice level={2} gate={data.gate} title="Audit streaming" absent="This build does not stream the audit log anywhere." />
 	{:else}
 		<div class="flex flex-col gap-4">
 			<FormErrors message={rowFailure ? String(rowFailure.error) : undefined} refused={formRefusal(rowFailure)} />

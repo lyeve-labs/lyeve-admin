@@ -16,12 +16,19 @@
 		gate,
 		title,
 		absent,
+		level = 3,
 	}: {
 		gate: Gate;
 		/** The feature's name. */
 		title: string;
 		/** What the page says when the route is not there. */
 		absent: string;
+		/**
+		 * The heading level of the not-enabled state's title. 3 by default, for
+		 * a notice inside a section. A caller placed straight under the page
+		 * title passes 2.
+		 */
+		level?: 2 | 3;
 	} = $props();
 
 	// A plain link to this address works before the page hydrates. After it
@@ -41,7 +48,7 @@
 {#if gate.state === 'absent'}
 	<Alert tone="brand">{absent}</Alert>
 {:else if gate.state === 'locked'}
-	<NotEnabled {title} url={gate.upgradeUrl} />
+	<NotEnabled {title} {level} url={gate.upgradeUrl} />
 {:else if gate.state === 'full'}
 	<Alert tone="warn" title="{title} is at its limit">{fullText(gate)}</Alert>
 {:else if gate.state === 'forbidden'}

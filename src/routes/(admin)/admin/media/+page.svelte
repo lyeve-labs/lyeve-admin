@@ -214,6 +214,7 @@
 
 	{#if !data.items.ok}
 		<GateNotice
+			level={2}
 			gate={data.items.gate}
 			title="Media library"
 			absent="The media plugin does not run on this instance, so there is no library to show."

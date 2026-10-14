@@ -73,6 +73,7 @@
 >
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Device recognition"
 			absent="The device recognition plugin is not part of this build, so no device is remembered."

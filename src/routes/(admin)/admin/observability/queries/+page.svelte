@@ -129,6 +129,7 @@
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Slow queries"
 			absent="The query monitor is not part of this build, so nothing is sampling statements."

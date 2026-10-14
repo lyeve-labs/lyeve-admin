@@ -297,7 +297,7 @@
 		</Card>
 
 		{#if data.gate.state !== 'ok'}
-			<GateNotice gate={data.gate} title="datasources" absent="The flow plugin does not serve datasources on this instance." />
+			<GateNotice level={2} gate={data.gate} title="datasources" absent="The flow plugin does not serve datasources on this instance." />
 		{/if}
 
 		{#if pageFailure?.refused}

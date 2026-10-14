@@ -47,6 +47,7 @@
 >
 	{#if !data.report.ok}
 		<GateNotice
+			level={2}
 			gate={data.report.gate}
 			title="Security"
 			absent="This engine does not report its controls. Its boot log lists the same controls."

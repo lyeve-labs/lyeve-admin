@@ -59,6 +59,7 @@
 >
 	{#if data.gate.state !== 'ok' || !settings}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Captcha"
 			absent="The captcha plugin is not part of this build, so no form is challenged."

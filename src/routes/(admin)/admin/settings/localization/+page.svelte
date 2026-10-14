@@ -91,6 +91,7 @@
 
 	{#if !data.locales.ok}
 		<GateNotice
+			level={2}
 			gate={data.locales.gate}
 			title="Locales"
 			absent="The localization plugin is not part of this build, so content is kept in one language."

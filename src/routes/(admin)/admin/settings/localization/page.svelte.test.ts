@@ -98,4 +98,10 @@ describe('heading outline', () => {
 		const { container } = render(LocalesPage, { props: { data: data(), form: null } });
 		expect(outlineSkips(container)).toEqual([]);
 	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(LocalesPage, { props: { data: data({ locales: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }), form: null } });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
 });

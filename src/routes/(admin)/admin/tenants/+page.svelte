@@ -153,6 +153,7 @@
 
 	{#if data.tenants.ok && data.provisionGate}
 		<GateNotice
+			level={2}
 			gate={data.provisionGate}
 			title="Tenant provisioning"
 			absent="This instance does not say whether it may create tenants."
@@ -167,6 +168,7 @@
 
 	{#if !data.tenants.ok}
 		<GateNotice
+			level={2}
 			gate={data.tenants.gate}
 			title="Tenants"
 			absent="The multitenant plugin is not part of this build, so this instance serves one tenant."

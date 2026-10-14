@@ -250,6 +250,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Synthetic monitoring"
 			absent="The synthetic monitoring plugin is not part of this build, so nothing is being probed."
@@ -272,6 +273,7 @@
 
 		{#if !data.alerts.ok}
 			<GateNotice
+				level={2}
 				gate={data.alerts.gate}
 				title="the open alerts"
 				absent="This version of the synthetic monitoring plugin keeps no alert list."

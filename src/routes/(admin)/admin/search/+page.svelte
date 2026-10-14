@@ -96,7 +96,7 @@
 					{#snippet iconSnippet()}<Search size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else if !data.results.ok}
-				<GateNotice gate={data.results.gate} title="Search" absent="This build does not serve content search." />
+				<GateNotice level={2} gate={data.results.gate} title="Search" absent="This build does not serve content search." />
 			{:else if data.results.value.results.length === 0}
 				<EmptyState
 					level={2}

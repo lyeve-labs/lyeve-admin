@@ -122,7 +122,7 @@
 	{#if data.gate.state !== 'ok'}
 		<!-- Every row comes from the status report, so no plugin is listed
 		     until the engine answers. -->
-		<GateNotice gate={data.gate} title="the plugin status" absent="This engine does not report its plugins." />
+		<GateNotice level={2} gate={data.gate} title="the plugin status" absent="This engine does not report its plugins." />
 	{/if}
 
 	{#if failed > 0}

@@ -184,6 +184,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Request capture"
 			absent="The request capture plugin is not part of this build, so no request is kept."

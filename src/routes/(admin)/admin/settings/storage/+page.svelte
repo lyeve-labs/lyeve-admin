@@ -176,6 +176,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Storage"
 			absent="The storage plugin is not part of this build, so uploads have nowhere to go."

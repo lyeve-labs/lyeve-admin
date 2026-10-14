@@ -61,6 +61,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Realtime"
 			absent="The realtime plugin is not part of this build, so nothing is holding connections open."

@@ -172,6 +172,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Customization"
 			absent="The multitenant plugin does not serve customization on this instance."

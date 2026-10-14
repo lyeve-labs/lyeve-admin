@@ -312,6 +312,7 @@
 
 	{#if !data.webhooks.ok}
 		<GateNotice
+			level={2}
 			gate={data.webhooks.gate}
 			title="Webhooks"
 			absent="The webhook plugin is not part of this build, so no callback is sent on a content event."

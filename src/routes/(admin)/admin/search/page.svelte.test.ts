@@ -158,4 +158,12 @@ describe('heading outline', () => {
 		const { container } = render(SearchPage, { props: { data: data() as never, form: null } });
 		expect(outlineSkips(container)).toEqual([]);
 	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(SearchPage, {
+			props: { data: data({ results: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }) as never, form: null },
+		});
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
 });

@@ -82,7 +82,7 @@
 	{/snippet}
 
 	{#if whole}
-		<GateNotice gate={whole} title="Logs" absent={ABSENT} />
+		<GateNotice level={2} gate={whole} title="Logs" absent={ABSENT} />
 	{:else}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Volume and levels</SectionHeading>

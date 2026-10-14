@@ -137,7 +137,7 @@
 	width="wide"
 >
 	{#if whole}
-		<GateNotice gate={whole} title="API analytics" absent={ABSENT} />
+		<GateNotice level={2} gate={whole} title="API analytics" absent={ABSENT} />
 	{:else}
 		{#if data.summary.ok}
 			{@const summary = data.summary.value}

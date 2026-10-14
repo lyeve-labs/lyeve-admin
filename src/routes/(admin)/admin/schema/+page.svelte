@@ -668,6 +668,7 @@
 		{#if data.loadGate}
 			<div class="shrink-0 px-3 pt-3">
 				<GateNotice
+					level={2}
 					gate={data.loadGate}
 					title="Schemas"
 					absent="The schema plugin does not run on this instance, so there are no schemas to show."

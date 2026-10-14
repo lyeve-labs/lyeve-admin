@@ -80,4 +80,10 @@ describe('heading outline', () => {
 		const { container } = setup(BASE);
 		expect(outlineSkips(container)).toEqual([]);
 	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = setup(BASE, null, { state: 'locked', upgradeUrl: '' } as never);
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
 });

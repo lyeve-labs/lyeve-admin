@@ -190,7 +190,7 @@
 	{/snippet}
 
 	{#if !release}
-		<GateNotice gate={data.gate} title="Releases" absent="This build serves no content releases." />
+		<GateNotice level={2} gate={data.gate} title="Releases" absent="This build serves no content releases." />
 	{:else}
 		<div class="flex flex-col gap-5">
 			{#if !drawerFailed}

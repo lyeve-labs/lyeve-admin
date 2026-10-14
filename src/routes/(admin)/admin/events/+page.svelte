@@ -78,6 +78,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Event log"
 			absent="The events plugin is not part of this build, so nothing is being recorded."

@@ -196,6 +196,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Data export"
 			absent="The data export plugin is not part of this build, so nothing can be exported from here."

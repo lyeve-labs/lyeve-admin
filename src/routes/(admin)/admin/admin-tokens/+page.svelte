@@ -257,7 +257,7 @@
 	<FormErrors message={pageFailure?.error} />
 
 	{#if !data.tokens.ok}
-		<GateNotice gate={data.tokens.gate} title="Admin tokens" absent="This engine does not serve admin tokens." />
+		<GateNotice level={2} gate={data.tokens.gate} title="Admin tokens" absent="This engine does not serve admin tokens." />
 	{:else if tokens.length === 0}
 		<EmptyState
 			level={2}

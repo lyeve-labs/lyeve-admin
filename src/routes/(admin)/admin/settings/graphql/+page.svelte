@@ -99,6 +99,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="GraphQL"
 			absent="The GraphQL plugin is not part of this build, so nothing answers on these paths."

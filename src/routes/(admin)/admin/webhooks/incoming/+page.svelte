@@ -164,6 +164,7 @@
 
 	{#if !data.incomingWebhooks.ok}
 		<GateNotice
+			level={2}
 			gate={data.incomingWebhooks.gate}
 			title="Incoming webhooks"
 			absent="The webhook plugin is not part of this build, so no external service can send payloads here."

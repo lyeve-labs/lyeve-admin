@@ -150,6 +150,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="SCIM provisioning"
 			absent="The SCIM plugin is not part of this build, so no directory can provision accounts here."

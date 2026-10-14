@@ -109,7 +109,7 @@
 		{/snippet}
 
 		{#if data.gate.state !== 'ok'}
-			<GateNotice gate={data.gate} title="flow variables" absent="The flow plugin does not serve variables on this instance." />
+			<GateNotice level={2} gate={data.gate} title="flow variables" absent="The flow plugin does not serve variables on this instance." />
 		{/if}
 
 		<FormErrors message={pageFailure} />

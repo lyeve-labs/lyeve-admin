@@ -73,4 +73,12 @@ describe('heading outline', () => {
 		mount();
 		expect(outlineSkips(document.body)).toEqual([]);
 	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(EditorPage, {
+			props: { data: { customPage: stored, schemas: [], schemasGate: { state: 'locked', upgradeUrl: '' }, user: { roles: ['admin'] } }, form: null } as never,
+		});
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
 });

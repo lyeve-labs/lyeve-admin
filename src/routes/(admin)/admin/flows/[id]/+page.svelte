@@ -666,7 +666,7 @@
 				     so the editor says they could not be read rather than offering
 				     an empty palette. -->
 				<div class="shrink-0 px-3 pt-2" data-testid="flow-catalog-unread">
-					<GateNotice gate={data.catalogGate} title="the node types" absent="The flow plugin did not send its node types, so the palette has nothing to offer." />
+					<GateNotice level={2} gate={data.catalogGate} title="the node types" absent="The flow plugin did not send its node types, so the palette has nothing to offer." />
 				</div>
 			{/if}
 			{#if blocked}

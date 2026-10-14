@@ -175,6 +175,7 @@
 
 	{#if !data.schemas.ok}
 		<GateNotice
+			level={2}
 			gate={data.schemas.gate}
 			title="Content"
 			absent="This build does not serve the collections."

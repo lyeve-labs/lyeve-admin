@@ -190,6 +190,7 @@
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Quotas and usage"
 			absent="The usage plugin is not part of this build, so nothing is metered or capped."

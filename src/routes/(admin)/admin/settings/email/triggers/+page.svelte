@@ -137,7 +137,7 @@
 
 	<FormErrors message={deleteFailure?.error} refused={pageRefusal} />
 	{#if data.triggers.ok && !data.templates.ok}
-		<GateNotice gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
+		<GateNotice level={2} gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
 	{:else if data.triggers.ok && activeTemplates.length === 0}
 		<Alert tone="warn" title="No active template">
 			{#snippet children()}A trigger sends an active email template, and this tenant has none. <a class="text-brand underline" href="/admin/settings/email/templates">Create one in Email templates</a> first.{/snippet}
@@ -154,7 +154,7 @@
 	{/if}
 
 	{#if !data.triggers.ok}
-		<GateNotice gate={data.triggers.gate} title="Email triggers" absent="This version of the email plugin has no triggers." />
+		<GateNotice level={2} gate={data.triggers.gate} title="Email triggers" absent="This version of the email plugin has no triggers." />
 	{:else if triggers.length === 0}
 		<EmptyState level={2} title="No triggers yet" description="A trigger sends a template to fixed addresses or to an address the record holds, each time its event fires.">
 			{#snippet iconSnippet()}<MailPlus size={ICON.lg} />{/snippet}

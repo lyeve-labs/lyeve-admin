@@ -105,7 +105,7 @@
 	{/snippet}
 
 	{#if data.statusGate}
-		<GateNotice gate={data.statusGate} title="This plugin" absent="" />
+		<GateNotice level={2} gate={data.statusGate} title="This plugin" absent="" />
 	{/if}
 
 	{#if plugin}

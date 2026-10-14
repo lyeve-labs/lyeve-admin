@@ -56,6 +56,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Releases"
 			absent="This build serves no content releases, so entries publish one at a time."

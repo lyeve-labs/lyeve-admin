@@ -220,4 +220,10 @@ describe('heading outline', () => {
 		const { container } = render(RecommendationsPage, { props: props() });
 		expect(outlineSkips(container)).toEqual([]);
 	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(RecommendationsPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' }, stats: null }) });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
 });
