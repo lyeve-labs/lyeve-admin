@@ -11,6 +11,7 @@
 		Table
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { Activity, ExternalLink, Route, Settings } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
@@ -102,6 +103,10 @@
 			</Button>
 		{/if}
 	{/snippet}
+
+	{#if data.statusGate}
+		<GateNotice gate={data.statusGate} title="This plugin" absent="" />
+	{/if}
 
 	{#if plugin}
 		<DescriptionList

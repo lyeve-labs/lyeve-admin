@@ -137,6 +137,15 @@ describe('License page status', () => {
 		expect(queryByText('No license')).toBeNull();
 	});
 
+	it('offers the key in neutral words when the license was not read', () => {
+		const { container } = mount({ ent: null });
+		const text = said(container);
+		expect(text).not.toContain('Add a license key');
+		expect(text).not.toContain('Activate license');
+		expect(text).not.toContain('Only needed for what a license grants');
+		expect(text).toContain('Apply license');
+	});
+
 	it('lists no feature the license carries and counts none', () => {
 		const { container } = mount({ ent: entitlements({ features: ['feature-a', 'feature-b'] }) });
 		expect(said(container)).not.toMatch(/feature-a|feature-b|features? enabled/);

@@ -26,7 +26,10 @@
 	const licensing = $derived(data.licensing ?? NO_LICENSING);
 
 	const status = $derived(ent?.state ?? '');
-	const none = $derived(unlicensed(status));
+	// Only a license that was read can be absent. An unread one says nothing
+	// about whether this instance holds a license, so its copy stays neutral.
+	const none = $derived(ent !== null && ent !== undefined && unlicensed(status));
+	const unread = $derived(ent === null || ent === undefined);
 	// The plan in the module's words, or as the license names it.
 	const plan = $derived(ent?.plan_label || ent?.plan || '');
 
@@ -158,7 +161,7 @@
 
 	{#if licensing.renew}
 		<section class="flex flex-col gap-4">
-			<SectionHeading>{none ? 'Add a license key' : 'Renew license'}</SectionHeading>
+			<SectionHeading>{none ? 'Add a license key' : unread ? 'License key' : 'Renew license'}</SectionHeading>
 			<Card>
 				{#if canRenew}
 					<form
@@ -179,7 +182,9 @@
 							label="License token or key"
 							hint={none
 								? 'Only needed for what a license grants. Paste the token or key you were issued.'
-								: 'Paste the license token or key you were issued.'}
+								: unread
+									? 'Paste the license token or key you were issued. It replaces any license this instance holds.'
+									: 'Paste the license token or key you were issued.'}
 							bind:value={licenseKey}
 							rows={3}
 							mono
@@ -188,7 +193,7 @@
 						<div class="flex justify-end">
 							<Button type="submit" variant="primary" disabled={!licenseKey.trim()}>
 								<Shield size={ICON.sm} aria-hidden="true" />
-								{none ? 'Activate license' : 'Renew license'}
+								{none ? 'Activate license' : unread ? 'Apply license' : 'Renew license'}
 							</Button>
 						</div>
 

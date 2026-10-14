@@ -138,7 +138,7 @@ describe('license +page.server.ts load', () => {
 		expect(result.entitlements).toEqual(entitlements);
 	});
 
-	it('returns null entitlements when getEntitlements throws', async () => {
+	it('hands over no license, not an empty one, when the read fails', async () => {
 		mockedGetEntitlements.mockRejectedValue(new Error('connection refused'));
 		mockedCreateClient.mockReturnValue({} as never);
 

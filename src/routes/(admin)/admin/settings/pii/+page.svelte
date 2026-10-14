@@ -212,7 +212,8 @@
 			/>
 			<Stat size="sm" mono label="Your own rules" value={`${enabledCount} of ${maxEnabled}`} />
 			<Stat size="sm" mono label="Mask styles" value={tags.length} />
-			<Stat size="sm" mono label="Unmasked reads" value={data.total} />
+			<!-- An unread log has no count, so the tile says so rather than 0. -->
+			<Stat size="sm" mono label="Unmasked reads" value={data.logFailed ? NO_VALUE : data.total} />
 		</div>
 
 		<section class="flex flex-col gap-4">

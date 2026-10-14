@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types';
 import { listPlugins, type PluginBreakdown } from '$lib/api/profiler';
 import { detailFor } from '$lib/plugin-rows';
 import { authedClient } from '$lib/server/authz';
+import type { Gate } from '$lib/api/gate';
 
 /**
  * The plugin as the shell's status report describes it, and the requests
@@ -30,8 +31,19 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
+	// The status report answers admins and super admins. Anyone else opening
+	// the page by its address is told so, and an operator whose read failed is
+	// told that, rather than shown a page with nothing on it.
+	const operator = roles.some((r) => r === 'admin' || r === 'super_admin');
+	const statusGate: Gate | null = !operator
+		? { state: 'forbidden' }
+		: pluginStatus
+			? null
+			: { state: 'error', message: 'The plugin status could not be read. This is not a report that the plugin is stopped.' };
+
 	return {
 		pluginName: name,
+		statusGate,
 		plugin: detailFor(pluginStatus, name),
 		traffic,
 		trafficRead,
