@@ -1,5 +1,6 @@
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
+import { httpStatusTone } from '../tones';
 
 const TOKENS_URL = '/api/admin/admin-tokens';
 
@@ -318,10 +319,7 @@ export function droppedCount(row: Pick<AdminTokenRequest, 'route_pattern' | 'sta
 }
 
 export function requestStatusTone(status: number): 'success' | 'neutral' | 'warn' | 'danger' {
-	if (status >= 500) return 'danger';
-	if (status >= 400) return 'warn';
-	if (status >= 200 && status < 300) return 'success';
-	return 'neutral';
+	return httpStatusTone(status);
 }
 
 /** The example a new token is shown with: one read its grants may open. */

@@ -41,6 +41,7 @@
 	import { formatDateTime } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
+	import { httpStatusTone } from '$lib/tones';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -463,7 +464,7 @@
 									{c.method} {capturePath(c.url)}
 								</td>
 								<td data-cell="nowrap">
-									<Badge tone={c.status_code >= 500 ? 'danger' : c.status_code >= 400 ? 'warn' : 'neutral'}>
+									<Badge tone={httpStatusTone(c.status_code)}>
 										{c.status_code}
 									</Badge>
 								</td>

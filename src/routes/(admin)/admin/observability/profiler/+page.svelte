@@ -38,6 +38,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
+	import { httpStatusTone } from '$lib/tones';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -263,7 +264,7 @@
 								{#each method.recent_entries as e, i (i)}
 									<tr>
 										<td data-cell="nowrap" class="font-mono text-xs"><span class="text-faint">{formatTime(e.captured_at, e.captured_at)}</span></td>
-										<td class="text-right"><Badge tone={e.status_code >= 500 ? 'danger' : e.status_code >= 400 ? 'warn' : 'neutral'}>{e.status_code}</Badge></td>
+										<td class="text-right"><Badge tone={httpStatusTone(e.status_code)}>{e.status_code}</Badge></td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(e.duration_ns)}</td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(e.alloc_bytes)}</td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{e.num_goroutine}</td>
