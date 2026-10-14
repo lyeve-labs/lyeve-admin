@@ -6,6 +6,7 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
 	USAGE_OK,
+	getTenantUsage,
 	listQuotas,
 	listRequests,
 	listTenantUsage,
@@ -19,14 +20,26 @@ import {
 	type TenantUsage,
 	type UsageGate,
 } from '$lib/api/usage';
+import { section, type Section } from '$lib/api/gate';
 import { rowsOf, pageWindow, pastEndOffset, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
 
+/** What the page says in place of a requests read that failed. */
+const REQUESTS_FAILED = 'The requests could not be read. This is not a report that nobody is waiting.';
+
+/** What the page says in place of a usage read that failed. */
+const USAGE_FAILED = 'What each tenant used could not be read. This is not a report that nothing was used.';
+
+/** A read the page did not make, said the same way a refusal would be. */
+const UNREAD: Section<never> = { ok: false, gate: { state: 'absent' } };
+
 export const load: PageServerLoad = async (event) => {
 	const { plugins, user } = await event.parent();
-	// Quotas cover every tenant, so reading and reviewing them is a super
-	// admin's. Anybody else is told rather than shown three failed reads.
-	const permitted = user.roles.includes('super_admin');
+	// The plugin serves the quota reads to an admin as well, scoped to the
+	// caller's tenant, and every write to a super admin only. Anybody else is
+	// told rather than shown three failed reads.
+	const superAdmin = user.roles.includes('super_admin');
+	const permitted = superAdmin || user.roles.includes('admin');
 
 	if (!permitted) {
 		return {
@@ -34,10 +47,9 @@ export const load: PageServerLoad = async (event) => {
 			quotaTotal: 0,
 			limit: 50,
 			offset: 0,
-			requests: [] as QuotaRequest[],
-			usage: [] as TenantUsage[],
-			usageRead: false,
-			requestsRead: false,
+			requests: UNREAD as Section<QuotaRequest[]>,
+			requestTotal: null as number | null,
+			usage: UNREAD as Section<TenantUsage[]>,
 			people: {} as Record<string, string>,
 			gate: USAGE_OK as UsageGate,
 			permitted,
@@ -67,34 +79,35 @@ export const load: PageServerLoad = async (event) => {
 	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// Pending requests are the queue somebody has to act on, so an unread list
-	// is never drawn as an empty one.
+	// is never drawn as an empty one. Only the pending ones are asked for, so
+	// one waiting behind a page of answered requests is still read.
 	// A request names its requester by account id, so the directory turns the
-	// ids into emails. The page is a super admin's, who may read it.
-	const [requests, usage, people] = await Promise.all([
-		gate.state === 'ok'
-			? listRequests(client)
-					.then((r) => ({ rows: rowsOf(r), read: true }))
-					.catch(() => ({ rows: [] as QuotaRequest[], read: false }))
-			: Promise.resolve({ rows: [] as QuotaRequest[], read: false }),
-		// A quota row draws its usage beside its limit. An unread usage list is
-		// said once over the table, never drawn as rows that used nothing.
-		gate.state === 'ok'
-			? listTenantUsage(client)
-					.then((u) => ({ rows: rowsOf(u), read: true }))
-					.catch(() => ({ rows: [] as TenantUsage[], read: false }))
-			: Promise.resolve({ rows: [] as TenantUsage[], read: false }),
-		gate.state === 'ok' ? listPeople(client) : Promise.resolve([]),
+	// ids into emails.
+	const ok = gate.state === 'ok';
+	const [requestRead, usage, people] = await Promise.all([
+		ok ? section(listRequests(client, 'pending'), REQUESTS_FAILED) : Promise.resolve(UNREAD),
+		// A quota row draws its usage beside its limit. Every tenant's usage is
+		// a super admin's read, and an admin reads their own tenant's.
+		ok
+			? section(
+					superAdmin
+						? listTenantUsage(client).then((u) => rowsOf(u))
+						: getTenantUsage(client, user.tenant_id).then((u) => [u]),
+					USAGE_FAILED,
+				)
+			: Promise.resolve(UNREAD),
+		ok ? listPeople(client) : Promise.resolve([]),
 	]);
+	const requests: Section<QuotaRequest[]> = requestRead.ok ? { ok: true, value: rowsOf(requestRead.value) } : requestRead;
 
 	return {
 		quotas,
 		quotaTotal,
 		limit,
 		offset,
-		requests: requests.rows,
-		requestsRead: requests.read,
-		usage: usage.rows,
-		usageRead: usage.read,
+		requests,
+		requestTotal: requestRead.ok ? statedTotal(requestRead.value) : null,
+		usage: usage as Section<TenantUsage[]>,
 		people: Object.fromEntries([
 			...people.map((p) => [p.id, p.email] as const),
 			...(user.email ? [[user.id, user.email] as const] : []),

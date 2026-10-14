@@ -12,12 +12,12 @@ import { load } from './+page.server';
 const ADMIN = '5cec39db-bbeb-44a3-bdef-912a4f57a344';
 const MIRA = '24d6560b-540e-47b6-8957-59934db4021d';
 
-function loadEvent() {
+function loadEvent(roles = ['super_admin']) {
 	return {
 		url: new URL('http://localhost/admin/tenants/usage'),
 		parent: async () => ({
 			plugins: { state: 'named', running: ['usage'], withheld: [] },
-			user: { id: ADMIN, email: 'admin@example.com', roles: ['super_admin'] },
+			user: { id: ADMIN, email: 'admin@example.com', roles, tenant_id: 'acme' },
 		}),
 	} as never;
 }
@@ -54,7 +54,7 @@ describe('the usage load', () => {
 		route({
 			'/api/admin/quotas': { data: [], total_count: 0 },
 			'/api/admin/quota-requests': { data: [request(MIRA)], total_count: 1 },
-			'/api/admin/usage/tenants': { data: [] },
+			'/api/admin/usage/tenants': [],
 			'/api/admin/users': [{ id: MIRA, email: 'mira.costa@example.com', roles: ['editor'] }],
 		});
 
@@ -67,14 +67,14 @@ describe('the usage load', () => {
 		route({
 			'/api/admin/quotas': { data: [], total_count: 0 },
 			'/api/admin/quota-requests': { data: [request(MIRA)], total_count: 1 },
-			'/api/admin/usage/tenants': { data: [] },
+			'/api/admin/usage/tenants': [],
 			'/api/admin/users': new ApiError(503, 'down', {}),
 		});
 
 		const out = (await load(loadEvent())) as Record<string, unknown>;
 
 		expect(out.people).toEqual({ [ADMIN]: 'admin@example.com' });
-		expect(out.requestsRead).toBe(true);
+		expect(out.requests).toMatchObject({ ok: true });
 	});
 });
 
@@ -83,7 +83,7 @@ describe('the usage load past the end', () => {
 		route({
 			'/api/admin/quotas': { data: [], total_count: 60 },
 			'/api/admin/quota-requests': { data: [], total_count: 0 },
-			'/api/admin/usage/tenants': { data: [] },
+			'/api/admin/usage/tenants': [],
 			'/api/admin/users': [],
 		});
 		const event = loadEvent() as unknown as { url: URL };
@@ -99,6 +99,47 @@ describe('the usage load past the end', () => {
 			'/api/admin/users': [],
 		});
 		const out = (await load(loadEvent())) as Record<string, unknown>;
-		expect(out.usageRead).toBe(false);
+		expect(out.usage).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+});
+
+describe('the usage load for each role', () => {
+	const usage = { tenant_id: 'acme', billing_period: '2026-10', api_calls: 10, storage_bytes: 0, bandwidth_bytes: 0, content_count: 0, media_count: 0 };
+
+	// The plugin pages its requests newest first across every status, so a
+	// read with no status could miss a pending one behind answered ones.
+	it('asks for the pending requests only, and keeps the stated total', async () => {
+		route({
+			'/api/admin/quotas': { data: [], total_count: 0 },
+			'/api/admin/quota-requests': { data: [request(MIRA)], total_count: 600 },
+			'/api/admin/usage/tenants': [usage],
+			'/api/admin/users': [],
+		});
+		const out = (await load(loadEvent())) as Record<string, unknown>;
+		const asked = engine.get.mock.calls.map(([u]) => String(u)).find((u) => u.startsWith('/api/admin/quota-requests'));
+		expect(new URL(asked!, 'http://x').searchParams.get('status')).toBe('pending');
+		expect(out.requestTotal).toBe(600);
+		expect(out.usage).toEqual({ ok: true, value: [usage] });
+	});
+
+	it("reads an admin's own tenant's quota, requests and usage", async () => {
+		route({
+			'/api/admin/quotas': { data: [], total_count: 0 },
+			'/api/admin/quota-requests': { data: [], total_count: 0 },
+			'/api/admin/usage/tenant/acme': usage,
+			'/api/admin/users': [],
+		});
+		const out = (await load(loadEvent(['admin']))) as Record<string, unknown>;
+		expect(out.permitted).toBe(true);
+		expect(out.gate).toEqual({ state: 'ok' });
+		expect(out.usage).toEqual({ ok: true, value: [usage] });
+		const asked = engine.get.mock.calls.map(([u]) => String(u));
+		expect(asked.some((u) => u.startsWith('/api/admin/usage/tenants'))).toBe(false);
+	});
+
+	it('reads nothing for an editor', async () => {
+		const out = (await load(loadEvent(['editor']))) as Record<string, unknown>;
+		expect(out.permitted).toBe(false);
+		expect(engine.get).not.toHaveBeenCalled();
 	});
 });
