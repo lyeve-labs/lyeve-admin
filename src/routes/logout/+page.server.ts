@@ -1,24 +1,29 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { createClient } from '@lyeve-labs/client';
-import { logout } from '@lyeve-labs/client-rest';
-import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
+import { authedHeaders } from '$lib/server/authz';
+import { clearRefreshCookie, clearSessionCookie, refreshToken, sessionToken } from '$lib/server/session-cookie';
 
 export const actions: Actions = {
 	default: async ({ cookies, fetch, url }) => {
 		const token = sessionToken({ cookies, url });
 		if (token) {
 			// Best-effort server-side session revocation so a stolen token does not
-			// remain valid after logout. Cookie is cleared regardless.
+			// remain valid after logout. Cookie is cleared regardless. The refresh
+			// token goes along, so the engine revokes its family too and nobody can
+			// trade it for a new session.
+			const headers = authedHeaders({ cookies, url });
 			const client = createClient((url, init) =>
 				fetch(url, {
 					...init,
-					headers: { ...init?.headers, Authorization: `Bearer ${token}` },
+					headers: { ...init?.headers, ...headers },
 				})
 			);
-			await logout(client).catch(() => {});
+			const refresh = refreshToken({ cookies, url });
+			await client.post('/api/admin/auth/logout', refresh ? { refresh_token: refresh } : {}).catch(() => {});
 		}
 		clearSessionCookie({ cookies, url });
+		clearRefreshCookie({ cookies, url });
 		redirect(302, '/login');
 	},
 };

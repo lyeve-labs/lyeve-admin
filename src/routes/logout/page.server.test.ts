@@ -122,4 +122,19 @@ describe('logout/+page.server.ts actions.default', () => {
 		const init = callArgs[1] as RequestInit;
 		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer my-token');
 	});
+
+	it('sends the refresh token so the engine revokes its family, and clears its cookie', async () => {
+		const fetch = vi.fn(async (_url: string, _init: RequestInit) => json({})) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies({ '__Host-sys_session': 'my-token', '__Host-console_refresh': 'refresh-1', '__Host-csrf': 'c1' });
+
+		await catchRedirect(() => actions.default({ fetch, cookies } as never));
+
+		const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+		expect(url).toContain('/api/admin/auth/logout');
+		expect(JSON.parse(String(init.body))).toEqual({ refresh_token: 'refresh-1' });
+		// The engine applies its CSRF check to this call when it sees its own
+		// session cookie, and a refused sign-out revokes nothing.
+		expect((init.headers as Record<string, string>)['X-CSRF-Token']).toBe('c1');
+		expect(cookies.delete).toHaveBeenCalledWith('__Host-console_refresh', expect.objectContaining({ path: '/', secure: true }));
+	});
 });
