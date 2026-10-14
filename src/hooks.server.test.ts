@@ -192,6 +192,7 @@ describe('hooks.server.ts session refresh', () => {
 		const now = Math.floor(Date.now() / 1000);
 		const old = `${part({ alg: 'HS256' })}.${part({ sub: 'u', exp: now + 30 })}.s`;
 		const renewed = `${part({ alg: 'HS256' })}.${part({ sub: 'u', exp: now + 900 })}.s`;
+		const refresh = `00000000-0000-4000-8000-000000000001.${'A'.repeat(43)}`;
 		const fetch = vi.fn(async (url: string): Promise<Response> => {
 			const body = url.endsWith('/auth/refresh')
 				? { token: renewed, refresh_token: 'refresh-2' }
@@ -200,11 +201,11 @@ describe('hooks.server.ts session refresh', () => {
 		});
 		const url = new URL('https://admin.example.com/admin/users');
 		const request = new Request(url, {
-			headers: { cookie: `__Host-sys_session=${old}; __Host-console_refresh=refresh-1` },
+			headers: { cookie: `__Host-sys_session=${old}; __Host-console_refresh=${refresh}` },
 		});
 		const jar = get_cookies(request, url);
 		jar.set_trailing_slash('never');
-		const event = { ...stubEvent('/admin/users', fetch as never), url, request, cookies: jar.cookies };
+		const event = { ...stubEvent('/admin/users', fetch as never), url, request, cookies: jar.cookies, getClientAddress: () => '203.0.113.7' };
 
 		let seen = '';
 		const resolve = vi.fn(async (e: unknown) => {

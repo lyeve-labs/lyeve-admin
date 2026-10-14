@@ -5,7 +5,8 @@ import type { Cookies, RequestEvent } from '@sveltejs/kit';
 // @ts-expect-error SvelteKit ships this module without type declarations.
 import { get_cookies } from '../../../node_modules/@sveltejs/kit/src/runtime/server/cookie.js';
 import { authedHeaders } from '$lib/server/authz';
-import { refreshSession, needsRefresh, resetSessionRefresh } from './session-refresh';
+import { resetRateLimitStore } from '$lib/server/rate-limit';
+import { refreshSession, needsRefresh, resetSessionRefresh, tradeOnce } from './session-refresh';
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');
 
@@ -15,34 +16,49 @@ function jwt(claims: { exp: number; sub?: string }): string {
 	return `${part({ alg: 'HS256', typ: 'JWT' })}.${part({ sub: 'user-1', ...claims })}.signature`;
 }
 
+/** A refresh token in the engine's shape: a family UUID, a dot, 32 bytes of base64url. */
+function refreshOf(n: number): string {
+	const family = `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+	return `${family}.${Buffer.alloc(32, n % 256).toString('base64url')}`;
+}
+
 const secs = (ms: number) => Math.floor(ms / 1000);
 const FRESH = jwt({ exp: secs(NOW) + 600 });
 const CLOSE = jwt({ exp: secs(NOW) + 90 });
 const EXPIRED = jwt({ exp: secs(NOW) - 30 });
 const RENEWED = jwt({ exp: secs(NOW) + 900 });
+const RT1 = refreshOf(1);
+const RT2 = refreshOf(2);
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
-function renewing(token = RENEWED, refresh = 'refresh-2') {
+function renewing(token = RENEWED, refresh = RT2) {
 	return vi.fn(async () => json({ token, refresh_token: refresh, csrf_token: 'c', expires_in: 900 }));
 }
 
-/** A request event over HTTPS whose cookies behave as SvelteKit's do inside handle. */
-function event(path: string, cookies: Record<string, string>, fetch: typeof globalThis.fetch): RequestEvent {
-	const url = new URL(`https://admin.example.com${path}`);
+interface Shape {
+	method?: string;
+	scheme?: 'https' | 'http';
+	address?: string;
+}
+
+/** A request event whose cookies behave as SvelteKit's do inside handle. */
+function event(path: string, cookies: Record<string, string>, fetch: typeof globalThis.fetch, shape: Shape = {}): RequestEvent {
+	const url = new URL(`${shape.scheme ?? 'https'}://admin.example.com${path}`);
 	const header = Object.entries(cookies)
 		.map(([name, value]) => `${name}=${value}`)
 		.join('; ');
-	const request = new Request(url, { headers: header ? { cookie: header } : {} });
+	const request = new Request(url, { method: shape.method ?? 'GET', headers: header ? { cookie: header } : {} });
 	const jar = get_cookies(request, url);
 	jar.set_trailing_slash('never');
-	return { url, request, fetch, cookies: jar.cookies as Cookies } as unknown as RequestEvent;
+	const address = shape.address ?? '203.0.113.7';
+	return { url, request, fetch, cookies: jar.cookies as Cookies, getClientAddress: () => address } as unknown as RequestEvent;
 }
 
-function signedIn(token: string, fetch: typeof globalThis.fetch, path = '/admin/users') {
-	return event(path, { '__Host-sys_session': token, '__Host-console_refresh': 'refresh-1' }, fetch);
+function signedIn(token: string, fetch: typeof globalThis.fetch, path = '/admin/users', shape: Shape = {}) {
+	return event(path, { '__Host-sys_session': token, '__Host-console_refresh': RT1 }, fetch, shape);
 }
 
 async function redirectOf(fn: () => Promise<unknown>): Promise<{ status: number; location: string } | null> {
@@ -60,6 +76,7 @@ beforeEach(() => {
 	vi.useFakeTimers({ toFake: ['Date'] });
 	vi.setSystemTime(NOW);
 	resetSessionRefresh();
+	resetRateLimitStore();
 });
 
 afterEach(() => {
@@ -107,15 +124,34 @@ describe('a renewed session', () => {
 		const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
 		expect(url).toBe('/api/admin/auth/refresh');
 		expect(init.method).toBe('POST');
-		expect(JSON.parse(String(init.body))).toEqual({ refresh_token: 'refresh-1' });
+		expect(JSON.parse(String(init.body))).toEqual({ refresh_token: RT1 });
 		expect(e.cookies.get('__Host-sys_session')).toBe(RENEWED);
-		expect(e.cookies.get('__Host-console_refresh')).toBe('refresh-2');
+		expect(e.cookies.get('__Host-console_refresh')).toBe(RT2);
 	});
 
 	it('reaches every load and action later in the same request', async () => {
 		const e = signedIn(EXPIRED, renewing());
 		await refreshSession(e);
 		expect(authedHeaders(e).Authorization).toBe(`Bearer ${RENEWED}`);
+	});
+
+	it('is restored for a request that brought only the refresh token', async () => {
+		const fetch = renewing();
+		const e = event('/admin/users', { '__Host-console_refresh': RT1 }, fetch);
+		await refreshSession(e);
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(e.cookies.get('__Host-sys_session')).toBe(RENEWED);
+		expect(e.cookies.get('__Host-console_refresh')).toBe(RT2);
+	});
+
+	it('reads and writes the plain cookie names over HTTP', async () => {
+		const fetch = renewing();
+		const e = event('/admin/users', { sys_session: CLOSE, console_refresh: RT1 }, fetch, { scheme: 'http' });
+		await refreshSession(e);
+		expect(JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ refresh_token: RT1 });
+		expect(e.cookies.get('sys_session')).toBe(RENEWED);
+		expect(e.cookies.get('console_refresh')).toBe(RT2);
+		expect(e.cookies.get('__Host-sys_session')).toBeUndefined();
 	});
 
 	it('is not taken over by a refresh token left from another account', async () => {
@@ -135,27 +171,98 @@ describe('one trade per refresh token', () => {
 		const second = signedIn(CLOSE, fetch);
 
 		const both = Promise.all([refreshSession(first), refreshSession(second)]);
-		for (const answer of pending) answer(json({ token: RENEWED, refresh_token: 'refresh-2' }));
+		for (const answer of pending) answer(json({ token: RENEWED, refresh_token: RT2 }));
 		await both;
 
 		expect(fetch).toHaveBeenCalledTimes(1);
 		expect(second.cookies.get('__Host-sys_session')).toBe(RENEWED);
-		expect(second.cookies.get('__Host-console_refresh')).toBe('refresh-2');
+		expect(second.cookies.get('__Host-console_refresh')).toBe(RT2);
 	});
 
-	it('serves the answer for a minute to a request that still carries the old cookie', async () => {
+	it('serves the answer for ten seconds to a request with the same old cookies', async () => {
 		const fetch = renewing();
 		await refreshSession(signedIn(CLOSE, fetch));
 
-		vi.setSystemTime(NOW + 59_000);
+		vi.setSystemTime(NOW + 9_000);
 		const late = signedIn(CLOSE, fetch);
 		await refreshSession(late);
 		expect(fetch).toHaveBeenCalledTimes(1);
 		expect(late.cookies.get('__Host-sys_session')).toBe(RENEWED);
 
-		vi.setSystemTime(NOW + 61_000);
+		vi.setSystemTime(NOW + 11_000);
 		await refreshSession(signedIn(CLOSE, fetch));
 		expect(fetch).toHaveBeenCalledTimes(2);
+	});
+
+	// A copied refresh token sent on its own, or beside another session
+	// cookie, has to reach the engine, which revokes a family whose rotated
+	// token comes back.
+	it('sends the old refresh token to the engine when the session cookie differs', async () => {
+		const fetch = renewing();
+		await refreshSession(signedIn(CLOSE, fetch));
+		await refreshSession(signedIn(EXPIRED, fetch));
+		expect(fetch).toHaveBeenCalledTimes(2);
+	});
+
+	it('sends the old refresh token to the engine when no session cookie came with it', async () => {
+		const fetch = renewing();
+		await refreshSession(signedIn(CLOSE, fetch));
+		await refreshSession(event('/admin/users', { '__Host-console_refresh': RT1 }, fetch));
+		expect(fetch).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not share a running trade with a request that carries another session cookie', async () => {
+		const pending: ((r: Response) => void)[] = [];
+		const fetch = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
+		const both = Promise.all([refreshSession(signedIn(CLOSE, fetch)), refreshSession(signedIn(EXPIRED, fetch))]);
+		for (const answer of pending) answer(json({ token: RENEWED, refresh_token: RT2 }));
+		await both;
+		expect(fetch).toHaveBeenCalledTimes(2);
+	});
+
+	it('keeps at most ten thousand answers, dropping the oldest', async () => {
+		const fetch = renewing();
+		for (let n = 1; n <= 10_001; n++) await tradeOnce(refreshOf(n), CLOSE, `198.51.100.${n}`, fetch);
+		expect(fetch).toHaveBeenCalledTimes(10_001);
+
+		await tradeOnce(refreshOf(10_001), CLOSE, 'kept', fetch);
+		expect(fetch).toHaveBeenCalledTimes(10_001);
+		await tradeOnce(refreshOf(1), CLOSE, 'dropped', fetch);
+		expect(fetch).toHaveBeenCalledTimes(10_002);
+	});
+});
+
+describe('a refresh cookie the engine could not have written', () => {
+	it.each([
+		['a short value', 'refresh-1'],
+		['no family id', `.${'A'.repeat(43)}`],
+		['a long forged value', `00000000-0000-4000-8000-000000000001.${'A'.repeat(4000)}`],
+	])('is refused here without asking the engine: %s', async (_name, forged) => {
+		const fetch = renewing();
+		const e = event('/admin/users', { '__Host-sys_session': CLOSE, '__Host-console_refresh': forged }, fetch);
+		await refreshSession(e);
+		expect(fetch).not.toHaveBeenCalled();
+		expect(e.cookies.get('__Host-console_refresh')).toBeUndefined();
+		expect(e.cookies.get('__Host-sys_session')).toBe(CLOSE);
+	});
+});
+
+describe('trades from one address', () => {
+	it('stop at the rate limit and leave the session as it is', async () => {
+		const fetch = renewing();
+		for (let n = 1; n <= 10; n++) {
+			await refreshSession(event('/admin/users', { '__Host-sys_session': jwt({ exp: secs(NOW) + n }), '__Host-console_refresh': refreshOf(n) }, fetch));
+		}
+		expect(fetch).toHaveBeenCalledTimes(10);
+
+		const over = event('/admin/users', { '__Host-sys_session': CLOSE, '__Host-console_refresh': refreshOf(11) }, fetch);
+		await refreshSession(over);
+		expect(fetch).toHaveBeenCalledTimes(10);
+		expect(over.cookies.get('__Host-sys_session')).toBe(CLOSE);
+		expect(over.cookies.get('__Host-console_refresh')).toBe(refreshOf(11));
+
+		await refreshSession(event('/admin/users', { '__Host-sys_session': CLOSE, '__Host-console_refresh': refreshOf(12) }, fetch, { address: '192.0.2.1' }));
+		expect(fetch).toHaveBeenCalledTimes(11);
 	});
 });
 
@@ -166,9 +273,26 @@ describe('a refused refresh', () => {
 
 		const r = await redirectOf(() => refreshSession(e));
 
-		expect(r).toEqual({ status: 303, location: '/login?ended=1' });
+		expect(r).toEqual({ status: 303, location: '/login?ended=1&next=%2Fadmin%2Fusers' });
 		expect(e.cookies.get('__Host-sys_session')).toBeUndefined();
 		expect(e.cookies.get('__Host-console_refresh')).toBeUndefined();
+	});
+
+	it('sends the reader back to the page and query they asked for', async () => {
+		const fetch = vi.fn(async () => json({ error: 'session revoked' }, 401));
+		const r = await redirectOf(() => refreshSession(signedIn(CLOSE, fetch, '/admin/content/posts?offset=40')));
+		expect(r?.location).toBe('/login?ended=1&next=%2Fadmin%2Fcontent%2Fposts%3Foffset%3D40');
+	});
+
+	// SvelteKit answers a redirect thrown from handle during an enhanced form
+	// submit as JSON, and the form then follows it. The address names the
+	// action, so only the page goes along.
+	it('sends a form action to the sign-in notice with the page alone', async () => {
+		const fetch = vi.fn(async () => json({ error: 'session revoked' }, 401));
+		const e = signedIn(CLOSE, fetch, '/admin/users?/delete', { method: 'POST' });
+		const r = await redirectOf(() => refreshSession(e));
+		expect(r).toEqual({ status: 303, location: '/login?ended=1&next=%2Fadmin%2Fusers' });
+		expect(e.cookies.get('__Host-sys_session')).toBeUndefined();
 	});
 
 	it('clears both cookies and lets the sign-in page itself render', async () => {
@@ -192,7 +316,7 @@ describe('an engine that cannot answer', () => {
 
 		expect(await redirectOf(() => refreshSession(e))).toBeNull();
 		expect(e.cookies.get('__Host-sys_session')).toBe(EXPIRED);
-		expect(e.cookies.get('__Host-console_refresh')).toBe('refresh-1');
+		expect(e.cookies.get('__Host-console_refresh')).toBe(RT1);
 	});
 
 	it('is asked again on the next request', async () => {

@@ -95,6 +95,10 @@ export function refreshToken(event: SessionRead): string | undefined {
  * Keeps the refresh token a sign-in answered. A sign-in that answered none
  * clears the cookie instead, so a refresh token left from an earlier session
  * can never renew this one.
+ *
+ * The engine keeps a refresh family for 30 days by default and does not say
+ * when this token expires. The cookie lasts a day and is written again at
+ * every trade, so it is a 24-hour idle limit inside the engine's own limit.
  */
 export function setRefreshCookie(event: SessionEvent, token: string | undefined): void {
 	if (!token) {

@@ -11,14 +11,19 @@
  * The engine rotates the refresh token on every trade and reads a second use
  * of a rotated one as theft: it revokes the whole family, which signs the
  * person out. A page sends several requests at once, and the browser can send
- * one with the old cookie after another request rotated it. So one trade runs
- * per refresh token in this process, and its answer stays here under the old
- * token for a minute, for every request that still carries it.
+ * one with the old cookies before it has stored the new ones. So one trade
+ * runs per refresh token in this process, and for ten seconds its answer goes
+ * to any request that carries the same refresh token and the same session
+ * cookie. A request that carries the old refresh token with any other session
+ * cookie, or none, goes to the engine, so a copied refresh token still trips
+ * the engine's check.
  *
  * A sign-in through a provider or an emailed link answers no refresh token,
  * so those sessions still end when their token does.
  */
+import { createHash } from 'node:crypto';
 import { redirect, type RequestEvent } from '@sveltejs/kit';
+import { checkRateLimit } from '$lib/server/rate-limit';
 import {
 	clearRefreshCookie,
 	clearSessionCookie,
@@ -30,8 +35,12 @@ import {
 
 /** How long before its expiry a session token is traded. */
 const AHEAD_MS = 2 * 60 * 1000;
-/** How long a trade's answer is served to requests that carry the old refresh token. */
-const KEEP_MS = 60 * 1000;
+/**
+ * How long a trade's answer is served to requests that carry the old cookies.
+ * It only has to cover the requests a browser sent before it stored the new
+ * ones: a server render, and a preload or two.
+ */
+const KEEP_MS = 10 * 1000;
 /** The most answers kept at once. The oldest go first. */
 const KEPT_MAX = 10_000;
 
@@ -43,8 +52,22 @@ export type Trade =
 	| { kind: 'refused' }
 	| { kind: 'unavailable' };
 
-const running = new Map<string, Promise<Trade>>();
-const kept = new Map<string, { trade: Trade; until: number }>();
+/**
+ * The engine's refresh token: a UUID naming the family, a dot, and 32 random
+ * bytes in unpadded base64url. Anything else is refused here, so a forged
+ * cookie never costs a call to the engine.
+ */
+const REFRESH_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[A-Za-z0-9_-]{43}$/i;
+
+/** Both maps are keyed by a digest of the refresh token, so a long forged cookie costs no more than a real one. */
+interface Shared {
+	/** A digest of the session cookie the trade was started with. */
+	session: string;
+}
+const running = new Map<string, Shared & { trade: Promise<Trade> }>();
+const kept = new Map<string, Shared & { trade: Trade; until: number }>();
+
+const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /** Forgets every trade, for a test that needs a fresh process. */
 export function resetSessionRefresh(): void {
@@ -94,31 +117,52 @@ async function trade(refresh: string, fetch: typeof globalThis.fetch): Promise<T
 	return { kind: 'renewed', token: body.token, refreshToken: body.refresh_token };
 }
 
-function keep(refresh: string, result: Trade): void {
+function keep(key: string, session: string, result: Trade): void {
 	const now = Date.now();
-	for (const [key, entry] of kept) {
+	for (const [old, entry] of kept) {
 		if (entry.until > now && kept.size < KEPT_MAX) break;
-		kept.delete(key);
+		kept.delete(old);
 	}
-	kept.set(refresh, { trade: result, until: now + KEEP_MS });
+	kept.set(key, { session, trade: result, until: now + KEEP_MS });
 }
 
 /**
- * The answer for this refresh token: a kept one, the trade already running,
- * or a new trade. An outage is not kept, so the next request asks again.
+ * The answer for this refresh token: a kept one or the trade already running,
+ * when it was started with the same session cookie, or else a new trade. A new
+ * trade counts against the caller's address, and one over the limit is
+ * answered as an outage, so the cookies stay. An outage is not kept, so the
+ * next request asks again.
  */
-export function tradeOnce(refresh: string, fetch: typeof globalThis.fetch): Promise<Trade> {
-	const hit = kept.get(refresh);
-	if (hit && hit.until > Date.now()) return Promise.resolve(hit.trade);
-	const inFlight = running.get(refresh);
-	if (inFlight) return inFlight;
+export function tradeOnce(
+	refresh: string,
+	session: string | undefined,
+	address: string,
+	fetch: typeof globalThis.fetch
+): Promise<Trade> {
+	const key = digest(refresh);
+	const mark = session ? digest(session) : null;
+	const hit = kept.get(key);
+	if (hit && mark === hit.session && hit.until > Date.now()) return Promise.resolve(hit.trade);
+	const inFlight = running.get(key);
+	if (inFlight && mark === inFlight.session) return inFlight.trade;
+	if (!checkRateLimit(`refresh:${address}`).allowed) return Promise.resolve({ kind: 'unavailable' });
+
 	const started = trade(refresh, fetch).then((result) => {
-		running.delete(refresh);
-		if (result.kind !== 'unavailable') keep(refresh, result);
+		if (running.get(key)?.trade === started) running.delete(key);
+		if (result.kind !== 'unavailable' && mark) keep(key, mark, result);
 		return result;
 	});
-	running.set(refresh, started);
+	if (mark) running.set(key, { session: mark, trade: started });
 	return started;
+}
+
+/** Where a request whose session ended goes, so the reader comes back to the same page. */
+function endedTarget(url: URL, method: string): string {
+	// A form action's address names the action. Sending the reader back there
+	// after sign-in would show the page, not repeat the write, so only the
+	// path goes along.
+	const back = method === 'GET' ? url.pathname + url.search : url.pathname;
+	return `${SESSION_ENDED}&next=${encodeURIComponent(back)}`;
 }
 
 /**
@@ -133,8 +177,12 @@ export async function refreshSession(event: RequestEvent): Promise<void> {
 	if (!refresh) return;
 	const current = sessionToken(event);
 	if (current && !needsRefresh(current)) return;
+	if (!REFRESH_SHAPE.test(refresh)) {
+		clearRefreshCookie(event);
+		return;
+	}
 
-	const result = await tradeOnce(refresh, event.fetch);
+	const result = await tradeOnce(refresh, current, event.getClientAddress(), event.fetch);
 	if (result.kind === 'unavailable') return;
 	if (result.kind === 'renewed') {
 		// A session cookie written by a later sign-in for another account wins
@@ -150,6 +198,6 @@ export async function refreshSession(event: RequestEvent): Promise<void> {
 	clearSessionCookie(event);
 	clearRefreshCookie(event);
 	if (event.url.pathname === '/admin' || event.url.pathname.startsWith('/admin/')) {
-		redirect(303, SESSION_ENDED);
+		redirect(303, endedTarget(event.url, event.request.method));
 	}
 }
