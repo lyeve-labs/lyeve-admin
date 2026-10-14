@@ -226,7 +226,10 @@ describe('api reference rows', () => {
 			'Copy a curl request for GET /api/admin/media',
 			'Copy the example response body for GET /api/admin/media',
 		]) {
-			expect(copyFrame(screen.getByRole('button', { name })).textContent, name).toContain(name);
+			const button = screen.getByRole('button', { name });
+			expect(copyFrame(button).textContent, name).toContain(name);
+			// The tooltip says what the name says, so it is not read a second time.
+			expect(button.hasAttribute('aria-describedby'), name).toBe(false);
 		}
 	});
 

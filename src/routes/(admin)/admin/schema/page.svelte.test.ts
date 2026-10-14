@@ -245,7 +245,10 @@ describe('schema builder relation panel', () => {
 		await openPosts();
 		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
 		const name = 'Copy a curl request for POST /api/v1/content/posts';
-		expect(copyFrame(screen.getByRole('button', { name })).textContent).toContain(name);
+		const button = screen.getByRole('button', { name });
+		expect(copyFrame(button).textContent).toContain(name);
+		// The tooltip says what the name says, so it is not read a second time.
+		expect(button.hasAttribute('aria-describedby')).toBe(false);
 	});
 
 	it('turns off the boxes that do nothing for a relation', async () => {
