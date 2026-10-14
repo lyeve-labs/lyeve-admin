@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { ApiError } from '@lyeve-labs/client';
 import { error, fail } from '@sveltejs/kit';
 import {
 	DESTINATION_HEADERS_REQUIRED,
@@ -44,17 +44,19 @@ export interface TelemetryPage {
 	destination: DestinationRead | null;
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { fetch, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
 		error(403, 'Requires admin or super_admin role');
 	}
 	const superAdmin = user.roles.includes('super_admin');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	const [families, exporters, destination] = await Promise.all([
-		readMetricsText(fetch, token)
+		// The exposition is plain text, which the JSON client cannot read, so
+		// it goes out with the session's bearer alone.
+		readMetricsText(fetch, sessionToken(event) ?? '')
 			.then(parseExposition)
 			.catch(() => null),
 		superAdmin ? listExporters(client).catch(() => null) : Promise.resolve(null),

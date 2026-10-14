@@ -5,9 +5,11 @@ const client = vi.hoisted(() => ({
 	post: vi.fn(async (_path: string, _body: unknown) => ({ id: 'e1' })),
 }));
 
+// Reads and writes share one session client, as they do in the load and the
+// action. Writes land in `client` and reads in `reads`.
 vi.mock('$lib/server/authz', () => ({
 	requireUser: vi.fn(async () => ({ id: 'u1' })),
-	authedClient: vi.fn(() => client),
+	authedClient: vi.fn(() => ({ post: client.post, get: reads.get })),
 	stripProtectedFields: (d: Record<string, unknown>) => d,
 }));
 
@@ -24,7 +26,6 @@ const { FakeApiError } = vi.hoisted(() => ({
 }));
 const reads = vi.hoisted(() => ({ get: vi.fn(async (_path: string): Promise<unknown> => ({})) }));
 vi.mock('@lyeve-labs/client', () => ({
-	createClient: vi.fn(() => reads),
 	ApiError: FakeApiError,
 }));
 
@@ -140,14 +141,10 @@ describe('opening the new entry form', () => {
 		relations: Record<string, { items: unknown[]; total: number; failed: boolean }>;
 	};
 
-	function open(
-		running: string[],
-		roles: string[] = ['admin'],
-		fetch = vi.fn(async (_path: string) => new Response(JSON.stringify({ data: [] }), { status: 200 })),
-	) {
+	function open(running: string[], roles: string[] = ['admin']) {
 		return Promise.resolve(
 			load({
-				fetch,
+				fetch: vi.fn(),
 				cookies: cookies(),
 				params: { schema: 'surveys' },
 				url: new URL('http://localhost/admin/content/surveys/new'),
@@ -230,14 +227,11 @@ describe('opening the new entry form', () => {
 
 	it('reads each related collection from the admin store, one page of 500', async () => {
 		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
-		const fetch = vi.fn(
-			async (_path: string) =>
-				new Response(JSON.stringify({ data: [{ id: 'a1', title: 'Ada' }], total_count: 900 }), { status: 200 }),
-		);
+		reads.get.mockResolvedValueOnce({ data: [{ id: 'a1', title: 'Ada' }], total_count: 900 });
 
-		const data = await open([], ['admin'], fetch);
+		const data = await open([]);
 
-		const asked = new URL(String(fetch.mock.calls[0][0]), 'http://localhost');
+		const asked = new URL(String(reads.get.mock.calls[0][0]), 'http://localhost');
 		expect(asked.pathname).toBe('/api/admin/content');
 		expect(asked.searchParams.get('schema')).toBe('author');
 		expect(asked.searchParams.get('limit')).toBe('500');
@@ -247,9 +241,9 @@ describe('opening the new entry form', () => {
 
 	it('marks a related collection whose read failed, rather than calling it empty', async () => {
 		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
-		const fetch = vi.fn(async (_path: string) => new Response(JSON.stringify({ error: 'down' }), { status: 503 }));
+		reads.get.mockRejectedValueOnce(new FakeApiError('down', 503));
 
-		const data = await open([], ['admin'], fetch);
+		const data = await open([]);
 
 		expect(data.relations.author).toEqual({ items: [], total: 0, failed: true });
 	});

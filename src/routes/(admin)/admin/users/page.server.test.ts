@@ -1,45 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-// Mock requireRole so the action tests don't hit a real API.
-vi.mock('$lib/server/authz', () => ({
-	authedHeaders: vi.fn(() => ({ Authorization: 'Bearer tok' })),
+// Mock requireRole so the action tests don't ask the engine for the session.
+// The session client stays real and runs over the event's own fetch, which the
+// tests stub, so every call carries the headers it would send.
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/authz')>()),
 	requireRole: vi.fn(
 		async () => ({ id: 'u1', email: 'admin@test.invalid', roles: ['super_admin'] }) as never
-	),
-	// The actions build their client here so writes carry the engine's CSRF
-	// token. Return a client backed by the event's own fetch, which the tests
-	// already stub.
-	authedClient: vi.fn(
-		(event: { fetch: typeof fetch }) =>
-			({
-				get: async (path: string) => (await event.fetch(path)).json(),
-				post: async (path: string, body: unknown) =>
-					(
-						await event.fetch(path, {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(body),
-						})
-					).json(),
-				put: async (path: string, body: unknown) =>
-					(
-						await event.fetch(path, {
-							method: 'PUT',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(body),
-						})
-					).json(),
-				patch: async (path: string, body: unknown) =>
-					(
-						await event.fetch(path, {
-							method: 'PATCH',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(body),
-						})
-					).json(),
-				delete: async (path: string) => (await event.fetch(path, { method: 'DELETE' })).json(),
-			}) as never
 	),
 }));
 
@@ -573,6 +541,7 @@ describe('admin/users/+page.server.ts tenants', () => {
 		expect(result).toEqual({ ok: true });
 		const post = calls.find((c) => c.url.endsWith('/api/admin/users'));
 		expect(post?.headers['x-tenant-id']).toBe('acme');
+		expect(post?.headers.authorization).toBe('Bearer tok');
 	});
 
 	it('asks for a tenant when the form offered a choice and none was made', async () => {

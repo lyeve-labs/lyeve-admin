@@ -1,17 +1,15 @@
 import type { PageServerLoad, Actions } from './$types';
-import { createClient } from '@lyeve-labs/client';
 import { listOAuthProviders, createOAuthProvider, updateOAuthProvider, deleteOAuthProvider } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { fail, error, type ActionFailure } from '@sveltejs/kit';
 import { actionFailure } from '$lib/server/action-error';
-import { sessionToken } from '$lib/server/session-cookie';
 import { section } from '$lib/api/gate';
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	const providers = await section(
 		listOAuthProviders(client),
 		'The OAuth providers could not be read. This is not a report that there are none.'

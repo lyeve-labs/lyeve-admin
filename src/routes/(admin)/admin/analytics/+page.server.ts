@@ -1,6 +1,5 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import {
 	getSummary,
 	getEndpoints,
@@ -9,7 +8,7 @@ import {
 	getAnomalies
 } from '@lyeve-labs/client-rest';
 import { section } from '$lib/api/gate';
-import { sessionToken } from '$lib/server/session-cookie';
+import { authedClient } from '$lib/server/authz';
 
 /** What each part of the page says when its read failed for a reason it cannot name. */
 const FAILED = {
@@ -20,14 +19,14 @@ const FAILED = {
 	anomalies: 'The anomalies could not be read. This is not a report that there are none.',
 } as const;
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent } = event;
 	const { user } = await parent();
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
 		error(403, 'Requires admin or super_admin role');
 	}
 
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	/*
 	 * The range is stated rather than left to the engine. Left open, the

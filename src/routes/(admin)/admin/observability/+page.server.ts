@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { ApiError } from '@lyeve-labs/client';
 import { error, fail } from '@sveltejs/kit';
 import { section } from '$lib/api/gate';
 import { latencyTop } from '$lib/api/observability';
@@ -23,7 +23,6 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { goroutineCount } from '$lib/server/goroutines';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
-import { sessionToken } from '$lib/server/session-cookie';
 
 export interface PoolStatsSnapshot {
 	max_open_connections: number;
@@ -99,14 +98,14 @@ export interface GoroutineEnginePanel extends GoroutineEngineViews {
 	superAdmin: boolean;
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user, plugins } = await parent();
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
 		error(403, 'Requires admin or super_admin role');
 	}
 
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	// The row count is a query parameter, so the ranking a person is looking at
 	// is a link, and refreshing the page keeps the depth they chose.

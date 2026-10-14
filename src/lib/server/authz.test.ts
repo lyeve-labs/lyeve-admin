@@ -125,6 +125,20 @@ describe('authedClient', () => {
 		expect(url).toBe('/api/admin/thing');
 		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sess-tok');
 	});
+
+	it('adds extra headers and never lets one replace the session', async () => {
+		const fetchImpl = vi.fn(
+			async (_url: string, _init: RequestInit): Promise<Response> => jsonResponse({ ok: true })
+		) as unknown as typeof fetch;
+		const event = stubEvent({ token: 'sess-tok', fetchImpl });
+
+		await authedClient(event, { 'X-Tenant-ID': 'acme', Authorization: 'Bearer other' }).get('/api/admin/thing');
+
+		const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } };
+		const headers = mock.mock.calls[0][1].headers as Record<string, string>;
+		expect(headers['X-Tenant-ID']).toBe('acme');
+		expect(headers.Authorization).toBe('Bearer sess-tok');
+	});
 });
 
 // requireUser

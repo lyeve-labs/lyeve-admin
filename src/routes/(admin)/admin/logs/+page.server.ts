@@ -1,17 +1,16 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import { getLoggingLevels, getLoggingConfig, getLogVolume } from '@lyeve-labs/client-rest';
 import { section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { LOG_DEFAULT_LIMIT, LOG_MAX_LIMIT, searchLogEntries } from '$lib/api/logs';
-import { sessionToken } from '$lib/server/session-cookie';
+import { authedClient } from '$lib/server/authz';
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	await parent();
 
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	const q = url.searchParams.get('q') ?? '';
 	const level = url.searchParams.get('level') ?? '';

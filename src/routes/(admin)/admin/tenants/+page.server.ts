@@ -1,6 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, error, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import {
 	listTenants,
@@ -11,7 +10,6 @@ import {
 } from '@lyeve-labs/client-rest';
 import { actionError } from '$lib/server/action-error';
 import { getProvisioning } from '$lib/api/tenants';
-import { sessionToken } from '$lib/server/session-cookie';
 import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
@@ -29,11 +27,11 @@ const MAX_LIMIT = 500;
 /** What the page says for a list read that failed for no reason it can name. */
 const LIST_FAILED = 'The tenants could not be read. This is not a report that there are none.';
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 

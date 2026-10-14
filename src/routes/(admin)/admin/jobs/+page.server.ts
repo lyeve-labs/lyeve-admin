@@ -1,12 +1,11 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
+import type { HttpClient } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { sessionToken } from '$lib/server/session-cookie';
 
 export interface Job {
 	id: string;
@@ -40,7 +39,7 @@ const MAX_LIMIT = 199;
 const LIST_FAILED = 'The jobs could not be read. This is not a report that there are none.';
 
 async function listJobs(
-	client: ReturnType<typeof createClient>,
+	client: HttpClient,
 	limit: number,
 	offset: number
 ): Promise<Job[]> {
@@ -52,11 +51,11 @@ async function listJobs(
 	return Array.isArray(res) ? res : (res?.jobs ?? []);
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	/*
@@ -89,7 +88,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	return { jobs, limit, offset, hasMore: page.hasMore, openNew, openJob };
 };
 
-async function readJob(client: ReturnType<typeof createClient>, id: string): Promise<Job | null> {
+async function readJob(client: HttpClient, id: string): Promise<Job | null> {
 	try {
 		// GET /api/admin/jobs/{id} returns the job itself. Reading a `job`
 		// wrapper that is not there yields undefined, and the edit form would

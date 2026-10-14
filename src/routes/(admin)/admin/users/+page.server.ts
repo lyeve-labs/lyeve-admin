@@ -1,13 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
-import { ApiError, createClient, type User } from '@lyeve-labs/client';
+import { ApiError, type User } from '@lyeve-labs/client';
 import { createUser, updateUserRoles, deleteUser, listTenants, type Tenant } from '@lyeve-labs/client-rest';
 import { fail, error, redirect } from '@sveltejs/kit';
-import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
+import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError } from '$lib/server/action-error';
 import { setUserPassword } from '$lib/api/users';
-import { sessionToken } from '$lib/server/session-cookie';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { section, type Section } from '$lib/api/gate';
 import { pastEndOffset, withOffset } from '$lib/api/list';
@@ -23,14 +22,14 @@ const DEFAULT_LIMIT = 25;
  */
 const MAX_LIMIT = 199;
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user, plugins } = await parent();
 	if (!user.roles.includes('super_admin')) {
 		error(403, 'Requires super_admin role');
 	}
 
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	const limit = Math.max(
 		1,
@@ -73,15 +72,6 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	return { users, limit, offset, hasMore, tenants: choices };
 };
 
-/**
- * A client whose requests act in tenant. The engine honors X-Tenant-ID from a
- * super admin only, and checks the slug against its roster.
- */
-function inTenant(event: Parameters<Actions[string]>[0], tenant: string) {
-	const headers = { ...authedHeaders(event), 'X-Tenant-ID': tenant };
-	return createClient((url, init) => event.fetch(url, { ...init, headers: { ...init?.headers, ...headers } }));
-}
-
 export const actions: Actions = {
 	create: async (event) => {
 		await requireRole(event, ['super_admin']);
@@ -115,8 +105,11 @@ export const actions: Actions = {
 		if (Object.keys(fields).length > 0) {
 			return fail(400, { error: 'Check the highlighted fields.', fields });
 		}
+		// The engine honors X-Tenant-ID from a super admin only, and checks the
+		// slug against its roster.
+		const target = tenant ? authedClient(event, { 'X-Tenant-ID': tenant }) : client;
 		try {
-			await createUser(email, password, roles.length ? roles : ['editor'], tenant ? inTenant(event, tenant) : client);
+			await createUser(email, password, roles.length ? roles : ['editor'], target);
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);

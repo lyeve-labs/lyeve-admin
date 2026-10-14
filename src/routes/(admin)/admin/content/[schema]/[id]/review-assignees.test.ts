@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
-vi.mock('$lib/server/authz', async (importOriginal) => ({
-	...((await importOriginal()) as object),
-	requireUser: vi.fn(async () => ({ id: 'u1', roles: ['admin'] }) as never),
-	authedClient: vi.fn(() => engine),
-}));
+vi.mock('$lib/server/authz', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/server/authz')>();
+	return {
+		...real,
+		requireUser: vi.fn(async () => ({ id: 'u1', roles: ['admin'] }) as never),
+		// The load reads through the real client over its event's fetch. An
+		// action's event carries no fetch and gets the fake.
+		authedClient: vi.fn((event: { fetch?: unknown }) => (event.fetch ? real.authedClient(event as never) : engine)),
+	};
+});
 vi.mock('@lyeve-labs/client-rest', () => ({
 	getSchema: vi.fn(async () => ({ name: 'article', fields: [] })),
 }));

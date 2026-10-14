@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
@@ -17,13 +17,12 @@ import {
 	type DatasourceKind,
 } from '$lib/api/flows';
 import { SSL_MODES, authFromForm } from '$lib/flow/datasources';
-import { sessionToken } from '$lib/server/session-cookie';
 
 const KINDS: DatasourceKind[] = ['postgres', 'mysql', 'mssql', 'http', 'google_sheets'];
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { cookies, url } = event;
+	const client = authedClient(event);
 	let datasources: Datasource[] = [];
 	// The list says whether this instance may use datasources. Without that
 	// it is empty by design and a create is refused, and the page has to say

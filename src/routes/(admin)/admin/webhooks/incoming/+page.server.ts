@@ -1,6 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, type ActionFailure } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import {
 	getSchemas,
 	listIncomingWebhooks,
@@ -10,7 +9,6 @@ import {
 } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
-import { sessionToken } from '$lib/server/session-cookie';
 import { section } from '$lib/api/gate';
 
 /** What the page says for a list read that failed for no reason it can name. */
@@ -25,9 +23,8 @@ function parseIPList(raw: FormDataEntryValue | null): string[] {
 		.filter((ip) => ip.length > 0);
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const client = authedClient(event);
 
 	const [incomingWebhooks, schemas] = await Promise.all([
 		section(listIncomingWebhooks(client), LIST_FAILED),

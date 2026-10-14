@@ -39,12 +39,15 @@ export function authedHeaders(event: RequestEvent): Record<string, string> {
 }
 
 /**
- * Build an API client authenticated as the current session.
- * Throws 401 if no session cookie is present. Use inside server load
- * functions and form actions where `await parent()` is unavailable.
+ * Build an API client authenticated as the current session. Every server load
+ * and form action reads the engine through it. Throws 401 if no session cookie
+ * is present.
+ *
+ * `extra` adds headers to every request, such as X-Tenant-ID for a super
+ * admin acting in another tenant. It never replaces the session's own.
  */
-export function authedClient(event: RequestEvent): HttpClient {
-	const headers = authedHeaders(event);
+export function authedClient(event: RequestEvent, extra: Record<string, string> = {}): HttpClient {
+	const headers = { ...extra, ...authedHeaders(event) };
 	return createClient((url, init) =>
 		event.fetch(url, {
 			...init,

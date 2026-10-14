@@ -1,6 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireRole, requireUser } from '$lib/server/authz';
 import type { DeadLetter, Webhook } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
@@ -9,7 +8,6 @@ import { actionFailure } from '$lib/server/action-error';
 import { createWebhookRecord, updateWebhookRecord, webhookBodyFrom } from '$lib/api/webhook-options';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
-import { sessionToken } from '$lib/server/session-cookie';
 
 /** The page size when a request names none. */
 const DEFAULT_LIMIT = 50;
@@ -28,9 +26,9 @@ const LIST_FAILED = 'The webhooks could not be read. This is not a report that t
 /** What the drawer says when the schema names could not be read. */
 const SCHEMAS_FAILED = 'The schemas could not be read.';
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { url } = event;
+	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	/*

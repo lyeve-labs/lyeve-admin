@@ -1,8 +1,7 @@
 import type { PageServerLoad } from './$types';
-import { createClient } from '@lyeve-labs/client';
 import { getPluginStatus, type PluginStatus } from '@lyeve-labs/client-rest';
-import { sessionToken } from '$lib/server/session-cookie';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
+import { authedClient } from '$lib/server/authz';
 
 /**
  * The plugin status, read on every visit rather than taken from the shell's
@@ -12,10 +11,10 @@ import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
  * status sorted into a gate, never its text: a role refusal is not an outage,
  * and a body from a failing engine can carry driver text.
  */
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent } = event;
 	await parent();
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	return getPluginStatus(client).then(
 		(report) => ({ plugins: report.plugins ?? [], gate: GATE_OK as Gate }),

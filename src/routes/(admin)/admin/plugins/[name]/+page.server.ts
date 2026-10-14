@@ -1,8 +1,7 @@
 import type { PageServerLoad } from './$types';
-import { createClient } from '@lyeve-labs/client';
 import { listPlugins, type PluginBreakdown } from '$lib/api/profiler';
 import { detailFor } from '$lib/plugin-rows';
-import { sessionToken } from '$lib/server/session-cookie';
+import { authedClient } from '$lib/server/authz';
 
 /**
  * The plugin as the shell's status report describes it, and the requests
@@ -14,7 +13,8 @@ import { sessionToken } from '$lib/server/session-cookie';
  * super admin alone. Null means it could not be read: the profiler is not
  * running, or the reader may not see it.
  */
-export const load: PageServerLoad = async ({ params, fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { params, parent } = event;
 	const { user, pluginStatus } = await parent();
 	const name = params.name;
 	const roles = user?.roles ?? [];
@@ -22,8 +22,7 @@ export const load: PageServerLoad = async ({ params, fetch, cookies, parent, url
 	let traffic: PluginBreakdown | null = null;
 	let trafficRead = false;
 	if (roles.includes('super_admin')) {
-		const token = sessionToken({ cookies, url }) ?? '';
-		const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+		const client = authedClient(event);
 		const sampled = await listPlugins(client).catch(() => null);
 		if (sampled) {
 			trafficRead = true;
