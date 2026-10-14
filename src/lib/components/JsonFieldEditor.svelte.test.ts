@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render } from '@testing-library/svelte';
+import { fireEvent, render, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import JsonFieldEditor, { cellValue, pairsOf, parseError, textOf } from './JsonFieldEditor.svelte';
 
@@ -68,6 +68,12 @@ describe('JsonFieldEditor', () => {
 		expect((inputs[0] as HTMLInputElement).value).toBe('a');
 		expect((inputs[1] as HTMLInputElement).value).toBe('x');
 		expect(JSON.parse(getByTestId('json-preview').textContent ?? '')).toEqual({ a: 'x' });
+	});
+
+	it('opens what is saved by default for keys and values, behind a disclosure button', () => {
+		const { container } = render(JsonFieldEditor, { props: { value: '{"a":"x"}' } });
+		const toggle = within(container).getByRole('button', { name: 'What is saved' });
+		expect(toggle.getAttribute('aria-expanded')).toBe('true');
 	});
 
 	it('opens a nested document as JSON text', () => {

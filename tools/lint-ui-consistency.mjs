@@ -571,7 +571,9 @@ export const rules = [
      * bright highlight, in the middle of a dark page. A native date field is
      * the browser's own calendar behind a box sized against nothing in the
      * theme. A bare checkbox ignores the theme. A native password field has
-     * no way to reveal what was pasted into it.
+     * no way to reveal what was pasted into it. A native details draws the
+     * browser's own marker and snaps open in one frame. A native dialog
+     * brings none of the kit's focus return, scroll lock or overlay sizes.
      *
      * `hidden` carries form state and renders nothing, and `file` is the only
      * way to open a file picker, including the common shape of a hidden picker
@@ -587,6 +589,10 @@ export const rules = [
           if (el.name === 'select' || el.name === 'textarea') {
             return `native <${el.name}>; use ${KIT_CONTROL[el.name]}`;
           }
+          if (el.name === 'details' || el.name === 'summary') {
+            return `native <${el.name}>; use Collapsible, or Accordion for a set`;
+          }
+          if (el.name === 'dialog') return 'native <dialog>; use Modal or Drawer';
           // An option list written by hand is a native select's list, whoever
           // renders it. The kit's Select takes its rows as data.
           if (el.name === 'option' || el.name === 'optgroup' || el.name === 'datalist') {
