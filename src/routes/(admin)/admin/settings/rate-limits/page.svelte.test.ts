@@ -60,7 +60,14 @@ const protection = {
 	customized: false,
 };
 
-type Over = { customEnabled?: boolean | null; superAdmin?: boolean; rules?: unknown[]; total?: number; form?: unknown };
+type Over = {
+	customEnabled?: boolean | null;
+	superAdmin?: boolean;
+	rules?: unknown[];
+	total?: number;
+	form?: unknown;
+	status?: unknown[];
+};
 
 function setup(over: Over = {}) {
 	return render(RateLimitsPage, { props: props(over) });
@@ -104,7 +111,7 @@ function props(over: Over = {}) {
 							],
 						},
 			superAdmin: over.superAdmin ?? true,
-			status: { ok: true, value: [] },
+			status: { ok: true, value: over.status ?? [] },
 			gate: { state: 'ok' },
 			installed: true,
 		},
@@ -231,5 +238,45 @@ describe('the stored rule count on a paged list', () => {
 	it('counts every stored rule from the total, not the rows on this page', () => {
 		const { getByText } = setup({ total: 120 });
 		expect(getByText(/120\s+stored rules are not enforced/)).toBeTruthy();
+	});
+});
+
+describe('the live counters', () => {
+	// The sign-in protection keeps one bucket for requests that resolved no
+	// tenant and one per tenant, for the same rule, caller and endpoint.
+	const bucket = {
+		rule_id: '6f1c2a54-0d1e-4c4f-9a57-1b2c3d4e5f60',
+		kind: 'protection',
+		client_ip: '203.0.113.0',
+		endpoint: 'POST /api/admin/auth/login',
+		rate: 0.0055,
+		burst: 5,
+		remaining: 3,
+		reset_at: '2099-01-01T00:00:00Z',
+	};
+
+	it('shows two buckets that differ only by tenant as two rows that say what each counts', () => {
+		const { getByRole } = setup({ status: [bucket, { ...bucket, tenant_id: 'default', remaining: 1 }] });
+		const table = getByRole('region', { name: 'Right now' });
+		const rows = [...table.querySelectorAll('tbody tr')];
+		expect(rows).toHaveLength(2);
+		expect(rows[0].textContent).toContain('No tenant');
+		expect(rows[0].textContent).toContain('3 of 5');
+		expect(rows[1].textContent).toContain('Tenant default');
+		expect(rows[1].textContent).toContain('1 of 5');
+		expect(rows[0].textContent).not.toBe(rows[1].textContent);
+	});
+
+	it('says a global limit bucket counts the whole instance', () => {
+		const global = { ...bucket, kind: 'global', endpoint: '*' };
+		const { getByRole } = setup({ status: [global, { ...bucket, tenant_id: 'default' }] });
+		const rows = [...getByRole('region', { name: 'Right now' }).querySelectorAll('tbody tr')];
+		expect(rows[0].textContent).toContain('Whole instance');
+		expect(rows[1].textContent).toContain('Tenant default');
+	});
+
+	it('keeps both rows when the masked address makes two buckets read alike', () => {
+		const { getByRole } = setup({ status: [bucket, { ...bucket, remaining: 0 }] });
+		expect(getByRole('region', { name: 'Right now' }).querySelectorAll('tbody tr')).toHaveLength(2);
 	});
 });
