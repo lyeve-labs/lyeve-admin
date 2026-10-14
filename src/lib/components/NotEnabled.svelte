@@ -7,11 +7,12 @@
 	 * when something says where the feature is turned on: the engine, beside
 	 * the refusal, or the license module.
 	 */
-	import { Badge, Button, EmptyState } from '@lyeve-labs/ui-kit';
+	import { Badge, EmptyState } from '@lyeve-labs/ui-kit';
 	import { Lock } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { useInstance } from '$lib/instance.svelte';
 	import { isExternalHref } from '$lib/links';
+	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
 
 	let {
 		title,
@@ -50,14 +51,7 @@
 
 {#snippet enable()}
 	{#if target}
-		<Button
-			variant="secondary"
-			href={target.href}
-			target={away ? '_blank' : undefined}
-			rel={away ? 'noopener noreferrer' : undefined}
-		>
-			{target.label ?? 'How to enable it'}
-		</Button>
+		<UpgradeLink link={target} />
 	{/if}
 {/snippet}
 
