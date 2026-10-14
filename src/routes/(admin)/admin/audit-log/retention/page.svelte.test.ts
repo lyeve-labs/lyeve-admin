@@ -154,3 +154,17 @@ describe('Retention holds that could not be read', () => {
 		expect(container.textContent).not.toContain('Nothing is held');
 	});
 });
+
+describe('the outcome of an enforcement run', () => {
+	it('says how many entries were deleted across how many policies', () => {
+		const { container } = render(RetentionPage, { props: props(['super_admin'], {}, { enforced: true, deleted: 12, policies: 2 }) });
+		expect(container.textContent).toContain('Retention enforced across 2 policies.');
+		expect(container.textContent).toContain('12 entries were deleted.');
+	});
+
+	it('speaks of one policy and one entry in the singular', () => {
+		const { container } = render(RetentionPage, { props: props(['super_admin'], {}, { enforced: true, deleted: 1, policies: 1 }) });
+		expect(container.textContent).toContain('across 1 policy.');
+		expect(container.textContent).toContain('1 entry was deleted.');
+	});
+});

@@ -42,9 +42,8 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
-	// The test route can report success under either of two field names.
-	// Reading one of them treats a refusal as a pass, so both are read and the
-	// absence of an explicit success is not success.
+	// The test route answers 200 for a provider that failed its ping too, so
+	// only an explicit healthy in the body is a pass.
 	test: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);

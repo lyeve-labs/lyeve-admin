@@ -51,10 +51,14 @@ export interface StorageProvider {
 	updated_at: string;
 }
 
+/** What the storage plugin answers for a ping: whether the provider answered, and why not. */
 export interface TestResult {
-	success?: boolean;
-	ok?: boolean;
-	message?: string;
+	provider_id?: string;
+	provider_type?: string;
+	provider_name?: string;
+	healthy?: boolean;
+	latency_ms?: number;
+	/** Empty when the provider answered. */
 	error?: string;
 }
 
@@ -84,19 +88,18 @@ export function providerLabel(type: string): string {
 }
 
 /**
- * Whether the test route reported success.
+ * Whether the test route reported a healthy provider.
  *
- * The engine may answer under either of two field names, and a caller reading
- * only one treats a refusal as a pass. Both are read, and absence of an
- * explicit success is not success.
+ * The route answers 200 whether or not the provider answered the ping, so
+ * the status says nothing. Only an explicit healthy is a pass.
  */
 export function testPassed(result: TestResult | null | undefined): boolean {
-	if (!result) return false;
-	return result.success === true || result.ok === true;
+	return result?.healthy === true;
 }
 
+/** Why a provider failed its test. The plugin sends an empty error on a pass. */
 export function testMessage(result: TestResult | null | undefined): string {
-	return result?.message ?? result?.error ?? 'The provider did not say why.';
+	return result?.error?.trim() || 'The provider did not say why.';
 }
 
 /**

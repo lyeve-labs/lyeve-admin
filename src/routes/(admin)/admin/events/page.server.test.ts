@@ -8,7 +8,8 @@ vi.mock('$lib/server/authz', async (importOriginal) => ({
 	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
 }));
 
-import { load } from './+page.server';
+import { requireRole } from '$lib/server/authz';
+import { actions, load } from './+page.server';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
@@ -52,5 +53,66 @@ describe('the events load', () => {
 			status: 307,
 			location: expect.stringContaining('offset=50'),
 		});
+	});
+});
+
+type Failure = { status: number; data: { error: string } };
+
+function replayEvent(fields: Record<string, string>) {
+	const body = new FormData();
+	for (const [k, v] of Object.entries(fields)) body.set(k, v);
+	return { request: new Request('http://localhost/admin/events', { method: 'POST', body }), url: new URL('http://localhost/admin/events') } as never;
+}
+
+// The replay re-delivers published events to their handlers, so a missing
+// or malformed field must never fire a real run.
+describe('replaying events', () => {
+	it('holds a replay to an admin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		const event = replayEvent({ since: '2026-10-01T09:30', since_offset: '0' });
+		await expect(actions.replay(event)).rejects.toMatchObject({ status: 403 });
+		expect(requireRole).toHaveBeenCalledWith(event, ['admin', 'super_admin']);
+		expect(engine.post).not.toHaveBeenCalled();
+	});
+
+	it('posts the instant the browser meant and runs dry unless told otherwise', async () => {
+		engine.post.mockResolvedValue({ run_id: 'run-1' });
+		const out = await actions.replay(replayEvent({ since: '2026-10-01T09:30', since_offset: '120', handler: ' search-index ' }));
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/events/replay', {
+			since: '2026-10-01T11:30:00.000Z',
+			handler: 'search-index',
+			dry_run: true,
+		});
+		expect(out).toEqual({ started: 'run-1', dryRun: true });
+	});
+
+	it('sends a real replay only when the form says so, for every handler when none is named', async () => {
+		engine.post.mockResolvedValue({ run_id: 'run-2' });
+		const out = await actions.replay(replayEvent({ since: '2026-10-01T09:30', since_offset: '0', dry_run: 'false' }));
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/events/replay', { since: '2026-10-01T09:30:00.000Z', handler: undefined, dry_run: false });
+		expect(out).toEqual({ started: 'run-2', dryRun: false });
+	});
+
+	it.each([
+		[{ since: '' }, 'Choose the point to replay from.'],
+		[{ since: 'yesterday' }, 'That is not a time the log can be replayed from.'],
+		[{ since: '2999-01-01T00:00', since_offset: '0' }, 'A replay starts in the past. Nothing has been published yet after that point.'],
+	])('refuses %o without starting a run', async (fields, sentence) => {
+		const out = (await actions.replay(replayEvent(fields))) as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe(sentence);
+		expect(engine.post).not.toHaveBeenCalled();
+	});
+
+	it('relays the engine refusal', async () => {
+		engine.post.mockRejectedValue(new ApiError(409, 'a replay is already in progress'));
+		const out = (await actions.replay(replayEvent({ since: '2026-10-01T09:30', since_offset: '0' }))) as Failure;
+		expect(out.data.error).toBe('a replay is already in progress');
+	});
+
+	it('keeps outage detail off the page', async () => {
+		engine.post.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
+		const out = (await actions.replay(replayEvent({ since: '2026-10-01T09:30', since_offset: '0' }))) as Failure;
+		expect(out.data.error).toBe('The replay could not be started.');
 	});
 });

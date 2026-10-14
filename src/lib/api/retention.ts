@@ -110,8 +110,28 @@ export async function releaseHold(client: HttpClient, id: string): Promise<void>
 	await client.delete(`${HOLDS_URL}/${encodeURIComponent(id)}`);
 }
 
-export async function enforceNow(client: HttpClient): Promise<{ deleted?: number }> {
-	return client.post<{ deleted?: number }>(ENFORCE_URL, {});
+/** One policy's share of an enforcement run, as the audit plugin reports it. */
+export interface EnforceResult {
+	policy_id: string;
+	entries_archived?: number;
+	entries_deleted?: number;
+	archive_failed?: boolean;
+}
+
+/** What an enforcement run answers. The plugin counts per policy and never sends a total. */
+export interface EnforceResponse {
+	policies_processed?: number;
+	results?: EnforceResult[] | null;
+	elapsed?: string;
+}
+
+export async function enforceNow(client: HttpClient): Promise<EnforceResponse> {
+	return client.post<EnforceResponse>(ENFORCE_URL, {});
+}
+
+/** The entries a run deleted across every policy it processed. */
+export function entriesDeleted(run: EnforceResponse): number {
+	return (run.results ?? []).reduce((sum, r) => sum + (r.entries_deleted ?? 0), 0);
 }
 
 /** Holds still in force. A soft-deleted hold protects nothing. */

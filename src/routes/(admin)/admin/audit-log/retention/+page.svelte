@@ -52,7 +52,7 @@
 	const rowError = $derived(
 		failure?.action && !DRAWER_ACTIONS.includes(failure.action) ? (failure.error ?? '') : '',
 	);
-	const outcome = $derived((form as { enforced?: boolean; deleted?: number } | null) ?? null);
+	const outcome = $derived((form as { enforced?: boolean; deleted?: number; policies?: number } | null) ?? null);
 	const holds = $derived(data.holds.ok ? data.holds.value : []);
 	const live = $derived(activeHolds(holds));
 	const blocked = $derived(deletionIsBlocked(data.policies, holds));
@@ -206,7 +206,8 @@
 		{/if}
 		{#if outcome?.enforced}
 			<Alert tone="success" autoDismiss>
-				Retention enforced. {outcome.deleted} entries were deleted.
+				Retention enforced across {outcome.policies} {outcome.policies === 1 ? 'policy' : 'policies'}.
+				{outcome.deleted} {outcome.deleted === 1 ? 'entry was' : 'entries were'} deleted.
 			</Alert>
 		{/if}
 

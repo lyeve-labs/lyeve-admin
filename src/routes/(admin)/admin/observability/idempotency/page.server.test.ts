@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@lyeve-labs/client';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
 const authz = vi.hoisted(() => ({ roles: ['admin'] as string[] }));
@@ -56,5 +57,27 @@ describe('the key list', () => {
 			status: 307,
 			location: expect.stringContaining('offset=50'),
 		});
+	});
+});
+
+describe('a release the engine does not carry out', () => {
+	type Failure = { status: number; data: { error: string } };
+
+	it('names nothing to release without a request', async () => {
+		const out = (await actions.release(actionEvent({}))) as Failure;
+		expect(out.data.error).toBe('No key was named.');
+		expect(engine.delete).not.toHaveBeenCalled();
+	});
+
+	it('relays the engine refusal', async () => {
+		engine.delete.mockRejectedValue(new ApiError(409, 'key is in flight'));
+		const out = (await actions.release(actionEvent({ key: 'order-17' }))) as Failure;
+		expect(out.data.error).toBe('key is in flight');
+	});
+
+	it('keeps outage detail off the page', async () => {
+		engine.delete.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.9:6379: connection refused'));
+		const out = (await actions.release(actionEvent({ key: 'order-17' }))) as Failure;
+		expect(out.data.error).toBe('The key could not be released.');
 	});
 });
