@@ -32,11 +32,22 @@
 	const tenant = $derived(data.tenant);
 
 	// A membership names roles inside one tenant. super_admin is an instance
-	// role held on the account itself, so it is not offered here. A row that
-	// already holds it keeps it: the engine signs a home tenant in with the
-	// roles saved here, so a save without it would end the account's super
-	// admin at its next sign-in, and this page offers no way back.
+	// role held on the account itself, so it is not offered here. A super
+	// admin's home row is not edited here at all: the engine signs a home
+	// tenant in with the roles its membership sets, so a save would either end
+	// the account's super admin or keep it past a removal on the Users page.
 	const MEMBER_ROLES = ['viewer', 'editor', 'admin'].map((r) => ({ value: r, label: r }));
+
+	/** A super admin's own home row, which this page leaves alone. */
+	function superHome(m: TenantMember): boolean {
+		return m.home && (m.roles.includes('super_admin') || data.homeSuperAdmins.includes(m.id));
+	}
+
+	// A super admin whose home membership already leaves the role out signs in
+	// here without it.
+	const lostSuperAdmin = $derived(
+		data.members.ok ? data.members.value.filter((m) => m.home && !m.roles.includes('super_admin') && data.homeSuperAdmins.includes(m.id)) : [],
+	);
 
 	const facts = $derived([
 		{ term: 'Slug', value: tenant.slug },
@@ -219,6 +230,11 @@
 		{#if revokeError}
 			<Alert tone="danger">{revokeError}</Alert>
 		{/if}
+		{#each lostSuperAdmin as m (m.id)}
+			<Alert tone="warn" title="{m.email} signs in here without super admin">
+				This is the account's home tenant, and its membership here sets roles that leave super admin out. The engine signs it in here with those roles. Neither this page nor the Users page changes a home membership.
+			</Alert>
+		{/each}
 		{#if !data.members.ok}
 			<GateNotice
 				gate={data.members.gate}
@@ -260,7 +276,16 @@
 							<td class="text-xs text-muted">{m.home ? 'Home tenant' : 'Membership'}</td>
 							<td>
 								<div class="flex items-center justify-end gap-2">
-									<Button variant="ghost" size="sm" aria-label="Edit roles for {m.email}" onclick={() => openEditMember(m)}>
+									{#if superHome(m)}
+										<span class="text-xs text-muted">A super admin's home roles are managed on the Users page.</span>
+									{/if}
+									<Button
+										variant="ghost"
+										size="sm"
+										aria-label="Edit roles for {m.email}"
+										disabled={superHome(m)}
+										onclick={() => openEditMember(m)}
+									>
 										<Pencil size={ICON.sm} />
 									</Button>
 									{#if !m.home}
@@ -295,12 +320,6 @@
 		{#if editingMember}
 			<input type="hidden" name="user_id" value={editingMember.id} />
 			<Input id="member-email" label="Account" value={memberEmail} disabled />
-			{#if editingMember.roles.includes('super_admin')}
-				<input type="hidden" name="roles" value="super_admin" />
-				<p class="text-xs text-muted" data-testid="keeps-super-admin">
-					This account is a super admin, and saving here keeps that role. The super admin role is managed on the Users page.
-				</p>
-			{/if}
 		{:else}
 			<Input
 				id="member-email"

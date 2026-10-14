@@ -89,13 +89,40 @@ export function withheldFrom(offered: string[], available: string[]): string[] {
  */
 export async function findUserByEmail(client: HttpClient, email: string, maxPages = 25): Promise<User | null> {
 	const want = email.trim().toLowerCase();
+	const [hit] = await walkUsers(client, (u) => u.email.toLowerCase() === want, 1, maxPages);
+	return hit ?? null;
+}
+
+/** Finds an account by id, walking the users pages the way the email lookup does. */
+export async function findUserById(client: HttpClient, id: string, maxPages = 25): Promise<User | null> {
+	const [hit] = await walkUsers(client, (u) => u.id === id, 1, maxPages);
+	return hit ?? null;
+}
+
+/**
+ * The ids among `ids` whose account holds super_admin. A tenant's member list
+ * shows the roles a home membership sets, which can leave out the account's
+ * own super_admin, so only the account says whether it holds it.
+ */
+export async function superAdminsAmong(client: HttpClient, ids: string[], maxPages = 25): Promise<string[]> {
+	if (ids.length === 0) return [];
+	const want = new Set(ids);
+	const hits = await walkUsers(client, (u) => want.has(u.id), ids.length, maxPages);
+	return hits.filter((u) => (u.roles ?? []).includes('super_admin')).map((u) => u.id);
+}
+
+/** Walks the users pages until `count` accounts match or the list ends. */
+async function walkUsers(client: HttpClient, match: (u: User) => boolean, count: number, maxPages: number): Promise<User[]> {
 	const size = 200;
+	const found: User[] = [];
 	for (let page = 0; page < maxPages; page++) {
 		const rows = await client.get<User[]>(`/api/admin/users?limit=${size}&offset=${page * size}`);
 		const list = Array.isArray(rows) ? rows : [];
-		const hit = list.find((u) => u.email.toLowerCase() === want);
-		if (hit) return hit;
-		if (list.length < size) return null;
+		for (const u of list) {
+			if (match(u)) found.push(u);
+			if (found.length >= count) return found;
+		}
+		if (list.length < size) return found;
 	}
-	return null;
+	return found;
 }

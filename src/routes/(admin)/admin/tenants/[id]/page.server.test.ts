@@ -64,6 +64,9 @@ function event(routes: Record<string, unknown>, form?: FormData) {
 
 const ME = { id: 'u0', email: 'root@example.com', roles: ['super_admin'] };
 
+/** An account whose home is another tenant, so a grant here is a plain membership. */
+const ADA = { id: 'u1', email: 'ada@example.com', roles: ['editor'], tenant_id: 'other', disabled: false };
+
 describe('admin/tenants/[id] load', () => {
 	it('offers what the instance serves and marks what is withheld', async () => {
 		const { event: ev } = event({
@@ -80,6 +83,28 @@ describe('admin/tenants/[id] load', () => {
 			],
 		});
 		expect(data.members.ok && data.members.value[0].email).toBe('a@x.io');
+	});
+
+	// The member list shows the roles a home membership sets. Only the account
+	// says whether it holds super_admin.
+	it('names the home rows whose account is a super admin the list leaves out', async () => {
+		const { event: ev } = event({
+			'GET /api/admin/tenants/t1': TENANT,
+			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: [], known: [] },
+			'GET /api/admin/tenant-members/acme': {
+				members: [
+					{ id: 'u1', email: 'root@acme.io', disabled: false, home: true, roles: ['editor'] },
+					{ id: 'u2', email: 'ada@acme.io', disabled: false, home: true, roles: ['editor'] },
+				],
+				total: 2,
+			},
+			'GET /api/admin/users': [
+				{ id: 'u1', email: 'root@acme.io', roles: ['super_admin'], tenant_id: 'acme', disabled: false },
+				{ id: 'u2', email: 'ada@acme.io', roles: ['editor'], tenant_id: 'acme', disabled: false },
+			],
+		});
+		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
+		expect(data.homeSuperAdmins).toEqual(['u1']);
 	});
 
 	it('keeps the features when the members read fails', async () => {
@@ -160,6 +185,7 @@ describe('admin/tenants/[id] grant action', () => {
 			{
 				'GET /api/admin/auth/me': ME,
 				'GET /api/admin/tenants/t1': TENANT,
+				'GET /api/admin/users': [ADA],
 				'PUT /api/admin/users/u1/memberships': json(body, 402),
 			},
 			grantForm('admin'),
@@ -193,12 +219,53 @@ describe('admin/tenants/[id] grant action', () => {
 			{
 				'GET /api/admin/auth/me': ME,
 				'GET /api/admin/tenants/t1': TENANT,
+				'GET /api/admin/users': [ADA],
 				'PUT /api/admin/users/u1/memberships': { tenant_id: 'acme', roles: ['editor'] },
 			},
 			grantForm('editor'),
 		);
 		expect(await actions.grant(ev)).toEqual({ memberSaved: true });
 		expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ tenant_id: 'acme', roles: ['editor'] });
+	});
+
+	/*
+	 * A membership in an account's home tenant replaces its roles when it signs
+	 * in there. Written for a super admin, it dropped super_admin or held it
+	 * past a removal on the Users page.
+	 */
+	const ROOT_AT_HOME = { id: 'u1', email: 'root@acme.io', roles: ['super_admin'], tenant_id: 'acme', disabled: false };
+
+	it('refuses a new member who is a super admin at home here', async () => {
+		const form = new FormData();
+		form.append('email', 'root@acme.io');
+		form.append('roles', 'editor');
+		const { event: ev, calls } = event(
+			{ 'GET /api/admin/auth/me': ME, 'GET /api/admin/tenants/t1': TENANT, 'GET /api/admin/users': [ROOT_AT_HOME] },
+			form,
+		);
+		expect(await actions.grant(ev)).toMatchObject({
+			status: 409,
+			data: { action: 'grant', memberError: 'root@acme.io is a super admin whose home is this tenant. Its roles are set on the Users page.', fields: { email: 'A super admin at home' } },
+		});
+		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+	});
+
+	it('refuses an edit of a super admin home row posted directly', async () => {
+		const { event: ev, calls } = event(
+			{ 'GET /api/admin/auth/me': ME, 'GET /api/admin/tenants/t1': TENANT, 'GET /api/admin/users': [ROOT_AT_HOME] },
+			grantForm('super_admin'),
+		);
+		expect(await actions.grant(ev)).toMatchObject({ status: 409, data: { action: 'grant' } });
+		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+	});
+
+	it('saves nothing when the account cannot be read', async () => {
+		const { event: ev, calls } = event(
+			{ 'GET /api/admin/auth/me': ME, 'GET /api/admin/tenants/t1': TENANT, 'GET /api/admin/users': json({ error: 'down' }, 503) },
+			grantForm('editor'),
+		);
+		expect(await actions.grant(ev)).toMatchObject({ status: 400, data: { action: 'grant' } });
+		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
 	});
 });
 

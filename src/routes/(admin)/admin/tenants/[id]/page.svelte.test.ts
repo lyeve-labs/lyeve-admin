@@ -27,6 +27,7 @@ function props(over: Record<string, unknown> = {}, form: unknown = null) {
 			tenant,
 			choices: { ok: true, value: [{ name: 'flow', available: true }] },
 			members: { ok: true, value: [member] },
+			homeSuperAdmins: [],
 			memberTotal: 1,
 			limit: 50,
 			offset: 0,
@@ -145,29 +146,35 @@ describe('unsaved plugin picks', () => {
 });
 
 /*
- * The engine signs a home tenant in with the roles saved on its home row, so
- * a save that dropped super_admin there ended the account's super admin at
- * its next sign-in.
+ * The engine signs a home tenant in with the roles its home membership sets.
+ * A save there either ended an account's super admin at its next sign-in or
+ * held it past a removal on the Users page.
  */
-describe('editing the roles of a super admin', () => {
+describe('the home row of a super admin', () => {
 	const root = { id: 'u1', email: 'root@example.com', disabled: false, home: true, roles: ['super_admin', 'admin'] };
+	const lost = { id: 'u3', email: 'lost@example.com', disabled: false, home: true, roles: ['editor'] };
+	const edit = (email: string) => screen.getByRole('button', { name: `Edit roles for ${email}` }) as HTMLButtonElement;
 
-	it('posts super_admin back with the roles picked, and says where it is managed', async () => {
-		render(TenantPage, { props: props({ members: { ok: true, value: [root] } }) });
-		await fireEvent.click(screen.getByRole('button', { name: 'Edit roles for root@example.com' }));
-		const form = document.body.querySelector<HTMLFormElement>('form#member-form');
-		const posted = new FormData(form!).getAll('roles');
-		expect(posted).toContain('super_admin');
-		expect(posted).toContain('admin');
-		expect(drawerText()).toContain('The super admin role is managed on the Users page.');
+	it('is not edited here and names the Users page', () => {
+		const { container } = render(TenantPage, { props: props({ members: { ok: true, value: [root] } }) });
+		expect(edit('root@example.com').disabled).toBe(true);
+		expect(container.textContent).toContain("A super admin's home roles are managed on the Users page.");
 	});
 
-	it('adds nothing for an account that is not a super admin', async () => {
-		render(TenantPage, { props: props() });
-		await fireEvent.click(screen.getByRole('button', { name: 'Edit roles for ada@example.com' }));
+	it('warns when the home membership already leaves super admin out', () => {
+		const { container } = render(TenantPage, {
+			props: props({ members: { ok: true, value: [lost, member] }, homeSuperAdmins: ['u3'] }),
+		});
+		expect(container.textContent).toContain('lost@example.com signs in here without super admin');
+		expect(edit('lost@example.com').disabled).toBe(true);
+	});
+
+	it('leaves any other account editable, and posts no role it was not given', async () => {
+		const { container } = render(TenantPage, { props: props() });
+		expect(container.textContent).not.toContain('signs in here without super admin');
+		await fireEvent.click(edit('ada@example.com'));
 		const form = document.body.querySelector<HTMLFormElement>('form#member-form');
 		expect(new FormData(form!).getAll('roles')).not.toContain('super_admin');
-		expect(screen.queryByTestId('keeps-super-admin')).toBeNull();
 	});
 });
 

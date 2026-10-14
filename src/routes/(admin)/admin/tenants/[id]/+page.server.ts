@@ -16,11 +16,13 @@ const MEMBERS_MAX = 200;
 import {
 	featureChoices,
 	findUserByEmail,
+	findUserById,
 	getTenantFeatures,
 	grantMembership,
 	listTenantMembers,
 	revokeMembership,
 	setTenantFeatures,
+	superAdminsAmong,
 	withheldFrom,
 	type FeatureChoice,
 	type TenantMember,
@@ -69,10 +71,19 @@ export const load: PageServerLoad = async (event) => {
 	}
 	const people: Section<TenantMember[]> = members.ok ? { ok: true, value: members.value.members ?? [] } : members;
 
+	// A home row lists the roles its membership sets, which can leave out the
+	// account's own super_admin, and the engine signs the account in here with
+	// those roles. Only the account says whether it holds super_admin. A failed
+	// read leaves these rows as they are listed: their roles already lack
+	// super_admin, so an edit cannot take it away.
+	const quiet = people.ok ? people.value.filter((m) => m.home && !m.roles.includes('super_admin')).map((m) => m.id) : [];
+	const homeSuperAdmins = await superAdminsAmong(client, quiet).catch(() => [] as string[]);
+
 	return {
 		tenant,
 		choices,
 		members: people,
+		homeSuperAdmins,
 		memberTotal: members.ok ? members.value.total : 0,
 		limit,
 		offset,
@@ -109,15 +120,22 @@ export const actions: Actions = {
 		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
 		const client = authedClient(event);
 		try {
-			let id = userId;
-			if (!id) {
-				const found = await findUserByEmail(client, email);
-				if (!found) {
-					return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
-				}
-				id = found.id;
+			const slug = await tenantSlug(event);
+			const found = userId ? await findUserById(client, userId) : await findUserByEmail(client, email);
+			if (!found && !userId) {
+				return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
 			}
-			await grantMembership(client, id, await tenantSlug(event), roles);
+			// A membership in the home tenant replaces the account's roles when it
+			// signs in there. Written for a super admin, it would either drop
+			// super_admin or hold it past a removal on the Users page.
+			if (found && found.tenant_id === slug && (found.roles ?? []).includes('super_admin')) {
+				return fail(409, {
+					action: 'grant',
+					memberError: `${found.email} is a super admin whose home is this tenant. Its roles are set on the Users page.`,
+					fields: userId ? undefined : { email: 'A super admin at home' },
+				});
+			}
+			await grantMembership(client, found?.id ?? userId, slug, roles);
 			return { memberSaved: true };
 		} catch (err) {
 			const full = seatRefusal(err);
