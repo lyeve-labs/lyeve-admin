@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Modal } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Collapsible, Modal } from '@lyeve-labs/ui-kit';
 	import type { Change } from '$lib/schema/editor';
 	import type { DryRunStatement } from '../+page.server';
 
@@ -119,12 +119,9 @@
 						{@render statementHead(stmt, i)}
 						<pre class="overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{stmt.sql}</pre>
 						{#if stmt.down_sql}
-							<details class="mt-1">
-								<summary class="cursor-pointer text-xs text-faint transition-colors hover:text-muted">
-									Down SQL
-								</summary>
+							<Collapsible label="Down SQL" class="mt-1">
 								<pre class="mt-1 overflow-x-auto rounded bg-surface-2/60 p-3 font-mono text-xs whitespace-pre-wrap text-muted">{stmt.down_sql}</pre>
-							</details>
+							</Collapsible>
 						{/if}
 					</div>
 				{/each}
