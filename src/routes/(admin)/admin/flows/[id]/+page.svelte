@@ -810,7 +810,7 @@
 				{:else if tab === 'runs'}
 					<div class="flex h-full flex-col gap-3 overflow-y-auto p-3">
 						{#if !data.runs.ok}
-							<GateNotice gate={data.runs.gate} title="the runs" absent="This flow is no longer there, so it has no runs." />
+							<GateNotice level={2} gate={data.runs.gate} title="the runs" absent="This flow is no longer there, so it has no runs." />
 						{:else if data.runs.value.rows.length === 0}
 							<p class="text-sm text-muted">No runs recorded yet.</p>
 						{:else}
