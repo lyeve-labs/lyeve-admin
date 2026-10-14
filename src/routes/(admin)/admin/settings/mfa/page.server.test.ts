@@ -26,16 +26,28 @@ function event(replies: Record<string, Reply>, form: Record<string, string> = {}
 
 describe('mfa load', () => {
 	it('reads the account state and keeps an unreadable one unknown, never off', async () => {
-		const on = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: true } } });
+		const on = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: true, has_passkeys: false, passkeys: [] } } });
 		expect(await load(on.ev)).toEqual({ mfa: { ok: true, value: { enabled: true, hasPasskeys: false } } });
-		const off = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: false } } });
+		const off = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: false, has_passkeys: false, passkeys: [] } } });
 		expect(await load(off.ev)).toEqual({ mfa: { ok: true, value: { enabled: false, hasPasskeys: false } } });
 		const down = event({ '/api/admin/mfa/status': { status: 503, body: { error: 'x' } } });
 		expect(await load(down.ev)).toEqual({ mfa: { ok: false, gate: { state: 'unavailable' } } });
 	});
 
+	// The plugin reports a passkey as two-factor on, and lists it.
 	it('keeps a passkey apart from the authenticator app', async () => {
-		const passkey = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: true, has_passkeys: true, passkeys: [] } } });
+		const passkey = event({
+			'/api/admin/mfa/status': {
+				status: 200,
+				body: {
+					enabled: true,
+					has_passkeys: true,
+					passkeys: [
+						{ id: 'a1b2', name: 'Laptop', is_backup: false, created_at: '2026-10-01T09:00:00Z', last_used_at: null },
+					],
+				},
+			},
+		});
 		expect(await load(passkey.ev)).toEqual({ mfa: { ok: true, value: { enabled: true, hasPasskeys: true } } });
 	});
 });
