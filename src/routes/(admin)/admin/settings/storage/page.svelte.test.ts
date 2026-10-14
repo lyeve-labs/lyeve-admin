@@ -54,6 +54,28 @@ describe('Storage controls by role', () => {
 		expect(admin.queryByRole('button', { name: /new provider/i })).toBeNull();
 	});
 });
+
+describe('the provider drawer', () => {
+	const failed = { action: 'create', providerError: 'The provider could not be created.' };
+
+	it('keeps a failed create out of an edit opened after it', async () => {
+		const { getByRole } = render(StoragePage, { props: { ...props(), form: failed as never } });
+		getByRole('button', { name: 'Edit Uploads bucket' }).click();
+		await new Promise((r) => setTimeout(r, 0));
+		const drawer = document.body.querySelector('form#provider-form');
+		expect(drawer).not.toBeNull();
+		expect(drawer?.textContent).not.toContain('The provider could not be created.');
+	});
+
+	it('shows a failed create that came back while the create drawer was open', async () => {
+		const { getAllByRole, rerender } = render(StoragePage, { props: props() });
+		getAllByRole('button', { name: /new provider/i })[0].click();
+		await new Promise((r) => setTimeout(r, 0));
+		await rerender({ ...props(), form: failed as never });
+		expect(document.body.querySelector('form#provider-form')?.textContent).toContain('The provider could not be created.');
+	});
+});
+
 describe('an edit save', () => {
 	it('sends back the stored cost weight on an edit', async () => {
 		const { getByRole } = render(StoragePage, { props: props() });

@@ -287,6 +287,11 @@
 						</Button>
 					</div>
 				{/snippet}
+				<!-- A failed delete shows here, where it was made, not beside the
+				     dashboard form. -->
+				{#if form?.pageDeleteError}
+					<Alert tone="danger">{form.pageDeleteError}</Alert>
+				{/if}
 				{#if data.pages.length === 0}
 					<EmptyState title="No pages yet" description="Build a page for the team from text, callouts, content lists, counts and links. It gets its own entry in the menu.">
 						{#snippet action()}

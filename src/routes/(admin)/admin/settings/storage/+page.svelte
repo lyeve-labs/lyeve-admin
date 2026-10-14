@@ -46,7 +46,15 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const providerError = $derived((form as { providerError?: string } | null)?.providerError ?? '');
+	// Create and update share one drawer and one form result, so the drawer
+	// shows only a failure of the action it is showing that came back after
+	// it opened. A failed create never shows in the next edit.
+	let openedOver = $state.raw<unknown>(null);
+	const providerError = $derived.by(() => {
+		const failed = form as { action?: string; providerError?: string } | null;
+		if (!failed?.providerError || form === openedOver) return '';
+		return failed.action === (editing ? 'update' : 'create') ? failed.providerError : '';
+	});
 
 	// One drawer for create and edit. A null target is a new provider.
 	let drawerOpen = $state(false);
@@ -73,6 +81,7 @@
 		enabled = true;
 		priority = '0';
 		publicUnsigned = false;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -86,6 +95,7 @@
 		enabled = p.enabled;
 		priority = String(p.priority);
 		publicUnsigned = p.local_public_unsigned;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -118,6 +128,7 @@
 		enabled = false;
 		priority = String(source.priority);
 		publicUnsigned = source.local_public_unsigned;
+		openedOver = form;
 		drawerOpen = true;
 	}
 

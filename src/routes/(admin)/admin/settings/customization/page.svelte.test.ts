@@ -87,6 +87,16 @@ describe('the customization controls', () => {
 		expect(posted('pinned')).toEqual(['users']);
 	});
 
+	it('shows a failed page delete in the Pages card, not beside the dashboard form', () => {
+		render(CustomizationPage, {
+			props: props({ pages: [{ slug: 'welcome', title: 'Welcome', roles: [], blocks: [] }] }, { pageDeleteError: 'The page could not be deleted.' }),
+		});
+		const alert = screen.getByText('The page could not be deleted.');
+		const pagesHeading = screen.getByRole('heading', { name: 'Pages' });
+		expect(pagesHeading.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		expect(screen.getByTestId('dashboard-state').parentElement?.textContent).not.toContain('could not be deleted');
+	});
+
 	it('offers the first page from the empty pages list', () => {
 		render(CustomizationPage, { props: props() });
 		expect(screen.getAllByRole('button', { name: /new page/i })).toHaveLength(2);

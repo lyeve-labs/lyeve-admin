@@ -325,3 +325,11 @@ describe('menu link, dashboard page and page delete', () => {
 	});
 });
 
+describe('a failed page delete', () => {
+	it('reports under its own key, which the Pages card draws', async () => {
+		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found'));
+		expect(await actions.deletePage(event({ slug: 'gone' }))).toMatchObject({ status: 400, data: { pageDeleteError: 'page not found' } });
+		api.deleteCustomPage.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
+		expect(await actions.deletePage(event({ slug: 'x' }))).toMatchObject({ data: { pageDeleteError: 'The page could not be deleted.' } });
+	});
+});

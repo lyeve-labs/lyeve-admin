@@ -302,7 +302,7 @@ export const actions: Actions = {
 			await deleteCustomPage(authedClient(event), slug);
 			return { pageDeleted: true };
 		} catch (err) {
-			return fail(400, { pagesError: actionError(err, 'The page could not be deleted.') });
+			return fail(400, { pageDeleteError: actionError(err, 'The page could not be deleted.') });
 		}
 	},
 };
