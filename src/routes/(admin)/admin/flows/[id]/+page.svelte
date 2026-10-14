@@ -157,8 +157,11 @@
 	// it is not known to be. Publish has nothing to do while the draft on
 	// the canvas is that one and the flow is live.
 	let liveDraft = $state<string | null>(
-		untrack(() => (initial && draftIsLive(initial, data.versions) ? cleanJSON(definition) : null)),
+		untrack(() => (initial && data.versions.ok && draftIsLive(initial, data.versions.value) ? cleanJSON(definition) : null)),
 	);
+	// Without the versions nobody knows whether the saved draft is the live
+	// one, and the toolbar says so rather than calling it unpublished.
+	const versionsUnread = $derived(!data.versions.ok);
 
 	// Validation, 500 ms after the last change. A browser client so the CSRF
 	// cookie is echoed on the write. The saved draft was validated when it was
@@ -182,7 +185,7 @@
 		status = flow.status;
 		version = flow.version;
 		savedAt = flow.updated_at;
-		liveDraft = draftIsLive(flow, data.versions) ? saved : null;
+		liveDraft = data.versions.ok && draftIsLive(flow, data.versions.value) ? saved : null;
 		selected = null;
 		validation = null;
 		runBlocked = false;
@@ -708,6 +711,7 @@
 		writeButtons({
 			dirty,
 			live: status === 'active' && liveDraft === canonical,
+			liveUnknown: status === 'active' && versionsUnread && liveDraft !== canonical,
 			publishable: canPublish,
 			refusal: blocked ? blockedHint : definition.nodes.length === 0 ? 'Add a node before publishing' : 'Fix the issues before publishing',
 		}),
@@ -1076,10 +1080,15 @@
 					/>
 					{#if !selected}
 						<div class="flex flex-col gap-3 border-t border-line p-4">
-							{#if data.versions.length > 0}
+							{#if !data.versions.ok}
+								<SectionHeading level={2} variant="eyebrow">Versions</SectionHeading>
+								<p class="text-xs text-muted" data-testid="versions-unread">
+									The versions could not be read, so none can be rolled back to from here. Reload to try again.
+								</p>
+							{:else if data.versions.value.length > 0}
 								<SectionHeading level={2} variant="eyebrow">Versions</SectionHeading>
 								<ul class="flex flex-col gap-1 text-sm">
-									{#each data.versions as v (v.version)}
+									{#each data.versions.value as v (v.version)}
 										<li class="flex items-center justify-between gap-2">
 											<span class="text-fg">v{v.version}</span>
 											<span class="text-xs text-faint" title={formatDateTime(v.created_at)}>{relativeTime(v.created_at)}</span>

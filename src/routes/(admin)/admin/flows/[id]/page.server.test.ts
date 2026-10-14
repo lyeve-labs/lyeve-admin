@@ -104,7 +104,7 @@ describe('admin/flows/[id] load', () => {
 		expect(result.eventTypes).toEqual(fixtureEventTypes);
 		expect(result.runs.ok && result.runs.value.rows.map((r: FlowRun) => r.id)).toEqual(['r1']);
 		expect(result.catalogGate).toEqual({ state: 'ok' });
-		expect(result.versions.map((v: FlowVersion) => v.version)).toEqual([1]);
+		expect(result.versions.ok && result.versions.value.map((v: FlowVersion) => v.version)).toEqual([1]);
 		// One row past the page says whether another follows.
 		expect(calls.find((c) => c.url.includes('/runs'))?.url).toContain('limit=21');
 	});

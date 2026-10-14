@@ -97,7 +97,7 @@ function setup(form: unknown = null, overrides: Record<string, unknown> = {}, co
 				variables: ['region'],
 				schemas: [],
 				runs: { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 0, total: 1, hasMore: false } },
-				versions: [],
+				versions: { ok: true, value: [] },
 				templates: fixtureTemplates,
 				entitlements: licensed,
 				assistant: 'ready',
@@ -693,7 +693,7 @@ describe('flow editor page', () => {
 		const live = { ...fixtureFlow, status: 'active', version: 2 };
 		const { container, getByRole } = setup(null, {
 			flow: live,
-			versions: [{ flow_id: live.id, version: 2, checksum: 'x', created_by: 'a', created_at: live.updated_at }],
+			versions: { ok: true, value: [{ flow_id: live.id, version: 2, checksum: 'x', created_by: 'a', created_at: live.updated_at }] },
 		});
 		const publish = () => getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
 		expect(publish().disabled).toBe(true);
@@ -958,14 +958,14 @@ describe('flow editor role grants', () => {
 		[...getByRole('toolbar', { name: 'Flow editor' }).querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim());
 
 	it('draws save for a flow the caller may update and hides test, publish, rollback and delete', () => {
-		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'update'] }, versions: [version] });
+		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'update'] }, versions: { ok: true, value: [version] } });
 		expect(toolbarNames(getByRole)).toEqual(['More actions', 'Node palette', 'Inspector', 'Focus mode', 'Save']);
 		expect(queryByRole('button', { name: 'Delete flow' })).toBeNull();
 		expect(queryByRole('button', { name: 'Roll back' })).toBeNull();
 	});
 
 	it('draws publish, test and rollback for a flow the caller may activate', () => {
-		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'activate'] }, versions: [version] });
+		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'activate'] }, versions: { ok: true, value: [version] } });
 		expect(toolbarNames(getByRole)).toEqual(['More actions', 'Node palette', 'Inspector', 'Focus mode', 'Test', 'Publish']);
 		expect(getByRole('button', { name: 'Roll back' })).toBeTruthy();
 		expect(queryByRole('button', { name: 'Save' })).toBeNull();

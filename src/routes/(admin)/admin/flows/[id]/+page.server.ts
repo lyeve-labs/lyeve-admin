@@ -31,8 +31,10 @@ import {
 	rollbackFlow,
 	saveDraft,
 	validationErrors,
+	type ValidationError,
 	type Flow,
 	type FlowRun,
+	type FlowVersion,
 	deleteTemplate,
 	saveTemplate,
 } from '$lib/api/flows';
@@ -57,7 +59,7 @@ const LOCKED = {
 	flows: [],
 	eventTypes: null,
 	runs: { ok: true, value: { rows: [], limit: RUNS_PER_PAGE, offset: 0, total: 0, hasMore: false } } as Section<PagedList<FlowRun>>,
-	versions: [],
+	versions: { ok: true, value: [] } as Section<FlowVersion[]>,
 	templates: [],
 	assistant: 'hidden' as const,
 };
@@ -138,7 +140,7 @@ export const load: PageServerLoad = async (event) => {
 				),
 				'The runs could not be read. This is not a report that the flow never ran.',
 			),
-			listVersions(client, flow.id).catch(() => []),
+			section(listVersions(client, flow.id), 'The versions could not be read.'),
 			getTemplates(client).catch(() => []),
 			// The assistant's catalog decides whether the tab exists at all: a
 			// 402 there means the assistant is not enabled, and a tab that could
