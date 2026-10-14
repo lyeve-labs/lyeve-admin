@@ -75,9 +75,9 @@
 				<li>
 					<Collapsible label={t.name} badge={t.columns.length}>
 						<div class="flex flex-col pb-1 pl-6">
-							<Button variant="ghost" size="sm" onclick={() => insertTable(t)} aria-label="Insert {t.name}">
-								<Plus size={ICON.xs} />
-								Insert table name
+							<Button variant="ghost" size="sm" onclick={() => insertTable(t)}>
+								<Plus size={ICON.sm} />
+								Insert {t.name}
 							</Button>
 							{#each t.columns as c (c.name)}
 								<Button

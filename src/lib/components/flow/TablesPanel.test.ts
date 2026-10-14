@@ -24,6 +24,14 @@ describe('TablesPanel', () => {
 		expect(oninsert.mock.calls).toEqual([['customers'], ['email']]);
 	});
 
+	it('names the insert button by the words it shows', async () => {
+		setup({ status: 'ready', tables: [customers, orders] });
+		await fireEvent.click(screen.getByRole('button', { name: /^customers/ }));
+		const insert = screen.getByRole('button', { name: 'Insert customers' });
+		expect(insert.getAttribute('aria-label')).toBeNull();
+		expect(insert.textContent?.trim()).toBe('Insert customers');
+	});
+
 	it('filters by a table or a column name', async () => {
 		setup({ status: 'ready', tables: [customers, orders] });
 		await fireEvent.input(screen.getByPlaceholderText('Filter tables'), { target: { value: 'total' } });

@@ -163,7 +163,7 @@
 			<Card>
 				<div class="flex flex-col gap-3">
 					<div class="flex flex-wrap items-baseline justify-between gap-2">
-						<SectionHeading level={3}>Responses</SectionHeading>
+						<SectionHeading level={2}>Responses</SectionHeading>
 						<span class="text-xs text-muted">
 							{formatCount(summary.unique_endpoints)} endpoints served, max P99 {fmtMs(summary.max_latency_p99_ms)}
 						</span>
@@ -208,7 +208,7 @@
 		{#if worstEndpoints.length > 0}
 			<Card>
 				<div class="flex flex-col gap-3">
-					<SectionHeading level={3}>Where the errors are</SectionHeading>
+					<SectionHeading level={2}>Where the errors are</SectionHeading>
 					<ul class="flex flex-col gap-2">
 						{#each worstEndpoints as e (e.key)}
 							<li class="flex flex-wrap items-center justify-between gap-2 text-sm">

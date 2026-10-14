@@ -278,6 +278,11 @@
 			</form>
 		{/if}
 
+		{#if data.gate.state === 'ok'}
+			<!-- The kit draws an empty state's title at level 3, so the list
+			     carries the level 2 heading a screen reader steps through. -->
+			<h2 class="sr-only">All flows</h2>
+		{/if}
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.flows.length === 0 && filtered}

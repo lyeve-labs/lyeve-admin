@@ -25,7 +25,23 @@ function setup(overrides: Record<string, unknown> = {}, form: unknown = null) {
 	});
 }
 
+/** Every heading level in document order, so a test can say none is skipped. */
+function levels(root: HTMLElement): number[] {
+	return [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => Number(h.tagName.slice(1)));
+}
+
+function skips(list: number[]): boolean {
+	return list.some((level, i) => level > (i === 0 ? 1 : list[i - 1]) + 1);
+}
+
 describe('AI provider detail page', () => {
+	it('puts Models and Capabilities at level 2, with no level skipped', () => {
+		const { container, getByRole } = setup();
+		expect(getByRole('heading', { level: 2, name: 'Models' })).toBeTruthy();
+		expect(getByRole('heading', { level: 2, name: 'Capabilities' })).toBeTruthy();
+		expect(skips(levels(container))).toBe(false);
+	});
+
 	it('shows a stored key as a placeholder and keeps it on a blank save', () => {
 		const { container } = setup();
 		const key = container.querySelector('input[name="api_key"]') as HTMLInputElement;

@@ -220,6 +220,13 @@ describe('flows list page', () => {
 		expect(form.querySelector('[role="toolbar"]')?.className).toContain('items-center');
 	});
 
+	it('puts a level 2 heading between the title and the first-run empty state', () => {
+		const { container } = setup({ flows: [] });
+		const levels = [...container.querySelectorAll('h1, h2, h3')].map((h) => Number(h.tagName.slice(1)));
+		expect(levels.some((level, i) => level > (i === 0 ? 1 : levels[i - 1]) + 1)).toBe(false);
+		expect(levels).toContain(3);
+	});
+
 	it('lists the validation errors a create returned inside the create drawer', async () => {
 		const data = { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed };
 		const { container, getAllByText, rerender } = render(FlowsPage, { props: { data, form: null } as never });

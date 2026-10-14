@@ -7,8 +7,8 @@
 	 * only the fields, so the owner decides where the buttons go: a drawer
 	 * footer on create, a card on the detail page.
 	 */
-	import { Checkbox, Input, NumberInput, PasswordInput, SegmentedControl, Select, Toggle } from '@lyeve-labs/ui-kit';
-	import { MODALITIES, PRESETS, PROVIDER_KINDS, isCompatibleKind, providerKindLabel, type AiProvider, type Modality, type ProviderKind } from '$lib/api/ai';
+	import { Checkbox, Input, NumberInput, PasswordInput, RadioGroup, Select, Toggle } from '@lyeve-labs/ui-kit';
+	import { MODALITIES, PRESETS, PROVIDER_KINDS, isCompatibleKind, providerKindDescription, providerKindLabel, type AiProvider, type Modality, type ProviderKind } from '$lib/api/ai';
 
 	let {
 		id,
@@ -43,7 +43,7 @@
 
 	const compatible = $derived(isCompatibleKind(kind));
 	const anthropicShaped = $derived(kind === 'anthropic_compatible');
-	const kindOptions = PROVIDER_KINDS.map((k) => ({ value: k, label: providerKindLabel(k) }));
+	const kindOptions = PROVIDER_KINDS.map((k) => ({ value: k, label: providerKindLabel(k), description: providerKindDescription(k) }));
 	const presetOptions = [{ value: '', label: 'None' }, ...PRESETS.map((p) => ({ value: p.id, label: p.label }))];
 
 	// A preset fills what is blank and never overwrites what the operator typed.
@@ -72,10 +72,10 @@
 
 <div class="grid gap-4 md:grid-cols-2">
 	<Input id="{id}-name" name="name" label="Name" required value={provider?.name ?? ''} placeholder="openai-primary" />
-	<!-- Four kinds fit in sight, so they are segments rather than a list.
-	     The strip takes the row, since its labels are wider than a column. -->
+	<!-- Two of the four labels are long, so a strip of segments overflows a
+	     phone. A list with a sentence on each stays inside it. -->
 	<div class="md:col-span-2">
-		<SegmentedControl name="kind" label="Kind" options={kindOptions} bind:value={kind} />
+		<RadioGroup name="kind" label="Kind" options={kindOptions} bind:value={kind} />
 	</div>
 
 	{#if compatible && !anthropicShaped}

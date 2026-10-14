@@ -39,9 +39,12 @@ describe('AI prices page', () => {
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
 		expect(dialog.querySelector('input[name="model"]')).toBeTruthy();
 		expect(dialog.querySelector('button[type="submit"]')?.textContent?.trim()).toBe('Create');
-		// Four kinds fit in sight, so they are segments that post the chosen one.
-		expect(dialog.querySelectorAll('[role="radiogroup"] [role="radio"]')).toHaveLength(4);
-		expect((dialog.querySelector('input[type="hidden"][name="kind"]') as HTMLInputElement).value).toBe('openai');
+		// The four kinds are a list of radios with a sentence each, so the long
+		// labels stay inside a phone-width drawer.
+		const radios = dialog.querySelectorAll<HTMLInputElement>('input[type="radio"][name="kind"]');
+		expect(radios).toHaveLength(4);
+		expect([...radios].find((r) => r.checked)?.value).toBe('openai');
+		expect(dialog.textContent).toContain('Any server that speaks the OpenAI API');
 	});
 
 	it('asks before it deletes, then posts the row key', async () => {
