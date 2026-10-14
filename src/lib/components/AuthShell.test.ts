@@ -90,6 +90,23 @@ describe('AuthShell', () => {
 		expect(queryByText('LyEve')).toBeNull();
 	});
 
+	// The name beside the logo already says whose it is, so the image is
+	// decoration. Alone, the logo is the only thing naming the lockup.
+	it('leaves the logo unnamed beside the tenant name', () => {
+		state.page.data = { brand: { name: 'Acme Studio', logo_url: '/api/v1/media/1/logo.png', accent: '', favicon_url: '' } };
+		const { getByTestId } = render(AuthShell, { props: props() });
+
+		expect(getByTestId('tenant-brand').querySelector('img')!.getAttribute('alt')).toBe('');
+	});
+
+	it('names the logo when the tenant has no name', () => {
+		state.page.data = { brand: { name: '', logo_url: '/api/v1/media/1/logo.png', accent: '', favicon_url: '' } };
+		const { getByTestId } = render(AuthShell, { props: props() });
+
+		expect(getByTestId('tenant-brand').querySelector('img')!.getAttribute('alt')).toBe('Logo');
+		expect(getByTestId('tenant-brand').textContent!.trim()).toBe('');
+	});
+
 	it('puts the tenant name beside the product mark when there is no logo', () => {
 		state.page.data = { brand: { name: 'Acme Studio', logo_url: '', accent: '', favicon_url: '' } };
 		const { getByTestId } = render(AuthShell, { props: props() });
