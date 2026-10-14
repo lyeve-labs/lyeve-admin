@@ -103,6 +103,30 @@ describe('Data export jobs', () => {
 		expect(running.container.querySelector('[aria-label="Cancel nightly"]')).not.toBeNull();
 	});
 
+	it('says a completed export that wrote the row ceiling reached it', () => {
+		const { container } = render(ExportPage, { props: props({ jobs: [job({ rows_written: 10000, rows_total: 10000 })] }) });
+		expect(said(container)).toContain('Reached the 10,000 entry ceiling. Entries past it are not in the file.');
+		expect(said(container)).not.toContain('Stopped');
+		cleanup();
+		const under = render(ExportPage, { props: props({ jobs: [job({ rows_written: 9999 })] }) });
+		expect(said(under.container)).not.toContain('entry ceiling');
+	});
+
+	it('counts running and failed on this page once the list is paged', () => {
+		const { container } = render(ExportPage, { props: props({ jobs: [job({ status: 'failed' })], total: 80 }) });
+		expect(said(container)).toContain('Failed on this page');
+		expect(said(container)).toContain('Running on this page');
+		cleanup();
+		const one = render(ExportPage, { props: props() });
+		expect(said(one.container)).not.toContain('on this page 0');
+		expect(one.container.textContent).not.toContain('Failed on this page');
+	});
+
+	it('names the search box for a screen reader', () => {
+		const { getByLabelText } = render(ExportPage, { props: props() });
+		expect(getByLabelText('Narrow this page')).toBeTruthy();
+	});
+
 	it('states a size a person can read', () => {
 		const { container } = render(ExportPage, { props: props() });
 		expect(said(container)).toContain('2.0 KB');

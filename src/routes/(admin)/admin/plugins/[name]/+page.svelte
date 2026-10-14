@@ -11,6 +11,7 @@
 		Table
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { Activity, ExternalLink, Route, Settings } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
@@ -94,11 +95,18 @@
 		{#if plugin?.beta}
 			<Badge tone="violet" size="sm">Beta</Badge>
 		{/if}
-		<Button variant="secondary" size="sm" href="/admin/settings/configuration?plugin={encodeURIComponent(pluginName)}">
-			<Settings size={ICON.sm} />
-			Settings
-		</Button>
+		<!-- The settings page is a super admin's alone. -->
+		{#if isSuperAdmin}
+			<Button variant="secondary" size="sm" href="/admin/settings/configuration?plugin={encodeURIComponent(pluginName)}">
+				<Settings size={ICON.sm} />
+				Settings
+			</Button>
+		{/if}
 	{/snippet}
+
+	{#if data.statusGate}
+		<GateNotice gate={data.statusGate} title="This plugin" absent="" />
+	{/if}
 
 	{#if plugin}
 		<DescriptionList
@@ -149,7 +157,7 @@
 							{#each routes as route (route.method + ' ' + route.pattern)}
 								<tr>
 									<td data-cell="nowrap"><Badge tone={methodTone(route.method)} size="sm">{route.method}</Badge></td>
-									<td class="font-mono text-xs">{route.pattern}</td>
+									<td data-cell="nowrap" class="font-mono text-xs">{route.pattern}</td>
 									<td data-cell="nowrap" class="text-sm text-muted">{ROUTE_GROUP_LABEL[group]}</td>
 								</tr>
 							{/each}

@@ -33,10 +33,10 @@ beforeEach(() => {
 
 describe('custom page editor load', () => {
 	it('reads the page and the schemas', async () => {
-		const data = (await load(event())) as { customPage: unknown; schemas: string[]; schemasRead: boolean };
+		const data = (await load(event())) as { customPage: unknown; schemas: string[]; schemasGate: unknown };
 		expect(data.customPage).toEqual(page);
 		expect(data.schemas).toEqual(['posts']);
-		expect(data.schemasRead).toBe(true);
+		expect(data.schemasGate).toEqual({ state: 'ok' });
 	});
 
 	// A page that exists is never reported missing because the engine or its
@@ -52,9 +52,15 @@ describe('custom page editor load', () => {
 
 	it('says the schemas were not read rather than that there are none', async () => {
 		schemas.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
-		const data = (await load(event())) as { schemas: string[]; schemasRead: boolean };
+		const data = (await load(event())) as { schemas: string[]; schemasGate: unknown };
 		expect(data.schemas).toEqual([]);
-		expect(data.schemasRead).toBe(false);
+		expect(data.schemasGate).toEqual({ state: 'unavailable' });
+	});
+
+	it('names a role refusal on the schema list as one', async () => {
+		schemas.mockRejectedValueOnce(new ApiError(403, 'forbidden'));
+		const data = (await load(event())) as { schemasGate: unknown };
+		expect(data.schemasGate).toEqual({ state: 'forbidden' });
 	});
 });
 

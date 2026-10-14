@@ -41,6 +41,7 @@
 	import { formatDateTime } from '$lib/format';
 	import type { ResolvedWidget } from '$lib/api/custom-dashboard';
 	import type { PageData, ActionData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -180,10 +181,12 @@
 		{/if}
 	</p>
 
-	{#if !data.schemasRead}
-		<Alert tone="warn">
-			The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.
-		</Alert>
+	{#if data.schemasGate.state !== 'ok'}
+		<GateNotice
+			gate={data.schemasGate}
+			title="The schema list"
+			absent="This instance serves no schema list, so no schema can be picked below."
+		/>
 	{/if}
 
 	<section class="flex flex-col gap-4">
@@ -233,7 +236,7 @@
 						</div>
 
 						{#if w.type === 'entry_counts'}
-							{#if data.schemasRead && schemaOptions.length === 0}
+							{#if data.schemasGate.state === 'ok' && schemaOptions.length === 0}
 								<p class="text-sm text-muted">This tenant has no schemas to count yet.</p>
 							{:else}
 								<MultiSelect

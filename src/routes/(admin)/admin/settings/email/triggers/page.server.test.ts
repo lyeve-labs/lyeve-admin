@@ -5,6 +5,7 @@ const api = vi.hoisted(() => ({
 	listEmailTriggers: vi.fn(),
 	listEmailTemplates: vi.fn(),
 	getSchemas: vi.fn(),
+	triggerWriteRefusal: vi.fn(),
 }));
 
 const authz = vi.hoisted(() => ({ roles: ['admin'] as string[] }));
@@ -22,6 +23,7 @@ vi.mock('$lib/api/email-triggers', async (orig) => ({
 	...(await orig<typeof import('$lib/api/email-triggers')>()),
 	listEmailTriggers: api.listEmailTriggers,
 	listEmailTemplates: api.listEmailTemplates,
+	triggerWriteRefusal: api.triggerWriteRefusal,
 }));
 vi.mock('@lyeve-labs/client-rest', () => ({ getSchemas: api.getSchemas }));
 
@@ -35,6 +37,7 @@ beforeEach(() => {
 	api.listEmailTriggers.mockResolvedValue({ triggers: [], events: ['after_create'] });
 	api.listEmailTemplates.mockResolvedValue([{ id: 't1', key: 'welcome', subject: 'Hi', status: 'active' }]);
 	api.getSchemas.mockResolvedValue([{ name: 'posts' }, { name: 'orders' }]);
+	api.triggerWriteRefusal.mockResolvedValue(null);
 });
 
 describe('email triggers load', () => {
@@ -50,6 +53,13 @@ describe('email triggers load', () => {
 		const out = (await load({} as never)) as Loaded;
 		expect(out.templates).toEqual({ ok: false, gate: { state: 'unavailable' } });
 		expect(out.triggers.ok).toBe(true);
+	});
+
+	it('carries the license refusal a trigger write would meet', async () => {
+		const refused = { kind: 'feature', feature: 'Email Pro', plugin: 'email', upgradeUrl: '' };
+		api.triggerWriteRefusal.mockResolvedValue(refused);
+		const out = (await load({} as never)) as Loaded;
+		expect(out.writeRefusal).toEqual(refused);
 	});
 
 	it('keeps a refused trigger read as forbidden', async () => {

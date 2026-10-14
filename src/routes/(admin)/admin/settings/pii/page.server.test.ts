@@ -99,6 +99,19 @@ describe('pii rule writes', () => {
 		expect(api.deleteRule).toHaveBeenCalledWith(expect.anything(), 'r1');
 	});
 
+	it('keeps a typed priority of 0, which runs the rule before every preset', async () => {
+		api.updateRule.mockResolvedValue({});
+		await actions.update(formEvent({ id: 'r1', ...RULE, priority: '0' }));
+		expect(api.updateRule).toHaveBeenCalledWith(expect.anything(), 'r1', expect.objectContaining({ priority: 0 }));
+	});
+
+	it('refuses a priority of 0 on create, which the plugin would store as 100', async () => {
+		const out = (await actions.create(formEvent({ ...RULE, priority: '0' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toContain('cannot take priority 0');
+		expect(api.createRule).not.toHaveBeenCalled();
+	});
+
 	it.each(['update', 'delete'] as const)('names nothing to %s without a request', async (name) => {
 		expect(((await actions[name](formEvent(RULE))) as Failure).data).toEqual({ action: name, error: 'Which rule?' });
 		expect(api.updateRule).not.toHaveBeenCalled();

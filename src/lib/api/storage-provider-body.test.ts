@@ -34,6 +34,11 @@ describe('providerBodyFrom', () => {
 		expect('body' in r && 'secret_key' in r.body).toBe(false);
 	});
 
+	it('sends back the cost weight an edit carries, which the plugin would otherwise reset to zero', () => {
+		const r = providerBodyFrom(form({ provider_type: 'local', name: 'disk', endpoint: '/data', cost_weight: '0.4' }), false);
+		expect('body' in r && r.body.cost_weight).toBe(0.4);
+	});
+
 	it('lets only a local provider hand out unsigned URLs', () => {
 		const r = providerBodyFrom(form({ provider_type: 'local', name: 'disk', endpoint: '/data', local_public_unsigned: 'true' }), true);
 		expect('body' in r && r.body.local_public_unsigned).toBe(true);

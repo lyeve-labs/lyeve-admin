@@ -54,11 +54,15 @@
 		failure?.action === 'delete' || failure?.action === 'resetProtection' ? (failure.error ?? '') : '',
 	);
 	const blocking = $derived(data.rules.filter(blocksEverything));
-	const spent = $derived(exhausted(data.status));
+	const live = $derived(data.status.ok ? data.status.value : []);
+	const spent = $derived(exhausted(live));
 	const overview = $derived(data.overview);
 	// Unknown is its own state: a failed read is neither locked nor unlocked.
 	const customEnabled = $derived(overview?.custom_licensed ?? null);
 	const unenforced = $derived(data.rules.filter((r) => !r.enforced));
+	// The rules are paged, so the count comes from the engine's total when it
+	// states one, not from the rows on this page.
+	const stored = $derived(data.total ?? data.rules.length);
 	const canEditProtections = $derived(data.superAdmin && customEnabled === true);
 
 	/**
@@ -161,7 +165,7 @@
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
-			<Stat size="sm" mono label="Custom rules" value={data.rules.length} />
+			<Stat size="sm" mono label="Custom rules" value={stored} />
 			<Stat
 				size="sm"
 				mono
@@ -173,7 +177,7 @@
 				size="sm"
 				mono
 				label="Callers at their limit"
-				value={data.statusRead ? spent.length : '?'}
+				value={data.status.ok ? spent.length : '?'}
 				tone={spent.length > 0 ? 'warn' : 'neutral'}
 			/>
 		</div>
@@ -314,8 +318,8 @@
 					     until then, and the page says so rather than listing them as
 					     live. -->
 					<Alert tone="warn">
-						{data.rules.length}
-						{data.rules.length === 1 ? 'stored rule is' : 'stored rules are'} not enforced on
+						{stored}
+						{stored === 1 ? 'stored rule is' : 'stored rules are'} not enforced on
 						this instance. They apply again when custom rules are enabled, and deleting one is
 						allowed either way.
 					</Alert>
@@ -481,12 +485,9 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Right now</SectionHeading>
-			{#if !data.statusRead}
-				<Alert tone="danger">
-					The live counters could not be read. This is not a report that nobody is being
-					throttled.
-				</Alert>
-			{:else if data.status.length === 0}
+			{#if !data.status.ok}
+				<GateNotice gate={data.status.gate} title="Live counters" absent="The rate-limit plugin is not part of this build." />
+			{:else if live.length === 0}
 				<EmptyState
 					title="Nobody is near a limit"
 					description="No caller has spent enough of a window for the limiter to be tracking it."
@@ -506,7 +507,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.status as s (s.rule_id + s.client_ip + s.endpoint)}
+						{#each live as s (s.rule_id + s.client_ip + s.endpoint)}
 							<tr>
 								<td data-cell="nowrap" class="font-mono text-xs">{s.client_ip}</td>
 								<td data-cell="nowrap" class="font-mono text-xs text-faint">{s.endpoint}</td>

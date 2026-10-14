@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, type ActionFailure } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
-import { actionFailure } from '$lib/server/action-error';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -77,6 +77,18 @@ function mailSettings(provenance: ConfigProvenance): ConfigSetting[] {
 	return MAIL_KEYS.map(
 		(key) => known.get(key) ?? ({ key, source: 'default', editable: true } as ConfigSetting)
 	);
+}
+
+function refusalSentence(refusal: ConfigRefusal): string {
+	const where = refusal.origin ? ` (${refusal.origin})` : '';
+	return `${refusal.reason}${where}`;
+}
+
+function refusedIn(body: unknown): ConfigRefusal | null {
+	const first = (body as { refused?: unknown } | null)?.refused;
+	if (!Array.isArray(first) || first.length === 0) return null;
+	const r = first[0] as Partial<ConfigRefusal>;
+	return typeof r?.reason === 'string' ? { key: String(r.key ?? ''), reason: r.reason, origin: r.origin } : null;
 }
 
 export const load: PageServerLoad = async (event) => {
@@ -162,14 +174,17 @@ export const actions: Actions = {
 			}>('/api/admin/config', { values: { [key]: value } });
 
 			const refusal = result.refused?.[0];
-			if (refusal) {
-				const where = refusal.origin ? ` (${refusal.origin})` : '';
-				return fail(409, { key, error: `${refusal.reason}${where}` });
-			}
+			if (refusal) return fail(409, { key, error: refusalSentence(refusal) });
 			return { success: true, key };
 		} catch (e) {
-			if (e instanceof ApiError) return fail(e.status, { key, error: e.message });
-			return fail(500, { key, error: 'Could not save the setting' });
+			// A save whose only key is refused answers 409 with the refusal in
+			// the body and no error field.
+			const refused = e instanceof ApiError && e.status === 409 ? refusedIn(e.body) : null;
+			if (refused) return fail(409, { key, error: refusalSentence(refused) });
+			// A failure of the engine keeps neither its status nor its text,
+			// because neither is written for the operator.
+			const status = e instanceof ApiError && e.status < 500 ? e.status : 502;
+			return fail(status, { key, error: actionError(e, 'The setting could not be saved. Nothing was changed.') });
 		}
 	},
 };

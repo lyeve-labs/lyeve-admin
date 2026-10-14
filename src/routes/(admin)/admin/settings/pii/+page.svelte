@@ -212,7 +212,8 @@
 			/>
 			<Stat size="sm" mono label="Your own rules" value={`${enabledCount} of ${maxEnabled}`} />
 			<Stat size="sm" mono label="Mask styles" value={tags.length} />
-			<Stat size="sm" mono label="Unmasked reads" value={data.total} />
+			<!-- An unread log has no count, so the tile says so rather than 0. -->
+			<Stat size="sm" mono label="Unmasked reads" value={data.logFailed ? NO_VALUE : data.total} />
 		</div>
 
 		<section class="flex flex-col gap-4">
@@ -381,6 +382,7 @@
 
 				<ListToolbar label="Filter unmasked reads">
 					{#snippet search()}
+						<label for="pii-narrow" class="sr-only">Narrow this page</label>
 						<SearchInput
 							id="pii-narrow"
 							bind:value={narrow}
@@ -498,7 +500,9 @@
 			name="priority"
 			label="Priority"
 			type="number"
-			hint="Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them."
+			hint={editing.id
+				? 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them, and 0 before them.'
+				: 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them. A new rule starts at 1 or more: set 0 by editing it.'}
 			bind:value={priorityText}
 		/>
 		<!-- The kit's Toggle is a button and serializes nothing, so the value

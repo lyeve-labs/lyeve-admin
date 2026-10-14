@@ -41,6 +41,15 @@ describe('the one sentence the page leads with', () => {
 
 	// A fresh install has published nothing, which is correct and must not
 	// read as a fault.
+	it('reads refused attempts through the outbox, where only dead events are lost', () => {
+		const outbox = { enabled: true, available: true, pending: 0, dead: 0 };
+		expect(brokerHealth(status({ failed: 3, published: 10, outbox }))).toBe('publishing');
+		expect(brokerHealth(status({ failed: 3, outbox: { ...outbox, pending: 2 } }))).toBe('retrying');
+		expect(brokerHealth(status({ failed: 0, outbox: { ...outbox, dead: 1 } }))).toBe('lost');
+		expect(brokerHealth(status({ failed: 3, outbox: { ...outbox, available: false } }))).toBe('retrying');
+		expect(brokerHealth(status({ failed: 3, outbox: { ...outbox, enabled: false } }))).toBe('refusing');
+	});
+
 	it('says nothing published rather than healthy on a fresh install', () => {
 		expect(brokerHealth(status({ published: 0 }))).toBe('idle');
 		expect(brokerHealth(null)).toBe('idle');

@@ -242,4 +242,22 @@ describe('admin/settings/email fallback transport', () => {
 		expect(result.status).toBe(409);
 		expect(result.data.error).toContain('environment variable');
 	});
+
+	it('reads the refusal from a 409 whose only key was refused', async () => {
+		const { event } = superAdminAction(form({ key: 'SMTP_HOST', value: 'relay', secret: 'false' }), {
+			'/admin/config': () => json({ refused: [{ key: 'SMTP_HOST', reason: 'set by the environment', origin: 'SMTP_HOST' }] }, 409),
+		});
+		const result = (await actions.saveSetting(event)) as { status: number; data: { error: string } };
+		expect(result.status).toBe(409);
+		expect(result.data.error).toBe('set by the environment (SMTP_HOST)');
+	});
+
+	it('keeps an engine failure out of the message', async () => {
+		const { event } = superAdminAction(form({ key: 'SMTP_HOST', value: 'relay', secret: 'false' }), {
+			'/admin/config': () => json({ error: 'pq: relation "sys_config" does not exist' }, 503),
+		});
+		const result = (await actions.saveSetting(event)) as { status: number; data: { error: string } };
+		expect(result.status).toBe(502);
+		expect(result.data.error).toBe('The setting could not be saved. Nothing was changed.');
+	});
 });

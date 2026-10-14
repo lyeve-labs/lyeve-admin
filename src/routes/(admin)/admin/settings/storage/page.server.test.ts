@@ -122,10 +122,11 @@ describe('creating a provider', () => {
 	it('relays a refusal in the drawer and hides an outage', async () => {
 		const refused = engine(S3, { reply: json({ error: 'region must be 1 to 32 lower-case letters, digits and hyphens for s3 providers' }, 422) });
 		expect(((await actions.create(refused.event)) as Failure).data).toEqual({
+			action: 'create',
 			providerError: 'region must be 1 to 32 lower-case letters, digits and hyphens for s3 providers',
 		});
 		const down = engine(S3, { reply: OUTAGE });
-		expect(((await actions.create(down.event)) as Failure).data).toEqual({ providerError: 'The provider could not be created.' });
+		expect(((await actions.create(down.event)) as Failure).data).toEqual({ action: 'create', providerError: 'The provider could not be created.' });
 	});
 });
 
@@ -142,15 +143,15 @@ describe('saving a provider', () => {
 
 	it('names nothing to save without a request', async () => {
 		const { event, calls } = engine(S3);
-		expect(((await actions.update(event)) as Failure).data).toEqual({ providerError: 'No provider was named.' });
+		expect(((await actions.update(event)) as Failure).data).toEqual({ action: 'update', providerError: 'No provider was named.' });
 		expect(calls).toEqual([]);
 	});
 
 	it('relays a refusal in the drawer and hides an outage', async () => {
 		const refused = engine({ id: 'p1', ...S3 }, { reply: json({ error: 'invalid provider ID' }, 400) });
-		expect(((await actions.update(refused.event)) as Failure).data).toEqual({ providerError: 'invalid provider ID' });
+		expect(((await actions.update(refused.event)) as Failure).data).toEqual({ action: 'update', providerError: 'invalid provider ID' });
 		const down = engine({ id: 'p1', ...S3 }, { reply: OUTAGE });
-		expect(((await actions.update(down.event)) as Failure).data).toEqual({ providerError: 'The provider could not be saved.' });
+		expect(((await actions.update(down.event)) as Failure).data).toEqual({ action: 'update', providerError: 'The provider could not be saved.' });
 	});
 });
 

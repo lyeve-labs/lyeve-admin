@@ -1,10 +1,13 @@
 import type { PageServerLoad, Actions } from './$types';
+import { ApiError } from '@lyeve-labs/client';
 import { authedHeaders, requireRole, authedClient } from '$lib/server/authz';
+import { actionFailure } from '$lib/server/action-error';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { unwrapList } from '@lyeve-labs/client-rest';
 import { pageNumber, pageOffset, pastEndOffset, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
-import { UUID, endpointQuery, readFilter } from '$lib/server/audit-filter';
+import { AUDIT_EXPORT_CEILING, UUID, endpointQuery, readFilter } from '$lib/server/audit-filter';
+import { formatCount } from '$lib/format';
 
 export interface AuditEntry {
 	id: string;
@@ -58,9 +61,14 @@ export const load: PageServerLoad = async (event) => {
 		'The audit log could not be read. This is not a report that it is empty.'
 	);
 	const isSuperAdmin = user.roles.includes('super_admin');
+	// The plugin stops an export that names no limit at its ceiling, and it
+	// cannot narrow a file by user or record id.
+	const exportNote =
+		`An export holds the entries the dates, action and resource type match, at most ${formatCount(AUDIT_EXPORT_CEILING)}.` +
+		(UUID.test(filter.q) ? ' The id in the search is not applied to the file.' : '');
 
 	if (!log.ok) {
-		return { entries: log, total: null, offset, limit, isSuperAdmin, filter, actions: [] as string[] };
+		return { entries: log, total: null, offset, limit, isSuperAdmin, filter, actions: [] as string[], exportNote };
 	}
 
 	const rows = log.value.entries;
@@ -73,17 +81,25 @@ export const load: PageServerLoad = async (event) => {
 	const total = Math.max(log.value.stated ?? 0, offset + rows.length);
 	// The action filter offers what is on the page plus the one in force. The
 	// engine keeps no list of the names it has written, so the page is the
-	// only source there is.
-	const actions = [...new Set([...rows.map((e) => e.action), filter.action].filter(Boolean))].sort();
+	// only source there is. With an action in force every row carries that
+	// one, so the names come from the same window read without it. Losing
+	// that read loses only the extra names.
+	let seen = rows;
+	if (filter.action) {
+		const params = endpointQuery({ ...filter, action: '', q: filter.q.includes('.') ? '' : filter.q }, limit, 0);
+		seen = await read(params)
+			.then((res) => unwrapList<AuditEntry>(res))
+			.catch(() => rows);
+	}
+	const actions = [...new Set([...seen.map((e) => e.action), filter.action].filter(Boolean))].sort();
 	const entries: Section<AuditEntry[]> = { ok: true, value: rows };
-	return { entries, total, offset, limit, isSuperAdmin, filter, actions };
+	return { entries, total, offset, limit, isSuperAdmin, filter, actions, exportNote };
 };
 
 export const actions: Actions = {
 	prune: async (event) => {
 		await requireRole(event, ['super_admin']);
-		const { request, fetch } = event;
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const olderThanRaw = form.get('older_than') as string;
 
 		if (!olderThanRaw) {
@@ -92,7 +108,7 @@ export const actions: Actions = {
 
 		const olderThan = `${olderThanRaw}T00:00:00Z`;
 
-		const res = await fetch('/api/admin/audit-log/prune', {
+		const res = await event.fetch('/api/admin/audit-log/prune', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -102,10 +118,14 @@ export const actions: Actions = {
 		});
 
 		if (!res.ok) {
-			return fail(res.status, { error: 'Prune failed' });
+			// The plugin says why it refused, such as a cut-off later than now,
+			// and the reason reaches the page. A 5xx body stays on the server.
+			const body = (await res.json().catch(() => undefined)) as { error?: unknown } | undefined;
+			const message = typeof body?.error === 'string' ? body.error : '';
+			return actionFailure(new ApiError(res.status, message, body), 'The audit log could not be pruned.', res.status);
 		}
 
-		const result = await res.json() as { deleted: number };
+		const result = (await res.json()) as { deleted: number };
 		redirect(303, `/admin/audit-log?pruned=${result.deleted}`);
 	},
 };

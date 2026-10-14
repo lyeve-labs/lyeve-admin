@@ -42,7 +42,11 @@
 	let setAside = $state<unknown>(null);
 	const failure = $derived(form && form !== setAside ? (form as { action?: string; error?: string }) : null);
 	const saveError = $derived(failure?.action === 'create' || failure?.action === 'update' ? (failure.error ?? '') : '');
-	const rowError = $derived(failure?.action === 'delete' ? (failure.error ?? '') : '');
+	// A region created but not closed is no longer a failure of the form, so
+	// it shows above the list with the region it names.
+	const rowError = $derived(
+		failure?.action === 'delete' || failure?.action === 'close' ? (failure.error ?? '') : '',
+	);
 	const summary = $derived(data.report?.summary ?? null);
 	const stranded = $derived(unassigned(data.report));
 	const partial = $derived(reportIsPartial(data.report));
@@ -89,7 +93,8 @@
 		const subject = displayName;
 		const verb = editing ? 'Saved' : 'Created';
 		return async ({ result, update }) => {
-			if (result.type !== 'failure') open = false;
+			const closeFailed = result.type === 'failure' && result.data?.action === 'close';
+			if (result.type !== 'failure' || closeFailed) open = false;
 			await update();
 			if (result.type === 'success') toast.success(`${verb} ${subject}`);
 		};
@@ -143,13 +148,14 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Where tenants are</SectionHeading>
 
-			{#if !data.reportRead}
+			{#if data.reportGate.state !== 'ok'}
 				<!-- An unread report is never drawn as a clean one. Zero unassigned
 				     tenants because nobody could ask is the worst answer here. -->
-				<Alert tone="danger">
-					The residency report could not be read. This is not a report that every tenant is
-					placed.
-				</Alert>
+				<GateNotice
+					gate={data.reportGate}
+					title="The residency report"
+					absent="This instance serves no residency report, so it cannot say where tenants are."
+				/>
 			{:else if summary}
 				<div class="grid gap-4 sm:grid-cols-4">
 					<Stat size="sm" mono label="Regions" value={summary.total_regions} />
@@ -268,6 +274,11 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.more}
+					<p class="text-xs text-muted">
+						Showing the first 100 regions. Regions past the hundredth are not listed here.
+					</p>
+				{/if}
 				<Table label="Regions">
 					<thead>
 						<tr>
@@ -377,7 +388,9 @@
 					id="region-lat"
 					name="lat"
 					label="Latitude"
-					hint="Optional. Used to route a client to its nearest region."
+					hint={editing?.coordinates
+						? 'Used to route a client to its nearest region. A save cannot remove stored coordinates: emptied fields keep them. Type new ones to move the region.'
+						: 'Optional. Used to route a client to its nearest region.'}
 					bind:value={lat}
 				/>
 				<Input id="region-long" name="long" label="Longitude" bind:value={long} />

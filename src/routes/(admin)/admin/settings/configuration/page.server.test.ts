@@ -6,9 +6,11 @@ vi.mock('@lyeve-labs/client', () => {
 		createClient: vi.fn(),
 		ApiError: class ApiError extends Error {
 			status: number;
-			constructor(status: number, message: string) {
+			body: unknown;
+			constructor(status: number, message: string, body?: unknown) {
 				super(message);
 				this.status = status;
+				this.body = body;
 			}
 		},
 	};
@@ -93,12 +95,53 @@ describe('configuration load', () => {
 			provenance: { value: { settings: { key: string; source: string }[] } };
 			plugin: { name: string; keys: string[]; found: boolean };
 		};
-		expect(result.plugin).toEqual({ name: 'email', keys: ['SMTP_HOST', 'SMTP_PORT'], found: true });
+		expect(result.plugin).toEqual({ name: 'email', keys: ['SMTP_HOST', 'SMTP_PORT'], found: true, failed: false });
 		expect(result.provenance.value.settings.map((s) => [s.key, s.source])).toEqual([['SMTP_HOST', 'env'], ['SMTP_PORT', 'default']]);
 	});
 });
 
+describe('configuration load for a plugin', () => {
+	async function loadWith(schemaError: Error) {
+		const get = vi.fn(async (path: string) => {
+			if (path === '/api/admin/config') return { settings: [], counts: {} };
+			throw schemaError;
+		});
+		mockedCreateClient.mockReturnValue({ get } as never);
+		return (await load({ fetch: vi.fn(), cookies: authed(), url: new URL('http://admin.test/x?plugin=email') } as never)) as {
+			plugin: { found: boolean; failed: boolean };
+		};
+	}
+
+	it('reads only a 404 as a plugin with no settings', async () => {
+		expect((await loadWith(new ApiError(404, 'not found'))).plugin).toMatchObject({ found: false, failed: false });
+	});
+
+	it('reports a failed schema read as a failure, not as no settings', async () => {
+		expect((await loadWith(new ApiError(503, 'down'))).plugin).toMatchObject({ found: false, failed: true });
+		expect((await loadWith(new ApiError(429, 'busy'))).plugin).toMatchObject({ failed: true });
+	});
+});
+
 describe('configuration save', () => {
+	it('reads the refusal from a 409 whose only key was refused', async () => {
+		mockedCreateClient.mockReturnValue({
+			put: vi.fn(async () => {
+				throw new ApiError(409, '{"refused":[...]}', {
+					refused: [{ key: 'APP_ENV', reason: 'set by the environment', origin: 'APP_ENV' }],
+				});
+			}),
+		} as never);
+
+		const result = (await actions.save({
+			request: request({ key: 'APP_ENV', value: 'development', secret: 'false' }),
+			fetch: vi.fn(),
+			cookies: authed(),
+		} as never)) as { status: number; data: { error: string } };
+
+		expect(result.status).toBe(409);
+		expect(result.data.error).toBe('set by the environment (APP_ENV)');
+	});
+
 	it('sends one setting', async () => {
 		const put = vi.fn(async () => ({ saved: [{ key: 'STORAGE_DRIVER' }] }));
 		mockedCreateClient.mockReturnValue({ put } as never);

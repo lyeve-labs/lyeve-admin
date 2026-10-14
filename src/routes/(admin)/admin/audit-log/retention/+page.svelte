@@ -52,7 +52,10 @@
 	const rowError = $derived(
 		failure?.action && !DRAWER_ACTIONS.includes(failure.action) ? (failure.error ?? '') : '',
 	);
-	const outcome = $derived((form as { enforced?: boolean; deleted?: number; policies?: number } | null) ?? null);
+	const outcome = $derived(
+		(form as { enforced?: boolean; deleted?: number; policies?: number; archiveFailed?: string[] } | null) ?? null,
+	);
+	const archiveFailed = $derived(outcome?.archiveFailed ?? []);
 	const holds = $derived(data.holds.ok ? data.holds.value : []);
 	const live = $derived(activeHolds(holds));
 	const blocked = $derived(deletionIsBlocked(data.policies, holds));
@@ -209,6 +212,15 @@
 				Retention enforced across {outcome.policies} {outcome.policies === 1 ? 'policy' : 'policies'}.
 				{outcome.deleted} {outcome.deleted === 1 ? 'entry was' : 'entries were'} deleted.
 			</Alert>
+			{#if archiveFailed.length > 0}
+				<!-- A standing condition, not an outcome: the entries are still
+				     there until an archive succeeds, so the warning stays. -->
+				<Alert tone="warn">
+					Archiving failed for {archiveFailed.join(', ')}, so nothing {archiveFailed.length === 1
+						? 'that policy covers'
+						: 'those policies cover'} was deleted. Check the archive storage, then enforce again.
+				</Alert>
+			{/if}
 		{/if}
 
 		{#if blocked}

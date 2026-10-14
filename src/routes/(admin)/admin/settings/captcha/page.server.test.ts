@@ -70,7 +70,14 @@ describe('captcha settings save', () => {
 			site_key: 'site',
 			secret_key: '',
 			score_floor: null,
+			failure_threshold: null,
 		});
+	});
+
+	it('sends back the failure threshold the page read, which the form does not show', async () => {
+		api.saveCaptchaSettings.mockResolvedValue({});
+		await actions.save(formEvent({ provider: 'turnstile', site_key: 'site', secret_key: '', failure_threshold: '7' }));
+		expect(api.saveCaptchaSettings).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ failure_threshold: 7 }));
 	});
 
 	it('sends the score floor for reCAPTCHA and drops it for any other provider', async () => {

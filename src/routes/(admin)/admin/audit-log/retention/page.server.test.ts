@@ -203,13 +203,27 @@ describe('enforcing retention now', () => {
 			elapsed: '7ms',
 		};
 		const { event, calls } = engine({}, { reply: json(run) });
-		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 12, policies: 2 });
+		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 12, policies: 2, archiveFailed: [] });
 		expect(calls).toEqual([{ method: 'POST', path: '/api/admin/retention/enforce', body: {} }]);
 	});
 
 	it('reads a run with no policy to process as none deleted', async () => {
 		const { event } = engine({}, { reply: json({ policies_processed: 0, results: null, elapsed: '1ms' }) });
-		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 0, policies: 0 });
+		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 0, policies: 0, archiveFailed: [] });
+	});
+
+	// The plugin answers 200 for a policy whose archive failed and deletes
+	// nothing it covers, so the run names it rather than reporting a clean pass.
+	it('names each policy whose archive failed', async () => {
+		const run = {
+			policies_processed: 2,
+			results: [
+				{ policy_id: 'p1', event_type: 'content.delete', resource_type: '', entries_deleted: 0, archive_failed: true, archive_error: 'no storage backend', elapsed: '1ms' },
+				{ policy_id: 'p2', event_type: '', resource_type: 'entry', entries_deleted: 4, elapsed: '1ms' },
+			],
+		};
+		const { event } = engine({}, { reply: json(run) });
+		expect(await actions.enforce(event)).toMatchObject({ deleted: 4, archiveFailed: ['content.delete'] });
 	});
 
 	it('says a failed run failed, without the engine text', async () => {

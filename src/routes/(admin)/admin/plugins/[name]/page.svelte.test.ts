@@ -37,12 +37,16 @@ interface Options {
 	roles?: string[];
 	traffic?: PluginBreakdown | null;
 	trafficRead?: boolean;
+	statusGate?: Record<string, unknown> | null;
 }
 
-function renderPage(plugin: PluginDetail | null, { roles = ['super_admin'], traffic = null, trafficRead = true }: Options = {}) {
+function renderPage(
+	plugin: PluginDetail | null,
+	{ roles = ['super_admin'], traffic = null, trafficRead = true, statusGate = null }: Options = {},
+) {
 	return render(PluginDetailPage, {
 		props: {
-			data: { pluginName: plugin?.name ?? 'search', plugin, traffic, trafficRead, userRoles: roles },
+			data: { pluginName: plugin?.name ?? 'search', plugin, traffic, trafficRead, userRoles: roles, statusGate },
 		} as never,
 	});
 }
@@ -89,6 +93,13 @@ describe('plugin detail page', () => {
 			['GET', '/api/v1/search', 'Anyone'],
 			['POST', '/api/admin/search/reindex', 'Admins'],
 		]);
+	});
+
+	it('keeps a route path on one line, so a narrow screen scrolls the table instead of breaking the path', () => {
+		const { container } = renderPage(SEARCH);
+		for (const tr of container.querySelectorAll('tbody tr')) {
+			expect(tr.querySelectorAll('td')[1].getAttribute('data-cell')).toBe('nowrap');
+		}
 	});
 
 	it('paints each method in the tone every other route list gives it', () => {
@@ -149,6 +160,27 @@ describe('plugin detail page', () => {
 	it('reads only, with no form on the page', () => {
 		const { container } = renderPage(SEARCH, { traffic: TRAFFIC });
 		expect(container.querySelector('form')).toBeNull();
+	});
+
+	it('offers the settings page to a super admin only, who alone may open it', () => {
+		renderPage(SEARCH);
+		expect(screen.getByRole('link', { name: /settings/i })).toBeTruthy();
+		cleanup();
+		renderPage(SEARCH, { roles: ['admin'] });
+		expect(screen.queryByRole('link', { name: /settings/i })).toBeNull();
+	});
+
+	it('says the status could not be read instead of drawing an empty page', () => {
+		const { container } = renderPage(null, {
+			roles: ['admin'],
+			statusGate: { state: 'error', message: 'The plugin status could not be read. This is not a report that the plugin is stopped.' },
+		});
+		expect(container.textContent).toContain('The plugin status could not be read.');
+	});
+
+	it('tells a reader the engine refuses the status to that it is not theirs', () => {
+		const { container } = renderPage(null, { roles: ['editor'], statusGate: { state: 'forbidden' } });
+		expect(container.textContent).toContain('Your role cannot open');
 	});
 
 	it('names the plugin by its name when nothing describes it', () => {

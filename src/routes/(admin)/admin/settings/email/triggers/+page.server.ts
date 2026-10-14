@@ -11,6 +11,7 @@ import {
 	deleteEmailTrigger,
 	listEmailTemplates,
 	listEmailTriggers,
+	triggerWriteRefusal,
 	updateEmailTrigger,
 } from '$lib/api/email-triggers';
 import { readTriggerForm } from '$lib/server/email-trigger-form';
@@ -20,15 +21,16 @@ export const load: PageServerLoad = async (event) => {
 	// Each read keeps its own failure. A template list that did not answer is
 	// not a tenant without templates, and a schema list that did not answer is
 	// not an instance without schemas.
-	const [triggers, templates, schemas] = await Promise.all([
+	const [triggers, templates, schemas, writeRefusal] = await Promise.all([
 		section(listEmailTriggers(client), 'The triggers could not be read. This is not a report that there are none.'),
 		section(listEmailTemplates(client), 'The templates could not be read, so a trigger cannot be given one right now.'),
 		section(
 			getSchemas(client).then((rows: { name: string }[]) => rows.map((s) => s.name).sort()),
 			'The schemas could not be read, so a trigger can only watch every schema right now.',
 		),
+		triggerWriteRefusal(client),
 	]);
-	return { triggers, templates, schemas };
+	return { triggers, templates, schemas, writeRefusal };
 };
 
 /**

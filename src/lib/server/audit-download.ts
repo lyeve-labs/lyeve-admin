@@ -1,6 +1,7 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 import { sessionToken } from '$lib/server/session-cookie';
 import { engineFetch } from '$lib/server/engine';
+import { exportBody, readFilter } from '$lib/server/audit-filter';
 
 /**
  * Proxy one of the engine's audit exports and hand the bytes back as the
@@ -28,13 +29,28 @@ export async function proxyAuditDownload(
 	const token = sessionToken(event);
 	if (!token) error(401, 'Not authenticated');
 
+	// The export form carries the filter on screen, so the file holds the
+	// entries the list shows rather than the whole log.
+	const fields = new URLSearchParams();
+	let posted: FormData | null = null;
+	try {
+		posted = await event.request.formData();
+	} catch {
+		posted = null;
+	}
+	for (const key of ['q', 'action', 'from', 'to']) {
+		const value = posted?.get(key);
+		if (typeof value === 'string' && value) fields.set(key, value);
+	}
+	const body = exportBody(readFilter(new URL(`http://filter/?${fields}`)));
+
 	let res: Response;
 	try {
 		res = await engineFetch(event, path, {
 			method: 'POST',
 			token,
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ format: 'json' }),
+			body: JSON.stringify(body),
 			signal: AbortSignal.timeout(TIMEOUT_MS)
 		});
 	} catch {

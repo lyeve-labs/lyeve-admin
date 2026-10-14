@@ -60,9 +60,15 @@ describe('dashboard editor', () => {
 
 	it('says the schemas were not read rather than that there are none', async () => {
 		vi.mocked(listSchemaNames).mockRejectedValueOnce(new ApiError(503, 'unavailable'));
-		const data = (await load(event())) as { schemas: string[]; schemasRead: boolean };
+		const data = (await load(event())) as { schemas: string[]; schemasGate: unknown };
 		expect(data.schemas).toEqual([]);
-		expect(data.schemasRead).toBe(false);
+		expect(data.schemasGate).toEqual({ state: 'unavailable' });
+	});
+
+	it('names a role refusal on the schema list as one', async () => {
+		vi.mocked(listSchemaNames).mockRejectedValueOnce(new ApiError(403, 'forbidden'));
+		const data = (await load(event())) as { schemasGate: unknown };
+		expect(data.schemasGate).toEqual({ state: 'forbidden' });
 	});
 
 	it('sends a reader without the capability back to customization', async () => {

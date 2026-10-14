@@ -6,6 +6,7 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
 	RETENTION_OK,
+	archiveFailures,
 	createHold,
 	createPolicy,
 	deletePolicy,
@@ -142,7 +143,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		try {
 			const run = await enforceNow(client);
-			return { enforced: true, deleted: entriesDeleted(run), policies: run.policies_processed ?? 0 };
+			return {
+				enforced: true,
+				deleted: entriesDeleted(run),
+				policies: run.policies_processed ?? 0,
+				archiveFailed: archiveFailures(run),
+			};
 		} catch (err) {
 			return fail(400, { action: 'enforce' as const, error: actionError(err, 'Retention could not be enforced.') });
 		}

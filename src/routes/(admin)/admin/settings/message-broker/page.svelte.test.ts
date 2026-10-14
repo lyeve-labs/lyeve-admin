@@ -172,3 +172,24 @@ describe('where the broker is set', () => {
 		);
 	});
 });
+
+describe('the outbox', () => {
+	it('leads with the lost and waiting events and words failures as attempts', () => {
+		const { container } = render(BrokerPage, {
+			props: props({ status: status({ failed: 40, outbox: { enabled: true, available: true, pending: 3, dead: 2 } }) }),
+		});
+		const text = said(container);
+		expect(text).toContain('2 events ran out of attempts and never reached the broker.');
+		expect(text).toContain('3 events are waiting in the outbox.');
+		expect(text).toContain('refused 40 publish attempts');
+		expect(text).not.toContain('fire and forget');
+		expect(text).toContain('Lost after every attempt');
+	});
+
+	it('drops the refusing badge once every refused attempt was delivered', () => {
+		const { container } = render(BrokerPage, {
+			props: props({ status: status({ failed: 5, outbox: { enabled: true, available: true, pending: 0, dead: 0 } }) }),
+		});
+		expect(said(container)).not.toContain('The broker is refusing events');
+	});
+});

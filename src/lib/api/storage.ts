@@ -105,15 +105,23 @@ export function testMessage(result: TestResult | null | undefined): string {
 /**
  * The provider a new upload goes to.
  *
- * Lowest priority number wins among enabled providers, so the list can say
- * which one is actually receiving writes rather than leaving somebody to work
- * it out from a column of integers.
+ * The plugin picks by cost before priority: among enabled providers, the
+ * lowest cost weight above zero wins, and only when none carries a weight
+ * does the lowest priority number win. The list says which one is actually
+ * receiving writes rather than leaving somebody to work it out from a column
+ * of integers.
  */
 export function activeProvider(
 	providers: readonly StorageProvider[]
 ): StorageProvider | null {
 	const usable = providers.filter((p) => p.enabled && !p.credentials_unavailable);
 	if (usable.length === 0) return null;
+	const weighted = usable.filter((p) => p.cost_weight > 0);
+	if (weighted.length > 0) {
+		return weighted.reduce((best, p) =>
+			p.cost_weight < best.cost_weight || (p.cost_weight === best.cost_weight && p.priority < best.priority) ? p : best,
+		);
+	}
 	return usable.reduce((best, p) => (p.priority < best.priority ? p : best));
 }
 
@@ -178,6 +186,8 @@ export interface ProviderBody {
 	use_ssl: boolean;
 	path_style: boolean;
 	priority: number;
+	/** The plugin replaces the row on a save, so an edit sends back the weight it read. */
+	cost_weight?: number;
 	enabled: boolean;
 	local_public_unsigned: boolean;
 }
@@ -259,6 +269,8 @@ export function providerBodyFrom(form: FormData, creating: boolean): { body: Pro
 		local_public_unsigned: type === 'local' && (form.get('local_public_unsigned') === 'on' || form.get('local_public_unsigned') === 'true'),
 		priority: Math.max(0, Math.trunc(Number(form.get('priority') ?? 0)) || 0),
 	};
+	const cost = Number(form.get('cost_weight'));
+	if (form.has('cost_weight') && Number.isFinite(cost) && cost >= 0) body.cost_weight = cost;
 	for (const f of PROVIDER_FIELDS[type]) {
 		const v = String(form.get(f.key) ?? '').trim();
 		if (!v) {

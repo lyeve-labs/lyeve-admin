@@ -4,6 +4,7 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { listSchemaNames } from '$lib/api/search-settings';
 import { readError } from '$lib/server/read-error';
+import { GATE_OK, section } from '$lib/api/gate';
 import {
 	deleteCustomPage,
 	getCustomPage,
@@ -24,12 +25,14 @@ export const load: PageServerLoad = async (event) => {
 		getCustomPage(client, event.params.slug).catch((err: unknown) =>
 			readError(err, 'No page has that address.'),
 		),
-		Promise.resolve()
-			.then(() => listSchemaNames(client))
-			.then((names) => ({ names, read: true }))
-			.catch(() => ({ names: [] as string[], read: false })),
+		// The gate says why the list is missing, so a role refusal and an
+		// outage are not one failure.
+		section(
+			Promise.resolve().then(() => listSchemaNames(client)),
+			'The schemas could not be read, so no schema can be picked below. A block keeps the schemas it already names.',
+		),
 	]);
-	return { customPage: page, schemas: schemas.names, schemasRead: schemas.read };
+	return { customPage: page, schemas: schemas.ok ? schemas.value : [], schemasGate: schemas.ok ? GATE_OK : schemas.gate };
 };
 
 export const actions: Actions = {

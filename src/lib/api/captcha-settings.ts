@@ -32,6 +32,8 @@ export interface TenantCaptcha {
 	has_secret: boolean;
 	/** reCAPTCHA v3 only: the lowest score a check passes with. Null is the provider's default. */
 	score_floor: number | null;
+	/** The failed-attempt count that calls for a captcha. Null is the instance threshold. */
+	failure_threshold?: number | null;
 }
 
 export interface CaptchaSettings {
@@ -49,6 +51,11 @@ export interface SaveCaptchaSettings {
 	/** Empty keeps the stored secret. */
 	secret_key: string;
 	score_floor: number | null;
+	/**
+	 * The plugin stores whatever the body carries here, absent as null, so a
+	 * save sends back the threshold it read rather than clearing it.
+	 */
+	failure_threshold: number | null;
 }
 
 export function captchaSettingsGate(err: unknown): Gate {

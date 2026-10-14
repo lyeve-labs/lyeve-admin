@@ -46,7 +46,15 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const providerError = $derived((form as { providerError?: string } | null)?.providerError ?? '');
+	// Create and update share one drawer and one form result, so the drawer
+	// shows only a failure of the action it is showing that came back after
+	// it opened. A failed create never shows in the next edit.
+	let openedOver = $state.raw<unknown>(null);
+	const providerError = $derived.by(() => {
+		const failed = form as { action?: string; providerError?: string } | null;
+		if (!failed?.providerError || form === openedOver) return '';
+		return failed.action === (editing ? 'update' : 'create') ? failed.providerError : '';
+	});
 
 	// One drawer for create and edit. A null target is a new provider.
 	let drawerOpen = $state(false);
@@ -73,6 +81,7 @@
 		enabled = true;
 		priority = '0';
 		publicUnsigned = false;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -86,6 +95,7 @@
 		enabled = p.enabled;
 		priority = String(p.priority);
 		publicUnsigned = p.local_public_unsigned;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -118,6 +128,7 @@
 		enabled = false;
 		priority = String(source.priority);
 		publicUnsigned = source.local_public_unsigned;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -205,7 +216,8 @@
 		{#if active}
 			<p class="text-xs text-muted">
 				New uploads go to <span class="font-medium text-fg">{active.name}</span>, which has
-				the lowest priority number among the providers that can take them.
+				{active.cost_weight > 0 ? 'the lowest cost weight' : 'the lowest priority number'} among
+				the providers that can take them.
 			</p>
 		{:else if data.providers.length > 0}
 			<Alert tone="danger">
@@ -216,7 +228,7 @@
 
 		<Card>
 			<div class="flex flex-col gap-3 text-sm text-muted">
-				<SectionHeading level={3}>How storage works</SectionHeading>
+				<SectionHeading level={2}>How storage works</SectionHeading>
 				<p>
 					With nothing configured, uploads are written to a directory on the engine host, the one
 					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span> names (<span class="font-mono text-xs">./uploads</span>
@@ -233,7 +245,8 @@
 				<p>
 					A tenant writes to the providers configured in that tenant. A tenant with none uses the
 					providers of the default tenant, and without those, the engine's directory. Among the
-					providers that can take a write, the lowest priority number receives it. Objects are kept
+					providers that can take a write, one given a cost weight through the API is preferred,
+					the lowest weight first. Without one, the lowest priority number receives it. Objects are kept
 					under a prefix per tenant in every store.
 				</p>
 				<p>
@@ -346,7 +359,12 @@
 <Drawer bind:open={drawerOpen} title={editing ? `Edit ${editing.name}` : 'New provider'}>
 	<form method="POST" action={editing ? '?/update' : '?/create'} id="provider-form" use:enhance={save.enhance} class="flex flex-col gap-4">
 		<FormErrors message={providerError || undefined} />
-		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
+		{#if editing}
+			<input type="hidden" name="id" value={editing.id} />
+			<!-- The plugin replaces the whole row on a save and the form has no
+			     cost field, so the stored weight goes back as it was read. -->
+			<input type="hidden" name="cost_weight" value={String(editing.cost_weight ?? 0)} />
+		{/if}
 		<input type="hidden" name="use_ssl" value={useSSL ? 'true' : 'false'} />
 		<input type="hidden" name="path_style" value={pathStyle ? 'true' : 'false'} />
 		<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />

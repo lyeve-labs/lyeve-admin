@@ -17,6 +17,12 @@ export const JOBS_URL = '/api/admin/data-export/jobs';
 export const SCHEDULES_URL = '/api/admin/data-export/schedules';
 export const START_URL = '/api/admin/data-export/start';
 
+/**
+ * The most entries one export holds. The plugin applies it to a request that
+ * names no limit, to keep an export from loading the whole content table.
+ */
+export const EXPORT_ROW_CEILING = 10_000;
+
 export const FORMATS = ['json', 'ndjson', 'yaml', 'csv', 'markdown', 'hugo', 'template'] as const;
 export type ExportFormat = (typeof FORMATS)[number];
 
@@ -25,7 +31,7 @@ export type ExportFormat = (typeof FORMATS)[number];
  * four are the ones the bulk import reads back.
  */
 export const FORMAT_LABELS: Readonly<Record<ExportFormat, { label: string; hint: string }>> = {
-	json: { label: 'JSON', hint: 'One document with every entry. Imports back as it is.' },
+	json: { label: 'JSON', hint: 'One document holding the entries. Imports back as it is.' },
 	ndjson: { label: 'NDJSON', hint: 'One entry per line, for large exports and streaming tools. Imports back.' },
 	yaml: { label: 'YAML', hint: 'The JSON document written as YAML. Imports back.' },
 	csv: {

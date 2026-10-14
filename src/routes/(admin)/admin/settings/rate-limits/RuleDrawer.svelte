@@ -142,11 +142,19 @@
 				required
 			/>
 			{#if superAdmin}
+				<!-- On an edit the plugin reads an absent tenant as "keep", so a rule
+				     can move to another tenant but not to every tenant. -->
 				<Input
 					id="rl-tenant"
 					name="tenant_id"
 					label="Tenant"
-					hint="Leave empty to apply the rule to every tenant."
+					hint={!editing
+						? 'Leave empty to apply the rule to every tenant.'
+						: editing.tenant_id
+							? 'Name another tenant to move the rule there. A rule cannot move to every tenant on an edit: delete it and create it again.'
+							: 'Leave empty to keep the rule on every tenant, or name a tenant to move it there.'}
+					placeholder={editing && !editing.tenant_id ? 'Every tenant' : undefined}
+					required={!!editing?.tenant_id}
 					bind:value={tenantId}
 				/>
 			{/if}

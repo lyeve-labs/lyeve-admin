@@ -110,12 +110,12 @@
 				<tbody>
 					<tr>
 						<th scope="row" class="text-sm">Queries and mutations</th>
-						<td class="font-mono text-xs">POST {GRAPHQL_HTTP}</td>
+						<td data-cell="nowrap" class="font-mono text-xs">POST {GRAPHQL_HTTP}</td>
 						<td class="text-xs text-muted">A GET on the same path answers only that the endpoint is ready.</td>
 					</tr>
 					<tr>
 						<th scope="row" class="text-sm">Subscriptions</th>
-						<td class="font-mono text-xs">GET {GRAPHQL_WS}</td>
+						<td data-cell="nowrap" class="font-mono text-xs">GET {GRAPHQL_WS}</td>
 						<td class="text-xs text-muted">WebSocket, the graphql-ws protocol: send the token in connection_init.</td>
 					</tr>
 				</tbody>
@@ -208,6 +208,12 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.persistedTotal > persisted.length}
+					<p class="text-xs text-muted">
+						Showing the first {persisted.length} of {data.persistedTotal} persisted queries. The rest still answer by
+						hash, but this page cannot show, switch off or delete them.
+					</p>
+				{/if}
 				<Table label="Persisted queries">
 					<thead>
 						<tr>

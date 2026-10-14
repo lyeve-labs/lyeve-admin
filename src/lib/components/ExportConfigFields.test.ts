@@ -17,3 +17,30 @@ describe('ExportConfigFields schema choice', () => {
 		expect(container.textContent).not.toContain('could not be read');
 	});
 });
+
+describe('ExportConfigFields format and status choice', () => {
+	it('shows every format with its sentence and submits the chosen one', () => {
+		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: [], format: 'csv' } });
+		const radios = container.querySelectorAll('input[type="radio"][name="format"]');
+		expect(radios).toHaveLength(7);
+		expect(container.textContent).toContain('Imports back as it is.');
+		expect(container.textContent).toContain('for a static site');
+		const form = document.createElement('form');
+		form.append(container.firstElementChild!.cloneNode(true));
+		expect(new FormData(form).get('format')).toBe('csv');
+	});
+
+	it('states the row ceiling and promises no export of every entry', () => {
+		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: [] } });
+		expect(container.textContent).toContain('An export holds at most 10,000 entries.');
+		expect(container.textContent).not.toContain('every entry');
+	});
+
+	it('keeps the three statuses in sight as checkboxes', () => {
+		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: [], statuses: ['draft'] } });
+		const boxes = container.querySelectorAll('input[type="checkbox"][name="statuses"]');
+		expect(boxes).toHaveLength(3);
+		const ticked = [...boxes].filter((b) => (b as HTMLInputElement).checked).map((b) => (b as HTMLInputElement).value);
+		expect(ticked).toEqual(['draft']);
+	});
+});

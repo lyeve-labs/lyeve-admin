@@ -1,6 +1,6 @@
 <script lang="ts">
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import { formRefusal } from '$lib/api/refusal';
+	import { LICENSE_PAGE, formRefusal } from '$lib/api/refusal';
 	import { Alert, Badge, Button, Drawer, EmptyState, Input, PageShell, Select, Table, Textarea, Toggle, confirm } from '@lyeve-labs/ui-kit';
 	import { MailPlus, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
@@ -55,6 +55,9 @@
 	// only once the templates answered with one. The notice above the list
 	// says why when it is not.
 	const canCreate = $derived(data.triggers.ok && data.templates.ok && activeTemplates.length > 0);
+	// The license this instance holds refuses a trigger create or update, so
+	// New and Edit are disabled with the reason above the list. Delete stays.
+	const writeRefusal = $derived(data.writeRefusal ?? null);
 
 	// One drawer for both writes. A null target is a new trigger.
 	let open = $state(false);
@@ -125,7 +128,7 @@
 >
 	{#snippet actions()}
 		{#if canCreate}
-			<Button variant="primary" size="sm" onclick={openCreate}>
+			<Button variant="primary" size="sm" onclick={openCreate} disabled={!!writeRefusal}>
 				<Plus size={ICON.sm} />
 				New trigger
 			</Button>
@@ -141,6 +144,15 @@
 		</Alert>
 	{/if}
 
+	{#if data.triggers.ok && writeRefusal}
+		<Alert tone="warn" title="Triggers cannot be created or changed">
+			{#snippet children()}Creating or editing a trigger needs {writeRefusal.kind === 'feature' && writeRefusal.feature
+					? writeRefusal.feature
+					: 'a capability'}, which the license on this instance does not include. Deleting a trigger is
+				allowed. <a class="text-brand underline" href={LICENSE_PAGE}>View the license</a>.{/snippet}
+		</Alert>
+	{/if}
+
 	{#if !data.triggers.ok}
 		<GateNotice gate={data.triggers.gate} title="Email triggers" absent="This version of the email plugin has no triggers." />
 	{:else if triggers.length === 0}
@@ -148,7 +160,7 @@
 			{#snippet iconSnippet()}<MailPlus size={ICON.lg} />{/snippet}
 			{#snippet action()}
 				{#if canCreate}
-					<Button variant="secondary" onclick={openCreate}>
+					<Button variant="secondary" onclick={openCreate} disabled={!!writeRefusal}>
 						<Plus size={ICON.sm} />
 						New trigger
 					</Button>
@@ -180,7 +192,13 @@
 						<td class="text-sm text-muted">{recipients(t)}</td>
 						<td>
 							<div class="flex items-center gap-2">
-								<Button variant="ghost" size="sm" onclick={() => openEdit(t)} aria-label="Edit {t.name}">
+								<Button
+								variant="ghost"
+								size="sm"
+								onclick={() => openEdit(t)}
+								aria-label="Edit {t.name}"
+								disabled={!!writeRefusal}
+							>
 									<Pencil size={ICON.sm} />
 								</Button>
 								<Button variant="ghost" size="sm" onclick={() => askDelete(t)} aria-label="Delete {t.name}">

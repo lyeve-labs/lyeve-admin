@@ -42,6 +42,19 @@ describe('captcha settings', () => {
 		expect((screen.getByLabelText('Secret key') as HTMLInputElement).value).toBe('');
 	});
 
+	it('carries the stored failure threshold into the save, so a save keeps it', () => {
+		const { container } = render(CaptchaPage, {
+			props: props({
+				source: 'tenant',
+				tenant: { provider: 'hcaptcha', site_key: 's', has_secret: true, score_floor: null, failure_threshold: 9 },
+				instance,
+				licensed: true,
+			}),
+		});
+		const form = container.querySelector('form#captcha-form') as HTMLFormElement;
+		expect(new FormData(form).get('failure_threshold')).toBe('9');
+	});
+
 	it('asks for the score floor only for reCAPTCHA', () => {
 		render(CaptchaPage, {
 			props: props({

@@ -8,6 +8,7 @@ import {
 	entriesDeleted,
 	holdIsUnbounded,
 	holdScope,
+	listPolicies,
 	policyIsCatchAll,
 	policyScope,
 	retentionGate,
@@ -149,5 +150,22 @@ describe('an enforcement run', () => {
 	it('counts a run that processed nothing as none deleted', () => {
 		expect(entriesDeleted({ policies_processed: 0, results: null })).toBe(0);
 		expect(entriesDeleted({})).toBe(0);
+	});
+});
+
+describe('reading every policy', () => {
+	it('reads past the first page until the stated total', async () => {
+		const asked: string[] = [];
+		const client = {
+			get: async (url: string) => {
+				asked.push(url);
+				const offset = Number(new URL(url, 'http://x').searchParams.get('offset'));
+				const size = offset === 0 ? 500 : 20;
+				return { data: Array.from({ length: size }, (_, i) => ({ id: `p${offset + i}` })), total_count: 520 };
+			},
+		};
+		const all = await listPolicies(client as never);
+		expect(all.data).toHaveLength(520);
+		expect(asked).toEqual(['/api/admin/retention-policies?limit=500&offset=0', '/api/admin/retention-policies?limit=500&offset=500']);
 	});
 });
