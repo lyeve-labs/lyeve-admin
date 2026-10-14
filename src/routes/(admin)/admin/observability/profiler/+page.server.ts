@@ -62,6 +62,7 @@ async function sampled(read: Promise<EndpointDetail>): Promise<EndpointDetail | 
 }
 
 export const load: PageServerLoad = async (event) => {
+	event.depends('app:profiler');
 	const { url, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) {

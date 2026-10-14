@@ -5,6 +5,7 @@ import { notRunning } from '$lib/plugins';
 import { GRPC_OK, grpcGate, readStatus, type GrpcGate, type GrpcStatus } from '$lib/api/grpc';
 
 export const load: PageServerLoad = async (event) => {
+	event.depends('app:grpc');
 	const { plugins, user } = await event.parent();
 	// The addresses describe how this process is reachable on its host, so the
 	// route is super admin. Anybody else is told rather than shown a failed

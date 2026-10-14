@@ -17,7 +17,7 @@
 		confirm,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { refresher } from '$lib/refresher';
 	import { Copy, Eye, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -38,14 +38,7 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
+	const refresh = refresher('app:pii', (on) => (refreshing = on));
 
 	let narrow = $state('');
 

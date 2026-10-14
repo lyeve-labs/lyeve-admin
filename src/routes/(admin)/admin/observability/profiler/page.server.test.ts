@@ -63,6 +63,7 @@ function loadEvent(routes: Record<string, Route>, roles: string[], search = '') 
 			fetch,
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/observability/profiler${search}`),
+			depends: vi.fn(),
 			parent: async () => ({ user: { id: 'u1', roles }, entitlements: { plan: '', state: '', features: [], tenant_quota: 1 } }),
 		} as never,
 		calls,

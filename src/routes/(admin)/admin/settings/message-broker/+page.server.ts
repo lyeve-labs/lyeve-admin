@@ -11,6 +11,7 @@ import {
 } from '$lib/api/messagebroker';
 
 export const load: PageServerLoad = async (event) => {
+	event.depends('app:message-broker');
 	const { plugins, user } = await event.parent();
 	// The route is super admin only, so anyone else is told rather than shown
 	// a failed read they cannot do anything about.

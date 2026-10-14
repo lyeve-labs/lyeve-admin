@@ -23,6 +23,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
 
 export const load: PageServerLoad = async (event) => {
+	event.depends('app:pii');
 	const { plugins } = await event.parent();
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
 

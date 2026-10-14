@@ -2,9 +2,10 @@
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 
 import PiiPage from './+page.svelte';
+import { invalidate, invalidateAll } from '$app/navigation';
 
 afterEach(cleanup);
 
@@ -261,5 +262,16 @@ describe('PII failures stay where they were made', () => {
 		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
 		const save = document.querySelector('form[action="?/create"]') as HTMLFormElement;
 		expect(save.textContent).not.toContain('could not be run');
+	});
+});
+
+describe('Refresh', () => {
+	it("rereads the page's own load and leaves the shell's data alone", async () => {
+		vi.mocked(invalidate).mockClear();
+		vi.mocked(invalidateAll).mockClear();
+		const { getByRole } = render(PiiPage, { props: props() });
+		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
+		expect(invalidate).toHaveBeenCalledWith('app:pii');
+		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

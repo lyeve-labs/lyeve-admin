@@ -15,6 +15,7 @@ type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 function loadEvent(query = '') {
 	return {
 		url: new URL(`http://localhost/admin/events${query}`),
+		depends: vi.fn(),
 		parent: async () => ({ plugins: { state: 'named', running: ['events'], withheld: [] } }),
 	} as never;
 }

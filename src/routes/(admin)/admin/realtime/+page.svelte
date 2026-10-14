@@ -9,7 +9,7 @@
 		Table,
 		Button,
 	} from '@lyeve-labs/ui-kit';
-	import { invalidateAll } from '$app/navigation';
+	import { refresher } from '$lib/refresher';
 	import { Radio, RefreshCw, Satellite, Users } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { inUse, tenantLoad, uptimeSince, type StreamMetrics } from '$lib/api/realtime';
@@ -20,14 +20,7 @@
 	let { data }: { data: PageData } = $props();
 
 	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
+	const refresh = refresher('app:realtime', (on) => (refreshing = on));
 
 	const streamUsed = $derived(inUse(data.stream));
 	const socketUsed = $derived(inUse(data.socket));

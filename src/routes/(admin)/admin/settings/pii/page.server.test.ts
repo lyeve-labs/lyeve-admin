@@ -28,6 +28,7 @@ function formEvent(fields: Record<string, string>) {
 function loadEvent(query = '') {
 	return {
 		url: new URL(`http://admin.test/admin/settings/pii${query}`),
+		depends: vi.fn(),
 		parent: async () => ({ plugins: null }),
 	} as never;
 }

@@ -9,7 +9,7 @@
 		SectionHeading,
 		Table,
 	} from '@lyeve-labs/ui-kit';
-	import { invalidateAll } from '$app/navigation';
+	import { refresher } from '$lib/refresher';
 	import { Network, RefreshCw } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
@@ -29,14 +29,7 @@
 	let { data }: { data: PageData } = $props();
 
 	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
+	const refresh = refresher('app:grpc', (on) => (refreshing = on));
 
 	const health = $derived(grpcHealth(data.status));
 	const gaps = $derived(undeclared(data.status));

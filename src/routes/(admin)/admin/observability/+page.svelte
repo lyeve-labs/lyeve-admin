@@ -17,7 +17,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { refresher } from '$lib/refresher';
 	import {
 		Activity,
 		Cpu,
@@ -61,14 +61,7 @@
 	// different answers with nothing reconciling them.
 	let refreshing = $state(false);
 
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
+	const refresh = refresher('app:observability', (on) => (refreshing = on));
 
 	// Each depth is a link, so the ranking a person is looking at is an
 	// address and the choice works before the page hydrates.

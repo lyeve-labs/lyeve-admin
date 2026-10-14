@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 
 import RealtimePage from './+page.svelte';
 import type { SocketMetrics, StreamMetrics } from '$lib/api/realtime';
+import { invalidate, invalidateAll } from '$app/navigation';
 
 afterEach(cleanup);
 
@@ -157,5 +158,16 @@ describe('Realtime tenant roster', () => {
 		expect(said(container)).toContain('roster could not be read');
 		expect(said(container)).toContain('unaffected');
 		expect(said(container)).not.toContain('No tenant has a connection open');
+	});
+});
+
+describe('Refresh', () => {
+	it("rereads the page's own load and leaves the shell's data alone", async () => {
+		vi.mocked(invalidate).mockClear();
+		vi.mocked(invalidateAll).mockClear();
+		const { getByRole } = render(RealtimePage, { props: props() });
+		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
+		expect(invalidate).toHaveBeenCalledWith('app:realtime');
+		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

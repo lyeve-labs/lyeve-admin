@@ -57,6 +57,7 @@ function loadEvent(routes: Record<string, Route>, roles = ['super_admin'], plugi
 		fetch,
 		cookies: mockCookies(),
 		url: new URL('http://localhost/admin/observability'),
+		depends: vi.fn(),
 		parent: async () => ({ user: { id: 'u1', roles }, entitlements: NO_ENTITLEMENTS, plugins }),
 	} as never;
 }
