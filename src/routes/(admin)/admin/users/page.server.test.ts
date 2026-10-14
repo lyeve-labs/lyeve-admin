@@ -282,8 +282,10 @@ describe('creating an account', () => {
 		});
 	});
 
-	it('refuses a password under 12 characters on its field', async () => {
-		const fetch = vi.fn() as never;
+	// The engine's minimum is a setting an install may lower, so a short
+	// password goes to the engine, which judges it and names its own rule.
+	it('leaves the shortest password to the engine', async () => {
+		const fetch = vi.fn(async (_url: string, _init: RequestInit) => json({ id: 'u1' })) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
 		const result = await actions.create(mockEvent({
@@ -292,14 +294,8 @@ describe('creating an account', () => {
 			cookies,
 		}) as never);
 
-		expect(result).toEqual({
-			status: 400,
-			data: {
-				action: 'create',
-				error: 'Check the highlighted fields.',
-				fields: { password: 'Password must be at least 12 characters' },
-			},
-		});
+		expect(result).toEqual({ ok: true });
+		expect(fetch).toHaveBeenCalled();
 	});
 
 	// The engine's hasher fails a password over 72 bytes with a 500 that names

@@ -6,7 +6,7 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError } from '$lib/server/action-error';
-import { passwordBytes, passwordTooLong, setUserPassword } from '$lib/api/users';
+import { passwordTooLong, setUserPassword } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
@@ -93,11 +93,10 @@ export const actions: Actions = {
 		 */
 		const fields: Record<string, string> = {};
 		if (!email) fields.email = 'Email is required';
-		// The engine's own default minimum, counted in bytes as the engine counts
-		// it. The engine judges every other rule, and its refusal lands on this
-		// field below. Past the hasher's limit it fails without naming a rule.
+		// The engine judges the password, its minimum included, since an install
+		// may set that, and its refusal lands on this field below. Past the
+		// hasher's limit it fails without naming a rule, so that one is caught here.
 		if (!password) fields.password = 'Password is required';
-		else if (passwordBytes(password) < 12) fields.password = 'Password must be at least 12 characters';
 		else if (passwordTooLong(password)) fields.password = passwordTooLong(password) ?? '';
 		// The form offers the choice only where there is one to make, and then
 		// it is required: the engine refuses an account that names no tenant.

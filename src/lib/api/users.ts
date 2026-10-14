@@ -17,7 +17,7 @@ export function setUserPassword(id: string, password: string, client: HttpClient
 export const MAX_PASSWORD_BYTES = 72;
 
 /** A password's length as the engine counts it, in UTF-8 bytes. */
-export function passwordBytes(password: string): number {
+function passwordBytes(password: string): number {
 	return new TextEncoder().encode(password).length;
 }
 
