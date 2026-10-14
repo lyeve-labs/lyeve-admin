@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { aiActionError, aiBanner, aiGate } from './ai-load';
+import { AI_BUDGET_TEXT, aiActionError, aiBanner, aiGate } from './ai-load';
 
 function cookies(): Cookies {
 	return { get: vi.fn(), set: vi.fn(), delete: vi.fn(), getAll: vi.fn(() => []), serialize: vi.fn(() => '') } as unknown as Cookies;
@@ -33,6 +33,13 @@ describe('aiGate', () => {
 });
 
 describe('aiActionError', () => {
+	it('says the budget is spent when the 402 carries the budget sentence', () => {
+		const budget = new ApiError(402, 'ai budget exhausted for this billing period', { error: 'ai budget exhausted for this billing period' });
+		expect(aiActionError(budget, 'f')).toBe(AI_BUDGET_TEXT);
+		const license = new ApiError(402, 'payment_required', { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' });
+		expect(aiActionError(license, 'f')).toBe('AI is not enabled on this instance.');
+	});
+
 	it('names each refusal and relays a 4xx reason', () => {
 		expect(aiActionError(new ApiError(402, 'x'), 'f')).toContain('not enabled');
 		expect(aiActionError(new ApiError(404, 'x'), 'f')).toContain('switched off');

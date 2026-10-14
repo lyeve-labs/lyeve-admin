@@ -15,7 +15,7 @@ describe('admin/ai layout load', () => {
 	});
 
 	it('locks on a 402', async () => {
-		const { event } = loadEvent({ '/api/admin/ai/settings': () => refused(402, 'payment required') });
+		const { event } = loadEvent({ '/api/admin/ai/settings': () => refused(402, 'payment_required') });
 		expect(await load(event)).toMatchObject({ aiLayoutGate: { state: 'locked' } });
 	});
 });

@@ -464,7 +464,7 @@ describe('admin/flows/[id] actions', () => {
 
 	it('assist maps 402, 404 and 503 to locked, off and unavailable with the static text', async () => {
 		const refused = (status: number, body: unknown) => actionEvent(assistForm(), { ...everything, '/api/admin/ai/assist/flow': () => json(body, status) }).event;
-		expect(await actions.assist(refused(402, { error: 'ai is not enabled' }))).toMatchObject({ status: 402, data: { assistRefused: { state: 'locked' } } });
+		expect(await actions.assist(refused(402, { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' }))).toMatchObject({ status: 402, data: { assistRefused: { state: 'locked' } } });
 		expect(await actions.assist(refused(404, { error: 'not found' }))).toMatchObject({ status: 404, data: { assistRefused: { state: 'off' } } });
 		expect(await actions.assist(refused(503, { error: 'flow validator is not registered' }))).toMatchObject({
 			status: 503,

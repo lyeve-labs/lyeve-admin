@@ -52,10 +52,43 @@ describe('admin/ai/settings actions', () => {
 	});
 
 	it('names the license on a 402 and the role on a 403', async () => {
-		const locked = actionEvent({ '/api/admin/ai/settings': () => refused(402, 'x') }, formOf({ enabled: 'false' }), { path });
+		const locked = actionEvent({ '/api/admin/ai/settings': () => refused(402, 'payment_required') }, formOf({ enabled: 'false' }), { path });
 		expect(await actions.save(locked.event)).toMatchObject({ status: 400, data: { error: 'AI is not enabled on this instance.' } });
-		const forbidden = actionEvent({ '/api/admin/ai/settings': () => refused(403, 'forbidden') }, formOf({ enabled: 'false' }), { path });
-		expect(await actions.save(forbidden.event)).toMatchObject({ status: 400, data: { error: 'forbidden' } });
+		const forbidden = actionEvent({ '/api/admin/ai/settings': () => refused(403, 'insufficient permissions') }, formOf({ enabled: 'false' }), { path });
+		expect(await actions.save(forbidden.event)).toMatchObject({
+			status: 403,
+			data: { error: 'Your role cannot change this. Ask a super admin if you need it.' },
+		});
+	});
+
+	it('keeps driver text out of a switch save that meets an outage', async () => {
+		const down = actionEvent({ '/api/admin/ai/settings': () => refused(503, 'pq: connection refused') }, formOf({ enabled: 'false' }), { path });
+		const out = await actions.save(down.event);
+		expect(out).toMatchObject({ status: 400, data: { scope: 'switch' } });
+		expect(JSON.stringify(out)).not.toContain('pq:');
+		const gone = actionEvent({ '/api/admin/ai/settings': () => Promise.reject(new TypeError('fetch failed')) }, formOf({ enabled: 'false' }), { path });
+		expect(await actions.save(gone.event)).toMatchObject({ status: 400, data: { error: 'The setting could not be saved' } });
+	});
+
+	it('names no raw text when the retention save meets an outage', async () => {
+		const down = actionEvent({ '/api/admin/config': () => refused(503, 'pq: connection refused') }, formOf({ key: 'ai_transcript_retention', value: '48h' }), { path });
+		const out = await actions.config(down.event);
+		expect(out).toMatchObject({ status: 503, data: { scope: 'config' } });
+		expect(JSON.stringify(out)).not.toContain('pq:');
+		const gone = actionEvent({ '/api/admin/config': () => Promise.reject(new TypeError('fetch failed')) }, formOf({ key: 'ai_transcript_retention', value: '48h' }), { path });
+		expect(await actions.config(gone.event)).toMatchObject({ status: 500, data: { error: 'Could not save the setting' } });
+	});
+
+	it('reads a save the engine refuses whole, which answers 409 with no error field', async () => {
+		const { event } = actionEvent(
+			{
+				'/api/admin/config': () =>
+					json({ refused: [{ key: 'ai_transcript_retention', reason: 'set by the environment', origin: 'AI_TRANSCRIPT_RETENTION' }] }, 409),
+			},
+			formOf({ key: 'ai_transcript_retention', value: '48h' }),
+			{ path }
+		);
+		expect(await actions.config(event)).toMatchObject({ status: 409, data: { error: 'set by the environment (AI_TRANSCRIPT_RETENTION)' } });
 	});
 
 	it('writes the retention window through the configuration route and refuses a bad duration', async () => {
