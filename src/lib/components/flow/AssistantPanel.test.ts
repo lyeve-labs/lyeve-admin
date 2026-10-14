@@ -32,14 +32,15 @@ function setup(props: Record<string, unknown> = {}) {
 function draft(over: Partial<AssistantDraft['draft']> = {}): AssistantDraft {
 	return {
 		prompt: 'Email me on new orders',
+		// The AI plugin's flow assist answer, field for field.
 		draft: {
-			model: 'small-model',
-			tokens: 1234,
-			// The AI plugin sends the cost as a decimal string.
-			cost: '0.0012' as never,
 			definition: { nodes: [] } as never,
 			yaml: 'nodes: []',
 			problems: [],
+			conversation_id: 'c-1',
+			model: 'small-model',
+			tokens: 1234,
+			cost: '0.001200',
 			...over,
 		},
 	};
@@ -126,8 +127,21 @@ describe('AssistantPanel', () => {
 		expect(onreset).toHaveBeenCalledTimes(1);
 	});
 
+	it('shows the cost the plugin sends as a decimal string', () => {
+		const { getByText } = setup({ draft: draft() });
+		expect(getByText('small-model, 1,234 tokens, $0.0012')).toBeTruthy();
+	});
+
+	it('shows no cost when the cost does not parse', () => {
+		for (const cost of ['', 'n/a', '-1']) {
+			const { getByText } = setup({ draft: draft({ cost }) });
+			expect(getByText('small-model, 1,234 tokens')).toBeTruthy();
+			cleanup();
+		}
+	});
+
 	it('shows an answer about its subject and closes it', async () => {
-		const answer: AssistantAnswer = { subject: 'send-email', answer: { model: 'm', tokens: 10, cost: '0' as never, answer: 'It sends **mail**.' } };
+		const answer: AssistantAnswer = { subject: 'send-email', answer: { model: 'm', tokens: 10, cost: '0', answer: 'It sends **mail**.' } };
 		const { getByRole, getByText, onclose } = setup({ answer });
 		expect(getByText('send-email')).toBeTruthy();
 		expect(getByText('mail').tagName).toBe('STRONG');

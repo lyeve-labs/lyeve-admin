@@ -25,7 +25,18 @@ export interface AssistProblem {
 export interface AssistUsage {
 	model: string;
 	tokens: number;
-	cost: number;
+	/** US dollars as a decimal string, because the plugin keeps the price table's precision. */
+	cost: string;
+}
+
+/**
+ * The cost as a number, or null when it does not parse. An empty or
+ * malformed string is null rather than zero, so a missing cost never reads
+ * as free. A number is null too, because the plugin never sends one.
+ */
+export function parseCost(cost: unknown): number | null {
+	if (typeof cost !== 'string' || !/^\d+(\.\d+)?$/.test(cost.trim())) return null;
+	return Number(cost);
 }
 
 /** What `POST /assist/flow` answers: the draft in both forms, and what the validator still refuses. */

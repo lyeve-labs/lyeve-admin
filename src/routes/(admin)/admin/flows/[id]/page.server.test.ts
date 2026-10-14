@@ -38,9 +38,9 @@ function fetchFor(routes: Record<string, Route>) {
 const everything: Record<string, Route> = {
 	'/api/admin/flows/catalog/llm': () => new Response('# Nodes\n\ncontent.query', { status: 200, headers: { 'content-type': 'text/markdown' } }),
 	'/api/admin/flows/catalog': () => json({ data: fixtureCatalog }),
-	'/api/admin/ai/assist/flow/explain': () => json({ answer: 'It **joins** two lists.', conversation_id: 'c1', model: 'm', tokens: 40, cost: 0.0002 }),
+	'/api/admin/ai/assist/flow/explain': () => json({ answer: 'It **joins** two lists.', conversation_id: 'c1', model: 'm', tokens: 40, cost: '0.000200' }),
 	'/api/admin/ai/assist/flow': () =>
-		json({ definition: joinFlow, yaml: 'name: x\n', problems: [{ node_id: 'join', path: '/config/left_key', message: 'required' }], conversation_id: 'c1', model: 'm', tokens: 120, cost: 0.001 }),
+		json({ definition: joinFlow, yaml: 'name: x\n', problems: [{ node_id: 'join', path: '/config/left_key', message: 'required' }], conversation_id: 'c1', model: 'm', tokens: 120, cost: '0.001000' }),
 	'/api/admin/flows/event-types': () => json(fixtureEventTypes),
 	'/api/admin/flows?': () => json({ data: [fixtureFlow, { ...fixtureFlow, id: 'f2', slug: 'send-receipt', name: 'Send receipt' }], total: 2 }),
 	'/api/admin/flows/templates': () => json({ data: fixtureTemplates }),
