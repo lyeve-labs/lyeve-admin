@@ -107,6 +107,21 @@ describe('SAML writes', () => {
 		expect(calls[0].body).not.toHaveProperty('idp_cert');
 	});
 
+	it('sends an emptied logout URL as a clear, so the stored one goes', async () => {
+		const { event, calls } = write({ ...PROVIDER, id: 'p1', slo_url: '' });
+		expect(await actions.update(event)).toEqual({ saved: 'Okta' });
+		expect(calls[0].body).toHaveProperty('slo_url', '');
+	});
+
+	it.each([
+		['entity_id', 'The IdP entity ID is required.'],
+		['sso_url', 'The IdP sign-on URL is required.'],
+	])('refuses an edit that empties %s before it saves anything', async (field, sentence) => {
+		const { event, calls } = write({ ...PROVIDER, id: 'p1', [field]: ' ' });
+		expect(((await actions.update(event)) as Failure).data).toEqual({ action: 'update', error: sentence });
+		expect(calls).toEqual([]);
+	});
+
 	it.each([
 		['delete', 'DELETE', '/api/admin/saml-providers/p1', { removed: 'p1' }],
 		['prepare', 'POST', '/api/admin/saml-providers/p1/prepare-cert', { prepared: 'p1' }],

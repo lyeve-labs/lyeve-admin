@@ -293,6 +293,21 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		});
 	});
 
+	// The engine's hasher fails a password over 72 bytes with a 500 that names
+	// no rule, so both forms refuse one on the field before sending it.
+	it('refuses a new account password over 72 bytes before sending it', async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+		const long = 'é'.repeat(37);
+		const result = (await actions.create(mockEvent({
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: long })) } as never,
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+		}) as never)) as { status: number; data: { fields: { password: string } } };
+		expect(result.status).toBe(400);
+		expect(result.data.fields.password).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
 	// The engine's policy can be stricter than the length checked here. Its
 	// 422 names the rule, and that sentence belongs on the password control.
 	it('puts the engine password refusal on the password field', async () => {
@@ -364,6 +379,17 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 	}
+
+	it('refuses a password over 72 bytes on its field before sending it', async () => {
+		const fetch = vi.fn();
+		const result = (await submit(fetch, { id: 'u1', new_password: 'é'.repeat(37) })) as {
+			status: number;
+			data: { fields: { new_password: string } };
+		};
+		expect(result.status).toBe(400);
+		expect(result.data.fields.new_password).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
+	});
 
 	it('puts the password to the account and answers ok', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>

@@ -12,3 +12,22 @@ import type { HttpClient, User } from '@lyeve-labs/client';
 export function setUserPassword(id: string, password: string, client: HttpClient): Promise<User> {
 	return client.put<User>(`/api/admin/users/${encodeURIComponent(id)}/password`, { password });
 }
+
+/** The longest password the engine's default hasher reads, in UTF-8 bytes. */
+export const MAX_PASSWORD_BYTES = 72;
+
+/** A password's length as the engine counts it, in UTF-8 bytes. */
+export function passwordBytes(password: string): number {
+	return new TextEncoder().encode(password).length;
+}
+
+/**
+ * The sentence for a password the hasher cannot hold, or null when it fits.
+ * The engine fails such a password with a 500 rather than naming the rule, so
+ * every form that sets one checks it before sending.
+ */
+export function passwordTooLong(password: string): string | null {
+	if (passwordBytes(password) <= MAX_PASSWORD_BYTES) return null;
+	return `Use at most ${MAX_PASSWORD_BYTES} bytes. A plain letter or digit is one byte, and an accented letter or symbol takes two to four.`;
+}
+

@@ -6,7 +6,7 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError } from '$lib/server/action-error';
-import { setUserPassword } from '$lib/api/users';
+import { passwordBytes, passwordTooLong, setUserPassword } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { section, type Section } from '$lib/api/gate';
 import { pastEndOffset, withOffset } from '$lib/api/list';
@@ -96,10 +96,12 @@ export const actions: Actions = {
 		 */
 		const fields: Record<string, string> = {};
 		if (!email) fields.email = 'Email is required';
-		// The engine's own default minimum. It judges every other rule, and its
-		// refusal lands on this field below.
+		// The engine's own default minimum, counted in bytes as the engine counts
+		// it. The engine judges every other rule, and its refusal lands on this
+		// field below. Past the hasher's limit it fails without naming a rule.
 		if (!password) fields.password = 'Password is required';
-		else if (password.length < 12) fields.password = 'Password must be at least 12 characters';
+		else if (passwordBytes(password) < 12) fields.password = 'Password must be at least 12 characters';
+		else if (passwordTooLong(password)) fields.password = passwordTooLong(password) ?? '';
 		// The form offers the choice only where there is one to make, and then
 		// it is required: the engine refuses an account that names no tenant.
 		const tenant = String(form.get('tenant_id') ?? '').trim();
@@ -174,11 +176,12 @@ export const actions: Actions = {
 		const password = String(form.get('new_password') ?? '');
 		// The field is named apart from the create form's so a refusal lands
 		// on the control that was submitted and never on the other drawer's.
-		if (!password) {
+		const problem = password ? passwordTooLong(password) : 'Password is required';
+		if (problem) {
 			return fail(400, {
 				action: 'setPassword',
 				error: 'Check the highlighted field.',
-				fields: { new_password: 'Password is required' },
+				fields: { new_password: problem },
 			});
 		}
 		try {

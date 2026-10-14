@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { submitter } from '$lib/forms.svelte';
+	import { fieldErrors, submitter } from '$lib/forms.svelte';
+	import { passwordTooLong } from '$lib/api/users';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import {
@@ -59,6 +60,7 @@
 	);
 
 	const formError = $derived(form && 'error' in form ? (form.error as string) : null);
+	const serverFields = $derived(fieldErrors(form));
 
 	// The browser's own bubble for a `required` field disappears on the next
 	// click and is never announced a second time, so the page validates before
@@ -83,6 +85,7 @@
 		// change. The engine names the rule a refused password broke, so the
 		// page states no rule of its own that could disagree with it.
 		if (!password) found.password = 'Password is required';
+		else if (passwordTooLong(password)) found.password = passwordTooLong(password) ?? '';
 		if (!confirm) found.confirm = 'Confirm password is required';
 		else if (password && confirm !== password) found.confirm = 'Passwords do not match';
 
@@ -276,7 +279,7 @@
 						autocomplete="new-password"
 						required
 						hint="The engine's password policy sets the rules. If it refuses this password, the refusal names the rule it broke."
-						error={errors.password}
+						error={errors.password ?? serverFields.password}
 					/>
 
 					<PasswordInput

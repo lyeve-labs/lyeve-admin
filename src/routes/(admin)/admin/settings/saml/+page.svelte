@@ -457,7 +457,9 @@
 			<!-- Toggle renders a button, and a button submits nothing. Each state
 			     reaches the action through the hidden field beside it, and every
 			     one of these is a security setting, so an unchecked switch has to
-			     say false rather than go missing. -->
+			     say false rather than go missing. The plugin turns the first three
+			     on for every new provider whatever the form sends, so a create shows
+			     them on and fixed, and an edit can turn them off. -->
 			<input
 				type="hidden"
 				name="want_assertions_signed"
@@ -467,6 +469,7 @@
 				id="saml-want-assertions-signed"
 				label="Require signed assertions"
 				bind:checked={wantAssertionsSigned}
+				disabled={!editing}
 			/>
 			<input
 				type="hidden"
@@ -477,6 +480,7 @@
 				id="saml-want-response-signed"
 				label="Require a signed response"
 				bind:checked={wantResponseSigned}
+				disabled={!editing}
 			/>
 			<input
 				type="hidden"
@@ -487,6 +491,8 @@
 				id="saml-sign-authn"
 				label="Sign our requests"
 				bind:checked={signAuthnRequests}
+				disabled={!editing}
+				hint={editing ? undefined : 'A new provider starts with these three on. Edit it after creating to turn one off.'}
 			/>
 			<input
 				type="hidden"

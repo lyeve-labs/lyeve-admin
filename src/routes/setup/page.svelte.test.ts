@@ -195,6 +195,25 @@ describe('Setup page: create the first admin', () => {
 		}
 	});
 
+	// The engine's hasher fails a password over 72 bytes without naming a rule,
+	// so the page says the limit on the field and sends nothing.
+	it('refuses a password over 72 bytes on its field', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}));
+		try {
+			const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
+			const long = 'é'.repeat(37);
+			(container.querySelector('#setup_token') as HTMLInputElement).value = 'from-the-log';
+			(container.querySelector('#email') as HTMLInputElement).value = 'a@b.test';
+			(container.querySelector('#password') as HTMLInputElement).value = long;
+			(container.querySelector('#confirm') as HTMLInputElement).value = long;
+			await fireEvent.submit(container.querySelector('form')!);
+			expect(container.querySelector('#password-error')?.textContent).toMatch(/at most 72 bytes/);
+			expect(fetchSpy).not.toHaveBeenCalled();
+		} finally {
+			fetchSpy.mockRestore();
+		}
+	});
+
 	// An install can change the engine's password policy, so the page states
 	// no length of its own. The engine names the rule it refuses a password for.
 	it('leaves the password rules to the engine', async () => {
