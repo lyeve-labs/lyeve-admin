@@ -1,0 +1,211 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { Cookies } from '@sveltejs/kit';
+
+import { actions } from './+page.server';
+
+type Call = { method: string; path: string; body: unknown };
+type Failure = { status: number; data: { action?: string; error: string } };
+
+function json(body: unknown, status = 200): Response {
+	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+}
+
+function cookies(): Cookies {
+	return { get: vi.fn(() => 'tok'), set: vi.fn(), delete: vi.fn(), getAll: vi.fn(() => []), serialize: vi.fn(() => '') } as unknown as Cookies;
+}
+
+/**
+ * An action event against a fake engine. The session check answers with the
+ * given roles, and every other request is recorded and answered with `reply`.
+ */
+function engine(fields: Record<string, string>, opts: { roles?: string[]; reply?: Response } = {}) {
+	const calls: Call[] = [];
+	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+		const path = String(url);
+		if (path.includes('/auth/me')) return json({ id: 'u1', roles: opts.roles ?? ['super_admin'], disabled: false });
+		calls.push({ method: init?.method ?? 'GET', path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+		return opts.reply?.clone() ?? json({});
+	});
+	const form = new FormData();
+	for (const [k, v] of Object.entries(fields)) form.set(k, v);
+	const url = new URL('http://localhost/admin/audit-log/retention');
+	return {
+		calls,
+		event: { fetch, cookies: cookies(), url, request: new Request(url, { method: 'POST', body: form }) } as never,
+	};
+}
+
+const REFUSED = json({ error: 'event_type must be a namespaced action' }, 422);
+const OUTAGE = json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503);
+
+describe('retention writes by role', () => {
+	const cases = [
+		['createPolicy', { retention_days: '30' }],
+		['deletePolicy', { id: 'p1' }],
+		['createHold', { name: 'Litigation' }],
+		['releaseHold', { id: 'h1' }],
+		['enforce', {}],
+	] as const;
+
+	it.each(cases)('refuses %s to an admin before it reaches the engine', async (name, fields) => {
+		const { event, calls } = engine(fields, { roles: ['admin'] });
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(calls).toEqual([]);
+	});
+});
+
+describe('creating a retention policy', () => {
+	it('posts the window and the archival settings', async () => {
+		const { event, calls } = engine({
+			event_type: ' content.delete ',
+			resource_type: 'entry',
+			retention_days: '90',
+			archival_enabled: 'true',
+			archival_storage: 'cold',
+			archival_path_prefix: 'audit/',
+		});
+		expect(await actions.createPolicy(event)).toEqual({ saved: 'policy' });
+		expect(calls).toEqual([
+			{
+				method: 'POST',
+				path: '/api/admin/retention-policies',
+				body: {
+					event_type: 'content.delete',
+					resource_type: 'entry',
+					retention_days: 90,
+					archival_enabled: true,
+					archival_storage: 'cold',
+					archival_path_prefix: 'audit/',
+				},
+			},
+		]);
+	});
+
+	it.each(['-1', '1.5', 'soon'])('refuses a window of %s without a request', async (days) => {
+		const { event, calls } = engine({ retention_days: days });
+		const out = (await actions.createPolicy(event)) as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data).toEqual({ action: 'createPolicy', error: 'A retention window is a whole number of days, and cannot be negative.' });
+		expect(calls).toEqual([]);
+	});
+
+	it('refuses archival with nowhere to archive to', async () => {
+		const { event, calls } = engine({ retention_days: '30', archival_enabled: 'true', archival_storage: ' ' });
+		const out = (await actions.createPolicy(event)) as Failure;
+		expect(out.data.error).toContain('no storage backend is named');
+		expect(calls).toEqual([]);
+	});
+
+	it('relays the engine refusal under its action', async () => {
+		const { event } = engine({ retention_days: '30' }, { reply: REFUSED });
+		const out = (await actions.createPolicy(event)) as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data).toEqual({ action: 'createPolicy', error: 'event_type must be a namespaced action' });
+	});
+
+	it('keeps outage detail off the page', async () => {
+		const { event } = engine({ retention_days: '30' }, { reply: OUTAGE });
+		const out = (await actions.createPolicy(event)) as Failure;
+		expect(out.data).toEqual({ action: 'createPolicy', error: 'The policy could not be created.' });
+	});
+});
+
+describe('removing a retention policy', () => {
+	it('deletes the named policy', async () => {
+		const { event, calls } = engine({ id: 'p 1' });
+		expect(await actions.deletePolicy(event)).toEqual({ removed: 'p 1' });
+		expect(calls).toEqual([{ method: 'DELETE', path: '/api/admin/retention-policies/p%201', body: undefined }]);
+	});
+
+	it('names nothing to delete without a request', async () => {
+		const { event, calls } = engine({});
+		expect(((await actions.deletePolicy(event)) as Failure).data).toEqual({ action: 'deletePolicy', error: 'No policy was named.' });
+		expect(calls).toEqual([]);
+	});
+
+	it('relays a refusal and hides an outage', async () => {
+		const refused = engine({ id: 'p1' }, { reply: json({ error: 'policy not found' }, 404) });
+		expect(((await actions.deletePolicy(refused.event)) as Failure).data.error).toBe('policy not found');
+		const down = engine({ id: 'p1' }, { reply: OUTAGE });
+		expect(((await actions.deletePolicy(down.event)) as Failure).data.error).toBe('The policy could not be removed.');
+	});
+});
+
+describe('placing a legal hold', () => {
+	it('posts the hold and its filters', async () => {
+		const { event, calls } = engine({ name: ' Litigation ', description: 'Case 4', filter_action: 'user.delete', filter_tenant_id: 'acme' });
+		expect(await actions.createHold(event)).toEqual({ saved: 'Litigation' });
+		expect(calls).toEqual([
+			{
+				method: 'POST',
+				path: '/api/admin/legal-holds',
+				body: {
+					name: 'Litigation',
+					description: 'Case 4',
+					filter_action: 'user.delete',
+					filter_resource_type: '',
+					filter_resource_id: '',
+					filter_tenant_id: 'acme',
+				},
+			},
+		]);
+	});
+
+	it('refuses a hold with no name', async () => {
+		const { event, calls } = engine({ name: '  ' });
+		const out = (await actions.createHold(event)) as Failure;
+		expect(out.data.action).toBe('createHold');
+		expect(out.data.error).toContain('Name the hold');
+		expect(calls).toEqual([]);
+	});
+
+	it('relays a refusal and hides an outage', async () => {
+		const refused = engine({ name: 'Litigation' }, { reply: json({ error: 'a hold with this name exists' }, 409) });
+		expect(((await actions.createHold(refused.event)) as Failure).data.error).toBe('a hold with this name exists');
+		const down = engine({ name: 'Litigation' }, { reply: OUTAGE });
+		expect(((await actions.createHold(down.event)) as Failure).data.error).toBe('The hold could not be created.');
+	});
+});
+
+describe('releasing a legal hold', () => {
+	it('deletes the named hold', async () => {
+		const { event, calls } = engine({ id: 'h1' });
+		expect(await actions.releaseHold(event)).toEqual({ released: 'h1' });
+		expect(calls).toEqual([{ method: 'DELETE', path: '/api/admin/legal-holds/h1', body: undefined }]);
+	});
+
+	it('names nothing to release without a request', async () => {
+		const { event, calls } = engine({});
+		expect(((await actions.releaseHold(event)) as Failure).data).toEqual({ action: 'releaseHold', error: 'No hold was named.' });
+		expect(calls).toEqual([]);
+	});
+
+	it('relays a refusal and hides an outage', async () => {
+		const refused = engine({ id: 'h1' }, { reply: json({ error: 'hold already released' }, 409) });
+		expect(((await actions.releaseHold(refused.event)) as Failure).data).toEqual({ action: 'releaseHold', error: 'hold already released' });
+		const down = engine({ id: 'h1' }, { reply: OUTAGE });
+		expect(((await actions.releaseHold(down.event)) as Failure).data.error).toBe('The hold could not be released.');
+	});
+});
+
+describe('enforcing retention now', () => {
+	it('reports how many entries the engine deleted', async () => {
+		const { event, calls } = engine({}, { reply: json({ deleted: 12 }) });
+		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 12 });
+		expect(calls).toEqual([{ method: 'POST', path: '/api/admin/retention/enforce', body: {} }]);
+	});
+
+	it('reads a run that names no count as none deleted', async () => {
+		const { event } = engine({}, { reply: json({}) });
+		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 0 });
+	});
+
+	it('relays a refusal and hides an outage', async () => {
+		const refused = engine({}, { reply: json({ error: 'a legal hold blocks enforcement' }, 409) });
+		expect(((await actions.enforce(refused.event)) as Failure).data).toEqual({ action: 'enforce', error: 'a legal hold blocks enforcement' });
+		const down = engine({}, { reply: OUTAGE });
+		const out = (await actions.enforce(down.event)) as Failure;
+		expect(out.data.error).toBe('Retention could not be enforced.');
+		expect(out.data.error).not.toContain('10.0.0.4');
+	});
+});

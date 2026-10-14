@@ -92,3 +92,88 @@ describe('admin/webhooks/incoming writes by role', () => {
 		expect(seen.some((u) => u.includes('/api/admin/incoming-webhooks/i1'))).toBe(true);
 	});
 });
+
+type Call = { method: string; path: string; body: unknown };
+type Failure = { status: number; data: { action?: string; error: string } };
+
+/** A super admin's action event against a fake engine that answers every write with `reply`. */
+function superAdminWrite(fields: Record<string, string>, reply: Response = json({})) {
+	const calls: Call[] = [];
+	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+		const path = String(url);
+		if (path.includes('/auth/me')) return json({ id: 'u1', roles: ['super_admin'], disabled: false });
+		calls.push({ method: init?.method ?? 'GET', path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+		return reply.clone();
+	}) as unknown as typeof globalThis.fetch;
+	const form = new FormData();
+	for (const [k, v] of Object.entries(fields)) form.set(k, v);
+	const url = new URL('http://localhost/admin/webhooks/incoming');
+	return { calls, event: { fetch, cookies: mockCookies(), url, request: new Request(url, { method: 'POST', body: form }) } as never };
+}
+
+const ENDPOINT = {
+	name: 'Orders',
+	schema_name: 'orders',
+	secret: 's3cret',
+	field_map: '{"id":"external_id"}',
+	enabled: 'on',
+	allowed_ips: '10.0.0.1\n\n 10.0.0.2 \n',
+};
+
+describe('admin/webhooks/incoming writes', () => {
+	it('creates an endpoint with its map and one address per line', async () => {
+		const { event, calls } = superAdminWrite(ENDPOINT);
+		expect(await actions.create(event)).toBeUndefined();
+		expect(calls).toEqual([
+			{
+				method: 'POST',
+				path: '/api/admin/incoming-webhooks',
+				body: {
+					name: 'Orders',
+					schema_name: 'orders',
+					secret: 's3cret',
+					field_map: { id: 'external_id' },
+					enabled: true,
+					allowed_ips: ['10.0.0.1', '10.0.0.2'],
+				},
+			},
+		]);
+	});
+
+	it('saves an endpoint under its id', async () => {
+		const { event, calls } = superAdminWrite({ ...ENDPOINT, id: 'i1', enabled: 'false' });
+		await actions.update(event);
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toMatchObject({ method: 'PUT', path: '/api/admin/incoming-webhooks/i1', body: { enabled: false } });
+	});
+
+	it.each(['create', 'update'] as const)('refuses a map that is not JSON on %s without a request', async (name) => {
+		const { event, calls } = superAdminWrite({ ...ENDPOINT, id: 'i1', field_map: '{id:' });
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'Field map must be valid JSON.' });
+		expect(calls).toEqual([]);
+	});
+
+	it.each(['create', 'update'] as const)('refuses an empty map on %s without a request', async (name) => {
+		const { event, calls } = superAdminWrite({ ...ENDPOINT, id: 'i1', field_map: '{}' });
+		const out = (await actions[name](event)) as Failure;
+		expect(out.data.action).toBe(name);
+		expect(out.data.error).toContain('at least one external key');
+		expect(calls).toEqual([]);
+	});
+
+	it.each(['create', 'update', 'delete'] as const)('relays the engine refusal on %s under its action', async (name) => {
+		const { event } = superAdminWrite({ ...ENDPOINT, id: 'i1' }, json({ error: 'schema orders does not exist' }, 422));
+		const out = (await actions[name](event)) as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data).toEqual({ action: name, error: 'schema orders does not exist' });
+	});
+
+	it.each([
+		['create', 'Failed to create incoming webhook'],
+		['update', 'Failed to update incoming webhook'],
+		['delete', 'Failed to delete incoming webhook'],
+	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
+		const { event } = superAdminWrite({ ...ENDPOINT, id: 'i1' }, json({ error: 'dial tcp 10.0.0.4:5432' }, 503));
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });
+	});
+});

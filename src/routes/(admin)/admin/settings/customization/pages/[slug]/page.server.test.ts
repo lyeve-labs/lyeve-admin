@@ -14,7 +14,8 @@ vi.mock('$lib/api/customization', async (orig) => ({
 	...api,
 }));
 
-import { load } from './+page.server';
+import { requireRole } from '$lib/server/authz';
+import { actions, load } from './+page.server';
 
 function event() {
 	return {
@@ -54,5 +55,68 @@ describe('custom page editor load', () => {
 		const data = (await load(event())) as { schemas: string[]; schemasRead: boolean };
 		expect(data.schemas).toEqual([]);
 		expect(data.schemasRead).toBe(false);
+	});
+});
+
+type Failure = { status: number; data: { error: string } };
+
+function actionEvent(fields: Record<string, string> = {}) {
+	const body = new FormData();
+	for (const [k, v] of Object.entries(fields)) body.set(k, v);
+	return {
+		params: { slug: 'launch' },
+		request: new Request('http://admin/admin/settings/customization/pages/launch', { method: 'POST', body }),
+	} as never;
+}
+
+describe('custom page editor writes', () => {
+	it.each(['save', 'delete'] as const)('holds %s to an admin', async (name) => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		const event = actionEvent({ page: JSON.stringify(page) });
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(requireRole).toHaveBeenCalledWith(event, ['admin', 'super_admin']);
+		expect(api.saveCustomPage).not.toHaveBeenCalled();
+		expect(api.deleteCustomPage).not.toHaveBeenCalled();
+	});
+
+	it('saves the page under the address it was opened at, whatever the form claims', async () => {
+		api.saveCustomPage.mockResolvedValue(undefined);
+		const out = await actions.save(actionEvent({ page: JSON.stringify({ ...page, slug: 'elsewhere', title: 'Launch day' }) }));
+		expect(out).toEqual({ saved: true });
+		expect(api.saveCustomPage).toHaveBeenCalledWith(expect.anything(), { ...page, slug: 'launch', title: 'Launch day' });
+	});
+
+	it('refuses a page the form did not carry as JSON', async () => {
+		const out = (await actions.save(actionEvent({ page: '{title:' }))) as Failure;
+		expect(out.data.error).toBe('The page could not be read from the form.');
+		expect(api.saveCustomPage).not.toHaveBeenCalled();
+	});
+
+	it('shows the first block problem the engine names', async () => {
+		api.saveCustomPage.mockRejectedValue(new ApiError(422, 'block 2: chart needs a schema'));
+		const out = (await actions.save(actionEvent({ page: JSON.stringify(page) }))) as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('block 2: chart needs a schema');
+	});
+
+	it('deletes the page and returns to the customization settings', async () => {
+		api.deleteCustomPage.mockResolvedValue(undefined);
+		await expect(actions.delete(actionEvent())).rejects.toMatchObject({ status: 303, location: '/admin/settings/customization' });
+		expect(api.deleteCustomPage).toHaveBeenCalledWith(expect.anything(), 'launch');
+	});
+
+	it('stays on the page when the engine refuses the delete', async () => {
+		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found'));
+		const out = (await actions.delete(actionEvent())) as Failure;
+		expect(out.data.error).toBe('page not found');
+	});
+
+	it.each([
+		['save', 'saveCustomPage', 'The page could not be saved.'],
+		['delete', 'deleteCustomPage', 'The page could not be deleted.'],
+	] as const)('keeps outage detail off the page on %s', async (name, fn, sentence) => {
+		api[fn].mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
+		const out = (await actions[name](actionEvent({ page: JSON.stringify(page) }))) as Failure;
+		expect(out.data.error).toBe(sentence);
 	});
 });

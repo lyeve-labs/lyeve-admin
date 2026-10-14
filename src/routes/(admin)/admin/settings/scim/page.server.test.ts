@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('$lib/server/authz', () => ({
-	requireRole: vi.fn(),
-	authedClient: (event: { fetch: typeof fetch }) => ({
-		get: async (path: string) => (await event.fetch(path)).json(),
-	}),
-}));
+const authz = vi.hoisted(() => ({ requireRole: vi.fn() }));
+vi.mock('$lib/server/authz', async () => {
+	const { createClient } = await vi.importActual<typeof import('@lyeve-labs/client')>('@lyeve-labs/client');
+	return {
+		requireRole: authz.requireRole,
+		authedClient: (event: { fetch: typeof fetch }) => createClient(event.fetch),
+	};
+});
 
-import { load } from './+page.server';
+import { actions, load } from './+page.server';
 
 function event(body: unknown, search: string) {
 	return {
@@ -23,5 +25,105 @@ describe('SCIM load', () => {
 			status: 307,
 			location: '/admin/settings/scim?offset=0&limit=25',
 		});
+	});
+});
+
+type Call = { method: string; path: string; body: unknown };
+type Failure = { status: number; data: { action: string; error: string } };
+
+function json(body: unknown, status = 200): Response {
+	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+}
+
+/** An action event against a fake engine that records each request and answers it with `reply`. */
+function write(fields: Record<string, string>, reply: Response = json({})) {
+	const calls: Call[] = [];
+	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+		calls.push({ method: init?.method ?? 'GET', path: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+		return reply.clone();
+	});
+	const form = new FormData();
+	for (const [k, v] of Object.entries(fields)) form.set(k, v);
+	const url = new URL('http://admin/admin/settings/scim');
+	return { calls, event: { fetch, url, request: new Request(url, { method: 'POST', body: form }) } as never };
+}
+
+const TOKEN = 'x'.repeat(32);
+const CONNECTION = { id: 'c1', name: ' Okta ', bearer_token: TOKEN, new_token: TOKEN, deprovision_action: 'disable', deprovision_on_delete: 'true' };
+const OUTAGE = json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503);
+
+describe('SCIM writes', () => {
+	it.each(['create', 'rotate', 'delete'] as const)('holds %s to a super admin', async (name) => {
+		authz.requireRole.mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		const { event, calls } = write(CONNECTION);
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(authz.requireRole).toHaveBeenLastCalledWith(event, ['super_admin']);
+		expect(calls).toEqual([]);
+	});
+
+	it('creates a connection with its token and what deprovisioning does', async () => {
+		const { event, calls } = write(CONNECTION);
+		expect(await actions.create(event)).toEqual({ saved: 'Okta' });
+		expect(calls).toEqual([
+			{
+				method: 'POST',
+				path: '/api/admin/scim/providers',
+				body: { name: 'Okta', bearer_token: TOKEN, deprovision_on_delete: true, deprovision_action: 'disable' },
+			},
+		]);
+	});
+
+	it.each([
+		[{ name: ' ' }, 'Name the connection'],
+		[{ bearer_token: 'short' }, 'Use at least 32 characters.'],
+		[{ deprovision_action: 'shred' }, 'Choose what happens to a deprovisioned account.'],
+	])('refuses %o before it creates anything', async (over, sentence) => {
+		const { event, calls } = write({ ...CONNECTION, ...over });
+		const out = (await actions.create(event)) as Failure;
+		expect(out.data.action).toBe('create');
+		expect(out.data.error).toContain(sentence);
+		expect(calls).toEqual([]);
+	});
+
+	it('rotates the named connection to the new token', async () => {
+		const { event, calls } = write(CONNECTION);
+		expect(await actions.rotate(event)).toEqual({ rotated: 'c1' });
+		expect(calls).toEqual([{ method: 'POST', path: '/api/admin/scim/providers/c1/rotate', body: { new_token: TOKEN } }]);
+	});
+
+	it('refuses a short replacement token, which would lock the directory out', async () => {
+		const { event, calls } = write({ ...CONNECTION, new_token: 'short' });
+		const out = (await actions.rotate(event)) as Failure;
+		expect(out.data.action).toBe('rotate');
+		expect(out.data.error).toContain('The old token stops working');
+		expect(calls).toEqual([]);
+	});
+
+	it('deletes the named connection', async () => {
+		const { event, calls } = write({ id: 'c1' });
+		expect(await actions.delete(event)).toEqual({ removed: 'c1' });
+		expect(calls).toEqual([{ method: 'DELETE', path: '/api/admin/scim/providers/c1', body: undefined }]);
+	});
+
+	it.each(['rotate', 'delete'] as const)('names nothing to %s without a request', async (name) => {
+		const { event, calls } = write({ ...CONNECTION, id: '' });
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'No connection was named.' });
+		expect(calls).toEqual([]);
+	});
+
+	it.each(['create', 'rotate', 'delete'] as const)('relays the engine refusal on %s under its action', async (name) => {
+		const { event } = write(CONNECTION, json({ error: 'connection name already in use' }, 409));
+		const out = (await actions[name](event)) as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data).toEqual({ action: name, error: 'connection name already in use' });
+	});
+
+	it.each([
+		['create', 'The connection could not be created.'],
+		['rotate', 'The token could not be rotated.'],
+		['delete', 'The connection could not be removed.'],
+	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
+		const { event } = write(CONNECTION, OUTAGE);
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });
 	});
 });
