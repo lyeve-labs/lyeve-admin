@@ -11,6 +11,7 @@ function mount(widgets: unknown[] = [], custom = false, running: string[] = ['co
 			data: {
 				layout: { entitled: true, custom, widgets, updated_at: custom ? '2026-09-26T10:00:00Z' : null },
 				schemas: ['posts', 'authors'],
+				schemasGate: { state: 'ok' },
 				plugins: { state: 'named', running, withheld: [] },
 				user: { roles: ['admin'] },
 			},
@@ -76,7 +77,7 @@ describe('dashboard widget controls', () => {
 				data: {
 					layout: { entitled: true, custom: true, widgets, updated_at: null },
 					schemas,
-					schemasRead,
+					schemasGate: schemasRead ? { state: 'ok' } : { state: 'error', message: 'The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.' },
 					plugins: { state: 'named', running: ['content', 'media', 'audit'], withheld: [] },
 					user: { roles: ['admin'] },
 				},

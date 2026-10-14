@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
 
 type Call = { method: string; path: string; body: unknown };
 type Failure = { status: number; data: { action?: string; error: string } };
@@ -81,6 +81,18 @@ describe('region writes', () => {
 		expect(calls[1]).toEqual({ method: 'PUT', path: '/api/admin/regions/r9', body: { enabled: false } });
 	});
 
+	it('says a created region is still open when closing it fails', async () => {
+		const { event } = engine(
+			{ ...REGION, enabled: 'false' },
+			{ respond: (call) => (call.method === 'POST' ? json({ id: 'r9' }) : OUTAGE.clone()) },
+		);
+		const out = (await actions.create(event)) as Failure;
+		expect(out.data.action).toBe('close');
+		expect(out.data.error).toContain('was created but could not be closed');
+		expect(out.data.error).toContain('listed to clients and used for nearest-region routing');
+		expect(out.data.error.endsWith('Edit it and turn off Accepting new tenants.')).toBe(true);
+	});
+
 	it('leaves out coordinates that were never filled in', async () => {
 		const { event, calls } = engine({ ...REGION, lat: '0', long: '0' });
 		await actions.create(event);
@@ -132,5 +144,57 @@ describe('region writes', () => {
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = engine({ id: 'r1', ...REGION }, { reply: OUTAGE });
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });
+	});
+});
+
+describe('the report read', () => {
+	function loadEvent(report: Response) {
+		const { event } = engine({}, { respond: (call) => (call.path.includes('/residency/report') ? report.clone() : json({ data: [] })) });
+		return {
+			...(event as object),
+			parent: async () => ({
+				plugins: { state: 'named', running: ['data-residency'], withheld: [] },
+				user: { id: 'u1', roles: ['super_admin'] },
+			}),
+		} as never;
+	}
+
+	it('names a role refusal as one, not as an unread report', async () => {
+		const out = (await load(loadEvent(json({ error: 'forbidden' }, 403)))) as Record<string, unknown>;
+		expect(out.report).toBeNull();
+		expect(out.reportGate).toEqual({ state: 'forbidden' });
+	});
+
+	it('names an outage as one', async () => {
+		const out = (await load(loadEvent(OUTAGE))) as Record<string, unknown>;
+		expect(out.reportGate).toEqual({ state: 'unavailable' });
+	});
+
+	it('reads one region past the cap to say the list was cut', async () => {
+		const { event, calls } = engine(
+			{},
+			{
+				respond: (call) =>
+					call.path.includes('/regions')
+						? json({ data: Array.from({ length: 101 }, (_, i) => ({ id: `r${i}`, slug: `r${i}` })) })
+						: json({ summary: null, tenant_regions: [] }),
+			},
+		);
+		const out = (await load({
+			...(event as object),
+			parent: async () => ({
+				plugins: { state: 'named', running: ['data-residency'], withheld: [] },
+				user: { id: 'u1', roles: ['super_admin'] },
+			}),
+		} as never)) as { regions: unknown[]; more: boolean };
+		expect(calls.find((c) => c.path.includes('/regions'))?.path).toContain('limit=101');
+		expect(out.regions).toHaveLength(100);
+		expect(out.more).toBe(true);
+	});
+
+	it('hands over the report it read', async () => {
+		const out = (await load(loadEvent(json({ summary: null, tenant_regions: [] })))) as Record<string, unknown>;
+		expect(out.reportGate).toEqual({ state: 'ok' });
+		expect(out.report).toEqual({ summary: null, tenant_regions: [] });
 	});
 });

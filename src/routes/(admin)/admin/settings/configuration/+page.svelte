@@ -130,6 +130,9 @@
 				<Alert tone={data.plugin.found ? 'brand' : 'warn'}>
 					{#if data.plugin.found}
 						Showing the settings of the <span class="font-mono">{data.plugin.name}</span> plugin.
+					{:else if data.plugin.failed}
+						The settings the <span class="font-mono">{data.plugin.name}</span> plugin declares could not be
+						read, so the list below may miss some. Try again in a moment.
 					{:else}
 						The <span class="font-mono">{data.plugin.name}</span> plugin declares no settings, or is not running.
 					{/if}

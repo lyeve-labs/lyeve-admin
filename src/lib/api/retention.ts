@@ -65,12 +65,33 @@ export function retentionGate(err: unknown): RetentionGate {
 	return gateOf(err, 'The retention rules could not be read. This is not a report that nothing is being deleted.');
 }
 
+/** The largest page the plugin serves. */
+const PAGE = 500;
+
+/**
+ * Every row of a paged list. The plugin pages at 50 by default, and the page
+ * judges whether deletion is blocked from the whole set, so a partial read
+ * would answer wrong.
+ */
+async function readAll<T>(client: HttpClient, url: string): Promise<ListEnvelope<T>> {
+	const rows: T[] = [];
+	for (let offset = 0; ; offset += PAGE) {
+		const page = await client.get<ListEnvelope<T>>(`${url}?limit=${PAGE}&offset=${offset}`);
+		const got = page.data ?? [];
+		rows.push(...got);
+		const total = page.total_count ?? page.total;
+		if (got.length < PAGE || (typeof total === 'number' && rows.length >= total)) {
+			return { data: rows, total_count: total ?? rows.length };
+		}
+	}
+}
+
 export async function listPolicies(client: HttpClient): Promise<ListEnvelope<RetentionPolicy>> {
-	return client.get<ListEnvelope<RetentionPolicy>>(POLICIES_URL);
+	return readAll<RetentionPolicy>(client, POLICIES_URL);
 }
 
 export async function listHolds(client: HttpClient): Promise<ListEnvelope<LegalHold>> {
-	return client.get<ListEnvelope<LegalHold>>(HOLDS_URL);
+	return readAll<LegalHold>(client, HOLDS_URL);
 }
 
 export interface SavePolicy {

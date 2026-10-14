@@ -112,6 +112,16 @@ describe('Data export jobs', () => {
 		expect(said(under.container)).not.toContain('entry ceiling');
 	});
 
+	it('counts running and failed on this page once the list is paged', () => {
+		const { container } = render(ExportPage, { props: props({ jobs: [job({ status: 'failed' })], total: 80 }) });
+		expect(said(container)).toContain('Failed on this page');
+		expect(said(container)).toContain('Running on this page');
+		cleanup();
+		const one = render(ExportPage, { props: props() });
+		expect(said(one.container)).not.toContain('on this page 0');
+		expect(one.container.textContent).not.toContain('Failed on this page');
+	});
+
 	it('states a size a person can read', () => {
 		const { container } = render(ExportPage, { props: props() });
 		expect(said(container)).toContain('2.0 KB');

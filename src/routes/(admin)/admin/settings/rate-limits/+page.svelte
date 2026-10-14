@@ -60,6 +60,9 @@
 	// Unknown is its own state: a failed read is neither locked nor unlocked.
 	const customEnabled = $derived(overview?.custom_licensed ?? null);
 	const unenforced = $derived(data.rules.filter((r) => !r.enforced));
+	// The rules are paged, so the count comes from the engine's total when it
+	// states one, not from the rows on this page.
+	const stored = $derived(data.total ?? data.rules.length);
 	const canEditProtections = $derived(data.superAdmin && customEnabled === true);
 
 	/**
@@ -162,7 +165,7 @@
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
-			<Stat size="sm" mono label="Custom rules" value={data.rules.length} />
+			<Stat size="sm" mono label="Custom rules" value={stored} />
 			<Stat
 				size="sm"
 				mono
@@ -315,8 +318,8 @@
 					     until then, and the page says so rather than listing them as
 					     live. -->
 					<Alert tone="warn">
-						{data.rules.length}
-						{data.rules.length === 1 ? 'stored rule is' : 'stored rules are'} not enforced on
+						{stored}
+						{stored === 1 ? 'stored rule is' : 'stored rules are'} not enforced on
 						this instance. They apply again when custom rules are enabled, and deleting one is
 						allowed either way.
 					</Alert>

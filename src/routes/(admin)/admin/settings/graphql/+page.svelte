@@ -208,6 +208,12 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.persistedTotal > persisted.length}
+					<p class="text-xs text-muted">
+						Showing the first {persisted.length} of {data.persistedTotal} persisted queries. The rest still answer by
+						hash, but this page cannot show, switch off or delete them.
+					</p>
+				{/if}
 				<Table label="Persisted queries">
 					<thead>
 						<tr>

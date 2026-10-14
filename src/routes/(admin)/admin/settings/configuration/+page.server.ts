@@ -57,12 +57,19 @@ export const load: PageServerLoad = async (event) => {
 	// engine's list cannot know about.
 	const pluginName = event.url.searchParams.get('plugin')?.trim() ?? '';
 	if (!pluginName || !read.ok) return { provenance: read, plugin: null };
-	const schema = await getPluginSchema(pluginName, client).catch(() => null);
+	// The engine answers 404 for a plugin that declares no settings or is not
+	// running. Any other failure is a read that did not happen, and the page
+	// says so rather than reporting a plugin with nothing to set.
+	let failed = false;
+	const schema = await getPluginSchema(pluginName, client).catch((err: unknown) => {
+		if (!(err instanceof ApiError && err.status === 404)) failed = true;
+		return null;
+	});
 	const merged = pluginSettings(read.value.settings, schema);
 	const provenance: Section<ConfigProvenance> = { ok: true, value: { ...read.value, settings: merged.settings } };
 	return {
 		provenance,
-		plugin: { name: pluginName, keys: merged.keys, found: schema !== null },
+		plugin: { name: pluginName, keys: merged.keys, found: schema !== null, failed },
 	};
 };
 

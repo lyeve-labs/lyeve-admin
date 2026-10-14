@@ -148,13 +148,14 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Where tenants are</SectionHeading>
 
-			{#if !data.reportRead}
+			{#if data.reportGate.state !== 'ok'}
 				<!-- An unread report is never drawn as a clean one. Zero unassigned
 				     tenants because nobody could ask is the worst answer here. -->
-				<Alert tone="danger">
-					The residency report could not be read. This is not a report that every tenant is
-					placed.
-				</Alert>
+				<GateNotice
+					gate={data.reportGate}
+					title="The residency report"
+					absent="This instance serves no residency report, so it cannot say where tenants are."
+				/>
 			{:else if summary}
 				<div class="grid gap-4 sm:grid-cols-4">
 					<Stat size="sm" mono label="Regions" value={summary.total_regions} />
@@ -273,6 +274,11 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.more}
+					<p class="text-xs text-muted">
+						Showing the first 100 regions. Regions past the hundredth are not listed here.
+					</p>
+				{/if}
 				<Table label="Regions">
 					<thead>
 						<tr>

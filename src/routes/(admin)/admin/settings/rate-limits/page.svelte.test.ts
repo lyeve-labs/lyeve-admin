@@ -60,7 +60,7 @@ const protection = {
 	customized: false,
 };
 
-type Over = { customEnabled?: boolean | null; superAdmin?: boolean; rules?: unknown[]; form?: unknown };
+type Over = { customEnabled?: boolean | null; superAdmin?: boolean; rules?: unknown[]; total?: number; form?: unknown };
 
 function setup(over: Over = {}) {
 	return render(RateLimitsPage, { props: props(over) });
@@ -72,7 +72,7 @@ function props(over: Over = {}) {
 		data: {
 			routes: [],
 			rules: over.rules ?? [customRule],
-			total: 1,
+			total: over.total ?? 1,
 			limit: 50,
 			offset: 0,
 			hasMore: false,
@@ -224,5 +224,12 @@ describe('rate-limits controls', () => {
 		expect(group.textContent).toContain('Each address a request comes from has a budget of its own.');
 		expect(group.textContent).toContain('One budget across every address an account calls from.');
 		expect(document.body.querySelector('#rl-key')).toBeNull();
+	});
+});
+
+describe('the stored rule count on a paged list', () => {
+	it('counts every stored rule from the total, not the rows on this page', () => {
+		const { getByText } = setup({ total: 120 });
+		expect(getByText(/120\s+stored rules are not enforced/)).toBeTruthy();
 	});
 });

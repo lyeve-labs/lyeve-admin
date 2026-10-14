@@ -216,11 +216,11 @@
 
 		<div class="grid gap-4 sm:grid-cols-3">
 			<Stat size="sm" mono label="Exports" value={formatCount(data.total)} />
-			<Stat size="sm" mono label="Running" value={formatCount(running.length)} />
+			<Stat size="sm" mono label={paged ? 'Running on this page' : 'Running'} value={formatCount(running.length)} />
 			<Stat
 				size="sm"
 				mono
-				label="Failed"
+				label={paged ? 'Failed on this page' : 'Failed'}
 				value={formatCount(failed)}
 				tone={failed > 0 ? 'danger' : undefined}
 			/>

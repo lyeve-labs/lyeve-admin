@@ -28,22 +28,29 @@ export const load: PageServerLoad = async (event) => {
 			gate: absent,
 			schema: { ok: false, gate: absent } as Section<Schema>,
 			persisted: { ok: false, gate: absent } as Section<PersistedQuery[]>,
+			persistedTotal: 0,
 		};
 	}
 
 	const client = authedClient(event);
 	// The schema and the allowlist are read apart: an instance that refuses
 	// introspection still keeps an allowlist, and the reverse.
+	// The plugin answers at most 200 a page and says how many it holds, so the
+	// total is kept to say what the list leaves out.
+	let persistedTotal = 0;
 	const [schema, persisted] = await Promise.all([
 		section(introspect(client), 'The schema could not be read. This is not a report that it is empty.'),
 		section(
-			listPersisted(client).then((r) => r.data),
+			listPersisted(client).then((r) => {
+				persistedTotal = r.total;
+				return r.data;
+			}),
 			'The persisted queries could not be read. This is not a report that there are none.',
 		),
 	]);
 	// Both refused is the plugin's answer as a whole, so the page says it once.
 	const gate: GraphqlGate = !schema.ok && !persisted.ok ? schema.gate : GRAPHQL_OK;
-	return { gate, schema, persisted };
+	return { gate, schema, persisted, persistedTotal };
 };
 
 const hashOf = async (event: Parameters<Actions[string]>[0]) => String((await event.request.formData()).get('hash') ?? '').trim();

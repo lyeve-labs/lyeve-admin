@@ -102,3 +102,11 @@ describe('switching and deleting a persisted query', () => {
 	});
 });
 
+describe('the persisted query total', () => {
+	it('hands over how many the plugin holds beside the page it read', async () => {
+		introspect.mockResolvedValue({ roots: null, refused: null });
+		listPersisted.mockResolvedValue({ data: [{ hash: 'h1' }], total: 340 });
+		const data = (await load(event(['graphql']))) as Record<string, unknown>;
+		expect(data.persistedTotal).toBe(340);
+	});
+});

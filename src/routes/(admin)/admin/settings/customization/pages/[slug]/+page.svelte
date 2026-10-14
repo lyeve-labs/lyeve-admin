@@ -21,6 +21,7 @@
 	import { ICON } from '$lib/icon';
 	import { ROLE_CHOICES, editablePage, type Block, type BlockType, type CustomPage } from '$lib/api/customization';
 	import type { PageData, ActionData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -136,10 +137,12 @@
 			<Alert tone="success" autoDismiss>Saved.</Alert>
 		{/if}
 
-		{#if !data.schemasRead}
-			<Alert tone="warn">
-				The schemas could not be read, so no schema can be picked below. A block keeps the schemas it already names.
-			</Alert>
+		{#if data.schemasGate.state !== 'ok'}
+			<GateNotice
+				gate={data.schemasGate}
+				title="The schema list"
+				absent="This instance serves no schema list, so no schema can be picked below."
+			/>
 		{/if}
 
 		<Card pad="md">

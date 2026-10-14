@@ -95,8 +95,30 @@ describe('configuration load', () => {
 			provenance: { value: { settings: { key: string; source: string }[] } };
 			plugin: { name: string; keys: string[]; found: boolean };
 		};
-		expect(result.plugin).toEqual({ name: 'email', keys: ['SMTP_HOST', 'SMTP_PORT'], found: true });
+		expect(result.plugin).toEqual({ name: 'email', keys: ['SMTP_HOST', 'SMTP_PORT'], found: true, failed: false });
 		expect(result.provenance.value.settings.map((s) => [s.key, s.source])).toEqual([['SMTP_HOST', 'env'], ['SMTP_PORT', 'default']]);
+	});
+});
+
+describe('configuration load for a plugin', () => {
+	async function loadWith(schemaError: Error) {
+		const get = vi.fn(async (path: string) => {
+			if (path === '/api/admin/config') return { settings: [], counts: {} };
+			throw schemaError;
+		});
+		mockedCreateClient.mockReturnValue({ get } as never);
+		return (await load({ fetch: vi.fn(), cookies: authed(), url: new URL('http://admin.test/x?plugin=email') } as never)) as {
+			plugin: { found: boolean; failed: boolean };
+		};
+	}
+
+	it('reads only a 404 as a plugin with no settings', async () => {
+		expect((await loadWith(new ApiError(404, 'not found'))).plugin).toMatchObject({ found: false, failed: false });
+	});
+
+	it('reports a failed schema read as a failure, not as no settings', async () => {
+		expect((await loadWith(new ApiError(503, 'down'))).plugin).toMatchObject({ found: false, failed: true });
+		expect((await loadWith(new ApiError(429, 'busy'))).plugin).toMatchObject({ failed: true });
 	});
 });
 

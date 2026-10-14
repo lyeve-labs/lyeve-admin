@@ -138,3 +138,16 @@ describe('persisted query delete', () => {
 		expect(out.sent).toBe('abc123');
 	});
 });
+describe('a persisted query list past one page', () => {
+	const query = { query_hash: 'abc123def456', operation_name: 'Landing', query: '{ x }', description: '', enabled: true };
+
+	it('says how many it cannot show', () => {
+		const { container } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] }, persistedTotal: 340 }) });
+		expect(container.textContent).toContain('Showing the first 1 of 340 persisted queries');
+	});
+
+	it('says nothing when the list is whole', () => {
+		const { container } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] }, persistedTotal: 1 }) });
+		expect(container.textContent).not.toContain('Showing the first');
+	});
+});
