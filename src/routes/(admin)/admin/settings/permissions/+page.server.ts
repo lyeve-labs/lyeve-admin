@@ -2,14 +2,14 @@ import type { PageServerLoad, Actions } from './$types';
 import type { Permission, Schema } from '@lyeve-labs/client';
 import { getSchemas, listPermissions, upsertPermission, deletePermission } from '@lyeve-labs/client-rest';
 import { refusalOf } from '$lib/api/refusal';
-import { fail, error } from '@sveltejs/kit';
+import { fail, error, isHttpError, isRedirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { listAllFlows } from '$lib/api/flows';
 import type { FlowOption } from '$lib/flow/types';
 import { isFlowResource } from '$lib/flow/permissions';
 import { getRoleLimits, type RoleLimits } from '$lib/api/permissions';
 import { actionError, actionFailure } from '$lib/server/action-error';
-import { section } from '$lib/api/gate';
+import { gateOf, section, type Gate } from '$lib/api/gate';
 
 // Static text. The engine's own message can carry driver or upstream detail
 // that has no place in a page, and the operator's next step is the same
@@ -42,13 +42,23 @@ export const load: PageServerLoad = async (event) => {
 		]);
 		const flows: FlowOption[] = flowRead.ok ? flowRead.value : [];
 		const flowsFailed = !flowRead.ok && flowRead.gate.state !== 'absent';
-		return { permissions, schemas, flows, flowsFailed, roleCap, roleCount, loadError: null as string | null };
-	} catch {
+		return { permissions, schemas, flows, flowsFailed, roleCap, roleCount, loadGate: null as Gate | null };
+	} catch (err) {
+		if (isRedirect(err) || isHttpError(err)) throw err;
 		// An empty list alone draws exactly the matrix an instance with no rules
 		// draws. On a 503 or an expired session that would tell the operator
 		// nothing is restricted, and the next click would grant a rule on top of
-		// rules still in the database, so the failure is named.
-		return { permissions: [] as Permission[], schemas: [] as Schema[], flows: [] as FlowOption[], flowsFailed: false, roleCap, roleCount, loadError: LOAD_FAILED };
+		// rules still in the database, so the failure is named, and a busy
+		// engine reads apart from a down one or an absent plugin.
+		return {
+			permissions: [] as Permission[],
+			schemas: [] as Schema[],
+			flows: [] as FlowOption[],
+			flowsFailed: false,
+			roleCap,
+			roleCount,
+			loadGate: gateOf(err, LOAD_FAILED) as Gate | null,
+		};
 	}
 };
 

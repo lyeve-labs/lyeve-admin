@@ -85,19 +85,39 @@ export const load: PageServerLoad = async (event) => {
 	const logToken = url.searchParams.get('log');
 	if (logToken) {
 		const logOffset = Math.max(0, Number(url.searchParams.get('log_offset')) || 0);
-		log = await listAdminTokenRequests(client, logToken, PAGE, logOffset)
-			.then((res) => {
-				const rows = rowsOf(res);
-				return { token: logToken, rows, total: Math.max(totalOf(res), logOffset + rows.length), limit: PAGE, offset: logOffset };
-			})
-			.catch((err) => ({
+		const read = await listAdminTokenRequests(client, logToken, PAGE, logOffset).then(
+			(res) => ({ ok: true as const, res }),
+			(err: unknown) => ({ ok: false as const, err })
+		);
+		if (read.ok) {
+			const logRows = rowsOf(read.res);
+			// A log_offset past the end would draw "No requests yet" for a token
+			// that has some, so it goes back to the last page that holds rows.
+			const back = pastEndOffset(logRows.length, PAGE, logOffset, statedTotal(read.res));
+			if (back !== null) {
+				const next = new URL(url);
+				if (back > 0) next.searchParams.set('log_offset', String(back));
+				else next.searchParams.delete('log_offset');
+				redirect(307, `${next.pathname}${next.search}`);
+			}
+			log = {
+				token: logToken,
+				rows: logRows,
+				total: Math.max(totalOf(read.res), logOffset + logRows.length),
+				limit: PAGE,
+				offset: logOffset,
+			};
+		} else {
+			const err = read.err;
+			log = {
 				token: logToken,
 				rows: [],
 				total: 0,
 				limit: PAGE,
 				offset: logOffset,
 				error: err instanceof ApiError && err.status === 404 ? 'This token is not one you can see.' : loadError(err, 'request log'),
-			}));
+			};
+		}
 	}
 
 	return {

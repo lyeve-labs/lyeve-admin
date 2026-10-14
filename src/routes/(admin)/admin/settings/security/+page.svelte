@@ -2,6 +2,7 @@
 	import { Alert, Badge, Card, PageShell, SectionHeading, Stat, EmptyState } from '@lyeve-labs/ui-kit';
 	import { CircleCheck, CircleAlert, CircleX, CircleDashed } from '@lucide/svelte';
 	import type { PageData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		CONTROL_LABEL,
 		CONTROL_SUMMARY,
@@ -32,7 +33,7 @@
 	// then what is not built in. The list is what to do, in that order.
 	const ORDER: Record<ControlStatus, number> = { FAIL: 0, WARN: 1, PASS: 2, SKIP: 3 };
 	const controls = $derived(
-		[...(data.report?.controls ?? [])].sort((a, b) => ORDER[a.status] - ORDER[b.status])
+		[...(data.report.ok ? data.report.value.controls : [])].sort((a, b) => ORDER[a.status] - ORDER[b.status])
 	);
 	const count = (status: ControlStatus) => controls.filter((c) => c.status === status).length;
 	const label = (c: SecurityControl) => CONTROL_LABEL[c.control] ?? c.control;
@@ -44,21 +45,19 @@
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
-	{#if data.unavailable === 'missing'}
-		<Alert tone="warn" title="This engine does not report its controls">
-			Its boot log lists the same controls.
-		</Alert>
-	{:else if data.unavailable === 'down' || !data.report}
-		<Alert tone="danger" title="The engine did not answer">
-			The report is read live from the engine, and the engine is not reachable. Try again in a
-			moment.
-		</Alert>
+	{#if !data.report.ok}
+		<GateNotice
+			gate={data.report.gate}
+			title="Security"
+			absent="This engine does not report its controls. Its boot log lists the same controls."
+		/>
 	{:else}
-		{#if data.report.failures > 0}
+		{@const report = data.report.value}
+		{#if report.failures > 0}
 			<Alert tone="danger" title="Configured but not enforcing">
-				{data.report.failures === 1
+				{report.failures === 1
 					? 'One control is switched on and not in the request path.'
-					: `${data.report.failures} controls are switched on and not in the request path.`}
+					: `${report.failures} controls are switched on and not in the request path.`}
 				That is the case to fix first: it reads as protected and is not.
 			</Alert>
 		{/if}
@@ -108,7 +107,7 @@
 			{/if}
 
 			<p class="text-xs text-faint">
-				Checked {formatDateTime(data.report.checked_at)}. Crawlers are refused on every admin response
+				Checked {formatDateTime(report.checked_at)}. Crawlers are refused on every admin response
 				and at /robots.txt. The public content API is left open to the crawlers a site invites.
 			</p>
 		</section>

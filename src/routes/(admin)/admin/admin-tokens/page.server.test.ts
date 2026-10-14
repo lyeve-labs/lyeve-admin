@@ -180,4 +180,17 @@ describe('the load', () => {
 		expect(out.log).toMatchObject({ token: 't1', total: 51, offset: 50 });
 		expect(out.tenants.value.map((t) => t.slug)).toEqual(['default']);
 	});
+
+	it('sends a request log offset past the end back to its last page', async () => {
+		const { ev } = loadEvent(
+			['super_admin'],
+			{
+				'GET /api/admin/admin-tokens': { status: 200, body: { data: [], total_count: 0 } },
+				'GET /api/admin/admin-tokens/t1/requests': { status: 200, body: { data: [], limit: 50, offset: 500, total_count: 51 } },
+				'GET /api/admin/tenants': { status: 200, body: { data: [], total_count: 0 } },
+			},
+			'http://admin/admin/admin-tokens?log=t1&log_offset=500'
+		);
+		await expect(load(ev)).rejects.toMatchObject({ status: 307, location: '/admin/admin-tokens?log=t1&log_offset=50' });
+	});
 });

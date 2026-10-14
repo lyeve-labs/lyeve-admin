@@ -53,7 +53,7 @@ function loadEvent() {
 interface LoadResult {
 	permissions: unknown[];
 	schemas: unknown[];
-	loadError: string | null;
+	loadGate: { state: string; message?: string } | null;
 }
 
 const permission = {
@@ -78,7 +78,7 @@ describe('permissions +page.server.ts load', () => {
 
 		expect(result.permissions).toEqual([permission]);
 		expect(result.schemas).toEqual([{ name: 'article' }]);
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 	});
 
 	it('reports a failed read rather than an empty matrix', async () => {
@@ -89,7 +89,7 @@ describe('permissions +page.server.ts load', () => {
 
 		const result = (await load(loadEvent())) as unknown as LoadResult;
 
-		expect(result.loadError).toBeTruthy();
+		expect(result.loadGate).toBeTruthy();
 		expect(result.permissions).toEqual([]);
 	});
 
@@ -99,7 +99,7 @@ describe('permissions +page.server.ts load', () => {
 
 		const result = (await load(loadEvent())) as unknown as LoadResult;
 
-		expect(result.loadError).toBeTruthy();
+		expect(result.loadGate).toBeTruthy();
 		expect(result.schemas).toEqual([]);
 	});
 
@@ -109,8 +109,8 @@ describe('permissions +page.server.ts load', () => {
 
 		const result = (await load(loadEvent())) as unknown as LoadResult;
 
-		expect(result.loadError).not.toContain('pq:');
-		expect(result.loadError).not.toContain('SSL');
+		expect(JSON.stringify(result.loadGate)).not.toContain('pq:');
+		expect(JSON.stringify(result.loadGate)).not.toContain('SSL');
 	});
 
 	it('refuses a session without super_admin', async () => {
@@ -157,7 +157,7 @@ describe('permissions +page.server.ts role ceiling', () => {
 		const result = (await load(loadEvent())) as LoadResult & { roleCap: number; roleCount: number | null };
 		expect(result.roleCap).toBe(0);
 		expect(result.roleCount).toBeNull();
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 		expect(result.permissions).toHaveLength(1);
 	});
 
@@ -166,7 +166,7 @@ describe('permissions +page.server.ts role ceiling', () => {
 		limits.getRoleLimits.mockResolvedValueOnce({ roles: { limit: 7, current: 7 } });
 		const result = (await load(loadEvent())) as LoadResult & { roleCap: number };
 		expect(result.roleCap).toBe(7);
-		expect(result.loadError).toBeTruthy();
+		expect(result.loadGate).toBeTruthy();
 	});
 });
 
@@ -177,7 +177,7 @@ describe('permissions +page.server.ts flows as resources', () => {
 		flows.listAllFlows.mockResolvedValueOnce([{ id: 'f1', slug: 'send-receipt', name: 'Send receipt' }]);
 		const result = (await load(loadEvent())) as LoadResult & { flows: { slug: string }[] };
 		expect(result.flows.map((f) => f.slug)).toEqual(['send-receipt']);
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 	});
 
 	it('reads an instance without the flow plugin as no flows, not a failed read', async () => {
@@ -187,7 +187,7 @@ describe('permissions +page.server.ts flows as resources', () => {
 		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
 		expect(result.flows).toEqual([]);
 		expect(result.flowsFailed).toBe(false);
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 	});
 
 	it('says the flows could not be read when the list fails for another reason', async () => {
@@ -197,7 +197,7 @@ describe('permissions +page.server.ts flows as resources', () => {
 		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
 		expect(result.flows).toEqual([]);
 		expect(result.flowsFailed).toBe(true);
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 	});
 
 	it('refuses activate on a schema before calling the engine', async () => {

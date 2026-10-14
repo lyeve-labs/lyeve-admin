@@ -16,6 +16,7 @@ type SubmitFn = (input: unknown) => EnhanceCallback | void;
 // passes it is: it decides whether the modal closes and whether load reruns.
 const forms = vi.hoisted(() => ({ submits: [] as SubmitFn[] }));
 
+vi.mock('$app/state', () => ({ page: { url: new URL('http://admin/admin/settings/permissions') } }));
 vi.mock('$app/forms', () => ({
 	enhance: (_node: HTMLFormElement, submit?: SubmitFn) => {
 		if (submit) forms.submits.push(submit);
@@ -74,14 +75,14 @@ function setup() {
 	});
 }
 
-function setupFailedLoad() {
+function setupFailedLoad(loadGate: unknown = { state: 'error', message: 'Permission rules could not be read from the engine.' }) {
 	return render(PermissionsPage, {
 		props: {
 			data: {
 				permissions: [],
 				schemas: [],
 				entitlements,
-				loadError: 'Permission rules could not be read from the engine.',
+				loadGate,
 			},
 			form: null,
 		} as never,
@@ -154,6 +155,13 @@ describe('permissions page load failure', () => {
 		const { container } = setupFailedLoad();
 		expect(container.textContent).toContain('Permission rules could not be read from the engine.');
 		expect(container.querySelector('table'), 'a matrix was drawn from a failed read').toBeNull();
+	});
+
+	it('says a busy engine is busy rather than that the session expired', () => {
+		const { container } = setupFailedLoad({ state: 'busy' });
+		expect(container.textContent).toContain('Too many requests');
+		expect(container.textContent).not.toContain('session has');
+		expect(container.querySelector('table')).toBeNull();
 	});
 
 	it('offers no write control while the rules are unknown', () => {
@@ -686,6 +694,19 @@ describe('permissions page drawers', () => {
 		await fireEvent.click(newRoleButton(getAllByRole('button')));
 		await rerender({ data: dataWith(), form: { action: 'role', error: 'The rule could not be saved.' } } as never);
 		expect(roleText()).toContain('The rule could not be saved.');
+	});
+
+	it('takes the ceiling from the refusal when the limits read failed', () => {
+		const refused = { kind: 'cap', cap: 'permissions.roles', limit: 5, current: 5, upgradeUrl: '' };
+		const { container } = setupWith({ action: 'role', roleCapReached: true, refused }, { roleCap: 0, roleCount: null });
+		expect(container.textContent).toContain('The ceiling is 5 roles and this instance has 5.');
+		expect(container.textContent).not.toContain('The ceiling is 0 roles');
+	});
+
+	it('states no ceiling when neither the refusal nor the read gave one', () => {
+		const { container } = setupWith({ action: 'role', roleCapReached: true }, { roleCap: 0, roleCount: null });
+		expect(container.textContent).toContain('This instance allows no more roles.');
+		expect(container.textContent).not.toContain('The ceiling is 0 roles');
 	});
 
 	it('shows the role ceiling refusal with its numbers in the role drawer', async () => {

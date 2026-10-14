@@ -18,6 +18,7 @@
 	import { tick } from 'svelte';
 	import type { PageData, ActionData } from './$types';
 	import type { Permission } from '@lyeve-labs/client';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ALL_FLOWS, isFlowResource } from '$lib/flow/permissions';
 	import { ICON } from '$lib/icon';
@@ -61,7 +62,8 @@
 
 	// Set when the read failed. An empty matrix and a failed read look the same
 	// on this screen, so the table is withheld rather than drawn from nothing.
-	const loadError = $derived<string | null>(data.loadError ?? null);
+	const loadGate = $derived(data.loadGate ?? null);
+	const loadError = $derived(loadGate !== null);
 
 	// What the plugin counts against the ceiling: roles that have at least one
 	// rule, as its limits read reports them. Without that read the count comes
@@ -75,6 +77,12 @@
 	// lifted. 0 is unlimited.
 	const roleCap = $derived<number>(data.roleCap ?? 0);
 	const atRoleCap = $derived(roleCap > 0 && storedRoleCount >= roleCap);
+
+	// A refusal at the ceiling carries the numbers the plugin checked. They
+	// win over the load's, which are 0 and a guess when the limits read failed.
+	const capRefusal = $derived(failure?.roleCapReached && refusal?.kind === 'cap' ? refusal : null);
+	const refusedLimit = $derived(capRefusal?.limit ?? (roleCap > 0 ? roleCap : null));
+	const refusedCount = $derived(capRefusal?.current ?? (roleCap > 0 ? storedRoleCount : null));
 
 	let schemaFilter = $state('');
 	let showUnruled = $state(false);
@@ -194,8 +202,14 @@
 	{:else if failure?.roleCapReached}
 		<Alert tone="warn" title="That would pass this instance's role ceiling">
 			{#snippet children()}
-				The ceiling is {roleCap} roles and this instance has {storedRoleCount}. Nothing was changed
-				and every role you have keeps working.
+				{#if refusedLimit !== null && refusedCount !== null}
+					The ceiling is {refusedLimit} roles and this instance has {refusedCount}.
+				{:else if refusedLimit !== null}
+					The ceiling is {refusedLimit} roles.
+				{:else}
+					This instance allows no more roles.
+				{/if}
+				Nothing was changed and every role you have keeps working.
 			{/snippet}
 		</Alert>
 	{:else if pageError}
@@ -204,11 +218,12 @@
 		</Alert>
 	{/if}
 
-	{#if loadError}
-		<Alert tone="danger" title="Permission rules unavailable">
-			{#snippet children()}{loadError} Reload once the engine answers again, and check the session has
-				not expired.{/snippet}
-		</Alert>
+	{#if loadGate}
+		<GateNotice
+			gate={loadGate}
+			title="Row-level permissions"
+			absent="The permissions plugin is not running on this instance, so it holds no row-level rules to manage."
+		/>
 	{:else}
 		<!-- The explanatory card below renders its title as an h3, so without this
 		     the page would go from its own title straight to a level three. -->

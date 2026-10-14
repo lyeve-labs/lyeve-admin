@@ -40,7 +40,7 @@ describe('security load', () => {
 		engine.get.mockResolvedValue(report);
 		const data = await load(event());
 		expect(engine.get).toHaveBeenCalledWith('/api/admin/security/controls');
-		expect(data).toEqual({ report, unavailable: null });
+		expect(data).toEqual({ report: { ok: true, value: report } });
 	});
 
 	it('refuses a lower role before reading anything', async () => {
@@ -48,12 +48,14 @@ describe('security load', () => {
 		expect(engine.get).not.toHaveBeenCalled();
 	});
 
-	it('tells an engine without the report apart from a dead one', async () => {
-		// A 404 is an engine without the endpoint, which the page says one way.
-		// Anything else is an engine that did not answer.
+	it('tells an engine without the report apart from a dead one and a busy one', async () => {
+		// A 404 is an engine without the endpoint, a 429 an engine that is up
+		// and refusing for the rate, and a 503 one that did not answer.
 		engine.get.mockRejectedValue(new ApiError(404, 'not found'));
-		expect(await load(event())).toEqual({ report: null, unavailable: 'missing' });
+		expect(await load(event())).toEqual({ report: { ok: false, gate: { state: 'absent' } } });
+		engine.get.mockRejectedValue(new ApiError(429, 'slow down'));
+		expect(await load(event())).toMatchObject({ report: { ok: false, gate: { state: 'busy' } } });
 		engine.get.mockRejectedValue(new ApiError(503, 'db down'));
-		expect(await load(event())).toEqual({ report: null, unavailable: 'down' });
+		expect(await load(event())).toMatchObject({ report: { ok: false, gate: { state: 'unavailable' } } });
 	});
 });
