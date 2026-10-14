@@ -160,6 +160,21 @@ describe('schema builder relation panel', () => {
 		expect(container.querySelector('aside')?.contains(buttons[0])).toBe(false);
 	});
 
+	it('folds the list to its header below lg once a schema is open, and brings it back', async () => {
+		render(SchemaPage, { props: { data: data(), form: null } });
+		expect(screen.queryByRole('button', { name: 'Show the list' })).toBeNull();
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+		const rail = document.getElementById('schema-rail') as HTMLElement;
+		expect(rail.className).toContain('max-lg:hidden');
+		const show = screen.getByRole('button', { name: 'Show the list' });
+		expect(show.getAttribute('aria-expanded')).toBe('false');
+		await fireEvent.click(show);
+		expect(rail.className).not.toContain('max-lg:hidden');
+		expect(screen.getByRole('button', { name: 'Hide the list' }).getAttribute('aria-expanded')).toBe('true');
+		await fireEvent.click(screen.getByRole('button', { name: 'Authors' }));
+		expect(rail.className).toContain('max-lg:hidden');
+	});
+
 	it('shows the selected collection its own API, with a request to copy', async () => {
 		await openPosts();
 		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));

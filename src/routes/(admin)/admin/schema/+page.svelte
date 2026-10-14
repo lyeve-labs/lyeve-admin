@@ -153,6 +153,14 @@
 	const dirty = $derived(selected !== null && (saved === null || canonical(selected) !== canonical(saved)));
 
 	let view = $state<'list' | 'canvas'>('list');
+
+	/**
+	 * Below lg the list sits above the editor, so once a schema is open it
+	 * folds to its header and the editor gets the screen. The header keeps a
+	 * button that brings the list back, and opening a schema folds it again.
+	 */
+	let listShown = $state(false);
+	const listFolded = $derived(selected !== null && !listShown);
 	let saveError = $state('');
 
 	/**
@@ -208,6 +216,7 @@
 		selected = s ? cloneSchema(s) : null;
 		saved = s && asSaved ? JSON.parse(JSON.stringify(selected)) : null;
 		saveError = '';
+		listShown = false;
 		resetHistory(selected);
 	}
 
@@ -676,8 +685,8 @@
 
 		<!-- One column below lg: the list on top and the editor under it, each
 		     scrolling on its own. The list keeps the whole height until a schema is
-		     picked or the canvas is shown, then gives three fifths of it to the
-		     pane. Side by side, a 400px screen would give the editor 112px, and the
+		     picked or the canvas is shown. An open schema folds it to its header,
+		     and the canvas alone takes three fifths of it. Side by side, a 400px screen would give the editor 112px, and the
 		     shell's own 224px sidebar arrives at md: and takes the room out of the
 		     editor, so the pair docks only from lg:, where there is room for both. -->
 		<div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
@@ -690,17 +699,33 @@
 				max={480}
 				breakpoint="lg"
 				collapsible
-				class={selected || view === 'canvas' ? 'max-h-2/5 shrink-0' : 'flex-1'}
+				class={listFolded ? 'shrink-0' : selected || view === 'canvas' ? 'max-h-2/5 shrink-0' : 'flex-1'}
 				testId="schema-list"
 			>
 				{#snippet meta()}
-					<!-- A count the engine did not answer is not a zero. -->
-					{#if !data.loadGate}
-						<span class="text-xs tabular-nums text-faint">{schemas.length}</span>
-					{/if}
+					<span class="flex items-center gap-2">
+						<!-- A count the engine did not answer is not a zero. -->
+						{#if !data.loadGate}
+							<span class="text-xs tabular-nums text-faint">{schemas.length}</span>
+						{/if}
+						{#if selected}
+							<Button
+								variant="ghost"
+								size="sm"
+								class="lg:hidden"
+								aria-expanded={!listFolded}
+								aria-controls="schema-rail"
+								onclick={() => (listShown = !listShown)}
+							>
+								{listFolded ? 'Show the list' : 'Hide the list'}
+							</Button>
+						{/if}
+					</span>
 				{/snippet}
 
-				<SchemaRail {schemas} {rowCounts} current={saved?.name} onselect={selectSchema} />
+				<div id="schema-rail" class={listFolded ? 'max-lg:hidden' : ''}>
+					<SchemaRail {schemas} {rowCounts} current={saved?.name} onselect={selectSchema} />
+				</div>
 			</ResizableAside>
 
 			{#if view === 'canvas' && SchemaCanvas && data.canvasGate}
