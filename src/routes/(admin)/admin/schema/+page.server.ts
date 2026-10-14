@@ -86,7 +86,9 @@ export const load: PageServerLoad = async (event) => {
 			presetsGate: null as Gate | null,
 			canSavePresets: false,
 			canvas: NO_CANVAS as CanvasLayout,
-			canvasGate: null as Gate | null,
+			// The canvas draws the schemas, so it says the same failure rather
+			// than a license that leaves it out.
+			canvasGate: read.gate as Gate | null,
 			canWrite,
 			isSuperAdmin,
 			loadGate: read.gate as Gate | null,

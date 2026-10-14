@@ -105,6 +105,8 @@ describe('admin/schema load', () => {
 		const { event } = loadEvent({ '/api/admin/schemas': () => json({ error: 'slow down' }, 429) });
 		const out = (await load(event)) as unknown as Loaded;
 		expect(out.loadGate).toEqual({ state: 'busy' });
+		// The canvas is not drawn either, and says why rather than blaming the license.
+		expect((out as unknown as { canvasGate: unknown }).canvasGate).toEqual({ state: 'busy' });
 	});
 
 	it('answers no gate for a list it read', async () => {
