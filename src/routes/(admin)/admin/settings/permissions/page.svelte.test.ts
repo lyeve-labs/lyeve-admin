@@ -720,3 +720,49 @@ describe('permissions page drawers', () => {
 		expect(container.ownerDocument.body.textContent).toContain('The flows could not be read');
 	});
 });
+
+describe('permissions page marks without color', () => {
+	// Each state has a shape of its own, so a reader who cannot tell the
+	// colors apart, or a forced-colors theme that paints them all one ink,
+	// still reads the matrix.
+	function shapeOf(el: Element | null): string {
+		expect(el).toBeTruthy();
+		if (el!.tagName.toLowerCase() === 'svg') return [...el!.classList].find((c) => c.startsWith('lucide-') && c !== 'lucide-icon') ?? 'svg';
+		return el!.classList.contains('border-2') ? 'ring' : 'dot';
+	}
+
+	it('draws a stored grant, an inherited one, a denial and an exempt role as four shapes', async () => {
+		const { container } = setupWith(
+			[
+				rule('editor', '*', ['read']),
+				rule('editor', 'article', ['create']),
+				rule('super_admin', 'article', ['read']),
+			],
+			['article', 'page'],
+		);
+		await fireEvent.click(container.querySelector('#show-unruled') as HTMLElement);
+		const article = childRow(container, 'editor', 'article');
+		const page = childRow(container, 'editor', 'page');
+		const shapes = {
+			stored: shapeOf(article.querySelector('[data-mark="stored"]')),
+			none: shapeOf(article.querySelector('[data-mark="none"]')),
+			inherited: shapeOf(page.querySelector('[data-mark="inherited"]')),
+			exempt: shapeOf(childRow(container, 'super_admin', 'article').querySelector('[data-mark="exempt"]')),
+		};
+		expect(shapes).toEqual({ stored: 'dot', none: 'lucide-minus', inherited: 'ring', exempt: 'lucide-shield-check' });
+		expect(new Set(Object.values(shapes)).size).toBe(4);
+	});
+
+	it('fills a summary bar empty for none, half for some and full for all', () => {
+		const { container } = setupWith(
+			[rule('editor', 'article', ['read']), rule('reviewer', '*', ['read']), rule('reviewer', 'flows', ['read'])],
+			['article', 'page'],
+		);
+		const fill = (role: string, state: string) =>
+			roleRow(container, role).querySelector(`[data-summary="${state}"] > span`)?.className ?? '';
+		expect(fill('admin', 'none')).toContain('w-0');
+		expect(fill('editor', 'some')).toContain('w-1/2');
+		expect(fill('reviewer', 'all')).toContain('w-full');
+		expect(roleRow(container, 'super_admin').querySelector('[data-mark="exempt"]')).toBeTruthy();
+	});
+});
