@@ -16,7 +16,7 @@ export class DeliveryHistory {
 	 *
 	 * A submit handler that returns without awaiting `update()` tells SvelteKit
 	 * to skip applying the result, so `form.deliveries` would never arrive and
-	 * the history modal would open empty.
+	 * the history drawer would open empty.
 	 */
 	load(wh: Webhook): SubmitFunction {
 		return () =>
