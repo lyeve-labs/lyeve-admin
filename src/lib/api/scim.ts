@@ -109,14 +109,15 @@ export function deprovisionAction(value: string): DeprovisionAction | null {
 }
 
 /**
- * What happens to an account this provider stops listing, in words.
+ * What happens to an account the directory deletes, in words.
  *
- * The two fields are read together on purpose: `deprovision_action` is stored
- * whether or not deprovisioning is switched on, so showing it alone tells an
- * operator that accounts are deleted when in fact nothing happens to them.
+ * The two fields are read together on purpose. The plugin disables the
+ * account only while the switch is on and the action is disable. With the
+ * switch off it deletes the account whatever the stored action says, so
+ * reading the action alone would promise a disable that never happens.
  */
 export function deprovisionLabel(p: ScimProvider): string {
-	if (!p.deprovision_on_delete) return 'Left alone';
+	if (!p.deprovision_on_delete) return 'Deleted';
 	return p.deprovision_action === 'delete' ? 'Deleted' : 'Disabled';
 }
 
@@ -127,7 +128,7 @@ export function deprovisionLabel(p: ScimProvider): string {
  * marked rather than stated flatly beside the reversible one.
  */
 export function deprovisionTone(p: ScimProvider): 'danger' | 'warn' | 'neutral' {
-	if (!p.deprovision_on_delete) return 'neutral';
+	if (!p.deprovision_on_delete) return 'danger';
 	return p.deprovision_action === 'delete' ? 'danger' : 'warn';
 }
 

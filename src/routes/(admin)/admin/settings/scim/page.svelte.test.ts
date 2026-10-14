@@ -104,14 +104,14 @@ describe('the rows', () => {
 		expect(said(container)).toContain('Deleted');
 	});
 
-	it('says an account is left alone when deprovisioning is off', () => {
+	it('says an account is deleted when deprovisioning is off, whatever the stored action', () => {
 		const { container } = render(ScimPage, {
 			props: props({
-				providers: [provider({ deprovision_on_delete: false, deprovision_action: 'delete' })],
+				providers: [provider({ deprovision_on_delete: false, deprovision_action: 'disable' })],
 			}),
 		});
-		expect(said(container)).toContain('Left alone');
-		expect(said(container)).not.toContain('Deleted');
+		expect(said(container)).toContain('Deleted');
+		expect(said(container)).not.toContain('Left alone');
 	});
 
 	it('counts connections in the pager, the word the page uses for them', () => {
@@ -245,5 +245,15 @@ describe('the removal switch', () => {
 		expect(container.ownerDocument.body.textContent).toContain('Always on.');
 		const field = container.ownerDocument.querySelector<HTMLInputElement>('input[name="deprovision_on_delete"]');
 		expect(field?.value).toBe('true');
+	});
+	// Okta and Entra remove a person by marking them inactive, and the plugin
+	// disables the account on that whatever the switch or the action say.
+	it('says the switch governs a delete only, and an inactive person is always disabled', async () => {
+		render(ScimPage, { props: props({}) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /new connection/i })[0]);
+		const hint = document.body.textContent ?? '';
+		expect(hint).toContain('a directory that deletes the person');
+		expect(hint).toContain('mark the person inactive');
+		expect(hint).toContain('always disables the account');
 	});
 });

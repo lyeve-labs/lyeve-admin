@@ -25,13 +25,13 @@ function provider(over: Partial<ScimProvider> = {}): ScimProvider {
 
 describe('what happens to a deprovisioned account', () => {
 	// The two fields are stored independently, so the action survives the
-	// switch being turned off. Reading it alone says accounts are deleted when
-	// in fact nothing touches them.
+	// switch being turned off. With the switch off the plugin deletes the
+	// account on a directory delete, even when the stored action is disable.
 	it('reads both fields, not just the action', () => {
-		expect(deprovisionLabel(provider({ deprovision_on_delete: false, deprovision_action: 'delete' })))
-			.toBe('Left alone');
-		expect(deprovisionTone(provider({ deprovision_on_delete: false, deprovision_action: 'delete' })))
-			.toBe('neutral');
+		expect(deprovisionLabel(provider({ deprovision_on_delete: false, deprovision_action: 'disable' })))
+			.toBe('Deleted');
+		expect(deprovisionTone(provider({ deprovision_on_delete: false, deprovision_action: 'disable' })))
+			.toBe('danger');
 	});
 
 	it('marks the irreversible option', () => {

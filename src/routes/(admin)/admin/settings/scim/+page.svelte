@@ -316,7 +316,7 @@
 			<Toggle
 				id="scim-deprovision"
 				label="Act on removals at all"
-				hint="Always on. This instance acts on every removal the directory sends, in the way chosen above."
+				hint="Always on. It governs a directory that deletes the person, which is handled the way chosen above. Okta and Microsoft Entra mark the person inactive instead, and that always disables the account, whichever way is chosen."
 				checked={true}
 				disabled
 			/>
