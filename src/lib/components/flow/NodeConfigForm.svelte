@@ -430,7 +430,7 @@
 					<Select
 						{id}
 						{label}
-						searchable={siblingFields.length > 8}
+						searchable
 						options={fieldRows(field.key).filter((o) => !tags(current).includes(o.value))}
 						value={null}
 						placeholder="Add a field"
@@ -523,7 +523,7 @@
 						<Select
 							id="{id}-new"
 							label="New key"
-							searchable={siblingFields.length > 8}
+							searchable
 							options={fieldRows(field.key).filter((o) => !entries(current).some(([k]) => k === o.value))}
 							value={draftKeys[field.key] ?? null}
 							placeholder="Pick a field"

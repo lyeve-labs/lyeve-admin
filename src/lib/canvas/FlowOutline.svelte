@@ -266,6 +266,7 @@
 									<Select
 										label="Input {port.label ?? port.name}"
 										placeholder="Add a source"
+										searchable
 										value=""
 										options={offers.map((o, i) => ({ value: String(i), label: sourceLabel(o.from, o.port) }))}
 										onvaluechange={(v) => connect(row.id, port.name, v)}

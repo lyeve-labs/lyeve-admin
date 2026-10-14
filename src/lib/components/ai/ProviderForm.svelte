@@ -85,6 +85,7 @@
 			label="Preset"
 			hint="Fills the base URL and the key header for a server people run. The row stays OpenAI-compatible."
 			options={presetOptions}
+			searchable
 			value={preset}
 			onvaluechange={applyPreset}
 		/>

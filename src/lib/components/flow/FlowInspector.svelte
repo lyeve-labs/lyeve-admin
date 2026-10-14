@@ -244,6 +244,7 @@
 		<Select
 			id="trigger-type"
 			label="Trigger type"
+			searchable
 			options={triggerOptions}
 			value={definition.trigger.type}
 			onvaluechange={(v) => {
