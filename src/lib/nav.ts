@@ -445,7 +445,6 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 						href: '/admin/tenants/costs',
 						icon: Coins,
 					},
-
 			  ]
 			: []),
 	];
