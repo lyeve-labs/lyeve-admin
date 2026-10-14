@@ -204,4 +204,23 @@ describe('API keys page', () => {
 		await vi.advanceTimersByTimeAsync(1500);
 		expect(screen.queryByText('Copied')).toBeNull();
 	});
+
+	it('keeps the way to copy the key by hand after a copy fails', async () => {
+		vi.useFakeTimers();
+		const writeText = vi.fn(async (_text: string) => {
+			throw new Error('denied');
+		});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		Object.defineProperty(document, 'execCommand', { value: vi.fn(() => false), configurable: true });
+		setup([key({})], {}, { created: true, raw_key: 'ly_live_secret', key_name: 'deploy' });
+		const hint = 'If the copy fails, select the key and copy it yourself.';
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Copy key' }));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(screen.getByText('Copy failed')).toBeTruthy();
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(screen.queryByText('Copy failed')).toBeNull();
+		expect(screen.getByText(hint)).toBeTruthy();
+	});
 });

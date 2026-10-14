@@ -66,7 +66,7 @@
 
 	{#if step === 'done'}
 		<Alert tone="success" title="Two-factor authentication is on">
-			Save these backup codes somewhere safe. They are not shown again.
+			Save these backup codes somewhere safe. They are not shown again. If the copy fails, write them down before you leave this page.
 		</Alert>
 		<Card>
 			<div class="flex flex-col gap-4">

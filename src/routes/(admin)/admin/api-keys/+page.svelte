@@ -468,7 +468,14 @@
 				Your API key <strong class="text-fg">{rawKeyName}</strong> has been created. Copy it now.
 				It will not be shown again.
 			</p>
-			<CopyField id="raw-api-key" label="API key" labelHidden value={rawKey} copyLabel="Copy key" />
+			<CopyField
+				id="raw-api-key"
+				label="API key"
+				labelHidden
+				value={rawKey}
+				copyLabel="Copy key"
+				hint="If the copy fails, select the key and copy it yourself."
+			/>
 			<p class="text-xs text-faint">
 				Send this key in the <code class="text-muted">X-API-Key</code> header of your requests.
 			</p>

@@ -72,4 +72,22 @@ describe('two-factor authentication page', () => {
 		await vi.advanceTimersByTimeAsync(1500);
 		expect(status.textContent).toBe('');
 	});
+
+	it('keeps the advice to write the codes down after a copy fails', async () => {
+		vi.useFakeTimers();
+		const writeText = vi.fn(async (_text: string) => {
+			throw new Error('denied');
+		});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		Object.defineProperty(document, 'execCommand', { value: vi.fn(() => false), configurable: true });
+		const { getByRole, getByText, queryByText } = setup(false, { step: 'done', backupCodes: ['a1', 'b2'] });
+
+		await fireEvent.click(getByRole('button', { name: 'Copy all codes' }));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(getByText('Copy failed')).toBeTruthy();
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(queryByText('Copy failed')).toBeNull();
+		expect(getByText(/If the copy fails, write them down before you leave this page\./)).toBeTruthy();
+	});
 });
