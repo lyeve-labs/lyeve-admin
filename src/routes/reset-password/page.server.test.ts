@@ -52,6 +52,17 @@ describe('reset-password action', () => {
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
+	it('refuses a password over 72 bytes before spending the token', async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+		// 37 characters, 74 bytes in UTF-8.
+		const long = 'é'.repeat(37);
+		const result = (await submit({ token: 't1', password: long, confirm: long }, fetch)) as {
+			data: { error: string };
+		};
+		expect(result.data.error).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
 	it('refuses two passwords that differ', async () => {
 		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
 		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG + '!' }, fetch)) as {

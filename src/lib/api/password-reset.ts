@@ -6,6 +6,12 @@ const PASSWORD_RESET_URL = '/api/admin/auth/password-reset';
 export const RESET_MIN_PASSWORD_LENGTH = 12;
 
 /**
+ * The longest password a reset can store, in UTF-8 bytes. The hash reads no
+ * further, and a longer one fails only after the link is spent.
+ */
+export const RESET_MAX_PASSWORD_BYTES = 72;
+
+/**
  * Ask for a reset link. The engine answers the same way whether or not the
  * address has an account, so the result carries nothing worth reading.
  */

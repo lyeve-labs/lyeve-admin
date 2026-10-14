@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
-import { confirmPasswordReset, RESET_MIN_PASSWORD_LENGTH } from '$lib/api/password-reset';
+import { confirmPasswordReset, RESET_MAX_PASSWORD_BYTES, RESET_MIN_PASSWORD_LENGTH } from '$lib/api/password-reset';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
@@ -26,6 +26,13 @@ export const actions: Actions = {
 		if (!token) return fail(400, { error: EXPIRED, expired: true });
 		if (password.length < RESET_MIN_PASSWORD_LENGTH) {
 			return fail(400, { error: `Use at least ${RESET_MIN_PASSWORD_LENGTH} characters.` });
+		}
+		// Checked here because the engine spends the link before it hashes the
+		// password, so a refusal there would cost the reader the link.
+		if (new TextEncoder().encode(password).length > RESET_MAX_PASSWORD_BYTES) {
+			return fail(400, {
+				error: `Use at most ${RESET_MAX_PASSWORD_BYTES} bytes. A plain letter or digit is one byte, and an accented letter or symbol takes two to four.`,
+			});
 		}
 		if (password !== confirm) return fail(400, { error: 'The two passwords do not match.' });
 
