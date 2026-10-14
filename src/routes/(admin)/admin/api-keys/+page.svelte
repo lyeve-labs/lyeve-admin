@@ -52,8 +52,20 @@
 	type APIKeyRow = Extract<PageData['keys'], { ok: true }>['value'][number];
 	const keys = $derived(data.keys.ok ? data.keys.value : []);
 
-	const errors = $derived(fieldErrors(form));
-	const formError = $derived(form && 'error' in form ? String(form.error) : undefined);
+	/*
+	 * Every action answers into the one `form`, so each failure names its
+	 * action. A drawer shows only its own action's failure, and only one that
+	 * came back after it opened. The page shows revoke and delete.
+	 */
+	type Failure = { action?: string; error?: string; fields?: Record<string, string>; refused?: unknown };
+	const failure = $derived(form && typeof form === 'object' && 'error' in form ? (form as Failure) : null);
+	let createOpenedOver = $state.raw<unknown>(null);
+	let limitOpenedOver = $state.raw<unknown>(null);
+	const createFailure = $derived(form !== createOpenedOver && failure?.action === 'create' ? failure : null);
+	const limitFailure = $derived(form !== limitOpenedOver && failure?.action === 'limit' ? failure : null);
+	const pageFailure = $derived(failure && failure.action !== 'create' && failure.action !== 'limit' ? failure : null);
+	const errors = $derived(fieldErrors(createFailure));
+	const limitErrors = $derived(fieldErrors(limitFailure));
 
 	function usagePct(keyId: string): number {
 		const key = keys.find((k) => k.id === keyId);
@@ -80,6 +92,7 @@
 	let limitOpen = $state(false);
 	let limitValues = $state<KeyLimits>({ ...NO_LIMITS });
 	function openLimit(key: APIKeyRow) {
+		limitOpenedOver = form;
 		limitKey = { id: key.id, name: key.name };
 		limitValues = limitsOf(key);
 		limitOpen = true;
@@ -96,7 +109,9 @@
 
 	// Which routes a key can be scoped to, from the engine's catalog.
 	const groups = $derived(groupCatalog(data.catalog ?? null));
-	const refused = $derived(formRefusal(form));
+	const refused = $derived(formRefusal(createFailure));
+	const limitRefused = $derived(formRefusal(limitFailure));
+	const pageRefused = $derived(formRefusal(pageFailure));
 	let createRoles = $state<string[]>(['editor']);
 	let createAccess = $state(defaultAccess());
 	const createScopes = $derived(accessScopes(createAccess));
@@ -115,6 +130,7 @@
 	const adminRoleKeys = $derived(keys.filter((k) => k.enabled && isPrivilegedKey(k.roles)).length);
 
 	function openCreate() {
+		createOpenedOver = form;
 		createName = '';
 		createLimits = { ...NO_LIMITS };
 		createRoles = ['editor'];
@@ -204,7 +220,7 @@
 		<a href="/admin/admin-tokens" class="text-brand hover:underline">admin token</a> instead: scoped grants, an expiry and a request log.
 	</p>
 
-	<FormErrors message={formError} fields={errors} {refused} />
+	<FormErrors message={pageFailure?.error} refused={pageRefused} />
 
 	{#if !data.keys.ok}
 		<GateNotice gate={data.keys.gate} title="API keys" absent="This engine does not serve API keys." />
@@ -391,7 +407,7 @@
 
 <Drawer bind:open={showCreate} title="New key">
 		<form method="POST" action="?/create" id="key-form" use:enhance={create.enhance} class="flex flex-col gap-4">
-			<FormErrors message={formError} fields={errors} {refused} />
+			<FormErrors message={createFailure?.error} fields={errors} {refused} />
 
 			<Input
 				id="key-name"
@@ -467,9 +483,9 @@
 <Drawer bind:open={limitOpen} title="Request limits for {limitKey?.name ?? ''}">
 	{#if limitKey}
 		<form method="POST" action="?/limit" id="limit-form" use:enhance={limit.enhance} class="flex flex-col gap-4">
-			<FormErrors message={formError} fields={errors} {refused} />
+			<FormErrors message={limitFailure?.error} fields={limitErrors} refused={limitRefused} />
 			<input type="hidden" name="id" value={limitKey.id} />
-			<RequestLimits bind:limits={limitValues} idPrefix="key-limit" {errors} />
+			<RequestLimits bind:limits={limitValues} idPrefix="key-limit" errors={limitErrors} />
 		</form>
 	{/if}
 	{#snippet footer()}

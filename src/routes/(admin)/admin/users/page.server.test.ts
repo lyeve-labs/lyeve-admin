@@ -236,7 +236,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ password: 'password123' })) } as never,
+			request: { formData: () => Promise.resolve(form({ password: 'password12345' })) } as never,
 			fetch,
 			cookies,
 		}) as never);
@@ -246,6 +246,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { email: 'Email is required' },
 			},
@@ -265,13 +266,14 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { password: 'Password is required' },
 			},
 		});
 	});
 
-	it('returns 400 when password is shorter than 8 characters', async () => {
+	it('returns 400 when password is shorter than 12 characters', async () => {
 		const fetch = vi.fn() as never;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
@@ -284,8 +286,32 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { password: 'Password must be at least 8 characters' },
+				fields: { password: 'Password must be at least 12 characters' },
+			},
+		});
+	});
+
+	// The engine's policy can be stricter than the length checked here. Its
+	// 422 names the rule, and that sentence belongs on the password control.
+	it('puts the engine password refusal on the password field', async () => {
+		const fetch = vi.fn(async () =>
+			json({ error: 'password must contain a digit', code: 'password_policy' }, 422)
+		) as unknown as typeof globalThis.fetch;
+
+		const result = await actions.create(mockEvent({
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'longenoughpassword' })) } as never,
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+		}) as never);
+
+		expect(result).toEqual({
+			status: 422,
+			data: {
+				action: 'create',
+				error: 'Check the highlighted field.',
+				fields: { password: 'password must contain a digit' },
 			},
 		});
 	});
@@ -297,7 +323,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345' })) } as never,
 			fetch,
 			cookies,
 		}) as never);
@@ -313,7 +339,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 
 		const result = await actions.create(mockEvent({
 			request: {
-				formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123', roles: 'admin,editor' })),
+				formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345', roles: 'admin,editor' })),
 			} as never,
 			fetch,
 			cookies,
@@ -372,6 +398,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 		expect(result).toEqual({
 			status: 422,
 			data: {
+				action: 'setPassword',
 				error: 'Check the highlighted field.',
 				fields: { new_password: 'password must be at least 12 characters' },
 			},
@@ -383,7 +410,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 
 		const result = await submit(fetch, { id: 'nope', new_password: 'correct horse battery' });
 
-		expect(result).toEqual({ status: 400, data: { error: 'user not found' } });
+		expect(result).toEqual({ status: 400, data: { action: 'setPassword', error: 'user not found' } });
 	});
 
 	it('refuses an empty password before asking the engine', async () => {
@@ -393,7 +420,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 
 		expect(result).toEqual({
 			status: 400,
-			data: { error: 'Check the highlighted field.', fields: { new_password: 'Password is required' } },
+			data: { action: 'setPassword', error: 'Check the highlighted field.', fields: { new_password: 'Password is required' } },
 		});
 		expect(fetch).not.toHaveBeenCalled();
 	});
@@ -432,12 +459,12 @@ describe('admin/users/+page.server.ts admin seat ceiling', () => {
 
 	it('says the seats are full when creating an admin is refused', async () => {
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123', roles: 'admin' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345', roles: 'admin' })) } as never,
 			fetch: seatsFull(),
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 402, data: { error: expected } });
+		expect(result).toEqual({ status: 402, data: { action: 'create', error: expected } });
 	});
 
 	it('says the seats are full when a promotion is refused', async () => {
@@ -447,12 +474,12 @@ describe('admin/users/+page.server.ts admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 402, data: { error: expected } });
+		expect(result).toEqual({ status: 402, data: { action: 'updateRoles', error: expected } });
 	});
 
 	it('leaves a refusal at another cap to the usual message', async () => {
 		const result = (await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123', roles: 'admin' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345', roles: 'admin' })) } as never,
 			fetch: vi.fn(async () => {
 				throw new ApiError(402, 'cap_exceeded', { error: 'cap_exceeded', cap: 'example.items', limit: 4, current: 4 });
 			}) as unknown as typeof globalThis.fetch,
@@ -472,7 +499,7 @@ describe('admin/users/+page.server.ts admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 400, data: { error: 'user not found' } });
+		expect(result).toEqual({ status: 400, data: { action: 'updateRoles', error: 'user not found' } });
 	});
 });
 
@@ -534,7 +561,7 @@ describe('admin/users/+page.server.ts tenants', () => {
 			return json({ id: 'n1', email: 'new@b.co', roles: ['editor'] }, 201);
 		});
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password123', tenant_id: 'acme', tenant_required: '1' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password12345', tenant_id: 'acme', tenant_required: '1' })) } as never,
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
@@ -547,13 +574,13 @@ describe('admin/users/+page.server.ts tenants', () => {
 	it('asks for a tenant when the form offered a choice and none was made', async () => {
 		const fetch = vi.fn();
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password123', tenant_required: '1' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password12345', tenant_required: '1' })) } as never,
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 		expect(result).toEqual({
 			status: 400,
-			data: { error: 'Check the highlighted fields.', fields: { tenant_id: 'Choose the tenant this account belongs to' } },
+			data: { action: 'create', error: 'Check the highlighted fields.', fields: { tenant_id: 'Choose the tenant this account belongs to' } },
 		});
 		expect(fetch).not.toHaveBeenCalled();
 	});

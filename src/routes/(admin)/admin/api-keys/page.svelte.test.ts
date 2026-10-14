@@ -224,3 +224,32 @@ describe('API keys page', () => {
 		expect(screen.getByText(hint)).toBeTruthy();
 	});
 });
+
+// Every action answers into one `form`. A failure from one action must not
+// read as another form's failure.
+describe('API keys failures stay with their own action', () => {
+	const dialog = () => document.body.querySelector('[role="dialog"]');
+
+	it('shows a failed revoke on the page and never inside the next New key drawer', async () => {
+		const { getAllByRole } = setup([key({})], {}, { action: 'revoke', error: 'Failed to revoke API key' });
+		expect(document.body.textContent).toContain('Failed to revoke API key');
+		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		expect(dialog()?.textContent).not.toContain('Failed to revoke API key');
+	});
+
+	it('keeps a failed create out of the request limits drawer', async () => {
+		const failed = { action: 'create', error: 'Check the highlighted fields.', fields: { hourly_limit: 'Too high' } };
+		const { getByRole } = setup([key({})], {}, failed);
+		await fireEvent.click(getByRole('button', { name: 'Request limits for deploy' }));
+		expect(dialog()?.textContent).not.toContain('Check the highlighted fields.');
+		expect(dialog()?.textContent).not.toContain('Too high');
+	});
+
+	it('shows a limits failure that comes back while its drawer is open', async () => {
+		const rendered = setup([key({})]);
+		await fireEvent.click(rendered.getByRole('button', { name: 'Request limits for deploy' }));
+		const data = { keys: { ok: true, value: [key({})] }, usageMap: {}, usageUnknown: [], month: '2026-10', total: 1, limit: 50, offset: 0, schemaNames: [], catalog: null };
+		await rendered.rerender({ data, form: { action: 'limit', error: 'The request limits could not be saved.' } } as never);
+		expect(dialog()?.textContent).toContain('The request limits could not be saved.');
+	});
+});
