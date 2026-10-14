@@ -731,6 +731,16 @@ describe('action-button', () => {
     expect(
       check('action-button', modal('<div><Button variant="danger">Delete</Button><Button variant="secondary">Cancel</Button><Button variant="primary">Save</Button></div>')),
     ).toEqual([]);
+    // Only one delete may lead, and Cancel still comes next.
+    expect(
+      check('action-button', modal('<div><Button variant="danger">Delete</Button><Button variant="primary">Save</Button><Button variant="secondary">Cancel</Button></div>')),
+    ).toHaveLength(1);
+    expect(
+      check('action-button', modal('<div><Button variant="danger">Delete</Button><Button variant="secondary">Cancel</Button><Button variant="danger">Remove</Button></div>')),
+    ).toHaveLength(1);
+    expect(
+      check('action-button', modal('<div><Button variant="danger">Delete</Button><Button variant="primary">Save</Button></div>')),
+    ).toHaveLength(1);
   });
 });
 

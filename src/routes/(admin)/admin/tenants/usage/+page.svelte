@@ -499,7 +499,7 @@
 	</form>
 	{#snippet footer()}
 		{#if editing}
-			<Button variant="danger" onclick={askClear}>Delete</Button>
+			<Button variant="danger" class="me-auto" onclick={askClear}>Delete</Button>
 		{/if}
 		<Button variant="secondary" onclick={() => (editorOpen = false)}>Cancel</Button>
 		<Button variant="primary" type="submit" form="quota-form" disabled={!editing && !tenantId.trim()} loading={saveQuota.pending}>
