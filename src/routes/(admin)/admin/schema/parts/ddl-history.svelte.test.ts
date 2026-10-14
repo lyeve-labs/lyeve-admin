@@ -79,6 +79,17 @@ describe('DdlHistory', () => {
 		expect(apply).toHaveBeenCalledTimes(1);
 	});
 
+	it('says the count could not be read before applying, and that the table may hold data', async () => {
+		const { ddl, apply } = setup({ rowCounts: {} });
+		await answer(ddl.submit, { type: 'success', data: { name: 'posts', entries: [], pending: 2, limit: 200 } });
+		await ddl.applyQueued();
+		expect(kit.confirm.mock.calls[0][0]).toBe('Apply 2 queued changes to posts?');
+		const body = kit.confirm.mock.calls[0][1];
+		expect(body).toContain('How many rows the table holds could not be read. It may hold data');
+		expect(body).not.toMatch(/holds 0 rows/);
+		expect(apply).toHaveBeenCalledTimes(1);
+	});
+
 	it('keeps a failed apply apart from the read that follows it', async () => {
 		const { ddl, submit } = setup();
 		await answer(ddl.submitApply, { type: 'failure', data: { error: 'The queued changes could not be applied.' } });

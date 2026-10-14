@@ -6,7 +6,11 @@ import type { SubmitFunction } from '@sveltejs/kit';
 const forms = vi.hoisted(() => ({ handlers: new Map<string, SubmitFunction>() }));
 vi.mock('$app/forms', () => ({
 	enhance: (el: HTMLFormElement, fn?: SubmitFunction) => {
-		if (fn) forms.handlers.set(el.getAttribute('action') ?? '', fn);
+		// Each card posts its own id, so a card's handler is keyed by it and no
+		// case depends on the order the cards registered in.
+		const id = el.querySelector<HTMLInputElement>('input[name="id"]')?.value;
+		const action = el.getAttribute('action') ?? '';
+		if (fn) forms.handlers.set(id ? `${action}#${id}` : action, fn);
 		return { destroy() {} };
 	},
 }));
@@ -76,20 +80,19 @@ describe('PresetsDrawer', () => {
 
 	it('marks the card busy and holds the others while it creates', async () => {
 		setup();
-		const submit = forms.handlers.get('?/preset') as SubmitFunction;
+		const submit = forms.handlers.get('?/preset#mine') as SubmitFunction;
 		await submit({} as never);
-		const [first, second] = screen.getAllByRole('button', { name: 'Create' }) as HTMLButtonElement[];
-		// The handler registered last is the last card's, so that card is busy.
-		expect(first.disabled).toBe(true);
-		expect(first.getAttribute('aria-busy')).toBeNull();
-		expect(second.getAttribute('aria-busy')).toBe('true');
+		const [notes, mine] = screen.getAllByRole('button', { name: 'Create' }) as HTMLButtonElement[];
+		expect(notes.disabled).toBe(true);
+		expect(notes.getAttribute('aria-busy')).toBeNull();
+		expect(mine.getAttribute('aria-busy')).toBe('true');
 	});
 
 	it('closes once a preset is created and stays open on a refusal', async () => {
 		setup();
-		await answer('?/preset', { type: 'failure', data: { error: 'exists' } });
+		await answer('?/preset#notes', { type: 'failure', data: { error: 'exists' } });
 		expect(screen.getByTestId('preset-gallery')).toBeTruthy();
-		await answer('?/preset', { type: 'success', data: { created: ['notes'] } });
+		await answer('?/preset#notes', { type: 'success', data: { created: ['notes'] } });
 		await waitFor(() => expect(screen.queryByTestId('preset-gallery')).toBeNull());
 	});
 

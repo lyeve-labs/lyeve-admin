@@ -11,6 +11,7 @@ let teardown: (() => void) | undefined;
 afterEach(() => {
 	cleanup();
 	teardown?.();
+	teardown = undefined;
 });
 
 function posts(): Schema {
@@ -30,6 +31,8 @@ function posts(): Schema {
  */
 function setup(over: Record<string, unknown> = {}) {
 	let ddl!: DdlHistory;
+	// A case that sets up twice ends the first root before it builds the second.
+	teardown?.();
 	teardown = $effect.root(() => {
 		ddl = new DdlHistory({ table: () => 'posts', isSuperAdmin: () => true, rowCounts: () => ({}) });
 	});
