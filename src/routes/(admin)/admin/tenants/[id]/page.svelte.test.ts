@@ -169,6 +169,15 @@ describe('the home row of a super admin', () => {
 		expect(edit('lost@example.com').disabled).toBe(true);
 	});
 
+	it('says the accounts could not be read where the warning would be', () => {
+		const { container } = render(TenantPage, {
+			props: props({ members: { ok: true, value: [lost] }, homeSuperAdmins: null }),
+		});
+		expect(container.textContent).toContain(
+			'The accounts could not be read, so this page cannot say whether a home member signs in here without super admin.',
+		);
+	});
+
 	// The warning says no page changes that membership, so the row must not
 	// send the reader to the Users page for it.
 	it('does not send the reader to the Users page for a home row that lost super admin', () => {

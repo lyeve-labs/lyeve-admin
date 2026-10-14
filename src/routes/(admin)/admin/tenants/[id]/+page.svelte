@@ -40,13 +40,13 @@
 
 	/** A super admin's own home row, which this page leaves alone. */
 	function superHome(m: TenantMember): boolean {
-		return m.home && (m.roles.includes('super_admin') || data.homeSuperAdmins.includes(m.id));
+		return m.home && (m.roles.includes('super_admin') || (data.homeSuperAdmins ?? []).includes(m.id));
 	}
 
 	// A super admin whose home membership already leaves the role out signs in
 	// here without it.
 	const lostSuperAdmin = $derived(
-		data.members.ok ? data.members.value.filter((m) => m.home && !m.roles.includes('super_admin') && data.homeSuperAdmins.includes(m.id)) : [],
+		data.members.ok ? data.members.value.filter((m) => m.home && !m.roles.includes('super_admin') && (data.homeSuperAdmins ?? []).includes(m.id)) : [],
 	);
 
 	const facts = $derived([
@@ -229,6 +229,11 @@
 		</div>
 		{#if revokeError}
 			<Alert tone="danger">{revokeError}</Alert>
+		{/if}
+		{#if data.homeSuperAdmins === null}
+			<Alert tone="warn">
+				The accounts could not be read, so this page cannot say whether a home member signs in here without super admin.
+			</Alert>
 		{/if}
 		{#each lostSuperAdmin as m (m.id)}
 			<Alert tone="warn" title="{m.email} signs in here without super admin">

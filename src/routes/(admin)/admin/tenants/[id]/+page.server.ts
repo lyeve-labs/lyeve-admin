@@ -75,9 +75,10 @@ export const load: PageServerLoad = async (event) => {
 	// account's own super_admin, and the engine signs the account in here with
 	// those roles. Only the account says whether it holds super_admin. A failed
 	// read leaves these rows as they are listed: their roles already lack
-	// super_admin, so an edit cannot take it away.
+	// super_admin, so an edit cannot take it away. It is kept as unknown, so
+	// the page says it could not tell rather than that nobody lost the role.
 	const quiet = people.ok ? people.value.filter((m) => m.home && !m.roles.includes('super_admin')).map((m) => m.id) : [];
-	const homeSuperAdmins = await superAdminsAmong(client, quiet).catch(() => [] as string[]);
+	const homeSuperAdmins: string[] | null = await superAdminsAmong(client, quiet).catch(() => null);
 
 	return {
 		tenant,
