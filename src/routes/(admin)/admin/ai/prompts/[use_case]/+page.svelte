@@ -15,11 +15,14 @@
 
 	const back = { href: '/admin/ai/prompts', label: 'Prompts' };
 	const p = $derived(data.prompt);
-	// The editor starts from the text in force and is re-seeded after a save,
-	// which the key on the form does.
+	// The editor starts from the text in force and is re-seeded when that text
+	// changes, after a save or a restore. The text is read through its own
+	// derived string, so a reload that hands back the same text, as the layout
+	// does when the AI switch is read again, leaves what the reader typed.
+	const active = $derived(p?.active ?? '');
 	let body = $state('');
 	$effect(() => {
-		body = p?.active ?? '';
+		body = active;
 	});
 	const dirty = $derived(!!p && body.trim() !== '' && body !== p.active);
 	const nextVersion = $derived(p ? Math.max(0, ...p.versions.map((v) => v.version)) + 1 : 1);
