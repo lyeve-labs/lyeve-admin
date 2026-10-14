@@ -38,7 +38,6 @@
 		Upload,
 	} from '@lucide/svelte';
 	import ImportWizard from '$lib/components/ImportWizard.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import TransformField from '$lib/components/imports/TransformField.svelte';
 	import { formRefusal } from '$lib/api/refusal';
@@ -266,11 +265,7 @@
 			absent="The bulk import plugin is not part of this build, so content is created one entry at a time."
 		/>
 	{:else}
-		{#if refusal}
-			<RefusalNotice {refusal} />
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={formError} refused={refusal} />
 
 		<div class="grid gap-4 lg:grid-cols-[3fr_2fr]">
 			<Card>

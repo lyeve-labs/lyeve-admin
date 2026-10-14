@@ -16,7 +16,6 @@
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { enhance } from '$app/forms';
 	import { confirmed, tracked } from '$lib/forms.svelte';
@@ -165,11 +164,7 @@
 			absent="The cache plugin is not part of this build, so nothing is cached."
 		/>
 	{:else}
-		{#if refusal && !fromDrawer}
-			<RefusalNotice {refusal} />
-		{:else if formError && !fromDrawer}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={fromDrawer ? undefined : formError} refused={fromDrawer ? null : refusal} />
 
 		{#if tripped.length > 0}
 			<!-- The reading the stats hide. A lower-priority provider picks up

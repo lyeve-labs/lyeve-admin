@@ -1,6 +1,6 @@
 <script lang="ts">
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -70,11 +70,7 @@
 			install's settings whatever is saved here, so a wrong key here cannot lock an admin out.
 		</Alert>
 
-		{#if refusal}
-			<RefusalNotice {refusal} />
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={formError} refused={refusal} />
 
 		<section class="flex flex-col gap-4" aria-label="What is checked now">
 			<SectionHeading level={2}>What is checked now</SectionHeading>

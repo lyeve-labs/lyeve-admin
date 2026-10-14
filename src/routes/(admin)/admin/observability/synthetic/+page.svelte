@@ -1,5 +1,4 @@
 <script lang="ts">
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -242,11 +241,7 @@
 			absent="The synthetic monitoring plugin is not part of this build, so nothing is being probed."
 		/>
 	{:else}
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={formError || undefined} refused={pageRefusal} />
 
 		<div class="grid gap-4 sm:grid-cols-3">
 			<Stat size="sm" mono label="Probes" value={data.total ?? data.probes.length} sub={data.total === null ? pageNote : undefined} />

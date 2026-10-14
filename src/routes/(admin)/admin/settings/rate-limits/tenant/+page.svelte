@@ -1,6 +1,5 @@
 <script lang="ts">
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -200,11 +199,7 @@
 			absent="The rate limit plugin is not part of this build, so no request is limited."
 		/>
 	{:else}
-		{#if refusal}
-			<RefusalNotice {refusal} />
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={formError} refused={refusal} />
 
 		<section class="flex flex-col gap-4" aria-label="Tenant limit">
 			<SectionHeading level={2}>Tenant limit</SectionHeading>

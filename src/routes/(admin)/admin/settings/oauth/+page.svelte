@@ -1,8 +1,6 @@
 <script lang="ts">
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Drawer,
@@ -139,11 +137,7 @@
 		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if formError}
-		<Alert tone="danger">{formError}</Alert>
-	{/if}
+	<FormErrors message={formError} refused={pageRefusal} />
 
 	{#if data.providers.ok}
 		<div class="grid gap-4 sm:grid-cols-3">
