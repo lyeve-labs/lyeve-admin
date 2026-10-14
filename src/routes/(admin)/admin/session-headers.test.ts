@@ -4,7 +4,7 @@ import { UNNAMED } from '$lib/plugins';
 
 /**
  * Every page load reads the engine as the session that opened the page, with
- * the bearer and the CSRF token the session client adds. A load that built
+ * the bearer and the CSRF token the session headers carry. A load that built
  * its own client could drop either without a sound, so each one is asked
  * here, with every plugin running and a super admin reading.
  */
@@ -14,11 +14,15 @@ const PAGES = [
 	'.',
 	'analytics',
 	'api-keys',
+	'api-labs',
+	'api-reference',
 	'audit-log',
 	'content',
 	'content/[schema]',
 	'content/[schema]/[id]',
 	'content/[schema]/new',
+	'flows',
+	'flows/[id]',
 	'flows/datasources',
 	'flows/variables',
 	'jobs',
@@ -71,14 +75,14 @@ async function engineCalls(page: string) {
 }
 
 describe('page loads read as the session', () => {
-	it.each(PAGES)('%s sends the bearer on every read and reads JSON through the session client', async (page) => {
+	it.each(PAGES)('%s sends the session headers on every read', async (page) => {
 		const calls = await engineCalls(page);
 		expect(calls.length).toBeGreaterThan(0);
 		for (const headers of calls) {
 			expect(headers.get('authorization')).toBe('Bearer sess-tok');
-			// The client marks each request it sends as JSON. The one plain-text
-			// read, the metrics exposition, carries the bearer alone.
-			if (headers.get('content-type') === 'application/json') {
+			// The one plain-text read, the metrics exposition, is built by a
+			// helper that sends the bearer alone.
+			if (headers.get('accept') !== 'text/plain') {
 				expect(headers.get('x-csrf-token')).toBe('csrf-tok');
 			}
 		}

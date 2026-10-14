@@ -2,10 +2,10 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError, type Schema, type HttpClient } from '@lyeve-labs/client';
 import { getSchemas, getSchemaStats } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { retryBusy } from '$lib/server/retry-busy';
-import { bundleContentType, flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
+import { bundleContentType, readImportForm } from '$lib/server/flow-import';
 import { IMPORT_SOURCES } from './import-sources';
 import { applySchemaPreset, deleteSchemaPreset, readSchemaPresets, saveSchemaPreset, type SchemaPreset } from '$lib/api/schema-preset-catalog';
 import { NO_CANVAS, parsePositions, readCanvasLayout, saveCanvasLayout, type CanvasLayout } from '$lib/api/schema-canvas-layout';
@@ -320,7 +320,7 @@ export const actions: Actions = {
 		try {
 			res = await event.fetch(`/api/admin/schemas/import?${query}`, {
 				method: 'POST',
-				headers: { ...flowAuthHeaders(event), 'Content-Type': type },
+				headers: { ...authedHeaders(event), 'Content-Type': type },
 				body: payload,
 			});
 		} catch {

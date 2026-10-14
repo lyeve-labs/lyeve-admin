@@ -1,8 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { flowAuthHeaders } from '$lib/server/flow-import';
+import { authedHeaders } from '$lib/server/authz';
 import { transcriptExportPath } from '$lib/api/ai';
-import { sessionToken } from '$lib/server/session-cookie';
 
 /**
  * The transcript download, as a plain link.
@@ -13,13 +12,12 @@ import { sessionToken } from '$lib/server/session-cookie';
  * anchor with `download` is all the page needs.
  */
 export const GET: RequestHandler = async ({ cookies, params, url, fetch }) => {
-	const token = sessionToken({ cookies, url });
-	if (!token) error(401, 'Not authenticated');
+	const auth = authedHeaders({ cookies, url });
 	const format = url.searchParams.get('format') === 'markdown' ? 'markdown' : 'json';
 
 	let res: Response;
 	try {
-		res = await fetch(transcriptExportPath(params.id, format), { headers: flowAuthHeaders({ cookies, url }) });
+		res = await fetch(transcriptExportPath(params.id, format), { headers: auth });
 	} catch {
 		error(502, 'Engine unreachable');
 	}

@@ -2,7 +2,7 @@ import { error, type RequestEvent } from '@sveltejs/kit';
 import { ApiError, createClient, type HttpClient } from '@lyeve-labs/client';
 import { getMe } from '@lyeve-labs/client-rest';
 import type { User } from '@lyeve-labs/client';
-import { sessionToken } from '$lib/server/session-cookie';
+import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { BUSY, OUTAGE } from '$lib/outage';
 
@@ -29,7 +29,7 @@ const CSRF_COOKIE_INSECURE = 'csrf';
  * The token is set only when a cookie is found: an empty header fails the
  * check it exists to pass.
  */
-export function authedHeaders(event: RequestEvent): Record<string, string> {
+export function authedHeaders(event: SessionRead): Record<string, string> {
 	const token = sessionToken(event);
 	if (!token) {
 		error(401, 'Not authenticated');

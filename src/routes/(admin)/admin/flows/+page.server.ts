@@ -1,9 +1,9 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
-import { ApiError, createClient } from '@lyeve-labs/client';
-import { authedClient, requireUser } from '$lib/server/authz';
+import { ApiError } from '@lyeve-labs/client';
+import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
+import { readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
 import { refusalFailure } from '$lib/server/flow-refusal';
@@ -32,8 +32,9 @@ function isLocked(err: unknown): boolean {
 	return err instanceof ApiError && err.status === 402;
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const client = createClient(fetch, flowAuthHeaders({ cookies, url }));
+export const load: PageServerLoad = async (event) => {
+	const { cookies, url } = event;
+	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 	// A status the list does not know would select no chip and still filter
 	// the list, so it reads as no filter.
@@ -149,7 +150,7 @@ export const actions: Actions = {
 
 		let result: ImportResult;
 		try {
-			result = await importFlow(event.fetch, { ...body, mode, slug }, flowAuthHeaders(event));
+			result = await importFlow(event.fetch, { ...body, mode, slug }, authedHeaders(event));
 		} catch (err) {
 			if (err instanceof FlowRefusal) return tagged('import', refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {

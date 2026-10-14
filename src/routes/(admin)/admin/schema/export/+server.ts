@@ -1,7 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { flowAuthHeaders } from '$lib/server/flow-import';
-import { sessionToken } from '$lib/server/session-cookie';
+import { authedHeaders } from '$lib/server/authz';
 
 /**
  * Every content type as one file, for moving them to another instance.
@@ -11,12 +10,12 @@ import { sessionToken } from '$lib/server/session-cookie';
  * engine's own type and filename. YAML by default, JSON on request.
  */
 export const GET: RequestHandler = async ({ cookies, url, fetch }) => {
-	if (!sessionToken({ cookies, url })) error(401, 'Not authenticated');
+	const auth = authedHeaders({ cookies, url });
 	const json = url.searchParams.get('format') === 'json';
 
 	let res: Response;
 	try {
-		res = await fetch(`/api/admin/schemas/export${json ? '?format=json' : ''}`, { headers: flowAuthHeaders({ cookies, url }) });
+		res = await fetch(`/api/admin/schemas/export${json ? '?format=json' : ''}`, { headers: auth });
 	} catch {
 		error(502, 'Engine unreachable');
 	}

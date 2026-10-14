@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { authedHeaders, requireUser } from '$lib/server/authz';
+import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
 import { engineOriginFor } from '$lib/server/engine';
 import {
 	MAX_SHOWN_BODY,
@@ -10,7 +10,6 @@ import {
 } from '$lib/api/try-it';
 import { staticGroups, type EndpointGroup } from '$lib/api/reference';
 import { buildReference, type OpenAPIDocument } from '$lib/api/openapi';
-import { sessionToken } from '$lib/server/session-cookie';
 
 export type ReferenceSource = 'engine' | 'catalog';
 
@@ -38,18 +37,16 @@ export interface ReferencePageData {
 // The engine serves two documents. The admin half is refused to anyone but a
 // super admin, so a request for it from an admin shows the public half: the
 // tab is hidden for them, and the engine is what refuses.
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }): Promise<ReferencePageData> => {
-	const { user } = await parent();
+export const load: PageServerLoad = async (event): Promise<ReferencePageData> => {
+	const { url } = event;
+	const { user } = await event.parent();
 	const canSeeAdmin = user.roles.includes('super_admin');
 	const half: ReferenceHalf = canSeeAdmin && url.searchParams.get('api') === 'admin' ? 'admin' : 'public';
 	const specHref = `/api/admin/openapi/${half}.json`;
-	const token = sessionToken({ cookies, url }) ?? '';
 	try {
-		const res = await fetch(specHref, {
-			headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+		const doc = await authedClient(event).get<OpenAPIDocument | null>(specHref, {
+			headers: { Accept: 'application/json' },
 		});
-		if (!res.ok) throw new Error(`${specHref} answered ${res.status}`);
-		const doc = (await res.json()) as OpenAPIDocument;
 		if (!doc || typeof doc.paths !== 'object') throw new Error(`${specHref} has no paths`);
 		const { groups, collections } = buildReference(doc, staticGroups);
 		return { groups, collections, source: 'engine', half, canSeeAdmin, specHref };
