@@ -92,6 +92,19 @@ describe('Users create', () => {
 		expect(getByRole('button', { name: /close/i })).toBeTruthy();
 	});
 
+	// An install may set its own minimum and drop the complexity rule, and the
+	// console cannot read either, so the hint gives the default as a default.
+	it('names the engine\'s policy and gives its rules only as the default', async () => {
+		const { container, getAllByRole } = render(UsersPage, { props: props() });
+
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+
+		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+		expect(dialog.textContent).toContain(
+			"The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
+		);
+	});
+
 	// The roles offered here and on the API key page are the same list.
 	it('offers every role the instance issues', async () => {
 		const { container, getAllByRole } = render(UsersPage, { props: props() });

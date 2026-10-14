@@ -344,7 +344,7 @@
 				bind:value={password}
 				required
 				autocomplete="new-password"
-				hint="At least 12 characters, with upper case, lower case and a digit"
+				hint="The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
 				error={errors.password}
 			/>
 			{#if !data.tenants.ok}
