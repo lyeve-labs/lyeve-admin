@@ -770,6 +770,9 @@
 	const publishFlow = submitter();
 	const disableFlow = submitter();
 
+	/** This page's route, so a navigation that stays on this flow is told apart. */
+	const EDITOR_ROUTE = '/(admin)/admin/flows/[id]';
+
 	// A delete answers with a redirect to the list, which is the one way out
 	// that must not ask about the edits it is throwing away.
 	let leaving = false;
@@ -781,6 +784,10 @@
 	// once the answer is yes. A reload or a closed tab is beforeUnload's.
 	beforeNavigate(({ cancel, to, type }) => {
 		if (leaving || !dirty || type === 'leave' || !to) return;
+		// A page of runs is this same editor at another address. The draft is
+		// seeded once and a reload never replaces it, so nothing is lost and
+		// there is nothing to ask.
+		if (to.route.id === EDITOR_ROUTE && to.params?.id === data.flow?.id) return;
 		cancel();
 		void (async () => {
 			const ok = await confirm(

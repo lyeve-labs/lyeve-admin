@@ -11,7 +11,13 @@ import { SHELL_KEY, type Shell } from '$lib/shell.svelte';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/f1') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}) }));
+const nav = vi.hoisted(() => ({ guard: null as null | ((n: unknown) => void) }));
+vi.mock('$app/navigation', () => ({
+	beforeNavigate: vi.fn((fn: (n: unknown) => void) => {
+		nav.guard = fn;
+	}),
+	goto: vi.fn(async () => {}),
+}));
 
 // The kit's confirm renders through a container the layout mounts and this
 // test does not, so the call is captured and answered here.
@@ -57,6 +63,8 @@ function refusingTestFetch(body: unknown) {
 }
 let fetchMock: ReturnType<typeof validFetch> | ReturnType<typeof refusingTestFetch> = validFetch();
 beforeEach(() => {
+	kit.confirm.mockReset();
+	kit.confirm.mockResolvedValue(false);
 	fetchMock = validFetch();
 	vi.stubGlobal('fetch', fetchMock);
 	localStorage.clear();
@@ -601,6 +609,26 @@ describe('flow editor page', () => {
 		await vi.waitFor(() => expect(document.body.textContent).toContain('The export could not be loaded.'));
 		expect(document.body.textContent).not.toContain('Loading the export.');
 		expect(document.body.querySelector('pre')).toBeNull();
+	});
+
+	// A page of runs is this editor at another address, and the draft survives it.
+	it('pages the runs with an unsaved draft and asks nothing', async () => {
+		const { container } = setup();
+		await fireEvent.input(container.querySelector('#flow-name') as HTMLInputElement, { target: { value: 'Renamed' } });
+		const cancel = vi.fn();
+		nav.guard?.({
+			cancel,
+			type: 'link',
+			to: { url: new URL('http://localhost/admin/flows/f1?limit=20&offset=20'), route: { id: '/(admin)/admin/flows/[id]' }, params: { id: 'f1' } },
+		});
+		await tick();
+		expect(cancel).not.toHaveBeenCalled();
+		expect(kit.confirm).not.toHaveBeenCalled();
+
+		nav.guard?.({ cancel, type: 'link', to: { url: new URL('http://localhost/admin/flows'), route: { id: '/(admin)/admin/flows' }, params: {} } });
+		await tick();
+		expect(cancel).toHaveBeenCalled();
+		expect(kit.confirm).toHaveBeenCalledWith(expect.stringContaining('Discard the changes'), expect.anything(), { confirmLabel: 'Discard' });
 	});
 
 	it('carries the in-product guide', async () => {
