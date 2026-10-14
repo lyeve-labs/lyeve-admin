@@ -80,7 +80,7 @@
 
 	function stageName(definitionId: string, stageId: string): string {
 		const row = byDefinition.get(definitionId);
-		return row?.stages.find((s) => s.id === stageId)?.name ?? shortId(stageId);
+		return row?.stages?.find((s) => s.id === stageId)?.name ?? shortId(stageId);
 	}
 
 	function definitionName(definitionId: string): string {
@@ -130,6 +130,9 @@
 	let stagesLocked = $derived(limits?.licensed === false);
 	let refused = $derived(formRefusal(form));
 	let formError = $derived(form && 'error' in form && form.error ? String(form.error) : undefined);
+	// The New definition drawer shows only a failed create. A failed delete
+	// stays on the page, so the next drawer never opens with it.
+	let createFailed = $derived(form && 'action' in form && form.action === 'create');
 
 	const ESCALATE = [
 		{ value: 'none', label: 'Nobody' },
@@ -270,7 +273,7 @@
 		{/if}
 	{/snippet}
 
-	{#if !open && (formError || refused)}
+	{#if (!open || !createFailed) && (formError || refused)}
 		<FormErrors message={formError} {refused} />
 	{:else if form && 'created' in form && form.created}
 		<Alert tone="success" autoDismiss>Definition created.</Alert>
@@ -332,6 +335,9 @@
 									</td>
 									<td data-cell="nowrap" class="font-mono text-xs">{row.definition.content_schema || 'default'}</td>
 									<td>
+										{#if row.stages === null}
+											<span class="text-xs text-warn">Stages could not be read</span>
+										{:else}
 										<ol class="flex flex-wrap items-center gap-1.5">
 											{#each row.stages as stage, i (stage.id)}
 												<li class="flex items-center gap-1 text-xs" data-testid="stage-chip">
@@ -347,6 +353,7 @@
 												</li>
 											{/each}
 										</ol>
+										{/if}
 									</td>
 									<td data-cell="nowrap">
 										<Badge tone={row.definition.publish_on_approve ? 'success' : 'neutral'}>
@@ -477,7 +484,7 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={formError} {refused} />
+		<FormErrors message={createFailed ? formError : undefined} refused={createFailed ? refused : null} />
 		<input type="hidden" name="stages" value={stagesJSON} />
 		<input type="hidden" name="publish_on_approve" value={publishOnApprove ? 'true' : 'false'} />
 		<Input

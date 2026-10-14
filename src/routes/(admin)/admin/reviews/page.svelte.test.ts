@@ -335,3 +335,24 @@ describe('reviews page, what the install allows', () => {
 		expect(screen.getByTestId('refusal-notice').textContent).toContain('1 of 1 workflows are in use');
 	});
 });
+
+describe('reviews page, failures and unread stages', () => {
+	it('says the stages could not be read instead of drawing an empty cell', () => {
+		render(ReviewsPage, {
+			props: { data: data({ definitions: [{ ...definition, stages: null }] }), form: null },
+		});
+		expect(screen.getByText('Stages could not be read')).toBeTruthy();
+	});
+
+	it('keeps a failed delete out of the New definition drawer', async () => {
+		render(ReviewsPage, {
+			props: { data: data(), form: { action: 'delete', error: 'Failed to delete the definition.' } as never },
+		});
+		expect(screen.getAllByText('Failed to delete the definition.')).toHaveLength(1);
+		await fireEvent.click(screen.getAllByRole('button', { name: /New definition/ })[0]);
+		const drawerForm = document.querySelector('form#definition-form') as HTMLFormElement;
+		expect(drawerForm.textContent).not.toContain('Failed to delete the definition.');
+		expect(screen.getAllByText('Failed to delete the definition.')).toHaveLength(1);
+	});
+});
+
