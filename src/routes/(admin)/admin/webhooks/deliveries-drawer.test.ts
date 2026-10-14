@@ -113,3 +113,34 @@ describe('asking for a webhook history', () => {
 		expect(update).toHaveBeenCalledWith({ reset: false });
 	});
 });
+
+describe('the history and its own failures', () => {
+	const listed = (n = 2, limit = 50) => ({
+		deliveries: { id: 'w1', items: Array.from({ length: n }, (_, i) => delivery(`d${i}`, false)), limit },
+	});
+
+	it('shows a failed retry inside the drawer, where the reader clicked', async () => {
+		const history = named();
+		const { rerender } = render(DeliveriesDrawer, { props: { form: listed(), history } });
+		await rerender({ form: { action: 'retry-delivery', error: 'cannot retry: webhook is disabled' }, history });
+		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('cannot retry: webhook is disabled');
+	});
+
+	it('holds the retry with the reason once the license refused one', () => {
+		const held = { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' };
+		render(DeliveriesDrawer, { props: { form: listed(), history: named(), held: held as never } });
+		const retry = document.body.querySelector<HTMLButtonElement>('form[action="?/retry-delivery"] button');
+		expect(retry?.disabled).toBe(true);
+		expect(document.body.querySelector('[data-testid="retry-held"]')?.textContent).toContain('example-feature');
+	});
+
+	// The plugin offers no offset on this list, so a full page says the older
+	// attempts are not listed rather than passing for the whole history.
+	it('says when the newest attempts fill the list', () => {
+		render(DeliveriesDrawer, { props: { form: listed(3, 3), history: named() } });
+		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('The newest 3 attempts.');
+		cleanup();
+		render(DeliveriesDrawer, { props: { form: listed(2, 3), history: named() } });
+		expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain('The newest');
+	});
+});

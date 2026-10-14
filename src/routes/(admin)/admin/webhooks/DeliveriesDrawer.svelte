@@ -4,6 +4,8 @@
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { CheckCircle, XCircle, History, RotateCcw } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import { formRefusal, refusalText, type Refusal } from '$lib/api/refusal';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import { eventTone } from './event-tone';
@@ -13,9 +15,18 @@
 		/** The page's one action result, which carries the history and each retry. */
 		form: Record<string, unknown> | null | undefined;
 		history: DeliveryHistory;
+		/** The license refusal a paid write met, which holds the retry. */
+		held?: Refusal | null;
 	}
 
-	let { form, history }: Props = $props();
+	let { form, history, held = null }: Props = $props();
+
+	// A failed retry shows here, beside the row that asked, not behind the panel.
+	const failure = $derived(form?.action === 'retry-delivery' ? (form as { error?: string }) : null);
+
+	// The plugin answers the newest attempts up to the limit asked and offers
+	// no offset, so a full page says the older ones are not listed.
+	let limit = $state(0);
 
 	// Two rows asked in quick succession can answer out of order. A history
 	// applies only to the webhook the drawer names last, or its rows would show
@@ -26,6 +37,7 @@
 			const d = form.deliveries as { id: string; items: WebhookDelivery[] };
 			if (d.id !== untrack(() => history.webhookId)) return;
 			history.items = d.items ?? [];
+			limit = (d as { limit?: number }).limit ?? 0;
 			history.open = true;
 		}
 	});
@@ -44,6 +56,10 @@
 
 <Drawer bind:open={history.open} title="Delivery history for {history.webhookName}" size="xl">
 	{#snippet children()}
+			<FormErrors message={failure?.error || undefined} refused={formRefusal(failure)} />
+			{#if held}
+				<p class="mb-2 text-xs text-muted" data-testid="retry-held">{refusalText(held)} Retrying a delivery needs it.</p>
+			{/if}
 			{#if history.items.length === 0}
 				<EmptyState
 					title="No deliveries recorded yet"
@@ -52,6 +68,9 @@
 					{#snippet iconSnippet()}<History size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else}
+				{#if limit > 0 && history.items.length >= limit}
+					<p class="mb-2 text-xs text-muted">The newest {limit} attempts. Older attempts are kept, and this list does not reach them.</p>
+				{/if}
 				<Table label="Delivery history">
 					<thead>
 						<tr>
@@ -107,6 +126,7 @@
 												variant="ghost"
 												size="sm"
 												type="submit"
+												disabled={held !== null}
 												title="Retry this delivery"
 												aria-label="Retry the delivery attempted at {formatDateTime(
 													d.attempted_at
