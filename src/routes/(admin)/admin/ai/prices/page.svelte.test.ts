@@ -39,6 +39,9 @@ describe('AI prices page', () => {
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
 		expect(dialog.querySelector('input[name="model"]')).toBeTruthy();
 		expect(dialog.querySelector('button[type="submit"]')?.textContent?.trim()).toBe('Create');
+		// Four kinds fit in sight, so they are segments that post the chosen one.
+		expect(dialog.querySelectorAll('[role="radiogroup"] [role="radio"]')).toHaveLength(4);
+		expect((dialog.querySelector('input[type="hidden"][name="kind"]') as HTMLInputElement).value).toBe('openai');
 	});
 
 	it('asks before it deletes, then posts the row key', async () => {

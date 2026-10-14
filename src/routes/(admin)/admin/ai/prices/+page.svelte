@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, Select, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, SegmentedControl, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { tracked } from '$lib/forms.svelte';
 	import { Coins, Pencil, Plus, Trash2 } from '@lucide/svelte';
@@ -83,7 +84,7 @@
 		);
 		if (!ok) return;
 		deleteTarget = p;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -183,7 +184,7 @@
 			<Input id="price-kind" label="Kind" value={providerKindLabel(editing.kind)} disabled />
 			<Input id="price-model" label="Model" value={editing.model} disabled />
 		{:else}
-			<Select id="price-kind" name="kind" label="Kind" options={kindOptions} value={kind} onvaluechange={(v) => (kind = v)} />
+			<SegmentedControl name="kind" label="Kind" options={kindOptions} bind:value={kind} />
 			<Input id="price-model" name="model" label="Model" required placeholder="gpt-4o-mini" bind:value={model} />
 		{/if}
 		<NumberInput id="price-in" name="input_per_1k" label="Input per 1K" min={0} step={0.0001} bind:value={input} />

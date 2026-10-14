@@ -128,6 +128,10 @@
 	</AiSection>
 </PageShell>
 
+<!-- A provider is created here and edited on its own page. The page holds
+     what a drawer cannot: the model list asked of the provider and the
+     capability check for one model, both answered by the provider itself,
+     beside the configuration they help fill in. -->
 {#if data.isSuperAdmin}
 	<Drawer bind:open title="New provider" description="A key is encrypted at rest and never shown again." onclose={() => (open = false)}>
 		<form id="provider-create" method="POST" action="?/create" use:enhance={create.enhance} class="flex flex-col gap-4">

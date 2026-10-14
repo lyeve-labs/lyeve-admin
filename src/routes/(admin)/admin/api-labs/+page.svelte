@@ -451,6 +451,7 @@
 							bind:value={grpcRoute}
 							options={data.grpc.routes.map((r) => ({ value: r, label: r }))}
 							placeholder="Pick a route"
+							searchable
 						/>
 						{#if grpcParams.length > 0}
 							<div class="grid gap-4 sm:grid-cols-2">

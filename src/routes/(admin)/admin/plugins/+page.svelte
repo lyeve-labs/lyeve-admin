@@ -160,6 +160,7 @@
 					options={categoryOptions}
 					value={category}
 					onvaluechange={(v) => (category = v)}
+					searchable
 					class="w-44"
 				/>
 				<CheckboxGroup

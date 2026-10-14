@@ -24,6 +24,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { copyText } from '$lib/clipboard';
 	import ResizableAside from '$lib/components/ResizableAside.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -212,9 +213,6 @@
 	fill
 >
 	{#snippet actions()}
-		{#if data.canSeeAdmin}
-			<SegmentedControl label="Document" labelHidden value={data.half} options={HALVES} />
-		{/if}
 		<Button
 			href={data.specHref}
 			variant="outline"
@@ -225,13 +223,6 @@
 		>
 			<Download size={ICON.sm} /> OpenAPI spec
 		</Button>
-		<div class="w-64">
-			<!-- The label is for a screen reader only. A placeholder is no name,
-			     because it leaves as soon as the box is typed into. The title row
-			     has no room for a visible one. -->
-			<label for="endpoint-search" class="sr-only">Search endpoints</label>
-			<SearchInput id="endpoint-search" bind:value={query} placeholder="Search endpoints" />
-		</div>
 	{/snippet}
 
 	<div class="flex min-h-0 flex-1 overflow-hidden">
@@ -293,6 +284,22 @@
 
 		<div class="min-h-0 flex-1 overflow-y-auto">
 			<div class="max-w-7xl space-y-10 px-6 py-6">
+				<!-- The search and the document switch narrow the list, so they sit
+				     on the list's own row rather than in the page header. -->
+				<ListToolbar label="Filter endpoints">
+					{#snippet search()}
+						<!-- The label is for a screen reader only. A placeholder is no
+						     name, because it leaves as soon as the box is typed into. -->
+						<label for="endpoint-search" class="sr-only">Search endpoints</label>
+						<SearchInput id="endpoint-search" bind:value={query} placeholder="Search endpoints" />
+					{/snippet}
+					{#snippet filters()}
+						{#if data.canSeeAdmin}
+							<SegmentedControl label="Document" labelHidden value={data.half} options={HALVES} />
+						{/if}
+					{/snippet}
+				</ListToolbar>
+
 				{#if data.source === 'catalog'}
 					<Alert tone="warn" title="Showing the built-in catalog">
 						The engine's OpenAPI document could not be read, so this is the reference as
