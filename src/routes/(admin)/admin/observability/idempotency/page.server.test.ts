@@ -81,3 +81,17 @@ describe('a release the engine does not carry out', () => {
 		expect(out.data.error).toBe('The key could not be released.');
 	});
 });
+
+describe('the counters', () => {
+	// A role refusal and an outage read differently, so a failed read keeps
+	// its gate.
+	it('keeps the gate of a failed counters read', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.includes('/stats')) throw new ApiError(503, 'down', {});
+			return { data: [], total_count: 0 };
+		});
+		const out = (await load(loadEvent())) as { statsRead: boolean; statsGate: unknown };
+		expect(out.statsRead).toBe(false);
+		expect(out.statsGate).toEqual({ state: 'unavailable' });
+	});
+});

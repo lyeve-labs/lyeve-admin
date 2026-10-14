@@ -82,3 +82,12 @@ describe('the key toolbar', () => {
 		expect(rows[0]).toContain('order-17');
 	});
 });
+
+describe('a refused counters read', () => {
+	it('says the role cannot read them rather than that the read failed', () => {
+		const { container } = render(IdempotencyPage, {
+			props: props({ stats: null, statsRead: false, statsGate: { state: 'forbidden' } }),
+		});
+		expect(container.textContent).toContain('Your role cannot open the counters');
+	});
+});

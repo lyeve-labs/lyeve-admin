@@ -15,6 +15,7 @@ import {
 	type IdempotencyStats,
 } from '$lib/api/idempotency';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { gateOf, type Gate } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -45,12 +46,18 @@ export const load: PageServerLoad = async (event) => {
 
 	// The counters cover every key, the list covers a page. Read separately so
 	// a page of fifty cannot be mistaken for the whole store.
-	const stats =
+	// A failed read keeps its gate, so a role refusal and an outage read
+	// differently.
+	const stats: { value: IdempotencyStats | null; read: boolean; gate: Gate | null } =
 		gate.state === 'ok'
 			? await readStats(client)
-					.then((s) => ({ value: s, read: true }))
-					.catch(() => ({ value: null as IdempotencyStats | null, read: false }))
-			: { value: null as IdempotencyStats | null, read: false };
+					.then((s) => ({ value: s, read: true, gate: null }))
+					.catch((err: unknown) => ({
+						value: null,
+						read: false,
+						gate: gateOf(err, 'The counters could not be read. The list below is one page, not the whole store.'),
+					}))
+			: { value: null, read: false, gate: null };
 
 	return {
 		keys,
@@ -60,6 +67,7 @@ export const load: PageServerLoad = async (event) => {
 		hasMore,
 		stats: stats.value,
 		statsRead: stats.read,
+		statsGate: stats.gate,
 		gate,
 	};
 };
