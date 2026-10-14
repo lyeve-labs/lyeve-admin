@@ -45,7 +45,6 @@ export interface TelemetryPage {
 }
 
 export const load: PageServerLoad = async (event) => {
-	event.depends('app:telemetry');
 	const { fetch, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {

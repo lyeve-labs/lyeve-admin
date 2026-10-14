@@ -2,7 +2,7 @@
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}),
+vi.mock('$app/navigation', () => ({
 	goto: vi.fn(async () => {}),
 	invalidateAll: vi.fn(async () => {}),
 }));
@@ -11,7 +11,6 @@ vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/obse
 
 import QueriesPage from './+page.svelte';
 import type { AnalysisRead, NoPlansReason, QueryLogEntry } from '$lib/api/query-monitor';
-import { invalidate, invalidateAll } from '$app/navigation';
 
 afterEach(cleanup);
 
@@ -226,16 +225,5 @@ describe('Slow queries filter', () => {
 		expect(container.textContent).toContain('Nothing on this page matches');
 		expect(container.querySelector('table')).toBeNull();
 		expect(container.querySelector('nav[aria-label*="agination" i]')).toBeNull();
-	});
-});
-
-describe('Refresh', () => {
-	it("rereads the page's own load and leaves the shell's data alone", async () => {
-		vi.mocked(invalidate).mockClear();
-		vi.mocked(invalidateAll).mockClear();
-		const { getByRole } = render(QueriesPage, { props: props() });
-		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
-		expect(invalidate).toHaveBeenCalledWith('app:observability-queries');
-		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

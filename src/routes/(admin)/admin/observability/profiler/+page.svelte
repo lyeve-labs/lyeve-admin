@@ -14,7 +14,7 @@
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { refresher } from '$lib/refresher';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		AlertTriangle,
 		CheckCircle,
@@ -42,7 +42,14 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let refreshing = $state(false);
-	const refresh = refresher('app:profiler', (on) => (refreshing = on));
+	async function refresh() {
+		refreshing = true;
+		try {
+			await invalidateAll();
+		} finally {
+			refreshing = false;
+		}
+	}
 
 	let resetting = $state(false);
 	let capturing = $state(false);

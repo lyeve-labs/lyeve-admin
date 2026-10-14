@@ -17,7 +17,7 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { refresher } from '$lib/refresher';
+	import { invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Activity, AlertTriangle, CheckCircle, Plus, RefreshCw, Send, Trash2, Upload } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -45,7 +45,14 @@
 	const beta = $derived(rowFor(data.pluginStatus, PLUGIN.telemetry)?.beta === true);
 
 	let refreshing = $state(false);
-	const refresh = refresher('app:telemetry', (on) => (refreshing = on));
+	async function refresh() {
+		refreshing = true;
+		try {
+			await invalidateAll();
+		} finally {
+			refreshing = false;
+		}
+	}
 
 	// The registry is filtered here, in the browser, because it is one read:
 	// a super admin's whole registry is a few hundred families, and a tenant

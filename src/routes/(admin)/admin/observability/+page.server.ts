@@ -99,7 +99,6 @@ export interface GoroutineEnginePanel extends GoroutineEngineViews {
 }
 
 export const load: PageServerLoad = async (event) => {
-	event.depends('app:observability');
 	const { url, parent } = event;
 	const { user, plugins } = await parent();
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {

@@ -53,7 +53,6 @@ function dialectOf(value: string | null): Dialect | null {
 }
 
 export const load: PageServerLoad = async (event) => {
-	event.depends('app:observability-queries');
 	const { user, plugins } = await event.parent();
 	// Captured SQL carries the text of a query written against one tenant's
 	// data, so the whole page is the super admin's.

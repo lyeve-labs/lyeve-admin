@@ -49,7 +49,6 @@ function loadEvent(routes: Record<string, Route>, roles: string[]) {
 			fetch,
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/observability/telemetry'),
-			depends: vi.fn(),
 			parent: async () => ({ user: { id: 'u1', roles }, entitlements: { plan: '', state: '', features: [], tenant_quota: 1 } }),
 		} as never,
 		calls,

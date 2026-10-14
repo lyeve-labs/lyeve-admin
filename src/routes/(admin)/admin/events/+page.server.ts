@@ -33,7 +33,6 @@ export interface Runs {
 const NO_RUNS: Section<Runs> = { ok: true, value: { rows: [], total: 0 } };
 
 export const load: PageServerLoad = async (event) => {
-	event.depends('app:events');
 	const { plugins } = await event.parent();
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
 

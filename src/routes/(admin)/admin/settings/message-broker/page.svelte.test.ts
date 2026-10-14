@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { render, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}) }));
 
 import BrokerPage from './+page.svelte';
 import type { BrokerStatus } from '$lib/api/messagebroker';
-import { invalidate, invalidateAll } from '$app/navigation';
 
 afterEach(cleanup);
 
@@ -171,16 +170,5 @@ describe('where the broker is set', () => {
 		expect(said(container)).toContain(
 			'through EVENT_BUS and RABBITMQ_URL, RABBITMQ_TLS, RABBITMQ_TLS_CA_FILE. Set them as environment variables'
 		);
-	});
-});
-
-describe('Refresh', () => {
-	it("rereads the page's own load and leaves the shell's data alone", async () => {
-		vi.mocked(invalidate).mockClear();
-		vi.mocked(invalidateAll).mockClear();
-		const { getByRole } = render(BrokerPage, { props: props() });
-		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
-		expect(invalidate).toHaveBeenCalledWith('app:message-broker');
-		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

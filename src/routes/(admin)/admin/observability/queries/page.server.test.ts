@@ -14,7 +14,6 @@ type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 function loadEvent(query = '') {
 	return {
 		url: new URL(`http://localhost/admin/observability/queries${query}`),
-		depends: vi.fn(),
 		parent: async () => ({
 			user: { roles: ['super_admin'] },
 			plugins: { state: 'named', running: ['query-monitor'], withheld: [] },

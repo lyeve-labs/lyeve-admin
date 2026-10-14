@@ -12,8 +12,7 @@
 		Table,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
-	import { goto } from '$app/navigation';
-	import { refresher } from '$lib/refresher';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { Lightbulb, RefreshCw, Search, Timer } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { page } from '$app/state';
@@ -38,7 +37,14 @@
 	const here = $derived(`${page.url.pathname}${page.url.search}`);
 
 	let refreshing = $state(false);
-	const refresh = refresher('app:observability-queries', (on) => (refreshing = on));
+	async function refresh() {
+		refreshing = true;
+		try {
+			await invalidateAll();
+		} finally {
+			refreshing = false;
+		}
+	}
 
 	// Narrowing happens on what is on screen. The plugin samples after the
 	// fact and offers no server-side filter, so a filter that pretended to

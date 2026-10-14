@@ -17,7 +17,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { browserOffset } from '$lib/utils/wall-clock';
-	import { refresher } from '$lib/refresher';
+	import { invalidateAll } from '$app/navigation';
 	import { History, RefreshCw, Rss, Search } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -31,7 +31,14 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let refreshing = $state(false);
-	const refresh = refresher('app:events', (on) => (refreshing = on));
+	async function refresh() {
+		refreshing = true;
+		try {
+			await invalidateAll();
+		} finally {
+			refreshing = false;
+		}
+	}
 
 	let narrow = $state('');
 	let failedFirst = $state(false);

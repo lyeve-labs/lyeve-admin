@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { render, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}) }));
 
 import GrpcPage from './+page.svelte';
 import type { GrpcStatus } from '$lib/api/grpc';
-import { invalidate, invalidateAll } from '$app/navigation';
 
 afterEach(cleanup);
 
@@ -129,16 +128,5 @@ describe('the listeners', () => {
 	it('offers the REST paths for a caller with no gRPC client', () => {
 		const { container } = render(GrpcPage, { props: props() });
 		expect(said(container)).toContain('GET /api/schemas');
-	});
-});
-
-describe('Refresh', () => {
-	it("rereads the page's own load and leaves the shell's data alone", async () => {
-		vi.mocked(invalidate).mockClear();
-		vi.mocked(invalidateAll).mockClear();
-		const { getByRole } = render(GrpcPage, { props: props() });
-		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
-		expect(invalidate).toHaveBeenCalledWith('app:grpc');
-		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

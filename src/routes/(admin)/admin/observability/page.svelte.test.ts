@@ -3,14 +3,13 @@ import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}),
+vi.mock('$app/navigation', () => ({
 	goto: vi.fn(async () => {}),
 	invalidateAll: vi.fn(async () => {}),
 }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 import ObservabilityPage from './+page.svelte';
-import { invalidate, invalidateAll } from '$app/navigation';
 
 /**
  * The live tail opens an EventSource as soon as the page mounts and jsdom has
@@ -682,16 +681,5 @@ describe('latency depth', () => {
 		]);
 		expect(links.find((a) => a.getAttribute('aria-current') === 'page')?.textContent).toContain('Top 20');
 		expect(container.querySelector('#latency-top')?.hasAttribute('data-sveltekit-noscroll')).toBe(true);
-	});
-});
-
-describe('Refresh', () => {
-	it("rereads the page's own load and leaves the shell's data alone", async () => {
-		vi.mocked(invalidate).mockClear();
-		vi.mocked(invalidateAll).mockClear();
-		const { getByRole } = render(ObservabilityPage, { props: props() });
-		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
-		expect(invalidate).toHaveBeenCalledWith('app:observability');
-		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

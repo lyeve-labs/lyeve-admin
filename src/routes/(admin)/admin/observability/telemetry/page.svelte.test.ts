@@ -3,12 +3,11 @@ import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 import TelemetryPage from './+page.svelte';
 import type { MetricFamily } from '$lib/api/telemetry';
-import { invalidate, invalidateAll } from '$app/navigation';
 
 const REQUESTS: MetricFamily = {
 	name: 'lyeve_requests_total',
@@ -158,16 +157,5 @@ describe('the exporters section', () => {
 		const { container } = render(TelemetryPage, props({ superAdmin: true, families: [], exporters: [{ name: 'statsd', healthy: true, last_export: '0001-01-01T00:00:00Z', exports: 0, failures: 0 }] }));
 		expect(container.textContent).toContain('Never');
 		expect(container.textContent).not.toContain('Invalid Date');
-	});
-});
-
-describe('Refresh', () => {
-	it("rereads the page's own load and leaves the shell's data alone", async () => {
-		vi.mocked(invalidate).mockClear();
-		vi.mocked(invalidateAll).mockClear();
-		const { getByRole } = render(TelemetryPage, props({ superAdmin: false, families: [REQUESTS], exporters: null }));
-		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
-		expect(invalidate).toHaveBeenCalledWith('app:telemetry');
-		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

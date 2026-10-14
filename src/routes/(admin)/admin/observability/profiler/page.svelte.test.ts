@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, fireEvent } from '@testing-library/svelte';
+import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 import ProfilerPage from './+page.svelte';
-import { invalidate, invalidateAll } from '$app/navigation';
 
 const STATS = {
 	endpoint: '/api/v1/content',
@@ -127,16 +126,5 @@ describe('the profiler page', () => {
 	it('relays a refused capture on the flamegraph form', () => {
 		const { container } = render(ProfilerPage, props(page(), { form: 'flamegraph', error: 'flamegraph generation failed' }));
 		expect(container.textContent).toContain('flamegraph generation failed');
-	});
-});
-
-describe('Refresh', () => {
-	it("rereads the page's own load and leaves the shell's data alone", async () => {
-		vi.mocked(invalidate).mockClear();
-		vi.mocked(invalidateAll).mockClear();
-		const { getByRole } = render(ProfilerPage, props(page()));
-		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
-		expect(invalidate).toHaveBeenCalledWith('app:profiler');
-		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });

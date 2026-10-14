@@ -15,7 +15,6 @@ import {
 } from '$lib/api/realtime';
 
 export const load: PageServerLoad = async (event) => {
-	event.depends('app:realtime');
 	const { user, plugins } = await event.parent();
 	const superAdmin = user.roles.includes('super_admin');
 

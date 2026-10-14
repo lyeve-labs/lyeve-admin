@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
-import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { render, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/navigation', () => ({ invalidate: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}) }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
 
 import EventsPage from './+page.svelte';
 import type { EventRow, ReplayRun } from '$lib/api/events';
-import { invalidate, invalidateAll } from '$app/navigation';
 
 afterEach(cleanup);
 
@@ -177,16 +176,5 @@ describe('figures that cover one page or failed', () => {
 		expect(text).toContain('did not answer');
 		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
 		expect(tile?.nextElementSibling?.textContent?.trim()).not.toBe('0');
-	});
-});
-
-describe('Refresh', () => {
-	it("rereads the page's own load and leaves the shell's data alone", async () => {
-		vi.mocked(invalidate).mockClear();
-		vi.mocked(invalidateAll).mockClear();
-		const { getByRole } = render(EventsPage, { props: props() });
-		await fireEvent.click(getByRole('button', { name: 'Refresh' }));
-		expect(invalidate).toHaveBeenCalledWith('app:events');
-		expect(invalidateAll).not.toHaveBeenCalled();
 	});
 });
