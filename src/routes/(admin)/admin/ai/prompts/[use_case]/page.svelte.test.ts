@@ -70,6 +70,21 @@ describe('AI prompt page', () => {
 		expect((container.querySelector('textarea[name="body"]') as HTMLTextAreaElement).value).toBe('Summarize in two bullets.');
 	});
 
+	// A restore saves a new version even when its text matches the one in
+	// force, and the editor shows what is in force after it.
+	it('reseeds the editor when a restore brings in a new version with the same text', async () => {
+		const { container, rerender } = setup();
+		const box = container.querySelector('textarea[name="body"]') as HTMLTextAreaElement;
+		await fireEvent.input(box, { target: { value: 'Summarize in two bullets.' } });
+
+		await rerender({
+			data: { gate: { state: 'ok' }, prompt: { ...fixturePrompt, active_version: 3 }, aiSettings: fixtureSettings, aiLayoutGate: { state: 'ok' }, isSuperAdmin: false },
+			form: { scope: 'restore', version: 3, from: 2 },
+		} as never);
+
+		expect((container.querySelector('textarea[name="body"]') as HTMLTextAreaElement).value).toBe('Summarize in three bullets.');
+	});
+
 	it('paints the locked state and no editor', () => {
 		const { container, getByText } = setup({ gate: { state: 'locked' }, prompt: null });
 		expect(getByText('Not enabled on this instance.')).toBeTruthy();

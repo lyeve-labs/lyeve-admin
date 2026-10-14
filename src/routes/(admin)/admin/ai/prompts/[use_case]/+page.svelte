@@ -15,13 +15,17 @@
 
 	const back = { href: '/admin/ai/prompts', label: 'Prompts' };
 	const p = $derived(data.prompt);
-	// The editor starts from the text in force and is re-seeded when that text
-	// changes, after a save or a restore. The text is read through its own
-	// derived string, so a reload that hands back the same text, as the layout
-	// does when the AI switch is read again, leaves what the reader typed.
+	// The editor starts from the text in force and is re-seeded when a new
+	// version comes into force, after a save or a restore, even one whose text
+	// matches the old. The version and the text are read through derived
+	// values of their own, so a reload that hands back the same version, as
+	// the layout does when the AI switch is read again, leaves what the reader
+	// typed.
 	const active = $derived(p?.active ?? '');
+	const activeVersion = $derived(p?.active_version ?? 0);
 	let body = $state('');
 	$effect(() => {
+		void activeVersion;
 		body = active;
 	});
 	const dirty = $derived(!!p && body.trim() !== '' && body !== p.active);
