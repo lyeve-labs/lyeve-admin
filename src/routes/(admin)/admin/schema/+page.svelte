@@ -216,8 +216,14 @@
 		selected = s ? cloneSchema(s) : null;
 		saved = s && asSaved ? JSON.parse(JSON.stringify(selected)) : null;
 		saveError = '';
+		// Below lg the fold hides the list button just pressed, and focus would
+		// drop to the page. It moves to the button that shows the list again.
+		const fromRail = document.getElementById('schema-rail')?.contains(document.activeElement) ?? false;
 		listShown = false;
 		resetHistory(selected);
+		if (s && fromRail && typeof window.matchMedia === 'function' && !window.matchMedia('(min-width: 64rem)').matches) {
+			void tick().then(() => document.querySelector<HTMLElement>('[aria-controls="schema-rail"]')?.focus());
+		}
 	}
 
 	/** Asks before throwing away edits. True when there is nothing to lose or the answer is yes. */
