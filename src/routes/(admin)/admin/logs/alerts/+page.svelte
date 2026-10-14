@@ -191,8 +191,11 @@
 						id="log-alert-cooldown"
 						name="cooldown"
 						label="Quiet time after a rule fires"
-						hint="A rule fires again only after this, such as 10m or 1h."
-						value={config.cooldown || '10m'}
+						hint={config.cooldown
+							? 'A rule fires again only after this, such as 10m or 1h.'
+							: 'No cooldown is set, so a rule fires on every check while it is over its count. Enter one such as 10m or 1h.'}
+						placeholder="10m"
+						value={config.cooldown}
 						mono
 					/>
 					<Button variant="secondary" type="submit">Save</Button>

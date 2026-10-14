@@ -69,3 +69,19 @@ describe('the volume alert rules', () => {
 		expect(container.querySelector('[data-testid="refusal-notice"]')).not.toBeNull();
 	});
 });
+
+describe('the cooldown', () => {
+	// The evaluator runs with no cooldown when none is stored. A field
+	// showing 10m claimed a quiet time the rules do not have.
+	it('shows an unset cooldown as empty and says what that means', () => {
+		const { container } = setup({ config: { ...CONFIG, cooldown: '' } });
+		const input = container.querySelector('#log-alert-cooldown') as HTMLInputElement;
+		expect(input.value).toBe('');
+		expect(container.textContent).toContain('No cooldown is set');
+	});
+
+	it('shows the stored cooldown', () => {
+		const { container } = setup();
+		expect((container.querySelector('#log-alert-cooldown') as HTMLInputElement).value).toBe('10m');
+	});
+});
