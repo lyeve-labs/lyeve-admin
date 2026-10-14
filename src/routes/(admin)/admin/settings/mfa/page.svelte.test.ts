@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, render, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn(async () => 'data:image/png;base64,AA') } }));
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 
 const licensed = { plan: 'example', state: 'active', features: ['mfa'], tenant_quota: 1 };
 
@@ -51,5 +54,22 @@ describe('two-factor authentication page', () => {
 	it('asks for a code to turn it off when it is on', () => {
 		const { container } = setup(true);
 		expect(container.querySelector('form[action="?/disable"] input[name="code"]')).not.toBeNull();
+	});
+
+	it('copies every backup code at once and confirms for a second and a half', async () => {
+		vi.useFakeTimers();
+		const writeText = vi.fn(async (_text: string) => {});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		const { getByRole } = setup(false, { step: 'done', backupCodes: ['a1', 'b2'] });
+		const copy = getByRole('button', { name: 'Copy all codes' });
+		const status = copy.parentElement!.querySelector('[role="status"]')!;
+
+		await fireEvent.click(copy);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(writeText).toHaveBeenCalledWith('a1\nb2');
+		expect(status.textContent).toBe('Copied');
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(status.textContent).toBe('');
 	});
 });

@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { formRefusal } from '$lib/api/refusal';
-	import { Alert, Button, Card, CopyField, Input, PageShell, Skeleton } from '@lyeve-labs/ui-kit';
+	import { Alert, Button, Card, CopyButton, CopyField, Input, PageShell, Skeleton } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { Shield, Copy, Check } from '@lucide/svelte';
+	import { Shield } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
-	import { copyText } from '$lib/clipboard';
 	import { tracked } from '$lib/forms.svelte';
 	import { ICON } from '$lib/icon';
 
@@ -29,8 +28,6 @@
 
 	let code = $state('');
 	let disableCode = $state('');
-	let clipboardError = $state('');
-	let copiedCodes = $state(false);
 	let qrDataUrl = $state('');
 
 	// Only the browser draws the code, so the generator is loaded here and
@@ -57,15 +54,6 @@
 	const description = $derived(
 		!data.mfa.ok ? 'The state of this account could not be read.' : mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'
 	);
-
-	async function copyBackupCodes() {
-		if (!(await copyText(backupCodes.join('\n')))) {
-			clipboardError = 'Could not reach the clipboard. Write the codes down before leaving this page.';
-			return;
-		}
-		copiedCodes = true;
-		setTimeout(() => (copiedCodes = false), 2000);
-	}
 </script>
 
 <PageShell
@@ -74,7 +62,7 @@
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
-	<FormErrors message={actionErrorText || clipboardError || undefined} refused={formRefusal(form)} />
+	<FormErrors message={actionErrorText || undefined} refused={formRefusal(form)} />
 
 	{#if step === 'done'}
 		<Alert tone="success" title="Two-factor authentication is on">
@@ -89,15 +77,8 @@
 						</code>
 					{/each}
 				</div>
-				<div class="flex justify-end gap-3">
-					<Button variant="secondary" onclick={copyBackupCodes}>
-						{#if copiedCodes}
-							<Check size={ICON.sm} class="text-success" aria-hidden="true" />
-						{:else}
-							<Copy size={ICON.sm} aria-hidden="true" />
-						{/if}
-						Copy all codes
-					</Button>
+				<div class="flex items-center justify-end gap-3">
+					<CopyButton value={backupCodes.join('\n')} text="Copy all codes" />
 					<Button variant="primary" href="/admin/settings/mfa">Done</Button>
 				</div>
 			</div>

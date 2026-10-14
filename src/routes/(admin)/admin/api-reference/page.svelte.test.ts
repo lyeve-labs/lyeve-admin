@@ -3,17 +3,20 @@ import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The only call the page makes off the page is to the clipboard, which jsdom
-// does not implement and which the copy control's tick depends on.
-const clip = vi.hoisted(() => ({ copyText: vi.fn(async (_text: string) => true) }));
-vi.mock('$lib/clipboard', () => clip);
+// does not implement, so each case installs a writer it can read.
+const writeText = vi.fn(async (_text: string) => {});
 
 import ApiReferencePage from './+page.svelte';
 import type { EndpointGroup } from '$lib/api/reference';
 import type { PageData } from './$types';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 beforeEach(() => {
 	vi.clearAllMocks();
+	Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 });
 
 /** Two endpoints. Every row discloses at least its gate and a request preview. */
@@ -152,8 +155,34 @@ describe('api reference rows', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Copy the path /api/admin/media' }));
 
-		expect(clip.copyText).toHaveBeenCalledWith('/api/admin/media');
+		expect(writeText).toHaveBeenCalledWith('/api/admin/media');
 		expect(disclosure.getAttribute('aria-expanded')).toBe('false');
+	});
+
+	it('confirms a copy for a second and a half', async () => {
+		vi.useFakeTimers();
+		setup();
+		const copy = screen.getByRole('button', { name: 'Copy the path /api/admin/media' });
+		const status = copy.parentElement!.querySelector('[role="status"]')!;
+
+		await fireEvent.click(copy);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(status.textContent).toBe('Copied');
+
+		await vi.advanceTimersByTimeAsync(1499);
+		expect(status.textContent).toBe('Copied');
+		await vi.advanceTimersByTimeAsync(1);
+		expect(status.textContent).toBe('');
+	});
+
+	it('copies the request preview from an open row', async () => {
+		const { container } = setup();
+		await fireEvent.click(disclosures(container)[0]);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Copy a curl request for GET /api/admin/media' }));
+
+		expect(writeText).toHaveBeenCalledTimes(1);
+		expect(writeText.mock.calls[0][0]).toContain('/api/admin/media');
 	});
 
 	it('names every copy control by what it copies', async () => {

@@ -20,7 +20,10 @@ vi.mock('$lib/canvas/schema', () => ({
 
 import SchemaPage from './+page.svelte';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 
 /**
  * The page reads only the entitlements, the schema list and the row counts, so
@@ -164,6 +167,25 @@ describe('schema builder relation panel', () => {
 		expect(paths.length).toBeGreaterThanOrEqual(6);
 		expect(screen.queryByText(/\{schema\}/)).toBeNull();
 		expect(screen.getByRole('button', { name: 'Copy a curl request for POST /api/v1/content/posts' })).toBeTruthy();
+	});
+
+	it('copies a collection request and confirms for a second and a half', async () => {
+		const writeText = vi.fn(async (_text: string) => {});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		await openPosts();
+		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
+		vi.useFakeTimers();
+		const copy = screen.getByRole('button', { name: 'Copy a curl request for POST /api/v1/content/posts' });
+		const status = copy.parentElement!.querySelector('[role="status"]')!;
+
+		await fireEvent.click(copy);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(writeText).toHaveBeenCalledTimes(1);
+		expect(writeText.mock.calls[0][0]).toContain('/api/v1/content/posts');
+		expect(status.textContent).toBe('Copied');
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(status.textContent).toBe('');
 	});
 
 	it('turns off the boxes that do nothing for a relation', async () => {

@@ -7,6 +7,7 @@
 		Card,
 		Checkbox,
 		Collapsible,
+		CopyButton,
 		Drawer,
 		Dropdown,
 		EmptyState,
@@ -43,9 +44,7 @@
 	import type { Action } from 'svelte/action';
 	import {
 		BookOpen,
-		Check,
 		Code,
-		Copy,
 		Download,
 		Ellipsis,
 		Eye,
@@ -68,7 +67,6 @@
 	import type { RelationType } from '$lib/relations';
 	import { collectionRoutes } from '$lib/api/collection-api';
 	import { curlFor } from '$lib/api/request-preview';
-	import { copyText } from '$lib/clipboard';
 	import { formatDateTime } from '$lib/format';
 	import type { HttpMethod } from '$lib/api/reference';
 	import {
@@ -244,7 +242,6 @@
 	let saved = $state<Schema | null>(null);
 	const isNewSchema = $derived(selected !== null && saved === null);
 	const dirty = $derived(selected !== null && (saved === null || canonical(selected) !== canonical(saved)));
-	let copiedRequest = $state<string | null>(null);
 
 	const methodTone: Record<HttpMethod, 'brand' | 'success' | 'warn' | 'danger'> = {
 		GET: 'brand',
@@ -254,13 +251,6 @@
 		DELETE: 'danger',
 	};
 
-	async function copyRequest(text: string) {
-		if (!(await copyText(text))) return;
-		copiedRequest = text;
-		setTimeout(() => {
-			copiedRequest = null;
-		}, 1500);
-	}
 	let view = $state<'list' | 'canvas'>('list');
 	let saveError = $state('');
 	let schemaFilter = $state('');
@@ -1612,19 +1602,12 @@
 								<Badge tone={methodTone[route.method]} class="font-mono">{route.method}</Badge>
 								<code class="min-w-0 flex-1 truncate font-mono text-xs text-fg">{route.path}</code>
 								<span class="text-xs text-faint">{route.summary}</span>
-								<button
-									type="button"
-									onclick={() => copyRequest(preview)}
-									class="relative hit-area flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint transition-colors hover:bg-surface-2 hover:text-fg"
-									title="Copy a curl request"
-									aria-label="Copy a curl request for {route.method} {route.path}"
-								>
-									{#if copiedRequest === preview}
-										<Check size={ICON.xs} class="text-success" />
-									{:else}
-										<Copy size={ICON.xs} />
-									{/if}
-								</button>
+								<CopyButton
+									value={preview}
+									label="Copy a curl request for {route.method} {route.path}"
+									size={ICON.xs}
+									class="shrink-0"
+								/>
 							</div>
 						</li>
 					{/each}

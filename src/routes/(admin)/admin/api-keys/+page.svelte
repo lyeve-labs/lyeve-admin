@@ -4,6 +4,7 @@
 		Badge,
 		Button,
 		CheckboxGroup,
+		CopyField,
 		DatePicker,
 		Drawer,
 		EmptyState,
@@ -21,12 +22,11 @@
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
-	import { Key, Plus, Trash2, Ban, Copy, Check, Gauge } from '@lucide/svelte';
+	import { Key, Plus, Trash2, Ban, Gauge } from '@lucide/svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { copyText } from '$lib/clipboard';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
@@ -130,8 +130,6 @@
 	let showRawKey = $state(false);
 	let rawKey = $state('');
 	let rawKeyName = $state('');
-	let copiedKey = $state(false);
-	let copyError = $state('');
 
 	$effect(() => {
 		if (form && 'created' in form && form.created) {
@@ -141,16 +139,6 @@
 			showRawKey = true;
 		}
 	});
-
-	async function copyKey() {
-		if (!(await copyText(rawKey))) {
-			copyError = 'Could not reach the clipboard. Select the key and copy it manually.';
-			return;
-		}
-		copyError = '';
-		copiedKey = true;
-		setTimeout(() => (copiedKey = false), 2000);
-	}
 
 	/**
 	 * A key is a live credential and deleting it cannot be undone, so the row
@@ -480,19 +468,7 @@
 				Your API key <strong class="text-fg">{rawKeyName}</strong> has been created. Copy it now.
 				It will not be shown again.
 			</p>
-			<div class="flex items-center gap-2 rounded-lg border border-line bg-ink px-3 py-2">
-				<code class="flex-1 font-mono text-xs break-all text-success">{rawKey}</code>
-				<Button variant="ghost" size="sm" onclick={copyKey} aria-label="Copy key">
-					{#if copiedKey}
-						<Check size={ICON.sm} class="text-success" />
-					{:else}
-						<Copy size={ICON.sm} />
-					{/if}
-				</Button>
-			</div>
-			{#if copyError}
-				<Alert tone="warn">{copyError}</Alert>
-			{/if}
+			<CopyField id="raw-api-key" label="API key" labelHidden value={rawKey} copyLabel="Copy key" />
 			<p class="text-xs text-faint">
 				Send this key in the <code class="text-muted">X-API-Key</code> header of your requests.
 			</p>
