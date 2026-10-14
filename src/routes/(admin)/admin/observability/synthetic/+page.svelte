@@ -528,8 +528,9 @@
 					autocomplete="off"
 					label="Auth token"
 					hint={storedSecret
-						? 'Saving replaces the stored token, which no read returns. Enter it again, or the canary runs without one.'
+						? 'A save replaces the stored token, and no read returns it, so enter it again to keep it.'
 						: 'Sent as a bearer token on each request of the cycle. Leave it empty to send none.'}
+					required={storedSecret}
 					bind:value={secret}
 				/>
 			{:else if type === 'login_flow'}
@@ -548,8 +549,9 @@
 					autocomplete="new-password"
 					label="Password"
 					hint={storedSecret
-						? 'Saving replaces the stored password, which no read returns. Enter it again, or the probe signs in with none.'
+						? 'A save replaces the stored password, and no read returns it, so enter it again to keep it.'
 						: 'The password the probe signs in with.'}
+					required={storedSecret}
 					bind:value={secret}
 				/>
 				<Input

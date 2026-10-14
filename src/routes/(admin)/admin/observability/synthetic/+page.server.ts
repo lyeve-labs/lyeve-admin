@@ -5,6 +5,7 @@ import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
+	SECRET_MASK,
 	SYNTHETIC_OK,
 	acknowledgeAlert,
 	createProbe,
@@ -89,19 +90,28 @@ function configFor(type: string, form: FormData): ProbeConfig {
 	}
 }
 
+interface Kept {
+	config: ProbeConfig;
+	regions?: string[];
+	/** The secrets the read masked, which a save without them erases. */
+	masked: { password: boolean; auth_token: boolean };
+}
+
 /**
  * What an edit read and the form does not show: the stored config and regions
  * the drawer sends back as JSON. The plugin replaces both whole on a save, so
  * anything left out of the body is erased.
  */
-function keptFrom(raw: FormDataEntryValue | null): { config: ProbeConfig; regions?: string[] } {
-	if (typeof raw !== 'string' || raw === '') return { config: {} };
+function keptFrom(raw: FormDataEntryValue | null): Kept {
+	const none: Kept = { config: {}, masked: { password: false, auth_token: false } };
+	if (typeof raw !== 'string' || raw === '') return none;
 	try {
 		const read = JSON.parse(raw) as { config?: ProbeConfig | null; regions?: unknown };
 		const regions = Array.isArray(read.regions) ? read.regions.filter((r): r is string => typeof r === 'string') : undefined;
-		return { config: keptConfig(read.config), regions };
+		const masked = { password: read.config?.password === SECRET_MASK, auth_token: read.config?.auth_token === SECRET_MASK };
+		return { config: keptConfig(read.config), regions, masked };
 	} catch {
-		return { config: {} };
+		return none;
 	}
 }
 
@@ -209,10 +219,18 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' });
 	if (!type) return fail(400, { error: 'Choose a probe type.', drawer: 'probe' });
 
-	const kept: { config: ProbeConfig; regions?: string[] } = id ? keptFrom(form.get('kept')) : { config: {} };
+	const kept = id ? keptFrom(form.get('kept')) : keptFrom(null);
 	const config: ProbeConfig = { ...kept.config, ...configFor(type, form) };
 	// No read returns a stored secret, so a save sends only the one typed here.
+	// The plugin replaces the config whole, so a save without it would erase
+	// the stored one.
 	const secret = String(form.get('secret') ?? '');
+	if (!secret && type === 'login_flow' && kept.masked.password) {
+		return fail(400, { error: 'This probe has a stored password that no read returns. Enter it again to save.', drawer: 'probe' });
+	}
+	if (!secret && type === 'api_canary' && kept.masked.auth_token) {
+		return fail(400, { error: 'This canary has a stored auth token that no read returns. Enter it again to save.', drawer: 'probe' });
+	}
 	if (secret && type === 'login_flow') config.password = secret;
 	if (secret && type === 'api_canary') config.auth_token = secret;
 	const required = REQUIRED_TARGET[type];

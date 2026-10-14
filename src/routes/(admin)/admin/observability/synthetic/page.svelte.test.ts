@@ -362,8 +362,9 @@ describe('editing a probe whose secrets no read returns', () => {
 		render(SyntheticPage, { props: props({ probes: [signIn] }) });
 		await fireEvent.click(screen.getByLabelText('Edit Sign in'));
 		const form = document.querySelector('#probe-form') as HTMLFormElement;
-		expect(form.querySelector('input[name="secret"][type="password"]')).toBeTruthy();
-		expect(said(form)).toContain('Saving replaces the stored password');
+		const input = form.querySelector('input[name="secret"][type="password"]') as HTMLInputElement;
+		expect(input.required).toBe(true);
+		expect(said(form)).toContain('A save replaces the stored password');
 	});
 
 	it('names the headers the save drops', async () => {

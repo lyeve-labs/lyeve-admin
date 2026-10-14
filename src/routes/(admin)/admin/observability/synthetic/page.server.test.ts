@@ -260,6 +260,7 @@ describe('editing a probe', () => {
 		timeout_seconds: '10',
 		enabled: 'true',
 		kept: JSON.stringify({ config: LOGIN.config, regions: LOGIN.regions }),
+		secret: 'hunter2',
 		...over,
 	});
 
@@ -272,15 +273,28 @@ describe('editing a probe', () => {
 		expect(url).toBe('/api/admin/synthetic-monitoring/probes/p2');
 		expect(body.regions).toEqual(['us-east', 'eu-west']);
 		expect(body.config).toMatchObject({ payload: { a: 1 }, headers: { 'X-Probe': 'yes' }, expected_redirect: '/home' });
+		// Sending the mask back would store the mask as the secret.
+		expect(body.config.headers.Authorization).toBeUndefined();
 	});
 
-	// Sending the mask back would store the mask as the secret.
-	it('never sends a masked secret back', async () => {
-		engine.put.mockResolvedValue(LOGIN);
-		await actions.update(requestEvent(fields()));
-		const body = engine.put.mock.calls[0][1];
-		expect(body.config.password).toBeUndefined();
-		expect(body.config.headers.Authorization).toBeUndefined();
+	// The read masks the stored secret and the plugin replaces the config
+	// whole, so a save without the secret would erase it.
+	it('refuses a save that would erase the stored password', async () => {
+		const out = (await actions.update(requestEvent(fields({ secret: '' })))) as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data).toMatchObject({ drawer: 'probe' });
+		expect(String(out.data.error)).toContain('Enter it again');
+		expect(engine.put).not.toHaveBeenCalled();
+	});
+
+	it("refuses a save that would erase a canary's stored auth token", async () => {
+		const kept = JSON.stringify({ config: { endpoint_base: 'https://example.com', auth_token: '***' }, regions: [] });
+		const out = (await actions.update(
+			requestEvent(fields({ type: 'api_canary', endpoint_base: 'https://example.com', kept, secret: '' })),
+		)) as Failure;
+		expect(out.status).toBe(400);
+		expect(String(out.data.error)).toContain('stored auth token');
+		expect(engine.put).not.toHaveBeenCalled();
 	});
 
 	it('sends the password typed in the form', async () => {
