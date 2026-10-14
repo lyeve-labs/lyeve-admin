@@ -16,7 +16,6 @@
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { confirmed, tracked } from '$lib/forms.svelte';
-	import type { SubmitFunction } from '@sveltejs/kit';
 	import { CAPTCHA_PROVIDERS, providerLabel, type CaptchaProvider } from '$lib/api/captcha-settings';
 	import type { ActionData, PageData } from './$types';
 

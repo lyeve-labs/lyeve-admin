@@ -7,9 +7,9 @@
 	import { ICON } from '$lib/icon';
 	import { isExternal } from '$lib/api/customization';
 	import { WIDTH_SPAN } from '$lib/api/custom-dashboard';
-	import { formatSize, mediaKindLabel } from '$lib/api/media';
+	import { mediaKindLabel } from '$lib/api/media';
 	import { WINDOW_LABEL, trafficTone } from '$lib/dashboard';
-	import { formatCount, formatDate, formatDateTime, formatPercent } from '$lib/format';
+	import { formatBytes, formatCount, formatDate, formatDateTime, formatPercent } from '$lib/format';
 	import { entryTone } from '$lib/tones';
 	import type { ResolvedWidget } from '$lib/api/custom-dashboard';
 
@@ -123,7 +123,7 @@
 							{:else}
 								<div class="grid grid-cols-2 gap-3">
 									<Stat size="sm" label="Files" value={formatCount(w.media.files)} />
-									<Stat size="sm" label="Space" value={formatSize(w.media.bytes)} sub={w.media.sampled < w.media.files ? `the newest ${formatCount(w.media.sampled)}` : undefined} />
+									<Stat size="sm" label="Space" value={formatBytes(w.media.bytes, 'MB')} sub={w.media.sampled < w.media.files ? `the newest ${formatCount(w.media.sampled)}` : undefined} />
 								</div>
 								{#if w.media.kinds.length > 0}
 									<ul class="flex flex-wrap gap-2">

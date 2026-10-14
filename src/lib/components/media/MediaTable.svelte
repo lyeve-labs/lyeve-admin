@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Table } from '@lyeve-labs/ui-kit';
-	import { formatSize, mediaKind, mediaKindLabel, type MediaItem } from '$lib/api/media';
-	import { formatDateTime } from '$lib/format';
+	import { mediaKind, mediaKindLabel, type MediaItem } from '$lib/api/media';
+	import { formatBytes, formatDateTime } from '$lib/format';
 	import MediaThumb from './MediaThumb.svelte';
 
 	interface Props {
@@ -41,7 +41,7 @@
 					</button>
 				</td>
 				<td data-cell="nowrap" class="text-muted">{mediaKindLabel(mediaKind(item.content_type))}</td>
-				<td data-cell="nowrap" class="text-muted">{formatSize(item.size)}</td>
+				<td data-cell="nowrap" class="text-muted">{formatBytes(item.size, 'MB')}</td>
 				<td data-cell="nowrap" class="text-muted">{formatDateTime(item.created_at)}</td>
 			</tr>
 		{/each}
