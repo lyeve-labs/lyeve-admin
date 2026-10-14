@@ -456,7 +456,7 @@
 																value={ep.requestBody.example}
 																label="Copy the example request body for {ep.method} {ep.path}"
 																size={ICON.xs}
-																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
 															/>
 														</div>
 													{/if}
@@ -478,7 +478,7 @@
 																value={ep.response.example}
 																label="Copy the example response body for {ep.method} {ep.path}"
 																size={ICON.xs}
-																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
 															/>
 														</div>
 													{/if}
@@ -496,7 +496,7 @@
 														value={preview}
 														label="Copy a curl request for {ep.method} {ep.path}"
 														size={ICON.xs}
-														class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+														class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
 													/>
 												</div>
 											</div>

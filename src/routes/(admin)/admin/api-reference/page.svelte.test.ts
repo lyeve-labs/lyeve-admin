@@ -175,6 +175,20 @@ describe('api reference rows', () => {
 		expect(status.textContent).toBe('');
 	});
 
+	// A code block's copy control stays out of the way until the block is
+	// hovered or the control is reached by keyboard. Revealing it on any focus
+	// left it standing after a mouse click until focus moved on.
+	it('reveals a code block copy control on keyboard focus, not on a click', async () => {
+		const { container } = setup();
+		await fireEvent.click(disclosures(container)[0]);
+
+		const copy = screen.getByRole('button', { name: 'Copy a curl request for GET /api/admin/media' });
+		const wrapper = copy.parentElement!;
+		expect(wrapper.classList.contains('opacity-0')).toBe(true);
+		expect(wrapper.classList.contains('has-[:focus-visible]:opacity-100')).toBe(true);
+		expect([...wrapper.classList].some((c) => c.startsWith('focus-within:'))).toBe(false);
+	});
+
 	it('copies the request preview from an open row', async () => {
 		const { container } = setup();
 		await fireEvent.click(disclosures(container)[0]);
