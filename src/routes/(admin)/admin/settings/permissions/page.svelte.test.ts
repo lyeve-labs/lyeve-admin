@@ -698,7 +698,7 @@ describe('permissions page drawers', () => {
 	});
 
 	it('takes the ceiling from the refusal when the limits read failed', () => {
-		const refused = { kind: 'cap', cap: 'permissions.roles', limit: 5, current: 5, upgradeUrl: '' };
+		const refused = { kind: 'cap', cap: 'rbac.roles', limit: 5, current: 5, upgradeUrl: '' };
 		const { container } = setupWith({ action: 'role', roleCapReached: true, refused }, { roleCap: 0, roleCount: null });
 		expect(container.textContent).toContain('The ceiling is 5 roles and this instance has 5.');
 		expect(container.textContent).not.toContain('The ceiling is 0 roles');
@@ -711,7 +711,7 @@ describe('permissions page drawers', () => {
 	});
 
 	it('shows the role ceiling refusal with its numbers in the role drawer', async () => {
-		const refused = { kind: 'cap', cap: 'permissions.roles', limit: 3, current: 3, upgradeUrl: '' };
+		const refused = { kind: 'cap', cap: 'rbac.roles', limit: 3, current: 3, upgradeUrl: '' };
 		const { getAllByRole, rerender } = setupWith(null);
 		await fireEvent.click(newRoleButton(getAllByRole('button')));
 		await rerender({ data: dataWith(), form: { action: 'role', roleCapReached: true, refused } } as never);

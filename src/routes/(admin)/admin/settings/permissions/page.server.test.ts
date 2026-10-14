@@ -5,9 +5,11 @@ vi.mock('@lyeve-labs/client', () => ({
 	createClient: vi.fn(() => ({})),
 	ApiError: class ApiError extends Error {
 		status: number;
-		constructor(status: number, message: string) {
+		body?: unknown;
+		constructor(status: number, message: string, body?: unknown) {
 			super(message);
 			this.status = status;
+			this.body = body;
 		}
 	},
 }));
@@ -255,6 +257,22 @@ describe('saving a rule', () => {
 
 describe('refused writes', () => {
 	type Failed = { status: number; data: Record<string, unknown> };
+
+	// The plugin's ceiling refusal, as its handler writes it: a 402 whose body
+	// names the cap and carries the ceiling and the count.
+	it('reads the role ceiling refusal with the numbers the plugin sent', async () => {
+		const body = { error: 'cap_exceeded', cap: 'rbac.roles', limit: 3, current: 3, upgrade_url: '' };
+		mockedUpsertPermission.mockRejectedValueOnce(new ApiError(402, 'cap_exceeded', body));
+		const result = (await actions.upsert(upsertEvent({ role: 'auditor', schema_name: '*', drawer: 'role' }))) as Failed;
+		expect(result).toEqual({
+			status: 402,
+			data: {
+				action: 'role',
+				roleCapReached: true,
+				refused: { kind: 'cap', cap: 'rbac.roles', limit: 3, current: 3, upgradeUrl: '' },
+			},
+		});
+	});
 
 	it('renders a license refusal that is not the role ceiling as a refusal, not as engine text', async () => {
 		const refusal = Object.assign(new ApiError(402, 'payment_required'), {
