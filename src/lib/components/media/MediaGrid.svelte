@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Card } from '@lyeve-labs/ui-kit';
-	import { formatSize, type MediaItem } from '$lib/api/media';
+	import type { MediaItem } from '$lib/api/media';
+	import { formatBytes } from '$lib/format';
 	import MediaThumb from './MediaThumb.svelte';
 
 	interface Props {
@@ -28,7 +29,7 @@
 				<MediaThumb {item} class="aspect-square w-full" />
 				<div class="p-2">
 					<p class="truncate text-xs text-fg" title={item.filename}>{item.filename}</p>
-					<p class="mt-0.5 text-xs text-faint">{formatSize(item.size)}</p>
+					<p class="mt-0.5 text-xs text-faint">{formatBytes(item.size, 'MB')}</p>
 				</div>
 			</Card>
 		</div>

@@ -14,13 +14,12 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 		CopyField,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { KeyRound, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -128,21 +127,11 @@
 	 * saying: an operator expecting a cleanup would otherwise get none.
 	 */
 	function removeConnection(p: ScimProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete SCIM connection ${p.name}`,
-				'The identity provider stops being able to create or remove accounts here. Accounts it already created are left as they are.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete SCIM connection ${p.name}`,
+			'The identity provider stops being able to create or remove accounts here. Accounts it already created are left as they are.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 
 	const saveConnectionSubmit = tracked(saveConnection);

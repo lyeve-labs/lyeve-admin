@@ -13,11 +13,10 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Gauge, Plus, SplitSquareHorizontal, Trash2 } from '@lucide/svelte';
 	import {
@@ -123,37 +122,19 @@
 	};
 
 	function removeVariant(v: Variant): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Remove variant ${v.name}?`,
-				'Exposures already recorded against it stay, so the results keep counting people who saw it.',
-				{ confirmLabel: 'Remove' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Removed ${v.name}`);
-			};
-		};
+		return confirmed(
+			`Remove variant ${v.name}?`,
+			'Exposures already recorded against it stay, so the results keep counting people who saw it.',
+			{ confirmLabel: 'Remove', success: `Removed ${v.name}` },
+		);
 	}
 
 	function removeMetric(m: Metric): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(`Remove metric ${m.name}?`, 'The events it counted stay recorded.', {
-				confirmLabel: 'Remove',
-			});
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Removed ${m.name}`);
-			};
-		};
+		return confirmed(
+			`Remove metric ${m.name}?`,
+			'The events it counted stay recorded.',
+			{ confirmLabel: 'Remove', success: `Removed ${m.name}` },
+		);
 	}
 
 	const saveVariantSubmit = tracked(saveVariant);

@@ -91,6 +91,16 @@ describe('plugin detail page', () => {
 		]);
 	});
 
+	it('paints each method in the tone every other route list gives it', () => {
+		// A read is brand here as it is on the schema and API reference pages,
+		// so the same method never reads two ways in one console.
+		const { container } = renderPage(SEARCH);
+		const badge = (method: string) =>
+			[...container.querySelectorAll('tbody td span')].find((el) => el.textContent?.trim() === method);
+		expect(badge('GET')?.className).toContain('text-brand');
+		expect(badge('POST')?.className).toContain('text-success');
+	});
+
 	it('says a running plugin with no routes works without any', () => {
 		renderPage({ ...SEARCH, routes: [] });
 		expect(screen.getByText('No routes of its own')).toBeTruthy();

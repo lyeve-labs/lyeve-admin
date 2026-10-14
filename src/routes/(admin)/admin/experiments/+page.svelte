@@ -15,7 +15,7 @@
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, FlaskConical, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
@@ -141,12 +141,12 @@
 	function moveExperiment(e: Experiment, move: string): SubmitFunction {
 		return async ({ cancel }) => {
 			if (move === 'stop') {
-				const confirmed = await confirmDialog(
+				const ok = await confirmDialog(
 					`Stop ${e.name}?`,
 					'A stopped experiment cannot be started again. Pause it instead if you mean to come back to it.',
 					{ confirmLabel: 'Stop' },
 				);
-				if (!confirmed) {
+				if (!ok) {
 					cancel();
 					return;
 				}
@@ -159,21 +159,11 @@
 	}
 
 	function removeExperiment(e: Experiment): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete experiment ${e.name}?`,
-				'Its variants, its metrics and every exposure recorded against it go with it.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${e.name}`);
-			};
-		};
+		return confirmed(
+			`Delete experiment ${e.name}?`,
+			'Its variants, its metrics and every exposure recorded against it go with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${e.name}` },
+		);
 	}
 
 	const saveExperimentSubmit = tracked(saveExperiment);

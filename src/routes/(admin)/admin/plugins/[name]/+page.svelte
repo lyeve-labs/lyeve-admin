@@ -14,6 +14,7 @@
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { Activity, ExternalLink, Route, Settings } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
+	import { methodTone } from '$lib/tones';
 	import { isExternalHref } from '$lib/links';
 	import { formatCount, formatDateTime, relativeTime } from '$lib/format';
 	import { formatSignedBinaryBytes, formatNs } from '$lib/api/profiler';
@@ -30,13 +31,6 @@
 	let isSuperAdmin = $derived(data.userRoles.includes('super_admin'));
 	let routeCount = $derived(plugin?.routes.length ?? 0);
 	let routeGroups = $derived(groupRoutes(plugin?.routes ?? []));
-
-	// A write stands out from a read, and a delete from both.
-	function methodTone(method: string): 'neutral' | 'brand' | 'danger' {
-		if (method === 'GET' || method === 'HEAD') return 'neutral';
-		if (method === 'DELETE') return 'danger';
-		return 'brand';
-	}
 
 	const back = { href: '/admin/plugins', label: 'Plugins' };
 </script>

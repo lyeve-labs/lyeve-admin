@@ -8,7 +8,7 @@
 	 */
 	import { Alert, Button } from '@lyeve-labs/ui-kit';
 	import { useInstance } from '$lib/instance.svelte';
-	import { isExternalHref } from '$lib/links';
+	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
 	import { LICENSE_PAGE, refusalText, refusalTitle, type Refusal } from '$lib/api/refusal';
 
 	let { refusal }: { refusal: Refusal } = $props();
@@ -17,7 +17,6 @@
 	// The license page is always offered. A link the engine or the license
 	// module names goes beside it, because that is where the license changes.
 	const upgrade = $derived(instance.upgradeLink(refusal.upgradeUrl || null));
-	const away = $derived(upgrade !== null && isExternalHref(upgrade.href));
 </script>
 
 <div data-testid="refusal-notice">
@@ -26,15 +25,7 @@
 		<div class="mt-3 flex flex-wrap gap-2">
 			<Button variant="secondary" size="sm" href={LICENSE_PAGE}>View the license</Button>
 			{#if upgrade && upgrade.href !== LICENSE_PAGE}
-				<Button
-					variant="ghost"
-					size="sm"
-					href={upgrade.href}
-					target={away ? '_blank' : undefined}
-					rel={away ? 'noopener noreferrer' : undefined}
-				>
-					{upgrade.label ?? 'How to enable it'}
-				</Button>
+				<UpgradeLink link={upgrade} variant="ghost" size="sm" />
 			{/if}
 		</div>
 	</Alert>

@@ -13,11 +13,11 @@
 		SegmentedControl,
 		Select,
 		Textarea,
-		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { ArrowDown, ArrowUp, ExternalLink, Plus, Trash2 } from '@lucide/svelte';
+	import { confirmed } from '$lib/forms.svelte';
 	import { ICON } from '$lib/icon';
 	import { ROLE_CHOICES, editablePage, type Block, type BlockType, type CustomPage } from '$lib/api/customization';
 	import type { PageData, ActionData } from './$types';
@@ -107,12 +107,11 @@
 		};
 	};
 
-	const confirmDelete: SubmitFunction = async ({ cancel }) => {
-		const ok = await confirmDialog(`Delete ${page.title}?`, 'Its menu entry goes with it, and the dashboard stops showing it.', {
+	// Built at submit time, so the question carries the title as edited.
+	const confirmDelete: SubmitFunction = (input) =>
+		confirmed(`Delete ${page.title}?`, 'Its menu entry goes with it, and the dashboard stops showing it.', {
 			confirmLabel: 'Delete',
-		});
-		if (!ok) cancel();
-	};
+		})(input);
 </script>
 
 <PageShell

@@ -14,7 +14,6 @@
 		Pagination,
 		SearchInput,
 		Table,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
@@ -25,7 +24,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { fieldErrors, tracked } from '$lib/forms.svelte';
+	import { confirmed, fieldErrors, tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
 	import { formatDate } from '$lib/format';
@@ -77,21 +76,11 @@
 	 * anything, so canceling here means the request is never made.
 	 */
 	function deleteAccount(email: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete user ${email}`,
-				'Their sessions end at once and their audit trail stays.',
-				{ confirmLabel: 'Delete' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${email}`);
-			};
-		};
+		return confirmed(
+			`Delete user ${email}`,
+			'Their sessions end at once and their audit trail stays.',
+			{ confirmLabel: 'Delete', success: `Deleted ${email}` },
+		);
 	}
 
 	// The password drawer is its own, not a third mode of the one above: it

@@ -1,9 +1,7 @@
 <script lang="ts">
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Drawer,
@@ -267,11 +265,7 @@
 	{#if !data.providers.ok}
 		<GateNotice gate={data.providers.gate} title="Email providers" absent="The email plugin is not part of this build, so no provider sends mail." />
 	{:else}
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if deleteFailure?.error}
-			<Alert tone="danger">{deleteFailure.error}</Alert>
-		{/if}
+		<FormErrors message={deleteFailure?.error} refused={pageRefusal} />
 
 		{#if providers.length === 0}
 			<EmptyState

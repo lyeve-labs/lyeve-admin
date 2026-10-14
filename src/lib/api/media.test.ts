@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
 	formatDimensions,
-	formatSize,
 	mediaFileUrl,
 	mediaKind,
 	mediaKindLabel,
@@ -61,24 +60,6 @@ describe('mediaThumbnailUrl', () => {
 	it('offers nothing to draw for a file that is not an image', () => {
 		expect(mediaThumbnailUrl({ id: 'm1', content_type: 'video/mp4' })).toBe('');
 		expect(mediaThumbnailUrl({ id: 'm1', content_type: 'application/pdf' })).toBe('');
-	});
-});
-
-describe('formatSize', () => {
-	it('picks the unit an operator reads', () => {
-		expect(formatSize(0)).toBe('0 B');
-		expect(formatSize(512)).toBe('512 B');
-		expect(formatSize(2048)).toBe('2.0 KB');
-		expect(formatSize(3 * 1048576)).toBe('3.0 MB');
-	});
-
-	it('stops at MB, so a large video reads in the unit beside it', () => {
-		expect(formatSize(2 * 1024 ** 3)).toBe('2048.0 MB');
-	});
-
-	it('does not print a negative or missing count', () => {
-		expect(formatSize(-1)).toBe('0 B');
-		expect(formatSize(Number.NaN)).toBe('0 B');
 	});
 });
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -12,12 +12,10 @@
 		PasswordInput,
 		SectionHeading,
 		SegmentedControl,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
-	import type { SubmitFunction } from '@sveltejs/kit';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import { CAPTCHA_PROVIDERS, providerLabel, type CaptchaProvider } from '$lib/api/captcha-settings';
 	import type { ActionData, PageData } from './$types';
 
@@ -46,21 +44,11 @@
 		if (result.type === 'success') toast.success('Saved the captcha settings');
 	});
 
-	const clear: SubmitFunction = async ({ cancel }) => {
-		const confirmed = await confirmDialog(
-			'Clear the tenant captcha settings?',
-			"This tenant's pages and flows go back to the install's captcha, and the stored secret is deleted.",
-			{ confirmLabel: 'Clear' },
-		);
-		if (!confirmed) {
-			cancel();
-			return;
-		}
-		return async ({ result, update }) => {
-			await update();
-			if (result.type === 'success') toast.success('Cleared the captcha settings');
-		};
-	};
+	const clear = confirmed(
+		'Clear the tenant captcha settings?',
+		"This tenant's pages and flows go back to the install's captcha, and the stored secret is deleted.",
+		{ confirmLabel: 'Clear', success: 'Cleared the captcha settings' },
+	);
 </script>
 
 <PageShell
@@ -81,11 +69,7 @@
 			install's settings whatever is saved here, so a wrong key here cannot lock an admin out.
 		</Alert>
 
-		{#if refusal}
-			<RefusalNotice {refusal} />
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={formError} refused={refusal} />
 
 		<section class="flex flex-col gap-4" aria-label="What is checked now">
 			<SectionHeading level={2}>What is checked now</SectionHeading>

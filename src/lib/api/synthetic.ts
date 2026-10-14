@@ -100,16 +100,6 @@ export interface ProbeAlert {
 	created_at: string;
 }
 
-export interface TrendBucket {
-	time: string;
-	avg_ms: number;
-	p50_ms: number;
-	p95_ms: number;
-	p99_ms: number;
-	count: number;
-	fail_count: number;
-}
-
 export type SyntheticGate = Gate;
 
 export const SYNTHETIC_OK: SyntheticGate = GATE_OK;

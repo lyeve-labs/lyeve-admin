@@ -11,14 +11,13 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import AuditTabs from '$lib/components/AuditTabs.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, Lock, Plus, ScrollText, Trash2, Unlock } from '@lucide/svelte';
 	import {
@@ -139,21 +138,11 @@
 	};
 
 	function removePolicy(p: RetentionPolicy): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete the policy covering ${policyScope(p)}`,
-				'Entries it covered stop being deleted, so the audit log grows without limit until another policy covers them.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success('Policy deleted');
-			};
-		};
+		return confirmed(
+			`Delete the policy covering ${policyScope(p)}`,
+			'Entries it covered stop being deleted, so the audit log grows without limit until another policy covers them.',
+			{ confirmLabel: 'Delete', success: 'Policy deleted' },
+		);
 	}
 
 	/**
@@ -161,38 +150,19 @@
 	 * policy already covers them, the next enforcement run removes them.
 	 */
 	function release(h: LegalHold): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Release ${h.name}?`,
-				'Entries this hold protected become deletable. Where a retention policy already covers them, the next enforcement run removes them for good.',
-				{ confirmLabel: 'Release' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Released ${h.name}`);
-			};
-		};
+		return confirmed(
+			`Release ${h.name}?`,
+			'Entries this hold protected become deletable. Where a retention policy already covers them, the next enforcement run removes them for good.',
+			{ confirmLabel: 'Release', success: `Released ${h.name}` },
+		);
 	}
 
 	/** Deletes. Not a dry run, and nothing undoes it. */
-	const enforce: SubmitFunction = async ({ cancel }) => {
-		const confirmed = await confirmDialog(
-			'Enforce retention now?',
-			'Every audit entry past its retention window and not covered by a hold is deleted. This is not a dry run and nothing undoes it.',
-			{ confirmLabel: 'Delete them' },
-		);
-		if (!confirmed) {
-			cancel();
-			return;
-		}
-		return async ({ update }) => {
-			await update();
-		};
-	};
+	const enforce = confirmed(
+		'Enforce retention now?',
+		'Every audit entry past its retention window and not covered by a hold is deleted. This is not a dry run and nothing undoes it.',
+		{ confirmLabel: 'Delete them' },
+	);
 
 	const savePolicySubmit = tracked(savePolicy);
 	const saveHoldSubmit = tracked(saveHold);

@@ -18,7 +18,7 @@
 		Toggle,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
-	import { Asterisk, ChevronRight, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { Asterisk, ChevronRight, Minus, Pencil, Plus, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -269,21 +269,19 @@
 	}
 
 	/**
-	 * A stored grant is filled and an inherited one is a ring, because the ring
-	 * comes from the parent rule and holds only until this resource has a rule
-	 * of its own.
+	 * Each state has a shape of its own, so the matrix reads the same without
+	 * color. A stored grant is a filled dot and an inherited one a ring,
+	 * because the ring comes from the parent rule and holds only until this
+	 * resource has a rule of its own. A denial is a dash and an exempt role a
+	 * shield. Every mark is drawn in currentColor, never as a background, so
+	 * a forced-colors theme repaints it in its own ink instead of erasing it.
 	 */
-	const MARK_PAINT: Record<Mark, string> = {
-		none: 'bg-surface-2',
-		stored: 'bg-brand',
-		inherited: 'border-2 border-brand',
-		exempt: 'bg-muted/40',
-	};
 
-	const SUMMARY_PAINT: Record<TriState, string> = {
-		none: 'bg-surface-2',
-		some: 'bg-brand/50',
-		all: 'bg-brand',
+	/** A role's summary fills its bar, out of 32: empty for none, half for some, full for all. */
+	const SUMMARY_FILL: Record<TriState, number> = {
+		none: 0,
+		some: 16,
+		all: 32,
 	};
 
 	let schemaFilter = $state('');
@@ -430,27 +428,49 @@
 	});
 </script>
 
+{#snippet exemptMark()}
+	<ShieldCheck size={ICON.sm} class="inline-block align-middle text-violet" aria-hidden="true" data-mark="exempt" />
+{/snippet}
+
 {#snippet summaryCell(role: string, action: Action)}
 	{#if role === EXEMPT_ROLE}
-		<span class="inline-block h-1.5 w-8 rounded-full {MARK_PAINT.exempt}" aria-hidden="true"></span>
+		{@render exemptMark()}
 		<span class="sr-only">
 			{role} is always allowed {action} on every schema. The role is exempt from these rules.
 		</span>
 	{:else}
-		<span
-			class="inline-block h-1.5 w-8 rounded-full {SUMMARY_PAINT[summaryState(role, action)]}"
+		{@const state = summaryState(role, action)}
+		<svg
+			width="32"
+			height="8"
+			viewBox="0 0 32 8"
+			class="inline-block align-middle text-brand"
 			aria-hidden="true"
-		></span>
+			data-summary={state}
+		>
+			<rect x="0.5" y="0.5" width="31" height="7" rx="3.5" fill="none" stroke="currentColor" />
+			<rect width={SUMMARY_FILL[state]} height="8" rx="4" fill="currentColor" data-fill />
+		</svg>
 		<span class="sr-only">{summaryText(role, action)}</span>
 	{/if}
 {/snippet}
 
 {#snippet markCell(role: string, schema: string, action: Action)}
 	{#if applies(action, schema)}
-		<span
-			class="inline-block h-3.5 w-3.5 rounded-full {MARK_PAINT[markFor(role, schema, action)]}"
-			aria-hidden="true"
-		></span>
+		{@const mark = markFor(role, schema, action)}
+		{#if mark === 'exempt'}
+			{@render exemptMark()}
+		{:else if mark === 'none'}
+			<Minus size={ICON.sm} class="inline-block align-middle text-muted" aria-hidden="true" data-mark="none" />
+		{:else}
+			<svg width="14" height="14" viewBox="0 0 14 14" class="inline-block align-middle text-brand" aria-hidden="true" data-mark={mark}>
+				{#if mark === 'stored'}
+					<circle cx="7" cy="7" r="7" fill="currentColor" />
+				{:else}
+					<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2" />
+				{/if}
+			</svg>
+		{/if}
 		<span class="sr-only">{markText(role, schema, action)}</span>
 	{:else}
 		<span class="sr-only">{action} does not apply to {schemaLabel(schema)}.</span>
@@ -700,7 +720,7 @@
 					A schema rule replaces the wildcard rule on that schema. The engine reads the schema rule's
 					actions alone, so clearing an action there denies it on that schema while the wildcard rule
 					keeps granting it everywhere else. A schema rule with no action shuts the role out of that
-					schema. An inherited grant draws as a ring, a stored one as a filled dot.
+					schema. A stored grant draws as a filled dot, an inherited one as a ring and a denied action as a dash. A shield marks a role these rules never limit. A role's bar is empty when it grants the action on nothing, half full on some schemas and full on all.
 				</li>
 				<li>
 					{EXEMPT_ROLE} passes the content gate before any rule is read. Every rule stored under it is

@@ -8,7 +8,6 @@
 		PageShell,
 		SectionHeading,
 		Table,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 		SearchInput,
@@ -16,6 +15,7 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { MonitorSmartphone, Trash2 } from '@lucide/svelte';
+	import { confirmed } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { narrows } from '$lib/narrow';
@@ -57,21 +57,11 @@
 	 * remembered, and the next sign-in from it is treated as a new one.
 	 */
 	function forget(d: Device): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Forget ${deviceLabel(d)}?`,
-				'It stops being a trusted device. Signing in from it again is treated as a new device.',
-				{ confirmLabel: 'Forget' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Forgot ${deviceLabel(d)}`);
-			};
-		};
+		return confirmed(
+			`Forget ${deviceLabel(d)}?`,
+			'It stops being a trusted device. Signing in from it again is treated as a new device.',
+			{ confirmLabel: 'Forget', success: `Forgot ${deviceLabel(d)}` },
+		);
 	}
 </script>
 

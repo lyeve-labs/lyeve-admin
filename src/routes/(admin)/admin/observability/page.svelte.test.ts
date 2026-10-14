@@ -600,6 +600,9 @@ describe('Goroutine engine', () => {
 		const forms = [...section(container).querySelectorAll('form')];
 		expect(forms).toHaveLength(3);
 		expect(forms[1].textContent).toContain('Failed to reconfigure');
+		// The failure arrives in a region mounted before it, which a screen
+		// reader announces reliably.
+		expect(forms[1].querySelector('.contents[aria-live="assertive"]')?.textContent).toContain('Failed to reconfigure');
 		expect(forms[0].textContent).not.toContain('Failed to');
 		expect(forms[2].textContent).not.toContain('Failed to');
 	});

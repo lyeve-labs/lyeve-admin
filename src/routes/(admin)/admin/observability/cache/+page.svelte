@@ -11,16 +11,14 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Database, Eraser, Pencil, Plus, RotateCcw, Route, Trash2 } from '@lucide/svelte';
 	import {
@@ -98,21 +96,11 @@
 	});
 
 	function removeRule(r: CacheRule): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete the rule for ${r.pattern}?`,
-				'What it cached is evicted with it, and the route is served uncached from the next request.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted the rule for ${r.pattern}`);
-			};
-		};
+		return confirmed(
+			`Delete the rule for ${r.pattern}?`,
+			'What it cached is evicted with it, and the route is served uncached from the next request.',
+			{ confirmLabel: 'Delete', success: `Deleted the rule for ${r.pattern}` },
+		);
 	}
 
 	/**
@@ -120,24 +108,17 @@
 	 * its next request, so the confirm says what it puts on the database.
 	 */
 	function purge(what: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Purge ${what}?`,
-				'Each purged response is computed again the next time it is asked for.',
-				{ confirmLabel: 'Purge' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') {
-					const n = (result.data as { purged?: number } | undefined)?.purged ?? 0;
-					toast.success(`Purged ${n} ${n === 1 ? 'response' : 'responses'}`);
-				}
-			};
-		};
+		return confirmed(
+			`Purge ${what}?`,
+			'Each purged response is computed again the next time it is asked for.',
+			{
+				confirmLabel: 'Purge',
+				success: (data) => {
+					const n = (data as { purged?: number } | undefined)?.purged ?? 0;
+					return `Purged ${n} ${n === 1 ? 'response' : 'responses'}`;
+				},
+			},
+		);
 	}
 
 	/**
@@ -145,22 +126,12 @@
 	 * deliberate load against the database rather than a tidy-up.
 	 */
 	function flush(tag: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const what = tag ? `everything tagged ${tag}` : 'the whole cache';
-			const confirmed = await confirmDialog(
-				`Flush ${what}?`,
-				'Every flushed key is recomputed the next time it is asked for, so this puts that load on the database at once.',
-				{ confirmLabel: 'Flush' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Flushed ${what}`);
-			};
-		};
+		const what = tag ? `everything tagged ${tag}` : 'the whole cache';
+		return confirmed(
+			`Flush ${what}?`,
+			'Every flushed key is recomputed the next time it is asked for, so this puts that load on the database at once.',
+			{ confirmLabel: 'Flush', success: `Flushed ${what}` },
+		);
 	}
 
 	function reset(p: CacheProvider): SubmitFunction {
@@ -193,11 +164,7 @@
 			absent="The cache plugin is not part of this build, so nothing is cached."
 		/>
 	{:else}
-		{#if refusal && !fromDrawer}
-			<RefusalNotice {refusal} />
-		{:else if formError && !fromDrawer}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={fromDrawer ? undefined : formError} refused={fromDrawer ? null : refusal} />
 
 		{#if tripped.length > 0}
 			<!-- The reading the stats hide. A lower-priority provider picks up

@@ -18,15 +18,6 @@ import { csrfHeaders } from './csrf';
 
 export const IMPORTS_URL = '/api/admin/imports';
 
-export type ImportStatus =
-	| 'pending'
-	| 'running'
-	| 'completed'
-	| 'completed_with_errors'
-	| 'failed'
-	| 'canceled'
-	| 'rolled_back';
-
 export interface ImportJob {
 	id: string;
 	content_type: string;

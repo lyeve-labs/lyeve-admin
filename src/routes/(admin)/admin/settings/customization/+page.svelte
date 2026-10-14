@@ -14,11 +14,11 @@
 		Select,
 		Table,
 		Textarea,
-		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { ExternalLink, LayoutDashboard, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { confirmed } from '$lib/forms.svelte';
 	import { ICON } from '$lib/icon';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -153,10 +153,11 @@
 	};
 
 	function confirmRemove(what: string, detail: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(`Delete ${what}?`, detail, { confirmLabel: 'Delete' });
-			if (!ok) cancel();
-		};
+		return confirmed(
+			`Delete ${what}?`,
+			detail,
+			{ confirmLabel: 'Delete' },
+		);
 	}
 </script>
 

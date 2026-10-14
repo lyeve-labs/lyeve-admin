@@ -15,7 +15,6 @@
 	import { enhance } from '$app/forms';
 	import {
 		formatDimensions,
-		formatSize,
 		mediaFileUrl,
 		mediaKind,
 		mediaKindLabel,
@@ -26,7 +25,7 @@
 	import type { Refusal } from '$lib/api/refusal';
 	import FocalPointPicker from './FocalPointPicker.svelte';
 	import TransformUrlBuilder from './TransformUrlBuilder.svelte';
-	import { formatDateTime } from '$lib/format';
+	import { formatBytes, formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import ImageZoom from './ImageZoom.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -108,7 +107,7 @@
 		const rows = [
 			{ term: 'Name', value: item.filename },
 			{ term: 'Type', value: `${mediaKindLabel(kind)} (${item.content_type})` },
-			{ term: 'Size', value: formatSize(item.size) },
+			{ term: 'Size', value: formatBytes(item.size, 'MB') },
 		];
 		const dimensions = formatDimensions(item);
 		if (dimensions) rows.push({ term: 'Dimensions', value: dimensions });

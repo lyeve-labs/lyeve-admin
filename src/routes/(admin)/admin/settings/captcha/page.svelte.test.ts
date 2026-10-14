@@ -92,3 +92,16 @@ describe('captcha settings', () => {
 		expect(screen.queryByLabelText('Site key')).toBeNull();
 	});
 });
+
+describe('a refused captcha write', () => {
+	// The banner arrives inside a region that was mounted before the failure,
+	// which is what a screen reader reliably announces.
+	it('says the failure inside a live region that was there before it', () => {
+		const settings = { source: 'instance', tenant: null, instance, licensed: true };
+		const { rerender } = render(CaptchaPage, { props: props(settings) });
+		const region = document.querySelector('[aria-live="assertive"][aria-atomic="true"].contents');
+		expect(region).not.toBeNull();
+		rerender(props(settings, {}, { error: 'The captcha settings could not be saved.' }));
+		expect(region?.textContent).toContain('The captcha settings could not be saved.');
+	});
+});

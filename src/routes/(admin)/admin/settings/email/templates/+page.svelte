@@ -1,5 +1,4 @@
 <script lang="ts">
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { Alert, Badge, Button, Drawer, EmptyState, Input, Modal, PageShell, SegmentedControl, Select, Table, Textarea, confirm, toast } from '@lyeve-labs/ui-kit';
@@ -157,11 +156,7 @@
 		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if formError}
-		<Alert tone="danger">{#snippet children()}{formError}{/snippet}</Alert>
-	{/if}
+	<FormErrors message={formError} refused={pageRefusal} />
 	{#if atCeiling}
 		<Alert tone="info" title="Every template slot is in use">
 			{#snippet children()}This instance holds {limit} templates. Edit one, delete one you no longer send, or change the license to hold more.{/snippet}

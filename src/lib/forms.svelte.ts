@@ -1,4 +1,5 @@
 import type { SubmitFunction } from '@sveltejs/kit';
+import { confirm, toast, type ConfirmOptions } from '@lyeve-labs/ui-kit';
 
 /**
  * The submit handler for a panel that closes itself, and whether it is running.
@@ -129,5 +130,44 @@ export function tracked(fn: SubmitFunction) {
 			return pending;
 		},
 		enhance,
+	};
+}
+
+/** What a confirmed write says once it goes through, from the action's answer. */
+type Success = string | ((data: Record<string, unknown> | undefined) => string);
+
+/**
+ * The submit handler for a write that asks first.
+ *
+ * enhance awaits the handler before it sends anything, so a declined question
+ * cancels the request rather than undoing it. Once the write goes through,
+ * the result is applied and, when the caller names one, a toast says what
+ * happened. A row's delete leaves nothing on screen to say it worked, so the
+ * toast is that word. A failure raises no toast: the action's answer lands in
+ * `form` and the page shows it where its own failure belongs.
+ *
+ *     <form use:enhance={confirmed(`Delete ${name}?`, 'Its history goes with it.', {
+ *         confirmLabel: 'Delete',
+ *         success: `Deleted ${name}`,
+ *     })}>
+ *
+ * Every other option goes to the kit's confirm unchanged.
+ */
+export function confirmed(
+	question: string,
+	detail: string,
+	{ success, ...options }: ConfirmOptions & { success?: Success } = {},
+): SubmitFunction {
+	return async ({ cancel }) => {
+		if (!(await confirm(question, detail, options))) {
+			cancel();
+			return;
+		}
+		return async ({ result, update }) => {
+			await update();
+			if (success && result.type === 'success') {
+				toast.success(typeof success === 'string' ? success : success(result.data));
+			}
+		};
 	};
 }

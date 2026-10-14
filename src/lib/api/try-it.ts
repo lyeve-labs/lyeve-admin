@@ -18,8 +18,6 @@ export const SAFE_METHODS = ['GET', 'HEAD'] as const;
 /** Methods that change something and are therefore acknowledged one at a time. */
 export const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
-export type TryMethod = (typeof SAFE_METHODS)[number] | (typeof WRITE_METHODS)[number];
-
 export function isSafeMethod(method: string): boolean {
 	return (SAFE_METHODS as readonly string[]).includes(method.toUpperCase());
 }

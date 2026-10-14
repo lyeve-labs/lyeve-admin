@@ -36,7 +36,6 @@ export interface RefreshResult {
 
 /** Where one entry in a person's feed came from. */
 export const FEED_SOURCES = ['similar', 'trending', 'collaborative', 'random'] as const;
-export type FeedSource = (typeof FEED_SOURCES)[number];
 
 export interface FeedEntry {
 	id: string;

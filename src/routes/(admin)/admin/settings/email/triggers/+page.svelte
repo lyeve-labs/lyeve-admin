@@ -1,5 +1,4 @@
 <script lang="ts">
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { Alert, Badge, Button, Drawer, EmptyState, Input, PageShell, Select, Table, Textarea, Toggle, confirm } from '@lyeve-labs/ui-kit';
@@ -132,11 +131,7 @@
 		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if deleteFailure?.error}
-		<Alert tone="danger">{#snippet children()}{deleteFailure.error}{/snippet}</Alert>
-	{/if}
+	<FormErrors message={deleteFailure?.error} refused={pageRefusal} />
 	{#if data.triggers.ok && !data.templates.ok}
 		<GateNotice gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
 	{:else if data.triggers.ok && activeTemplates.length === 0}

@@ -37,7 +37,6 @@ export interface Region {
 }
 
 export const REPLICATION_STATUSES = ['syncing', 'synced', 'failed', 'paused'] as const;
-export type ReplicationStatus = (typeof REPLICATION_STATUSES)[number];
 
 export interface TenantResidency {
 	tenant_id: string;

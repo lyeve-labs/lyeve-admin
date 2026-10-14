@@ -68,7 +68,6 @@
 	import { collectionRoutes } from '$lib/api/collection-api';
 	import { curlFor } from '$lib/api/request-preview';
 	import { formatDateTime } from '$lib/format';
-	import type { HttpMethod } from '$lib/api/reference';
 	import {
 		RELATION_KINDS,
 		planRelation,
@@ -98,6 +97,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
+	import { methodTone } from '$lib/tones';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	// The schema plugin says whether this install draws the canvas and saves
@@ -242,14 +242,6 @@
 	let saved = $state<Schema | null>(null);
 	const isNewSchema = $derived(selected !== null && saved === null);
 	const dirty = $derived(selected !== null && (saved === null || canonical(selected) !== canonical(saved)));
-
-	const methodTone: Record<HttpMethod, 'brand' | 'success' | 'warn' | 'danger'> = {
-		GET: 'brand',
-		POST: 'success',
-		PUT: 'warn',
-		PATCH: 'warn',
-		DELETE: 'danger',
-	};
 
 	let view = $state<'list' | 'canvas'>('list');
 	let saveError = $state('');
@@ -1599,7 +1591,7 @@
 						{@const preview = curlFor(route)}
 						<li class="rounded-lg border border-line bg-surface p-3">
 							<div class="flex flex-wrap items-center gap-2">
-								<Badge tone={methodTone[route.method]} class="font-mono">{route.method}</Badge>
+								<Badge tone={methodTone(route.method)} class="font-mono">{route.method}</Badge>
 								<code class="min-w-0 flex-1 truncate font-mono text-xs text-fg">{route.path}</code>
 								<span class="text-xs text-faint">{route.summary}</span>
 								<CopyButton
