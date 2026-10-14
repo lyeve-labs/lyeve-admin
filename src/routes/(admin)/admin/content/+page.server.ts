@@ -82,6 +82,13 @@ const MAX_LIMIT = 199;
 /** What the index says when the collections could not be read. */
 const LIST_FAILED = 'The collections could not be read. This is not a report that there are none.';
 
+/**
+ * The roles the content plugin serves. Every one of its routes refuses the
+ * rest, so a reader below admin who opens the page by URL is told so instead
+ * of being offered collections whose entries no button can open.
+ */
+const CONTENT_ROLES = ['admin', 'super_admin'];
+
 /** What the stats endpoint says about one collection, as far as the index reads it. */
 export interface CollectionStats {
 	rows: number;
@@ -165,9 +172,12 @@ function ordered(
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { url } = event;
+	const { url, parent } = event;
+	const { user } = await parent();
 	const client = authedClient(event);
-	const read = await section(getSchemas(client), LIST_FAILED);
+	const read: Section<Schema[]> = user.roles.some((r) => CONTENT_ROLES.includes(r))
+		? await section(getSchemas(client), LIST_FAILED)
+		: { ok: false, gate: { state: 'forbidden' } };
 	const typed = (url.searchParams.get('schema') ?? url.searchParams.get('q') ?? '').trim();
 	const { sort, dir } = sortFromParams(url.searchParams);
 	const filter = filterFromParams(url.searchParams);

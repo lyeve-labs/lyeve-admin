@@ -357,4 +357,21 @@ describe('admin/content/+page.server.ts load', () => {
 		expect(data.filter).toBe('all');
 		expect(loadedRows(data)).toHaveLength(3);
 	});
+
+	// Every content route refuses a reader below admin, so the index says so
+	// instead of listing collections whose New entry buttons all end in a refusal.
+	it.each(['editor', 'viewer'])('answers the forbidden gate for the %s role without reading', async (role) => {
+		const fetch = vi.fn(async () => json(schemas(3))) as unknown as typeof globalThis.fetch;
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/content'),
+			parent: async () => ({ user: { roles: [role] } }),
+		} as never;
+
+		const data = (await load(event)) as Loaded;
+
+		expect(data.schemas).toEqual({ ok: false, gate: { state: 'forbidden' } });
+		expect(fetch).not.toHaveBeenCalled();
+	});
 });
