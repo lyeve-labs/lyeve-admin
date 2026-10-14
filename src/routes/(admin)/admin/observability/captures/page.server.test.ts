@@ -32,12 +32,12 @@ import { load, actions } from './+page.server';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
-function loadEvent(plugins?: unknown, roles = ['admin']) {
+function loadEvent(plugins?: unknown, roles = ['admin'], tenant_id = '') {
 	return {
 		url: new URL('http://admin/admin/observability/captures'),
 		fetch: vi.fn(),
 		cookies: {},
-		parent: async () => ({ user: { roles }, plugins }),
+		parent: async () => ({ user: { roles, tenant_id }, plugins }),
 	} as never;
 }
 
@@ -110,6 +110,12 @@ describe('captures load', () => {
 	it('says whether the list is every tenant\'s', async () => {
 		expect(((await load(loadEvent())) as Loaded).superAdmin).toBe(false);
 		expect(((await load(loadEvent(undefined, ['super_admin']))) as Loaded).superAdmin).toBe(true);
+	});
+
+	// A replay set takes only the session tenant's captures.
+	it("hands the page the session's own tenant", async () => {
+		expect(((await load(loadEvent(undefined, ['super_admin'], 'acme'))) as Loaded).ownTenant).toBe('acme');
+		expect(((await load(loadEvent(undefined, ['super_admin']))) as Loaded).ownTenant).toBeNull();
 	});
 });
 

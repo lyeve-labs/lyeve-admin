@@ -66,6 +66,12 @@
 	const enabledRules = $derived(data.rules.filter((r) => r.enabled).length);
 
 	let selected = $state<string[]>([]);
+	// The plugin refuses a set that names a capture another tenant sent. A
+	// session with no tenant of its own cannot tell, so its rows stay live.
+	function foreign(c: { tenant_id?: string }): boolean {
+		return data.superAdmin && !!data.ownTenant && c.tenant_id !== data.ownTenant;
+	}
+
 	function toggleCapture(id: string, on: boolean) {
 		selected = on ? [...new Set([...selected, id])] : selected.filter((x) => x !== id);
 	}
@@ -474,8 +480,11 @@
 								<td data-cell="nowrap">
 									<Checkbox
 										id="pick-{c.id}"
-										label="Select {c.method} {capturePath(c.url)}"
+										label={foreign(c)
+											? `${c.method} ${capturePath(c.url)} came from another tenant, so it cannot join a replay set`
+											: `Select ${c.method} ${capturePath(c.url)}`}
 										labelHidden
+										disabled={foreign(c)}
 										checked={selected.includes(c.id)}
 										onchange={(on) => toggleCapture(c.id, on)}
 									/>

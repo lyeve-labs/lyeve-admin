@@ -41,8 +41,11 @@ export const load: PageServerLoad = async (event) => {
 	// The plugin applies no tenant filter to a super admin's read that names
 	// none, so their list holds every tenant's requests.
 	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	// A replay set holds only captures the session's own tenant sent.
+	const ownTenant = user?.tenant_id || null;
 	const empty = {
 		superAdmin,
+		ownTenant,
 		captures: [] as Capture[],
 		total: null as number | null,
 		limit,
@@ -101,6 +104,7 @@ export const load: PageServerLoad = async (event) => {
 
 	return {
 		superAdmin,
+		ownTenant,
 		captures: page.rows,
 		total: page.total,
 		limit,

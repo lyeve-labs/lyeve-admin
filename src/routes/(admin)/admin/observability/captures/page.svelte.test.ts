@@ -249,6 +249,27 @@ describe("a super admin's list", () => {
 		expect(screen.getByRole('cell', { name: 'acme' })).toBeTruthy();
 	});
 
+	// The plugin refuses a set that names another tenant's capture, so that
+	// row cannot be picked, and its label says why.
+	it("cannot pick another tenant's capture for a replay set", () => {
+		render(CapturesPage, {
+			props: props({
+				superAdmin: true,
+				ownTenant: 'acme',
+				captures: [
+					{ ...capture, tenant_id: 'acme' },
+					{ ...capture, id: 'c2', tenant_id: 'globex' },
+				],
+			}),
+		});
+		const own = screen.getByRole('checkbox', { name: 'Select POST /api/v1/content/orders' }) as HTMLInputElement;
+		const other = screen.getByRole('checkbox', {
+			name: 'POST /api/v1/content/orders came from another tenant, so it cannot join a replay set',
+		}) as HTMLInputElement;
+		expect(own.disabled).toBe(false);
+		expect(other.disabled).toBe(true);
+	});
+
 	it("keeps a tenant admin's list to the tenant", () => {
 		const { container } = render(CapturesPage, { props: props() });
 		expect(said(container)).toContain('Requests this tenant sent');
