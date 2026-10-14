@@ -54,7 +54,9 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 // from the envelope total, stated once by Pagination.
 describe('content listing states the collection total', () => {
 	it('names the way back to Content', () => {
-		render(ContentListPage, { props: { data: data(), form: null } });
+		// Three rows, because the header is the subject. A hundred rows made this
+		// the slowest first render in the file, and it timed out on a busy machine.
+		render(ContentListPage, { props: { data: data({ items: items(3) }), form: null } });
 
 		// The sidebar cannot name this page: it marks Content, and Content is
 		// the collection index rather than this page.
