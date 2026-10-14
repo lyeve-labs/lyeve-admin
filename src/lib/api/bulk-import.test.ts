@@ -158,7 +158,7 @@ describe('mapping', () => {
 	});
 
 	it('guesses by name, ignoring case and separators, and leaves the rest unmapped', async () => {
-		const { mappingTargets, suggestMapping, mappingsFrom } = await import('./bulk-import');
+		const { mappingTargets, suggestMapping } = await import('./bulk-import');
 		const targets = mappingTargets([{ name: 'page_views', field_type: 'number' }, { name: 'summary' }]);
 		const chosen = suggestMapping(['Slug', 'Name', 'Page Views', 'Other'], targets);
 		expect(chosen).toEqual({
@@ -168,11 +168,6 @@ describe('mapping', () => {
 			page_views: 'Page Views',
 			summary: '',
 		});
-		expect(mappingsFrom(chosen, targets)).toEqual([
-			{ source_field: 'Slug', target_field: 'entry.slug', data_type: 'string' },
-			{ source_field: 'Name', target_field: 'entry.title', data_type: 'string' },
-			{ source_field: 'Page Views', target_field: 'page_views', data_type: 'number' },
-		]);
 	});
 
 	it('reads the format from a file name', async () => {

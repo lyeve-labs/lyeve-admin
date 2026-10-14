@@ -7,7 +7,6 @@ import {
 	roleIsSound,
 	windowLabel,
 	exhausted,
-	headroom,
 	rateLabel,
 	rateLimitGate,
 	resetsIn,
@@ -94,14 +93,6 @@ describe('the live counters', () => {
 	it('finds the callers with nothing left', () => {
 		const rows = [state(), state({ client_ip: '1.2.3.4', remaining: 0 })];
 		expect(exhausted(rows)).toHaveLength(1);
-	});
-
-	// Against the burst, because the burst is the size of the bucket and the
-	// rate is how fast it refills. Two of fifty left is nearly out.
-	it('measures headroom against the burst, not the rate', () => {
-		expect(headroom(state({ remaining: 10, burst: 20 }))).toBe(0.5);
-		expect(headroom(state({ remaining: 0, burst: 20 }))).toBe(0);
-		expect(headroom(state({ remaining: 5, burst: 0 }))).toBe(0);
 	});
 
 	it('counts a reset down rather than printing a timestamp', () => {

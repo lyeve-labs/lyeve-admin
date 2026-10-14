@@ -3,7 +3,6 @@ import { ApiError } from '@lyeve-labs/client';
 import {
 	everyLabel,
 	intervalHint,
-	millis,
 	readProbeLimits,
 	runOutcome,
 	runProbeNow,
@@ -103,20 +102,6 @@ describe('intervals in words', () => {
 		expect(everyLabel(0)).toBe('Not scheduled');
 		expect(everyLabel(-1)).toBe('Not scheduled');
 		expect(everyLabel(Number.NaN)).toBe('Not scheduled');
-	});
-});
-
-describe('response times', () => {
-	it('keeps milliseconds until they stop reading as milliseconds', () => {
-		expect(millis(0)).toBe('0 ms');
-		expect(millis(342)).toBe('342 ms');
-		expect(millis(999)).toBe('999 ms');
-		expect(millis(1500)).toBe('1.50 s');
-	});
-
-	it('prints nothing it was not given', () => {
-		expect(millis(null)).toBe('-');
-		expect(millis(undefined)).toBe('-');
 	});
 });
 

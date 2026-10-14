@@ -140,8 +140,3 @@ export function deprovisionTone(p: ScimProvider): 'danger' | 'warn' | 'neutral' 
  * reads next to the field.
  */
 export const MIN_TOKEN_LENGTH = 32;
-
-/** The SCIM base URL an identity provider is configured with. */
-export function scimBaseUrl(origin: string): string {
-	return `${origin.replace(/\/+$/, '')}${SCIM_BASE_PATH}`;
-}

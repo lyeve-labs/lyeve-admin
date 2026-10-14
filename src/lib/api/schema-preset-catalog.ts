@@ -29,10 +29,6 @@ export interface PresetResult {
 	created: string[];
 }
 
-export async function listSchemaPresets(client: HttpClient): Promise<SchemaPreset[]> {
-	return (await readSchemaPresets(client)).presets;
-}
-
 /**
  * The catalog and whether this install would accept a saved preset. The
  * plugin says so itself, so the page offers the form only where it works.

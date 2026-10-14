@@ -145,12 +145,6 @@
 	 */
 	const checkedAt = $derived(formatDateTime(pool?.checked_at, '') || null);
 
-	// Same guard for the tail: an entry whose timestamp will not parse keeps its
-	// raw value, which is at least what arrived, rather than "Invalid Date".
-	function fmtTime(ts: string): string {
-		return formatTime(ts, ts);
-	}
-
 	/**
 	 * One entry off the SSE tail.
 	 *
@@ -800,7 +794,8 @@
 							{#each logEntries as entry (entry.sequence)}
 								<tr class="align-top">
 									<td class="whitespace-nowrap font-mono text-xs">
-										<span class="text-faint">{fmtTime(entry.timestamp)}</span>
+										<!-- A timestamp that will not parse shows as it arrived, never as "Invalid Date". -->
+										<span class="text-faint">{formatTime(entry.timestamp, entry.timestamp)}</span>
 									</td>
 									<td class="whitespace-nowrap">
 										<Badge tone={logLevelTone(entry.level)}>{logLevelLabel(entry.level)}</Badge>

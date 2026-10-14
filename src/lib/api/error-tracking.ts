@@ -19,8 +19,6 @@ import { rowsOf, statedTotal, type ListEnvelope } from './list';
 export const BASE_URL = '/api/admin/error-tracking';
 export const ALERTS_URL = `${BASE_URL}/alerts`;
 export const CODES_URL = `${BASE_URL}/codes`;
-export const TOP_URL = `${BASE_URL}/top`;
-export const TREND_URL = `${BASE_URL}/trend`;
 export const EVENTS_URL = `${BASE_URL}/events`;
 export const SETTINGS_URL = `${BASE_URL}/alert-settings`;
 

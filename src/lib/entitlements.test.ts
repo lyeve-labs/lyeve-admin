@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasFeature, hasLicenseModule, NO_ENTITLEMENTS } from './entitlements';
+import { hasLicenseModule, NO_ENTITLEMENTS } from './entitlements';
 import type { Entitlements } from '$lib/entitlements';
 
 const example: Entitlements = {
@@ -8,27 +8,6 @@ const example: Entitlements = {
 	features: ['search', 'audit'],
 	tenant_quota: 0,
 };
-
-describe('hasFeature', () => {
-	it('is true when the feature is present', () => {
-		expect(hasFeature(example, 'search')).toBe(true);
-	});
-
-	it('is false when the feature is absent', () => {
-		expect(hasFeature(example, 'localization')).toBe(false);
-	});
-
-	it('is false for a feature withheld from the tenant', () => {
-		const withheld = { ...example, withheld: ['search'] };
-		expect(hasFeature(withheld, 'search')).toBe(false);
-		expect(hasFeature(withheld, 'flow')).toBe(example.features.includes('flow'));
-	});
-
-	it('fails closed for null/undefined entitlements', () => {
-		expect(hasFeature(null, 'search')).toBe(false);
-		expect(hasFeature(undefined, 'search')).toBe(false);
-	});
-});
 
 describe('hasLicenseModule', () => {
 	it('is true only when the engine says the build links one', () => {

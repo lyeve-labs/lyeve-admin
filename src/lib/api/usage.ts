@@ -18,7 +18,7 @@
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
-import { formatCount } from '$lib/format';
+import { formatBytes, formatCount } from '$lib/format';
 import { shortId } from '$lib/utils/entry-identity';
 
 export const QUOTAS_URL = '/api/admin/quotas';
@@ -244,21 +244,8 @@ export function usageTone(pct: number | null): 'danger' | 'warn' | 'success' | '
 	return 'success';
 }
 
-/** A byte count a person can read. */
-export function bytes(size: number | null | undefined): string {
-	if (size === null || size === undefined || !Number.isFinite(size) || size <= 0) return '0 B';
-	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-	let n = size;
-	let i = 0;
-	while (n >= 1024 && i < units.length - 1) {
-		n /= 1024;
-		i += 1;
-	}
-	return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
-}
-
 /** A limit as written, with zero spelled out rather than shown as a number. */
 export function limitLabel(limit: number, asBytes = false): string {
 	if (limit <= 0) return 'Unchecked';
-	return asBytes ? bytes(limit) : formatCount(limit);
+	return asBytes ? formatBytes(limit) : formatCount(limit);
 }

@@ -65,6 +65,14 @@ describe('what the page counts', () => {
 	});
 });
 
+describe('endpoints', () => {
+	it('stops an average request size at MB', () => {
+		const endpoint = { ...method('/api/v1/content', 3), request_size_avg_bytes: 2 * 1024 ** 3 };
+		const { container } = render(AnalyticsPage, { props: props({ endpoints: ok({ items: [endpoint], total: 1 }) }) });
+		expect(said(container)).toContain('2048.0 MB');
+	});
+});
+
 describe('HTTP methods', () => {
 	function shares(container: HTMLElement): Record<string, string> {
 		const out: Record<string, string> = {};

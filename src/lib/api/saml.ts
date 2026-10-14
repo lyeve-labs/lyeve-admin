@@ -24,7 +24,6 @@ import type { ListEnvelope } from './list';
 
 export const PROVIDERS_URL = '/api/admin/saml-providers';
 export const TEMPLATES_URL = '/api/admin/saml-templates';
-export const PUBLIC_PROVIDERS_URL = '/api/admin/auth/saml-providers';
 
 /**
  * One configured identity provider.

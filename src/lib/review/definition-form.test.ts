@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assigneesNeeded, parseStages } from './definition-form';
+import { parseStages } from './definition-form';
 
 describe('parseStages', () => {
 	it('keeps the order and trims what the drawer sent', () => {
@@ -70,10 +70,5 @@ describe('parseStages, the paid stage settings', () => {
 		expect(parseStages(stage({ condition_field: 'category', condition_op: 'equals', condition_value: '' }))).toEqual({
 			error: 'Stage 1: give the condition a value to compare with.',
 		});
-	});
-
-	it('counts the assignees an assignment needs from the largest quorum', () => {
-		expect(assigneesNeeded([{ quorum: 0 }, { quorum: 3 }, { quorum: 2 }])).toBe(3);
-		expect(assigneesNeeded([])).toBe(1);
 	});
 });

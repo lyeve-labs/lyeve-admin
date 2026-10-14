@@ -28,7 +28,7 @@
 		type Dialect,
 		type QueryLogEntry,
 	} from '$lib/api/query-monitor';
-	import { NO_VALUE, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatDateTime, formatMillis } from '$lib/format';
 	import type { PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -91,10 +91,6 @@
 		void goto(`${url.pathname}${url.search}`, { keepFocus: true, noScroll: true });
 	}
 
-	function ms(value: number): string {
-		return value >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${Math.round(value)} ms`;
-	}
-
 	function planFlags(entry: QueryLogEntry): string[] {
 		const a = entry.analysis;
 		if (!a) return [];
@@ -147,10 +143,10 @@
 				size="sm"
 				mono
 				label="Slowest on this page"
-				value={slowest ? ms(slowest) : NO_VALUE}
+				value={slowest ? formatMillis(slowest) : NO_VALUE}
 				tone={slowest >= 1000 ? 'danger' : undefined}
 			/>
-			<Stat size="sm" mono label="Median on this page" value={median ? ms(median) : NO_VALUE} />
+			<Stat size="sm" mono label="Median on this page" value={median ? formatMillis(median) : NO_VALUE} />
 		</div>
 
 		<section class="flex flex-col gap-4">
@@ -273,7 +269,7 @@
 										{/if}
 									</td>
 									<td data-cell="nowrap">
-										<Badge tone={durationTone(entry.duration_ms)}>{ms(entry.duration_ms)}</Badge>
+										<Badge tone={durationTone(entry.duration_ms)}>{formatMillis(entry.duration_ms)}</Badge>
 									</td>
 									<td data-cell="nowrap" class="text-xs">{entry.rows_returned ?? NO_VALUE}</td>
 									<td data-cell="nowrap" class="font-mono text-xs text-faint"

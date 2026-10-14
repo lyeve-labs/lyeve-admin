@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
-	bytes,
 	cacheGate,
 	circuitState,
 	circuitTone,
@@ -97,13 +96,6 @@ describe('entries', () => {
 			{ key: 'c', size: 1, expires_at: '', created_at: '', ttl_mode: 'ttl', tags: null },
 		];
 		expect(tagsOf(entries)).toEqual(['home', 'posts']);
-	});
-
-	it('reads a size a person can', () => {
-		expect(bytes(512)).toBe('512 B');
-		expect(bytes(2048)).toBe('2.0 KB');
-		expect(bytes(0)).toBe('0 B');
-		expect(bytes(null)).toBe('0 B');
 	});
 });
 

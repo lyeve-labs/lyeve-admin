@@ -12,7 +12,7 @@
 		Table,
 	} from '@lyeve-labs/ui-kit';
 	import { TrendingUp, Gauge, Globe, Server } from '@lucide/svelte';
-	import { NO_VALUE, formatCount, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatBytes, formatCount, formatDateTime } from '$lib/format';
 	import type { PageData } from './$types';
 	import type { BreakdownItem, Summary } from '@lyeve-labs/client-rest';
 	import { ICON } from '$lib/icon';
@@ -46,10 +46,6 @@
 		methods.reduce((sum: number, it: BreakdownItem) => sum + it.request_count, 0)
 	);
 
-	function fmtInt(n: number): string {
-		return formatCount(n);
-	}
-
 	function fmtMs(ms: number): string {
 		if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
 		return `${ms.toFixed(1)}ms`;
@@ -57,12 +53,6 @@
 
 	function fmtPct(fraction: number): string {
 		return `${(fraction * 100).toFixed(2)}%`;
-	}
-
-	function fmtBytes(b: number): string {
-		if (b >= 1_048_576) return `${(b / 1_048_576).toFixed(1)} MB`;
-		if (b >= 1024) return `${(b / 1024).toFixed(1)} KB`;
-		return `${Math.round(b)} B`;
 	}
 
 	function errorRateVariant(rate: number): 'danger' | 'warn' | 'success' {
@@ -155,7 +145,7 @@
 		{#if data.summary.ok}
 			{@const summary = data.summary.value}
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-				<Stat size="sm" mono label="Total requests" value={fmtInt(summary.total_requests)} />
+				<Stat size="sm" mono label="Total requests" value={formatCount(summary.total_requests)} />
 				<Stat
 					size="sm"
 					mono
@@ -178,14 +168,14 @@
 					<div class="flex flex-wrap items-baseline justify-between gap-2">
 						<SectionHeading level={3}>Responses</SectionHeading>
 						<span class="text-xs text-muted">
-							{fmtInt(summary.unique_endpoints)} endpoints served, max P99 {fmtMs(summary.max_latency_p99_ms)}
+							{formatCount(summary.unique_endpoints)} endpoints served, max P99 {fmtMs(summary.max_latency_p99_ms)}
 						</span>
 					</div>
 					{#if summary.total_requests > 0}
 						<div
 							class="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-2"
 							role="img"
-							aria-label={`${fmtInt(summary.total_2xx)} successful, ${fmtInt(summary.total_4xx)} client errors, ${fmtInt(summary.total_5xx)} server errors`}
+							aria-label={`${formatCount(summary.total_2xx)} successful, ${formatCount(summary.total_4xx)} client errors, ${formatCount(summary.total_5xx)} server errors`}
 						>
 							<div class="bg-success" style:width={`${(summary.total_2xx / summary.total_requests) * 100}%`}></div>
 							<div class="bg-warn" style:width={`${(summary.total_4xx / summary.total_requests) * 100}%`}></div>
@@ -196,17 +186,17 @@
 						<span class="flex items-center gap-1.5">
 							<span class="h-2 w-2 rounded-full bg-success"></span>
 							<span class="text-muted">2xx</span>
-							<span class="font-mono text-fg">{fmtInt(summary.total_2xx)}</span>
+							<span class="font-mono text-fg">{formatCount(summary.total_2xx)}</span>
 						</span>
 						<span class="flex items-center gap-1.5">
 							<span class="h-2 w-2 rounded-full bg-warn"></span>
 							<span class="text-muted">4xx</span>
-							<span class="font-mono text-fg">{fmtInt(summary.total_4xx)}</span>
+							<span class="font-mono text-fg">{formatCount(summary.total_4xx)}</span>
 						</span>
 						<span class="flex items-center gap-1.5">
 							<span class="h-2 w-2 rounded-full bg-danger"></span>
 							<span class="text-muted">5xx</span>
-							<span class="font-mono text-fg">{fmtInt(summary.total_5xx)}</span>
+							<span class="font-mono text-fg">{formatCount(summary.total_5xx)}</span>
 						</span>
 					</div>
 				</div>
@@ -227,7 +217,7 @@
 							<li class="flex flex-wrap items-center justify-between gap-2 text-sm">
 								<code class="min-w-0 truncate font-mono text-xs text-fg">{e.key}</code>
 								<span class="flex shrink-0 items-center gap-3">
-									<span class="text-xs text-muted">{fmtInt(e.request_count)} requests</span>
+									<span class="text-xs text-muted">{formatCount(e.request_count)} requests</span>
 									<Badge tone={errorRateVariant(e.error_rate)}>{fmtPct(e.error_rate)}</Badge>
 								</span>
 							</li>
@@ -271,14 +261,14 @@
 							<tr>
 								<td data-cell="nowrap"><span class="text-faint">{i + 1}</span></td>
 								<td data-cell="nowrap" class="font-mono text-xs">{item.key}</td>
-								<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtInt(item.request_count)}</td>
+								<td data-cell="nowrap" class="text-right font-mono text-xs">{formatCount(item.request_count)}</td>
 								<td class="text-right">
 									<Badge tone={errorRateVariant(item.error_rate)}>{fmtPct(item.error_rate)}</Badge>
 								</td>
 								<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtMs(item.avg_latency_p95_ms)}</td>
 								<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtMs(item.max_latency_p99_ms)}</td>
 								<td data-cell="nowrap" class="text-right font-mono text-xs">
-									<span class="text-faint">{fmtBytes(item.request_size_avg_bytes)}</span>
+									<span class="text-faint">{formatBytes(item.request_size_avg_bytes, 'MB')}</span>
 								</td>
 							</tr>
 						{/each}
@@ -306,7 +296,7 @@
 						<div class="flex flex-col gap-3">
 							{#each methods as item (item.key)}
 								<Progress
-									label={`${item.key || NO_VALUE} (${fmtInt(item.request_count)})`}
+									label={`${item.key || NO_VALUE} (${formatCount(item.request_count)})`}
 									value={item.request_count}
 									max={methodTotal}
 									showValue
@@ -343,7 +333,7 @@
 							{#each agents as item (item.key)}
 								<tr>
 									<td data-cell="nowrap" class="font-mono text-xs">{item.key || NO_VALUE}</td>
-									<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtInt(item.request_count)}</td>
+									<td data-cell="nowrap" class="text-right font-mono text-xs">{formatCount(item.request_count)}</td>
 									<td class="text-right">
 										<Badge tone={errorRateVariant(item.error_rate)}>{fmtPct(item.error_rate)}</Badge>
 									</td>

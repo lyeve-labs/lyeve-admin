@@ -34,10 +34,6 @@
 	const socketUsed = $derived(inUse(data.socket));
 	const loads = $derived(tenantLoad(data.platform?.connections_by_tenant));
 
-	function num(value: number | undefined | null): string {
-		return formatCount(value);
-	}
-
 	function pct(share: number): string {
 		return `${Math.round(share * 100)}%`;
 	}
@@ -80,19 +76,19 @@
 			{/if}
 			{#if !data.streamGate}
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					<Stat size="sm" mono label="Open now" value={num(data.stream?.active_connections)} />
+					<Stat size="sm" mono label="Open now" value={formatCount(data.stream?.active_connections)} />
 					<Stat
 						size="sm"
 						mono
 						label="Accepted in {window_(data.stream)}"
-						value={num(data.stream?.total_connections)}
+						value={formatCount(data.stream?.total_connections)}
 					/>
-					<Stat size="sm" mono label="Events pushed" value={num(data.stream?.events_dispatched)} />
+					<Stat size="sm" mono label="Events pushed" value={formatCount(data.stream?.events_dispatched)} />
 					<Stat
 						size="sm"
 						mono
 						label="Rejected"
-						value={num(data.stream?.connections_rejected)}
+						value={formatCount(data.stream?.connections_rejected)}
 						tone={(data.stream?.connections_rejected ?? 0) > 0 ? 'warn' : undefined}
 					/>
 				</div>
@@ -111,16 +107,16 @@
 			{/if}
 			{#if !data.socketGate}
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					<Stat size="sm" mono label="Open now" value={num(data.socket?.active_connections)} />
+					<Stat size="sm" mono label="Open now" value={formatCount(data.socket?.active_connections)} />
 					<Stat
 						size="sm"
 						mono
 						label="Idle"
-						value={num(data.socket?.idle_connections)}
+						value={formatCount(data.socket?.idle_connections)}
 						tone={(data.socket?.idle_connections ?? 0) > 0 ? 'warn' : undefined}
 					/>
-					<Stat size="sm" mono label="Broadcasts" value={num(data.socket?.broadcasts_sent)} />
-					<Stat size="sm" mono label="Reconnections" value={num(data.socket?.reconnections)} />
+					<Stat size="sm" mono label="Broadcasts" value={formatCount(data.socket?.broadcasts_sent)} />
+					<Stat size="sm" mono label="Reconnections" value={formatCount(data.socket?.reconnections)} />
 				</div>
 			{/if}
 

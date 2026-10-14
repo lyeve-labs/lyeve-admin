@@ -102,11 +102,3 @@ export function parseStages(raw: string): { stages: StageInput[] } | { error: st
 	}
 	return { stages };
 }
-
-/**
- * The fewest assignees an assignment on these stages has to name: the
- * largest quorum among them, or one.
- */
-export function assigneesNeeded(stages: readonly { quorum: number }[]): number {
-	return stages.reduce((most, s) => Math.max(most, s.quorum > 1 ? s.quorum : 1), 1);
-}

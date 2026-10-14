@@ -138,10 +138,6 @@
 		};
 	}
 
-	function formatDay(iso: string): string {
-		return formatDate(iso);
-	}
-
 	const back = { href: '/admin/content', label: 'Content' };
 </script>
 
@@ -317,9 +313,9 @@
 									</Badge>
 								</td>
 							{/if}
-							<td class="text-xs whitespace-nowrap text-faint">{formatDay(item.created_at)}</td>
+							<td class="text-xs whitespace-nowrap text-faint">{formatDate(item.created_at)}</td>
 							{#if data.schemaDef.with_updated_at}
-								<td class="text-xs whitespace-nowrap text-faint">{formatDay(item.updated_at)}</td>
+								<td class="text-xs whitespace-nowrap text-faint">{formatDate(item.updated_at)}</td>
 							{/if}
 							<td class="text-right">
 								<form

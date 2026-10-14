@@ -31,7 +31,7 @@
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
-	import { formatCount, formatDate as formatDay } from '$lib/format';
+	import { formatCount, formatDate } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import {
@@ -201,10 +201,6 @@
 		};
 	}
 
-	function formatDate(iso: string | null) {
-		return formatDay(iso, 'Never');
-	}
-
 	// The endpoint takes no search, so the box narrows the page on screen.
 	let query = $state('');
 	let status = $state('');
@@ -348,12 +344,12 @@
 								<Badge tone="danger" dot>Revoked</Badge>
 							{/if}
 						</td>
-						<td data-cell="nowrap" class="text-xs text-faint">{formatDate(key.created_at)}</td>
+						<td data-cell="nowrap" class="text-xs text-faint">{formatDate(key.created_at, 'Never')}</td>
 						<td data-cell="nowrap" class="text-xs text-faint">
 							{#if !key.expires_at && isPrivilegedKey(key.roles)}
 								<Badge tone="warn">No expiry</Badge>
 							{:else}
-								{formatDate(key.expires_at)}
+								{formatDate(key.expires_at, 'Never')}
 							{/if}
 						</td>
 						<td>

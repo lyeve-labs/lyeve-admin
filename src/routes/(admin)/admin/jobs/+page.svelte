@@ -123,10 +123,6 @@
 		};
 	}
 
-	function formatDate(iso: string | null) {
-		return formatDateTime(iso, 'Never');
-	}
-
 	// The endpoint takes no search, so the box narrows the page on screen and
 	// the pager below still walks the whole collection.
 	let query = $state('');
@@ -230,7 +226,7 @@
 								{:else}
 									<Clock size={ICON.xs} class="shrink-0" />
 								{/if}
-								{formatDate(job.last_run_at)}
+								{formatDateTime(job.last_run_at, 'Never')}
 							</div>
 						</td>
 						<td>

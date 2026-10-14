@@ -165,19 +165,18 @@ export async function deleteReplaySet(client: HttpClient, id: string): Promise<v
 }
 
 /**
- * Replays every capture in a set. `confirm_replay` acknowledges that the
- * replay carries the caller's own credentials in place of the redacted ones.
- * `confirm_mutating` covers every write in the set, and without it a set that
- * holds one is refused before any of it runs.
+ * The code a replay answers 428 for when the set holds a write and the
+ * request did not cover it.
  */
-/**
- * The codes of the two confirmations a replay answers 428 for: one that
- * acknowledges the substituted credentials, and one that covers the writes
- * a capture or a set holds.
- */
-export const CONFIRM_REPLAY = 'request_capture.confirm_replay';
 export const CONFIRM_WRITES = 'request_capture.confirm_writes';
 
+/**
+ * Replays every capture in a set. `confirm_replay` acknowledges that the
+ * replay carries the caller's own credentials in place of the redacted ones,
+ * and it is always sent, so its own 428 never comes back. `confirm_mutating`
+ * covers every write in the set, and without it a set that holds one is
+ * refused before any of it runs.
+ */
 export async function replaySet(client: HttpClient, id: string, confirmMutating: boolean): Promise<SetReplay> {
 	return client.post<SetReplay>(`${REPLAY_SETS_URL}/${encodeURIComponent(id)}/replay`, {
 		confirm_replay: true,

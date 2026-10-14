@@ -4,7 +4,6 @@ import {
 	deprovisionAction,
 	deprovisionLabel,
 	deprovisionTone,
-	scimBaseUrl,
 	scimGate,
 	type ScimProvider,
 } from './scim';
@@ -55,13 +54,6 @@ describe('the action the form may send', () => {
 		expect(deprovisionAction('delete')).toBe('delete');
 		expect(deprovisionAction('')).toBeNull();
 		expect(deprovisionAction('archive')).toBeNull();
-	});
-});
-
-describe('the base URL a directory is configured with', () => {
-	it('joins the origin without doubling the slash', () => {
-		expect(scimBaseUrl('https://cms.example.com')).toBe('https://cms.example.com/api/v1/scim/v2');
-		expect(scimBaseUrl('https://cms.example.com/')).toBe('https://cms.example.com/api/v1/scim/v2');
 	});
 });
 

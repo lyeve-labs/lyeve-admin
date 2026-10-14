@@ -65,12 +65,6 @@
 		const params = { ...(data.q ? { q: data.q } : {}), ...(lv === data.level ? {} : { level: lv }) };
 		return pageHref('/admin/logs', data.limit, params)(1);
 	}
-
-	// An entry whose timestamp will not parse keeps its raw value, which is at
-	// least what arrived, rather than "Invalid Date".
-	function fmtTime(ts: string): string {
-		return formatDateTime(ts, ts);
-	}
 </script>
 
 <PageTitle title="Logs" />
@@ -218,7 +212,8 @@
 							{#each entries as entry, i (entry.timestamp + i)}
 								<tr class="align-top">
 									<td class="whitespace-nowrap text-xs">
-										<span class="text-faint">{fmtTime(entry.timestamp)}</span>
+										<!-- A timestamp that will not parse shows as it arrived, never as "Invalid Date". -->
+										<span class="text-faint">{formatDateTime(entry.timestamp, entry.timestamp)}</span>
 									</td>
 									<td>
 										<Badge tone={logLevelTone(entry.level)}>{entry.level}</Badge>

@@ -134,16 +134,6 @@ export async function listOpenAlerts(client: HttpClient, limit = 50): Promise<Li
 	);
 }
 
-export async function listResults(
-	client: HttpClient,
-	probeId: string,
-	limit = 20
-): Promise<ListEnvelope<ProbeResult>> {
-	return client.get<ListEnvelope<ProbeResult>>(
-		`${PROBES_URL}/${encodeURIComponent(probeId)}/results?limit=${limit}&offset=0`
-	);
-}
-
 export interface SaveProbe {
 	name: string;
 	type: ProbeType;
@@ -327,13 +317,6 @@ export function everyLabel(seconds: number): string {
 		return `Every ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 	}
 	return `Every ${seconds} seconds`;
-}
-
-/** A response time, at the precision it was measured. */
-export function millis(ms: number | null | undefined): string {
-	if (ms === null || ms === undefined || !Number.isFinite(ms)) return '-';
-	if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
-	return `${Math.round(ms)} ms`;
 }
 
 /**
