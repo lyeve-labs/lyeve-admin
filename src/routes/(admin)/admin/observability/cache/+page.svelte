@@ -252,9 +252,13 @@
 				</p>
 			{/if}
 			{#if !data.providersRead}
-				<Alert tone="danger">
-					The providers could not be read. This is not a report that all of them are healthy.
-				</Alert>
+				{#if data.providersGate}
+					<GateNotice gate={data.providersGate} title="the providers" absent="This version of the cache plugin does not list its providers." />
+				{:else}
+					<Alert tone="danger">
+						The providers could not be read. This is not a report that all of them are healthy.
+					</Alert>
+				{/if}
 			{:else if data.providers.length === 0}
 				<EmptyState
 					title="No provider is configured"

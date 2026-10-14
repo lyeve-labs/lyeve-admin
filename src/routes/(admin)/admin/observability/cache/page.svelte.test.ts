@@ -199,6 +199,14 @@ describe('stored entries', () => {
 		expect(said(container)).toContain('This cache provider does not list its entries');
 		expect(said(container)).not.toContain('Nothing is cached');
 	});
+
+	it('says a refused providers read with its gate', () => {
+		const { container } = render(CachePage, {
+			props: props({ providers: [], providersRead: false, providersGate: { state: 'forbidden' } }),
+		});
+		expect(said(container)).toContain('Your role cannot open the providers');
+		expect(said(container)).not.toContain('No provider is configured');
+	});
 });
 
 describe('a failed rule save', () => {

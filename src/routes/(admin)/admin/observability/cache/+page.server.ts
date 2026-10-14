@@ -76,7 +76,8 @@ export const load: PageServerLoad = async (event) => {
 	// Providers are the half the stats hide: a tripped backend leaves the hit
 	// rate plausible because a lower-priority provider picks up. Losing this
 	// read must not read as every provider being healthy.
-	const providers =
+	const unread = { rows: [] as CacheProvider[], read: false, licensed: null as boolean | null, inactive: [] as InactiveProvider[] };
+	const providers: typeof unread & { gate: Gate | null } =
 		gate.state === 'ok'
 			? await listProviders(client)
 					.then((p) => ({
@@ -84,9 +85,13 @@ export const load: PageServerLoad = async (event) => {
 						read: true,
 						licensed: typeof p?.licensed === 'boolean' ? p.licensed : null,
 						inactive: p?.inactive ?? [],
+						gate: null,
 					}))
-					.catch(() => ({ rows: [] as CacheProvider[], read: false, licensed: null, inactive: [] as InactiveProvider[] }))
-			: { rows: [] as CacheProvider[], read: false, licensed: null, inactive: [] as InactiveProvider[] };
+					.catch((err: unknown) => ({
+						...unread,
+						gate: gateOf(err, 'The providers could not be read. This is not a report that all of them are healthy.'),
+					}))
+			: { ...unread, gate: null };
 
 	// The rules are the tenant's own and read on their own, so a refused or
 	// failed read says so in their section and leaves the rest of the page.
@@ -135,6 +140,7 @@ export const load: PageServerLoad = async (event) => {
 		stats,
 		providers: providers.rows,
 		providersRead: providers.read,
+		providersGate: providers.gate,
 		providersLicensed: providers.licensed,
 		inactive: providers.inactive,
 		rules,

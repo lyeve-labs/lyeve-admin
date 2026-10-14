@@ -150,6 +150,13 @@ describe('cache load', () => {
 		expect(result.unlisted).toBe(false);
 	});
 
+	it('keeps a refused providers read as its gate', async () => {
+		api.listProviders.mockRejectedValue(new ApiError(503, 'down', {}));
+		const result = (await load(loadEvent(['admin']))) as Loaded;
+		expect(result.providersRead).toBe(false);
+		expect(result.providersGate).toEqual({ state: 'unavailable' });
+	});
+
 	it("scopes the flush to the session's tenant whenever the session names one", async () => {
 		expect(((await load(loadEvent(['admin']))) as Loaded).flushScoped).toBe(true);
 		expect(((await load(loadEvent(['super_admin'], 'acme'))) as Loaded).flushScoped).toBe(true);
