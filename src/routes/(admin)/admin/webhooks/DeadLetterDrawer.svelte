@@ -5,7 +5,7 @@
 	import { enhance } from '$app/forms';
 	import { RotateCcw, Skull, Trash2, XCircle } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import { formRefusal } from '$lib/api/refusal';
+	import { formRefusal, refusalText, type Refusal } from '$lib/api/refusal';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import { eventTone } from './event-tone';
@@ -13,9 +13,11 @@
 	interface Props {
 		/** The page's one action result, which carries the queue and each replay or dismissal. */
 		form: Record<string, unknown> | null | undefined;
+		/** The license refusal a paid write met, which holds replay and dismissal. */
+		held?: Refusal | null;
 	}
 
-	let { form }: Props = $props();
+	let { form, held = null }: Props = $props();
 
 	/** The queue's own writes, whose failures this drawer draws. */
 	const OWN_ACTIONS = ['dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
@@ -81,6 +83,11 @@
 						Showing {deadLetterItems.length} of {deadLetterTotal} entries.
 					</p>
 				{/if}
+				{#if held}
+					<p class="mb-2 text-xs text-muted" data-testid="replay-held">
+						{refusalText(held)} Replaying and dismissing need it. Deleting stays open.
+					</p>
+				{/if}
 				<Table label="Dead letters">
 					<thead>
 						<tr>
@@ -130,6 +137,7 @@
 													size="sm"
 													type="submit"
 													title="Replay"
+													disabled={held !== null}
 													aria-label="Replay the dead letter from {dl.webhook_name}"
 												>
 													<RotateCcw class="h-3.5 w-3.5" />
@@ -142,6 +150,7 @@
 													size="sm"
 													type="submit"
 													title="Dismiss"
+													disabled={held !== null}
 													aria-label="Dismiss the dead letter from {dl.webhook_name}"
 												>
 													<XCircle class="h-3.5 w-3.5" />

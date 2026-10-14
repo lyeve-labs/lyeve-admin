@@ -1,7 +1,7 @@
 <script lang="ts">
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { filtersText, keptJSON, type WebhookRecord } from '$lib/api/webhook-options';
-	import { formRefusal } from '$lib/api/refusal';
+	import { formRefusal, type Refusal } from '$lib/api/refusal';
 	import {
 		Alert,
 		Badge,
@@ -70,6 +70,19 @@
 	let openedOver = $state.raw<unknown>(null);
 	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
 	const pageForm = $derived(inDrawer || OTHER_DRAWERS.includes((form as Failure)?.action ?? '') ? null : form);
+
+	/*
+	 * The plugin says nothing about its license until a paid write is
+	 * refused, so the first refusal of a retry, a replay or a dismissal is
+	 * what the page learns it from. The drawers then hold those three with the
+	 * reason beside them.
+	 */
+	const PAID_ACTIONS = ['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss'];
+	let held = $state.raw<Refusal | null>(null);
+	$effect(() => {
+		const refused = formRefusal(form);
+		if (refused?.kind === 'feature' && PAID_ACTIONS.includes((form as Failure)?.action ?? '')) held = refused;
+	});
 	const drawerError = $derived((drawerForm as Failure)?.error || undefined);
 	const pageError = $derived((pageForm as Failure)?.error || undefined);
 	const drawerRefusal = $derived(formRefusal(drawerForm));
@@ -261,12 +274,16 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<form method="POST" action="?/dead-letters" use:enhance>
-			<Button variant="secondary" size="sm" type="submit" title="View dead letter queue">
-				<Skull size={ICON.sm} />
-				Dead letters
-			</Button>
-		</form>
+		<!-- The queue is the same plugin's read: a list that could not be
+		     read offers no queue either. -->
+		{#if data.webhooks.ok}
+			<form method="POST" action="?/dead-letters" use:enhance>
+				<Button variant="secondary" size="sm" type="submit" title="View dead letter queue">
+					<Skull size={ICON.sm} />
+					Dead letters
+				</Button>
+			</form>
+		{/if}
 		<!-- A list that could not be read offers no write against it. -->
 		{#if data.webhooks.ok && isSuperAdmin}
 			<Button variant="primary" size="sm" onclick={openCreate}>
@@ -554,9 +571,9 @@
 
 <!-- A row's history is a read on that row, so it opens over the list the way
      its edit does, and the queue does the same. -->
-<DeliveriesDrawer {form} {history} />
+<DeliveriesDrawer {form} {history} {held} />
 
-<DeadLetterDrawer {form} />
+<DeadLetterDrawer {form} {held} />
 
 {#if reveal}
 	<Modal open title="New signing secret for {reveal.name}" onclose={() => (reveal = null)}>

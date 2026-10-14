@@ -110,6 +110,8 @@ describe('the result of a replay or a dismissal', () => {
 });
 
 describe('the queue and its own failures', () => {
+	const refused = { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' };
+
 	it('shows a failed replay inside the drawer', async () => {
 		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
 		await rerender({ form: { action: 'dead-letter-replay', id: 'a', error: 'dead letter entry is not pending' } });
@@ -120,5 +122,15 @@ describe('the queue and its own failures', () => {
 		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
 		await rerender({ form: { action: 'delete', error: 'Failed to delete webhook' } });
 		expect(dialog()?.textContent).not.toContain('Failed to delete webhook');
+	});
+
+	it('holds replay and dismiss with the reason once the license refused one, and keeps delete', () => {
+		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] }, held: refused as never } });
+		const button = (name: RegExp) =>
+			[...(dialog()?.querySelectorAll('button') ?? [])].find((b) => name.test(b.getAttribute('aria-label') ?? '')) as HTMLButtonElement;
+		expect(button(/^Replay/).disabled).toBe(true);
+		expect(button(/^Dismiss/).disabled).toBe(true);
+		expect(button(/^Delete/).disabled).toBe(false);
+		expect(dialog()?.textContent).toContain('example-feature');
 	});
 });

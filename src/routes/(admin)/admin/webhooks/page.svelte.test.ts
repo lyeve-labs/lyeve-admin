@@ -113,6 +113,8 @@ describe('the webhook list when it could not be read', () => {
 		expect(container.textContent).toContain('so Webhooks could not be read. Nothing was changed.');
 		expect(container.textContent).not.toContain('No webhooks configured yet');
 		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
+		// The queue is the same plugin's read, so it is not offered either.
+		expect(queryByRole('button', { name: /dead letters/i })).toBeNull();
 		expect(container.querySelector('table')).toBeNull();
 	});
 

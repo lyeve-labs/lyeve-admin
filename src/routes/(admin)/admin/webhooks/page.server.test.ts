@@ -343,6 +343,16 @@ describe('admin/webhooks/+page.server.ts reads and writes an admin makes', () =>
 		});
 	});
 
+	it('renders a license refusal of a replay through the refusal notice', async () => {
+		const { event } = postEvent({ id: 'dl1' }, () =>
+			json({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature' }, 402),
+		);
+		expect(await actions['dead-letter-replay'](event)).toMatchObject({
+			status: 402,
+			data: { action: 'dead-letter-replay', id: 'dl1', refused: { kind: 'feature' } },
+		});
+	});
+
 	it.each([...names, 'dead-letters'] as const)('%s is refused to a session the engine does not sign in', async (name) => {
 		const fetch = vi.fn(async () => json({ error: 'unauthorized' }, 401)) as unknown as typeof globalThis.fetch;
 		const event = {
