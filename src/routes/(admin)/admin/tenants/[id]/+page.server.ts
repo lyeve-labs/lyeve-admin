@@ -125,6 +125,11 @@ export const actions: Actions = {
 			if (!found && !userId) {
 				return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
 			}
+			// An account the lookup did not reach could be a super admin at home
+			// here, so nothing is saved for it.
+			if (!found) {
+				return fail(404, { action: 'grant', memberError: 'The account could not be found, so nothing was saved.' });
+			}
 			// A membership in the home tenant replaces the account's roles when it
 			// signs in there. Written for a super admin, it would either drop
 			// super_admin or hold it past a removal on the Users page.
@@ -135,7 +140,7 @@ export const actions: Actions = {
 					fields: userId ? undefined : { email: 'A super admin at home' },
 				});
 			}
-			await grantMembership(client, found?.id ?? userId, slug, roles);
+			await grantMembership(client, found.id, slug, roles);
 			return { memberSaved: true };
 		} catch (err) {
 			const full = seatRefusal(err);

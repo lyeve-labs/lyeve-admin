@@ -259,6 +259,18 @@ describe('admin/tenants/[id] grant action', () => {
 		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
 	});
 
+	it('saves nothing for an account the lookup does not find', async () => {
+		const { event: ev, calls } = event(
+			{ 'GET /api/admin/auth/me': ME, 'GET /api/admin/tenants/t1': TENANT, 'GET /api/admin/users': [] },
+			grantForm('editor'),
+		);
+		expect(await actions.grant(ev)).toEqual({
+			status: 404,
+			data: { action: 'grant', memberError: 'The account could not be found, so nothing was saved.' },
+		});
+		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+	});
+
 	it('saves nothing when the account cannot be read', async () => {
 		const { event: ev, calls } = event(
 			{ 'GET /api/admin/auth/me': ME, 'GET /api/admin/tenants/t1': TENANT, 'GET /api/admin/users': json({ error: 'down' }, 503) },
