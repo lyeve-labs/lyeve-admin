@@ -112,12 +112,12 @@
 					<tr>
 						<th scope="row" class="text-sm">Queries and mutations</th>
 						<td data-cell="nowrap" class="font-mono text-xs">POST {GRAPHQL_HTTP}</td>
-						<td class="text-xs text-muted">A GET on the same path answers only that the endpoint is ready.</td>
+						<td class="min-w-48 text-xs text-muted">A GET on the same path answers only that the endpoint is ready.</td>
 					</tr>
 					<tr>
 						<th scope="row" class="text-sm">Subscriptions</th>
 						<td data-cell="nowrap" class="font-mono text-xs">GET {GRAPHQL_WS}</td>
-						<td class="text-xs text-muted">WebSocket, the graphql-ws protocol: send the token in connection_init.</td>
+						<td class="min-w-48 text-xs text-muted">WebSocket, the graphql-ws protocol: send the token in connection_init.</td>
 					</tr>
 				</tbody>
 			</Table>
@@ -150,7 +150,7 @@
 					Generated from the content types, so a schema you add in the Schema builder appears here as its own
 					fields.
 				</p>
-				<div class="grid gap-4 lg:grid-cols-3">
+				<div class="grid gap-4 xl:grid-cols-3">
 					{#each roots as [label, fields] (label)}
 						<div class="flex flex-col gap-2">
 							<SectionHeading level={3}>{label} <Badge tone="neutral" size="sm">{fields.length}</Badge></SectionHeading>

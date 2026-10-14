@@ -340,7 +340,7 @@
 										{:else}
 										<ol class="flex flex-wrap items-center gap-1.5">
 											{#each row.stages as stage, i (stage.id)}
-												<li class="flex items-center gap-1 text-xs" data-testid="stage-chip">
+												<li class="flex items-center gap-1 whitespace-nowrap text-xs" data-testid="stage-chip">
 													<span class="text-faint">{i + 1}.</span>
 													<span class="text-fg">{stage.name}</span>
 													{#if stage.required_role}
@@ -541,9 +541,13 @@
 				<ol class="flex flex-col gap-3" aria-label="Stages">
 					{#each stages as stage, i (stage.key)}
 						<li class="flex flex-col gap-2 rounded-md border border-line bg-surface-2/40 p-3">
-							<div class="flex items-center gap-2">
+							<!-- Beside the three stage buttons a phone left the name field
+							     about 105px, which cut its placeholder. The field keeps a
+							     minimum width beside its number, and the buttons wrap below
+							     it as one group when the row is too narrow. -->
+							<div class="flex flex-wrap items-center gap-2">
 								<span class="text-xs text-faint">{i + 1}.</span>
-								<div class="flex-1">
+								<div class="min-w-48 flex-1">
 									<Input
 										id="stage-name-{stage.key}"
 										label="Stage name"
@@ -552,36 +556,38 @@
 										placeholder="Copy edit"
 									/>
 								</div>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									aria-label="Move stage {i + 1} up"
-									disabled={i === 0}
-									onclick={() => move(i, -1)}
-								>
-									<ArrowUp size={ICON.sm} />
-								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									aria-label="Move stage {i + 1} down"
-									disabled={i === stages.length - 1}
-									onclick={() => move(i, 1)}
-								>
-									<ArrowDown size={ICON.sm} />
-								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									aria-label="Remove stage {i + 1}"
-									disabled={stages.length === 1}
-									onclick={() => (stages = stages.filter((s) => s.key !== stage.key))}
-								>
-									<X size={ICON.sm} />
-								</Button>
+								<div class="ms-auto flex gap-2">
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										aria-label="Move stage {i + 1} up"
+										disabled={i === 0}
+										onclick={() => move(i, -1)}
+									>
+										<ArrowUp size={ICON.sm} />
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										aria-label="Move stage {i + 1} down"
+										disabled={i === stages.length - 1}
+										onclick={() => move(i, 1)}
+									>
+										<ArrowDown size={ICON.sm} />
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										aria-label="Remove stage {i + 1}"
+										disabled={stages.length === 1}
+										onclick={() => (stages = stages.filter((s) => s.key !== stage.key))}
+									>
+										<X size={ICON.sm} />
+									</Button>
+								</div>
 							</div>
 							<div class="grid gap-2 sm:grid-cols-2">
 								<Input

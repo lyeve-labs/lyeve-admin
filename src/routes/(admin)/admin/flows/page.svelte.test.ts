@@ -337,3 +337,13 @@ describe('flows list page role grants', () => {
 		expect(container.textContent).toContain('delete on flows');
 	});
 });
+
+describe('flow name link', () => {
+	// The name is the only way to open a flow, and its link is 17px tall.
+	it('gives the link that opens a flow a touch hit area', () => {
+		const { getByText } = setup({ flows: [fixtureFlow] });
+		const link = getByText(fixtureFlow.name).closest('a') as HTMLElement;
+		expect(link.className).toContain('relative');
+		expect(link.className).toContain('hit-area');
+	});
+});

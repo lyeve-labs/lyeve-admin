@@ -319,7 +319,7 @@
 					{#each data.flows as flow (flow.id)}
 						<tr>
 							<td data-cell="nowrap" class="font-medium">
-								<a class="text-fg hover:text-brand" href="/admin/flows/{flow.id}{rowQuery}">{flow.name}</a>
+								<a class="relative hit-area text-fg hover:text-brand" href="/admin/flows/{flow.id}{rowQuery}">{flow.name}</a>
 							</td>
 							<td data-cell="nowrap" class="font-mono text-xs text-muted">{flow.slug}</td>
 							<td>

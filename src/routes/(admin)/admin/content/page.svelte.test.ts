@@ -118,3 +118,17 @@ describe('content index read', () => {
 		expect(container.querySelector('a[aria-label^="New entry"]')).toBeNull();
 	});
 });
+
+describe('content index sort headers', () => {
+	it('grows the header row to the touch target height under a finger, and only there', () => {
+		const { container } = render(ContentIndex, { props: { data: data() } });
+		const sorts = [...container.querySelectorAll('th a[href*="sort="]')];
+		expect(sorts.length).toBeGreaterThan(0);
+		for (const link of sorts) {
+			const cls = link.className.split(/\s+/);
+			expect(cls).toContain('-my-1');
+			expect(cls).toContain('coarse:-my-0.5');
+			expect(cls).toContain('hit-area');
+		}
+	});
+});

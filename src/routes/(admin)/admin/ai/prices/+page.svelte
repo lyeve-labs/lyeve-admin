@@ -150,7 +150,7 @@
 							<td data-cell="nowrap" class="font-mono text-muted">${p.input_per_1k}</td>
 							<td data-cell="nowrap" class="font-mono text-muted">${p.output_per_1k}</td>
 							<td data-cell="nowrap" class="font-mono text-muted">${p.image_per_call}</td>
-							<td class="text-muted">
+							<td data-cell="nowrap" class="text-muted">
 								{formatDateTime(p.updated_at)}
 								{#if mine && form && 'saved' in form}
 									<span class="block text-xs text-success" role="status">Saved.</span>
