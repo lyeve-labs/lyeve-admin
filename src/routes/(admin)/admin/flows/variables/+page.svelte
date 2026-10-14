@@ -1,6 +1,8 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Badge, Button, Drawer, EmptyState, Input, PageShell, PasswordInput, Table, Toggle, confirm, Pagination } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Input, PageShell, PasswordInput, SearchInput, Table, Toggle, confirm, Pagination } from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { Pencil, Plus, Trash2, Variable as VariableIcon } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
@@ -75,14 +77,19 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(v: Variable) {
-		const ok = await confirm('Delete variable', `Delete vars.${v.key}? Expressions that read it will fail.`, { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete variable vars.${v.key}?`, 'Expressions that read it will fail.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteKey = v.key;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
 	const save = submitter(() => (open = false));
+
+	// The flow this page was opened from rides along with the search and the
+	// pager, so the way back still leads to it.
+	const fromFlow = $derived(page.url.searchParams.get('flow') ?? '');
+	const keep = $derived({ ...(data.q ? { q: data.q } : {}), ...(fromFlow ? { flow: fromFlow } : {}) });
 </script>
 
 <PageTitle title="Variables - Flows" />
@@ -109,8 +116,30 @@
 
 		<FormErrors message={pageFailure} />
 
+		{#if data.gate.state === 'ok' && (data.total > 0 || data.q)}
+			<!-- A GET form, so the search lives in the address and the pager
+			     keeps it. -->
+			<form method="GET" data-testid="variable-filters">
+				{#if fromFlow}<input type="hidden" name="flow" value={fromFlow} />{/if}
+				<ListToolbar label="Filter variables">
+					{#snippet search()}
+						<div class="flex items-center gap-2">
+							<label for="variable-search" class="sr-only">Search variables</label>
+							<SearchInput id="variable-search" name="q" value={data.q} placeholder="Key or value" class="min-w-0 flex-1" />
+							<Button type="submit" variant="secondary">Search</Button>
+							{#if data.q}
+								<Button variant="ghost" href="/admin/flows/variables">Clear</Button>
+							{/if}
+						</div>
+					{/snippet}
+				</ListToolbar>
+			</form>
+		{/if}
+
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
+		{:else if data.variables.length === 0 && data.q}
+			<EmptyState title="No variables match" description="No key, and no value that is not secret, holds that text." />
 		{:else if data.variables.length === 0}
 			<EmptyState title="No variables yet" description="Expressions read one as vars.<key>.">
 				{#snippet iconSnippet()}<VariableIcon size={ICON.lg} />{/snippet}
@@ -166,7 +195,7 @@
 				count={data.variables.length}
 				total={data.total ?? undefined}
 				noun="variables"
-				href={pageHref('/admin/flows/variables', data.limit)}
+				href={pageHref('/admin/flows/variables', data.limit, keep)}
 			/>
 		{/if}
 	</PageShell>

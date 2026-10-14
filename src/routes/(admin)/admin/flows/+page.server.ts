@@ -25,6 +25,9 @@ import {
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
 
+/** The statuses the list filters by. Anything else in the address is no filter. */
+const STATUSES: readonly string[] = ['draft', 'active', 'disabled', 'blocked'];
+
 function isLocked(err: unknown): boolean {
 	return err instanceof ApiError && err.status === 402;
 }
@@ -32,7 +35,10 @@ function isLocked(err: unknown): boolean {
 export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	const client = createClient(fetch, flowAuthHeaders({ cookies, url }));
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
-	const status = url.searchParams.get('status') ?? '';
+	// A status the list does not know would select no chip and still filter
+	// the list, so it reads as no filter.
+	const raw = url.searchParams.get('status') ?? '';
+	const status = STATUSES.includes(raw) ? raw : '';
 	const q = url.searchParams.get('q') ?? '';
 
 	// One row past the page answers "is there another page" when the endpoint

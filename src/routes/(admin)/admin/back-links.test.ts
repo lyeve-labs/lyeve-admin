@@ -180,7 +180,7 @@ const cases: Case[] = [
 	{
 		route: 'flows/variables',
 		component: FlowVariables,
-		data: { variables: [], locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
+		data: { variables: [], total: 0, q: '', limit: 50, offset: 0, locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
 		href: '/admin/flows',
 		label: 'Flows',
 	},

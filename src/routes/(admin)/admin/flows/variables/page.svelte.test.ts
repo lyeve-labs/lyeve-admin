@@ -143,6 +143,19 @@ describe('variables page', () => {
 	});
 });
 
+describe('variables search', () => {
+	it('searches by the address and says when nothing matches', () => {
+		const { container, getByLabelText } = render(VariablesPage, {
+			props: { data: { variables: [], total: 0, q: 'zz', limit: 50, offset: 0, locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed }, form: null } as never,
+		});
+		const form = container.querySelector('[data-testid="variable-filters"]') as HTMLFormElement;
+		expect(form.getAttribute('method')).toBe('GET');
+		expect((getByLabelText('Search variables') as HTMLInputElement).value).toBe('zz');
+		expect(container.textContent).toContain('No variables match');
+		expect(container.textContent).not.toContain('No variables yet');
+	});
+});
+
 describe('variables page for a role the plugin refuses', () => {
 	it('says the role cannot read variables and offers nothing to create', () => {
 		const { container, queryByText } = setup([], null, false, { state: 'forbidden' }, ['editor']);

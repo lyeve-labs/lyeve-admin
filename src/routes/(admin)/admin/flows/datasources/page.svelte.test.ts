@@ -66,12 +66,13 @@ describe('datasources page', () => {
 	});
 
 	it('offers the TLS modes of the chosen kind and submits the stored one on edit', async () => {
-		const { getByLabelText, container } = setup();
+		const { getByLabelText, getByRole, container } = setup();
 		await fireEvent.click(getByLabelText('Edit warehouse'));
 		const form = container.querySelector('#datasource-form') as HTMLFormElement;
 		expect((form.querySelector('input[name="ssl"]') as HTMLInputElement).value).toBe('prefer');
-		await fireEvent.click(getByLabelText('TLS'));
-		const modes = [...container.querySelectorAll('[role="option"]')].map((o) => o.textContent?.trim());
+		// Three modes fit in sight, so they are segments rather than a list.
+		const group = getByRole('radiogroup', { name: 'TLS' });
+		const modes = [...group.querySelectorAll('[role="radio"]')].map((o) => o.querySelector('span:not([aria-hidden]) span:not([aria-hidden])')?.textContent?.trim());
 		expect(modes).toEqual(['Require TLS', 'Prefer TLS', 'No TLS']);
 	});
 
@@ -91,8 +92,8 @@ describe('datasources page', () => {
 	});
 
 	async function chooseAuth(container: HTMLElement, label: string) {
-		await fireEvent.click(container.querySelector('#ds-auth-type') as HTMLElement);
-		await fireEvent.click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent?.trim() === label) as HTMLElement);
+		const group = container.querySelector('[data-testid="auth-section"] [role="radiogroup"]') as HTMLElement;
+		await fireEvent.click([...group.querySelectorAll('[role="radio"]')].find((o) => o.querySelector('span:not([aria-hidden]) span:not([aria-hidden])')?.textContent?.trim() === label) as HTMLElement);
 	}
 
 	it('shows the auth section for the http kind, with the fields and a required secret per type', async () => {

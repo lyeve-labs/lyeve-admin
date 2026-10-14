@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SectionHeading, SegmentedControl, Toggle } from '@lyeve-labs/ui-kit';
+	import { FilterChips, SectionHeading, SegmentedControl, Toggle } from '@lyeve-labs/ui-kit';
 	import CodeEditor from './CodeEditor.svelte';
 	import GridEditor from './GridEditor.svelte';
 	import type { JsonSchema } from '$lib/flow/types';
@@ -63,13 +63,22 @@
 </script>
 
 <div class="flex flex-col gap-3" data-testid="inline-data-editor">
-	<SegmentedControl
-		label="Format"
-		size="sm"
-		value={format}
-		options={formats}
-		onchange={(v) => set({ format: v })}
-	/>
+	<!-- Five formats do not fit one strip in the inspector, so they are chips
+	     that wrap. A schema that narrows them to a few keeps the strip. -->
+	{#if formats.length >= 5}
+		<div class="flex flex-col gap-1.5">
+			<span class="text-xs font-medium text-fg" aria-hidden="true">Format</span>
+			<FilterChips label="Format" value={format} options={formats} onchange={(v) => set({ format: v })} />
+		</div>
+	{:else}
+		<SegmentedControl
+			label="Format"
+			size="sm"
+			value={format}
+			options={formats}
+			onchange={(v) => set({ format: v })}
+		/>
+	{/if}
 	{#if errorFor('format')}<span class="text-xs text-danger">{errorFor('format')}</span>{/if}
 	{#if format === 'table'}
 		<div class="flex flex-col gap-2 rounded-md border border-line p-3">

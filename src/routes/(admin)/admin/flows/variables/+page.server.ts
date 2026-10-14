@@ -1,20 +1,30 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';
-import { pageWindow, rowsOf, totalOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 import { sessionToken } from '$lib/server/session-cookie';
 
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
+
+/** The most variables one read asks for, which is more than a tenant keeps. */
+const ALL = 500;
+
+/** Whether a variable matches the search: its key, or a value that is not secret. */
+function matches(v: Variable, q: string): boolean {
+	const needle = q.toLowerCase();
+	return v.key.toLowerCase().includes(needle) || (!v.is_secret && (v.value ?? '').toLowerCase().includes(needle));
+}
 
 export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 	const { limit, offset } = pageWindow(url, 50, 500);
+	const q = (url.searchParams.get('q') ?? '').trim();
 	let variables: Variable[] = [];
 	let total = 0;
 	let locked = false;
@@ -22,14 +32,22 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	// so a reader below admin sees the role refusal and nothing to create.
 	let gate: Gate = GATE_OK;
 	try {
-		const res = await listVariables(client, limit, offset);
-		variables = rowsOf(res);
-		total = Math.max(totalOf(res), offset + variables.length);
+		// The plugin answers every variable in one list whatever window is
+		// asked for, so the search and the window are applied here. Asking the
+		// plugin for a window would hand back the whole list on every page.
+		const all = rowsOf(await listVariables(client, ALL, 0));
+		const found = q ? all.filter((v) => matches(v, q)) : all;
+		total = found.length;
+		variables = found.slice(offset, offset + limit);
 	} catch (err) {
 		({ locked } = flowLoadOutcome(err, { cookies, url }, 'variables'));
 		if (!locked) gate = gateOf(err, engineBanner('variables'));
 	}
-	return { variables, total, limit, offset, locked, gate };
+	if (gate.state === 'ok' && !locked) {
+		const back = pastEndOffset(variables.length, limit, offset, total);
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
+	return { variables, total, limit, offset, q, locked, gate };
 };
 
 export const actions: Actions = {

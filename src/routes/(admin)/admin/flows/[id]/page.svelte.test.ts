@@ -13,6 +13,14 @@ vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flow
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}) }));
 
+// The kit's confirm renders through a container the layout mounts and this
+// test does not, so the call is captured and answered here.
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
 // The page is tested with the list editor whatever the build carries, so the
 // suite reads the same with the visual editor mounted and without it. A case
 // that needs the page's side of the visual editor sets the flag.
@@ -295,8 +303,20 @@ describe('flow editor page', () => {
 		expect(queryByTestId('flow-inspector')?.textContent ?? '').not.toContain('Delete flow');
 		const remove = getByRole('button', { name: 'Delete flow' });
 		expect(remove.className).toContain('text-danger');
+		const form = document.querySelector('form[action="?/delete"]') as HTMLFormElement;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+
+		kit.confirm.mockResolvedValueOnce(false);
 		await fireEvent.click(remove);
-		expect(getByRole('dialog').textContent).toContain('Delete');
+		await tick();
+		// The title names the flow. The body says what the delete takes with it.
+		expect(kit.confirm).toHaveBeenCalledWith(`Delete flow ${fixtureFlow.name}?`, expect.stringContaining('run history'), { confirmLabel: 'Delete' });
+		expect(submit).not.toHaveBeenCalled();
+
+		kit.confirm.mockResolvedValueOnce(true);
+		await fireEvent.click(remove);
+		await tick();
+		expect(submit).toHaveBeenCalled();
 	});
 
 	it('names the save state beside the status, as the schema builder does', async () => {

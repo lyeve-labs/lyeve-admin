@@ -146,6 +146,14 @@ describe('admin/flows load', () => {
 		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 
+	// A status no chip carries would filter the list with no chip selected.
+	it('reads a status it does not know as no filter', async () => {
+		const { event, calls } = loadEvent({ '/api/admin/flows?': () => json({ data: [], total: 0 }) }, '?status=archived');
+		const result = (await load(event)) as Loaded;
+		expect(result.status).toBe('');
+		expect(calls.find((c) => c.url.includes('/api/admin/flows?'))?.url).not.toContain('status=archived');
+	});
+
 	it('passes the status and search filters to the engine and back to the page', async () => {
 		const { event, calls } = loadEvent({ '/api/admin/flows?': () => json({ data: [], total: 0 }) }, '?status=active&q=orders');
 		const result = (await load(event)) as Loaded;

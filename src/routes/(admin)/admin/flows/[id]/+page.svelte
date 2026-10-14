@@ -196,6 +196,17 @@
 		runBlocked = false;
 	}
 
+	/*
+	 * The editor validates the draft, lists a datasource's tables and runs a
+	 * test from the browser rather than through a load or an action. Each is
+	 * a read about a draft that exists only on this page: validation follows
+	 * every edit half a second later, and a form action would post the whole
+	 * definition and rerun the page's load on every keystroke, which would
+	 * reread the catalog and the runs and could not keep up. None of them
+	 * writes anything the engine stores. The session cookie and the CSRF
+	 * header ride along on a same-origin request, so the engine applies the
+	 * same role and tenant as it does to the page's own reads.
+	 */
 	function browserClient() {
 		return createClient(fetch, csrfHeaders());
 	}
@@ -486,7 +497,14 @@
 		importCleared = form;
 		showImport = true;
 	}
-	let showDelete = $state(false);
+	// Delete asks through the kit's confirm dialog, then posts a hidden form,
+	// so the button never posts on its own and the delete stays a form action.
+	let deleteFlowForm = $state<HTMLFormElement>();
+	async function askDelete() {
+		const ok = await confirm(`Delete flow ${definition.name || data.flow?.name || ''}?`, 'Its versions and run history go with it.', { confirmLabel: 'Delete' });
+		if (!ok) return;
+		deleteFlowForm?.requestSubmit();
+	}
 	let disableForm = $state<HTMLFormElement | undefined>();
 
 	// Drawer
@@ -934,7 +952,7 @@
 							</Button>
 						{/if}
 						{#if can.delete}
-							<Button variant="ghost" size="sm" class="text-danger" aria-label="Delete flow" hint="Delete the flow, its versions and its runs" onclick={() => (showDelete = true)}>
+							<Button variant="ghost" size="sm" class="text-danger" aria-label="Delete flow" hint="Delete the flow, its versions and its runs" onclick={askDelete}>
 								<Trash2 size={ICON.sm} />
 							</Button>
 						{/if}
@@ -1147,7 +1165,7 @@
 								mono
 							/>
 							<Toggle id="test-live" label="Live side effects" hint="Off runs writes and calls as dry runs." bind:checked={live} />
-							<Select id="test-until" label="Until node" options={nodeOptions} placeholder="Run to the end" bind:value={untilNode} />
+							<Select id="test-until" label="Until node" options={nodeOptions} placeholder="Run to the end" searchable bind:value={untilNode} />
 							{#if testError}
 								<Alert tone="danger">
 									{#snippet children()}{testError}{/snippet}
@@ -1367,22 +1385,7 @@
 		{/snippet}
 	</Drawer>
 
-	{#if showDelete}
-		<Modal open title="Delete {data.flow.name}?" onclose={() => (showDelete = false)}>
-			{#snippet children()}
-				<p class="mb-6 text-sm text-fg">Its versions and run history go with it.</p>
-				<form
-					method="POST"
-					action="?/delete"
-					use:enhance={deleteFlow.enhance}
-					class="flex justify-end gap-3"
-				>
-					<Button variant="secondary" type="button" onclick={() => (showDelete = false)}>Cancel</Button>
-					<Button variant="danger" type="submit" loading={deleteFlow.pending}>Delete</Button>
-				</form>
-			{/snippet}
-		</Modal>
-	{/if}
+	<form method="POST" action="?/delete" use:enhance={deleteFlow.enhance} bind:this={deleteFlowForm} class="hidden"></form>
 {:else}
 	<PageShell title="Flows" width="wide">
 		<NotEnabled

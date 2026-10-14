@@ -9,10 +9,10 @@
 		FileInput,
 		Input,
 		PageShell,
+		FilterChips,
 		Pagination,
+		RadioGroup,
 		SearchInput,
-		SegmentedControl,
-		Select,
 		Table,
 		Textarea,
 		Tooltip,
@@ -20,6 +20,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import { Database, Plus, Trash2, Upload, Variable, Workflow } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
@@ -79,7 +80,7 @@
 	}
 
 	let showImport = $state(false);
-	let importMode = $state<string | null>('create');
+	let importMode = $state('create');
 
 	function openImport() {
 		cleared = form;
@@ -93,13 +94,13 @@
 
 	async function askDelete(id: string, name: string) {
 		const ok = await confirmDialog(
-			`Delete ${name}?`,
+			`Delete flow ${name}?`,
 			'Its versions and run history go with it.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
 		deleteId = id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -139,8 +140,12 @@
 	const enableLink = $derived(instance.upgradeLink());
 
 	const MODES = [
-		{ value: 'create', label: 'Create a new flow' },
-		{ value: 'replace', label: 'Replace the draft of an existing flow' },
+		{ value: 'create', label: 'Create a new flow', description: 'The definition becomes a flow of its own, under the slug it carries.' },
+		{
+			value: 'replace',
+			label: 'Replace the draft of an existing flow',
+			description: 'The definition overwrites that flow\'s draft. Its published version runs until you publish again.',
+		},
 	];
 
 	// The filter lives in the URL, so a filtered view is a link someone can
@@ -266,9 +271,8 @@
 						</div>
 					{/snippet}
 					{#snippet filters()}
-						<nav aria-label="Status">
-							<SegmentedControl label="Status" labelHidden value={data.status} options={statusOptions} />
-						</nav>
+						<!-- Five statuses do not fit one strip, so they are chips that wrap. -->
+						<FilterChips label="Status" value={data.status} options={statusOptions} />
 					{/snippet}
 				</ListToolbar>
 			</form>
@@ -442,7 +446,7 @@
 				placeholder={'version: 1\nname: Orders with shipments'}
 				mono
 			/>
-			<Select id="import-mode" name="mode" label="Mode" options={MODES} bind:value={importMode} />
+			<RadioGroup name="mode" label="Mode" options={MODES} bind:value={importMode} />
 			{#if importMode === 'replace'}
 				<Input id="import-slug" name="slug" label="Slug of the flow to replace" required />
 			{/if}

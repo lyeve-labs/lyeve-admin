@@ -82,6 +82,16 @@ describe('flows list page', () => {
 		expect(container.textContent).not.toContain('Nightly sheet export');
 	});
 
+	// Each mode changes what an import does to an existing flow, so each says so.
+	it('offers the import modes as choices that each say what they do', async () => {
+		const { getByText, container } = setup();
+		await fireEvent.click(getByText('Import'));
+		const form = container.ownerDocument.querySelector('#flow-import-form') as HTMLElement;
+		const radios = form.querySelectorAll('input[type="radio"][name="mode"]');
+		expect(radios).toHaveLength(2);
+		expect(form.textContent).toContain('Its published version runs until you publish again.');
+	});
+
 	it('asks for a name and a slug and nothing else', async () => {
 		const { getAllByText, container } = setup();
 		await fireEvent.click(getAllByText('New flow')[0]);
@@ -114,7 +124,7 @@ describe('flows list page', () => {
 		// The title asks the question and names the flow. The body says what the
 		// delete takes with it.
 		expect(kit.confirm).toHaveBeenCalledWith(
-			expect.stringContaining(fixtureFlow.name),
+			`Delete flow ${fixtureFlow.name}?`,
 			expect.stringContaining('run history'),
 			{ confirmLabel: 'Delete' },
 		);
@@ -205,9 +215,8 @@ describe('flows list page', () => {
 		expect(search.getAttribute('placeholder')).toBe('Name or slug');
 		const label = form.querySelector('label[for="flow-search"]') as HTMLElement;
 		expect(label.className).toContain('sr-only');
-		// The status control sits at the control height, the field's own, so
-		// the two share a middle instead of the control centering on a label.
-		expect(getByRole('group', { name: 'Status' }).className).toContain('h-control');
+		// Five statuses are chips that wrap rather than a strip that overflows.
+		expect(getByRole('group', { name: 'Status' }).querySelectorAll('a')).toHaveLength(5);
 		expect(form.querySelector('[role="toolbar"]')?.className).toContain('items-center');
 	});
 

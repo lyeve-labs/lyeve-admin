@@ -11,6 +11,7 @@
 		PageShell,
 		PasswordInput,
 		SectionHeading,
+		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
@@ -21,7 +22,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { flowBack } from '$lib/flow/back';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 	import type { Datasource, DatasourceKind } from '$lib/api/flows';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
@@ -184,13 +185,13 @@
 
 	async function askDelete(ds: Datasource) {
 		const ok = await confirm(
-			'Delete datasource',
-			`Delete ${ds.name}? A flow that names it will fail at that node until you create it again.`,
+			`Delete datasource ${ds.name}?`,
+			'A flow that names it will fail at that node until you create it again.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
 		deleteId = ds.id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -399,14 +400,10 @@
 					label="Password"
 					hint={editing?.has_secret ? 'Stored and never shown. Leave blank to keep it.' : 'Encrypted at rest.'}
 				/>
-				<Select
-					id="ds-ssl"
-					name="ssl"
-					label="TLS"
-					options={sslOptions}
-					bind:value={ssl}
-					hint="What the driver is told about the connection's encryption."
-				/>
+				<div class="flex flex-col gap-1">
+					<SegmentedControl name="ssl" label="TLS" options={sslOptions} value={ssl ?? ''} onchange={(v) => (ssl = v)} />
+					<p class="text-xs text-faint">What the driver is told about the connection's encryption.</p>
+				</div>
 			{:else if kind === 'http'}
 				<Input id="ds-base-url" name="base_url" label="Base URL" placeholder="https://api.example.com" bind:value={baseUrl} required />
 				<Input
@@ -419,17 +416,18 @@
 				/>
 				<div class="flex flex-col gap-3 rounded-md border border-line p-3" data-testid="auth-section">
 					<SectionHeading level={3} variant="eyebrow">Authentication</SectionHeading>
-					<Select
-						id="ds-auth-type"
-						name="auth_type"
-						label="Type"
-						options={AUTH_TYPES}
-						value={auth.type}
-						hint="Sent with every request of an http.request node; an explicit Authorization header on the node wins."
-						onvaluechange={(v) => {
-							if (isAuthType(v)) auth = { ...auth, type: v };
-						}}
-					/>
+					<div class="flex flex-col gap-1">
+						<SegmentedControl
+							name="auth_type"
+							label="Type"
+							options={AUTH_TYPES}
+							value={auth.type}
+							onchange={(v) => {
+								if (isAuthType(v)) auth = { ...auth, type: v };
+							}}
+						/>
+						<p class="text-xs text-faint">Sent with every request of an http.request node. An explicit Authorization header on the node wins.</p>
+					</div>
 					{#if auth.type === 'bearer'}
 						<PasswordInput id="ds-auth-token" name="auth_token" label="Token" hint={secretHint} required={!keepSecret} autocomplete="off" />
 					{:else if auth.type === 'basic'}
