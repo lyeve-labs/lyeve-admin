@@ -35,12 +35,12 @@ import { load, actions } from './+page.server';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
-function loadEvent(roles: string[]) {
+function loadEvent(roles: string[], tenant_id = '') {
 	return {
 		url: new URL('http://admin/admin/observability/cache'),
 		fetch: vi.fn(),
 		cookies: {},
-		parent: async () => ({ user: { roles } }),
+		parent: async () => ({ user: { roles, tenant_id } }),
 	} as never;
 }
 
@@ -130,6 +130,39 @@ describe('cache load', () => {
 		expect(result.providers).toHaveLength(1);
 	});
 
+	// The in-memory provider lists its keys. A networked one answers an empty
+	// page and a note, which is not an empty cache.
+	it('marks a provider that cannot list its entries', async () => {
+		api.listEntries.mockResolvedValue({
+			data: [],
+			total_count: 0,
+			limit: 51,
+			offset: 0,
+			note: 'entry listing is only available with the in-memory provider',
+		});
+		const result = (await load(loadEvent(['super_admin']))) as Loaded;
+		expect(result.unlisted).toBe(true);
+		expect(result.entries).toEqual([]);
+	});
+
+	it('reads an empty page with no note as an empty cache', async () => {
+		const result = (await load(loadEvent(['super_admin']))) as Loaded;
+		expect(result.unlisted).toBe(false);
+	});
+
+	it('keeps a refused providers read as its gate', async () => {
+		api.listProviders.mockRejectedValue(new ApiError(503, 'down', {}));
+		const result = (await load(loadEvent(['admin']))) as Loaded;
+		expect(result.providersRead).toBe(false);
+		expect(result.providersGate).toEqual({ state: 'unavailable' });
+	});
+
+	it("scopes the flush to the session's tenant whenever the session names one", async () => {
+		expect(((await load(loadEvent(['admin']))) as Loaded).flushScoped).toBe(true);
+		expect(((await load(loadEvent(['super_admin'], 'acme'))) as Loaded).flushScoped).toBe(true);
+		expect(((await load(loadEvent(['super_admin']))) as Loaded).flushScoped).toBe(false);
+	});
+
 	it('reads a provider list with no tier as unknown rather than as one that needs no license', async () => {
 		api.listProviders.mockResolvedValue({ data: [], total_count: 0 });
 		const result = (await load(loadEvent(['admin']))) as Loaded;
@@ -186,9 +219,121 @@ describe('cache rule actions', () => {
 		expect(api.purgeResponses).toHaveBeenLastCalledWith(expect.anything(), '');
 	});
 
-	it('keeps the instance flush to a super admin', async () => {
+});
+
+describe('cache flush', () => {
+	// The plugin admits a tenant admin and scopes the flush to the tenant.
+	it('flushes for a tenant admin', async () => {
+		api.flushAll.mockResolvedValue(undefined);
+		expect(await actions.flush(formEvent({}))).toEqual({ flushed: 'everything' });
+		expect(api.flushAll).toHaveBeenCalled();
+	});
+
+	it('flushes one tag for a super admin', async () => {
+		authz.roles = ['super_admin'];
+		api.flushTag.mockResolvedValue(undefined);
+		expect(await actions.flush(formEvent({ tag: 'posts' }))).toEqual({ flushed: 'posts' });
+		expect(api.flushTag).toHaveBeenCalledWith(expect.anything(), 'posts');
+	});
+
+	// A tag other than a tenant tag is flushed from every tenant's entries.
+	it('refuses a tag flush from a tenant admin', async () => {
+		await expect(actions.flush(formEvent({ tag: 'posts' }))).rejects.toThrow('403');
+		expect(api.flushTag).not.toHaveBeenCalled();
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
 		await expect(actions.flush(formEvent({}))).rejects.toThrow('403');
 		expect(api.flushAll).not.toHaveBeenCalled();
+	});
+
+	it("relays the plugin's refusal", async () => {
+		authz.roles = ['super_admin'];
+		api.flushTag.mockRejectedValue(new ApiError(403, "cannot flush another tenant's cache entries", {}));
+		const out = (await actions.flush(formEvent({ tag: 'tenant:other' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe("cannot flush another tenant's cache entries");
+	});
+
+	it('says an outage failed the flush', async () => {
+		api.flushAll.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.flush(formEvent({}))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('The cache could not be flushed.');
+	});
+});
+
+describe('cache rule update', () => {
+	const fields = { id: rule.id, pattern: '/api/v1/content/posts/**', ttl_seconds: '600', tags: 'posts', enabled: 'false' };
+
+	it('saves the rule it names', async () => {
+		api.updateRule.mockResolvedValue(rule);
+		expect(await actions.updateRule(formEvent(fields))).toEqual({ savedRule: '/api/v1/content/posts/**' });
+		expect(api.updateRule).toHaveBeenCalledWith(expect.anything(), rule.id, {
+			pattern: '/api/v1/content/posts/**',
+			ttl_seconds: 600,
+			tags: ['posts'],
+			enabled: false,
+		});
+	});
+
+	it('refuses a save that names no rule', async () => {
+		const out = (await actions.updateRule(formEvent({ ...fields, id: '' }))) as { status: number };
+		expect(out.status).toBe(400);
+		expect(api.updateRule).not.toHaveBeenCalled();
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
+		await expect(actions.updateRule(formEvent(fields))).rejects.toThrow('403');
+	});
+
+	it("relays the plugin's refusal into the rule drawer", async () => {
+		api.updateRule.mockRejectedValue(new ApiError(422, 'pattern overlaps another rule', {}));
+		const out = (await actions.updateRule(formEvent(fields))) as { status: number; data: Record<string, unknown> };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('pattern overlaps another rule');
+		expect(out.data.drawer).toBe('rule');
+	});
+
+	it('says an outage failed the save', async () => {
+		api.updateRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.updateRule(formEvent(fields))) as { status: number; data: Record<string, unknown> };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('The rule could not be saved.');
+		expect(out.data.drawer).toBe('rule');
+	});
+});
+
+describe('cache circuit reset', () => {
+	it('resets the named provider for a super admin', async () => {
+		authz.roles = ['super_admin'];
+		api.resetCircuit.mockResolvedValue(undefined);
+		expect(await actions.resetCircuit(formEvent({ name: 'redis-1' }))).toEqual({ reset: 'redis-1' });
+		expect(api.resetCircuit).toHaveBeenCalledWith(expect.anything(), 'redis-1');
+	});
+
+	// Every tenant is served from the providers, so the plugin keeps the reset
+	// to a super admin.
+	it('refuses a tenant admin', async () => {
+		await expect(actions.resetCircuit(formEvent({ name: 'redis-1' }))).rejects.toThrow('403');
+		expect(api.resetCircuit).not.toHaveBeenCalled();
+	});
+
+	it("relays the plugin's refusal", async () => {
+		authz.roles = ['super_admin'];
+		api.resetCircuit.mockRejectedValue(new ApiError(404, 'provider not found', {}));
+		const out = (await actions.resetCircuit(formEvent({ name: 'gone' }))) as { status: number };
+		expect(out.status).toBe(400);
+	});
+
+	it('says an outage failed the reset', async () => {
+		authz.roles = ['super_admin'];
+		api.resetCircuit.mockRejectedValue(new TypeError('fetch failed'));
+		const out = (await actions.resetCircuit(formEvent({ name: 'redis-1' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('The circuit could not be reset.');
 	});
 });
 

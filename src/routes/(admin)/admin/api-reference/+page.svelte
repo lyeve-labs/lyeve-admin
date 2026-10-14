@@ -21,6 +21,7 @@
 		SegmentedControl,
 		Table,
 		Textarea,
+		Collapsible,
 		type AccentTone,
 	} from '@lyeve-labs/ui-kit';
 	import ResizableAside from '$lib/components/ResizableAside.svelte';
@@ -214,7 +215,7 @@
 				{#each adminGroups as g}
 					<button
 						onclick={() => scrollToGroup(g.id)}
-						class="w-full px-4 py-2 text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
+						class="w-full px-4 py-2 coarse:min-h-control text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
 					>
 						{shortLabel(g.label)}
 					</button>
@@ -239,7 +240,7 @@
 					{#each pluginGroups as g}
 						<button
 							onclick={() => scrollToGroup(g.id)}
-							class="w-full px-4 py-2 text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
+							class="w-full px-4 py-2 coarse:min-h-control text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
 						>
 							{shortLabel(g.label)}
 						</button>
@@ -254,7 +255,7 @@
 				{#each apiGroups as g}
 					<button
 						onclick={() => scrollToGroup(g.id)}
-						class="w-full px-4 py-2 text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
+						class="w-full px-4 py-2 coarse:min-h-control text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
 					>
 						{shortLabel(g.label)}
 					</button>
@@ -530,13 +531,7 @@
 	{@const write = isWriteMethod(method)}
 	{@const missing = unfilledParameters(ep.path)}
 	{@const mine = triedKey === key}
-	<details class="rounded-lg border border-line">
-		<summary class="cursor-pointer px-3 py-2 text-xs font-medium text-muted">
-			Try it
-			{#if write}
-				<Badge tone="warn" size="sm">changes data</Badge>
-			{/if}
-		</summary>
+	<Collapsible class="rounded-lg border border-line" label="Try it" badge={write ? 'changes data' : undefined}>
 		<form
 			method="POST"
 			action="?/try"
@@ -601,5 +596,5 @@
 					class="max-h-80 overflow-auto rounded-lg border border-line bg-surface-2 p-3 font-mono text-xs text-fg">{tried.body}</pre>
 			</div>
 		{/if}
-	</details>
+	</Collapsible>
 {/snippet}

@@ -60,3 +60,14 @@ describe('the spike alerts page', () => {
 		expect(container.textContent).toContain('not part of this build');
 	});
 });
+
+describe('the heading outline', () => {
+	// The page title is the h1, so its top sections are h2. An h3 straight
+	// under the h1 skips a level in a screen reader's heading list.
+	it('puts its top sections at the second level', () => {
+		const { container } = setup(BASE);
+		const levels = [...container.querySelectorAll('h2, h3')].map((h) => `${h.tagName} ${h.textContent?.trim()}`);
+		expect(levels).toContain('H2 Where alerts go');
+		expect(levels).toContain('H2 What counts as a spike');
+	});
+});

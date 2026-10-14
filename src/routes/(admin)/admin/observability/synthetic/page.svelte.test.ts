@@ -349,3 +349,43 @@ describe('tiles counted across every probe', () => {
 		expect(said(container)).not.toContain('on this page');
 	});
 });
+
+describe('editing a probe whose secrets no read returns', () => {
+	const signIn = probe({
+		name: 'Sign in',
+		type: 'login_flow',
+		config: { login_url: 'https://example.com/login', username: 'probe', password: '***', headers: { Authorization: '***' } },
+		regions: ['us-east'],
+	});
+
+	it('says the save replaces the stored password and asks for it again', async () => {
+		render(SyntheticPage, { props: props({ probes: [signIn] }) });
+		await fireEvent.click(screen.getByLabelText('Edit Sign in'));
+		const form = document.querySelector('#probe-form') as HTMLFormElement;
+		const input = form.querySelector('input[name="secret"][type="password"]') as HTMLInputElement;
+		expect(input.required).toBe(true);
+		expect(said(form)).toContain('A save replaces the stored password');
+	});
+
+	it('names the headers the save drops', async () => {
+		render(SyntheticPage, { props: props({ probes: [signIn] }) });
+		await fireEvent.click(screen.getByLabelText('Edit Sign in'));
+		const form = document.querySelector('#probe-form') as HTMLFormElement;
+		expect(said(form)).toContain('Saving drops the header Authorization');
+	});
+
+	// The plugin replaces the config and regions whole, so the read travels back.
+	it('carries the stored config and regions back with the save', async () => {
+		render(SyntheticPage, { props: props({ probes: [signIn] }) });
+		await fireEvent.click(screen.getByLabelText('Edit Sign in'));
+		const kept = document.querySelector('#probe-form input[name="kept"]') as HTMLInputElement;
+		expect(JSON.parse(kept.value)).toEqual({ config: signIn.config, regions: ['us-east'] });
+	});
+});
+
+describe('the probe search box', () => {
+	it('is named for a screen reader', () => {
+		const { container } = render(SyntheticPage, { props: props() });
+		expect(container.querySelector('label[for="probe-narrow"]')?.textContent).toBe('Narrow this page');
+	});
+});

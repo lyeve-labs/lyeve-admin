@@ -77,7 +77,7 @@
 
 			<Card>
 				{#snippet header()}
-					<SectionHeading level={3}>Where alerts go</SectionHeading>
+					<SectionHeading level={2}>Where alerts go</SectionHeading>
 				{/snippet}
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted">
@@ -95,7 +95,7 @@
 
 			<Card>
 				{#snippet header()}
-					<SectionHeading level={3}>What counts as a spike</SectionHeading>
+					<SectionHeading level={2}>What counts as a spike</SectionHeading>
 				{/snippet}
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted">

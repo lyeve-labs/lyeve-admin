@@ -5,11 +5,13 @@ import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
+	SECRET_MASK,
 	SYNTHETIC_OK,
 	acknowledgeAlert,
 	createProbe,
 	deleteProbe,
 	getProbeChannels,
+	keptConfig,
 	listOpenAlerts,
 	listProbes,
 	probeHealth,
@@ -38,7 +40,7 @@ const CHANNEL_PREFIX = 'channel_';
  * A refused or failed read is said in the drawer rather than as no channels.
  */
 type ChannelsFor = { probe: Probe; read: ProbeChannels | null; gate: Gate } | null;
-import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 const NO_ALERTS: Section<ProbeAlert[]> = { ok: true, value: [] };
 
@@ -85,6 +87,31 @@ function configFor(type: string, form: FormData): ProbeConfig {
 			return { webhook_url: str('webhook_url') };
 		default:
 			return {};
+	}
+}
+
+interface Kept {
+	config: ProbeConfig;
+	regions?: string[];
+	/** The secrets the read masked, which a save without them erases. */
+	masked: { password: boolean; auth_token: boolean };
+}
+
+/**
+ * What an edit read and the form does not show: the stored config and regions
+ * the drawer sends back as JSON. The plugin replaces both whole on a save, so
+ * anything left out of the body is erased.
+ */
+function keptFrom(raw: FormDataEntryValue | null): Kept {
+	const none: Kept = { config: {}, masked: { password: false, auth_token: false } };
+	if (typeof raw !== 'string' || raw === '') return none;
+	try {
+		const read = JSON.parse(raw) as { config?: ProbeConfig | null; regions?: unknown };
+		const regions = Array.isArray(read.regions) ? read.regions.filter((r): r is string => typeof r === 'string') : undefined;
+		const masked = { password: read.config?.password === SECRET_MASK, auth_token: read.config?.auth_token === SECRET_MASK };
+		return { config: keptConfig(read.config), regions, masked };
+	} catch {
+		return none;
 	}
 }
 
@@ -157,7 +184,7 @@ export const load: PageServerLoad = async (event) => {
 	const alerts =
 		gate.state === 'ok'
 			? await section(
-					listOpenAlerts(client).then((p) => p.data ?? []),
+					listOpenAlerts(client).then((p) => rowsOf(p)),
 					'The open alerts could not be read. This is not a report that no probe is alerting.'
 				)
 			: NO_ALERTS;
@@ -192,7 +219,20 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' });
 	if (!type) return fail(400, { error: 'Choose a probe type.', drawer: 'probe' });
 
-	const config = configFor(type, form);
+	const kept = id ? keptFrom(form.get('kept')) : keptFrom(null);
+	const config: ProbeConfig = { ...kept.config, ...configFor(type, form) };
+	// No read returns a stored secret, so a save sends only the one typed here.
+	// The plugin replaces the config whole, so a save without it would erase
+	// the stored one.
+	const secret = String(form.get('secret') ?? '');
+	if (!secret && type === 'login_flow' && kept.masked.password) {
+		return fail(400, { error: 'This probe has a stored password that no read returns. Enter it again to save.', drawer: 'probe' });
+	}
+	if (!secret && type === 'api_canary' && kept.masked.auth_token) {
+		return fail(400, { error: 'This canary has a stored auth token that no read returns. Enter it again to save.', drawer: 'probe' });
+	}
+	if (secret && type === 'login_flow') config.password = secret;
+	if (secret && type === 'api_canary') config.auth_token = secret;
 	const required = REQUIRED_TARGET[type];
 	if (required && !config[required.field]) {
 		return fail(400, { error: required.says, drawer: 'probe' });
@@ -212,6 +252,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		interval_seconds: interval,
 		timeout_seconds: timeout,
 		alert_threshold: positive(form.get('alert_threshold'), 3),
+		...(kept.regions ? { regions: kept.regions } : {}),
 	};
 
 	try {

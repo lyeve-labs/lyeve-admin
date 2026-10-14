@@ -121,16 +121,35 @@
 		);
 	}
 
+	const RECOMPUTED =
+		'Every flushed key is recomputed the next time it is asked for, so this puts that load on the database at once.';
+
 	/**
 	 * Every flushed key is recomputed on its next request, so this is a
-	 * deliberate load against the database rather than a tidy-up.
+	 * deliberate load against the database rather than a tidy-up. The plugin
+	 * flushes only the request's tenant when the request names one, so the
+	 * confirm says which of the two this flush is.
 	 */
-	function flush(tag: string): SubmitFunction {
-		const what = tag ? `everything tagged ${tag}` : 'the whole cache';
+	function flushAll(): SubmitFunction {
+		if (data.flushScoped) {
+			return confirmed(
+				"Flush this tenant's cached responses?",
+				`Other tenants' entries and keys outside the response cache stay. ${RECOMPUTED}`,
+				{ confirmLabel: 'Flush', success: "Flushed this tenant's cached responses" },
+			);
+		}
 		return confirmed(
-			`Flush ${what}?`,
-			'Every flushed key is recomputed the next time it is asked for, so this puts that load on the database at once.',
-			{ confirmLabel: 'Flush', success: `Flushed ${what}` },
+			'Flush the cache?',
+			`Your session names no tenant, so on an install with many tenants this removes every key of every tenant. On an install with one tenant it removes that tenant's cached responses. ${RECOMPUTED}`,
+			{ confirmLabel: 'Flush', success: 'Flushed the cache' },
+		);
+	}
+
+	function flushTag(tag: string): SubmitFunction {
+		return confirmed(
+			`Flush everything tagged ${tag}?`,
+			`Every entry carrying the tag goes, whichever tenant it belongs to. ${RECOMPUTED}`,
+			{ confirmLabel: 'Flush', success: `Flushed everything tagged ${tag}` },
 		);
 	}
 
@@ -151,7 +170,15 @@
 >
 	{#snippet actions()}
 		{#if data.gate.state === 'ok' && rules.gate.state === 'ok'}
-			<Button variant="primary" size="sm" onclick={openCreate}>
+			<!-- At the ceiling a create can only be refused, so the button waits
+			     and the warning beside the rules says why. -->
+			<Button
+				variant="primary"
+				size="sm"
+				onclick={openCreate}
+				disabled={rulesFull}
+				aria-describedby={rulesFull ? 'rules-full' : undefined}
+			>
 				<Plus size={ICON.sm} /> New rule
 			</Button>
 		{/if}
@@ -225,9 +252,13 @@
 				</p>
 			{/if}
 			{#if !data.providersRead}
-				<Alert tone="danger">
-					The providers could not be read. This is not a report that all of them are healthy.
-				</Alert>
+				{#if data.providersGate}
+					<GateNotice gate={data.providersGate} title="the providers" absent="This version of the cache plugin does not list its providers." />
+				{:else}
+					<Alert tone="danger">
+						The providers could not be read. This is not a report that all of them are healthy.
+					</Alert>
+				{/if}
 			{:else if data.providers.length === 0}
 				<EmptyState
 					title="No provider is configured"
@@ -328,10 +359,12 @@
 				/>
 			{:else}
 				{#if rulesFull}
-					<Alert tone="warn" title="Every rule this install allows is in use">
-						{rules.limit?.current} of {rules.limit?.limit} rules are in use. Delete one to add another, or
-						change the license to allow more. Existing rules keep serving either way.
-					</Alert>
+					<div id="rules-full">
+						<Alert tone="warn" title="Every rule this install allows is in use">
+							{rules.limit?.current} of {rules.limit?.limit} rules are in use. Delete one to add another, or
+							change the license to allow more. Existing rules keep serving either way.
+						</Alert>
+					</div>
 				{/if}
 
 				<div class="flex flex-wrap items-end gap-2">
@@ -415,29 +448,40 @@
 			{/if}
 		</section>
 
-		{#if data.superAdmin}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Stored</SectionHeading>
 			<div class="flex flex-wrap items-center gap-2">
-				<form method="POST" action="?/flush" use:enhance={flush('')}>
+				<form method="POST" action="?/flush" use:enhance={flushAll()}>
 					<Button variant="secondary" size="sm" type="submit">
-						<Trash2 size={ICON.sm} /> Flush everything
+						<Trash2 size={ICON.sm} />
+						{data.flushScoped ? "Flush this tenant's responses" : 'Flush the cache'}
 					</Button>
 				</form>
-				{#each tags as tag (tag)}
-					<form method="POST" action="?/flush" use:enhance={flush(tag)}>
-						<input type="hidden" name="tag" value={tag} />
-						<Button variant="ghost" size="sm" type="submit">Flush {tag}</Button>
-					</form>
-				{/each}
+				{#if data.superAdmin}
+					{#each tags as tag (tag)}
+						<form method="POST" action="?/flush" use:enhance={flushTag(tag)}>
+							<input type="hidden" name="tag" value={tag} />
+							<Button variant="ghost" size="sm" type="submit">Flush {tag}</Button>
+						</form>
+					{/each}
+				{/if}
 			</div>
 
-			{#if data.entriesGate}
+			{#if !data.superAdmin}
+				<p class="text-sm text-muted">
+					The stored keys are listed for super admins only, because the store holds every tenant's keys.
+				</p>
+			{:else if data.entriesGate}
 				<GateNotice
 					gate={data.entriesGate}
 					title="the stored entries"
 					absent="This version of the cache plugin does not list its stored entries."
 				/>
+			{:else if data.unlisted}
+				<Alert tone="brand">
+					This cache provider does not list its entries, so none are shown here. The counters above still
+					count them.
+				</Alert>
 			{:else if data.entries.length === 0}
 				<EmptyState
 					title="Nothing is cached"
@@ -448,6 +492,9 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.flushScoped}
+					<p class="text-xs text-faint">Only this tenant's keys are listed. The counters above count every tenant.</p>
+				{/if}
 				<Table label="Stored">
 					<thead>
 						<tr>
@@ -483,7 +530,6 @@
 				/>
 			{/if}
 		</section>
-		{/if}
 	{/if}
 </PageShell>
 

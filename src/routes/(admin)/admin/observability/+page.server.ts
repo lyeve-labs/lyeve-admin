@@ -24,36 +24,29 @@ import { goroutineCount } from '$lib/server/goroutines';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 
-export interface PoolStatsSnapshot {
-	max_open_connections: number;
-	open_connections: number;
-	in_use: number;
-	idle: number;
-	wait_count: number;
-	wait_duration: number;
-	max_idle_closed: number;
-	max_idle_time_closed: number;
-	max_lifetime_closed: number;
-}
-
 /**
- * What the engine answers at /api/admin/pool/health.
+ * What the engine answers at /api/admin/pool/health: one flat snapshot of the
+ * pool, measured when the request arrives.
  *
- * Everything but the engine name is optional because the engine sends it that
- * way: a deployment with no pooler configured answers `healthy: true` and no
- * `pool_stats` at all, and `checked_at` can be absent with it. Declared as
- * always present, they would render empty tiles under a Healthy badge and
- * print "Invalid Date" as the time of a check that never reported one. The
- * optionality is the fact. The page reads it.
+ * The counts are optional because an engine with no pool health provider wired
+ * answers `healthy: true` and a message, with no engine name and no counts.
+ * Declared as always present, they would render a Healthy badge over tiles
+ * measuring nothing.
  */
 export interface PoolHealth {
-	engine: string;
-	pool_stats?: PoolStatsSnapshot;
-	latency?: number;
+	engine?: string;
 	healthy: boolean;
-	checked_at?: string;
+	latency_ms?: number;
+	open_connections?: number;
+	in_use?: number;
+	idle?: number;
+	max_open_connections?: number;
+	wait_count?: number;
+	wait_duration_ms?: number;
 	errors?: string[];
-	pooler_config?: string;
+	utilization?: number;
+	utilization_warning?: boolean;
+	message?: string;
 }
 
 export interface LatencyStats {

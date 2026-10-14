@@ -101,6 +101,15 @@ async function readJob(client: HttpClient, id: string): Promise<Job | null> {
 	}
 }
 
+/** Which write a failure came from, so the drawer shows only its own. */
+type JobAction = 'create' | 'update' | 'delete';
+
+/** A failed write, tagged with the action that failed. */
+function failed(action: JobAction, err: unknown, fallback: string) {
+	const out = actionFailure(err, fallback);
+	return fail(out.status, { ...out.data, action });
+}
+
 /** The body both writes send, or the one sentence that stops them. */
 function jobBody(form: FormData): { body: Record<string, unknown> } | { error: string } {
 	const body: Record<string, unknown> = {
@@ -118,6 +127,11 @@ function jobBody(form: FormData): { body: Record<string, unknown> } | { error: s
 		} catch {
 			return { error: 'Payload must be valid JSON.' };
 		}
+	} else if (form.get('had_payload') === 'true') {
+		// The cron plugin reads a null payload as "leave it", so a cleared
+		// field would keep the old payload. An empty object is the nearest
+		// clear it accepts, and the form says so.
+		body.payload = {};
 	}
 	if (!body.name || !body.schedule || !body.endpoint) {
 		return { error: 'Name, schedule, and endpoint are required' };
@@ -143,12 +157,12 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const client = authedClient(event);
 		const parsed = jobBody(await event.request.formData());
-		if ('error' in parsed) return fail(400, { error: parsed.error });
+		if ('error' in parsed) return fail(400, { error: parsed.error, action: 'create' as const });
 		let saved: SavedJob;
 		try {
 			saved = await client.post<SavedJob>('/api/admin/jobs', parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to create job.');
+			return failed('create', err, 'Failed to create job.');
 		}
 		if (saved?.alert_signing_secret) return signingReveal(saved);
 		redirect(303, '/admin/jobs');
@@ -159,14 +173,14 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Missing job id' });
+		if (!id) return fail(400, { error: 'Missing job id', action: 'update' as const });
 		const parsed = jobBody(form);
-		if ('error' in parsed) return fail(400, { error: parsed.error });
+		if ('error' in parsed) return fail(400, { error: parsed.error, action: 'update' as const });
 		let saved: SavedJob;
 		try {
 			saved = await client.put<SavedJob>(`/api/admin/jobs/${encodeURIComponent(id)}`, parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to update job.');
+			return failed('update', err, 'Failed to update job.');
 		}
 		if (saved?.alert_signing_secret) return signingReveal(saved);
 		redirect(303, '/admin/jobs');
@@ -178,11 +192,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await request.formData();
 		const id = form.get('id') as string;
-		if (!id) return fail(400, { error: 'Missing job id' });
+		if (!id) return fail(400, { error: 'Missing job id', action: 'delete' as const });
 		try {
 			await client.delete(`/api/admin/jobs/${encodeURIComponent(id)}`);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete job.') });
+			return fail(400, { error: actionError(err, 'Failed to delete job.'), action: 'delete' as const });
 		}
 		redirect(303, '/admin/jobs');
 	},

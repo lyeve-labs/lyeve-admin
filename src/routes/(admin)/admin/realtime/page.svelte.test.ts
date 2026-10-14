@@ -150,12 +150,41 @@ describe('Realtime tenant roster', () => {
 				platform: null,
 				platformGate: {
 					state: 'error',
-					message: "The per-tenant roster could not be read. The counters above are this tenant's and are unaffected.",
+					message: 'The per-tenant roster could not be read. The counters above are unaffected.',
 				},
 			}),
 		});
 		expect(said(container)).toContain('roster could not be read');
 		expect(said(container)).toContain('unaffected');
 		expect(said(container)).not.toContain('No tenant has a connection open');
+	});
+});
+
+describe('whose counters these are', () => {
+	// The plugin counts connections per tenant and every activity counter
+	// across the whole instance.
+	it('labels the activity counters as the whole instance', () => {
+		const { container } = render(RealtimePage, { props: props() });
+		const text = said(container);
+		for (const label of ['Events pushed, whole instance', 'Rejected, whole instance', 'Broadcasts, whole instance', 'Reconnections, whole instance']) {
+			expect(text, label).toContain(label);
+		}
+	});
+
+	// The tenant view hard-codes the idle count to zero.
+	it('shows no idle count the plugin never measured', () => {
+		const { container } = render(RealtimePage, {
+			props: props({ socket: socket({ connections_by_state: { active: 3, idle: 0 } }) }),
+		});
+		expect(said(container)).not.toContain('Idle');
+		expect(said(container)).not.toContain('idle 0');
+		expect(said(container)).toContain('active 3');
+	});
+
+	it("reads a tenant that never connected as unused, whatever the instance pushed", () => {
+		const { container } = render(RealtimePage, {
+			props: props({ stream: stream({ total_connections: 0, active_connections: 0, events_dispatched: 900 }) }),
+		});
+		expect(said(container)).toContain('Nothing has connected over this transport');
 	});
 });

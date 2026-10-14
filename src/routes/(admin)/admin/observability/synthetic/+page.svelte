@@ -35,8 +35,10 @@
 		PROBE_TYPES,
 		PROBE_TYPE_HINTS,
 		PROBE_TYPE_LABELS,
+		SECRET_MASK,
 		everyLabel,
 		intervalHint,
+		maskedHeaders,
 		probeHealth,
 		probeTarget,
 		probeTone,
@@ -134,6 +136,17 @@
 	let username = $state('');
 	let expectedRedirect = $state('');
 	let webhookUrl = $state('');
+	let secret = $state('');
+
+	// The plugin replaces a probe's config whole on a save and masks its
+	// secrets on every read, so a stored secret cannot be kept. The form says
+	// so and asks for it again.
+	const storedSecret = $derived(
+		!!editing &&
+			editing.type === type &&
+			(type === 'login_flow' ? editing.config?.password : editing.config?.auth_token) === SECRET_MASK,
+	);
+	const droppedHeaders = $derived(editing ? maskedHeaders(editing.config) : []);
 
 	function reset() {
 		url = '';
@@ -145,6 +158,7 @@
 		username = '';
 		expectedRedirect = '';
 		webhookUrl = '';
+		secret = '';
 	}
 
 	function openCreate() {
@@ -316,6 +330,7 @@
 			{:else}
 				<ListToolbar label="Filter probes">
 					{#snippet search()}
+						<label for="probe-narrow" class="sr-only">Narrow this page</label>
 						<SearchInput id="probe-narrow" bind:value={narrow} placeholder="Name or target on this page" />
 					{/snippet}
 					{#snippet filters()}
@@ -451,9 +466,18 @@
 		<FormErrors message={probeError || undefined} refused={probeRefusal} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
+			<!-- What the read held beyond these fields travels back, because a
+			     save replaces the stored config and regions whole. -->
+			<input type="hidden" name="kept" value={JSON.stringify({ config: editing.config ?? {}, regions: editing.regions ?? [] })} />
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			{#if droppedHeaders.length > 0}
+				<Alert tone="warn">
+					Saving drops the {droppedHeaders.length === 1 ? 'header' : 'headers'} {droppedHeaders.join(', ')}. Every read
+					hides their values, so this form cannot send them back. Set them again through the API after saving.
+				</Alert>
+			{/if}
 			<Input id="probe-name" name="name" label="Name" bind:value={name} required />
 			<!-- Each type needs a sentence to tell it from the others, so every
 			     option carries its own rather than one hint that changes. -->
@@ -497,6 +521,18 @@
 					hint="Read out of the create response so the rest of the cycle knows what it made."
 					bind:value={resourceIdField}
 				/>
+				<Input
+					id="probe-auth-token"
+					name="secret"
+					type="password"
+					autocomplete="off"
+					label="Auth token"
+					hint={storedSecret
+						? 'A save replaces the stored token, and no read returns it, so enter it again to keep it.'
+						: 'Sent as a bearer token on each request of the cycle. Leave it empty to send none.'}
+					required={storedSecret}
+					bind:value={secret}
+				/>
 			{:else if type === 'login_flow'}
 				<Input
 					id="probe-login-url"
@@ -506,6 +542,18 @@
 					required
 				/>
 				<Input id="probe-username" name="username" label="Username" bind:value={username} />
+				<Input
+					id="probe-password"
+					name="secret"
+					type="password"
+					autocomplete="new-password"
+					label="Password"
+					hint={storedSecret
+						? 'A save replaces the stored password, and no read returns it, so enter it again to keep it.'
+						: 'The password the probe signs in with.'}
+					required={storedSecret}
+					bind:value={secret}
+				/>
 				<Input
 					id="probe-expected-redirect"
 					name="expected_redirect"

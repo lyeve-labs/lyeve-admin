@@ -224,8 +224,9 @@ export async function listEntries(
 	client: HttpClient,
 	limit: number,
 	offset: number
-): Promise<ListEnvelope<CacheEntry>> {
-	return client.get<ListEnvelope<CacheEntry>>(`${ENTRIES_URL}?limit=${limit}&offset=${offset}`);
+): Promise<ListEnvelope<CacheEntry> & { note?: string }> {
+	// A provider that cannot list its entries answers an empty page and a note.
+	return client.get<ListEnvelope<CacheEntry> & { note?: string }>(`${ENTRIES_URL}?limit=${limit}&offset=${offset}`);
 }
 
 export async function flushAll(client: HttpClient): Promise<void> {

@@ -46,6 +46,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		rulesRead: true,
 		sets: [set],
 		setsRead: true,
+		superAdmin: false,
 		licensed: true,
 		gate: { state: 'ok' },
 		...over,
@@ -231,5 +232,43 @@ describe('editing a rule without the license', () => {
 		render(CapturesPage, { props: props({ licensed: true }) });
 		expect((screen.getByRole('button', { name: `Edit ${rule.route_pattern}` }) as HTMLButtonElement).disabled).toBe(false);
 		expect(screen.queryByRole('button', { name: `Switch off ${rule.route_pattern}` })).toBeNull();
+	});
+});
+
+describe("a super admin's list", () => {
+	// The plugin applies no tenant filter to a super admin's read, so the list
+	// and its total cover every tenant.
+	it('says it covers every tenant and names each row\'s tenant', () => {
+		const { container } = render(CapturesPage, {
+			props: props({ superAdmin: true, captures: [{ ...capture, tenant_id: 'acme' }] }),
+		});
+		expect(said(container)).toContain('Requests every tenant sent');
+		expect(said(container)).toContain('Captures from every tenant');
+		expect(said(container)).toContain('A replay set holds only captures your own tenant sent');
+		expect(screen.getByRole('columnheader', { name: 'Tenant' })).toBeTruthy();
+		expect(screen.getByRole('cell', { name: 'acme' })).toBeTruthy();
+	});
+
+	it("keeps a tenant admin's list to the tenant", () => {
+		const { container } = render(CapturesPage, { props: props() });
+		expect(said(container)).toContain('Requests this tenant sent');
+		expect(screen.queryByRole('columnheader', { name: 'Tenant' })).toBeNull();
+	});
+});
+
+describe('a failed side read', () => {
+	it('says a refused sets read with its gate', () => {
+		const { container } = render(CapturesPage, {
+			props: props({ sets: [], setsRead: false, setsGate: { state: 'forbidden' } }),
+		});
+		expect(said(container)).toContain('Your role cannot open the replay sets');
+	});
+});
+
+describe('the new replay set button', () => {
+	it('carries the Plus every New button carries', async () => {
+		render(CapturesPage, { props: props() });
+		const button = screen.getByRole('button', { name: /New replay set/ });
+		expect(button.querySelector('svg.lucide-plus')).toBeTruthy();
 	});
 });

@@ -33,6 +33,7 @@
  * lab can send, its operator could already have sent with curl.
  */
 import type { EndpointDoc, EndpointGroup, HttpMethod } from './reference';
+import { httpStatusTone } from '../tones';
 
 /** Methods that change something. Named so a page can say so before sending. */
 const MUTATING: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -255,10 +256,7 @@ export function formatBody(raw: string, contentType: string | null): { body: str
 
 /** How a status reads, for the badge beside it. */
 export function statusTone(status: number): 'success' | 'warn' | 'danger' | 'neutral' {
-	if (status >= 200 && status < 300) return 'success';
-	if (status >= 300 && status < 400) return 'neutral';
-	if (status >= 400 && status < 500) return 'warn';
-	return 'danger';
+	return httpStatusTone(status);
 }
 
 /**

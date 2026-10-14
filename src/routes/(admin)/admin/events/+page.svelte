@@ -222,6 +222,7 @@
 			{:else}
 				<ListToolbar label="Filter published events">
 					{#snippet search()}
+						<label for="event-narrow" class="sr-only">Narrow this page</label>
 						<SearchInput
 							id="event-narrow"
 							bind:value={narrow}

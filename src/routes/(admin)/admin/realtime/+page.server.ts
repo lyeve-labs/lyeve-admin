@@ -60,7 +60,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			platform = await getPlatformMetrics(client);
 		} catch (err) {
-			platformGate = gateOf(err, 'The per-tenant roster could not be read. The counters above are this tenant\'s and are unaffected.');
+			platformGate = gateOf(err, 'The per-tenant roster could not be read. The counters above are unaffected.');
 		}
 	}
 

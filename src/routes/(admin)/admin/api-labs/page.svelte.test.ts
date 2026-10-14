@@ -186,3 +186,24 @@ describe('gRPC', () => {
 		expect(said(container)).toContain('present and nothing is listening');
 	});
 });
+
+describe('the endpoint picker', () => {
+	it('names its search box for a screen reader', () => {
+		const { container } = render(LabsPage, { props: props() });
+		const label = container.querySelector('label[for="endpoint-narrow"]');
+		expect(label?.textContent).toBe('Search endpoints');
+		expect(container.querySelector('#endpoint-narrow')).toBeTruthy();
+	});
+
+	// Squeezed by the summary on a phone, the path stacked one character per
+	// line.
+	it('keeps the path its width and drops the summary below the small breakpoint', () => {
+		const { container } = render(LabsPage, { props: props() });
+		const cells = container.querySelectorAll('table[aria-label="Pick an endpoint"] td, [aria-label="Pick an endpoint"] td');
+		const path = [...cells].find((c) => c.classList.contains('font-mono')) as HTMLElement;
+		expect(path.className).toContain('min-w-56');
+		const summary = path.nextElementSibling as HTMLElement;
+		expect(summary.className).toContain('hidden');
+		expect(summary.className).toContain('sm:table-cell');
+	});
+});

@@ -269,7 +269,7 @@
 					<Card>
 						{#snippet header()}
 							<div class="flex flex-wrap items-center gap-2">
-								<SectionHeading level={3}><span class="font-mono text-sm">{family.name}</span></SectionHeading>
+								<SectionHeading level={3}><span class="font-mono text-sm [overflow-wrap:anywhere]">{family.name}</span></SectionHeading>
 								<Badge tone="neutral">{family.type}</Badge>
 								<span class="ms-auto text-xs text-faint">{family.samples.length} samples</span>
 							</div>

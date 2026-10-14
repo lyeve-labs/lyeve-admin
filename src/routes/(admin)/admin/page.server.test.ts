@@ -40,7 +40,7 @@ const superAdmin = { ...admin, roles: ['super_admin'] };
  */
 function applyEvent(
 	fields: Record<string, string>,
-	{ apply = json({ applied: 2 }), user = admin }: { apply?: Response; user?: unknown } = {}
+	{ apply = json({ applied: 2 }), user = superAdmin }: { apply?: Response; user?: unknown } = {}
 ) {
 	const seen: { url: string; method: string | undefined }[] = [];
 	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
@@ -155,6 +155,15 @@ describe('admin dashboard applyMigrations action', () => {
 			{ redirectTo: '/admin' },
 			{ user: { ...admin, roles: ['editor'] } }
 		);
+
+		await expect(actions.applyMigrations(event)).rejects.toMatchObject({ status: 403 });
+		expect(seen.some((r) => r.url.includes('/api/admin/migrate/apply'))).toBe(false);
+	});
+
+	// The engine serves the apply to a super admin only, so an admin's post
+	// is a role refusal rather than a migration that failed.
+	it('refuses an admin before the engine is asked', async () => {
+		const { seen, event } = applyEvent({ redirectTo: '/admin' }, { user: admin });
 
 		await expect(actions.applyMigrations(event)).rejects.toMatchObject({ status: 403 });
 		expect(seen.some((r) => r.url.includes('/api/admin/migrate/apply'))).toBe(false);

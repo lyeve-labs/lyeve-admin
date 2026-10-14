@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
+	listCodes,
 	listEvents,
 	count,
 	errorGate,
@@ -118,5 +119,30 @@ describe('the event list', () => {
 	it('reads a null window as every event read', async () => {
 		const page = await listEvents(client({ data: [], total_count: 0, hidden_older: 0, window_days: null }), 50);
 		expect(page.windowDays).toBeNull();
+	});
+});
+
+describe('the code catalog', () => {
+	// The plugin serves 50 codes unless asked for more. An alert whose code
+	// sat past the first page read as an unclassified failure.
+	it('reads every page of the catalog', async () => {
+		const codes = Array.from({ length: 620 }, (_, i) => ({ id: `c${i}` }));
+		const get = vi.fn(async (url: string) => {
+			const q = new URL(url, 'http://x').searchParams;
+			const offset = Number(q.get('offset'));
+			const limit = Number(q.get('limit'));
+			return { data: codes.slice(offset, offset + limit), total_count: codes.length, limit, offset };
+		});
+		const out = await listCodes({ get } as never);
+		expect(out.data).toHaveLength(620);
+		expect(get).toHaveBeenCalledTimes(2);
+		expect(get.mock.calls[0][0]).toContain('limit=500');
+	});
+
+	it('stops at a short page', async () => {
+		const get = vi.fn(async () => ({ data: [{ id: 'c1' }], total_count: 1 }));
+		const out = await listCodes({ get } as never);
+		expect(out.data).toHaveLength(1);
+		expect(get).toHaveBeenCalledTimes(1);
 	});
 });

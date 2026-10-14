@@ -29,3 +29,16 @@ export function entryTone(status: string): StatusTone {
 	if (status === 'draft') return 'warn';
 	return 'neutral';
 }
+
+/**
+ * The tone an HTTP status badge carries, the same on every page that shows a
+ * response. A success is success, a redirect neutral, a refusal warn and a
+ * server failure danger. A status outside those ranges, such as a 0 for a
+ * request that got no answer, says nothing about the response and is neutral.
+ */
+export function httpStatusTone(status: number): 'success' | 'neutral' | 'warn' | 'danger' {
+	if (status >= 200 && status < 300) return 'success';
+	if (status >= 400 && status < 500) return 'warn';
+	if (status >= 500 && status < 600) return 'danger';
+	return 'neutral';
+}

@@ -14,7 +14,7 @@
 import { toChannels, type AlertChannels } from './alert-channels';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
-import type { ListEnvelope } from './list';
+import { rowsOf, type ListEnvelope } from './list';
 
 export const PROBES_URL = '/api/admin/synthetic-monitoring/probes';
 export const ALERTS_URL = '/api/admin/synthetic-monitoring/alerts';
@@ -55,6 +55,44 @@ export interface ProbeConfig {
 	expected_redirect?: string;
 	webhook_url?: string;
 	headers?: Record<string, string> | null;
+	/** Masked as "***" on every read. No read returns the stored value. */
+	auth_token?: string;
+	/** Masked as "***" on every read. No read returns the stored value. */
+	password?: string;
+	payload?: Record<string, unknown> | null;
+	expected_response?: Record<string, string> | null;
+}
+
+/** What the plugin answers in place of a stored secret. */
+export const SECRET_MASK = '***';
+
+/**
+ * The headers whose stored values a read masks. A probe save replaces the
+ * stored config whole, so these cannot be sent back and the save drops them.
+ */
+export function maskedHeaders(config: ProbeConfig | null | undefined): string[] {
+	return Object.entries(config?.headers ?? {})
+		.filter(([, v]) => v === SECRET_MASK)
+		.map(([k]) => k)
+		.sort();
+}
+
+/**
+ * The stored config a save sends back beside what the form shows. The plugin
+ * replaces the config whole, so a key the form never shows is lost unless it
+ * travels back. A masked secret cannot travel back: sending the mask would
+ * store the mask, so it is left out and the form asks for it again.
+ */
+export function keptConfig(read: ProbeConfig | null | undefined): ProbeConfig {
+	const kept: ProbeConfig = { ...(read ?? {}) };
+	delete kept.auth_token;
+	delete kept.password;
+	if (kept.headers) {
+		const headers = Object.fromEntries(Object.entries(kept.headers).filter(([, v]) => v !== SECRET_MASK));
+		if (Object.keys(headers).length > 0) kept.headers = headers;
+		else delete kept.headers;
+	}
+	return kept;
 }
 
 export interface Probe {
@@ -117,11 +155,16 @@ export async function listProbes(
 	return client.get<ListEnvelope<Probe>>(`${PROBES_URL}?limit=${limit}&offset=${offset}`);
 }
 
-/** Outstanding alerts. Acknowledged ones are history and are not asked for. */
+/**
+ * Outstanding alerts. Acknowledged ones are history and are not asked for.
+ * The plugin answers a bare array.
+ */
 export async function listOpenAlerts(client: HttpClient, limit = 50): Promise<ListEnvelope<ProbeAlert>> {
-	return client.get<ListEnvelope<ProbeAlert>>(
+	const raw = await client.get<ListEnvelope<ProbeAlert> | ProbeAlert[]>(
 		`${ALERTS_URL}?acknowledged=false&limit=${limit}&offset=0`
 	);
+	const data = rowsOf(raw);
+	return { data, total_count: Array.isArray(raw) ? data.length : (raw?.total_count ?? data.length) };
 }
 
 export interface SaveProbe {
@@ -132,6 +175,8 @@ export interface SaveProbe {
 	interval_seconds: number;
 	timeout_seconds: number;
 	alert_threshold: number;
+	/** The plugin stores an absent list as none, so an edit sends back what it read. */
+	regions?: string[];
 }
 
 export async function createProbe(client: HttpClient, body: SaveProbe): Promise<Probe> {

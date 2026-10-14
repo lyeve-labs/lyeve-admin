@@ -257,7 +257,8 @@
 	{#if tab === 'rest'}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Pick an endpoint</SectionHeading>
-			<SearchInput bind:value={narrow} placeholder="Search {data.endpoints.length} endpoints" />
+			<label for="endpoint-narrow" class="sr-only">Search endpoints</label>
+			<SearchInput id="endpoint-narrow" bind:value={narrow} placeholder="Search {data.endpoints.length} endpoints" />
 
 			{#if visible.length === 0}
 				<EmptyState title="No endpoint matches" description="Nothing here is named or pathed that way.">
@@ -274,8 +275,10 @@
 									<td data-cell="nowrap">
 										<Badge tone={riskTone(riskOf(e.method))}>{e.method}</Badge>
 									</td>
-									<td class="font-mono text-xs">{e.path}</td>
-									<td class="max-w-sm truncate text-xs text-faint">{e.summary}</td>
+									<!-- The path keeps its width and the box scrolls sideways. Squeezed
+									     by the summary, it stacked one character per line. -->
+									<td class="min-w-56 font-mono text-xs [overflow-wrap:anywhere]">{e.path}</td>
+									<td class="hidden max-w-sm truncate text-xs text-faint sm:table-cell">{e.summary}</td>
 									<td data-cell="nowrap">
 										<Button
 											variant={selectedId === e.id ? 'primary' : 'ghost'}

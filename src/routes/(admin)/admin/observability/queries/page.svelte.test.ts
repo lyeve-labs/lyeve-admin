@@ -227,3 +227,10 @@ describe('Slow queries filter', () => {
 		expect(container.querySelector('nav[aria-label*="agination" i]')).toBeNull();
 	});
 });
+
+describe('the search box', () => {
+	it('is named for a screen reader', () => {
+		const { container } = render(QueriesPage, { props: props() });
+		expect(container.querySelector('label[for="query-narrow"]')?.textContent).toBe('Narrow this page');
+	});
+});

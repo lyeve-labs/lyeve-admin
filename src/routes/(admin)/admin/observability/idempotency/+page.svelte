@@ -100,9 +100,13 @@
 				of running again.
 			</p>
 		{:else if !data.statsRead}
-			<Alert tone="danger">
-				The counters could not be read. The list below is one page, not the whole store.
-			</Alert>
+			{#if data.statsGate}
+				<GateNotice gate={data.statsGate} title="the counters" absent="This version of the idempotency plugin keeps no counters." />
+			{:else}
+				<Alert tone="danger">
+					The counters could not be read. The list below is one page, not the whole store.
+				</Alert>
+			{/if}
 		{/if}
 
 		{#if orphans.length > 0}
@@ -133,6 +137,7 @@
 			{:else}
 				<ListToolbar label="Filter keys">
 					{#snippet search()}
+						<label for="key-narrow" class="sr-only">Narrow this page</label>
 						<SearchInput id="key-narrow" bind:value={narrow} placeholder="Key, method or path on this page" />
 					{/snippet}
 					{#snippet filters()}

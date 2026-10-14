@@ -58,31 +58,29 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-const POOL_STATS = {
-	max_open_connections: 25,
+// The engine's pool health snapshot as it serializes it: one flat object,
+// measured on every read, latency in milliseconds.
+const POOL_SNAPSHOT = {
+	engine: 'postgres',
+	healthy: true,
+	latency_ms: 1.2,
 	open_connections: 8,
 	in_use: 3,
 	idle: 5,
+	max_open_connections: 25,
 	wait_count: 0,
-	wait_duration: 0,
+	wait_duration_ms: 0,
 	max_idle_closed: 0,
-	max_idle_time_closed: 0,
 	max_lifetime_closed: 0,
+	utilization: 0.12,
+	utilization_warning: false,
 };
 
 const ok = <T,>(value: T) => ({ ok: true as const, value });
 
 function data(overrides: Record<string, unknown> = {}) {
 	return {
-		poolHealth: ok({
-			engine: 'postgres',
-			healthy: true,
-			pool_stats: POOL_STATS,
-			latency: 1200,
-			checked_at: '2026-01-01T00:00:00Z',
-			errors: [],
-			pooler_config: 'pgbouncer',
-		}),
+		poolHealth: ok(POOL_SNAPSHOT),
 		latency: ok({ slowest: [], total: 0 }),
 		top: 20,
 		goroutines: 42,
@@ -134,21 +132,27 @@ const health = (over: Record<string, unknown>) => ({
 });
 
 describe('Pool health badge', () => {
-	it('reads Healthy when the engine sent the metrics behind the claim', () => {
+	it('reads Healthy with its counts for a measured pool', () => {
 		const { container } = render(ObservabilityPage, { props: props() });
+		const row = container.querySelector('[data-testid="pool-stats"]') as HTMLElement;
 
 		expect(container.textContent).toContain('Healthy');
 		expect(container.textContent).not.toContain('Health unconfirmed');
+		expect(container.textContent).not.toContain('no connection statistics');
+		const text = row.textContent?.replace(/\s+/g, ' ');
+		expect(text).toContain('Open 8');
+		expect(text).toContain('In use 3');
+		expect(text).toContain('Idle 5');
+		expect(text).toContain('1.2ms');
 	});
 
 	/*
-	 * The engine answers `healthy: true` with no pool_stats on a deployment with
-	 * no pooler. A Healthy badge over tiles rendering a dash would claim a
-	 * measurement nobody took.
+	 * An answer with no counts measured nothing. A Healthy badge over it would
+	 * claim a measurement nobody took.
 	 */
-	it('does not claim health it has no metrics for', () => {
+	it('does not claim health for an answer that carries no counts', () => {
 		const { container } = render(ObservabilityPage, {
-			props: props(health({ healthy: true, checked_at: '2026-01-01T00:00:00Z' })),
+			props: props(health({ healthy: true })),
 		});
 
 		expect(container.textContent).toContain('Health unconfirmed');
@@ -173,33 +177,14 @@ describe('Pool health badge', () => {
 		expect(container.textContent).not.toContain('Health unconfirmed');
 	});
 
-	it('reports the counts when they are there', () => {
-		const { container } = render(ObservabilityPage, { props: props() });
+	it('reads Unhealthy over a measured pool the engine judged unhealthy', () => {
+		const { container } = render(ObservabilityPage, {
+			props: props({ poolHealth: ok({ ...POOL_SNAPSHOT, healthy: false, errors: ['ping took 900ms'] }) }),
+		});
 
+		expect(container.textContent).toContain('Unhealthy');
+		expect(container.textContent).toContain('ping took 900ms');
 		expect(container.textContent).toContain('Wait count');
-		expect(container.textContent).toContain('Open');
-	});
-});
-
-describe('Last checked', () => {
-	// An unguarded parse renders the literal string "Invalid Date", which reads
-	// as a value the engine sent rather than as one it did not.
-	it('never renders the words Invalid Date', () => {
-		for (const checked_at of ['', undefined, 'not a timestamp']) {
-			cleanup();
-			const { container } = render(ObservabilityPage, {
-				props: props(health({ checked_at, pool_stats: POOL_STATS })),
-			});
-			expect(container.textContent, String(checked_at)).not.toContain('Invalid Date');
-			expect(container.textContent, String(checked_at)).toContain('No check time reported');
-		}
-	});
-
-	it('renders the time when the engine reported a readable one', () => {
-		const { container } = render(ObservabilityPage, { props: props() });
-
-		expect(container.textContent).toContain('Last checked');
-		expect(container.textContent).not.toContain('No check time reported');
 	});
 });
 
