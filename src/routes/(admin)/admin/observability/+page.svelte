@@ -5,7 +5,7 @@
 	import { Database, Gauge, AlertTriangle, CheckCircle, RefreshCw } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { LATENCY_TOP_CHOICES } from '$lib/api/observability';
-	import { NO_VALUE, formatDateTime } from '$lib/format';
+	import { NO_VALUE } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import GoroutineEnginePanel from './GoroutineEnginePanel.svelte';
@@ -49,20 +49,11 @@
 		return 'neutral';
 	}
 
-	// The engine sends the counts only where a pooler is configured, so their
-	// absence is a deployment fact rather than a fetch that went wrong.
+	// The engine measures its pool on every read and sends the counts at the top
+	// level of its answer. An engine with no pool health provider wired sends
+	// none, so their absence is a deployment fact rather than a measurement.
 	const pool = $derived(data.poolHealth.ok ? data.poolHealth.value : null);
-	const poolStats = $derived(pool?.pool_stats);
-
-	/**
-	 * The time of the last check, or nothing when the answer carried no readable
-	 * one.
-	 *
-	 * An unguarded parse of a missing or malformed timestamp renders the literal
-	 * string "Invalid Date" beside the badge, which reads as a value the engine
-	 * sent rather than as one it did not.
-	 */
-	const checkedAt = $derived(formatDateTime(pool?.checked_at, '') || null);
+	const measured = $derived(typeof pool?.open_connections === 'number');
 </script>
 
 {#snippet noPoolHealth()}
@@ -87,7 +78,7 @@
 	{/snippet}
 
 	<!-- The pool's state is a badge on its card, not a banner over the page:
-	     a deployment with no pooler answers this way every time, and a warning
+	     an engine with no pool health provider answers this way every time, and a warning
 	     that greets every visit stops being read. The figures are one row. -->
 	<Card>
 		{#snippet header()}
@@ -96,17 +87,11 @@
 				{#if pool?.engine}
 					{#if !pool.healthy}
 						<Badge tone="danger" class="shrink-0 whitespace-nowrap"><AlertTriangle size={ICON.xs} /> Unhealthy</Badge>
-					{:else if poolStats}
+					{:else if measured}
 						<Badge tone="success" class="shrink-0 whitespace-nowrap"><CheckCircle size={ICON.xs} /> Healthy</Badge>
 					{:else}
 						<Badge tone="warn" class="shrink-0 whitespace-nowrap"><AlertTriangle size={ICON.xs} /> Health unconfirmed</Badge>
 					{/if}
-				{/if}
-				{#if pool}
-					<span class="ms-auto text-xs text-faint">
-						{#if checkedAt}Last checked {checkedAt}{:else}No check time reported{/if}
-						{#if pool.pooler_config}, pooler {pool.pooler_config}{/if}
-					</span>
 				{/if}
 			</div>
 		{/snippet}
@@ -120,22 +105,26 @@
 		{:else if pool?.engine}
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7" data-testid="pool-stats">
 				<Stat size="sm" label="Engine" value={pool.engine} />
-				<Stat size="sm" label="Ping latency" mono value={pool.latency ? fmtUs(pool.latency) : NO_VALUE} />
+				<Stat
+					size="sm"
+					label="Ping latency"
+					mono
+					value={typeof pool.latency_ms === 'number' ? fmtUs(Math.round(pool.latency_ms * 1000)) : NO_VALUE}
+				/>
 				<Stat size="sm" label="Goroutines" mono value={data.goroutines ?? NO_VALUE} />
-				{#if poolStats}
-					<Stat size="sm" label="Open" mono value={poolStats.open_connections} />
-					<Stat size="sm" label="In use" mono value={poolStats.in_use} />
-					<Stat size="sm" label="Idle" mono value={poolStats.idle} />
-					<Stat size="sm" label="Wait count" mono value={poolStats.wait_count} />
+				{#if measured}
+					<Stat size="sm" label="Open" mono value={pool.open_connections ?? NO_VALUE} />
+					<Stat size="sm" label="In use" mono value={pool.in_use ?? NO_VALUE} />
+					<Stat size="sm" label="Idle" mono value={pool.idle ?? NO_VALUE} />
+					<Stat size="sm" label="Wait count" mono value={pool.wait_count ?? NO_VALUE} />
 				{/if}
 			</div>
-			{#if !poolStats}
+			{#if !measured}
 				<!-- The tiles are omitted rather than dashed. Four dashes in a row
 				     read as four measurements of nothing. -->
 				<p class="mt-3 text-xs text-muted">
 					The engine reported no connection statistics, so nothing here can say how many
-					connections are open or how long callers wait for one. A deployment with no pooler
-					configured answers this way.
+					connections are open or how long callers wait for one.
 				</p>
 			{/if}
 			{#if pool.errors && pool.errors.length > 0}
