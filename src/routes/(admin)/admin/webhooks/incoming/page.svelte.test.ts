@@ -27,6 +27,11 @@ function setup(over: Record<string, unknown> = {}, form: unknown = null) {
 				schemas: { ok: true, value: [{ name: 'orders' }] },
 				entitlements,
 				user: { roles: ['super_admin'] },
+				limit: 50,
+				offset: 0,
+				total: 1,
+				hasMore: false,
+				licensed: null,
 				...over,
 			},
 			form,
@@ -100,5 +105,43 @@ describe('the incoming webhook drawer and the failures of other actions', () => 
 		} as never);
 		const form = document.body.querySelector('form#incoming-form') as HTMLFormElement;
 		expect(form.firstElementChild?.textContent).toContain('Field map must be valid JSON.');
+	});
+});
+
+/*
+ * The plugin refuses create and update without its license. A page that kept
+ * them live let the reader fill in the whole form before the refusal arrived.
+ */
+describe('the incoming webhook controls and the license', () => {
+	const HELD = 'The license on this instance does not include creating or changing incoming webhooks.';
+
+	it('holds New and Edit with the reason when the plugin says the license is missing', () => {
+		const { container, getByRole } = setup({ licensed: false });
+		expect(container.textContent).toContain(HELD);
+		expect((getByRole('button', { name: /new incoming webhook/i }) as HTMLButtonElement).disabled).toBe(true);
+		expect((getByRole('button', { name: 'Edit Stripe' }) as HTMLButtonElement).disabled).toBe(true);
+		expect((getByRole('button', { name: 'Delete Stripe' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('holds the first endpoint too on an empty list', () => {
+		const { getAllByRole } = setup({ licensed: false, incomingWebhooks: { ok: true, value: [] } });
+		for (const b of getAllByRole('button', { name: /new incoming webhook/i })) {
+			expect((b as HTMLButtonElement).disabled).toBe(true);
+		}
+	});
+
+	it.each([[null], [true]])('keeps New and Edit live when the flag reads %s', (licensed) => {
+		const { container, getByRole } = setup({ licensed });
+		expect(container.textContent).not.toContain(HELD);
+		expect((getByRole('button', { name: /new incoming webhook/i }) as HTMLButtonElement).disabled).toBe(false);
+		expect((getByRole('button', { name: 'Edit Stripe' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+});
+
+describe('the incoming webhook pager', () => {
+	it('links the next page when the plugin holds more', () => {
+		const { container } = setup({ total: 120, hasMore: true });
+		const next = [...container.querySelectorAll('a')].find((a) => a.getAttribute('href')?.includes('offset=50'));
+		expect(next?.getAttribute('href')).toBe('/admin/webhooks/incoming?limit=50&offset=50');
 	});
 });

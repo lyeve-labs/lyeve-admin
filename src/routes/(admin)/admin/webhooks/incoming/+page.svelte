@@ -10,6 +10,7 @@
 		EmptyState,
 		Input,
 		PageShell,
+		Pagination,
 		PasswordInput,
 		SearchInput,
 		SegmentedControl,
@@ -27,6 +28,7 @@
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { narrows } from '$lib/narrow';
+	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -49,6 +51,11 @@
 	// The webhook plugin serves create, update and delete to a super admin
 	// only. An admin reads the endpoints and is told the rest.
 	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
+
+	// The plugin reports whether its license opens create and update. Only a
+	// stated false holds them, so an older plugin that says nothing keeps both
+	// live and lets the write answer.
+	const held = $derived(data.licensed === false);
 
 	const rows = $derived(data.incomingWebhooks.ok ? data.incomingWebhooks.value : []);
 	const schemaNames = $derived(data.schemas.ok ? data.schemas.value.map((s) => s.name) : []);
@@ -136,7 +143,7 @@
 	{#snippet actions()}
 		<!-- A list that could not be read offers no write against it. -->
 		{#if data.incomingWebhooks.ok && isSuperAdmin}
-			<Button variant="primary" size="sm" onclick={openCreate}>
+			<Button variant="primary" size="sm" onclick={openCreate} disabled={held}>
 				<Plus size={ICON.sm} />
 				New incoming webhook
 			</Button>
@@ -147,6 +154,12 @@
 
 	{#if data.incomingWebhooks.ok && !isSuperAdmin}
 		<Alert tone="brand">Your role reads incoming webhooks. Creating, changing or deleting one takes a super admin.</Alert>
+	{/if}
+
+	{#if data.incomingWebhooks.ok && isSuperAdmin && held}
+		<Alert tone="warn">
+			The license on this instance does not include creating or changing incoming webhooks. Deleting one stays open.
+		</Alert>
 	{/if}
 
 	{#if !data.incomingWebhooks.ok}
@@ -163,7 +176,7 @@
 			{#snippet iconSnippet()}<ArrowDownToLine size={ICON.lg} />{/snippet}
 			{#snippet action()}
 				{#if isSuperAdmin}
-					<Button variant="secondary" onclick={openCreate}>
+					<Button variant="secondary" onclick={openCreate} disabled={held}>
 						<Plus size={ICON.sm} />
 						New incoming webhook
 					</Button>
@@ -217,6 +230,7 @@
 								variant="ghost"
 								size="sm"
 								onclick={() => openEdit(wh)}
+								disabled={held}
 								title="Edit"
 								aria-label="Edit {wh.name}"
 							>
@@ -238,6 +252,15 @@
 			{/each}
 		</div>
 		{/if}
+		<Pagination
+			page={pageNumber(data.offset, data.limit)}
+			perPage={data.limit}
+			count={data.incomingWebhooks.value.length}
+			total={data.total ?? undefined}
+			hasNext={data.hasMore}
+			noun="incoming webhooks"
+			href={pageHref('/admin/webhooks/incoming', data.limit)}
+		/>
 	{/if}
 </PageShell>
 
