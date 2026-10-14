@@ -22,6 +22,15 @@ describe('providerBodyFrom', () => {
 		});
 	});
 
+	it('sends an Azure endpoint, and leaves it out when the field is empty', () => {
+		const fields = { provider_type: 'azure_blob', name: 'Blob', bucket: 'c', access_key: 'acct', secret_key: 'k' };
+		const set = providerBodyFrom(form({ ...fields, endpoint: 'https://files.example.com' }), true);
+		expect(set).toMatchObject({ body: { endpoint: 'https://files.example.com' } });
+		const empty = providerBodyFrom(form(fields), true);
+		expect(empty).not.toHaveProperty('error');
+		expect((empty as { body: object }).body).not.toHaveProperty('endpoint');
+	});
+
 	it('refuses a create missing a required field and names it', () => {
 		expect(providerBodyFrom(form({ provider_type: 's3', name: 'x', bucket: 'b', region: 'r', access_key: 'AK' }), true)).toEqual({ error: 'Secret access key is required.' });
 		expect(providerBodyFrom(form({ provider_type: 'nope', name: 'x' }), true)).toEqual({ error: 'Choose a provider type.' });
