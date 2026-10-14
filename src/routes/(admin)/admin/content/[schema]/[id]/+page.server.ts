@@ -5,6 +5,7 @@ import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
+import { refusalOf, refusalText } from '$lib/api/refusal';
 import { readRelationChoices } from '$lib/server/relation-choices';
 import { setEntryRelations } from '$lib/server/content-relations';
 import { fieldRefusalOf } from '$lib/server/content-validation';
@@ -471,9 +472,20 @@ export const actions: Actions = {
 			if (exists) {
 				await updateTranslation(client, params.id, locale, input);
 			} else {
+				// The localization plugin refuses a new translation with no title.
+				// A title left empty means the reader of this locale gets the
+				// source, so the first save sends the source title.
+				if (!input.title?.trim()) {
+					const source = await client.get<{ title?: string }>(`/api/admin/content/${encodeURIComponent(params.id)}`);
+					if (source?.title) input.title = source.title;
+				}
 				await createTranslation(client, params.id, locale, input);
 			}
 		} catch (err) {
+			// A 402 is the locale ceiling or a license refusal, which carries
+			// numbers and a link a bare relayed code would drop.
+			const refused = refusalOf(err);
+			if (refused) return fail(402, { error: refusalText(refused), refused, translationLocale: locale });
 			return fail(400, {
 				error: actionError(err, 'Failed to save the translation.'),
 				translationLocale: locale,

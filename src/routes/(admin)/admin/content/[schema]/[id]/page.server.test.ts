@@ -554,8 +554,38 @@ describe('content editor translations', () => {
 	it('returns the refusal against the locale it was about', async () => {
 		const fn = vi.fn(async () => json({ error: 'nope' }, 402)) as unknown as typeof globalThis.fetch;
 		const out = await runAction('saveTranslation', translationEvent(fn, { locale: 'fr', exists: 'true', data: '{}' }));
-		expect(out?.status).toBe(400);
+		expect(out?.status).toBe(402);
 		expect(out?.data).toMatchObject({ translationLocale: 'fr' });
 		expect(out?.data?.error).toBeTruthy();
+	});
+
+	// The plugin refuses a new locale past the free ceiling with the bare code
+	// cap_exceeded and the numbers beside it.
+	it('reads the locale ceiling into its numbers instead of the bare code', async () => {
+		const fn = vi.fn(async () =>
+			json({ error: 'cap_exceeded', cap: 'locales', limit: 2, current: 2 }, 402)
+		) as unknown as typeof globalThis.fetch;
+		const out = await runAction('saveTranslation', translationEvent(fn, { locale: 'de', exists: 'false', data: JSON.stringify({ title: 'Eins' }) }));
+		expect(out?.status).toBe(402);
+		expect(out?.data?.error).toContain('2 of 2');
+		expect(out?.data?.error).not.toContain('cap_exceeded');
+		expect(out?.data).toMatchObject({ translationLocale: 'de' });
+	});
+
+	// The plugin refuses a new translation with no title. Left empty, the
+	// locale's reader gets the source, so the first save sends the source title.
+	it('sends the source title on the first save when the title was left empty', async () => {
+		const calls: Call[] = [];
+		const fn = vi.fn(async (path: string, init?: RequestInit) => {
+			calls.push({ method: init?.method ?? 'GET', path, body: typeof init?.body === 'string' ? init.body : undefined });
+			return path === '/api/admin/content/e1' ? json(entry) : json({ ok: true }, 201);
+		}) as unknown as typeof globalThis.fetch;
+		const out = await runAction(
+			'saveTranslation',
+			translationEvent(fn, { locale: 'fr', exists: 'false', data: JSON.stringify({ title: '', body: '<p>Salut</p>' }) })
+		);
+		expect(out).toMatchObject({ status: 303 });
+		const post = calls.find((c) => c.method === 'POST');
+		expect(JSON.parse(post?.body ?? '{}')).toMatchObject({ title: 'One' });
 	});
 });
