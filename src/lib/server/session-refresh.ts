@@ -86,18 +86,25 @@ function refusedTooOften(address: string, now = Date.now()): boolean {
 	return !!bucket && bucket.resetAt > now && bucket.count >= REFUSALS_MAX;
 }
 
-function countRefusal(address: string, now = Date.now()): void {
+/**
+ * Counts a trade against its address as it starts. The caller gives the count
+ * back unless the engine refuses the trade, so a renewal ends up uncounted, and
+ * a burst sent all at once is held back before any refusal has come back.
+ */
+function countRefusal(address: string, now = Date.now()): { count: number } {
 	const bucket = refusals.get(address);
 	if (bucket && bucket.resetAt > now) {
 		bucket.count++;
-		return;
+		return bucket;
 	}
 	refusals.delete(address);
 	for (const [old, entry] of refusals) {
 		if (entry.resetAt > now && refusals.size < ADDRESSES_MAX) break;
 		refusals.delete(old);
 	}
-	refusals.set(address, { count: 1, resetAt: now + REFUSALS_WINDOW_MS });
+	const fresh = { count: 1, resetAt: now + REFUSALS_WINDOW_MS };
+	refusals.set(address, fresh);
+	return fresh;
 }
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -180,10 +187,11 @@ export function tradeOnce(
 	const inFlight = running.get(key);
 	if (inFlight && mark === inFlight.session) return inFlight.trade;
 	if (refusedTooOften(address)) return Promise.resolve({ kind: 'unavailable' });
+	const counted = countRefusal(address);
 
 	const started = trade(refresh, fetch).then((result) => {
 		if (running.get(key)?.trade === started) running.delete(key);
-		if (result.kind === 'refused') countRefusal(address);
+		if (result.kind !== 'refused') counted.count--;
 		if (result.kind !== 'unavailable' && mark) keep(key, mark, result);
 		return result;
 	});

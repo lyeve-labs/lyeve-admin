@@ -260,6 +260,18 @@ describe('trades from one address', () => {
 		expect(fetch).toHaveBeenCalledTimes(20);
 	});
 
+	// A thousand forged cookies sent at once would all be on their way before
+	// the first refusal came back, so a trade counts from the moment it starts.
+	it('are held back during a burst, before any refusal has come back', async () => {
+		const pending: ((r: Response) => void)[] = [];
+		const fetch = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
+		const burst = Array.from({ length: 50 }, (_, i) => refreshSession(event('/settings', expiring(i + 1), fetch)));
+		await Promise.resolve();
+		for (const answer of pending) answer(json({ error: 'token reuse' }, 401));
+		await Promise.all(burst);
+		expect(fetch.mock.calls.length).toBeLessThanOrEqual(10);
+	});
+
 	it('are held back after ten refusals, and the session is left as it is', async () => {
 		const fetch = vi.fn(async () => json({ error: 'token reuse' }, 401));
 		for (let n = 1; n <= 10; n++) await refreshSession(event('/settings', expiring(n), fetch));
