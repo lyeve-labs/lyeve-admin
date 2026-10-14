@@ -63,7 +63,7 @@ describe('admin tokens page', () => {
 
 	it('says the list could not be read rather than drawing it empty', () => {
 		const { getByText, queryByText, queryByRole } = setup({ tokens: { ok: false, gate: { state: 'unavailable' } } });
-		expect(getByText(/did not answer, so Admin tokens could not be read/)).toBeTruthy();
+		expect(getByText(/did not answer, so admin tokens could not be read/)).toBeTruthy();
 		expect(queryByText('No admin tokens yet')).toBeNull();
 		expect(queryByRole('button', { name: /New token/ })).toBeNull();
 	});

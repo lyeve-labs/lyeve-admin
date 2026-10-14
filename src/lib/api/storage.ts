@@ -244,7 +244,7 @@ export const PROVIDER_FIELDS: Readonly<Record<ProviderType, readonly ProviderFie
 		{ key: 'secret_key', label: 'Account key', hint: 'One of the account access keys. Stored encrypted.', required: true, secret: true },
 		// The plugin stores what a save sends, so an endpoint missing from the
 		// form would be erased by every save.
-		{ key: 'endpoint', label: 'Endpoint', hint: "Optional. For a custom domain or an emulator, on a public address. Empty uses the account's default address.", required: false, placeholder: 'https://<account>.blob.core.windows.net' },
+		{ key: 'endpoint', label: 'Endpoint', hint: "Optional. For a custom domain on a public address. Empty uses the account's default address.", required: false, placeholder: 'https://<account>.blob.core.windows.net' },
 		{ key: 'cdn_base_url', label: 'CDN base URL', hint: 'Optional. A CDN in front of the container.', required: false },
 	],
 	local: [

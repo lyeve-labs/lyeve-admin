@@ -51,7 +51,7 @@ describe('GateNotice', () => {
 describe('GateNotice for a role the engine refused', () => {
 	it('names the feature the role cannot open and who to ask', () => {
 		const { container } = mount({ state: 'forbidden' });
-		expect(container.textContent?.trim()).toBe('Your role cannot open Cache. Ask a super admin if you need it.');
+		expect(container.textContent?.trim()).toBe('Your role cannot open cache. Ask a super admin if you need it.');
 	});
 
 	it('is not drawn as a failure', () => {
@@ -66,9 +66,25 @@ describe('GateNotice for a role the engine refused', () => {
 	});
 });
 
+describe('GateNotice names a feature in a sentence in lower case', () => {
+	const sentence = (title: string) =>
+		render(GateNotice, { props: { gate: { state: 'forbidden' }, title, absent: ABSENT } }).container.textContent?.trim();
+
+	it('lowers a capitalized common noun', () => {
+		expect(sentence('Public search')).toBe('Your role cannot open public search. Ask a super admin if you need it.');
+		expect(sentence('Two-factor authentication')).toBe('Your role cannot open two-factor authentication. Ask a super admin if you need it.');
+	});
+
+	it('keeps a first word spelled with more than its first capital', () => {
+		for (const title of ['API keys', 'GraphQL schema', 'OAuth providers', 'A/B testing', 'gRPC']) {
+			expect(sentence(title)).toBe(`Your role cannot open ${title}. Ask a super admin if you need it.`);
+		}
+	});
+});
+
 describe('GateNotice with a heading-only title', () => {
 	const named = (gate: Gate) =>
-		render(GateNotice, { props: { gate, title: 'The schema list', subject: 'the schema list', absent: ABSENT } });
+		render(GateNotice, { props: { gate, title: 'The schema list', absent: ABSENT } });
 
 	it('names the subject in lower case inside the role refusal', () => {
 		const { container } = named({ state: 'forbidden' });
@@ -91,7 +107,7 @@ describe('GateNotice for a read nothing answered', () => {
 		const { container } = mount({ state: 'unavailable' });
 		expect(container.textContent).toContain('Temporarily unavailable');
 		expect(container.textContent).toContain(
-			'The engine or its database did not answer, so Cache could not be read. Nothing was changed. Try again in a moment.',
+			'The engine or its database did not answer, so cache could not be read. Nothing was changed. Try again in a moment.',
 		);
 	});
 

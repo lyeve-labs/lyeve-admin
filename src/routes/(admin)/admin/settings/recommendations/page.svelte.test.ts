@@ -60,7 +60,7 @@ describe('the trending list', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({ trending: { ok: false, gate: { state: 'forbidden' } } }),
 		});
-		expect(said(container)).toContain('Your role cannot open Trending entries');
+		expect(said(container)).toContain('Your role cannot open trending entries');
 		expect(said(container)).not.toContain('Nothing is trending yet');
 	});
 });

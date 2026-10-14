@@ -177,7 +177,7 @@ describe('reviews page', () => {
 				form: null,
 			},
 		});
-		expect(screen.getByText(/Review assignments could not be read/)).toBeTruthy();
+		expect(screen.getByText(/review assignments could not be read/)).toBeTruthy();
 		expect(screen.getByText('The review definitions could not be read.')).toBeTruthy();
 		expect(screen.queryByText('Nothing under review')).toBeNull();
 		expect(screen.queryByText('No definition yet')).toBeNull();

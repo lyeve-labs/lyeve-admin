@@ -151,7 +151,7 @@ describe('the metrics view', () => {
 			TelemetryPage,
 			props({ superAdmin: false, families: failed({ state: 'unavailable' }), exporters: null }),
 		);
-		expect(container.textContent).toContain('so Telemetry metrics could not be read');
+		expect(container.textContent).toContain('so telemetry metrics could not be read');
 		expect(container.textContent).not.toContain('No series yet');
 		expect(queryByRole('searchbox', { name: 'Filter families' })).toBeNull();
 	});
@@ -161,7 +161,7 @@ describe('the metrics view', () => {
 			TelemetryPage,
 			props({ superAdmin: false, families: failed({ state: 'forbidden' }), exporters: null }),
 		);
-		expect(container.textContent).toContain('Your role cannot open Telemetry metrics.');
+		expect(container.textContent).toContain('Your role cannot open telemetry metrics.');
 		expect(queryByRole('link', { name: /Try again/ })).toBeNull();
 	});
 

@@ -159,7 +159,7 @@
 				{#if !data.publicSchemas.ok}
 					<GateNotice gate={data.publicSchemas.gate} title="Public search" absent="This build does not serve public search." />
 				{:else if !data.schemas.ok}
-					<GateNotice gate={data.schemas.gate} title="The schemas" subject="the schemas" absent="This build does not list schemas." />
+					<GateNotice gate={data.schemas.gate} title="The schemas" absent="This build does not list schemas." />
 				{:else if data.schemas.value.length === 0}
 					<EmptyState title="No schemas yet" description="Build a schema, then choose here whether anyone may search it.">
 						{#snippet iconSnippet()}<Database size={ICON.lg} />{/snippet}

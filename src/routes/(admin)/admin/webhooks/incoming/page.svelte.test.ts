@@ -42,7 +42,7 @@ function setup(over: Record<string, unknown> = {}, form: unknown = null) {
 describe('the incoming webhook list when it could not be read', () => {
 	it('says the engine did not answer and offers no first endpoint', () => {
 		const { container, queryByRole } = setup({ incomingWebhooks: { ok: false, gate: { state: 'unavailable' } } });
-		expect(container.textContent).toContain('so Incoming webhooks could not be read. Nothing was changed.');
+		expect(container.textContent).toContain('so incoming webhooks could not be read. Nothing was changed.');
 		expect(container.textContent).not.toContain('No incoming webhooks');
 		expect(queryByRole('button', { name: /new incoming webhook/i })).toBeNull();
 	});

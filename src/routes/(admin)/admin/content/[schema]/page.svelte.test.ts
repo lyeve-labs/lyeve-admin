@@ -226,7 +226,7 @@ describe('content listing reads', () => {
 			props: { data: data({ items: { ok: false, gate: { state: 'unavailable' } }, total: 0 }), form: null },
 		});
 
-		expect(screen.getByText(/Entries could not be read/)).toBeTruthy();
+		expect(screen.getByText(/entries could not be read/)).toBeTruthy();
 		expect(screen.queryByText('No entries yet')).toBeNull();
 		expect(screen.queryByRole('link', { name: /New entry/ })).toBeNull();
 	});
@@ -236,7 +236,7 @@ describe('content listing reads', () => {
 			props: { data: data({ items: { ok: false, gate: { state: 'forbidden' } }, total: 0 }), form: null },
 		});
 
-		expect(screen.getByText(/Your role cannot open Entries/)).toBeTruthy();
+		expect(screen.getByText(/Your role cannot open entries/)).toBeTruthy();
 		expect(screen.queryByText('No entries yet')).toBeNull();
 	});
 

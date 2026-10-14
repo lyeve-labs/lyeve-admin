@@ -96,7 +96,7 @@ describe('Persisted queries', () => {
 		const { container, queryByText, queryByRole } = render(GraphqlPage, {
 			props: props({ persisted: { ok: false, gate: { state: 'forbidden' } } }),
 		});
-		expect(container.textContent).toContain('Your role cannot open Persisted queries');
+		expect(container.textContent).toContain('Your role cannot open persisted queries');
 		expect(queryByText('No persisted queries')).toBeNull();
 		expect(queryByRole('button', { name: 'New persisted query' })).toBeNull();
 	});

@@ -31,6 +31,13 @@ describe('providerBodyFrom', () => {
 		expect((empty as { body: object }).body).not.toHaveProperty('endpoint');
 	});
 
+	// The plugin refuses a loopback or private endpoint, so the hint promises
+	// nothing that runs on one.
+	it('offers an Azure endpoint for a custom domain only', () => {
+		const endpoint = PROVIDER_FIELDS.azure_blob.find((f) => f.key === 'endpoint');
+		expect(endpoint?.hint).toBe("Optional. For a custom domain on a public address. Empty uses the account's default address.");
+	});
+
 	it('refuses a create missing a required field and names it', () => {
 		expect(providerBodyFrom(form({ provider_type: 's3', name: 'x', bucket: 'b', region: 'r', access_key: 'AK' }), true)).toEqual({ error: 'Secret access key is required.' });
 		expect(providerBodyFrom(form({ provider_type: 'nope', name: 'x' }), true)).toEqual({ error: 'Choose a provider type.' });

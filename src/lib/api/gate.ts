@@ -129,6 +129,17 @@ export function fullText(gate: Extract<Gate, { state: 'full' }>): string {
 	return 'This instance allows no more.';
 }
 
+/**
+ * A feature's title as it reads inside a sentence. A first word written with
+ * only its first capital is lowered ("Public search"). One spelled with more
+ * capitals than that is a name and keeps them ("API keys", "GraphQL schema").
+ */
+export function inSentence(title: string): string {
+	const first = title.split(/\s/, 1)[0];
+	if (first.length < 2 || first.slice(1) !== first.slice(1).toLowerCase()) return title;
+	return title[0].toLowerCase() + title.slice(1);
+}
+
 /** The sentence for a read the reader's role may not make. `what` names what was refused. */
 export function forbiddenText(what: string): string {
 	return `Your role cannot open ${what}. Ask a super admin if you need it.`;

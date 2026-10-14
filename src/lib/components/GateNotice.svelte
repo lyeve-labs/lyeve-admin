@@ -10,23 +10,17 @@
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import { ICON } from '$lib/icon';
 	import { BUSY, OUTAGE } from '$lib/outage';
-	import { forbiddenText, fullText, type Gate } from '$lib/api/gate';
+	import { forbiddenText, fullText, inSentence, type Gate } from '$lib/api/gate';
 
 	let {
 		gate,
 		title,
-		subject = title,
 		absent,
 		level = 3,
 	}: {
 		gate: Gate;
 		/** The feature's name. */
 		title: string;
-		/**
-		 * The name inside a sentence, for a title that reads right only as a
-		 * heading ("The schema list"). The title by default.
-		 */
-		subject?: string;
 		/** What the page says when the route is not there. */
 		absent: string;
 		/**
@@ -36,6 +30,9 @@
 		 */
 		level?: 2 | 3;
 	} = $props();
+
+	// The title opens a heading, but these sentences name the feature mid-way.
+	const subject = $derived(inSentence(title));
 
 	// A plain link to this address works before the page hydrates. After it
 	// hydrates, the router keeps the data it holds for an address that did not
