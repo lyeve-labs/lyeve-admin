@@ -133,3 +133,28 @@ describe('auth/magic-link/verify actions', () => {
 		});
 	});
 });
+
+describe('auth/magic-link/verify and the refresh cookie', () => {
+	beforeEach(() => resetRateLimitStore());
+
+	it('drops a refresh token left from an earlier session when the link answers none', async () => {
+		const fetch = vi.fn(async () => json({ access_token: 'sess', user_id: 'u1' })) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies();
+		await redirectOf(Promise.resolve(actions.verify(event({ token: 'abc' }, fetch, cookies))));
+		expect(cookies.delete).toHaveBeenCalledWith('__Host-console_refresh', expect.objectContaining({ path: '/', secure: true }));
+	});
+
+	it('keeps the refresh token the link answers', async () => {
+		const fetch = vi.fn(async () => json({ access_token: 'sess', refresh_token: 'r1', user_id: 'u1' })) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies();
+		await redirectOf(Promise.resolve(actions.verify(event({ token: 'abc' }, fetch, cookies))));
+		expect(cookies.set).toHaveBeenCalledWith('__Host-console_refresh', 'r1', expect.objectContaining({ httpOnly: true, secure: true }));
+	});
+
+	it('keeps the refresh token the second factor answers', async () => {
+		const fetch = vi.fn(async () => json({ token: 'sess2', refresh_token: 'r2' })) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies();
+		await redirectOf(Promise.resolve(actions.mfa(event({ challenge_token: 'ch', code: '123456' }, fetch, cookies))));
+		expect(cookies.set).toHaveBeenCalledWith('__Host-console_refresh', 'r2', expect.objectContaining({ httpOnly: true, secure: true }));
+	});
+});

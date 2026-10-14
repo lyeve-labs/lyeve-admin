@@ -6,7 +6,7 @@ import { claimSetup, getSetupModeStatus } from '$lib/api/setup';
 import { passwordTooLong } from '$lib/api/users';
 import { readEngineSetup, safeNext } from '$lib/server/setup-gate';
 import { LANDING } from '$lib/landing';
-import { setSessionCookie } from '$lib/server/session-cookie';
+import { setRefreshCookie, setSessionCookie } from '$lib/server/session-cookie';
 import { actionError } from '$lib/server/action-error';
 
 export const load: PageServerLoad = async ({ fetch, url }) => {
@@ -92,8 +92,9 @@ export const actions: Actions = {
 
 		const client = createClient(fetch);
 		try {
-			const res = await claimSetup({ email, password, setup_token: setupToken }, client);
+			const res: { token: string; refresh_token?: string } = await claimSetup({ email, password, setup_token: setupToken }, client);
 			setSessionCookie(event, res.token);
+			setRefreshCookie(event, res.refresh_token);
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 401) {
 				return fail(401, { error: TOKEN_REFUSED });
