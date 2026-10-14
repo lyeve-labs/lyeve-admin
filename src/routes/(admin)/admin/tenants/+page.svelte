@@ -23,7 +23,7 @@
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { Tenant } from '@lyeve-labs/client-rest';
-	import { formatDate as formatDay, NO_VALUE } from '$lib/format';
+	import { formatDate, NO_VALUE } from '$lib/format';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
@@ -139,11 +139,6 @@
 		)
 	);
 
-	function formatDate(iso: string | null | undefined): string {
-		return formatDay(iso, 'Unknown');
-	}
-
-
 	const saveTenantSubmit = tracked(saveTenant);
 </script>
 
@@ -243,7 +238,7 @@
 								{tenant.enabled ? 'Enabled' : 'Disabled'}
 							</Badge>
 						</td>
-						<td data-cell="nowrap" class="text-xs text-faint">{formatDate(tenant.created_at)}</td>
+						<td data-cell="nowrap" class="text-xs text-faint">{formatDate(tenant.created_at, 'Unknown')}</td>
 						<td>
 							<div class="flex items-center justify-end gap-2">
 								<Button

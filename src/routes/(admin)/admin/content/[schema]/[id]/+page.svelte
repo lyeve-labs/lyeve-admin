@@ -138,10 +138,6 @@
 	let releaseError = $derived(form && 'release' in form && form.release === true ? (form.error ?? '') : '');
 	let sideRefusal = $derived(commentError || releaseError ? formRefusal(form) : null);
 
-	function formatDate(iso: string) {
-		return formatDateTime(iso);
-	}
-
 	function revDiff(rev: Revision): string {
 		const keys = Object.keys(rev.data ?? {}).filter((k) => !['_status', '_locale'].includes(k));
 		const shown = keys.slice(0, 3).join(', ');
@@ -198,11 +194,11 @@
 				{/if}
 				<div class="flex flex-col items-end gap-1 text-xs text-faint">
 					<span class="flex items-center gap-1">
-						<Clock size={ICON.xs} /> Created {formatDate(data.item?.created_at ?? '')}
+						<Clock size={ICON.xs} /> Created {formatDateTime(data.item?.created_at ?? '')}
 					</span>
 					{#if data.schemaDef?.with_updated_at}
 						<span class="flex items-center gap-1">
-							<Clock size={ICON.xs} /> Updated {formatDate(data.item?.updated_at ?? '')}
+							<Clock size={ICON.xs} /> Updated {formatDateTime(data.item?.updated_at ?? '')}
 						</span>
 					{/if}
 				</div>
@@ -319,7 +315,7 @@
 										focus-visible:ring-brand"
 									onclick={() => (selectedRev = selectedRev === rev.id ? null : rev.id)}
 								>
-									<span class="block text-xs text-fg">{formatDate(rev.created_at)}</span>
+									<span class="block text-xs text-fg">{formatDateTime(rev.created_at)}</span>
 									<span class="mt-0.5 block truncate text-xs text-faint">{revDiff(rev)}</span>
 								</button>
 								{#if selectedRev === rev.id}
@@ -336,7 +332,7 @@
 					{#if openedRevision}
 						<div class="border-t border-line px-4 py-3" data-testid="opened-revision">
 							<p class="text-xs font-medium text-fg">Revision {openedRevision.revision_num}</p>
-							<p class="mt-0.5 text-xs text-faint">{formatDate(openedRevision.created_at)}</p>
+							<p class="mt-0.5 text-xs text-faint">{formatDateTime(openedRevision.created_at)}</p>
 							<p class="mt-0.5 truncate text-xs text-faint">{revDiff(openedRevision)}</p>
 							<form method="POST" action="?/restore" use:enhance class="mt-2">
 								<input type="hidden" name="rev_num" value={openedRevision.revision_num} />

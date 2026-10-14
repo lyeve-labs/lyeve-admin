@@ -29,7 +29,7 @@
 	import { fieldErrors, tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
-	import { formatDate as formatDay } from '$lib/format';
+	import { formatDate } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
@@ -142,12 +142,6 @@
 		};
 	};
 
-	// An account with no readable timestamp still has to render a row, so the
-	// cell names the gap rather than printing "Invalid Date".
-	function formatDate(iso: string | null | undefined): string {
-		return formatDay(iso, 'Unknown');
-	}
-
 	// The endpoint takes no search, so the box narrows the page on screen and
 	// the pager below still walks the whole collection.
 	let query = $state('');
@@ -247,7 +241,7 @@
 									{/if}
 								</div>
 							</td>
-							<td data-cell="nowrap" class="text-xs text-faint">{formatDate(user.created_at)}</td>
+							<td data-cell="nowrap" class="text-xs text-faint">{formatDate(user.created_at, 'Unknown')}</td>
 							<td>
 								<div class="flex items-center justify-end gap-2">
 									<Button
