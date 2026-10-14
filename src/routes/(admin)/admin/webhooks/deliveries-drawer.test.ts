@@ -58,6 +58,23 @@ describe('the delivery history drawer', () => {
 		expect(body.get('delivery_id')).toBe('d2');
 	});
 
+	it('stays shut on a history that names another webhook than the row asked last', () => {
+		render(DeliveriesDrawer, {
+			props: { form: { deliveries: { id: 'w9', items: [delivery('d1', false)] } }, history: named() },
+		});
+		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+	});
+
+	it('leaves the history it shows alone when a late answer for another webhook arrives', async () => {
+		const history = named();
+		const { rerender } = render(DeliveriesDrawer, {
+			props: { form: { deliveries: { id: 'w1', items: [delivery('d1', true)] } }, history },
+		});
+		await rerender({ form: { deliveries: { id: 'w9', items: [delivery('x1', false), delivery('x2', false)] } }, history });
+		expect(history.items.map((d) => d.id)).toEqual(['d1']);
+		expect(document.body.querySelectorAll('form[action="?/retry-delivery"]')).toHaveLength(0);
+	});
+
 	it('says so when the webhook has made no attempt', () => {
 		render(DeliveriesDrawer, { props: { form: { deliveries: { id: 'w1', items: [] } }, history: named() } });
 		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('No deliveries recorded yet');

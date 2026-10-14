@@ -17,9 +17,14 @@
 
 	let { form, history }: Props = $props();
 
+	// Two rows asked in quick succession can answer out of order. A history
+	// applies only to the webhook the drawer names last, or its rows would show
+	// under another webhook's name and each retry would post that webhook's id.
+	// The name is read untracked, so naming a row never replays an old result.
 	$effect(() => {
 		if (form && 'deliveries' in form && form.deliveries) {
 			const d = form.deliveries as { id: string; items: WebhookDelivery[] };
+			if (d.id !== untrack(() => history.webhookId)) return;
 			history.items = d.items ?? [];
 			history.open = true;
 		}
