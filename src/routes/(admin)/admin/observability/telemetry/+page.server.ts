@@ -70,19 +70,27 @@ export const load: PageServerLoad = async (event) => {
 /** The most headers a destination carries, as the plugin bounds them. */
 const MAX_HEADERS = 16;
 
+/** Which destination write failed, so each form shows only its own failure. */
+type DestinationAction = 'save' | 'remove';
+
 /**
  * A destination write's failure, under keys of its own so it never shows in
- * the exporters' section. A 402 carries the refusal for RefusalNotice.
+ * the exporters' section. A 402 carries the refusal for the form's notice.
  */
-function destinationFailure(err: unknown, fallback: string) {
+function destinationFailure(action: DestinationAction, err: unknown, fallback: string) {
 	const refused = refusalOf(err);
-	if (refused) return fail(402, { destinationError: refusalText(refused), refused });
+	if (refused) return fail(402, { destinationAction: action, destinationError: refusalText(refused), refused });
 	// The plugin keeps stored headers only while the URL keeps its host, so
 	// a key is never sent somewhere the caller just chose.
 	if (errorCodeOf(err) === DESTINATION_HEADERS_REQUIRED) {
-		return fail(422, { destinationError: actionError(err, fallback), hostMoved: true });
+		return fail(422, { destinationAction: action, destinationError: actionError(err, fallback), hostMoved: true });
 	}
-	return fail(400, { destinationError: actionError(err, fallback) });
+	return fail(400, { destinationAction: action, destinationError: actionError(err, fallback) });
+}
+
+/** A save refused before the round trip. */
+function saveRefused(destinationError: string) {
+	return fail(400, { destinationAction: 'save' as const, destinationError });
 }
 
 export const actions: Actions = {
@@ -92,7 +100,7 @@ export const actions: Actions = {
 		const kind = String(data.get('kind') ?? '') as DestinationKind;
 		const url = String(data.get('url') ?? '').trim();
 		if (!DESTINATION_KINDS.some((k) => k.value === kind)) {
-			return fail(400, { destinationError: 'Choose OTLP or Pushgateway.' });
+			return saveRefused('Choose OTLP or Pushgateway.');
 		}
 		let parsed: URL | null = null;
 		try {
@@ -101,10 +109,10 @@ export const actions: Actions = {
 			parsed = null;
 		}
 		if (!parsed || !['http:', 'https:'].includes(parsed.protocol) || url.length > 2048) {
-			return fail(400, { destinationError: 'The URL is an absolute http or https address.' });
+			return saveRefused('The URL is an absolute http or https address.');
 		}
 		if (parsed.username || parsed.password) {
-			return fail(400, { destinationError: 'Put credentials in a header, not in the URL.' });
+			return saveRefused('Put credentials in a header, not in the URL.');
 		}
 
 		const body: SaveDestination = { kind, url };
@@ -115,18 +123,18 @@ export const actions: Actions = {
 			for (const [i, name] of names.entries()) {
 				if (!name) continue;
 				if (!headerNameIsSound(name)) {
-					return fail(400, { destinationError: `${name} is not a header name.` });
+					return saveRefused(`${name} is not a header name.`);
 				}
 				if (RESERVED_HEADERS.includes(name.toLowerCase())) {
-					return fail(400, { destinationError: `${name} is set by the exporter itself.` });
+					return saveRefused(`${name} is set by the exporter itself.`);
 				}
 				if (/[\r\n]/.test(values[i] ?? '')) {
-					return fail(400, { destinationError: 'A header value is a single line.' });
+					return saveRefused('A header value is a single line.');
 				}
 				headers[name] = values[i] ?? '';
 			}
 			if (Object.keys(headers).length > MAX_HEADERS) {
-				return fail(400, { destinationError: `A destination carries at most ${MAX_HEADERS} headers.` });
+				return saveRefused(`A destination carries at most ${MAX_HEADERS} headers.`);
 			}
 			body.headers = headers;
 		}
@@ -134,7 +142,7 @@ export const actions: Actions = {
 		try {
 			await saveDestination(authedClient(event), body);
 		} catch (err) {
-			return destinationFailure(err, 'The destination could not be saved.');
+			return destinationFailure('save', err, 'The destination could not be saved.');
 		}
 		return { savedDestination: true };
 	},
@@ -145,7 +153,7 @@ export const actions: Actions = {
 		try {
 			await removeDestination(authedClient(event));
 		} catch (err) {
-			return destinationFailure(err, 'The destination could not be removed.');
+			return destinationFailure('remove', err, 'The destination could not be removed.');
 		}
 		return { removedDestination: true };
 	},

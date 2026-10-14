@@ -288,8 +288,9 @@ describe('the tenant destination', () => {
 			{},
 			['admin'],
 		);
-		const result = (await actions.saveDestination(event)) as { status: number };
+		const result = (await actions.saveDestination(event)) as { status: number; data: { destinationAction: string } };
 		expect(result.status).toBe(400);
+		expect(result.data.destinationAction).toBe('save');
 		expect(bodyOf(calls)).toBeNull();
 	});
 
@@ -340,5 +341,31 @@ describe('the tenant destination', () => {
 		expect(result.status).toBe(402);
 		expect(result.data.refused.kind).toBe('feature');
 		expect(result.data.error).toBeUndefined();
+	});
+
+	// The save and the delete share one form result on the page, so each
+	// failure says which write it came from.
+	it('tags a failed delete as the delete', async () => {
+		const { event } = actionEvent(
+			{},
+			{ '/telemetry/destination': () => refused(503, 'tenant destinations are unavailable', 'service_unavailable') },
+			['admin'],
+		);
+		const result = (await actions.removeDestination(event)) as {
+			status: number;
+			data: { destinationAction: string; destinationError: string };
+		};
+		expect(result.data.destinationAction).toBe('remove');
+		expect(result.data.destinationError).toBeTruthy();
+	});
+
+	it('tags a failed save as the save', async () => {
+		const { event } = actionEvent(
+			{ kind: 'otlp', url: 'https://otlp.example.com/v1/metrics', headers_mode: 'replace' },
+			{ '/telemetry/destination': () => refused(503, 'tenant destinations are unavailable', 'service_unavailable') },
+			['admin'],
+		);
+		const result = (await actions.saveDestination(event)) as { data: { destinationAction: string } };
+		expect(result.data.destinationAction).toBe('save');
 	});
 });

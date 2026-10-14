@@ -57,6 +57,12 @@ function props(destination: unknown, form: Record<string, unknown> | null = null
 	return { data: pageData(destination), form: form as never };
 }
 
+function formFor(container: HTMLElement, action: string): HTMLFormElement {
+	const form = container.querySelector<HTMLFormElement>(`form[action="${action}"]`);
+	if (!form) throw new Error(`no form for ${action}`);
+	return form;
+}
+
 describe('the tenant destination', () => {
 	it('names the stored headers and never shows a value', () => {
 		const { container } = render(TelemetryPage, props({ destination: STORED, licensed: true }));
@@ -113,6 +119,16 @@ describe('the tenant destination', () => {
 		expect((screen.getByRole('button', { name: 'Delete destination' }) as HTMLButtonElement).disabled).toBe(false);
 	});
 
+	// A disabled fieldset stops a press but not the arrow keys, which the
+	// header choice handles itself, so the choice has to be disabled too.
+	it('leaves the header choice unmovable on an unlicensed install', async () => {
+		const { container } = render(TelemetryPage, props({ destination: STORED, licensed: false }));
+		const keep = screen.getByRole('radio', { name: 'Keep the stored headers' });
+		await fireEvent.keyDown(keep, { key: 'ArrowRight' });
+		expect(said(container)).toContain('Their values are never shown');
+		expect(screen.queryByRole('button', { name: /Add header/ })).toBeNull();
+	});
+
 	it('keeps the save live on a licensed install', () => {
 		render(TelemetryPage, props({ destination: STORED, licensed: true }));
 		expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
@@ -155,5 +171,59 @@ describe('the tenant destination', () => {
 		const { container } = render(TelemetryPage, props({ ok: false, gate: { state: 'unavailable' } }));
 		expect(said(container)).toContain('so Tenant destination could not be read');
 		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+	});
+});
+
+describe('the destination failures', () => {
+	it('shows a failed save inside the save form', () => {
+		const { container } = render(
+			TelemetryPage,
+			props({ destination: STORED, licensed: true }, { destinationAction: 'save', destinationError: 'The destination could not be saved.' }),
+		);
+		expect(formFor(container, '?/saveDestination').textContent).toContain('The destination could not be saved.');
+		expect(formFor(container, '?/removeDestination').textContent).not.toContain('could not be saved');
+	});
+
+	// The save and the delete share one form result, so a failed delete
+	// must not read as the save having failed.
+	it('shows a failed delete beside the delete, never in the save form', () => {
+		const { container } = render(
+			TelemetryPage,
+			props(
+				{ destination: STORED, licensed: true },
+				{ destinationAction: 'remove', destinationError: 'The destination could not be removed.' },
+			),
+		);
+		expect(formFor(container, '?/removeDestination').textContent).toContain('The destination could not be removed.');
+		expect(formFor(container, '?/saveDestination').textContent).not.toContain('could not be removed');
+	});
+
+	it('shows no destination failure for an export failure', () => {
+		const { container } = render(
+			TelemetryPage,
+			props({ destination: STORED, licensed: true }, { name: 'otlp', error: 'The otlp export failed.' }),
+		);
+		expect(screen.getByTestId('telemetry-destination').textContent).not.toContain('export failed');
+		expect(formFor(container, '?/saveDestination').querySelector('[role="alert"]')?.textContent ?? '').toBe('');
+	});
+});
+
+describe('the destination form across reloads', () => {
+	// A refresh or an export reloads the page data, which hands the page a
+	// new destination object holding the same values.
+	it('keeps an edit in progress through a reload that changed nothing', async () => {
+		const { rerender } = render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		const url = screen.getByLabelText(/^URL/) as HTMLInputElement;
+		await fireEvent.input(url, { target: { value: 'https://otlp.example.com/v2/metrics' } });
+		await rerender(props({ destination: { ...STORED, header_names: [...STORED.header_names] }, licensed: true }));
+		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe('https://otlp.example.com/v2/metrics');
+	});
+
+	it('follows a stored destination that changed', async () => {
+		const { rerender } = render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		const url = screen.getByLabelText(/^URL/) as HTMLInputElement;
+		await fireEvent.input(url, { target: { value: 'https://otlp.example.com/v2/metrics' } });
+		await rerender(props({ destination: { ...STORED, url: 'https://collector.example.net/v1/metrics' }, licensed: true }));
+		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe('https://collector.example.net/v1/metrics');
 	});
 });

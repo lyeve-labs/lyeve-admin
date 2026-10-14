@@ -15,12 +15,13 @@
 		Table,
 		toast,
 	} from '@lyeve-labs/ui-kit';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Activity, AlertTriangle, CheckCircle, Plus, RefreshCw, Send, Trash2, Upload } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { confirmed, tracked } from '$lib/forms.svelte';
@@ -106,9 +107,19 @@
 		return formatDateTime(e.last_export, NO_VALUE);
 	}
 
-	const refusal = $derived(formRefusal(form));
-	const destinationError = $derived((form as { destinationError?: string } | null)?.destinationError ?? '');
-	const hostMoved = $derived((form as { hostMoved?: boolean } | null)?.hostMoved === true);
+	// The save and the delete share one form result. Each failure names the
+	// write that failed, so a failed delete never shows inside the save form.
+	type DestinationFailure = {
+		destinationAction?: 'save' | 'remove';
+		destinationError?: string;
+		hostMoved?: boolean;
+		refused?: unknown;
+	};
+	const failure = $derived(form as DestinationFailure | null);
+	const saveFailure = $derived(failure?.destinationAction === 'save' ? failure : null);
+	const removeFailure = $derived(failure?.destinationAction === 'remove' ? failure : null);
+	const saveRefusal = $derived(formRefusal(saveFailure));
+	const hostMoved = $derived(saveFailure?.hostMoved === true);
 
 	const destinationRead = $derived(data.destination.ok ? data.destination.value : null);
 	const destination = $derived(destinationRead?.destination ?? null);
@@ -120,12 +131,23 @@
 	let headers = $state<{ id: number; name: string; value: string }[]>([]);
 	let nextHeader = 0;
 
-	// The form starts from what is stored, and follows a save or a removal.
-	$effect(() => {
+	function fillDestinationForm() {
 		kind = destination?.kind ?? 'otlp';
 		destUrl = destination?.url ?? '';
 		headersMode = destination && destination.header_names.length > 0 ? 'keep' : 'replace';
 		headers = [];
+	}
+
+	// The form starts from what is stored, and follows a save or a removal.
+	// Every reload hands the page a new destination object, a refresh or an
+	// export included, so the effect follows what is stored rather than the
+	// object, and an edit in progress survives a reload that changed nothing.
+	const storedDestination = $derived(
+		destination ? JSON.stringify([destination.kind, destination.url, destination.header_names]) : '',
+	);
+	$effect(() => {
+		void storedDestination;
+		untrack(fillDestinationForm);
 	});
 
 	// Leaving the stored headers in place while the host changes is the one
@@ -148,7 +170,12 @@
 
 	const saveDest = tracked(() => async ({ result, update }) => {
 		await update({ reset: false });
-		if (result.type === 'success') toast.success('Saved the destination');
+		if (result.type === 'success') {
+			// A save that changed only header values stores what the effect
+			// cannot see, and the values typed must not stay on screen.
+			fillDestinationForm();
+			toast.success('Saved the destination');
+		}
 	});
 
 	// Built at submit time, so the question names the destination on screen
@@ -298,19 +325,6 @@
 				absent="This build of the telemetry plugin does not serve tenant destinations."
 			/>
 		{:else}
-			{#if refusal}
-				<RefusalNotice {refusal} />
-			{:else if hostMoved}
-				<Alert tone="warn" title="Send the headers again for the new host">
-					<p>
-						The stored headers usually carry the collector's key, so they are never carried to a different host.
-						Choose to replace the headers and enter them for the new address. Nothing was saved.
-					</p>
-				</Alert>
-			{:else if destinationError}
-				<Alert tone="danger">{destinationError}</Alert>
-			{/if}
-
 			{#if !licensed}
 				<p class="text-sm text-muted" id="destination-unlicensed">
 					Setting or changing a destination needs a license this install does not hold. A destination already
@@ -341,6 +355,15 @@
 					use:enhance={saveDest.enhance}
 					class="flex flex-col gap-4"
 				>
+					<FormErrors message={hostMoved ? undefined : saveFailure?.destinationError} refused={saveRefusal} />
+					{#if hostMoved}
+						<Alert tone="warn" title="Send the headers again for the new host">
+							<p>
+								The stored headers usually carry the collector's key, so they are never carried to a different host.
+								Choose to replace the headers and enter them for the new address. Nothing was saved.
+							</p>
+						</Alert>
+					{/if}
 					<!-- A save the license refuses is not offered. The fields stay in
 					     sight, so the reader sees what is set, and the reason is
 					     beside the button. -->
@@ -361,6 +384,7 @@
 								label="Headers"
 								name="headers_mode"
 								bind:value={headersMode}
+								disabled={!licensed}
 								options={[
 									{ value: 'keep', label: 'Keep the stored headers' },
 									{ value: 'replace', label: 'Replace them' },
@@ -428,8 +452,11 @@
 					</fieldset>
 				</form>
 				{#if destination}
-					<form method="POST" action="?/removeDestination" class="mt-4 border-t border-line pt-4" use:enhance={removeDest}>
-						<Button variant="secondary" size="sm" type="submit">Delete destination</Button>
+					<form method="POST" action="?/removeDestination" class="mt-4 flex flex-col gap-3 border-t border-line pt-4" use:enhance={removeDest}>
+						<FormErrors message={removeFailure?.destinationError} refused={formRefusal(removeFailure)} />
+						<div>
+							<Button variant="secondary" size="sm" type="submit">Delete destination</Button>
+						</div>
 					</form>
 				{/if}
 			</Card>
