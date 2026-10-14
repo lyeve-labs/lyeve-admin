@@ -18,6 +18,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -64,16 +65,23 @@
 		}
 	});
 	const formError = $derived(form && 'error' in form && form.error ? String(form.error) : undefined);
-	// A failed create or update belongs to the drawer. A failed delete belongs
-	// to the page, and read by the drawer it greeted the next job as that
-	// job's failure.
-	const drawerFailed = $derived(!!form && 'action' in form && (form.action === 'create' || form.action === 'update'));
+	// A failed create or update belongs to the drawer that sent it, and only
+	// when it came back after that drawer opened. A failed delete belongs to
+	// the page. Read by the wrong drawer, a failure greets the next job as that
+	// job's own.
+	let openedOver = $state.raw<unknown>(null);
+	const drawerFailed = $derived(
+		form !== openedOver && !!form && 'action' in form && form.action === (editing ? 'update' : 'create'),
+	);
 
+	// The address effect below calls both openers. Reading `form` untracked
+	// keeps every answer from reopening the drawer.
 	function openCreate() {
 		editing = null;
 		enabled = true;
 		payload = '';
 		threshold = 1;
+		openedOver = untrack(() => form);
 		open = true;
 	}
 
@@ -82,6 +90,7 @@
 		enabled = job.enabled;
 		payload = job.payload ? JSON.stringify(job.payload, null, 2) : '';
 		threshold = job.alerts?.failure_threshold ?? 1;
+		openedOver = untrack(() => form);
 		open = true;
 	}
 
