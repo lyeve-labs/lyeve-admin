@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 import CustomizationPage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -131,5 +132,20 @@ describe('unsaved customization edits', () => {
 		await fireEvent.input(document.querySelector('#brand-name') as HTMLInputElement, { target: { value: 'Draft' } });
 		await rerender(props({ settings: { ...settings, brand: { ...settings.brand, name: 'Stored' } } }, { brandSaved: true }));
 		expect((document.querySelector('#brand-name') as HTMLInputElement).value).toBe('Stored');
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(CustomizationPage, { props: props() });
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(CustomizationPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' } }) });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

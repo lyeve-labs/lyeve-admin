@@ -139,6 +139,7 @@
 
 		{#if data.schemasGate.state !== 'ok'}
 			<GateNotice
+				level={2}
 				gate={data.schemasGate}
 				title="The schema list"
 				absent="This instance serves no schema list, so no schema can be picked below."

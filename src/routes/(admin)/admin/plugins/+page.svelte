@@ -122,7 +122,7 @@
 	{#if data.gate.state !== 'ok'}
 		<!-- Every row comes from the status report, so no plugin is listed
 		     until the engine answers. -->
-		<GateNotice gate={data.gate} title="the plugin status" absent="This engine does not report its plugins." />
+		<GateNotice level={2} gate={data.gate} title="the plugin status" absent="This engine does not report its plugins." />
 	{/if}
 
 	{#if failed > 0}
@@ -138,6 +138,7 @@
 	{#if rows.length === 0}
 		{#if data.gate.state === 'ok'}
 			<EmptyState
+				level={2}
 				title="No plugins in this build"
 				description="This engine was built without plugins, so it serves only its own pages."
 			>
@@ -172,6 +173,7 @@
 
 		{#if filtered.length === 0}
 			<EmptyState
+				level={2}
 				title="No plugins match your filters"
 				description="Widen the search, choose a different category, or clear the state filter."
 			>

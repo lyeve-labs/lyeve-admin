@@ -169,6 +169,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Imports"
 			absent="The bulk import plugin is not part of this build, so content is created one entry at a time."

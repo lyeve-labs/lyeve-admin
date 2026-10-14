@@ -135,6 +135,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Errors"
 			absent="The error tracking plugin is not part of this build, so failures are logged and not grouped."

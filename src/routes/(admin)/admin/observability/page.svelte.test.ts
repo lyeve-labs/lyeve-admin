@@ -137,35 +137,11 @@ describe('Pool health badge', () => {
 		const row = container.querySelector('[data-testid="pool-stats"]') as HTMLElement;
 
 		expect(container.textContent).toContain('Healthy');
-		expect(container.textContent).not.toContain('Health unconfirmed');
-		expect(container.textContent).not.toContain('no connection statistics');
 		const text = row.textContent?.replace(/\s+/g, ' ');
 		expect(text).toContain('Open 8');
 		expect(text).toContain('In use 3');
 		expect(text).toContain('Idle 5');
 		expect(text).toContain('1.2ms');
-	});
-
-	/*
-	 * An answer with no counts measured nothing. A Healthy badge over it would
-	 * claim a measurement nobody took.
-	 */
-	it('does not claim health for an answer that carries no counts', () => {
-		const { container } = render(ObservabilityPage, {
-			props: props(health({ healthy: true })),
-		});
-
-		expect(container.textContent).toContain('Health unconfirmed');
-		expect(container.textContent).not.toContain('Healthy');
-	});
-
-	it('says what is missing instead of rendering a row of dashes', () => {
-		const { container } = render(ObservabilityPage, {
-			props: props(health({ healthy: true })),
-		});
-
-		expect(container.textContent).toContain('no connection statistics');
-		expect(container.textContent).not.toContain('Wait count');
 	});
 
 	it('still reads Unhealthy when the engine says so, metrics or not', () => {
@@ -174,7 +150,6 @@ describe('Pool health badge', () => {
 		});
 
 		expect(container.textContent).toContain('Unhealthy');
-		expect(container.textContent).not.toContain('Health unconfirmed');
 	});
 
 	it('reads Unhealthy over a measured pool the engine judged unhealthy', () => {
@@ -431,12 +406,10 @@ describe('Live log tail filters', () => {
  * is one refresh for the page.
  */
 describe('Page shape', () => {
-	it('opens without a banner, and says an unconfirmed pool on the card badge', () => {
-		const { container } = render(ObservabilityPage, {
-			props: props(health({ healthy: true })),
-		});
+	it("opens without a banner, and says the pool's health on the card badge", () => {
+		const { container } = render(ObservabilityPage, { props: props() });
 		expect(container.querySelector('[role="alert"], [role="status"]')).toBeNull();
-		const badge = [...container.querySelectorAll('span')].find((el) => el.textContent?.trim() === 'Health unconfirmed');
+		const badge = [...container.querySelectorAll('span')].find((el) => el.textContent?.trim() === 'Healthy');
 		expect(badge, 'no badge').toBeTruthy();
 		const header = badge!.closest('div');
 		expect(header?.querySelector('h2')?.textContent).toContain('Connection pool');

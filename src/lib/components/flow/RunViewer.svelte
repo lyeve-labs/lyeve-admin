@@ -8,12 +8,8 @@
 	import { ICON } from '$lib/icon';
 
 	interface Props {
-		/**
-		 * The run as the plugin served it. `withheld` says the reader's own
-		 * access does not cover what the run read, so every input, output and
-		 * error came back empty.
-		 */
-		run: (FlowRun & { withheld?: boolean }) | null;
+		/** The run as the plugin served it. */
+		run: FlowRun | null;
 		/** The step to open first. The reader picks another from the list. */
 		focus?: string | null;
 		/** Runs the test again with the same input. */

@@ -103,6 +103,19 @@ describe('ErrorPanel', () => {
 			cleanup();
 			expect(mount(500, 'boom').getByText('What the server said')).toBeTruthy();
 		});
+
+		it('folds the detail block shut behind a disclosure button', () => {
+			const toggle = mount(500, 'boom').getByRole('button', { name: 'What the server said' });
+			expect(toggle.getAttribute('aria-expanded')).toBe('false');
+		});
+
+		it('heads at the level the page asks for', () => {
+			state.page.url = new URL('http://admin.test/admin');
+			const { getAllByRole } = render(ErrorPanel, {
+				props: { status: 404, homeHref: '/admin', homeLabel: 'Dashboard', level: 2 },
+			});
+			expect(getAllByRole('heading', { level: 2 })).toHaveLength(1);
+		});
 	});
 
 	// A client-side retry would run only the load that failed again and keep

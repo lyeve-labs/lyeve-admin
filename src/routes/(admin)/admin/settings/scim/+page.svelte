@@ -53,7 +53,6 @@
 		return actions.includes(failure.action ?? '') ? failure.error : undefined;
 	}
 	const rowError = $derived(failure?.error && failure.action !== 'create' && failure.action !== 'rotate' ? failure.error : '');
-	const deprovisioning = $derived(data.providers.filter((p) => p.deprovision_on_delete).length);
 
 	// An admin may read the connections. Every write is the super admin's, so an
 	// admin is shown the list and no control that would only be refused.
@@ -151,6 +150,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="SCIM provisioning"
 			absent="The SCIM plugin is not part of this build, so no directory can provision accounts here."
@@ -165,7 +165,6 @@
 
 		<div class="grid gap-4 sm:grid-cols-2">
 			<Stat size="sm" mono label="Connections" value={data.providers.length} />
-			<Stat size="sm" mono label="Deprovisioning accounts" value={deprovisioning} />
 		</div>
 
 		<section class="flex flex-col gap-4">
@@ -316,7 +315,7 @@
 			<Toggle
 				id="scim-deprovision"
 				label="Act on removals at all"
-				hint="Always on. This instance acts on every removal the directory sends, in the way chosen above."
+				hint="Always on. It governs a directory that deletes the person, which is handled the way chosen above. Okta and Microsoft Entra mark the person inactive instead, and that always disables the account, whichever way is chosen."
 				checked={true}
 				disabled
 			/>

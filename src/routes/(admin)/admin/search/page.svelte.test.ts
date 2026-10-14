@@ -3,6 +3,7 @@ import { render, cleanup, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import SearchPage from './+page.svelte';
 import type { Entitlements } from '$lib/entitlements';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -150,3 +151,19 @@ describe('Search page counts', () => {
 	});
 });
 
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(SearchPage, { props: { data: data() as never, form: null } });
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(SearchPage, {
+			props: { data: data({ results: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }) as never, form: null },
+		});
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
+});

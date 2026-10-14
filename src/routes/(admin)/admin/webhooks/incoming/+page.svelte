@@ -164,12 +164,14 @@
 
 	{#if !data.incomingWebhooks.ok}
 		<GateNotice
+			level={2}
 			gate={data.incomingWebhooks.gate}
 			title="Incoming webhooks"
 			absent="The webhook plugin is not part of this build, so no external service can send payloads here."
 		/>
 	{:else if data.incomingWebhooks.value.length === 0}
 		<EmptyState
+			level={2}
 			title="No incoming webhooks"
 			description="Create one to receive payloads from external services."
 		>
@@ -195,7 +197,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState title="No incoming webhook matches" description="Clear the search or widen the status to see every endpoint." />
+			<EmptyState level={2} title="No incoming webhook matches" description="Clear the search or widen the status to see every endpoint." />
 		{:else}
 		<div class="flex flex-col gap-3">
 			{#each visible as wh (wh.id)}

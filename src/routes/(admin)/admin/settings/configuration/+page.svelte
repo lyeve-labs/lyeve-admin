@@ -61,6 +61,7 @@
 >
 	{#if !data.provenance.ok}
 		<GateNotice
+			level={2}
 			gate={data.provenance.gate}
 			title="Configuration"
 			absent="This engine does not report where its settings come from."

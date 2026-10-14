@@ -344,6 +344,7 @@
 										<CopyButton
 											value={ep.path}
 											label="Copy the path {ep.path}"
+											title="Copy the path {ep.path}"
 											size={ICON.sm}
 											class="shrink-0"
 										/>
@@ -448,6 +449,7 @@
 															<CopyButton
 																value={ep.requestBody.example}
 																label="Copy the example request body for {ep.method} {ep.path}"
+																title="Copy the example request body for {ep.method} {ep.path}"
 																size={ICON.xs}
 																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
 															/>
@@ -470,6 +472,7 @@
 															<CopyButton
 																value={ep.response.example}
 																label="Copy the example response body for {ep.method} {ep.path}"
+																title="Copy the example response body for {ep.method} {ep.path}"
 																size={ICON.xs}
 																class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
 															/>
@@ -488,6 +491,7 @@
 													<CopyButton
 														value={preview}
 														label="Copy a curl request for {ep.method} {ep.path}"
+														title="Copy a curl request for {ep.method} {ep.path}"
 														size={ICON.xs}
 														class="absolute top-2 right-2 rounded bg-surface-2 opacity-0 transition-opacity group-hover/code:opacity-100 has-[:focus-visible]:opacity-100 pointer-coarse:opacity-100"
 													/>
@@ -503,6 +507,7 @@
 
 				{#if filtered.length === 0}
 					<EmptyState
+						level={2}
 						title={`No endpoints match "${query}"`}
 						description="Clear the search to see every endpoint."
 					/>

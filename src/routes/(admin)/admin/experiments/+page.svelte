@@ -184,6 +184,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="A/B testing"
 			absent="The A/B testing plugin is not part of this build, so no traffic is being split."
@@ -193,6 +194,7 @@
 
 		{#if data.experiments.length === 0}
 			<EmptyState
+				level={2}
 				title="No experiment is set up"
 				description="Create one to split traffic between variants and measure the difference."
 			>
@@ -220,6 +222,7 @@
 
 			{#if visible.length === 0}
 				<EmptyState
+					level={2}
 					title="No experiment matches"
 					description="Nothing here is named or described that way."
 				>

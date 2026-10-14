@@ -10,6 +10,7 @@ vi.mock('$app/state', () => state);
 
 import RootError from './+error.svelte';
 import { BUSY, OUTAGE } from '$lib/outage';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -20,6 +21,12 @@ function renderAt(status: number, message = '') {
 }
 
 describe('Root error page', () => {
+	it('opens its heading outline with an h1 that names the page', () => {
+		const { container, getByRole } = renderAt(404);
+		expect(getByRole('heading', { level: 1, name: 'This page could not be opened' })).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
 	it('shows the status code carried by the page state', () => {
 		const { getByText } = renderAt(404);
 		expect(getByText('404')).toBeTruthy();

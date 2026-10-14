@@ -56,7 +56,7 @@
 		{/if}
 	{/snippet}
 
-	<AiSection tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
+	<AiSection level={2} tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
 		{#if t}
 			<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
 				<Stat size="sm" mono label="Messages" value={t.messages?.length ?? t.message_count} />

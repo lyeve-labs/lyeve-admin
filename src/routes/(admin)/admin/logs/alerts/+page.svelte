@@ -102,6 +102,7 @@
 
 	{#if data.gate.state !== 'ok' || !config}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Volume alerts"
 			absent="The logging plugin is not part of this build, so there are no volume rules."

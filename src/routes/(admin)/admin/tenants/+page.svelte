@@ -153,12 +153,14 @@
 
 	{#if data.tenants.ok && data.provisionGate}
 		<GateNotice
+			level={2}
 			gate={data.provisionGate}
 			title="Tenant provisioning"
 			absent="This instance does not say whether it may create tenants."
 		/>
 	{:else if data.tenants.ok && !canProvision}
 		<NotEnabled
+			level={2}
 			title="Tenant provisioning"
 			description="Creating a tenant from this page. The tenants below can still be edited, disabled and deleted."
 		/>
@@ -166,12 +168,14 @@
 
 	{#if !data.tenants.ok}
 		<GateNotice
+			level={2}
 			gate={data.tenants.gate}
 			title="Tenants"
 			absent="The multitenant plugin is not part of this build, so this instance serves one tenant."
 		/>
 	{:else if data.tenants.value.length === 0}
 		<EmptyState
+			level={2}
 			title="No tenants yet"
 			description="Create a tenant to start serving content on this instance."
 		>
@@ -199,6 +203,7 @@
 
 		{#if visible.length === 0}
 			<EmptyState
+				level={2}
 				title="No tenant on this page matches"
 				description="Clear the search, or turn the page: the box narrows what is on screen."
 			/>

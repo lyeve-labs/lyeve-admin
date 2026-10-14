@@ -56,6 +56,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Releases"
 			absent="This build serves no content releases, so entries publish one at a time."
@@ -72,6 +73,7 @@
 
 		{#if data.releases.length === 0}
 			<EmptyState
+				level={2}
 				title={data.status ? 'No release has this status' : 'No releases yet'}
 				description={data.status
 					? 'Pick another status to see the rest.'

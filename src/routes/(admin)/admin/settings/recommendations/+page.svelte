@@ -92,6 +92,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Recommendations"
 			absent="The recommendations plugin is not part of this build, so nothing is being computed."

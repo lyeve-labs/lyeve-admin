@@ -185,6 +185,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="PII masking"
 			absent="The masking plugin is not part of this build, so responses are served as they are stored."

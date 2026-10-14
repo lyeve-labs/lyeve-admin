@@ -68,6 +68,7 @@
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Message broker"
 			absent="The message broker plugin is not part of this build, so no event is published."

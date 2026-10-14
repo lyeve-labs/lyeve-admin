@@ -666,7 +666,7 @@
 				     so the editor says they could not be read rather than offering
 				     an empty palette. -->
 				<div class="shrink-0 px-3 pt-2" data-testid="flow-catalog-unread">
-					<GateNotice gate={data.catalogGate} title="the node types" absent="The flow plugin did not send its node types, so the palette has nothing to offer." />
+					<GateNotice level={2} gate={data.catalogGate} title="the node types" absent="The flow plugin did not send its node types, so the palette has nothing to offer." />
 				</div>
 			{/if}
 			{#if blocked}
@@ -810,7 +810,7 @@
 				{:else if tab === 'runs'}
 					<div class="flex h-full flex-col gap-3 overflow-y-auto p-3">
 						{#if !data.runs.ok}
-							<GateNotice gate={data.runs.gate} title="the runs" absent="This flow is no longer there, so it has no runs." />
+							<GateNotice level={2} gate={data.runs.gate} title="the runs" absent="This flow is no longer there, so it has no runs." />
 						{:else if data.runs.value.rows.length === 0}
 							<p class="text-sm text-muted">No runs recorded yet.</p>
 						{:else}
@@ -899,6 +899,7 @@
 {:else}
 	<PageShell title="Flows" documentTitle={`${data.flow?.name ?? 'Flow'} - Flows`} width="wide">
 		<NotEnabled
+			level={2}
 			title="Flows"
 			description="The engine refused the flow routes."
 		/>

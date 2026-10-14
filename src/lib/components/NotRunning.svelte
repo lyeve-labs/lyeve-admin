@@ -18,6 +18,7 @@
 		plugin,
 		reason,
 		operator = false,
+		level = 3,
 	}: {
 		/** The page's name. */
 		title: string;
@@ -26,6 +27,11 @@
 		reason: NotRunningReason;
 		/** Whether the reader may open the plugin list, where the details are. */
 		operator?: boolean;
+		/**
+		 * The heading level of the title. 3 by default, for a block inside a
+		 * section. A caller placed straight under the page title passes 2.
+		 */
+		level?: 2 | 3;
 	} = $props();
 
 	const details = $derived(`/admin/plugins/${encodeURIComponent(plugin)}`);
@@ -39,15 +45,17 @@
 <div data-testid="not-running" data-state={reason.state} data-plugin={plugin}>
 	{#if reason.state === 'withheld'}
 		<EmptyState
+			{level}
 			title="Withheld from this tenant"
 			description="An administrator of this instance withheld {title} from this tenant. Ask them to make it available again."
 		>
 			{#snippet iconSnippet()}<Ban size={ICON.lg} />{/snippet}
 		</EmptyState>
 	{:else if reason.state === 'not-enabled'}
-		<NotEnabled {title} url={reason.upgradeUrl} />
+		<NotEnabled {title} {level} url={reason.upgradeUrl} />
 	{:else if reason.state === 'failed'}
 		<EmptyState
+			{level}
 			title="Failed to start"
 			description="The {plugin} plugin stopped with an error when the engine started it."
 			action={detailsLink}
@@ -59,6 +67,7 @@
 		</EmptyState>
 	{:else if reason.state === 'not-started'}
 		<EmptyState
+			{level}
 			title="Not started"
 			description="The {plugin} plugin is part of this build, and the engine did not start it."
 			action={detailsLink}
@@ -70,6 +79,7 @@
 		</EmptyState>
 	{:else if reason.state === 'not-built'}
 		<EmptyState
+			{level}
 			title="Not part of this build"
 			description="This engine was built without the {plugin} plugin, so there is nothing to show here."
 		>
@@ -77,6 +87,7 @@
 		</EmptyState>
 	{:else}
 		<EmptyState
+			{level}
 			title="Not running"
 			description={operator
 				? 'The plugin behind this page is not running, and the engine did not say why.'

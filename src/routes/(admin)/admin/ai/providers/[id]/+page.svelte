@@ -66,7 +66,7 @@
 		<Breadcrumb items={crumbsAfter(back, [{ label: 'AI', href: '/admin/ai' }, { label: 'Providers', href: '/admin/ai/providers' }, { label: p?.name ?? 'Provider' }])} />
 	{/snippet}
 
-	<AiSection tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
+	<AiSection level={2} tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
 		{#if p}
 			<div class="flex flex-wrap items-center gap-2">
 				{#if p.enabled}<Badge tone="success" dot>Enabled</Badge>{:else}<Badge tone="neutral" dot>Disabled</Badge>{/if}

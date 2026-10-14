@@ -6,6 +6,7 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/observability/errors/alerts') } }));
 
 import SpikePage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -69,5 +70,20 @@ describe('the heading outline', () => {
 		const levels = [...container.querySelectorAll('h2, h3')].map((h) => `${h.tagName} ${h.textContent?.trim()}`);
 		expect(levels).toContain('H2 Where alerts go');
 		expect(levels).toContain('H2 What counts as a spike');
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = setup(BASE);
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = setup(BASE, null, { state: 'locked', upgradeUrl: '' } as never);
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

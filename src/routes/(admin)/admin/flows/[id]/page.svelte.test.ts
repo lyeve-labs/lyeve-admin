@@ -8,6 +8,7 @@ import { blockedFlow, blockedRunError, fixtureCatalog, fixtureFlow, fixtureRun, 
 import { BLOCKED_TEXT } from '$lib/flow/blocked';
 import { FOCUS_KEY } from '$lib/flow/prefs';
 import { SHELL_KEY, type Shell } from '$lib/shell.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/f1') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -1041,5 +1042,19 @@ describe('flow editor page with a visual editor in the build', () => {
 		await pickOverflow(getByRole, 'Shortcuts');
 		expect(queryByTestId('keyboard-hints')?.textContent).toContain('undo');
 		expect(queryByTestId('keyboard-hints')?.textContent).toContain('drag to pan');
+	});
+});
+
+describe('heading outline', () => {
+	// A collapsed side panel hides its header from xl up through the stylesheet,
+	// which the test document does not apply, so the test hides it the same way.
+	it('keeps the runs notice one level under the title with both side panels collapsed', async () => {
+		const { getByRole, container } = setup(null, { runs: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } });
+		await fireEvent.click(getByRole('button', { name: 'Collapse Palette' }));
+		await fireEvent.click(getByRole('button', { name: 'Collapse Inspector' }));
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		for (const el of container.querySelectorAll('.xl\\:hidden')) el.setAttribute('hidden', '');
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

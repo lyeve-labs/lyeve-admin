@@ -194,6 +194,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Retention"
 			absent="Audit retention is not part of this build, so entries are kept indefinitely."

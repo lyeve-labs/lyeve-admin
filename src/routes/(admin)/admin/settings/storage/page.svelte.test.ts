@@ -6,6 +6,7 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
 
 import StoragePage from './+page.svelte';
 import type { StorageProvider } from '$lib/api/storage';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -83,5 +84,25 @@ describe('an edit save', () => {
 		await new Promise((r) => setTimeout(r, 0));
 		const drawer = document.body.querySelector('form#provider-form') as HTMLFormElement;
 		expect(new FormData(drawer).get('cost_weight')).toBe('1');
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(StoragePage, { props: props() });
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time with nothing in it yet', () => {
+		const { container } = render(StoragePage, { props: props({ providers: [] }) });
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(StoragePage, { props: props({ gate: { state: 'locked', upgradeUrl: '' } }) });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

@@ -255,6 +255,11 @@ describe('native-control', () => {
     // The select and its option are two findings: either alone is refused.
     expect(check('native-control', '<select name="region"><option>eu</option></select>')).toHaveLength(2);
     expect(check('native-control', '<textarea name="body"></textarea>')).toHaveLength(1);
+    // A disclosure and its summary are two findings, as the select and its
+    // option are.
+    expect(check('native-control', '<details open><summary>More</summary><pre>x</pre></details>')).toHaveLength(2);
+    expect(check('native-control', '<details class="w-full">x</details>')[0]).toContain('Collapsible');
+    expect(check('native-control', '<dialog open>x</dialog>')[0]).toContain('Modal');
     expect(check('native-control', '<input type="checkbox" bind:checked={enabled} />')).toHaveLength(1);
     expect(check('native-control', '<input\n\ttype="number"\n\tmin="0"\n/>')).toHaveLength(1);
     expect(check('native-control', '<input name="q" class="border border-line" />')[0]).toContain(

@@ -205,6 +205,13 @@ describe('API keys page', () => {
 		expect(screen.queryByText('Copied')).toBeNull();
 	});
 
+	it('shows the whole new key across lines instead of one truncated line', () => {
+		setup([key({})], {}, { created: true, raw_key: 'ly_live_secret', key_name: 'deploy' });
+		const field = screen.getByLabelText('API key');
+		expect(field.tagName).toBe('TEXTAREA');
+		expect(field.className).toContain('break-all');
+	});
+
 	it('keeps the way to copy the key by hand after a copy fails', async () => {
 		vi.useFakeTimers();
 		const writeText = vi.fn(async (_text: string) => {

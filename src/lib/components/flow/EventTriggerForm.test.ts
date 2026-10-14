@@ -24,6 +24,13 @@ describe('EventTriggerForm', () => {
 		expect(container.textContent).not.toContain('Hook');
 	});
 
+	it('names the kind hint as the description of the kind group', () => {
+		setup({ kind: 'system', name: 'flow.run.failed' });
+		const group = screen.getByRole('radiogroup', { name: 'Kind' });
+		const hint = document.getElementById(group.getAttribute('aria-describedby') ?? '');
+		expect(hint?.textContent).toContain('A hook a plugin publishes');
+	});
+
 	it('switches to a system event and drops what belonged to the content event', async () => {
 		const { onchange } = setup({ kind: 'content', schema: 'customers', event: 'after_create', filter: 'true' });
 		await fireEvent.click(screen.getByRole('radio', { name: 'System' }));

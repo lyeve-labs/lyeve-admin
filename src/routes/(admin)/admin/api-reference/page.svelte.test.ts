@@ -48,6 +48,13 @@ const groups: EndpointGroup[] = [
 	},
 ];
 
+/** The kit's copy control: the frame that holds the button, its tooltip and its live region. */
+function copyFrame(button: HTMLElement): HTMLElement {
+	let node = button.parentElement;
+	while (node && !node.querySelector(':scope > [role="status"]')) node = node.parentElement;
+	return node!;
+}
+
 function setup() {
 	return render(ApiReferencePage, {
 		props: { data: { groups, collections: 0, source: 'engine' } as unknown as PageData, form: null },
@@ -163,7 +170,7 @@ describe('api reference rows', () => {
 		vi.useFakeTimers();
 		setup();
 		const copy = screen.getByRole('button', { name: 'Copy the path /api/admin/media' });
-		const status = copy.parentElement!.querySelector('[role="status"]')!;
+		const status = copyFrame(copy).querySelector('[role="status"]')!;
 
 		await fireEvent.click(copy);
 		await vi.advanceTimersByTimeAsync(0);
@@ -183,7 +190,7 @@ describe('api reference rows', () => {
 		await fireEvent.click(disclosures(container)[0]);
 
 		const copy = screen.getByRole('button', { name: 'Copy a curl request for GET /api/admin/media' });
-		const wrapper = copy.parentElement!;
+		const wrapper = copyFrame(copy);
 		expect(wrapper.classList.contains('opacity-0')).toBe(true);
 		expect(wrapper.classList.contains('has-[:focus-visible]:opacity-100')).toBe(true);
 		expect([...wrapper.classList].some((c) => c.startsWith('focus-within:'))).toBe(false);
@@ -208,6 +215,22 @@ describe('api reference rows', () => {
 				name: 'Copy the example response body for GET /api/admin/media',
 			}),
 		).toBeTruthy();
+	});
+
+	it('shows a tooltip on every icon-only copy control naming what it copies', async () => {
+		const { container } = setup();
+		await fireEvent.click(disclosures(container)[0]);
+
+		for (const name of [
+			'Copy the path /api/admin/media',
+			'Copy a curl request for GET /api/admin/media',
+			'Copy the example response body for GET /api/admin/media',
+		]) {
+			const button = screen.getByRole('button', { name });
+			expect(copyFrame(button).textContent, name).toContain(name);
+			// The tooltip says what the name says, so it is not read a second time.
+			expect(button.hasAttribute('aria-describedby'), name).toBe(false);
+		}
 	});
 
 	it('names the search box for a reader who cannot see the placeholder', () => {

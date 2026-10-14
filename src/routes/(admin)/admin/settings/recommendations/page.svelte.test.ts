@@ -6,6 +6,7 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
 
 import RecommendationsPage from './+page.svelte';
 import type { AbStats } from '$lib/api/recommendations';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -209,5 +210,20 @@ describe('the preview failure', () => {
 		const formText = container.querySelector('form#rec-preview-form')?.textContent ?? '';
 		expect(formText).toContain('That is not a user id.');
 		expect(said(container).split('That is not a user id.').length).toBe(2);
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(RecommendationsPage, { props: props() });
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(RecommendationsPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' }, stats: null }) });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

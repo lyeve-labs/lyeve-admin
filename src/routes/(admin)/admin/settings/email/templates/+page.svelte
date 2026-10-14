@@ -164,9 +164,9 @@
 	{/if}
 
 	{#if !data.templates.ok}
-		<GateNotice gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
+		<GateNotice level={2} gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
 	{:else if templates.length === 0}
-		<EmptyState title="No templates yet" description="A template is the subject and body a mail is sent with.">
+		<EmptyState level={2} title="No templates yet" description="A template is the subject and body a mail is sent with.">
 			{#snippet iconSnippet()}<Mail size={ICON.lg} />{/snippet}
 			{#snippet action()}
 				<Button variant="secondary" onclick={openCreate} disabled={atCeiling}>

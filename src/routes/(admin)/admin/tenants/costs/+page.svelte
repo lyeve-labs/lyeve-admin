@@ -200,6 +200,7 @@
 
 	{#if !data.enabled}
 		<NotEnabled
+			level={2}
 			title="Tenant costs"
 			description="The ledger the feed fills every hour from the usage and AI meters, the prices it applies and the budgets held against it."
 			url={data.upgradeUrl}

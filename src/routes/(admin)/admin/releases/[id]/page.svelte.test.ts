@@ -11,6 +11,7 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
 }));
 
 import ReleasePage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -156,3 +157,17 @@ describe('release drawers', () => {
 	});
 });
 
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = setup();
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = setup({ release: null, gate: { state: 'locked', upgradeUrl: '' } });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
+});

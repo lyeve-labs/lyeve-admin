@@ -38,7 +38,7 @@
 		<Breadcrumb items={crumbsAfter(back, [{ label: 'AI', href: '/admin/ai' }, { label: 'Prompts', href: '/admin/ai/prompts' }, { label: p ? useCaseLabel(p.use_case) : 'Prompt' }])} />
 	{/snippet}
 
-	<AiSection tab="prompts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prompts">
+	<AiSection level={2} tab="prompts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prompts">
 		{#if p}
 			<div class="flex flex-wrap items-center gap-2">
 				{#if p.active_version === 0}

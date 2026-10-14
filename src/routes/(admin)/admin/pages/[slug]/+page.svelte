@@ -19,6 +19,7 @@
 	{/snippet}
 	{#if data.blocks.length === 0}
 		<EmptyState
+			level={2}
 			title="This page has no blocks yet"
 			description={canEdit ? 'Add blocks to show content here.' : 'An admin adds the blocks this page shows.'}
 		>

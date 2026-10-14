@@ -133,7 +133,7 @@
 			</form>
 		</Card>
 	{:else if !data.mfa.ok}
-		<GateNotice gate={data.mfa.gate} title="Two-factor authentication" absent="This engine does not serve two-factor authentication." />
+		<GateNotice level={2} gate={data.mfa.gate} title="Two-factor authentication" absent="This engine does not serve two-factor authentication." />
 	{:else if hasPasskeys}
 		<Alert tone="success" title="Two-factor authentication is on">
 			This account has a passkey, so signing in takes a second factor. While a passkey is registered the engine does

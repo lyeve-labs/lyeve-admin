@@ -172,12 +172,14 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Customization"
 			absent="The multitenant plugin does not serve customization on this instance."
 		/>
 	{:else if !data.entitled}
 		<NotEnabled
+			level={2}
 			title="Customization"
 			description="Give each tenant its own name, logo and colors, a dashboard and a menu shaped to what its team uses, and pages built for that team."
 		/>

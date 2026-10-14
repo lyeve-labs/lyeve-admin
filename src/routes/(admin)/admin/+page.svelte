@@ -114,7 +114,7 @@
 		{/if}
 	{:else if schemas && schemas.length === 0}
 		{#if data.isAdmin}
-			<EmptyState title="No schemas yet" description="A content type is the first thing to make.">
+			<EmptyState level={2} title="No schemas yet" description="A content type is the first thing to make.">
 				{#snippet action()}
 					<Button variant="secondary" href="/admin/schema">
 						<Plus size={ICON.sm} /> New schema
@@ -123,7 +123,7 @@
 			</EmptyState>
 		{:else}
 			<!-- The engine admits a new schema only from an admin. -->
-			<EmptyState title="No schemas yet" description="An admin makes the first content type. Your entries start once one exists." />
+			<EmptyState level={2} title="No schemas yet" description="An admin makes the first content type. Your entries start once one exists." />
 		{/if}
 	{:else}
 		{#if data.isAdmin}

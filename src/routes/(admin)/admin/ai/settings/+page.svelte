@@ -22,7 +22,7 @@
 </script>
 
 <PageShell title="AI settings" description="The switch for this tenant, transcript storage and how long a transcript is kept." width="wide">
-	<AiSection tab="settings" gate={AI_OK} layoutGate={data.aiLayoutGate} noun="settings">
+	<AiSection level={2} tab="settings" gate={AI_OK} layoutGate={data.aiLayoutGate} noun="settings">
 		{#if settings}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>This tenant</SectionHeading>

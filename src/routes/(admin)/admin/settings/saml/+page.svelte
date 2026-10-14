@@ -189,6 +189,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="SAML SSO"
 			absent="The SAML plugin is not part of this build, so no identity provider can be configured here."

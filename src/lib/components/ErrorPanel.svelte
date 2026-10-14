@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Badge, Button, EmptyState } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Collapsible, EmptyState } from '@lyeve-labs/ui-kit';
 	import {
 		AlertTriangle,
 		ArrowLeft,
@@ -31,9 +31,14 @@
 		/** Where "home" is: the console for a signed-in reader, the site otherwise. */
 		homeHref: string;
 		homeLabel: string;
+		/**
+		 * The heading level of the title. 3 by default, for a block inside a
+		 * section. A caller placed straight under the page title passes 2.
+		 */
+		level?: 2 | 3;
 	}
 
-	let { status, message = '', homeHref, homeLabel }: Props = $props();
+	let { status, message = '', homeHref, homeLabel, level = 3 }: Props = $props();
 
 	/*
 	 * A 401 is a session the engine no longer honors, and signing in again is
@@ -113,7 +118,7 @@
 	const retryHref = $derived(page.url.pathname + page.url.search);
 </script>
 
-<EmptyState {title} description={hint}>
+<EmptyState {title} {level} description={hint}>
 	{#snippet iconSnippet()}
 		<Icon size={ICON.lg} />
 	{/snippet}
@@ -124,14 +129,11 @@
 			{#if variant === 'server'}
 				<!-- Shut by default: a stack trace is the first thing on screen only
 				     for the reader who went looking for it. -->
-				<details class="w-full text-left">
-					<summary class="cursor-pointer text-xs text-faint transition-colors hover:text-muted">
-						What the server said
-					</summary>
+				<Collapsible label="What the server said" class="w-full text-left">
 					<pre
-						class="border-line bg-surface-2 text-muted mt-2 max-h-32 overflow-auto rounded-lg border p-3 text-xs">{message ||
+						class="border-line bg-surface-2 text-muted max-h-32 overflow-auto rounded-lg border p-3 text-xs">{message ||
 							'Nothing beyond the status.'}</pre>
-				</details>
+				</Collapsible>
 			{/if}
 		</div>
 	{/snippet}

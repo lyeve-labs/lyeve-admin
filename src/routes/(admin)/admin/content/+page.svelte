@@ -175,12 +175,14 @@
 
 	{#if !data.schemas.ok}
 		<GateNotice
+			level={2}
 			gate={data.schemas.gate}
 			title="Content"
 			absent="This build does not serve the collections."
 		/>
 	{:else if rows.length === 0 && data.filter === 'all' && !data.query}
 		<EmptyState
+			level={2}
 			title="No schemas yet"
 			description="Build a schema first, then come back here to manage content."
 		>

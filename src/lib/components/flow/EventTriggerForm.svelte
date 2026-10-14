@@ -31,6 +31,12 @@
 		{ value: 'system', label: 'System', icon: Webhook },
 	];
 
+	const KIND_HINTS: Record<EventKind, string> = {
+		content: 'A record of a content schema was created, updated or deleted.',
+		system:
+			'A hook a plugin publishes, such as a flow run that failed. The schema narrows it to one publisher, such as a flow slug, and the filter must be true for the run to start.',
+	};
+
 	const kind = $derived(eventKindOf(value));
 	const shown = $derived(kindSchema(schema, kind));
 
@@ -40,13 +46,6 @@
 </script>
 
 <div class="flex flex-col gap-3" data-testid="event-trigger-form">
-	<SegmentedControl label="Kind" options={KINDS} value={kind} size="sm" onchange={pickKind} />
-	<p class="text-xs text-muted">
-		{#if kind === 'content'}
-			A record of a content schema was created, updated or deleted.
-		{:else}
-			A hook a plugin publishes, such as a flow run that failed. The schema narrows it to one publisher, such as a flow slug, and the filter must be true for the run to start.
-		{/if}
-	</p>
+	<SegmentedControl label="Kind" options={KINDS} value={kind} size="sm" onchange={pickKind} hint={KIND_HINTS[kind]} />
 	<NodeConfigForm schema={shown} {value} {path} {errors} {idPrefix} {schemas} {events} {onchange} />
 </div>

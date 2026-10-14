@@ -206,7 +206,7 @@
 		{/snippet}
 
 		{#if data.gate.state !== 'ok'}
-			<GateNotice gate={data.gate} title="flows" absent="The flow plugin does not serve its list on this instance." />
+			<GateNotice level={2} gate={data.gate} title="flows" absent="The flow plugin does not serve its list on this instance." />
 		{/if}
 
 		{#if refusal}
@@ -469,6 +469,7 @@
 {:else}
 	<PageShell title="Flows" width="wide">
 		<NotEnabled
+			level={2}
 			title="Flows"
 			description="The engine refused the flow routes."
 		/>

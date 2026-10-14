@@ -42,6 +42,18 @@ describe('NotRunning', () => {
 		expect(getByRole('link', { name: 'How to enable it' }).getAttribute('href')).toBe('https://example.test/enable');
 	});
 
+	it('passes the heading level it is given to every state, the not-enabled one included', () => {
+		const failed = render(NotRunning, {
+			props: { title: 'Search', plugin: 'search', reason: { state: 'failed', error: 'boom' }, level: 2 },
+		});
+		expect(failed.getByRole('heading', { name: 'Failed to start', level: 2 })).toBeTruthy();
+		cleanup();
+		const locked = render(NotRunning, {
+			props: { title: 'Search', plugin: 'search', reason: { state: 'not-enabled', upgradeUrl: '' }, level: 2 },
+		});
+		expect(locked.getByRole('heading', { name: 'Search', level: 2 })).toBeTruthy();
+	});
+
 	it('shows no link when the engine named none, or an unsafe one, and no license module serves one', () => {
 		const bare = mount({ state: 'not-enabled', upgradeUrl: '' });
 		expect(bare.getByTestId('not-enabled')).toBeTruthy();

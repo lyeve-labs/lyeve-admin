@@ -64,6 +64,7 @@
 >
 	{#if data.gate.state !== 'ok' || !settings}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Spike alerts"
 			absent="The error tracking plugin is not part of this build, so there are no spike alerts to set."

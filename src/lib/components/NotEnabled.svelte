@@ -19,6 +19,7 @@
 		description = '',
 		url = undefined,
 		compact = false,
+		level = 3,
 		class: cls = '',
 	}: {
 		/** The feature's name. */
@@ -29,6 +30,11 @@
 		url?: string | null;
 		/** A small marker for a header or a toolbar, in place of the card. */
 		compact?: boolean;
+		/**
+		 * The heading level of the title. 3 by default, for a block inside a
+		 * section. A caller placed straight under the page title passes 2.
+		 */
+		level?: 2 | 3;
 		class?: string;
 	} = $props();
 
@@ -81,6 +87,7 @@
 	<div data-testid="not-enabled" class={cls}>
 		<EmptyState
 			{title}
+			{level}
 			description="{STATE}."
 			iconSnippet={lock}
 			children={description ? detail : undefined}

@@ -92,6 +92,12 @@ export interface FlowRun {
 	finished_at: string;
 	duration_ms: number;
 	steps?: RunStep[];
+	/**
+	 * The reader's own access does not cover what the run read, so the run's
+	 * input, output and error, and every step's, come back empty. The plugin
+	 * omits the field when nothing was withheld.
+	 */
+	withheld?: boolean;
 }
 
 export interface TestRequest {

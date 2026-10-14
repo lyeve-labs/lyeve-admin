@@ -149,6 +149,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Rate limits"
 			absent="The rate limit plugin is not part of this build, so no endpoint is throttled."

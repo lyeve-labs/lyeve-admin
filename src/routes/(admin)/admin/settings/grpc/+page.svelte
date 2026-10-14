@@ -63,6 +63,7 @@
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="gRPC"
 			absent="The gRPC plugin is not part of this build, so nothing is listening."

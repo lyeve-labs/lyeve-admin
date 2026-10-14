@@ -11,15 +11,18 @@ vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async (
 
 // The builder is tested as a build without the diagram, whatever the tree
 // carries. A case that needs the page's side of the diagram sets the flag.
-const seam = vi.hoisted(() => ({ diagram: false }));
+const seam = vi.hoisted(() => ({ diagram: false, canvas: null as unknown }));
 vi.mock('$lib/canvas/schema', () => ({
-	SchemaCanvas: null,
+	get SchemaCanvas() {
+		return seam.canvas;
+	},
 	get hasSchemaCanvas() {
 		return seam.diagram;
 	},
 }));
 
 import SchemaPage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(() => {
 	cleanup();
@@ -34,6 +37,13 @@ afterEach(() => {
  * without, and svelte-dnd-action needs a stable id per item to keep a row under
  * the pointer while the list reorders.
  */
+/** The kit's copy control: the frame that holds the button, its tooltip and its live region. */
+function copyFrame(button: HTMLElement): HTMLElement {
+	let node = button.parentElement;
+	while (node && !node.querySelector(':scope > [role="status"]')) node = node.parentElement;
+	return node!;
+}
+
 function data(overrides: Record<string, unknown> = {}): PageData {
 	return {
 		entitlements: { plan: 'example', state: 'active', features: ['schema'], tenant_quota: 1 },
@@ -222,7 +232,7 @@ describe('schema builder relation panel', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
 		vi.useFakeTimers();
 		const copy = screen.getByRole('button', { name: 'Copy a curl request for POST /api/v1/content/posts' });
-		const status = copy.parentElement!.querySelector('[role="status"]')!;
+		const status = copyFrame(copy).querySelector('[role="status"]')!;
 
 		await fireEvent.click(copy);
 		await vi.advanceTimersByTimeAsync(0);
@@ -232,6 +242,16 @@ describe('schema builder relation panel', () => {
 
 		await vi.advanceTimersByTimeAsync(1500);
 		expect(status.textContent).toBe('');
+	});
+
+	it('shows a tooltip on a collection request copy control', async () => {
+		await openPosts();
+		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
+		const name = 'Copy a curl request for POST /api/v1/content/posts';
+		const button = screen.getByRole('button', { name });
+		expect(copyFrame(button).textContent).toContain(name);
+		// The tooltip says what the name says, so it is not read a second time.
+		expect(button.hasAttribute('aria-describedby')).toBe(false);
 	});
 
 	it('turns off the boxes that do nothing for a relation', async () => {
@@ -816,3 +836,32 @@ describe('schema builder transports', () => {
 	});
 });
 
+describe('heading outline', () => {
+	// A collapsed list hides its header from lg up through the stylesheet,
+	// which the test document does not apply, so the test hides it the same way.
+	async function canvasWithListCollapsed(overrides: Record<string, unknown>) {
+		const view = render(SchemaPage, { props: { data: data(overrides), form: null } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'Canvas' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Collapse Content types' }));
+		for (const el of view.container.querySelectorAll('.lg\\:hidden')) el.setAttribute('hidden', '');
+		return view;
+	}
+
+	for (const [state, overrides] of [
+		['the license leaves the canvas out', { canvas: { licensed: false } }],
+		['the canvas read is refused for the license', { canvasGate: { state: 'locked', upgradeUrl: '' } }],
+	] as const) {
+		it(`keeps the canvas notice one level under the title with the list collapsed when ${state}`, async () => {
+			seam.diagram = true;
+			seam.canvas = {};
+			try {
+				const { container } = await canvasWithListCollapsed(overrides);
+				expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+				expect(outlineSkips(container)).toEqual([]);
+			} finally {
+				seam.diagram = false;
+				seam.canvas = null;
+			}
+		});
+	}
+});

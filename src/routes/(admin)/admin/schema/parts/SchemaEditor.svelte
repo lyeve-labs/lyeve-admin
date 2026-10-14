@@ -171,24 +171,6 @@
 	const problemAt = (target: string) => problems.find((p) => p.target === target)?.message;
 
 	/**
-	 * The kit's segmented control takes neither an id nor a description, so its
-	 * wrapper hands both to the radio group inside it. The problem list finds a
-	 * control by its id, and a screen reader reads the hint or the problem the
-	 * group names when focus enters it.
-	 */
-	const groupNamed: Action<HTMLElement, { id: string; describedBy?: string }> = (node, initial) => {
-		const apply = (p: { id: string; describedBy?: string }) => {
-			const group = node.querySelector('[role="radiogroup"]');
-			if (!group) return;
-			group.id = p.id;
-			if (p.describedBy) group.setAttribute('aria-describedby', p.describedBy);
-			else group.removeAttribute('aria-describedby');
-		};
-		apply(initial);
-		return { update: apply };
-	};
-
-	/**
 	 * Why a row's localized mark was just cleared, by row id. It stays beside
 	 * the row until the field can carry the mark again, so the change the
 	 * operator did not ask for is never silent. The page holds the record.
@@ -380,20 +362,17 @@
 				</div>
 				<div class="flex flex-col gap-3">
 					{#each TRANSPORTS as t (t.key)}
-						<div
-							class="flex min-w-0 flex-col gap-1"
-							data-testid="transport-{t.key}"
-							use:groupNamed={{ id: `transport-${t.key}`, describedBy: `transport-${t.key}-hint` }}
-						>
+						<div class="min-w-0" data-testid="transport-{t.key}">
 							<SegmentedControl
+								id="transport-{t.key}"
 								label={t.label}
 								size="sm"
 								class="max-w-full overflow-x-auto"
 								options={TRANSPORT_MODE_OPTIONS}
 								value={transportMode(schema, t.key)}
 								onchange={(v) => setTransport(t.key, v)}
+								hint={t.hint}
 							/>
-							<span id="transport-{t.key}-hint" class="text-xs text-faint">{t.hint}</span>
 						</div>
 					{/each}
 				</div>
@@ -558,11 +537,9 @@
 				>
 					<!-- The problem list moves focus to the kind's radio group by its
 					     id, and the group names the problem as its description. -->
-					<div
-						class="flex min-w-0 flex-col gap-1"
-						use:groupNamed={{ id: `relation-type-${rowId}`, describedBy: problemAt(`relation-type-${rowId}`) ? `relation-type-${rowId}-problem` : undefined }}
-					>
+					<div class="min-w-0">
 						<SegmentedControl
+							id="relation-type-{rowId}"
 							label="Relation"
 							size="sm"
 							class="max-w-full overflow-x-auto"
@@ -572,10 +549,8 @@
 								field.relation_type = v;
 								dropInertFlags(field);
 							}}
+							error={problemAt(`relation-type-${rowId}`)}
 						/>
-						{#if problemAt(`relation-type-${rowId}`)}
-							<p id="relation-type-{rowId}-problem" class="text-xs text-danger">{problemAt(`relation-type-${rowId}`)}</p>
-						{/if}
 					</div>
 					<div class="grid gap-3 sm:grid-cols-2">
 						<Select
@@ -768,6 +743,7 @@
 							<CopyButton
 								value={preview}
 								label="Copy a curl request for {route.method} {route.path}"
+								title="Copy a curl request for {route.method} {route.path}"
 								size={ICON.xs}
 								class="shrink-0"
 							/>

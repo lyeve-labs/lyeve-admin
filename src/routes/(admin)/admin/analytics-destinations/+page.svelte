@@ -137,6 +137,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Analytics destinations"
 			absent="The analytics plugin is not part of this build, so events are not sent anywhere."
