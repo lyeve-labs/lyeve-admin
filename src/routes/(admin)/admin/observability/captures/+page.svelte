@@ -227,7 +227,11 @@
 				{/if}
 			</p>
 			{#if !data.rulesRead}
-				<Alert tone="danger">The capture rules could not be read. This is not a report that there are none.</Alert>
+				{#if data.rulesGate}
+					<GateNotice gate={data.rulesGate} title="the capture rules" absent="This version of the request capture plugin keeps no capture rules." />
+				{:else}
+					<Alert tone="danger">The capture rules could not be read. This is not a report that there are none.</Alert>
+				{/if}
 			{:else if data.rules.length === 0}
 				<EmptyState title="No capture rule" description="Every request this tenant sends is kept for a day.">
 					{#snippet iconSnippet()}
@@ -318,7 +322,11 @@
 		<section class="flex flex-col gap-4" aria-label="Replay sets">
 			<SectionHeading level={2}>Replay sets</SectionHeading>
 			{#if !data.setsRead}
-				<Alert tone="danger">The replay sets could not be read. This is not a report that there are none.</Alert>
+				{#if data.setsGate}
+					<GateNotice gate={data.setsGate} title="the replay sets" absent="This version of the request capture plugin keeps no replay sets." />
+				{:else}
+					<Alert tone="danger">The replay sets could not be read. This is not a report that there are none.</Alert>
+				{/if}
 			{:else if data.sets.length === 0}
 				<p class="text-sm text-muted">
 					No replay set yet. Select captures below and save them as a set to replay them together and compare

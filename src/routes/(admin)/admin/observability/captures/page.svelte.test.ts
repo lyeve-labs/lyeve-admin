@@ -255,3 +255,12 @@ describe("a super admin's list", () => {
 		expect(screen.queryByRole('columnheader', { name: 'Tenant' })).toBeNull();
 	});
 });
+
+describe('a failed side read', () => {
+	it('says a refused sets read with its gate', () => {
+		const { container } = render(CapturesPage, {
+			props: props({ sets: [], setsRead: false, setsGate: { state: 'forbidden' } }),
+		});
+		expect(said(container)).toContain('Your role cannot open the replay sets');
+	});
+});

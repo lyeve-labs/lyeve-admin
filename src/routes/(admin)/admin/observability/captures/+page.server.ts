@@ -30,6 +30,7 @@ import {
 	type RuleMethod,
 } from '$lib/api/request-capture';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { gateOf, type Gate } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -49,8 +50,10 @@ export const load: PageServerLoad = async (event) => {
 		hasMore: false,
 		rules: [] as CaptureRule[],
 		rulesRead: false,
+		rulesGate: null as Gate | null,
 		sets: [] as ReplaySet[],
 		setsRead: false,
+		setsGate: null as Gate | null,
 		licensed: null as boolean | null,
 	};
 
@@ -79,11 +82,20 @@ export const load: PageServerLoad = async (event) => {
 	// section and never reads as having none.
 	const [rules, sets] = await Promise.all([
 		listCaptureRules(client)
-			.then((r) => ({ rows: r?.data ?? [], read: true, licensed: r?.licensed }))
-			.catch(() => ({ rows: [] as CaptureRule[], read: false, licensed: undefined })),
+			.then((r) => ({ rows: r?.data ?? [], read: true, licensed: r?.licensed, gate: null }))
+			.catch((err: unknown) => ({
+				rows: [] as CaptureRule[],
+				read: false,
+				licensed: undefined,
+				gate: gateOf(err, 'The capture rules could not be read. This is not a report that there are none.'),
+			})),
 		listReplaySets(client)
-			.then((r) => ({ rows: r?.data ?? [], read: true }))
-			.catch(() => ({ rows: [] as ReplaySet[], read: false })),
+			.then((r) => ({ rows: r?.data ?? [], read: true, gate: null }))
+			.catch((err: unknown) => ({
+				rows: [] as ReplaySet[],
+				read: false,
+				gate: gateOf(err, 'The replay sets could not be read. This is not a report that there are none.'),
+			})),
 	]);
 	if (licensed === null && typeof rules.licensed === 'boolean') licensed = rules.licensed;
 
@@ -96,8 +108,10 @@ export const load: PageServerLoad = async (event) => {
 		hasMore: page.hasMore,
 		rules: rules.rows,
 		rulesRead: rules.read,
+		rulesGate: rules.gate as Gate | null,
 		sets: sets.rows,
 		setsRead: sets.read,
+		setsGate: sets.gate as Gate | null,
 		licensed,
 		gate,
 	};

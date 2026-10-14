@@ -95,6 +95,16 @@ describe('captures load', () => {
 		expect(result.captures).toHaveLength(1);
 	});
 
+	// A role refusal, a lapsed license and an outage each read differently,
+	// so a failed rules or sets read keeps its gate.
+	it('keeps the gate of a failed rules or sets read', async () => {
+		api.listCaptureRules.mockRejectedValue(new ApiError(403, 'forbidden', {}));
+		api.listReplaySets.mockRejectedValue(new ApiError(503, 'down', {}));
+		const result = (await load(loadEvent())) as Loaded;
+		expect(result.rulesGate).toEqual({ state: 'forbidden' });
+		expect(result.setsGate).toEqual({ state: 'unavailable' });
+	});
+
 	// The plugin applies no tenant filter to a super admin's read, so the page
 	// has to know whose requests it lists.
 	it('says whether the list is every tenant\'s', async () => {
