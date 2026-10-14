@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { Badge, Button, Drawer, EmptyState, Table } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Pagination, Table } from '@lyeve-labs/ui-kit';
 	import type { DeadLetter } from '@lyeve-labs/client';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { RotateCcw, Skull, Trash2, XCircle } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal, refusalText, type Refusal } from '$lib/api/refusal';
+	import { pageNumber } from '$lib/api/list';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import { eventTone } from './event-tone';
@@ -20,16 +21,20 @@
 	let { form, held = null }: Props = $props();
 
 	/** The queue's own writes, whose failures this drawer draws. */
-	const OWN_ACTIONS = ['dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
+	const OWN_ACTIONS = ['dead-letters-page', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
 
 	let showDeadLetters = $state(false);
 	let deadLetterItems = $state<DeadLetter[]>([]);
 	let deadLetterTotal = $state<number | null>(null);
+	let deadLetterOffset = $state(0);
+	let deadLetterLimit = $state(50);
 
 	$effect(() => {
 		if (form && 'deadLetters' in form && form.deadLetters) {
 			deadLetterItems = form.deadLetters as DeadLetter[];
 			deadLetterTotal = (form.deadLetterTotal as number | null | undefined) ?? null;
+			deadLetterOffset = (form.deadLetterOffset as number | undefined) ?? 0;
+			deadLetterLimit = (form.deadLetterLimit as number | undefined) ?? 50;
 			showDeadLetters = true;
 		}
 	});
@@ -65,6 +70,16 @@
 			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: { text: 'Dismissed', done: true } };
 		}
 	});
+
+	// A page of the queue is another read of the same action, posted from the
+	// hidden form below with the offset it names.
+	let pageForm = $state<HTMLFormElement>();
+	let askedOffset = $state(0);
+	async function turnTo(page: number) {
+		askedOffset = (page - 1) * deadLetterLimit;
+		await tick();
+		pageForm?.requestSubmit();
+	}
 </script>
 
 <Drawer bind:open={showDeadLetters} title="Dead letter queue" size="xl">
@@ -78,11 +93,6 @@
 					{#snippet iconSnippet()}<Skull size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else}
-				{#if deadLetterTotal !== null && deadLetterTotal > deadLetterItems.length}
-					<p class="mb-2 text-xs text-faint">
-						Showing {deadLetterItems.length} of {deadLetterTotal} entries.
-					</p>
-				{/if}
 				{#if held}
 					<p class="mb-2 text-xs text-muted" data-testid="replay-held">
 						{refusalText(held)} Replaying and dismissing need it. Deleting stays open.
@@ -185,7 +195,19 @@
 						{/each}
 					</tbody>
 				</Table>
+				<Pagination
+					page={pageNumber(deadLetterOffset, deadLetterLimit)}
+					perPage={deadLetterLimit}
+					count={deadLetterItems.length}
+					total={deadLetterTotal ?? undefined}
+					hasNext={deadLetterTotal === null && deadLetterItems.length === deadLetterLimit}
+					noun="entries"
+					onchange={turnTo}
+				/>
 			{/if}
+			<form method="POST" action="?/dead-letters" use:enhance bind:this={pageForm} class="hidden">
+				<input type="hidden" name="offset" value={askedOffset} />
+			</form>
 		{/snippet}
 		{#snippet footer()}
 			<Button variant="secondary" type="button" onclick={() => (showDeadLetters = false)}>

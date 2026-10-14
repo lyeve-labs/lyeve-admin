@@ -42,14 +42,14 @@ describe('the dead letter drawer', () => {
 	});
 
 	it('opens on the returned queue and states the total when it is larger than the page', () => {
-		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending'), entry('b', 'replayed')], deadLetterTotal: 9 } } });
+		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending'), entry('b', 'replayed')], deadLetterTotal: 9, deadLetterOffset: 0, deadLetterLimit: 2 } } });
 		expect(dialog()?.textContent).toContain('Dead letter queue');
-		expect(dialog()?.textContent).toContain('Showing 2 of 9 entries.');
+		expect(dialog()?.textContent).toContain('entries 1 to 2 of 9');
 	});
 
 	it('leaves the total out when the queue did not state one', () => {
 		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')], deadLetterTotal: null } } });
-		expect(dialog()?.textContent).not.toContain('Showing');
+		expect(dialog()?.textContent).not.toMatch(/ of \d/);
 	});
 
 	it('offers replay, dismiss and delete on a pending entry only, each posting its id', () => {
@@ -132,5 +132,17 @@ describe('the queue and its own failures', () => {
 		expect(button(/^Dismiss/).disabled).toBe(true);
 		expect(button(/^Delete/).disabled).toBe(false);
 		expect(dialog()?.textContent).toContain('example-feature');
+	});
+
+	it('turns the page by posting the offset it names', async () => {
+		render(DeadLetterDrawer, {
+			props: { form: { deadLetters: [entry('a', 'pending'), entry('b', 'pending')], deadLetterTotal: 5, deadLetterOffset: 0, deadLetterLimit: 2 } },
+		});
+		const pager = document.body.querySelector<HTMLFormElement>('form[action="?/dead-letters"]')!;
+		const submit = vi.spyOn(pager, 'requestSubmit').mockImplementation(() => {});
+		const next = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => /next/i.test(b.getAttribute('aria-label') ?? b.textContent ?? ''));
+		next?.click();
+		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
+		expect(new FormData(pager).get('offset')).toBe('2');
 	});
 });

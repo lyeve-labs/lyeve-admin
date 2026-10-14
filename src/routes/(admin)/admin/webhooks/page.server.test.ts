@@ -353,6 +353,19 @@ describe('admin/webhooks/+page.server.ts reads and writes an admin makes', () =>
 		});
 	});
 
+	it('asks for the page of the queue the form names', async () => {
+		const { event, seen } = postEvent({ offset: '100' }, () => json({ data: [], total_count: 120 }));
+		expect(await actions['dead-letters'](event)).toMatchObject({ deadLetterOffset: 100, deadLetterLimit: 50 });
+		expect(seen[0]).toContain('offset=100');
+	});
+
+	it('reports a failed page turn inside the queue and a failed first read above the list', async () => {
+		const turned = postEvent({ offset: '50' }, () => json({ error: 'pq: timeout' }, 503));
+		expect(await actions['dead-letters'](turned.event)).toMatchObject({ data: { action: 'dead-letters-page' } });
+		const first = postEvent({}, () => json({ error: 'pq: timeout' }, 503));
+		expect(await actions['dead-letters'](first.event)).toMatchObject({ data: { action: 'dead-letters' } });
+	});
+
 	it.each([...names, 'dead-letters'] as const)('%s is refused to a session the engine does not sign in', async (name) => {
 		const fetch = vi.fn(async () => json({ error: 'unauthorized' }, 401)) as unknown as typeof globalThis.fetch;
 		const event = {

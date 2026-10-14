@@ -26,6 +26,12 @@ const LIST_FAILED = 'The webhooks could not be read. This is not a report that t
 /** What the drawer says when the schema names could not be read. */
 const SCHEMAS_FAILED = 'The schemas could not be read.';
 
+/** One page of the dead letter queue. */
+const DEAD_LETTER_PAGE = 50;
+
+/** How many attempts the delivery history asks for. The plugin offers no offset. */
+const DELIVERY_LIMIT = 50;
+
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const client = authedClient(event);
@@ -144,8 +150,8 @@ export const actions: Actions = {
 			const id = String(data.get('id') ?? '');
 
 			try {
-				const items = await listDeliveries(id, client, 50);
-				return { deliveries: { id, items } };
+				const items = await listDeliveries(id, client, DELIVERY_LIMIT);
+				return { deliveries: { id, items, limit: DELIVERY_LIMIT } };
 			} catch (err) {
 				return tagged('deliveries', actionFailure(err, 'Failed to load deliveries'));
 			}
@@ -201,16 +207,25 @@ export const actions: Actions = {
 			const client = authedClient(event);
 			const data = await request.formData();
 			const status = data.get('status');
-			const qs = new URLSearchParams({ limit: '50', offset: '0' });
+			const asked = Number(data.get('offset') ?? 0);
+			const offset = Number.isInteger(asked) && asked > 0 ? asked : 0;
+			const qs = new URLSearchParams({ limit: String(DEAD_LETTER_PAGE), offset: String(offset) });
 			if (status) qs.set('status', String(status));
 
 			try {
 				const res = await client.get<ListEnvelope<DeadLetter> | DeadLetter[]>(
 					`/api/admin/webhook-dead-letters?${qs}`
 				);
-				return { deadLetters: rowsOf(res), deadLetterTotal: statedTotal(res) };
+				return {
+					deadLetters: rowsOf(res),
+					deadLetterTotal: statedTotal(res),
+					deadLetterOffset: offset,
+					deadLetterLimit: DEAD_LETTER_PAGE
+				};
 			} catch (err) {
-				return tagged('dead-letters', actionFailure(err, 'Failed to load dead letters'));
+				// A page turned inside the open queue reports there, and the first
+				// read reports above the list, where the button was.
+				return tagged(offset > 0 ? 'dead-letters-page' : 'dead-letters', actionFailure(err, 'Failed to load dead letters'));
 			}
 		},
 

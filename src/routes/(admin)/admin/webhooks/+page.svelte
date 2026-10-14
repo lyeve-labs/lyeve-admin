@@ -65,7 +65,7 @@
 	const DRAWER_ACTIONS = ['create', 'update'];
 	// The history and the queue draw their own writes' failures inside them,
 	// where the reader clicked, rather than behind the open panel.
-	const OTHER_DRAWERS = ['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
+	const OTHER_DRAWERS = ['retry-delivery', 'dead-letters-page', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
 	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
 	let openedOver = $state.raw<unknown>(null);
 	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
