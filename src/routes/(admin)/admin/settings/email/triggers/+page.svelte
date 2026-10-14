@@ -156,7 +156,7 @@
 	{#if !data.triggers.ok}
 		<GateNotice gate={data.triggers.gate} title="Email triggers" absent="This version of the email plugin has no triggers." />
 	{:else if triggers.length === 0}
-		<EmptyState title="No triggers yet" description="A trigger sends a template to fixed addresses or to an address the record holds, each time its event fires.">
+		<EmptyState level={2} title="No triggers yet" description="A trigger sends a template to fixed addresses or to an address the record holds, each time its event fires.">
 			{#snippet iconSnippet()}<MailPlus size={ICON.lg} />{/snippet}
 			{#snippet action()}
 				{#if canCreate}
