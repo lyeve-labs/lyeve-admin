@@ -362,7 +362,7 @@
 				{#if !data.prices.ok}
 					<GateNotice gate={data.prices.gate} title="the prices" absent="This instance does not serve cost prices." />
 				{:else}
-				<div class="grid gap-3 lg:grid-cols-2" data-testid="cost-prices">
+				<div class="grid gap-3 xl:grid-cols-2" data-testid="cost-prices">
 					{#each RESOURCE_TYPES as resource (resource)}
 						{@const current = priceOf(resource)}
 						<Card>
@@ -385,7 +385,7 @@
 							>
 								<input type="hidden" name="resource_type" value={resource} />
 								<fieldset class="flex flex-col gap-3">
-									<div class="grid gap-3 sm:grid-cols-3">
+									<div class="grid gap-3 sm:grid-cols-[1fr_minmax(9rem,1.4fr)_1fr]">
 										<Input
 											id="price-{resource}-unit"
 											name="unit_price"

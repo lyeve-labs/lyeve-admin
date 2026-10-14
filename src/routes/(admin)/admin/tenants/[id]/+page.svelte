@@ -226,7 +226,11 @@
 				absent="The multitenant plugin does not serve tenant members on this instance."
 			/>
 		{:else if data.members.value.length === 0}
-			<EmptyState title="No members" description="No account calls this tenant home or holds a membership in it." />
+			<EmptyState title="No members" description="No account calls this tenant home or holds a membership in it.">
+				{#snippet action()}
+					<Button variant="secondary" onclick={openNewMember}><Plus size={ICON.sm} /> New member</Button>
+				{/snippet}
+			</EmptyState>
 		{:else}
 			<Table label="Members">
 				<thead>

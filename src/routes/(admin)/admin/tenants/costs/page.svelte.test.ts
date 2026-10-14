@@ -222,3 +222,18 @@ describe('the budget controls', () => {
 		expect(new FormData(form).get('id')).toBe('b1');
 	});
 });
+
+/*
+ * At 1024 pixels two cards sat side by side and the per-units stepper shrank
+ * to a few digits between its buttons, so a block of 1073741824 read as 10737.
+ */
+describe('the price cards on a narrow screen', () => {
+	it('keeps the cards one per row below the widest screens and gives the stepper the widest column', () => {
+		render(CostsPage, { props: { data: data(), form: null } });
+		const cards = screen.getByTestId('cost-prices');
+		expect(cards.className).toContain('xl:grid-cols-2');
+		expect(cards.className).not.toMatch(/(^|\s)lg:grid-cols-2/);
+		const row = document.querySelector('#price-storage-per')?.closest('.grid');
+		expect(row?.className).toContain('minmax(9rem,1.4fr)');
+	});
+});

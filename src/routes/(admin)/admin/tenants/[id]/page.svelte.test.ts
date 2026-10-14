@@ -170,3 +170,11 @@ describe('editing the roles of a super admin', () => {
 		expect(screen.queryByTestId('keeps-super-admin')).toBeNull();
 	});
 });
+
+describe('a tenant with no members', () => {
+	it('offers the action that adds one', () => {
+		const { container } = render(TenantPage, { props: props({ members: { ok: true, value: [] }, memberTotal: 0 }) });
+		expect(container.textContent).toContain('No members');
+		expect(screen.getAllByRole('button', { name: /new member/i }).length).toBe(2);
+	});
+});

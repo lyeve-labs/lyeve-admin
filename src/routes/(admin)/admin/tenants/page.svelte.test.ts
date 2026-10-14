@@ -237,3 +237,14 @@ describe('the tenant drawer fields', () => {
 		expect(drawer?.querySelector('[data-testid="refusal-notice"]')).not.toBeNull();
 	});
 });
+
+describe('the tenant name link on a touch screen', () => {
+	// The link is 17 pixels tall. The kit's hit area extends what a finger can
+	// reach without moving the row.
+	it('carries the extended hit area', () => {
+		const { container } = render(TenantsPage, { props: props() });
+		const link = container.querySelector('a[href="/admin/tenants/t0"]');
+		expect(link?.classList.contains('hit-area')).toBe(true);
+		expect(link?.classList.contains('relative')).toBe(true);
+	});
+});

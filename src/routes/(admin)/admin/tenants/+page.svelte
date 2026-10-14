@@ -219,7 +219,7 @@
 					<tr>
 						<td data-cell="nowrap" class="font-mono text-xs">{tenant.slug}</td>
 						<td data-cell="nowrap">
-							<a href="/admin/tenants/{tenant.id}" class="text-fg transition-colors hover:text-brand">{tenant.name}</a>
+							<a href="/admin/tenants/{tenant.id}" class="relative hit-area text-fg transition-colors hover:text-brand">{tenant.name}</a>
 						</td>
 						<td>
 							{#if tenant.plan}
