@@ -5,7 +5,7 @@ import { createClient, ApiError } from '@lyeve-labs/client';
 import { mfaVerify, isMFAChallenge, type LoginResponse } from '@lyeve-labs/client-rest';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { secondFactorFailure } from '$lib/server/second-factor';
-import { clearSessionCookie, setSessionCookie, sessionToken } from '$lib/server/session-cookie';
+import { clearSessionCookie, setRefreshCookie, setSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import { adminReturnPath } from '$lib/server/local-path';
 import { LANDING } from '$lib/landing';
 import { challengeFrom } from '$lib/captcha';
@@ -87,7 +87,7 @@ export const load: PageServerLoad = async (event) => {
 		routeMounted(fetch, '/api/admin/auth/magic-link/request'),
 	]);
 
-	return { oauthProviders, samlProviders, passwordReset, magicLink };
+	return { oauthProviders, samlProviders, passwordReset, magicLink, ended: event.url?.searchParams.has('ended') === true };
 };
 
 export const actions: Actions = {
@@ -109,8 +109,9 @@ export const actions: Actions = {
 			const code = form.get('code') as string;
 			if (!code) return { error: 'Verification code is required.', mfa_required: true, challenge_token: challengeToken };
 			try {
-				const res = await mfaVerify(challengeToken, code, createClient(fetch));
+				const res: { token: string; refresh_token?: string } = await mfaVerify(challengeToken, code, createClient(fetch));
 				setSessionCookie(event, res.token);
+				setRefreshCookie(event, res.refresh_token);
 			} catch (e) {
 				const failed = secondFactorFailure(e);
 				if (failed.restart) return fail(failed.status, { error: failed.error });
@@ -136,12 +137,13 @@ export const actions: Actions = {
 
 		const client = createClient(fetch);
 		try {
-			const res = await client.post<LoginResponse>('/api/admin/auth/login', body);
+			const res = await client.post<LoginResponse & { refresh_token?: string }>('/api/admin/auth/login', body);
 			if (isMFAChallenge(res)) {
 				// Return challenge token to trigger TOTP step in the UI.
 				return { mfa_required: true, challenge_token: res.challenge_token };
 			}
 			setSessionCookie(event, res.token);
+			setRefreshCookie(event, res.refresh_token);
 		} catch (e) {
 			// Only a rejected credential should read as a rejected credential.
 			// The engine rate-limits this endpoint at 5 attempts, and reporting

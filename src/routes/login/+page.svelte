@@ -59,6 +59,8 @@
 		<form method="POST" use:enhance={signIn.enhance} class="space-y-5">
 			{#if form?.error}
 				<Alert tone="danger">{form.error}</Alert>
+			{:else if data.ended}
+				<Alert tone="warn">Your session ended. Sign in again to continue.</Alert>
 			{/if}
 
 			<Input

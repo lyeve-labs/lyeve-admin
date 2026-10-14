@@ -65,7 +65,7 @@ describe('the console frame', () => {
 		expect(r.location).toBe('/login');
 	});
 
-	it('deletes the session cookie and redirects to /login when the engine answers 401', async () => {
+	it('deletes the session cookie and tells the sign-in page the session ended when the engine answers 401', async () => {
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			if (String(url).includes('/api/admin/setup')) return json({ setup_required: false });
 			// /me endpoint: return 401 (invalid/expired token)
@@ -86,7 +86,7 @@ describe('the console frame', () => {
 			sameSite: 'strict',
 		});
 		expect(r.status).toBe(302);
-		expect(r.location).toBe('/login');
+		expect(r.location).toBe('/login?ended=1');
 	});
 
 	/*

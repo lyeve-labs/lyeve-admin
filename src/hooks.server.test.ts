@@ -9,6 +9,11 @@ vi.mock('$app/environment', () => env);
 
 import { handle } from './hooks.server';
 import { resetSetupGateCache } from '$lib/server/setup-gate';
+import { authedHeaders } from '$lib/server/authz';
+// SvelteKit's own request cookie jar, so a cookie set in handle is read back
+// the way a load reads it.
+// @ts-expect-error SvelteKit ships this module without type declarations.
+import { get_cookies } from '../node_modules/@sveltejs/kit/src/runtime/server/cookie.js';
 
 // helpers
 
@@ -177,5 +182,38 @@ describe('the setup gate on a page request', () => {
 		const response = await handle({ event: event as never, resolve });
 		expect(resolve).toHaveBeenCalled();
 		expect(response.headers.get('X-Frame-Options')).toBe('DENY');
+	});
+});
+
+describe('hooks.server.ts session refresh', () => {
+	it('renews a session close to expiry before any load reads it', async () => {
+		resetSetupGateCache();
+		const part = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
+		const now = Math.floor(Date.now() / 1000);
+		const old = `${part({ alg: 'HS256' })}.${part({ sub: 'u', exp: now + 30 })}.s`;
+		const renewed = `${part({ alg: 'HS256' })}.${part({ sub: 'u', exp: now + 900 })}.s`;
+		const fetch = vi.fn(async (url: string): Promise<Response> => {
+			const body = url.endsWith('/auth/refresh')
+				? { token: renewed, refresh_token: 'refresh-2' }
+				: { setup_required: false };
+			return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		});
+		const url = new URL('https://admin.example.com/admin/users');
+		const request = new Request(url, {
+			headers: { cookie: `__Host-sys_session=${old}; __Host-console_refresh=refresh-1` },
+		});
+		const jar = get_cookies(request, url);
+		jar.set_trailing_slash('never');
+		const event = { ...stubEvent('/admin/users', fetch as never), url, request, cookies: jar.cookies };
+
+		let seen = '';
+		const resolve = vi.fn(async (e: unknown) => {
+			seen = authedHeaders(e as never).Authorization;
+			return new Response('ok');
+		});
+		await handle({ event: event as never, resolve });
+
+		expect(fetch).toHaveBeenCalledWith('/api/admin/auth/refresh', expect.anything());
+		expect(seen).toBe(`Bearer ${renewed}`);
 	});
 });
