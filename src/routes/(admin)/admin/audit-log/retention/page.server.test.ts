@@ -182,31 +182,40 @@ describe('releasing a legal hold', () => {
 	});
 
 	it('relays a refusal and hides an outage', async () => {
-		const refused = engine({ id: 'h1' }, { reply: json({ error: 'hold already released' }, 409) });
-		expect(((await actions.releaseHold(refused.event)) as Failure).data).toEqual({ action: 'releaseHold', error: 'hold already released' });
+		// The plugin answers 404 for a hold that is already released.
+		const refused = engine({ id: 'h1' }, { reply: json({ error: 'failed to delete legal hold' }, 404) });
+		expect(((await actions.releaseHold(refused.event)) as Failure).data).toEqual({ action: 'releaseHold', error: 'failed to delete legal hold' });
 		const down = engine({ id: 'h1' }, { reply: OUTAGE });
 		expect(((await actions.releaseHold(down.event)) as Failure).data.error).toBe('The hold could not be released.');
 	});
 });
 
 describe('enforcing retention now', () => {
-	it('reports how many entries the engine deleted', async () => {
-		const { event, calls } = engine({}, { reply: json({ deleted: 12 }) });
-		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 12 });
+	// The plugin counts per policy and sends no total, so the action adds the
+	// policies' deletions up.
+	it('reports the entries deleted across every policy the run processed', async () => {
+		const run = {
+			policies_processed: 2,
+			results: [
+				{ policy_id: 'p1', event_type: 'content.delete', resource_type: '', entries_archived: 0, entries_deleted: 9, elapsed: '4ms' },
+				{ policy_id: 'p2', event_type: '', resource_type: 'entry', entries_archived: 3, entries_deleted: 3, elapsed: '2ms' },
+			],
+			elapsed: '7ms',
+		};
+		const { event, calls } = engine({}, { reply: json(run) });
+		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 12, policies: 2 });
 		expect(calls).toEqual([{ method: 'POST', path: '/api/admin/retention/enforce', body: {} }]);
 	});
 
-	it('reads a run that names no count as none deleted', async () => {
-		const { event } = engine({}, { reply: json({}) });
-		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 0 });
+	it('reads a run with no policy to process as none deleted', async () => {
+		const { event } = engine({}, { reply: json({ policies_processed: 0, results: null, elapsed: '1ms' }) });
+		expect(await actions.enforce(event)).toEqual({ enforced: true, deleted: 0, policies: 0 });
 	});
 
-	it('relays a refusal and hides an outage', async () => {
-		const refused = engine({}, { reply: json({ error: 'a legal hold blocks enforcement' }, 409) });
-		expect(((await actions.enforce(refused.event)) as Failure).data).toEqual({ action: 'enforce', error: 'a legal hold blocks enforcement' });
-		const down = engine({}, { reply: OUTAGE });
-		const out = (await actions.enforce(down.event)) as Failure;
-		expect(out.data.error).toBe('Retention could not be enforced.');
-		expect(out.data.error).not.toContain('10.0.0.4');
+	it('says a failed run failed, without the engine text', async () => {
+		for (const reply of [OUTAGE, json({ error: 'retention enforcement failed' }, 500)]) {
+			const { event } = engine({}, { reply });
+			expect(((await actions.enforce(event)) as Failure).data).toEqual({ action: 'enforce', error: 'Retention could not be enforced.' });
+		}
 	});
 });

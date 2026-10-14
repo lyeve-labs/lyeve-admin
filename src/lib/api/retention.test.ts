@@ -5,6 +5,7 @@ import {
 	archivalLabel,
 	archivalTone,
 	deletionIsBlocked,
+	entriesDeleted,
 	holdIsUnbounded,
 	holdScope,
 	policyIsCatchAll,
@@ -130,5 +131,23 @@ describe('the gate', () => {
 	it('never reports a failed read as nothing being deleted', () => {
 		const gate = retentionGate(new Error('network'));
 		expect(gate.state === 'error' && gate.message).toContain('not a report that nothing is being deleted');
+	});
+});
+
+describe('an enforcement run', () => {
+	it('adds up the entries each policy deleted', () => {
+		const run = {
+			policies_processed: 2,
+			results: [
+				{ policy_id: 'p1', entries_deleted: 9 },
+				{ policy_id: 'p2', entries_deleted: 3, entries_archived: 3 },
+			],
+		};
+		expect(entriesDeleted(run)).toBe(12);
+	});
+
+	it('counts a run that processed nothing as none deleted', () => {
+		expect(entriesDeleted({ policies_processed: 0, results: null })).toBe(0);
+		expect(entriesDeleted({})).toBe(0);
 	});
 });

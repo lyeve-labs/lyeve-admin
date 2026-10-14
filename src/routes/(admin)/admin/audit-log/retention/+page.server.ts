@@ -10,6 +10,7 @@ import {
 	createPolicy,
 	deletePolicy,
 	enforceNow,
+	entriesDeleted,
 	listHolds,
 	listPolicies,
 	releaseHold,
@@ -140,8 +141,8 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const client = authedClient(event);
 		try {
-			const result = await enforceNow(client);
-			return { enforced: true, deleted: result.deleted ?? 0 };
+			const run = await enforceNow(client);
+			return { enforced: true, deleted: entriesDeleted(run), policies: run.policies_processed ?? 0 };
 		} catch (err) {
 			return fail(400, { action: 'enforce' as const, error: actionError(err, 'Retention could not be enforced.') });
 		}
