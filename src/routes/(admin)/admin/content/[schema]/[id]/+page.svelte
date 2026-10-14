@@ -1,7 +1,7 @@
 <script lang="ts">
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import OlderHidden from '$lib/components/OlderHidden.svelte';
-	import { Badge, Breadcrumb, Button, Card, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
+	import { Badge, Breadcrumb, Button, Card, NumberInput, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { enhance } from '$app/forms';
@@ -114,6 +114,12 @@
 	let nextOlder = $derived(
 		revisions.length > 0 ? Math.min(...revisions.map((r) => r.revision_num)) - 1 : 0,
 	);
+	// The number the opener asks for. It starts at the next older revision and
+	// takes any number down to the first, so every revision can be opened.
+	let openNum = $state(0);
+	$effect(() => {
+		if (openNum < 1 || openNum > nextOlder) openNum = nextOlder;
+	});
 
 	// A refusal from opening or restoring a revision stays in the panel.
 	let revisionError = $derived(form && 'revision' in form && form.revision === true ? (form.error ?? '') : '');
@@ -355,20 +361,14 @@
 								<p class="text-xs text-muted">
 									The newest {revisions.length} of {revisionTotal} revisions are listed. Open an older one by number.
 								</p>
-								{#if nextOlder > 0 && !openedRevision}
-									<form method="POST" action="?/openRevision" use:enhance>
-										<input type="hidden" name="rev_num" value={nextOlder} />
-										<Button variant="secondary" size="sm" type="submit">Open revision {nextOlder}</Button>
-									</form>
+								{#if nextOlder > 0}
+									{@render revisionOpener()}
 								{/if}
 							{/if}
 							{#if olderHidden}
 								<OlderHidden count={hiddenOlder} noun="revisions" {windowDays}>
-									{#if nextOlder > 0 && !openedRevision}
-										<form method="POST" action="?/openRevision" use:enhance>
-											<input type="hidden" name="rev_num" value={nextOlder} />
-											<Button variant="secondary" size="sm" type="submit">Open revision {nextOlder}</Button>
-										</form>
+									{#if nextOlder > 0}
+										{@render revisionOpener()}
 									{/if}
 								</OlderHidden>
 							{/if}
@@ -382,3 +382,19 @@
 		{/if}
 	</div>
 </PageShell>
+
+<!-- Opens an older revision by number, from one up to the next older than the oldest listed. -->
+{#snippet revisionOpener()}
+	<form method="POST" action="?/openRevision" use:enhance class="flex items-end gap-2" data-testid="open-revision">
+		<NumberInput
+			id="open-revision-num"
+			name="rev_num"
+			label="Revision number"
+			min={1}
+			max={nextOlder}
+			bind:value={openNum}
+			class="min-w-0 flex-1"
+		/>
+		<Button variant="secondary" size="sm" type="submit">Open</Button>
+	</form>
+{/snippet}
