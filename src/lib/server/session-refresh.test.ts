@@ -375,3 +375,43 @@ describe('an engine that cannot answer', () => {
 		expect(fetch).toHaveBeenCalledTimes(2);
 	});
 });
+
+describe('a request that is part of a renewal', () => {
+	/** Fails a renewal that never settles instead of letting the test time out. */
+	function settles(work: Promise<void>): Promise<void> {
+		return Promise.race([
+			work,
+			new Promise<void>((_, reject) => setTimeout(() => reject(new Error('the renewal waited on itself')), 1_000)),
+		]);
+	}
+
+	/** An engine call that first comes back into this console as inner, with the same cookies. */
+	function comingBack(inner: (engine: typeof globalThis.fetch) => RequestEvent) {
+		const engine = renewing();
+		const fetch = vi.fn(async () => {
+			// The request arrives after this trade is under way, as it does through a real fetch.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			await refreshSession(inner(engine));
+			return engine();
+		});
+		return { engine, fetch };
+	}
+
+	it('finishes when its call comes back as a request this console made to itself', async () => {
+		const { engine, fetch } = comingBack((f) =>
+			Object.assign(signedIn(CLOSE, f, '/admin/users'), { isSubRequest: true })
+		);
+		const e = signedIn(CLOSE, fetch);
+		await settles(refreshSession(e));
+		expect(engine).toHaveBeenCalledTimes(1);
+		expect(e.cookies.get('__Host-sys_session')).toBe(RENEWED);
+	});
+
+	it('finishes when its call comes back over the network to the refresh route', async () => {
+		const { engine, fetch } = comingBack((f) => signedIn(CLOSE, f, '/api/admin/auth/refresh'));
+		const e = signedIn(CLOSE, fetch);
+		await settles(refreshSession(e));
+		expect(engine).toHaveBeenCalledTimes(1);
+		expect(e.cookies.get('__Host-sys_session')).toBe(RENEWED);
+	});
+});

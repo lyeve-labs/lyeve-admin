@@ -45,6 +45,9 @@ const KEEP_MS = 10 * 1000;
 /** The most answers kept at once. The oldest go first. */
 const KEPT_MAX = 10_000;
 
+/** The engine's route that trades a refresh token for a new pair. */
+const REFRESH_PATH = '/api/admin/auth/refresh';
+
 /** Where the sign-in page says the session ended. */
 export const SESSION_ENDED = '/login?ended=1';
 
@@ -153,7 +156,7 @@ export function needsRefresh(token: string, now = Date.now()): boolean {
 async function trade(refresh: string, fetch: typeof globalThis.fetch): Promise<Trade> {
 	let res: Response;
 	try {
-		res = await fetch('/api/admin/auth/refresh', {
+		res = await fetch(REFRESH_PATH, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ refresh_token: refresh }),
@@ -229,6 +232,10 @@ export function sessionEndedTarget(url: URL, method: string): string {
  * way it shows on any page.
  */
 export async function refreshSession(event: RequestEvent): Promise<void> {
+	// A request this console made to itself carries cookies its parent already
+	// renewed, and the renewal's own call arriving here is the trade in flight.
+	// Either one waiting on a renewal would wait on itself and never answer.
+	if (event.isSubRequest || event.url.pathname === REFRESH_PATH) return;
 	const refresh = refreshToken(event);
 	if (!refresh) return;
 	const current = sessionToken(event);
