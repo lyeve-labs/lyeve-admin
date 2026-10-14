@@ -94,10 +94,13 @@
 		{#if plugin?.beta}
 			<Badge tone="violet" size="sm">Beta</Badge>
 		{/if}
-		<Button variant="secondary" size="sm" href="/admin/settings/configuration?plugin={encodeURIComponent(pluginName)}">
-			<Settings size={ICON.sm} />
-			Settings
-		</Button>
+		<!-- The settings page is a super admin's alone. -->
+		{#if isSuperAdmin}
+			<Button variant="secondary" size="sm" href="/admin/settings/configuration?plugin={encodeURIComponent(pluginName)}">
+				<Settings size={ICON.sm} />
+				Settings
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if plugin}

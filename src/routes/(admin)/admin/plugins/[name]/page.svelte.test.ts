@@ -151,6 +151,14 @@ describe('plugin detail page', () => {
 		expect(container.querySelector('form')).toBeNull();
 	});
 
+	it('offers the settings page to a super admin only, who alone may open it', () => {
+		renderPage(SEARCH);
+		expect(screen.getByRole('link', { name: /settings/i })).toBeTruthy();
+		cleanup();
+		renderPage(SEARCH, { roles: ['admin'] });
+		expect(screen.queryByRole('link', { name: /settings/i })).toBeNull();
+	});
+
 	it('names the plugin by its name when nothing describes it', () => {
 		const { container } = renderPage(null, { roles: ['admin'], trafficRead: false });
 		expect(container.querySelector('h1')?.textContent).toContain('search');

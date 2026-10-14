@@ -60,6 +60,24 @@ function props(over: Record<string, unknown> = {}, form: unknown = null) {
 	};
 }
 
+describe('email triggers without the license for writes', () => {
+	const refused = { kind: 'feature', feature: 'Email Pro', plugin: 'email', upgradeUrl: '' };
+
+	it('disables New and Edit with the reason, and keeps Delete', () => {
+		render(TriggersPage, { props: props({ writeRefusal: refused }) });
+		const create = screen.getAllByRole('button', { name: /new trigger/i })[0] as HTMLButtonElement;
+		expect(create.disabled).toBe(true);
+		expect((screen.getByRole('button', { name: 'Edit Order confirmation' }) as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByRole('button', { name: 'Delete Order confirmation' }) as HTMLButtonElement).disabled).toBe(false);
+		expect(document.body.textContent).toContain('Creating or editing a trigger needs Email Pro');
+	});
+
+	it('leaves New and Edit live when the license allows them', () => {
+		render(TriggersPage, { props: props({ writeRefusal: null }) });
+		expect((screen.getByRole('button', { name: 'Edit Order confirmation' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+});
+
 describe('email triggers page', () => {
 	it('says a failed template read failed rather than that the tenant has none', () => {
 		render(TriggersPage, {
