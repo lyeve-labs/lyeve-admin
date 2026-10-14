@@ -5,7 +5,8 @@ import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
-import { setRelations } from '$lib/server/content-relations';
+import { setEntryRelations } from '$lib/server/content-relations';
+import { fieldRefusalOf } from '$lib/server/content-validation';
 import { entryIdentity } from '$lib/utils/new-entry';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
 import { getLocales } from '$lib/api/localization';
@@ -92,9 +93,13 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const raw = form.get('data') as string;
 		const m2mRaw = form.get('m2m_relations') as string | null;
+		let schemaDef: Schema | null = null;
+		let created = '';
+		let links: Record<string, string[]> | null = null;
 		try {
 			const data = stripProtectedFields(JSON.parse(raw) as Record<string, unknown>);
-			const schemaDef = await getSchema(params.schema, client).catch(() => null);
+			links = m2mRaw ? (JSON.parse(m2mRaw) as Record<string, string[]>) : null;
+			schemaDef = await getSchema(params.schema, client).catch(() => null);
 			const { title, slug } = entryIdentity(data, schemaDef?.fields ?? []);
 
 			// title and slug are columns on the entry and stay in the body as
@@ -110,17 +115,22 @@ export const actions: Actions = {
 				slug,
 				body: data,
 			});
-
-			if (m2mRaw && item?.id) {
-				const m2m = JSON.parse(m2mRaw) as Record<string, string[]>;
-				await Promise.all(
-					Object.entries(m2m).map(([fieldName, ids]) =>
-						setRelations(event, item.id, fieldName, ids),
-					),
-				);
-			}
+			created = item?.id ?? '';
 		} catch (err) {
+			const shown = (schemaDef?.fields ?? []).filter((f) => !f.system).map((f) => f.name);
+			const refused = fieldRefusalOf(err, shown);
+			if (refused) return fail(422, refused);
 			return fail(400, { error: actionError(err, 'Failed to create entry. Check all fields and try again.') });
+		}
+
+		// The entry exists once the create answered, so a refused link is
+		// reported beside its id. Sending the form again would create a second
+		// entry, and a redirect to the list would read as a full success.
+		if (links && created) {
+			const failed = await setEntryRelations(event, created, links);
+			if (failed) {
+				return fail(400, { error: `The entry was created, but not every link was saved. ${failed}`, created });
+			}
 		}
 		redirect(303, `/admin/content/${params.schema}`);
 	},

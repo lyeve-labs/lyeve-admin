@@ -168,3 +168,15 @@ describe('content entry editor, revision history', () => {
 		expect((opened.querySelector('input[name="rev_num"]') as HTMLInputElement).value).toBe('4');
 	});
 });
+
+describe('content entry editor, a schema refusal', () => {
+	it('shows the message the plugin gave beside the field it refused', () => {
+		const { container } = render(EntryPage, {
+			props: {
+				data: data(),
+				form: { error: 'The entry was not saved. Check the highlighted fields.', fieldErrors: { title: 'must be at least 3 characters' } } as never,
+			},
+		});
+		expect(container.querySelector('[data-field-name="title"]')?.textContent).toContain('must be at least 3 characters');
+	});
+});

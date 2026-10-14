@@ -44,8 +44,8 @@ vi.mock('@lyeve-labs/client-rest', () => rest);
 const relations = vi.hoisted(() => ({
 	// Takes the event, not a fetch and a token: the CSRF header the write needs
 	// is built from the event's cookies in one place.
-	setRelations: vi.fn(
-		async (_event: unknown, _entryID: string, _fieldName: string, _ids: string[]) => {},
+	setEntryRelations: vi.fn(
+		async (_event: unknown, _entryID: string, _byField: Record<string, string[]>): Promise<string | null> => null,
 	),
 }));
 vi.mock('$lib/server/content-relations', () => relations);
@@ -77,7 +77,7 @@ async function create(data: Record<string, unknown>, m2m?: Record<string, string
 
 beforeEach(() => {
 	client.post.mockClear();
-	relations.setRelations.mockClear();
+	relations.setEntryRelations.mockClear();
 });
 
 describe('creating a content entry', () => {
@@ -116,14 +116,39 @@ describe('creating a content entry', () => {
 
 	it('writes the relations against the id the admin store gave back', async () => {
 		await create({ title: 'Contact' }, { tags: ['t1', 't2'] });
-		expect(relations.setRelations).toHaveBeenCalledOnce();
-		const [event, entryID, fieldName, ids] = relations.setRelations.mock.calls[0];
+		expect(relations.setEntryRelations).toHaveBeenCalledOnce();
+		const [event, entryID, byField] = relations.setEntryRelations.mock.calls[0];
 		// The event carries the session and CSRF cookies. Anything else here
 		// sends Bearer alone, which the engine refuses with 403.
 		expect(event).toHaveProperty('cookies');
 		expect(entryID).toBe('e1');
-		expect(fieldName).toBe('tags');
-		expect(ids).toEqual(['t1', 't2']);
+		expect(byField).toEqual({ tags: ['t1', 't2'] });
+	});
+
+	it('reports links the plugin refused instead of redirecting as a success', async () => {
+		relations.setEntryRelations.mockResolvedValueOnce('In tags, 1 link could not be added.');
+		const { result, threw } = await create({ title: 'Contact' }, { tags: ['t1'] });
+		expect(threw).toBeUndefined();
+		const data = (result as { data: { error: string; created: string } }).data;
+		expect(data.error).toContain('The entry was created');
+		expect(data.error).toContain('In tags, 1 link could not be added.');
+		expect(data.created).toBe('e1');
+	});
+
+	// The plugin answers a value the schema refuses with an errors array and no
+	// error key, so the message the client carries is the raw body.
+	it('reads a schema refusal into a message per field', async () => {
+		const refusal = Object.assign(
+			new FakeApiError('{"errors":[{"field":"title","message":"must be an email"}]}', 422),
+			{ body: { errors: [{ field: 'title', message: 'must be an email', code: 'email', rule: 'email' }] } },
+		);
+		client.post.mockRejectedValueOnce(refusal);
+		const { result } = await create({ title: 'Contact' });
+		const failure = result as { status: number; data: { error: string; fieldErrors: Record<string, string> } };
+		expect(failure.status).toBe(422);
+		expect(failure.data.fieldErrors).toEqual({ title: 'must be an email' });
+		expect(failure.data.error).toBe('The entry was not saved. Check the highlighted fields.');
+		expect(failure.data.error).not.toContain('{');
 	});
 
 	it('relays the reason a create was refused', async () => {

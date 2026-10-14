@@ -44,3 +44,28 @@ describe('new entry locale', () => {
 		expect(queryByText(/could not be read/)).toBeNull();
 	});
 });
+
+describe('new entry refusals', () => {
+	it('shows the message the plugin gave beside the field it refused', () => {
+		const { container } = render(NewEntryPage, {
+			props: {
+				data: data(null),
+				form: { error: 'The entry was not saved. Check the highlighted fields.', fieldErrors: { title: 'must be at least 3 characters' } } as never,
+			},
+		});
+		const field = container.querySelector('[data-field-name="title"]');
+		expect(field?.textContent).toContain('must be at least 3 characters');
+		expect(container.textContent).toContain('1 field needs attention.');
+	});
+
+	it('offers the created entry instead of a second Create when a link did not save', () => {
+		const { container, queryByRole } = render(NewEntryPage, {
+			props: {
+				data: data(null),
+				form: { error: 'The entry was created, but not every link was saved.', created: 'e1' } as never,
+			},
+		});
+		expect(queryByRole('button', { name: 'Create' })).toBeNull();
+		expect(container.querySelector('a[href="/admin/content/posts/e1"]')?.textContent).toContain('Open the entry');
+	});
+});

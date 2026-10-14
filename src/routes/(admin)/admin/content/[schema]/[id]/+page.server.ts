@@ -6,7 +6,8 @@ import { authedClient, requireUser, stripProtectedFields } from '$lib/server/aut
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
 import { readRelationChoices } from '$lib/server/relation-choices';
-import { setRelations } from '$lib/server/content-relations';
+import { setEntryRelations } from '$lib/server/content-relations';
+import { fieldRefusalOf } from '$lib/server/content-validation';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
@@ -382,8 +383,10 @@ export const actions: Actions = {
 		const raw = form.get('data') as string;
 		const m2mRaw = form.get('m2m_relations') as string | null;
 
+		let links: Record<string, string[]> | null = null;
 		try {
 			const data = stripProtectedFields(JSON.parse(raw) as Record<string, unknown>);
+			links = m2mRaw ? (JSON.parse(m2mRaw) as Record<string, string[]>) : null;
 			// title is written twice on purpose. It is a column on the entry, and
 			// the load overlays that column on top of body, so a title only in
 			// body never reads back. It is also a field of the schema, and the
@@ -394,17 +397,23 @@ export const actions: Actions = {
 				...(typeof title === 'string' ? { title } : {}),
 				body: data,
 			});
-
-			if (m2mRaw) {
-				const m2m = JSON.parse(m2mRaw) as Record<string, string[]>;
-				await Promise.all(
-					Object.entries(m2m).map(([fieldName, ids]) =>
-						setRelations(event, params.id, fieldName, ids),
-					),
-				);
-			}
 		} catch (err) {
+			// The fields the form shows are the schema's own, so a refusal names
+			// them against the schema rather than against what the form sent.
+			if (err instanceof ApiError && err.status === 422) {
+				const schemaDef = await getSchema(params.schema, client).catch(() => null);
+				const shown = (schemaDef?.fields ?? []).filter((f) => !f.system).map((f) => f.name);
+				const refused = fieldRefusalOf(err, shown);
+				if (refused) return fail(422, refused);
+			}
 			return fail(400, { error: actionError(err, 'Failed to save entry. Check all fields and try again.') });
+		}
+
+		// The entry is saved by now, so a refused link is reported as such
+		// rather than as a failed save or a finished one.
+		if (links) {
+			const failed = await setEntryRelations(event, params.id, links);
+			if (failed) return fail(400, { error: `The entry was saved, but not every link was. ${failed}` });
 		}
 		redirect(303, `/admin/content/${params.schema}`);
 	},

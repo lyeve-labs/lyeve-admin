@@ -54,6 +54,12 @@
 		),
 	);
 
+	// A value the plugin refused comes back by field, so each control marks its
+	// own message the way a value refused before sending does.
+	$effect(() => {
+		if (form && 'fieldErrors' in form && form.fieldErrors) validationErrors = form.fieldErrors as Record<string, string>;
+	});
+
 	function handleSubmit(e: SubmitEvent) {
 		const errors = validate(userFields, formValues);
 		if (Object.keys(errors).length > 0) {
