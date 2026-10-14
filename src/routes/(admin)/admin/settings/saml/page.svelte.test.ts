@@ -232,6 +232,15 @@ describe('the role', () => {
 describe('the drawer', () => {
 	const drawerText = () => document.body.querySelector('form#saml-provider-form')?.textContent ?? '';
 
+	// The two last switches sat 16px apart, so the second one's touch hit area
+	// took the bottom of the first one's.
+	it('spaces the last two switches so each keeps its touch hit area', async () => {
+		render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		const enabled = document.body.querySelector('#saml-enabled')?.closest('label') as HTMLElement;
+		expect(enabled.className).toContain('coarse:mt-2');
+	});
+
 	it('shows a refused save inside the open drawer', async () => {
 		const { rerender } = render(SamlPage, { props: props() });
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);

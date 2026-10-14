@@ -510,6 +510,7 @@
 			<Toggle
 				id="saml-enabled"
 				label="Show on the sign-in page"
+				class="coarse:mt-2"
 				bind:checked={enabled}
 			/>
 		</div>

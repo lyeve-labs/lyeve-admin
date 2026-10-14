@@ -79,6 +79,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A console started without the internal engine address renews a session instead of hanging every page once the session is two minutes from expiry.
 - Rate limits: the page stays up when two live counters differ only by tenant, and each live counter says which tenant it counts, or that it counts the whole instance or requests with no tenant.
 - On a phone the GraphQL endpoint notes keep a readable width and the table scrolls in its box, and below 1280 pixels the GraphQL schema tables stack instead of sitting three across with a description column a few letters wide. A review stage stays on one line in the definitions table, and an AI price's update time stays on one line. On a phone the stage name in the New review definition form keeps a readable width beside its number and its placeholder shows whole, with the stage buttons on the line below.
+- Under a finger the flow name, the only way to open a flow, takes a full touch target, as do the content sort headers and the switch for encrypted assertions in the New SAML provider form.
 
 ### Upgrade notes
 

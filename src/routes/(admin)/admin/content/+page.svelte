@@ -143,9 +143,12 @@
 
 {#snippet sortHeader(key: CollectionSort, label: string, align: 'left' | 'right')}
 	<th scope="col" aria-sort={ariaSort(key)} class={align === 'right' ? 'text-right' : undefined}>
+		<!-- The header row is 40px tall and the scroll box clips the link's 44px
+		     hit area to it. Under a finger the link gives back 4px of its negative
+		     margin, so the row grows to 44px and holds the whole area. -->
 		<a
 			href={sortHref(key)}
-			class="relative -my-1 py-1 inline-flex items-center gap-1 hit-area outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-brand"
+			class="relative -my-1 coarse:-my-0.5 py-1 inline-flex items-center gap-1 hit-area outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-brand"
 		>
 			{label}
 			{#if data.sort === key}
