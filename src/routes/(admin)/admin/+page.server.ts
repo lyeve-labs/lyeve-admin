@@ -161,9 +161,9 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 				`/api/admin/logs/search?level=ERROR&from=${encodeURIComponent(from)}&limit=${RECENT}`
 			)
 		),
-		// super_admin only. An admin's 403 reads as null, and the tile that
-		// would say "no failures" is not drawn from a report nobody read.
-		ifAdmin(true, () => getSecurityControls(client)),
+		// The security report is a super admin route, so no other role is
+		// asked for it. Null means it was not read, and nothing is drawn from it.
+		ifSuperAdmin(true, () => getSecurityControls(client)),
 	]);
 
 	const jobList = jobs === null ? null : Array.isArray(jobs) ? jobs : (jobs.jobs ?? []);

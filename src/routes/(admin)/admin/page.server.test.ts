@@ -205,7 +205,7 @@ const schemaList = [{ name: 'post', display_name: 'Post', fields: [] }];
  */
 describe('admin dashboard load', () => {
 	it('asks no plugin anything on an engine that runs none, and still reads its own security report', async () => {
-		const { event, seen } = loadEvent({}, admin, 'http://localhost/admin', {
+		const { event, seen } = loadEvent({}, superAdmin, 'http://localhost/admin', {
 			plugins: { state: 'named', running: [], withheld: [] },
 		});
 
@@ -410,6 +410,17 @@ describe('admin dashboard load', () => {
 		expect(d.entryTotal).toBeNull();
 		expect(d.entries).toBeNull();
 		expect(d.requests).toBeNull();
+	});
+
+	// The security report is a super admin route, so an admin's visit does not
+	// cost a refused read.
+	it('does not ask an admin for the security report', async () => {
+		const { seen, event } = loadEvent({ '/api/admin/schemas': schemaList });
+
+		const d = (await load(event)) as Loaded;
+
+		expect(seen).not.toContain('/api/admin/security/controls');
+		expect(d.controlFailures).toBeNull();
 	});
 
 	// The scheduler lists its jobs to a super admin only.

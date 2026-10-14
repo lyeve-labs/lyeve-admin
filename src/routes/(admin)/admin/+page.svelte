@@ -60,7 +60,8 @@
 		(data.offers.analytics && !data.requests) ||
 			(data.superAdmin && data.offers.jobs && !data.jobs) ||
 			(data.offers.logs && data.errorsLogged === null) ||
-			(data.offers.webhooks && !data.webhooks)
+			(data.offers.webhooks && !data.webhooks) ||
+			(data.superAdmin && data.controlFailures === null)
 	);
 
 	const entriesSub = $derived(

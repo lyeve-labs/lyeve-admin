@@ -34,6 +34,7 @@ const empty = data({ schemas: { ok: true, value: [] }, entryTotal: null });
 
 /** Every tile read and answered, with nothing wrong. */
 const quiet = {
+	controlFailures: 0,
 	requests: { total: 10, errorRate: 0, p95: 5 },
 	jobs: { enabled: 1, failed: [] },
 	errorsLogged: 0,
@@ -253,6 +254,12 @@ describe('needs attention', () => {
 		const { container } = render(DashboardPage, { props: { data: data(quiet), form: null } });
 
 		expect(container.textContent).toContain('Nothing needs attention in the last 24 hours.');
+	});
+
+	it('does not call the instance quiet when the security report could not be read', () => {
+		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, controlFailures: null }), form: null } });
+
+		expect(container.textContent).toContain('Nothing needs attention in what could be read.');
 	});
 
 	it('does not call the instance quiet when a tile could not be read', () => {
