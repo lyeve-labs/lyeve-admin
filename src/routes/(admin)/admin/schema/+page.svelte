@@ -737,11 +737,12 @@
 
 			{#if view === 'canvas' && SchemaCanvas && data.canvasGate}
 				<div class="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6" data-testid="schema-canvas-unread">
-					<GateNotice gate={data.canvasGate} title="Schema canvas" absent="This build does not serve the schema canvas. The list editor does everything." />
+					<GateNotice level={2} gate={data.canvasGate} title="Schema canvas" absent="This build does not serve the schema canvas. The list editor does everything." />
 				</div>
 			{:else if view === 'canvas' && SchemaCanvas && !canvasLicensed}
 				<div class="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6" data-testid="schema-canvas-locked">
 					<NotEnabled
+						level={2}
 						title="Schema canvas"
 						description="The canvas draws every content type and its relations as a diagram you edit in place, and keeps the layout your team arranges. This instance's license does not include it. The list editor does everything else."
 					/>

@@ -11,15 +11,18 @@ vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async (
 
 // The builder is tested as a build without the diagram, whatever the tree
 // carries. A case that needs the page's side of the diagram sets the flag.
-const seam = vi.hoisted(() => ({ diagram: false }));
+const seam = vi.hoisted(() => ({ diagram: false, canvas: null as unknown }));
 vi.mock('$lib/canvas/schema', () => ({
-	SchemaCanvas: null,
+	get SchemaCanvas() {
+		return seam.canvas;
+	},
 	get hasSchemaCanvas() {
 		return seam.diagram;
 	},
 }));
 
 import SchemaPage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(() => {
 	cleanup();
@@ -833,3 +836,32 @@ describe('schema builder transports', () => {
 	});
 });
 
+describe('heading outline', () => {
+	// A collapsed list hides its header from lg up through the stylesheet,
+	// which the test document does not apply, so the test hides it the same way.
+	async function canvasWithListCollapsed(overrides: Record<string, unknown>) {
+		const view = render(SchemaPage, { props: { data: data(overrides), form: null } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'Canvas' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Collapse Content types' }));
+		for (const el of view.container.querySelectorAll('.lg\\:hidden')) el.setAttribute('hidden', '');
+		return view;
+	}
+
+	for (const [state, overrides] of [
+		['the license leaves the canvas out', { canvas: { licensed: false } }],
+		['the canvas read is refused for the license', { canvasGate: { state: 'locked', upgradeUrl: '' } }],
+	] as const) {
+		it(`keeps the canvas notice one level under the title with the list collapsed when ${state}`, async () => {
+			seam.diagram = true;
+			seam.canvas = {};
+			try {
+				const { container } = await canvasWithListCollapsed(overrides);
+				expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+				expect(outlineSkips(container)).toEqual([]);
+			} finally {
+				seam.diagram = false;
+				seam.canvas = null;
+			}
+		});
+	}
+});
