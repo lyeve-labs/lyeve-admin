@@ -46,7 +46,7 @@ export const load: LayoutServerLoad = async (event) => {
 		// The address is read only here, on the way out, so a session that
 		// stands does not make this load depend on it and re-run on every
 		// navigation.
-		redirect(302, sessionEndedTarget(event.url, 'GET'));
+		redirect(302, sessionEndedTarget(event.url, event.request.method));
 	}
 
 	/*
