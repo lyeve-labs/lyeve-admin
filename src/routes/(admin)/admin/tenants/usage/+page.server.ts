@@ -84,18 +84,23 @@ export const load: PageServerLoad = async (event) => {
 	// A request names its requester by account id, so the directory turns the
 	// ids into emails.
 	const ok = gate.state === 'ok';
+	// A quota row draws its usage beside its limit. Every tenant's usage is a
+	// super admin's read, and an admin reads their own tenant's. The session
+	// does not carry the tenant, but an admin's quota list holds only their
+	// own tenant's row, so that row names it. With no row there is nothing to
+	// draw the usage beside, so nothing is asked.
+	const ownTenant = superAdmin ? '' : (quotas[0]?.tenant_id ?? '');
+	const NO_USAGE: Section<TenantUsage[]> = { ok: true, value: [] };
+	const usageRead = !ok
+		? Promise.resolve(UNREAD)
+		: superAdmin
+			? section(listTenantUsage(client).then((u) => rowsOf(u)), USAGE_FAILED)
+			: ownTenant
+				? section(getTenantUsage(client, ownTenant).then((u) => [u]), USAGE_FAILED)
+				: Promise.resolve(NO_USAGE);
 	const [requestRead, usage, people] = await Promise.all([
 		ok ? section(listRequests(client, 'pending'), REQUESTS_FAILED) : Promise.resolve(UNREAD),
-		// A quota row draws its usage beside its limit. Every tenant's usage is
-		// a super admin's read, and an admin reads their own tenant's.
-		ok
-			? section(
-					superAdmin
-						? listTenantUsage(client).then((u) => rowsOf(u))
-						: getTenantUsage(client, user.tenant_id).then((u) => [u]),
-					USAGE_FAILED,
-				)
-			: Promise.resolve(UNREAD),
+		usageRead,
 		ok ? listPeople(client) : Promise.resolve([]),
 	]);
 	const requests: Section<QuotaRequest[]> = requestRead.ok ? { ok: true, value: rowsOf(requestRead.value) } : requestRead;

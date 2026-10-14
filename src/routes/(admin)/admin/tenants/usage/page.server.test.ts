@@ -17,7 +17,7 @@ function loadEvent(roles = ['super_admin']) {
 		url: new URL('http://localhost/admin/tenants/usage'),
 		parent: async () => ({
 			plugins: { state: 'named', running: ['usage'], withheld: [] },
-			user: { id: ADMIN, email: 'admin@example.com', roles, tenant_id: 'acme' },
+			user: { id: ADMIN, email: 'admin@example.com', roles },
 		}),
 	} as never;
 }
@@ -122,9 +122,11 @@ describe('the usage load for each role', () => {
 		expect(out.usage).toEqual({ ok: true, value: [usage] });
 	});
 
+	// The session names no tenant, so the admin's own quota row is what says
+	// which tenant's usage to ask for.
 	it("reads an admin's own tenant's quota, requests and usage", async () => {
 		route({
-			'/api/admin/quotas': { data: [], total_count: 0 },
+			'/api/admin/quotas': { data: [{ id: 'k1', tenant_id: 'acme', requests_limit: 1000 }], total_count: 1 },
 			'/api/admin/quota-requests': { data: [], total_count: 0 },
 			'/api/admin/usage/tenant/acme': usage,
 			'/api/admin/users': [],
@@ -135,6 +137,18 @@ describe('the usage load for each role', () => {
 		expect(out.usage).toEqual({ ok: true, value: [usage] });
 		const asked = engine.get.mock.calls.map(([u]) => String(u));
 		expect(asked.some((u) => u.startsWith('/api/admin/usage/tenants'))).toBe(false);
+	});
+
+	it('asks no usage for an admin whose tenant has no quota', async () => {
+		route({
+			'/api/admin/quotas': { data: [], total_count: 0 },
+			'/api/admin/quota-requests': { data: [], total_count: 0 },
+			'/api/admin/users': [],
+		});
+		const out = (await load(loadEvent(['admin']))) as Record<string, unknown>;
+		expect(out.usage).toEqual({ ok: true, value: [] });
+		const asked = engine.get.mock.calls.map(([u]) => String(u));
+		expect(asked.some((u) => u.startsWith('/api/admin/usage/'))).toBe(false);
 	});
 
 	it('reads nothing for an editor', async () => {
