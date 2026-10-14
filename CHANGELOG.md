@@ -12,10 +12,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.36.0.
+- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.37.0.
 - The console's docs link and the README point at the documentation's new address, lyeve.com/docs. The old host redirects there.
 - A release candidate image is published under its exact tag only, `X.Y.Z-rc.N`, and never as `latest` or the minor line.
 - The release jobs that read secrets run in a release environment that admits only version tags.
+- The sidebar offers each role only the pages the engine lets it open. Editors, viewers and custom roles see the dashboard, the schema builder, flows, reviews and API access. An admin no longer sees gRPC, which only a super admin can open.
+- A page that cannot be read says why: the engine or its database did not answer, too many requests reached the engine, the role cannot open it, or the feature is not enabled. Each offers Try again where trying again can help.
+- Every choice uses one kind of control: two to four short options are a segmented control, longer filters are chips that wrap, options that each need a sentence are radio buttons with a description, and long lists are searchable. Every delete confirmation names what it deletes.
+- Browser tab titles come from the page frame, and the sign-in frame and the copy controls come from ui-kit. A copy confirmation lasts 1.5 seconds, and the API key and backup codes say how to copy them by hand if copying fails. The page shown for a plugin that is not running has a tab title.
+- Under a finger, segmented controls and number steppers take a 44 pixel target, and the collapsed sidebar stacks a group's disclosure under its link, which also stops the rail scrolling sideways under a mouse. Both come with ui-kit 0.37.0.
+- The permission matrix draws each state with its own shape, so a grant, an inherited grant, a refusal and an exempt role read without color and keep their shape in high contrast mode.
+- The plugin page colors HTTP methods the way the schema builder and the API reference do.
+- The UI check refuses a style block in a component and a date or time written with no locale.
 
 ### Fixed
 
@@ -43,6 +51,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Logs: a one-word search also finds a request or trace id, and the default level reads as the engine names it.
 - OAuth: the providers table shows the API path where provider sign-in starts.
 - Cache: the URL of the retired metrics route is gone.
+- An outage of the engine's database no longer signs everyone out. Only a session the engine has ended sends a reader to sign in again, and a page that cannot be read during an outage says so and offers Try again. A missing admin seat, an address rule or a request limit each say what they are.
+- A second factor reads as an invalid code only when the engine refused the code. Setup says when the engine did not answer.
+- A list, dashboard or panel whose read failed no longer shows its first-run state, or zeros with a create button. It says the read failed. A detail page says Not found only for a record that is missing.
+- Values the console could not read are no longer shown as real: the search ranking, cost prices, the two-factor status, and a table's row count in the schema confirmations.
+- GDPR: an erasure that partly failed reads as incomplete, and one stopped by a legal hold names the holds and says how to release them.
+- A form drawer shows its failure inside the drawer, and a page with several forms shows each failure only on the form that sent it.
+- A new entry of a localized schema opens without the localization plugin, and its locale picker is labeled.
+- Pages offer no control the reader's role or license cannot use. Webhook, retention, storage, SAML, SCIM and rate-limit writes are offered to super admins only, and unlicensed telemetry, captures, flow datasources and tenant rate limits are disabled with the reason.
+- Retention enforcement reports the entries it deleted. A healthy storage provider passes its test. Email triggers show a license refusal and require an admin. The flow assistant shows its cost, and a busy export says to try again.
+- Unsaved edits survive turning a members page, saving another part of the customization, restoring a prompt version, and refreshing the telemetry page.
+- The flow editor's runs page turns without asking to discard the draft, and the live log tail stays open when the page refreshes.
+- Synthetic probes and flow variables page through every row, and the content list filters by status.
+- Webhooks: a test, a delivery retry, and a dead letter replay or dismiss show their result instead of stopping the page's updates, and the delivery history shows the webhook that was asked for.
 
 ## [0.20.1] - 2026-10-10
 
