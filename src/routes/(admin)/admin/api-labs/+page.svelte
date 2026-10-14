@@ -37,6 +37,7 @@
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import StreamLab from '$lib/components/labs/StreamLab.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -424,11 +425,14 @@
 	{:else if tab === 'grpc'}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>gRPC</SectionHeading>
-			{#if !data.grpc.reachable}
-				<Alert tone="brand">
-					The gRPC plugin is not part of this build, or the instance does not enable it, so there
-					is no listener to call.
-				</Alert>
+			{#if data.grpc.gate.state !== 'ok'}
+				<!-- Only a 404 says the plugin is not here. A role refusal says the
+				     role, and an outage offers a retry. -->
+				<GateNotice
+					gate={data.grpc.gate}
+					title="the gRPC listener"
+					absent="The gRPC plugin is not part of this build, or the instance does not enable it, so there is no listener to call."
+				/>
 			{:else if !data.grpc.listening}
 				<Alert tone="danger">
 					The plugin is present and nothing is listening. The gRPC screen says why.
