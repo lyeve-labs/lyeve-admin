@@ -3,9 +3,10 @@
  *
  * Every signed-in role may read GET /api/admin/plugins/running. It carries
  * names only, never a reason, an error or a URL, because those are an
- * operator's, and an operator reads them from the plugin status instead. On
- * an engine without the list, the same answer is derived from that status
- * report.
+ * operator's, and an operator reads them from the plugin status instead. The
+ * same answer is derived from that status report and the tenant's withheld
+ * list, so an operator who read both does not read the list as well, and an
+ * engine without the list is answered that way too.
  */
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import type { PluginStatusReport } from '@lyeve-labs/client-rest';
