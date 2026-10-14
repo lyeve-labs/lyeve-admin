@@ -88,6 +88,16 @@ describe('NotEnabled', () => {
 		expect(getByRole('link').getAttribute('href')).toBe('/admin/settings/license');
 	});
 
+	// The marker is 22px tall, under the 44px a finger needs.
+	it('gives the compact link a touch hit area', () => {
+		const { getByRole } = render(NotEnabled, {
+			props: { title: 'Datasources', url: '/admin/settings/license', compact: true },
+		});
+		const link = getByRole('link');
+		expect(link.className).toContain('relative');
+		expect(link.className).toContain('hit-area');
+	});
+
 	it('draws the compact form as plain text when no link is known', () => {
 		const { getByTestId, queryByRole } = render(Host, { props: { licensing: NO_LICENSING, compact: true } });
 		expect(getByTestId('not-enabled').textContent?.trim()).toBe('Not enabled on this instance');

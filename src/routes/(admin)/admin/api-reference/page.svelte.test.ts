@@ -123,6 +123,7 @@ describe('api reference rows', () => {
 		const row = [...container.querySelectorAll('span')].filter((s) => s.textContent?.trim() === 'GET /api/admin/waf/config');
 		expect(row).toHaveLength(0);
 		const fold = getByRole('button', { name: /Plugins \(1\)/ });
+		expect(fold.className).toContain('coarse:min-h-control');
 		expect(fold.getAttribute('aria-expanded')).toBe('false');
 		expect(queryByRole('button', { name: 'waf' })).toBeNull();
 	});

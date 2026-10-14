@@ -495,7 +495,7 @@
 		<input type="hidden" name="warn_at_pct_80" value={warn80 ? 'true' : 'false'} />
 		<Toggle id="quota-warn80" label="Warn at 80%" bind:checked={warn80} />
 		<input type="hidden" name="warn_at_pct_90" value={warn90 ? 'true' : 'false'} />
-		<Toggle id="quota-warn90" label="Warn at 90%" bind:checked={warn90} />
+		<Toggle id="quota-warn90" label="Warn at 90%" class="coarse:mt-2" bind:checked={warn90} />
 	</form>
 	{#snippet footer()}
 		{#if editing}

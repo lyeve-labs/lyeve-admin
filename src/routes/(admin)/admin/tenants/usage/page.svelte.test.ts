@@ -102,6 +102,15 @@ describe('the quota drawer and the failures of other actions', () => {
 		expect(drawerText()).not.toContain('could not be reviewed');
 	});
 
+	// The two warning switches sat 16px apart, so the second one's touch hit
+	// area took the bottom of the first one's.
+	it('spaces the two warning switches so each keeps its touch hit area', async () => {
+		const { getAllByRole } = render(UsagePage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new quota/i })[0]);
+		const warn90 = document.body.querySelector('#quota-warn90')?.closest('label') as HTMLElement;
+		expect(warn90.className).toContain('coarse:mt-2');
+	});
+
 	it('shows a failed save inside the open drawer', async () => {
 		const { getAllByRole, rerender } = render(UsagePage, { props: props() });
 		await fireEvent.click(getAllByRole('button', { name: /new quota/i })[0]);

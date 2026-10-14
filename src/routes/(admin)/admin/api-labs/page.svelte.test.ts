@@ -206,4 +206,31 @@ describe('the endpoint picker', () => {
 		expect(summary.className).toContain('hidden');
 		expect(summary.className).toContain('sm:table-cell');
 	});
+
+	// The row is wider than its scroll box on a phone and a tablet, which left
+	// the Select button past the box edge.
+	it('keeps the Select cell stuck to the end of the scroll box, painted like its row', () => {
+		const { getAllByRole } = render(LabsPage, { props: props() });
+		const cell = getAllByRole('button', { name: 'Select' })[0].closest('td') as HTMLElement;
+		for (const cls of ['sticky', 'end-0', 'z-1', 'bg-ink', '[tr:hover>&]:bg-[color-mix(in_srgb,var(--color-surface-2)_60%,var(--color-ink))]']) {
+			expect(cell.className.split(/\s+/), cls).toContain(cls);
+		}
+		expect((cell.closest('tr') as HTMLElement).className).not.toContain('relative');
+	});
+
+	it('gives each row one Select button, and a click picks that row', async () => {
+		const posts = endpoint({ id: 'POST /api/v1/content/{schema}', method: 'POST', summary: 'Create an entry' });
+		const { container, getByRole, queryByRole } = render(LabsPage, { props: props({ endpoints: [endpoint(), posts] }) });
+		const rows = [...container.querySelectorAll('[aria-label="Pick an endpoint"] tbody tr')] as HTMLElement[];
+		expect(rows).toHaveLength(2);
+		for (const row of rows) {
+			const buttons = [...row.querySelectorAll('button')];
+			expect(buttons.map((b) => b.textContent?.trim())).toEqual(['Select']);
+		}
+		await fireEvent.click(rows[1].querySelector('button') as HTMLElement);
+		expect(rows[1].querySelector('button')?.textContent?.trim()).toBe('Selected');
+		expect(rows[0].querySelector('button')?.textContent?.trim()).toBe('Select');
+		expect(getByRole('heading', { level: 2, name: 'POST /api/v1/content/{schema}' })).toBeTruthy();
+		expect(queryByRole('heading', { level: 2, name: 'GET /api/v1/content/{schema}' })).toBeNull();
+	});
 });

@@ -245,12 +245,12 @@
 			</div>
 		</a>
 		{#if plugin.upgradeUrl}
-			<div class="px-4 pb-3 ps-14">
+			<div class="px-4 pb-3 ps-14 coarse:pb-3.5">
 				<a
 					href={plugin.upgradeUrl}
 					target={isExternalHref(plugin.upgradeUrl) ? '_blank' : undefined}
 					rel={isExternalHref(plugin.upgradeUrl) ? 'noopener noreferrer' : undefined}
-					class="inline-flex items-center gap-1 text-xs text-brand transition-colors hover:text-brand-light"
+					class="relative hit-area inline-flex items-center gap-1 text-xs text-brand transition-colors hover:text-brand-light"
 				>
 					How to enable it
 					{#if isExternalHref(plugin.upgradeUrl)}

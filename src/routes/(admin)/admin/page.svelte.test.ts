@@ -235,6 +235,17 @@ describe('dashboard window', () => {
 		expect(container.textContent).toContain('Requests, 7d');
 	});
 
+	// The labels are two and three characters, so the segments drew 35 to 42px
+	// wide and their touch hit areas shared the gaps between them.
+	it('gives each window segment the control width under a finger', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ window: '7d' }), form: null },
+		});
+		for (const link of container.querySelectorAll('a[href^="/admin?window="]')) {
+			expect(link.className).toContain('coarse:min-w-control');
+		}
+	});
+
 	it('does not offer a window to an editor, whose tiles are not windowed', () => {
 		const { container } = render(DashboardPage, {
 			props: { data: data({ isAdmin: false }), form: null },

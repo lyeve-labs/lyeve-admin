@@ -104,7 +104,7 @@
 					<SectionHeading level={3}>Tracker</SectionHeading>
 				{/snippet}
 				{#if ge.snapshot}
-					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
 						<Stat size="sm" label="Tracked" mono value={ge.snapshot.total} />
 						<Stat size="sm" label="Runtime" mono value={ge.snapshot.runtime_total ?? NO_VALUE} />
 						<Stat size="sm" label="Ceiling" mono value={ge.snapshot.max_goroutines ?? NO_VALUE} />
@@ -120,7 +120,7 @@
 					<SectionHeading level={3}>Worker pool</SectionHeading>
 				{/snippet}
 				{#if ge.pool}
-					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
 						<Stat size="sm" label="Size" mono value={ge.pool.size} />
 						<Stat size="sm" label="Active" mono value={ge.pool.active} />
 						<Stat size="sm" label="Waiting" mono value={ge.pool.waiting ?? NO_VALUE} />
@@ -154,7 +154,7 @@
 					<SectionHeading level={3}>Async hooks</SectionHeading>
 				{/snippet}
 				{#if ge.asyncHooks}
-					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
 						<Stat size="sm" label="Enabled" value={onOff(ge.asyncHooks.enabled)} tone={ge.asyncHooks.enabled ? 'success' : undefined} />
 						<Stat size="sm" label="Workers" mono value={ge.asyncHooks.workers ?? NO_VALUE} />
 						<Stat size="sm" label="Queue size" mono value={ge.asyncHooks.queue_size ?? NO_VALUE} />

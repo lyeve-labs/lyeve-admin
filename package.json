@@ -46,7 +46,7 @@
 		"@lucide/svelte": "^1.47.0",
 		"@lyeve-labs/client": "^0.5.0",
 		"@lyeve-labs/client-rest": "^0.3.0",
-		"@lyeve-labs/ui-kit": "^0.38.1",
+		"@lyeve-labs/ui-kit": "^0.38.2",
 		"@tiptap/core": "^3.31.3",
 		"@tiptap/extension-link": "^3.31.3",
 		"@tiptap/extension-underline": "^3.31.3",

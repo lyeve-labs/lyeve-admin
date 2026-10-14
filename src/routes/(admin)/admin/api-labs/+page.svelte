@@ -279,7 +279,15 @@
 									     by the summary, it stacked one character per line. -->
 									<td class="min-w-56 font-mono text-xs [overflow-wrap:anywhere]">{e.path}</td>
 									<td class="hidden max-w-sm truncate text-xs text-faint sm:table-cell">{e.summary}</td>
-									<td data-cell="nowrap">
+									<!-- On a narrow screen the row is wider than its scroll box, and the
+									     Select button sat past the edge. The cell sticks to the box's end
+									     so the button is always in view. Its background is the page's,
+									     and on hover the row's tint laid over it, so text scrolling
+									     under the cell never shows through. -->
+									<td
+										data-cell="nowrap"
+										class="sticky end-0 z-1 bg-ink transition-colors [tr:hover>&]:bg-[color-mix(in_srgb,var(--color-surface-2)_60%,var(--color-ink))]"
+									>
 										<Button
 											variant={selectedId === e.id ? 'primary' : 'ghost'}
 											size="sm"

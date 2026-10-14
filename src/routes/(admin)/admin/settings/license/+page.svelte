@@ -134,7 +134,7 @@
 				{/if}
 
 				{#if links.length > 0}
-					<ul class="flex flex-col gap-2 border-t border-line pt-4">
+					<ul class="flex flex-col gap-2 coarse:gap-5 border-t border-line pt-4">
 						{#each links as link (link.rel)}
 							{@const away = isExternalHref(link.href)}
 							<li>
