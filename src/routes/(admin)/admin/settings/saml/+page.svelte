@@ -462,57 +462,61 @@
 			     say false rather than go missing. The plugin turns the first three
 			     on for every new provider whatever the form sends, so a create shows
 			     them on and fixed, and an edit can turn them off. -->
-			<input
-				type="hidden"
-				name="want_assertions_signed"
-				value={wantAssertionsSigned ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-want-assertions-signed"
-				label="Require signed assertions"
-				bind:checked={wantAssertionsSigned}
-				disabled={!editing}
-			/>
-			<input
-				type="hidden"
-				name="want_response_signed"
-				value={wantResponseSigned ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-want-response-signed"
-				label="Require a signed response"
-				bind:checked={wantResponseSigned}
-				disabled={!editing}
-			/>
-			<input
-				type="hidden"
-				name="sign_authn_requests"
-				value={signAuthnRequests ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-sign-authn"
-				label="Sign our requests"
-				bind:checked={signAuthnRequests}
-				disabled={!editing}
-				hint={editing ? undefined : 'A new provider starts with these three on. Edit it after creating to turn one off.'}
-			/>
-			<input
-				type="hidden"
-				name="encrypt_assertions"
-				value={encryptAssertions ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-encrypt"
-				label="Expect encrypted assertions"
-				bind:checked={encryptAssertions}
-			/>
-			<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
-			<Toggle
-				id="saml-enabled"
-				label="Show on the sign-in page"
-				class="coarse:mt-2"
-				bind:checked={enabled}
-			/>
+			<!-- Under a finger each switch takes a 44px hit area around its 20px
+			     track. Rows 16px apart let two neighbors share 6px of it, and
+			     24px apart they share none. -->
+			<div class="flex flex-col gap-4 coarse:gap-6">
+				<input
+					type="hidden"
+					name="want_assertions_signed"
+					value={wantAssertionsSigned ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-want-assertions-signed"
+					label="Require signed assertions"
+					bind:checked={wantAssertionsSigned}
+					disabled={!editing}
+				/>
+				<input
+					type="hidden"
+					name="want_response_signed"
+					value={wantResponseSigned ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-want-response-signed"
+					label="Require a signed response"
+					bind:checked={wantResponseSigned}
+					disabled={!editing}
+				/>
+				<input
+					type="hidden"
+					name="sign_authn_requests"
+					value={signAuthnRequests ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-sign-authn"
+					label="Sign our requests"
+					bind:checked={signAuthnRequests}
+					disabled={!editing}
+					hint={editing ? undefined : 'A new provider starts with these three on. Edit it after creating to turn one off.'}
+				/>
+				<input
+					type="hidden"
+					name="encrypt_assertions"
+					value={encryptAssertions ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-encrypt"
+					label="Expect encrypted assertions"
+					bind:checked={encryptAssertions}
+				/>
+				<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
+				<Toggle
+					id="saml-enabled"
+					label="Show on the sign-in page"
+					bind:checked={enabled}
+				/>
+			</div>
 		</div>
 	</form>
 	{#snippet footer()}

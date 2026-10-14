@@ -232,13 +232,34 @@ describe('the role', () => {
 describe('the drawer', () => {
 	const drawerText = () => document.body.querySelector('form#saml-provider-form')?.textContent ?? '';
 
-	// The two last switches sat 16px apart, so the second one's touch hit area
-	// took the bottom of the first one's.
-	it('spaces the last two switches so each keeps its touch hit area', async () => {
+	// The switches sat 16px apart, so each one's touch hit area took part of
+	// its neighbor's. An edit enables the first three and drops the hint that
+	// spaced the third, so both drawers have to space every switch.
+	const switchGroups = () =>
+		new Set(
+			[...document.body.querySelectorAll('form#saml-provider-form [role="switch"]')].map(
+				(s) => s.closest('label')?.parentElement,
+			),
+		);
+
+	it('spaces every switch for touch in the New provider drawer', async () => {
 		render(SamlPage, { props: props() });
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
-		const enabled = document.body.querySelector('#saml-enabled')?.closest('label') as HTMLElement;
-		expect(enabled.className).toContain('coarse:mt-2');
+		expect(document.body.querySelectorAll('form#saml-provider-form [role="switch"]')).toHaveLength(5);
+		const groups = switchGroups();
+		expect(groups.size).toBe(1);
+		expect([...groups][0]?.className).toContain('coarse:gap-6');
+	});
+
+	it('spaces every switch for touch in the Edit drawer', async () => {
+		render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit Okta' }));
+		const switches = document.body.querySelectorAll('form#saml-provider-form [role="switch"]');
+		expect(switches).toHaveLength(5);
+		expect([...switches].filter((s) => (s as HTMLButtonElement).disabled)).toHaveLength(0);
+		const groups = switchGroups();
+		expect(groups.size).toBe(1);
+		expect([...groups][0]?.className).toContain('coarse:gap-6');
 	});
 
 	it('shows a refused save inside the open drawer', async () => {
