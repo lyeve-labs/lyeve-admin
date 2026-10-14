@@ -28,6 +28,19 @@ describe('reset-password load', () => {
 });
 
 describe('reset-password action', () => {
+	// An outage says nothing about what the visitor typed, so it reads as the
+	// engine being away rather than as a bad address or an expired link.
+	it.each([
+		['answers 503', () => json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503)],
+		['answers 502', () => json({ error: 'bad gateway' }, 502)],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('says the engine is unavailable when it %s', async (_case, answer) => {
+		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
+		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG }, fetch)) as { status: number; data: { error: string } };
+		expect(result.status).toBeGreaterThanOrEqual(500);
+		expect(result.data.error).toBe('Password reset is unavailable right now. Please try again shortly.');
+	});
+
 	beforeEach(() => resetRateLimitStore());
 
 	it('sets the new password with the token from the link', async () => {

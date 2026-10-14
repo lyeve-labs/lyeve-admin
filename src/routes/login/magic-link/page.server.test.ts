@@ -17,6 +17,19 @@ function submit(fields: Record<string, string>, fetch: typeof globalThis.fetch) 
 }
 
 describe('login/magic-link action', () => {
+	// An outage says nothing about what the visitor typed, so it reads as the
+	// engine being away rather than as a bad address or an expired link.
+	it.each([
+		['answers 503', () => json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503)],
+		['answers 502', () => json({ error: 'bad gateway' }, 502)],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('says the engine is unavailable when it %s', async (_case, answer) => {
+		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
+		const result = (await submit({ email: 'a@b.co' }, fetch)) as { status: number; data: { error: string } };
+		expect(result.status).toBeGreaterThanOrEqual(500);
+		expect(result.data.error).toBe('Email sign-in is unavailable right now. Please try again shortly.');
+	});
+
 	beforeEach(() => resetRateLimitStore());
 
 	it('asks the engine for a link and reports it sent', async () => {

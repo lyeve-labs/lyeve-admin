@@ -106,8 +106,8 @@ function loadEvent(rows: unknown[], search = '') {
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 const run = async (event: never): Promise<Loaded> => (await load(event)) as Loaded;
 
-describe('admin/users/+page.server.ts load', () => {
-	it('returns users list when super_admin', async () => {
+describe('the accounts list', () => {
+	it('lists the accounts for a super admin', async () => {
 		const { event } = loadEvent([{ id: 'u1', email: 'a@b.co' }]);
 
 		const result = await run(event);
@@ -239,8 +239,8 @@ describe('admin/users/+page.server.ts load', () => {
 
 // actions.create
 
-describe('admin/users/+page.server.ts actions.create', () => {
-	it('returns 400 when email is missing (null → fail, not 500)', async () => {
+describe('creating an account', () => {
+	it('asks for the email on its field before calling the engine', async () => {
 		const fetch = vi.fn() as never;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
@@ -262,7 +262,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		});
 	});
 
-	it('returns 400 when password is missing (null guarded before .length)', async () => {
+	it('asks for the password on its field before calling the engine', async () => {
 		const fetch = vi.fn() as never;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
@@ -282,7 +282,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		});
 	});
 
-	it('returns 400 when password is shorter than 12 characters', async () => {
+	it('refuses a password under 12 characters on its field', async () => {
 		const fetch = vi.fn() as never;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
@@ -380,7 +380,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
  * every session the account held. The action's job is to carry the refusal
  * to the control and nothing else.
  */
-describe('admin/users/+page.server.ts actions.setPassword', () => {
+describe('setting an account password', () => {
 	function submit(fetch: unknown, data: Record<string, string>) {
 		return actions.setPassword(mockEvent({
 			request: { formData: () => Promise.resolve(form(data)) } as never,
@@ -476,7 +476,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 	});
 });
 
-describe('admin/users/+page.server.ts admin seat ceiling', () => {
+describe('the admin seat ceiling', () => {
 	const seatsFull = (): typeof globalThis.fetch =>
 		vi.fn(async () => {
 			throw new ApiError(402, 'cap_exceeded', {
@@ -540,7 +540,7 @@ describe('admin/users/+page.server.ts admin seat ceiling', () => {
 
 // An account belongs to one tenant. With several, the form names it and the
 // engine is asked in that tenant.
-describe('admin/users/+page.server.ts tenants', () => {
+describe('the tenant a new account belongs to', () => {
 	it('offers the tenants the multitenant plugin lists, leaving out archived ones', async () => {
 		const fetch = vi.fn(async (url: string) =>
 			String(url).startsWith('/api/admin/tenants')
@@ -621,3 +621,42 @@ describe('admin/users/+page.server.ts tenants', () => {
 	});
 });
 
+
+describe('deleting an account', () => {
+	function remove(reply: () => Response | Promise<Response>) {
+		const calls: { method: string; url: string }[] = [];
+		const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+			calls.push({ method: init?.method ?? 'GET', url: String(url) });
+			return reply();
+		}) as unknown as typeof globalThis.fetch;
+		const event = mockEvent({
+			request: { formData: () => Promise.resolve(form({ id: 'u1' })) } as never,
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+		});
+		return { calls, run: () => actions.delete(event as never) };
+	}
+
+	it('deletes the named account', async () => {
+		const { calls, run } = remove(() => new Response(null, { status: 204 }));
+		expect(await run()).toEqual({ ok: true });
+		expect(calls).toEqual([{ method: 'DELETE', url: '/api/admin/users/u1' }]);
+	});
+
+	it('relays the engine refusal on the page', async () => {
+		const { run } = remove(() => json({ error: 'cannot delete the last super admin' }, 409));
+		expect(await run()).toEqual({ status: 400, data: { action: 'delete', error: 'cannot delete the last super admin' } });
+	});
+
+	it('keeps outage detail off the page', async () => {
+		const { run } = remove(() => Promise.reject(new TypeError('fetch failed')));
+		expect(await run()).toEqual({ status: 400, data: { action: 'delete', error: 'Failed to delete user' } });
+	});
+
+	it('holds the delete to a super admin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('Requires one of roles: super_admin'), { status: 403 }));
+		const { calls, run } = remove(() => new Response(null, { status: 204 }));
+		await expect(run()).rejects.toMatchObject({ status: 403 });
+		expect(calls).toEqual([]);
+	});
+});

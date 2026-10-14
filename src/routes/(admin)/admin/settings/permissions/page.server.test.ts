@@ -69,7 +69,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('permissions +page.server.ts load', () => {
+describe('reading the rules', () => {
 	it('returns the rules and schemas when both reads succeed', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([{ name: 'article' }] as never);
@@ -140,7 +140,7 @@ function upsertEvent(fields: Record<string, string | string[]>) {
 	} as never;
 }
 
-describe('permissions +page.server.ts role ceiling', () => {
+describe('the role ceiling', () => {
 	it('takes the ceiling and the count from the plugin', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([] as never);
@@ -170,7 +170,7 @@ describe('permissions +page.server.ts role ceiling', () => {
 	});
 });
 
-describe('permissions +page.server.ts flows as resources', () => {
+describe('flows as resources', () => {
 	it('lists the flows beside the schemas', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([{ name: 'article' }] as never);
@@ -219,7 +219,7 @@ describe('permissions +page.server.ts flows as resources', () => {
 	});
 });
 
-describe('permissions +page.server.ts actions.upsert', () => {
+describe('saving a rule', () => {
 	it('writes a wildcard rule with no actions for a new role', async () => {
 		mockedUpsertPermission.mockResolvedValue(permission as never);
 
@@ -253,7 +253,7 @@ describe('permissions +page.server.ts actions.upsert', () => {
 	});
 });
 
-describe('permissions +page.server.ts refused writes', () => {
+describe('refused writes', () => {
 	type Failed = { status: number; data: Record<string, unknown> };
 
 	it('renders a license refusal that is not the role ceiling as a refusal, not as engine text', async () => {

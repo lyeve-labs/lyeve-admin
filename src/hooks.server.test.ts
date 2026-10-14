@@ -40,7 +40,7 @@ function stubEvent(path = '/', fetch = engineAnswering({ setup_required: false }
 
 // tests
 
-describe('hooks.server.ts handle', () => {
+describe('every response', () => {
 	// A response passed through from fetch has immutable headers. Setting the
 	// security headers on one throws.
 	it('sets its headers on a response whose own headers are immutable', async () => {
@@ -102,7 +102,7 @@ describe('hooks.server.ts handle', () => {
 		expect(response.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
 	});
 
-	it('calls resolve(event) and returns the response', async () => {
+	it('serves the page the route renders', async () => {
 		const event = stubEvent();
 		const resolve = stubResolve();
 		const response = await handle({ event: event as never, resolve });
@@ -129,7 +129,7 @@ describe('hooks.server.ts handle', () => {
 	});
 });
 
-describe('hooks.server.ts setup gate', () => {
+describe('the setup gate on a page request', () => {
 	it('sends a page to the setup screen while the engine is in setup mode', async () => {
 		resetSetupGateCache();
 		const resolve = stubResolve();

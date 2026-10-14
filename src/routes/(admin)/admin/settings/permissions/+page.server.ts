@@ -63,10 +63,9 @@ export const load: PageServerLoad = async (event) => {
 };
 
 // The plugin refuses a role past the ceiling with 402 and a body naming the
-// cap and both numbers. The page writes the sentence from the numbers its own
-// load read from the plugin, which are the ones the refusal checked.
+// cap and both numbers, which the page prints.
 function isRoleCapRefusal(e: unknown): boolean {
-	return (e as { status?: number } | null)?.status === 402 && e instanceof Error && e.message === 'cap_exceeded';
+	return refusalOf(e)?.kind === 'cap';
 }
 
 export const actions: Actions = {

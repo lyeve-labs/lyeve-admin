@@ -53,7 +53,7 @@ function catchRedirect(fn: () => unknown): Promise<{ status: number; location: s
 
 // tests
 
-describe('(admin)/+layout.server.ts load', () => {
+describe('the console frame', () => {
 	it('redirects to /login when there is no session cookie', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
 			json({ setup_required: false })
@@ -144,7 +144,7 @@ describe('(admin)/+layout.server.ts load', () => {
 		});
 	});
 
-	it('returns user and fail-closed NO_ENTITLEMENTS when entitlements endpoint errors', async () => {
+	it('treats an unreadable license as granting nothing, and keeps the reader signed in', async () => {
 		const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			if (String(url).includes('/api/admin/setup')) return json({ setup_required: false });
@@ -480,7 +480,7 @@ describe('(admin)/+layout.server.ts load', () => {
 		});
 	});
 
-	it('returns user + entitlements on full happy path', async () => {
+	it('gives the console the reader and what the license grants', async () => {
 		const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
 		const entitlements = { plan: 'example', state: 'active', features: ['example'], caps: {} };
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {

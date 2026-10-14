@@ -55,7 +55,7 @@ function mockEvent(overrides: Record<string, unknown> = {}) {
 
 // load
 
-describe('login/+page.server.ts load', () => {
+describe('opening the sign-in page', () => {
 	it('redirects to the dashboard when the session cookie still authenticates', async () => {
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			const s = String(url);
@@ -202,7 +202,7 @@ describe('login/+page.server.ts load', () => {
 
 // actions.default
 
-describe('login/+page.server.ts actions.default', () => {
+describe('signing in', () => {
 	beforeEach(() => {
 		resetRateLimitStore();
 	});
@@ -492,7 +492,7 @@ describe('login/+page.server.ts actions.default', () => {
 // The captcha plugin challenges the login after repeated failures. The form
 // has to carry the challenge to the page and the token back to the engine.
 
-describe('login/+page.server.ts captcha challenge', () => {
+describe('a sign-in the engine challenges', () => {
 	beforeEach(() => {
 		resetRateLimitStore();
 	});
