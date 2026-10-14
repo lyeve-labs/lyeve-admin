@@ -203,6 +203,19 @@ describe('data export writes', () => {
 		expect(out.data).toEqual({ action: name, error: 'cron_expression is not valid' });
 	});
 
+	it('says to retry when every export slot is taken', async () => {
+		const { event } = write(EXPORT, json({ error: 'too many concurrent exports running, try again later' }, 503));
+		expect(((await actions.start(event)) as Failure).data).toEqual({
+			action: 'start',
+			error: 'Too many exports are running. Try again in a moment.',
+		});
+	});
+
+	it('reads any other 503 on start as an outage', async () => {
+		const { event } = write(EXPORT, json({ error: 'service unavailable' }, 503));
+		expect(((await actions.start(event)) as Failure).data).toEqual({ action: 'start', error: 'The export could not be started.' });
+	});
+
 	it.each([
 		['start', 'The export could not be started.'],
 		['cancel', 'The export could not be canceled.'],

@@ -1,5 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, isRedirect, redirect } from '@sveltejs/kit';
+import { ApiError } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
@@ -22,6 +23,22 @@ import {
 import { exportConfigFrom } from '$lib/data-export-form';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
+
+/** The plugin's own 503 when every export slot is taken. */
+const EXPORTS_BUSY = 'too many concurrent exports running, try again later';
+
+/**
+ * Why a start failed, in words the reader can act on. Only the plugin's busy
+ * sentence means retry. A 503 with any other sentence is an outage, and its
+ * detail stays off the page.
+ */
+function startError(err: unknown): string {
+	if (err instanceof ApiError && err.status === 503) {
+		const said = (err.body as { error?: unknown } | undefined)?.error;
+		if (said === EXPORTS_BUSY) return 'Too many exports are running. Try again in a moment.';
+	}
+	return actionError(err, 'The export could not be started.');
+}
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
@@ -94,7 +111,7 @@ export const actions: Actions = {
 			const job = await startExport(client, { name, ...config.config });
 			return { started: job.id };
 		} catch (err) {
-			return fail(400, { action: 'start' as const, error: actionError(err, 'The export could not be started.') });
+			return fail(400, { action: 'start' as const, error: startError(err) });
 		}
 	},
 
