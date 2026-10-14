@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import DatasourcesPage from './+page.svelte';
 import type { Entitlements } from '$lib/entitlements';
 import type { Datasource } from '$lib/api/flows';
+import { AUTH_TYPES } from '$lib/flow/datasources';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/datasources') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -62,18 +63,20 @@ describe('datasources page', () => {
 		expect(form.querySelector('[name="password"]')).toBeTruthy();
 		expect(form.querySelector('[name="base_url"]')).toBeNull();
 		expect(form.querySelector('[name="chat_id"]')).toBeNull();
-		expect((form.querySelector('input[name="ssl"]') as HTMLInputElement).value).toBe('require');
+		expect((form.querySelector('input[name="ssl"]:checked') as HTMLInputElement).value).toBe('require');
 	});
 
 	it('offers the TLS modes of the chosen kind and submits the stored one on edit', async () => {
 		const { getByLabelText, getByRole, container } = setup();
 		await fireEvent.click(getByLabelText('Edit warehouse'));
 		const form = container.querySelector('#datasource-form') as HTMLFormElement;
-		expect((form.querySelector('input[name="ssl"]') as HTMLInputElement).value).toBe('prefer');
-		// Three modes fit in sight, so they are segments rather than a list.
-		const group = getByRole('radiogroup', { name: 'TLS' });
-		const modes = [...group.querySelectorAll('[role="radio"]')].map((o) => o.querySelector('span:not([aria-hidden]) span:not([aria-hidden])')?.textContent?.trim());
-		expect(modes).toEqual(['Require TLS', 'Prefer TLS', 'No TLS']);
+		expect((form.querySelector('input[name="ssl"]:checked') as HTMLInputElement).value).toBe('prefer');
+		// Each mode says what it tells the driver, so they are choices with a
+		// sentence each rather than a strip of bare words.
+		const radios = [...form.querySelectorAll('input[type="radio"][name="ssl"]')] as HTMLInputElement[];
+		expect(radios.map((r) => r.value)).toEqual(['require', 'prefer', 'disable']);
+		expect(getByRole('radio', { name: /Prefer TLS/ })).toBeTruthy();
+		expect(form.textContent).toContain('connects in the clear when it does not');
 	});
 
 	it('opens the edit drawer with the stored config and a per-header secret toggle', async () => {
@@ -92,8 +95,8 @@ describe('datasources page', () => {
 	});
 
 	async function chooseAuth(container: HTMLElement, label: string) {
-		const group = container.querySelector('[data-testid="auth-section"] [role="radiogroup"]') as HTMLElement;
-		await fireEvent.click([...group.querySelectorAll('[role="radio"]')].find((o) => o.querySelector('span:not([aria-hidden]) span:not([aria-hidden])')?.textContent?.trim() === label) as HTMLElement);
+		const value = AUTH_TYPES.find((t) => t.label === label)?.value;
+		await fireEvent.click(container.querySelector(`[data-testid="auth-section"] input[name="auth_type"][value="${value}"]`) as HTMLElement);
 	}
 
 	it('shows the auth section for the http kind, with the fields and a required secret per type', async () => {
@@ -105,11 +108,11 @@ describe('datasources page', () => {
 		expect((form.querySelector('[name="chat_id"]') as HTMLInputElement).value).toBe('');
 		const section = getByTestId('auth-section');
 		expect(section.textContent).toContain('Authentication');
-		expect((form.querySelector('input[name="auth_type"]') as HTMLInputElement).value).toBe('none');
+		expect((form.querySelector('input[name="auth_type"]:checked') as HTMLInputElement).value).toBe('none');
 		expect(section.textContent).toContain('No credential beyond the headers');
 
 		await chooseAuth(container, 'Bearer token');
-		expect((form.querySelector('input[name="auth_type"]') as HTMLInputElement).value).toBe('bearer');
+		expect((form.querySelector('input[name="auth_type"]:checked') as HTMLInputElement).value).toBe('bearer');
 		const token = form.querySelector('[name="auth_token"]') as HTMLInputElement;
 		expect(token.type).toBe('password');
 		expect(token.required).toBe(true);
@@ -142,7 +145,7 @@ describe('datasources page', () => {
 		const { getByLabelText, container, getByTestId } = setup([oauth]);
 		await fireEvent.click(getByLabelText('Edit weather'));
 		const form = container.querySelector('#datasource-form') as HTMLFormElement;
-		expect((form.querySelector('input[name="auth_type"]') as HTMLInputElement).value).toBe('oauth2_client_credentials');
+		expect((form.querySelector('input[name="auth_type"]:checked') as HTMLInputElement).value).toBe('oauth2_client_credentials');
 		expect((form.querySelector('[name="auth_token_url"]') as HTMLInputElement).value).toBe('https://auth.example.test/token');
 		expect((form.querySelector('[name="auth_client_id"]') as HTMLInputElement).value).toBe('cid');
 		expect((form.querySelector('[name="auth_scopes"]') as HTMLInputElement).value).toBe('read write');
@@ -314,3 +317,4 @@ describe('where a datasource failure shows', () => {
 		expect(document.body.textContent?.split('A datasource needs a name.').length).toBe(2);
 	});
 });
+

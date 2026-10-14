@@ -11,7 +11,7 @@
 		PageShell,
 		PasswordInput,
 		SectionHeading,
-		SegmentedControl,
+		RadioGroup,
 		Select,
 		Table,
 		Textarea,
@@ -54,6 +54,7 @@
 	// either grant. An admin sees both and the reason they are fixed.
 	const superAdmin = $derived(data.user.roles.includes('super_admin'));
 	const GRANT_HINT = 'Only a super admin can change this.';
+
 	const instance = useInstance();
 	const enableLink = $derived(instance.upgradeLink());
 
@@ -177,6 +178,26 @@
 	const sqlKind = $derived(isSqlKind(kind) ? kind : null);
 	const isSql = $derived(sqlKind !== null);
 	const sslOptions = $derived(sqlKind ? SSL_MODES[sqlKind] : []);
+
+	// What each TLS mode tells the driver, keyed by the value the driver takes.
+	const SSL_SAYS: Record<string, string> = {
+		require: 'Encrypts the connection and refuses a server that will not.',
+		prefer: 'Encrypts when the server offers it, and connects in the clear when it does not.',
+		disable: 'Connects in the clear.',
+		true: 'Encrypts the connection and checks the server certificate.',
+		'skip-verify': 'Encrypts the connection without checking whose certificate it is. Use it only for a server you trust on its address alone.',
+		false: 'Connects in the clear.',
+	};
+	const sslChoices = $derived(sslOptions.map((m) => ({ ...m, description: SSL_SAYS[m.value] })));
+
+	// What each scheme sends, so the choice says it before the fields appear.
+	const AUTH_SAYS: Record<string, string> = {
+		none: 'Sends no credential beyond the headers below.',
+		bearer: 'Sends a token in the Authorization header.',
+		basic: 'Sends a user and a password in the Authorization header.',
+		oauth2_client_credentials: 'Asks a token URL for a token with a client id and secret, and sends that token.',
+	};
+	const authChoices = AUTH_TYPES.map((t) => ({ ...t, description: AUTH_SAYS[t.value] }));
 
 	// Delete goes through the kit's confirm dialog, then a hidden form, so the
 	// row's button never posts on its own and the action stays a form action.
@@ -400,10 +421,14 @@
 					label="Password"
 					hint={editing?.has_secret ? 'Stored and never shown. Leave blank to keep it.' : 'Encrypted at rest.'}
 				/>
-				<div class="flex flex-col gap-1">
-					<SegmentedControl name="ssl" label="TLS" options={sslOptions} value={ssl ?? ''} onchange={(v) => (ssl = v)} />
-					<p class="text-xs text-faint">What the driver is told about the connection's encryption.</p>
-				</div>
+				<RadioGroup
+					name="ssl"
+					label="TLS"
+					hint="What the driver is told about the connection's encryption."
+					options={sslChoices}
+					value={ssl ?? ''}
+					onchange={(v) => (ssl = v)}
+				/>
 			{:else if kind === 'http'}
 				<Input id="ds-base-url" name="base_url" label="Base URL" placeholder="https://api.example.com" bind:value={baseUrl} required />
 				<Input
@@ -416,18 +441,16 @@
 				/>
 				<div class="flex flex-col gap-3 rounded-md border border-line p-3" data-testid="auth-section">
 					<SectionHeading level={3} variant="eyebrow">Authentication</SectionHeading>
-					<div class="flex flex-col gap-1">
-						<SegmentedControl
-							name="auth_type"
-							label="Type"
-							options={AUTH_TYPES}
-							value={auth.type}
-							onchange={(v) => {
-								if (isAuthType(v)) auth = { ...auth, type: v };
-							}}
-						/>
-						<p class="text-xs text-faint">Sent with every request of an http.request node. An explicit Authorization header on the node wins.</p>
-					</div>
+					<RadioGroup
+						name="auth_type"
+						label="Type"
+						hint="Sent with every request of an http.request node. An explicit Authorization header on the node wins."
+						options={authChoices}
+						value={auth.type}
+						onchange={(v) => {
+							if (isAuthType(v)) auth = { ...auth, type: v };
+						}}
+					/>
 					{#if auth.type === 'bearer'}
 						<PasswordInput id="ds-auth-token" name="auth_token" label="Token" hint={secretHint} required={!keepSecret} autocomplete="off" />
 					{:else if auth.type === 'basic'}
