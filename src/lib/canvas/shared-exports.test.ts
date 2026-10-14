@@ -12,8 +12,8 @@ import * as icon from '$lib/icon';
  * from the editors at the commit the image build pins. A build without them
  * calls none of these, so a dead code pass sees no reader. Losing one fails
  * the official image, and this test fails first in the pull request that
- * removed it. The editors import only types from the flow API module, and the
- * type check covers those when the editors are in place.
+ * removed it. The editors' other imports are types only, which the type check
+ * covers when the editors are in place.
  */
 const USED: [string, Record<string, unknown>, string[]][] = [
 	[
