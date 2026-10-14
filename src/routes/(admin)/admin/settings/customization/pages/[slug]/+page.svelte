@@ -147,7 +147,7 @@
 
 		<Card pad="md">
 			{#snippet header()}
-				<SectionHeading level={3}>Page</SectionHeading>
+				<SectionHeading level={2}>Page</SectionHeading>
 			{/snippet}
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<Input id="page-title" label="Title" required bind:value={page.title} />

@@ -122,6 +122,11 @@ describe('Data export jobs', () => {
 		expect(one.container.textContent).not.toContain('Failed on this page');
 	});
 
+	it('names the search box for a screen reader', () => {
+		const { getByLabelText } = render(ExportPage, { props: props() });
+		expect(getByLabelText('Narrow this page')).toBeTruthy();
+	});
+
 	it('states a size a person can read', () => {
 		const { container } = render(ExportPage, { props: props() });
 		expect(said(container)).toContain('2.0 KB');

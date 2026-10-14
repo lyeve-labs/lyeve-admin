@@ -131,7 +131,7 @@
 
 <Card pad="md">
 	{#snippet header()}
-		<SectionHeading level={3}>{copy.heading}</SectionHeading>
+		<SectionHeading level={2}>{copy.heading}</SectionHeading>
 	{/snippet}
 	<div class="flex flex-col gap-4">
 		{#if error}

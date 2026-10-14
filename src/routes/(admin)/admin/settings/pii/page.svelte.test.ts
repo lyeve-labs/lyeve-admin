@@ -93,6 +93,11 @@ describe('PII masking access log', () => {
 		expect(said(container)).not.toMatch(/Unmasked reads ?0/);
 	});
 
+	it('names the search box for a screen reader', () => {
+		const { getByLabelText } = render(PiiPage, { props: props() });
+		expect(getByLabelText('Narrow this page')).toBeTruthy();
+	});
+
 	it('reads an empty log as nobody having looked', () => {
 		const { container } = render(PiiPage, { props: props({ entries: [], total: 0 }) });
 		expect(said(container)).toContain('Nobody has read unmasked data');

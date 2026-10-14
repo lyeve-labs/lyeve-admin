@@ -97,6 +97,13 @@ describe('the customization controls', () => {
 		expect(screen.getByTestId('dashboard-state').parentElement?.textContent).not.toContain('could not be deleted');
 	});
 
+	it('gives each top section a level 2 heading under the page title', () => {
+		render(CustomizationPage, { props: props() });
+		for (const name of ['Brand', 'Dashboard', 'Pages', 'Menu', 'Links']) {
+			expect(screen.getByRole('heading', { name, level: 2 })).toBeTruthy();
+		}
+	});
+
 	it('offers the first page from the empty pages list', () => {
 		render(CustomizationPage, { props: props() });
 		expect(screen.getAllByRole('button', { name: /new page/i })).toHaveLength(2);

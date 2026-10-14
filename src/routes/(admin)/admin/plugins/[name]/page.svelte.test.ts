@@ -95,6 +95,13 @@ describe('plugin detail page', () => {
 		]);
 	});
 
+	it('keeps a route path on one line, so a narrow screen scrolls the table instead of breaking the path', () => {
+		const { container } = renderPage(SEARCH);
+		for (const tr of container.querySelectorAll('tbody tr')) {
+			expect(tr.querySelectorAll('td')[1].getAttribute('data-cell')).toBe('nowrap');
+		}
+	});
+
 	it('paints each method in the tone every other route list gives it', () => {
 		// A read is brand here as it is on the schema and API reference pages,
 		// so the same method never reads two ways in one console.

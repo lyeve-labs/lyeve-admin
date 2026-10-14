@@ -157,7 +157,7 @@
 							{#each routes as route (route.method + ' ' + route.pattern)}
 								<tr>
 									<td data-cell="nowrap"><Badge tone={methodTone(route.method)} size="sm">{route.method}</Badge></td>
-									<td class="font-mono text-xs">{route.pattern}</td>
+									<td data-cell="nowrap" class="font-mono text-xs">{route.pattern}</td>
 									<td data-cell="nowrap" class="text-sm text-muted">{ROUTE_GROUP_LABEL[group]}</td>
 								</tr>
 							{/each}

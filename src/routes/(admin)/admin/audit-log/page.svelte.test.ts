@@ -236,6 +236,12 @@ describe('Audit log toolbar', () => {
 		expect(container.textContent).toContain('at most 100,000');
 	});
 
+	it('names the two date filters for a screen reader', () => {
+		const { getByLabelText } = render(AuditLogPage, { props: { data: data() as never, form: null as never } });
+		expect(getByLabelText('From').id).toBe('audit-from');
+		expect(getByLabelText('To').id).toBe('audit-to');
+	});
+
 	it('carries the filter through the pager', () => {
 		const { container } = render(AuditLogPage, {
 			props: {

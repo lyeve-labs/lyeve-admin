@@ -112,7 +112,7 @@
 
 		<Card>
 			<div class="flex flex-col gap-3 text-sm text-muted">
-				<SectionHeading level={3}>What recommendations do</SectionHeading>
+				<SectionHeading level={2}>What recommendations do</SectionHeading>
 				<p>
 					Your application tells the engine what each reader does: views, likes, bookmarks and shares,
 					weighted 1, 2, 5 and 3. From that, each reader gets:

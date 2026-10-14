@@ -189,7 +189,7 @@
 		<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
 			<Card pad="md">
 				{#snippet header()}
-					<SectionHeading level={3}>Brand</SectionHeading>
+					<SectionHeading level={2}>Brand</SectionHeading>
 				{/snippet}
 				<form method="POST" action="?/brand" class="flex flex-col gap-4" use:enhance={keep}>
 					{#if form?.brandError}
@@ -236,7 +236,7 @@
 			<Card pad="md">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-2">
-						<SectionHeading level={3}>Dashboard</SectionHeading>
+						<SectionHeading level={2}>Dashboard</SectionHeading>
 						<Button variant="secondary" size="sm" href="/admin/settings/customization/dashboard">
 							<LayoutDashboard size={ICON.sm} /> Edit dashboard
 						</Button>
@@ -281,7 +281,7 @@
 			<Card pad="md">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-2">
-						<SectionHeading level={3}>Pages</SectionHeading>
+						<SectionHeading level={2}>Pages</SectionHeading>
 						<Button variant="secondary" size="sm" onclick={openPage}>
 							<Plus size={ICON.sm} /> New page
 						</Button>
@@ -340,7 +340,7 @@
 
 		<Card pad="md">
 			{#snippet header()}
-				<SectionHeading level={3}>Menu</SectionHeading>
+				<SectionHeading level={2}>Menu</SectionHeading>
 			{/snippet}
 			<form method="POST" action="?/menu" class="flex flex-col gap-4" use:enhance={keep}>
 				{#if form?.menuError}
@@ -384,7 +384,7 @@
 		<Card pad="md">
 			{#snippet header()}
 				<div class="flex items-center justify-between gap-2">
-					<SectionHeading level={3}>Links</SectionHeading>
+					<SectionHeading level={2}>Links</SectionHeading>
 					<Button variant="secondary" size="sm" onclick={openLink}>
 						<Plus size={ICON.sm} /> New link
 					</Button>

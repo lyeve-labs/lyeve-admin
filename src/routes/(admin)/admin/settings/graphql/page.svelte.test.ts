@@ -138,6 +138,18 @@ describe('persisted query delete', () => {
 		expect(out.sent).toBe('abc123');
 	});
 });
+
+describe('the endpoint table', () => {
+	it('keeps each method and path on one line, so a narrow screen scrolls the table instead of breaking the path', () => {
+		const { container } = render(GraphqlPage, { props: props() });
+		const cells = [...container.querySelectorAll('td')].filter((td) =>
+			/^(POST|GET) \//.test(td.textContent?.trim() ?? ''),
+		);
+		expect(cells).toHaveLength(2);
+		for (const td of cells) expect(td.getAttribute('data-cell')).toBe('nowrap');
+	});
+});
+
 describe('a persisted query list past one page', () => {
 	const query = { query_hash: 'abc123def456', operation_name: 'Landing', query: '{ x }', description: '', enabled: true };
 

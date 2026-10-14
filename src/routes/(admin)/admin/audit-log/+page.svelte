@@ -190,9 +190,11 @@
 			{/snippet}
 			{#snippet filters()}
 				<label for="audit-action" class="sr-only">Action</label>
-				<Select id="audit-action" name="action" options={actionOptions} bind:value={action} class="w-44" />
+				<Select id="audit-action" name="action" options={actionOptions} bind:value={action} searchable class="w-44" />
+				<label for="audit-from" class="sr-only">From</label>
 				<DatePicker id="audit-from" placeholder="From" bind:value={from} class="w-36" />
 				<input type="hidden" name="from" value={from} />
+				<label for="audit-to" class="sr-only">To</label>
 				<DatePicker id="audit-to" placeholder="To" bind:value={to} class="w-36" />
 				<input type="hidden" name="to" value={to} />
 			{/snippet}

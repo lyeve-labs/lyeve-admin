@@ -228,7 +228,7 @@
 
 		<Card>
 			<div class="flex flex-col gap-3 text-sm text-muted">
-				<SectionHeading level={3}>How storage works</SectionHeading>
+				<SectionHeading level={2}>How storage works</SectionHeading>
 				<p>
 					With nothing configured, uploads are written to a directory on the engine host, the one
 					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span> names (<span class="font-mono text-xs">./uploads</span>
