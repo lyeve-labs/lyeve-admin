@@ -105,6 +105,10 @@
 	let hiddenOlder = $derived(data.revisionWindow?.hiddenOlder ?? 0);
 	let windowDays = $derived(data.revisionWindow?.windowDays ?? null);
 	let olderHidden = $derived(hiddenOlder > 0 && windowDays !== null);
+	// One read lists at most the engine's page ceiling. Past it, the count is
+	// the plugin's total and the older revisions open one at a time by number.
+	let revisionTotal = $derived(Math.max(data.revisionTotal ?? 0, revisions.length));
+	let olderUnlisted = $derived(revisionTotal - revisions.length);
 	// The revision just older than the oldest listed. Opening it is how the
 	// panel asks, and the plugin answers 402 when it is outside the window.
 	let nextOlder = $derived(
@@ -189,7 +193,7 @@
 						type="button"
 						onclick={() => (showHistory = !showHistory)}
 					>
-						<History size={ICON.sm} /> History ({revisions.length})
+						<History size={ICON.sm} /> History ({revisionTotal})
 					</Button>
 				{/if}
 				{#if data.revisionsFailed}
@@ -345,8 +349,19 @@
 							</form>
 						</div>
 					{/if}
-					{#if olderHidden || revisionError}
+					{#if olderHidden || olderUnlisted > 0 || revisionError}
 						<div class="flex flex-col gap-3 border-t border-line p-3">
+							{#if olderUnlisted > 0 && !olderHidden}
+								<p class="text-xs text-muted">
+									The newest {revisions.length} of {revisionTotal} revisions are listed. Open an older one by number.
+								</p>
+								{#if nextOlder > 0 && !openedRevision}
+									<form method="POST" action="?/openRevision" use:enhance>
+										<input type="hidden" name="rev_num" value={nextOlder} />
+										<Button variant="secondary" size="sm" type="submit">Open revision {nextOlder}</Button>
+									</form>
+								{/if}
+							{/if}
 							{#if olderHidden}
 								<OlderHidden count={hiddenOlder} noun="revisions" {windowDays}>
 									{#if nextOlder > 0 && !openedRevision}

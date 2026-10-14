@@ -20,7 +20,11 @@ vi.mock('@lyeve-labs/client-rest', () => ({
 import { actions, load } from './+page.server';
 
 type Failure = { status: number; data: Record<string, unknown> };
-type Loaded = { revisions: { revision_num: number }[]; revisionWindow: { hiddenOlder: number; windowDays: number | null } };
+type Loaded = {
+	revisions: { revision_num: number }[];
+	revisionTotal: number;
+	revisionWindow: { hiddenOlder: number; windowDays: number | null };
+};
 
 const REFUSED = new ApiError(402, 'payment_required', {
 	error: 'payment_required',
@@ -32,9 +36,15 @@ function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+let revisionPaths: string[] = [];
+
 async function loadWith(revisions: unknown): Promise<Loaded> {
+	revisionPaths = [];
 	const fetch = vi.fn(async (path: string) => {
-		if (String(path).includes('/revisions')) return json(revisions);
+		if (String(path).includes('/revisions')) {
+			revisionPaths.push(String(path));
+			return json(revisions);
+		}
 		return json({ id: 'e1', created_at: '', updated_at: '', title: 'One', body: {}, status: 'draft' });
 	}) as unknown as typeof globalThis.fetch;
 	return (await load({
@@ -74,6 +84,22 @@ describe('the revision window', () => {
 	it('reads a plugin that sends neither field as one with nothing hidden', async () => {
 		const out = await loadWith({ data: [], total_count: 0 });
 		expect(out.revisionWindow).toEqual({ hiddenOlder: 0, windowDays: null });
+	});
+});
+
+describe('the revision count', () => {
+	// Left unnamed, the plugin answers its default page of 50, newest first.
+	it('asks for the engine page ceiling and keeps the total the plugin counted', async () => {
+		const rows = Array.from({ length: 3 }, (_, i) => ({ id: `r${i}`, revision_num: 700 - i, created_at: '', title: 'One' }));
+		const out = await loadWith({ data: rows, total_count: 700, hidden_older: 0 });
+		expect(revisionPaths).toHaveLength(1);
+		expect(new URL(revisionPaths[0], 'http://x').searchParams.get('limit')).toBe('500');
+		expect(out.revisionTotal).toBe(700);
+	});
+
+	it('counts the rows when the plugin sends no total', async () => {
+		const out = await loadWith([{ id: 'r1', revision_num: 1, created_at: '', title: 'One' }]);
+		expect(out.revisionTotal).toBe(1);
 	});
 });
 

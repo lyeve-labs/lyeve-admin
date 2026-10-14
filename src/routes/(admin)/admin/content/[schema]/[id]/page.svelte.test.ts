@@ -180,3 +180,17 @@ describe('content entry editor, a schema refusal', () => {
 		expect(container.querySelector('[data-field-name="title"]')?.textContent).toContain('must be at least 3 characters');
 	});
 });
+
+describe('content entry editor, revision count', () => {
+	it('labels the history with the total and offers the next older revision past the listed ones', async () => {
+		const revisions = [
+			{ id: 'r600', revision_num: 600, created_at: '2026-09-19T10:00:00Z', data: { title: 'One' } },
+			{ id: 'r599', revision_num: 599, created_at: '2026-09-18T10:00:00Z', data: { title: 'One' } },
+		];
+		render(EntryPage, { props: { data: data({ revisions, revisionTotal: 600 }), form: null } });
+		const toggle = screen.getByRole('button', { name: /History \(600\)/ });
+		await fireEvent.click(toggle);
+		expect(screen.getByText(/The newest 2 of 600 revisions are listed/)).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Open revision 598' })).toBeTruthy();
+	});
+});

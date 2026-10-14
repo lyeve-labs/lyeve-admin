@@ -121,11 +121,13 @@ type RevisionList = {
 	revisions: EditorRevision[];
 	hiddenOlder: number;
 	windowDays: number | null;
+	/** How many revisions the plugin says the entry has in the window, which can exceed the rows read. */
+	total: number;
 	/** The read failed, so the empty list says nothing about the entry's history. */
 	failed: boolean;
 };
 
-const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: null, failed: true };
+const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: null, total: 0, failed: true };
 
 /**
  * Fetch the entry's revisions.
@@ -139,17 +141,28 @@ const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDa
 /** The revisions as the endpoint answers them: the envelope, or a bare array from an older engine. */
 type RevisionBody =
 	| Record<string, unknown>[]
-	| { data?: Record<string, unknown>[]; hidden_older?: unknown; window_days?: unknown }
+	| { data?: Record<string, unknown>[]; total_count?: unknown; hidden_older?: unknown; window_days?: unknown }
 	| null;
+
+/**
+ * The most rows one read asks for, which is the engine's page ceiling. Left
+ * unnamed, the plugin answers its default of 50, newest first, and the older
+ * ones could not be listed or restored from the panel.
+ */
+const REVISION_LIMIT = 500;
 
 async function listRevisions(client: HttpClient, id: string): Promise<RevisionList> {
 	try {
-		const body = await client.get<RevisionBody>(`/api/admin/content/${encodeURIComponent(id)}/revisions`);
+		const body = await client.get<RevisionBody>(
+			`/api/admin/content/${encodeURIComponent(id)}/revisions?limit=${REVISION_LIMIT}&offset=0`,
+		);
 		const rows = (Array.isArray(body) ? body : (body?.data ?? [])) as Record<string, unknown>[];
 		const hidden = Array.isArray(body) ? 0 : Number(body?.hidden_older ?? 0);
 		const days = Array.isArray(body) ? null : body?.window_days;
+		const counted = Array.isArray(body) ? NaN : Number(body?.total_count);
 		return {
 			revisions: rows.map(toEditorRevision),
+			total: Number.isInteger(counted) && counted > rows.length ? counted : rows.length,
 			hiddenOlder: Number.isInteger(hidden) && hidden > 0 ? hidden : 0,
 			windowDays: typeof days === 'number' && days > 0 ? days : null,
 			failed: false,
@@ -357,12 +370,13 @@ export const load: PageServerLoad = async (event) => {
 		? await Promise.resolve().then(() => listMediaChoices(client)).catch(() => null)
 		: [];
 
-	const { revisions, hiddenOlder, windowDays, failed: revisionsFailed } = revisionList;
+	const { revisions, hiddenOlder, windowDays, total: revisionTotal, failed: revisionsFailed } = revisionList;
 	return {
 		schemaDef,
 		item,
 		relations,
 		revisions,
+		revisionTotal,
 		revisionsFailed,
 		revisionWindow: { hiddenOlder, windowDays },
 		localization,
