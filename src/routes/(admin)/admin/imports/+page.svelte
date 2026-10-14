@@ -408,7 +408,11 @@
 				</Alert>
 			{/if}
 			{#if !data.templatesRead}
-				<Alert tone="danger">The templates could not be read. This is not a report that there are none.</Alert>
+				<GateNotice
+					gate={data.templatesGate ?? { state: 'error', message: 'The templates could not be read. This is not a report that there are none.' }}
+					title="Templates"
+					absent="This build does not keep mapping templates."
+				/>
 			{:else if data.templates.length === 0}
 				<EmptyState title="No mapping template" description="Each import maps its columns from scratch.">
 					{#snippet iconSnippet()}

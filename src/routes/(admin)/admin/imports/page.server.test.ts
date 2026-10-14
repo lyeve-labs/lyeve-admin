@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({
 	listRows: vi.fn(),
 	listTemplates: vi.fn(),
 	rollbackJob: vi.fn(),
+	cancelJob: vi.fn(),
 	createTemplate: vi.fn(),
 	updateTemplate: vi.fn(),
 	deleteTemplate: vi.fn(),
@@ -81,6 +82,12 @@ describe('imports load', () => {
 		const result = (await load(loadEvent())) as Loaded;
 		expect(result.templatesRead).toBe(false);
 		expect(result.licensed).toBeNull();
+	});
+
+	it('keeps the reason the templates were not read', async () => {
+		api.listTemplates.mockRejectedValue(new ApiError(403, 'insufficient permissions'));
+		const result = (await load(loadEvent())) as Loaded & { templatesGate: unknown };
+		expect(result.templatesGate).toEqual({ state: 'forbidden' });
 	});
 });
 
@@ -176,3 +183,33 @@ describe('template actions', () => {
 		expect(await actions.deleteTemplate(formEvent({ id: 't1' }))).toEqual({ removedTemplate: 't1' });
 	});
 });
+
+describe('canceling an import', () => {
+	type Failure = { status: number; data: Record<string, unknown> };
+
+	it('cancels the import it names', async () => {
+		api.cancelJob.mockResolvedValue(undefined);
+		expect(await actions.cancel(formEvent({ id: 'j1' }))).toEqual({ canceled: 'j1' });
+		expect(api.cancelJob).toHaveBeenCalledWith(expect.anything(), 'j1');
+	});
+
+	it('names the cancel on a refusal and relays its reason', async () => {
+		api.cancelJob.mockRejectedValue(new ApiError(409, 'job is not running'));
+		expect(((await actions.cancel(formEvent({ id: 'j1' }))) as Failure).data).toEqual({ action: 'cancel', error: 'job is not running' });
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		api.cancelJob.mockRejectedValue(new ApiError(503, 'pq: down'));
+		expect(((await actions.cancel(formEvent({ id: 'j1' }))) as Failure).data).toEqual({
+			action: 'cancel',
+			error: 'The import could not be canceled.',
+		});
+	});
+
+	it('refuses an editor before it reaches the plugin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		await expect(actions.cancel(formEvent({ id: 'j1' }))).rejects.toMatchObject({ status: 403 });
+		expect(api.cancelJob).not.toHaveBeenCalled();
+	});
+});
+
