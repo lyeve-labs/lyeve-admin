@@ -39,6 +39,7 @@
 		type WidgetWindow,
 	} from '$lib/api/custom-dashboard';
 	import { formatDateTime } from '$lib/format';
+	import { inSentence } from '$lib/api/gate';
 	import type { ResolvedWidget } from '$lib/api/custom-dashboard';
 	import type { PageData, ActionData } from './$types';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -98,11 +99,6 @@
 	const full = $derived(widgets.length >= MAX_WIDGETS);
 	const wire = $derived(JSON.stringify(widgets.map(wireWidget)));
 	const preview = $derived((form as { preview?: ResolvedWidget[] } | null)?.preview ?? null);
-
-	/** A label as it reads mid-sentence: lower case, except an acronym such as API. */
-	function inSentence(label: string): string {
-		return /^[A-Z]{2}/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
-	}
 
 	function add(type: WidgetType) {
 		if (full) return;
