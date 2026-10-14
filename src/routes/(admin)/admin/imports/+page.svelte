@@ -4,16 +4,11 @@
 		Badge,
 		Button,
 		Card,
-		DescriptionList,
-		Drawer,
 		EmptyState,
 		PageShell,
 		Pagination,
-		Input,
 		Progress,
-		RadioGroup,
 		SectionHeading,
-		Select,
 		Spinner,
 		Stat,
 		Table,
@@ -39,9 +34,8 @@
 	} from '@lucide/svelte';
 	import ImportWizard from '$lib/components/ImportWizard.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import TransformField from '$lib/components/imports/TransformField.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { confirmed, tracked } from '$lib/forms.svelte';
+	import { confirmed } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		OUTCOME_LABELS,
@@ -52,22 +46,16 @@
 		rejectedHref,
 		rejectionRate,
 		rollbackable,
-		emptyTransform,
-		mappingTargets,
-		transformDraft,
-		transformFields,
 		transformLabel,
-		written,
-		type FieldMapping,
 		type ImportJob,
-		type ImportMode,
 		type MappingTemplate,
-		type TransformDraft,
 	} from '$lib/api/bulk-import';
 	import { NO_VALUE, formatCount, formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
+	import ImportRowsDrawer from './ImportRowsDrawer.svelte';
+	import TemplateDrawer from './TemplateDrawer.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -87,7 +75,6 @@
 	// Null while the content types are unread, so each place that offers one
 	// says why it offers none.
 	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
-	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 	const running = $derived(data.jobs.filter(cancelable));
 	const rejecting = $derived(data.jobs.filter((j) => outcome(j) === 'partial' || outcome(j) === 'nothing'));
 
@@ -146,92 +133,14 @@
 		);
 	}
 
-	const detailItems = $derived(
-		detail
-			? [
-					{ term: 'Content type', value: detail.job.content_type },
-					{
-						term: 'Source',
-						value: `${detail.job.source_kind === 'url' ? 'Web address' : 'Upload'}, ${detail.job.source_format}`,
-					},
-					{
-						term: 'When an entry exists',
-						value: detail.job.mode === 'upsert' ? 'Update it' : 'Leave it alone',
-					},
-					{
-						term: 'Key field',
-						value: detail.job.upsert_key === 'entry.slug' ? 'Entry slug' : detail.job.upsert_key || 'None',
-					},
-					{ term: 'Created', value: formatCount(detail.job.inserted_rows) },
-					{ term: 'Updated', value: formatCount(detail.job.updated_rows) },
-					{ term: 'Skipped', value: formatCount(detail.job.skipped_rows) },
-					{ term: 'Rejected', value: formatCount(detail.job.errored_rows) },
-				]
-			: [],
-	);
-	// A mapping template: a saved mapping an import names instead of mapping
-	// its columns again. Created and edited in a drawer, like any row.
-	interface MappingRow {
-		id: number;
-		source: string;
-		target: string;
-		transform: TransformDraft;
-	}
-
-	let templateOpen = $state(false);
-	let editingTemplate = $state<MappingTemplate | null>(null);
-	let templateName = $state('');
-	let templateType = $state('');
-	let templateMode = $state<ImportMode>('create');
-	let templateKey = $state('');
-	let rows = $state<MappingRow[]>([]);
-	let nextRow = 0;
-
-	const templateTargets = $derived(
-		mappingTargets((schemaList ?? []).find((x) => x.name === templateType)?.fields ?? []),
-	);
-	const targetOptions = $derived(templateTargets.map((t) => ({ value: t.value, label: t.label })));
-
-	/** The rows as the plugin takes them, or the first problem in words. */
-	const templateMappings = $derived.by((): FieldMapping[] | string => {
-		const out: FieldMapping[] = [];
-		for (const r of rows) {
-			if (!r.source.trim() && !r.target) continue;
-			if (!r.source.trim() || !r.target) return 'Every row names a column in the file and the field it fills.';
-			const fields = transformFields(r.transform);
-			if (typeof fields === 'string') return `${r.source}: ${fields}`;
-			const dataType = templateTargets.find((t) => t.value === r.target)?.dataType;
-			out.push({ source_field: r.source.trim(), target_field: r.target, data_type: dataType, ...fields });
-		}
-		return out;
-	});
-
-	function addRow(source = '', target = '', transform: TransformDraft = emptyTransform()) {
-		rows = [...rows, { id: nextRow++, source, target, transform }];
-	}
+	// The drawer owns its fields. The page sets the old failure aside first,
+	// so a drawer opened after a failure starts clean.
+	let templateDrawer = $state<TemplateDrawer>();
 
 	function openTemplate(t: MappingTemplate | null) {
-		editingTemplate = t;
-		templateName = t?.name ?? '';
-		templateType = t?.content_type ?? (schemaList?.length === 1 ? schemaList[0].name : '');
-		templateMode = t?.mode === 'upsert' ? 'upsert' : 'create';
-		templateKey = t?.upsert_key ?? '';
-		rows = [];
-		for (const m of t?.field_mappings ?? []) addRow(m.source_field, m.target_field, transformDraft(m));
-		if (rows.length === 0) addRow();
 		setAside = form;
-		templateOpen = true;
+		templateDrawer?.edit(t);
 	}
-
-	const saveTemplate = tracked(() => {
-		const subject = templateName;
-		const verb = editingTemplate ? 'Saved' : 'Created';
-		return async ({ result, update }) => {
-			if (result.type !== 'failure') templateOpen = false;
-			await update();
-			if (result.type === 'success') toast.success(`${verb} ${subject}`);
-		};
-	});
 
 	function removeTemplate(t: MappingTemplate): SubmitFunction {
 		return confirmed(
@@ -563,186 +472,12 @@
 	onstarted={started}
 />
 
-<Drawer bind:open={templateOpen} title={editingTemplate ? `Edit ${editingTemplate.name}` : 'New template'}>
-	<form
-		id="template-form"
-		method="POST"
-		action={editingTemplate ? '?/updateTemplate' : '?/createTemplate'}
-		use:enhance={saveTemplate.enhance}
-	>
-		{#if editingTemplate}
-			<input type="hidden" name="id" value={editingTemplate.id} />
-		{/if}
-		<input type="hidden" name="mappings" value={JSON.stringify(typeof templateMappings === 'string' ? [] : templateMappings)} />
-		<div class="flex flex-col gap-4">
-			<FormErrors message={templateError || undefined} refused={templateRefusal} />
-			<Input id="template-name" name="name" label="Name" bind:value={templateName} required />
-			<Select
-				id="template-type"
-				name="content_type"
-				label="Content type"
-				searchable
-				hint={schemaList === null ? 'The content types could not be read, so none can be chosen. Close this and try again in a moment.' : undefined}
-				bind:value={templateType}
-				options={(schemaList ?? []).map((x) => ({ value: x.name, label: x.name }))}
-			/>
-			<RadioGroup
-				label="When an entry already exists"
-				name="mode"
-				hint="The key field decides which entry a row is."
-				bind:value={templateMode}
-				options={[
-					{ value: 'create', label: 'Create only', description: 'Leave an entry the key finds alone and report the row as skipped.' },
-					{ value: 'upsert', label: 'Create and update', description: 'Overwrite the fields of an entry the key finds, and create the rest.' },
-				]}
-			/>
-			{#if templateMode === 'upsert'}
-				<Select
-					id="template-key"
-					name="upsert_key"
-					label="Key field"
-					hint="The field that finds the entry a row updates."
-					searchable
-					bind:value={templateKey}
-					options={[
-						{ value: '', label: 'Choose the key field' },
-						{ value: 'entry.slug', label: 'Entry slug' },
-						...templateTargets.filter((t) => !t.value.startsWith('entry.')).map((t) => ({ value: t.value, label: t.value })),
-					]}
-				/>
-			{/if}
-			<div class="flex flex-col gap-3">
-				{#each rows as r, i (r.id)}
-					<div class="flex flex-col gap-2 rounded border border-line p-3">
-						<div class="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
-							<Input id="template-source-{r.id}" label="Column in the file" bind:value={r.source} />
-							<Select
-								id="template-target-{r.id}"
-								label="Field"
-								searchable
-								bind:value={r.target}
-								options={[{ value: '', label: 'Choose a field' }, ...targetOptions]}
-							/>
-							<Button
-								variant="ghost"
-								size="sm"
-								aria-label="Remove column {r.source || i + 1}"
-								onclick={() => (rows = rows.filter((x) => x.id !== r.id))}
-							>
-								<Trash2 size={ICON.sm} class="text-danger" />
-							</Button>
-						</div>
-						<TransformField
-							id="template-{r.id}"
-							label="Transform"
-							licensed={data.licensed}
-							bind:draft={r.transform}
-						/>
-					</div>
-				{/each}
-				<div>
-					<Button variant="secondary" size="sm" onclick={() => addRow()}>
-						<Plus size={ICON.sm} /> Add column
-					</Button>
-				</div>
-				{#if typeof templateMappings === 'string'}
-					<p class="text-xs text-danger">{templateMappings}</p>
-				{/if}
-			</div>
-		</div>
-	</form>
-	{#snippet footer()}
-		<Button variant="secondary" onclick={() => (templateOpen = false)}>Cancel</Button>
-		<Button
-			variant="primary"
-			type="submit"
-			form="template-form"
-			disabled={typeof templateMappings === 'string'}
-			loading={saveTemplate.pending}
-		>
-			{editingTemplate ? 'Save' : 'Create'}
-		</Button>
-	{/snippet}
-</Drawer>
+<TemplateDrawer
+	bind:this={templateDrawer}
+	schemas={schemaList}
+	licensed={data.licensed}
+	error={templateError}
+	refused={templateRefusal}
+/>
 
-<Drawer
-	bind:open={detailOpen}
-	title={detail ? `Import of ${detail.job.source_name}` : 'Import'}
-	description={detail ? OUTCOME_LABELS[outcome(detail.job)] : ''}
-	onclose={closeDetail}
->
-	{#if data.detail && !data.detail.ok}
-		<GateNotice
-			gate={data.detail.gate}
-			title="this import"
-			absent="That import no longer exists. It may have been removed since the history was read."
-		/>
-	{:else if detail}
-		<div class="flex flex-col gap-5">
-			<DescriptionList items={detailItems} />
-			<div class="flex flex-col gap-3">
-				<div class="flex flex-wrap items-center justify-between gap-2">
-					<SectionHeading level={3}>Rejected rows</SectionHeading>
-					{#if detail.rejectedTotal > 0}
-						<Button variant="secondary" size="sm" href={rejectedHref(detail.job.id)}>
-							<Download size={ICON.sm} /> Download all {formatCount(detail.rejectedTotal)} as CSV
-						</Button>
-					{/if}
-				</div>
-				{#if detail.rejected.length === 0}
-					<p class="text-sm text-muted">No row was rejected.</p>
-				{:else}
-					<Table label="Rejected rows of this import">
-						<thead>
-							<tr>
-								<th scope="col">Row</th>
-								<th scope="col">Why</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each detail.rejected as r (r.id)}
-								<tr>
-									<td data-cell="nowrap" class="font-mono text-xs">{r.row_index + 1}</td>
-									<td class="text-xs">
-										{r.error_message || r.error_code}
-										{#if r.error_code}<span class="text-faint"> ({r.error_code})</span>{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</Table>
-					{#if detail.rejectedTotal > detail.rejected.length}
-						<p class="text-xs text-muted">
-							The first {formatCount(detail.rejected.length)} of {formatCount(detail.rejectedTotal)}. The
-							download has them all.
-						</p>
-					{/if}
-				{/if}
-			</div>
-			{#if detail.skipped.length > 0}
-				<div class="flex flex-col gap-3">
-					<SectionHeading level={3}>Skipped rows</SectionHeading>
-					<Table label="Skipped rows of this import">
-						<thead>
-							<tr>
-								<th scope="col">Row</th>
-								<th scope="col">Why</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each detail.skipped as r (r.id)}
-								<tr>
-									<td data-cell="nowrap" class="font-mono text-xs">{r.row_index + 1}</td>
-									<td class="text-xs">{r.error_message || 'Skipped'}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</Table>
-				</div>
-			{/if}
-		</div>
-	{/if}
-	{#snippet footer()}
-		<Button variant="secondary" onclick={closeDetail}>Close</Button>
-	{/snippet}
-</Drawer>
+<ImportRowsDrawer bind:open={detailOpen} detail={data.detail} onclose={closeDetail} />
