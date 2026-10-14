@@ -122,7 +122,15 @@ export async function requireUser(event: RequestEvent): Promise<User> {
  * cannot be driven by a direct POST from a lower-privileged session.
  */
 export async function requireRole(event: RequestEvent, roles: string[]): Promise<User> {
-	const user = await requireUser(event);
+	return assertRole(await requireUser(event), roles);
+}
+
+/**
+ * Throw 403 unless the user holds at least one of the given roles. A load
+ * takes the user from the layout's data and checks it here, so it asks the
+ * engine for the session once per page and not once per load.
+ */
+export function assertRole(user: User, roles: string[]): User {
 	if (!roles.some((r) => user.roles.includes(r))) {
 		error(403, `Requires one of roles: ${roles.join(', ')}`);
 	}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
-import { authedClient, authedHeaders, requireUser, requireRole, stripProtectedFields } from './authz';
+import { assertRole, authedClient, authedHeaders, requireUser, requireRole, stripProtectedFields } from './authz';
 import { BUSY, OUTAGE } from '$lib/outage';
 
 // event stub
@@ -138,6 +138,25 @@ describe('authedClient', () => {
 		const headers = mock.mock.calls[0][1].headers as Record<string, string>;
 		expect(headers['X-Tenant-ID']).toBe('acme');
 		expect(headers.Authorization).toBe('Bearer sess-tok');
+	});
+});
+
+describe('assertRole', () => {
+	const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
+
+	it('returns a user who holds one of the roles', () => {
+		expect(assertRole(user as never, ['admin', 'super_admin'])).toBe(user);
+	});
+
+	it('throws 403 for a user who holds none of them', () => {
+		const err = (() => {
+			try {
+				assertRole(user as never, ['super_admin']);
+			} catch (e) {
+				return e as { status?: number };
+			}
+		})();
+		expect(err?.status).toBe(403);
 	});
 });
 

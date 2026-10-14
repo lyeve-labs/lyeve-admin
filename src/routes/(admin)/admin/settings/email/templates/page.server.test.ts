@@ -65,6 +65,13 @@ describe('email templates load', () => {
 		expect(order[0]).toContain('/api/admin/email-templates?limit=200');
 	});
 
+	it('takes the session from the layout rather than asking the engine again', async () => {
+		const { event, calls } = loadEvent(routes);
+		await load(event);
+		expect(calls.some((c) => c.url.includes('/auth/me'))).toBe(false);
+		expect(calls.every((c) => (c.init?.headers as Record<string, string>).Authorization === 'Bearer tok')).toBe(true);
+	});
+
 	it('says the list failed rather than drawing an empty one', async () => {
 		const { event } = loadEvent({ '/api/admin/email-templates?': () => json({ error: 'db down' }, 503), ...routes });
 		const out = (await load(event)) as Loaded;
