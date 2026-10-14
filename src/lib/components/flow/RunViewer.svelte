@@ -144,20 +144,23 @@
 					{/if}
 					<div class="mb-3 flex items-center justify-between gap-2">
 						<span class="text-xs text-muted">Step <span class="font-mono text-fg">{current.node_id}</span>, attempt {current.attempt}</span>
-						<CopyButton value={pretty({ input: current.input, output: current.output, error: current.error || undefined })} label="Copy step" />
+						<!-- A withheld value comes back as null, which a copy would pass off as real. -->
+						{#if !withheld}
+							<CopyButton value={pretty({ input: current.input, output: current.output, error: current.error || undefined })} label="Copy step" />
+						{/if}
 					</div>
 					<div class="grid gap-4 md:grid-cols-2">
 						<section>
 							<SectionHeading level={3} variant="eyebrow" class="mb-1">
 								Input
-								{#snippet actions()}<CopyButton value={pretty(current.input)} label="Copy input" />{/snippet}
+								{#snippet actions()}{#if !withheld}<CopyButton value={pretty(current.input)} label="Copy input" />{/if}{/snippet}
 							</SectionHeading>
 							{@render valueBox(current.input)}
 						</section>
 						<section>
 							<SectionHeading level={3} variant="eyebrow" class="mb-1">
 								Output
-								{#snippet actions()}<CopyButton value={pretty(current.output)} label="Copy output" />{/snippet}
+								{#snippet actions()}{#if !withheld}<CopyButton value={pretty(current.output)} label="Copy output" />{/if}{/snippet}
 							</SectionHeading>
 							{@render valueBox(current.output)}
 						</section>

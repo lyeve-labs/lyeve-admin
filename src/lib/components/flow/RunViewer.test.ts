@@ -43,6 +43,12 @@ describe('RunViewer', () => {
 		expect(screen.getByTestId('run-failure').textContent).toContain('Run failed at join');
 		expect(container.textContent).toContain('Withheld from you.');
 		expect(container.textContent).not.toContain('null');
+		expect(screen.queryByRole('button', { name: /^Copy (step|input|output)$/ })).toBeNull();
+	});
+
+	it('offers to copy a step and its values when they are not withheld', () => {
+		render(RunViewer, { props: { run: fixtureRun } });
+		for (const name of ['Copy step', 'Copy input', 'Copy output']) expect(screen.getByRole('button', { name })).toBeTruthy();
 	});
 
 	it('leads back to the failed step from another one', async () => {
