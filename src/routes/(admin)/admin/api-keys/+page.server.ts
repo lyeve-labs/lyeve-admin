@@ -1,7 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, error, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { createClient } from '@lyeve-labs/client';
 import { revokeAPIKey, deleteAPIKey } from '@lyeve-labs/client-rest';
 import type { APIKey } from '@lyeve-labs/client';
 import { actionError, actionFailure } from '$lib/server/action-error';
@@ -18,7 +17,6 @@ import { cleanScopes, fetchKeyScopeCatalog } from '$lib/api/key-access';
 import { listSchemaNames } from '$lib/api/search-settings';
 import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
-import { sessionToken } from '$lib/server/session-cookie';
 
 export interface UsageSummary {
 	api_key_id: string;
@@ -29,11 +27,11 @@ export interface UsageSummary {
 	bytes_out: number;
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent, url } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	// The endpoint pages at fifty, so a read that names no window shows the
 	// first fifty keys as every key the instance has.
 	const { limit, offset } = pageWindow(url, 50, 500);

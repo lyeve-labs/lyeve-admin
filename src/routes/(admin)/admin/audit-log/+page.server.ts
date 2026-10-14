@@ -1,12 +1,10 @@
 import type { PageServerLoad, Actions } from './$types';
-import { createClient } from '@lyeve-labs/client';
-import { authedHeaders, requireRole } from '$lib/server/authz';
+import { authedHeaders, requireRole, authedClient } from '$lib/server/authz';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { unwrapList } from '@lyeve-labs/client-rest';
 import { pageNumber, pageOffset, pastEndOffset, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
 import { UUID, endpointQuery, readFilter } from '$lib/server/audit-filter';
-import { sessionToken } from '$lib/server/session-cookie';
 
 export interface AuditEntry {
 	id: string;
@@ -21,11 +19,11 @@ export interface AuditEntry {
 
 const PAGE_SIZE = 50;
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) error(403, 'Requires admin role');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	const limit = PAGE_SIZE;
 	// The offset comes from the address, so it is clamped and snapped to a page
 	// boundary before the engine sees it or the pager counts from it.

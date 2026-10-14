@@ -5,7 +5,7 @@
 
 import { ApiError } from '@lyeve-labs/client';
 import { CatalogError, getLLMCatalog } from '$lib/api/assist';
-import { flowAuthHeaders } from '$lib/server/flow-import';
+import { authedHeaders } from '$lib/server/authz';
 import type { AssistRefusal } from '$lib/flow/assistant';
 
 const NO_CATALOG_TEXT = 'This engine does not publish the node catalog the assistant reads. Update the flow plugin.';
@@ -68,10 +68,10 @@ const cache = new WeakMap<Request, Promise<string>>();
  * as long as the action does, so nothing outlives the request and two
  * tenants never share a read.
  */
-export function catalogFor(event: { request: Request; fetch: typeof fetch } & Parameters<typeof flowAuthHeaders>[0]): Promise<string> {
+export function catalogFor(event: { request: Request; fetch: typeof fetch } & Parameters<typeof authedHeaders>[0]): Promise<string> {
 	let pending = cache.get(event.request);
 	if (!pending) {
-		pending = getLLMCatalog(event.fetch, flowAuthHeaders(event));
+		pending = getLLMCatalog(event.fetch, authedHeaders(event));
 		cache.set(event.request, pending);
 	}
 	return pending;

@@ -1,6 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import {
 	search,
 	listSynonyms,
@@ -24,17 +23,16 @@ import {
 	setPublicSchemas,
 	type SearchAnalytics,
 } from '$lib/api/search-settings';
-import { sessionToken } from '$lib/server/session-cookie';
 import { section, type Section } from '$lib/api/gate';
 
 /** Runs f so that a synchronous throw lands in the same catch as a rejection. */
 const attempt = <T>(f: () => Promise<T>): Promise<T> => Promise.resolve().then(f);
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user } = await parent();
 
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	const q = url.searchParams.get('q')?.trim() ?? '';
 

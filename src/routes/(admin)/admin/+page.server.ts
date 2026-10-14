@@ -6,7 +6,6 @@ import { resolveWidgets } from '$lib/server/dashboard-widgets';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
 import { fail, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import type { DeadLetter, GlobalHealthStats, Schema } from '@lyeve-labs/client';
 import {
 	getEndpoints,
@@ -32,7 +31,6 @@ import { getSecurityControls } from '$lib/api/security';
 import { hasLicenseModule } from '$lib/entitlements';
 import type { AuditEntry } from './audit-log/+page.server';
 import type { Job } from './jobs/+page.server';
-import { sessionToken } from '$lib/server/session-cookie';
 
 /** What the content plugin lists for an entry, as far as the dashboard reads it. */
 export interface RecentEntry {
@@ -47,10 +45,10 @@ export interface RecentEntry {
 /** How many rows each "what changed" list shows. */
 const RECENT = 5;
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent, url } = event;
 	const { user, entitlements, customization, plugins } = await parent();
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	const superAdmin = user.roles.includes('super_admin');
 	const isAdmin = superAdmin || user.roles.includes('admin');
 

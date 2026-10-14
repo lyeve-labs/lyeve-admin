@@ -2,9 +2,12 @@ import { error, type RequestEvent } from '@sveltejs/kit';
 import { ApiError, createClient, type HttpClient } from '@lyeve-labs/client';
 import { getMe } from '@lyeve-labs/client-rest';
 import type { User } from '@lyeve-labs/client';
-import { sessionToken } from '$lib/server/session-cookie';
+import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { BUSY, OUTAGE } from '$lib/outage';
+
+/** The headers that carry the session, in lower case. Only `authedHeaders` sets them. */
+const SESSION_HEADERS = new Set(['authorization', 'x-csrf-token']);
 
 // The engine's double-submit CSRF cookie, secure name first.
 const CSRF_COOKIE = '__Host-csrf';
@@ -26,7 +29,7 @@ const CSRF_COOKIE_INSECURE = 'csrf';
  * The token is set only when a cookie is found: an empty header fails the
  * check it exists to pass.
  */
-export function authedHeaders(event: RequestEvent): Record<string, string> {
+export function authedHeaders(event: SessionRead): Record<string, string> {
 	const token = sessionToken(event);
 	if (!token) {
 		error(401, 'Not authenticated');
@@ -39,12 +42,19 @@ export function authedHeaders(event: RequestEvent): Record<string, string> {
 }
 
 /**
- * Build an API client authenticated as the current session.
- * Throws 401 if no session cookie is present. Use inside server load
- * functions and form actions where `await parent()` is unavailable.
+ * Build an API client authenticated as the current session. Every server load
+ * and form action reads the engine through it. Throws 401 if no session cookie
+ * is present.
+ *
+ * `extra` adds headers to every request, such as X-Tenant-ID for a super
+ * admin acting in another tenant. It never sets the session's own headers.
+ * Header names are case-insensitive, so an `authorization` in `extra` would
+ * travel beside the session's bearer, and a CSRF header in `extra` would stand
+ * in for the cookie's when there is none. Both are dropped in any spelling.
  */
-export function authedClient(event: RequestEvent): HttpClient {
-	const headers = authedHeaders(event);
+export function authedClient(event: RequestEvent, extra: Record<string, string> = {}): HttpClient {
+	const allowed = Object.entries(extra).filter(([name]) => !SESSION_HEADERS.has(name.toLowerCase()));
+	const headers = { ...Object.fromEntries(allowed), ...authedHeaders(event) };
 	return createClient((url, init) =>
 		event.fetch(url, {
 			...init,
@@ -119,7 +129,15 @@ export async function requireUser(event: RequestEvent): Promise<User> {
  * cannot be driven by a direct POST from a lower-privileged session.
  */
 export async function requireRole(event: RequestEvent, roles: string[]): Promise<User> {
-	const user = await requireUser(event);
+	return assertRole(await requireUser(event), roles);
+}
+
+/**
+ * Throw 403 unless the user holds at least one of the given roles. A load
+ * takes the user from the layout's data and checks it here, so it asks the
+ * engine for the session once per page and not once per load.
+ */
+export function assertRole(user: User, roles: string[]): User {
 	if (!roles.some((r) => user.roles.includes(r))) {
 		error(403, `Requires one of roles: ${roles.join(', ')}`);
 	}

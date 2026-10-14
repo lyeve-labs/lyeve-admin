@@ -1,16 +1,15 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { ApiError, createClient, type Schema } from '@lyeve-labs/client';
+import { ApiError, type Schema, type HttpClient } from '@lyeve-labs/client';
 import { getSchemas, getSchemaStats } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { retryBusy } from '$lib/server/retry-busy';
-import { bundleContentType, flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
+import { bundleContentType, readImportForm } from '$lib/server/flow-import';
 import { IMPORT_SOURCES } from './import-sources';
 import { applySchemaPreset, deleteSchemaPreset, readSchemaPresets, saveSchemaPreset, type SchemaPreset } from '$lib/api/schema-preset-catalog';
 import { NO_CANVAS, parsePositions, readCanvasLayout, saveCanvasLayout, type CanvasLayout } from '$lib/api/schema-canvas-layout';
 import { refusalOf, refusalText } from '$lib/api/refusal';
-import { sessionToken } from '$lib/server/session-cookie';
 import { section, type Gate } from '$lib/api/gate';
 
 /** Every schema write the engine serves takes one of these. */
@@ -51,7 +50,7 @@ export type ImportPlan = {
  */
 const STATS_CONCURRENCY = 8;
 
-async function countRows(schemas: Schema[], client: ReturnType<typeof createClient>): Promise<Record<string, number>> {
+async function countRows(schemas: Schema[], client: HttpClient): Promise<Record<string, number>> {
 	const out: Record<string, number> = {};
 	let next = 0;
 	async function worker() {
@@ -68,10 +67,10 @@ async function countRows(schemas: Schema[], client: ReturnType<typeof createClie
 	return out;
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent } = event;
 	const { user } = await parent();
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	const canWrite = (user?.roles ?? []).some((r: string) => WRITERS.includes(r));
 	const isSuperAdmin = (user?.roles ?? []).includes('super_admin');
 
@@ -321,7 +320,7 @@ export const actions: Actions = {
 		try {
 			res = await event.fetch(`/api/admin/schemas/import?${query}`, {
 				method: 'POST',
-				headers: { ...flowAuthHeaders(event), 'Content-Type': type },
+				headers: { ...authedHeaders(event), 'Content-Type': type },
 				body: payload,
 			});
 		} catch {

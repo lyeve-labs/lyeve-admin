@@ -1,13 +1,11 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';
 import { pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
-import { sessionToken } from '$lib/server/session-cookie';
 
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -25,9 +23,9 @@ function matches(v: Variable, q: string): boolean {
 	return v.key.toLowerCase().includes(needle) || (!v.is_secret && (v.value ?? '').toLowerCase().includes(needle));
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { cookies, url } = event;
+	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, 50, 500);
 	const q = (url.searchParams.get('q') ?? '').trim();
 	let variables: Variable[] = [];

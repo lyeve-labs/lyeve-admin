@@ -298,6 +298,74 @@ describe('(admin)/+layout.server.ts load', () => {
 			expect(result!.plugins).toEqual({ state: 'named', running: ['media'], withheld: ['audit'] });
 		});
 
+		describe('for an operator', () => {
+			// Every phase a plugin can be in, and one the build left out. The
+			// running list below is what the engine derives from the same report.
+			const report = {
+				compiled: ['media', 'search', 'audit', 'forms', 'cache'],
+				entitled: ['media', 'search', 'audit', 'forms', 'cache'],
+				plugins: [
+					{ name: 'media', compiled: true, entitled: true, requested: true, active: true, phase: 'running' },
+					{ name: 'search', compiled: true, entitled: true, requested: true, active: false, phase: 'lazy' },
+					{ name: 'audit', compiled: true, entitled: true, requested: true, active: true, phase: 'running' },
+					{ name: 'forms', compiled: true, entitled: true, requested: true, active: false, phase: 'failed' },
+					{ name: 'cache', compiled: false, entitled: true, requested: true, active: false, phase: 'registered' },
+				],
+			};
+			const entitlements = { plan: '', state: '', features: [], withheld: ['search'] };
+			const routes = {
+				'/api/admin/plugins/running': () => json({ plugins: ['audit', 'media'], withheld: ['search'] }),
+				'/api/admin/plugins/status': () => json(report),
+				'/api/admin/entitlements': () => json(entitlements),
+			};
+			const listRead = (seen: string[]) => seen.some((u) => u.includes('/api/admin/plugins/running'));
+
+			it('builds the same plugin set from the status report as the running list gives', async () => {
+				const editor = engine(['editor'], routes);
+				const operator = engine(['super_admin'], routes);
+				const fromList = (await editor.run())!.plugins;
+				const fromStatus = (await operator.run())!.plugins;
+				expect(fromList).toEqual({ state: 'named', running: ['audit', 'media'], withheld: ['search'] });
+				expect(fromStatus).toEqual(fromList);
+				expect(listRead(editor.seen)).toBe(true);
+				expect(listRead(operator.seen)).toBe(false);
+			});
+
+			it('reads the running list when the status report could not be read', async () => {
+				const { seen, run } = engine(['admin'], { ...routes, '/api/admin/plugins/status': () => json({ error: 'down' }, 503) });
+				expect((await run())!.plugins).toEqual({ state: 'named', running: ['audit', 'media'], withheld: ['search'] });
+				expect(listRead(seen)).toBe(true);
+			});
+
+			it('reads the running list when the entitlements could not be read', async () => {
+				// Without them nothing says what is withheld, and a set derived
+				// without that would offer a withheld plugin's pages.
+				const { seen, run } = engine(['admin'], { ...routes, '/api/admin/entitlements': () => json({ error: 'down' }, 503) });
+				expect((await run())!.plugins).toEqual({ state: 'named', running: ['audit', 'media'], withheld: ['search'] });
+				expect(listRead(seen)).toBe(true);
+			});
+		});
+
+		it.each([['editor'], ['viewer']])('never asks the engine for the entitlements on behalf of the %s role', async (role) => {
+			const { seen, run } = engine([role], {
+				'/api/admin/plugins/running': () => json({ plugins: ['media'], withheld: [] }),
+				'/api/admin/entitlements': () => json({ plan: 'example', state: 'active', features: ['example'] }),
+			});
+			const result = await run();
+			expect(seen.some((u) => u.includes('/api/admin/entitlements'))).toBe(false);
+			expect(result!.entitlements.features).toEqual([]);
+		});
+
+		it.each([['admin'], ['super_admin']])('reads the entitlements for the %s role', async (role) => {
+			const { seen, run } = engine([role], {
+				'/api/admin/plugins/running': () => json({ plugins: ['media'], withheld: [] }),
+				'/api/admin/entitlements': () => json({ plan: 'example', state: 'active', features: ['example'] }),
+			});
+			const result = await run();
+			expect(seen.some((u) => u.includes('/api/admin/entitlements'))).toBe(true);
+			expect(result!.entitlements.features).toEqual(['example']);
+		});
+
 		it('shows every page to an editor on an engine without the list', async () => {
 			const { run } = engine(['editor'], {
 				'/api/admin/plugins/running': () => json({ error: 'not found' }, 404),

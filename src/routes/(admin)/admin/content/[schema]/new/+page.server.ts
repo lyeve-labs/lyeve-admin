@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
-import { createClient, type Schema } from '@lyeve-labs/client';
+import type { Schema } from '@lyeve-labs/client';
 import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
@@ -12,17 +12,16 @@ import { getLocales } from '$lib/api/localization';
 import { forbiddenText, section, type Section } from '$lib/api/gate';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
-import { readRelationChoices } from '$lib/components/content/relation-choices';
-import { sessionToken } from '$lib/server/session-cookie';
+import { readRelationChoices } from '$lib/server/relation-choices';
 
 /** One locale the new entry can be written in. */
 type LocaleChoice = { code: string; name: string; is_default: boolean };
 
 const LOCALES_FAILED = 'The locales could not be read, so no locale can be picked for this entry.';
 
-export const load: PageServerLoad = async ({ fetch, cookies, params, url, parent }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { params, parent } = event;
+	const client = authedClient(event);
 	const { plugins, user } = await parent();
 	// The create route admits an admin and a super admin only. The schema read
 	// admits any signed-in reader, so without this an editor would get a whole
@@ -58,7 +57,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url, parent
 	// The pickers read the admin store, the one this form writes to. The
 	// public content routes read a different store, so an entry made here
 	// would not be in a picker fed from them.
-	const relations = await readRelationChoices(fetch, token, schemaDef.fields ?? []);
+	const relations = await readRelationChoices(client, schemaDef.fields ?? []);
 
 	// Published library files, for a media field's picker. Read only when
 	// the schema has one. A read that fails is null, so the picker says the

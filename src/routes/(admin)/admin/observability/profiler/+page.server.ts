@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { ApiError } from '@lyeve-labs/client';
 import { error, fail } from '@sveltejs/kit';
 import {
 	captureFlamegraph,
@@ -18,7 +18,6 @@ import {
 import { section, type Section } from '$lib/api/gate';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { sessionToken } from '$lib/server/session-cookie';
 
 /**
  * What the page renders. Every view is the profiler plugin's, under
@@ -62,13 +61,13 @@ async function sampled(read: Promise<EndpointDetail>): Promise<EndpointDetail | 
 	}
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) {
 		error(403, 'Requires super_admin role');
 	}
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	// The selection is a query parameter, so a detail is a link and survives
 	// a refresh. The engine samples paths with their leading slash.

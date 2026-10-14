@@ -1,23 +1,7 @@
 /**
- * What the two flow import forms share: the headers for the one call the
- * authed client cannot make, and the reading of a pasted or uploaded
+ * What the two flow import forms share: the reading of a pasted or uploaded
  * definition into the shape the engine takes.
  */
-
-import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
-
-const CSRF_COOKIES = ['__Host-csrf', 'csrf'];
-
-/**
- * The bearer and CSRF headers the authed client sends, for a call that has to
- * go through `fetch`: a chosen file goes up as multipart, which the client
- * does not send.
- */
-export function flowAuthHeaders(event: SessionRead): Record<string, string> {
-	const token = sessionToken(event) ?? '';
-	const csrf = CSRF_COOKIES.map((n) => event.cookies.get(n)).find(Boolean);
-	return { Authorization: `Bearer ${token}`, ...(csrf ? { 'X-CSRF-Token': csrf } : {}) };
-}
 
 export type ImportText = { content: string; format: 'json' | 'yaml' } | { file: File };
 

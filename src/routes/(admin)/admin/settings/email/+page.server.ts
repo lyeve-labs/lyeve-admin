@@ -80,8 +80,7 @@ function mailSettings(provenance: ConfigProvenance): ConfigSetting[] {
 }
 
 export const load: PageServerLoad = async (event) => {
-	const user = await requireUser(event);
-	const { plugins } = await event.parent();
+	const { plugins, user } = await event.parent();
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.email)) {
 		return { mail: null, providers: { ok: false, gate: { state: 'absent' } } as Section<EmailProvider[]> };

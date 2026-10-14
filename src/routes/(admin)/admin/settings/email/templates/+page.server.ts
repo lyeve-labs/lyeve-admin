@@ -25,7 +25,6 @@ import {
 const STATUSES: TemplateStatus[] = ['draft', 'active', 'archived'];
 
 export const load: PageServerLoad = async (event) => {
-	await requireUser(event);
 	const { plugins } = await event.parent();
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.email)) {

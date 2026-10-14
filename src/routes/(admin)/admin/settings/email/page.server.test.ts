@@ -29,6 +29,9 @@ function fetchFor(routes: Record<string, Route>) {
 	return { fetch, calls };
 }
 
+/** The session user the layout hands every load. */
+const ADMIN = { id: 'u1', roles: ['admin'] };
+
 const withEmail: PluginSet = { state: 'named', running: ['email'], withheld: [] };
 const none: PluginSet = { state: 'named', running: [], withheld: [] };
 
@@ -45,7 +48,7 @@ const row = {
 
 function loadEvent(routes: Record<string, Route>, plugins = withEmail) {
 	const { fetch } = fetchFor(routes);
-	return { fetch, cookies: mockCookies(), url: new URL('http://localhost/admin/settings/email'), parent: async () => ({ plugins }) } as never;
+	return { fetch, cookies: mockCookies(), url: new URL('http://localhost/admin/settings/email'), parent: async () => ({ plugins, user: ADMIN }) } as never;
 }
 
 function actionEvent(form: FormData, routes: Record<string, Route>) {
@@ -72,7 +75,7 @@ describe('admin/settings/email load', () => {
 
 	it('does not call the plugin while it does not run', async () => {
 		const { fetch } = fetchFor({});
-		const event = { fetch, cookies: mockCookies(), url: new URL('http://localhost/admin/settings/email'), parent: async () => ({ plugins: none }) } as never;
+		const event = { fetch, cookies: mockCookies(), url: new URL('http://localhost/admin/settings/email'), parent: async () => ({ plugins: none, user: ADMIN }) } as never;
 		const result = (await load(event)) as Loaded;
 		expect(result.providers).toEqual({ ok: false, gate: { state: 'absent' } });
 		expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.some((c) => String(c[0]).includes('/email/'))).toBe(false);
@@ -150,7 +153,7 @@ const asSuperAdmin = (routes: Record<string, Route>, plugins = withEmail) => {
 			request: { formData: async () => new FormData() },
 			url: new URL('http://localhost/admin/settings/email'),
 			params: {},
-			parent: async () => ({ plugins }),
+			parent: async () => ({ plugins, user: { id: 'u1', roles: ['super_admin'] } }),
 		} as never,
 	};
 };

@@ -1,6 +1,5 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import { getSchemaStats, getSchemas } from '@lyeve-labs/client-rest';
 import type { Schema } from '@lyeve-labs/client';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
@@ -14,7 +13,7 @@ import {
 	type CollectionSort,
 	type SortDir
 } from '$lib/api/collections';
-import { sessionToken } from '$lib/server/session-cookie';
+import { authedClient } from '$lib/server/authz';
 
 /**
  * Resolve typed text to exactly one collection.
@@ -165,9 +164,9 @@ function ordered(
 	});
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { url } = event;
+	const client = authedClient(event);
 	const read = await section(getSchemas(client), LIST_FAILED);
 	const typed = (url.searchParams.get('schema') ?? url.searchParams.get('q') ?? '').trim();
 	const { sort, dir } = sortFromParams(url.searchParams);

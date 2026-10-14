@@ -9,7 +9,6 @@ import { parsePreferences } from '$lib/localization/preferences';
 import { section, type Section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
-	await requireUser(event);
 	const { plugins } = await event.parent();
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.localization)) {

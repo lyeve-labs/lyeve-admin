@@ -1,11 +1,11 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { ApiError, createClient, type Schema } from '@lyeve-labs/client';
+import { ApiError, type Schema, type HttpClient } from '@lyeve-labs/client';
 import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
-import { readRelationChoices } from '$lib/components/content/relation-choices';
+import { readRelationChoices } from '$lib/server/relation-choices';
 import { setRelations } from '$lib/server/content-relations';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
@@ -34,7 +34,6 @@ import {
 	type ReviewDefinition,
 	type StageSLA,
 } from '$lib/api/review';
-import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
 import { listPeople, type Person } from '$lib/server/people';
 
 /**
@@ -44,20 +43,24 @@ import { listPeople, type Person } from '$lib/server/people';
  * admin endpoints and normalizes the rows into the shape the editor expects.
  */
 
+/** An entry as the admin store answers it. */
+type StoredEntry = {
+	id: string;
+	created_at: string;
+	updated_at: string;
+	title?: unknown;
+	body?: unknown;
+	meta?: unknown;
+	status?: string;
+};
+
 /**
  * Fetch the entry from the admin store and normalize it to the editor shape.
  * A refusal throws the client's error, so the load can tell an entry that is
  * not there from an engine that did not answer.
  */
-async function getEntry(fetch: typeof globalThis.fetch, token: string, id: string) {
-	const res = await fetch(`/api/admin/content/${encodeURIComponent(id)}`, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	if (!res.ok) {
-		const body: unknown = await res.json().catch(() => undefined);
-		throw new ApiError(res.status, `get entry: ${res.status}`, body);
-	}
-	const e = await res.json();
+async function getEntry(client: HttpClient, id: string) {
+	const e = await client.get<StoredEntry>(`/api/admin/content/${encodeURIComponent(id)}`);
 	return {
 		id: e.id,
 		created_at: e.created_at,
@@ -131,13 +134,15 @@ const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDa
  * undefined, and the History control is rendered only when that is above
  * zero. Beside the page it says how many older revisions it left out.
  */
-async function listRevisions(fetch: typeof globalThis.fetch, token: string, id: string): Promise<RevisionList> {
+/** The revisions as the endpoint answers them: the envelope, or a bare array from an older engine. */
+type RevisionBody =
+	| Record<string, unknown>[]
+	| { data?: Record<string, unknown>[]; hidden_older?: unknown; window_days?: unknown }
+	| null;
+
+async function listRevisions(client: HttpClient, id: string): Promise<RevisionList> {
 	try {
-		const res = await fetch(`/api/admin/content/${encodeURIComponent(id)}/revisions`, {
-			headers: { Authorization: `Bearer ${token}` },
-		});
-		if (!res.ok) return REVISIONS_FAILED;
-		const body = await res.json();
+		const body = await client.get<RevisionBody>(`/api/admin/content/${encodeURIComponent(id)}/revisions`);
 		const rows = (Array.isArray(body) ? body : (body?.data ?? [])) as Record<string, unknown>[];
 		const hidden = Array.isArray(body) ? 0 : Number(body?.hidden_older ?? 0);
 		const days = Array.isArray(body) ? null : body?.window_days;
@@ -167,7 +172,7 @@ export type EntryLocalization = {
 };
 
 async function loadLocalization(
-	client: ReturnType<typeof createClient>,
+	client: HttpClient,
 	entryId: string,
 	running: boolean,
 ): Promise<EntryLocalization | null> {
@@ -223,7 +228,7 @@ const REVIEW_NONE = (userId: string): EntryReview => ({
 });
 
 async function loadReview(
-	client: ReturnType<typeof createClient>,
+	client: HttpClient,
 	entryId: string,
 	running: boolean,
 	user: { id: string; roles: string[] },
@@ -275,7 +280,7 @@ export type EntryComments = {
 };
 
 async function loadComments(
-	client: ReturnType<typeof createClient>,
+	client: HttpClient,
 	entryId: string,
 	people: Promise<Person[]>,
 ): Promise<EntryComments | null> {
@@ -300,7 +305,7 @@ export type EntryReleases = {
 	failed: boolean;
 };
 
-async function loadReleases(client: ReturnType<typeof createClient>, entryId: string): Promise<EntryReleases | null> {
+async function loadReleases(client: HttpClient, entryId: string): Promise<EntryReleases | null> {
 	try {
 		const res = await listReleases(client, '', 100, 0);
 		const open = rowsOf(res).filter(editable);
@@ -322,17 +327,17 @@ async function loadReleases(client: ReturnType<typeof createClient>, entryId: st
 	}
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, params, parent, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { params, parent } = event;
+	const client = authedClient(event);
 	const { plugins, user } = await parent();
 	// One read of the directory serves the mention list and the review picker.
 	const people = listPeople(client);
 
 	const [schemaDef, item, revisionList, localization, review, comments, releases] = await Promise.all([
 		getSchema(params.schema, client).catch((err: unknown): Schema => readError(err, `Schema "${params.schema}" not found`)),
-		getEntry(fetch, token, params.id).catch((err: unknown) => readError(err, 'Entry not found')),
-		listRevisions(fetch, token, params.id),
+		getEntry(client, params.id).catch((err: unknown) => readError(err, 'Entry not found')),
+		listRevisions(client, params.id),
 		loadLocalization(client, params.id, runs(plugins, PLUGIN.localization)),
 		loadReview(client, params.id, runs(plugins, PLUGIN.review), user).then(async (r) =>
 			r ? { ...r, people: await people } : null,
@@ -341,7 +346,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, parent, url
 		loadReleases(client, params.id).catch(() => null),
 	]);
 
-	const relations = await readRelationChoices(fetch, token, schemaDef.fields ?? []);
+	const relations = await readRelationChoices(client, schemaDef.fields ?? []);
 
 	// Published library files, for a media field's picker. Read only when
 	// the schema has one. A read that fails is null, so the picker says the
@@ -365,11 +370,6 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, parent, url
 		releases,
 	};
 };
-
-/** The session cookie, which the relationship calls carry themselves. */
-function token(event: SessionRead) {
-	return sessionToken(event) ?? '';
-}
 
 export const actions: Actions = {
 	// Named, not default: SvelteKit rejects a default action on a page that also

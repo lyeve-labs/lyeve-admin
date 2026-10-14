@@ -1,52 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-// authedHeaders is left real: the relationship writes build their headers
-// through it, and a stub would hide a call that sends Bearer alone.
+// The session client is left real and runs over the event's fetch, so every
+// read and write lands in one call log with the headers it would send. It
+// throws on a non-2xx: a fake that resolved whatever the engine answered would
+// turn a refused write into a passing test.
 vi.mock('$lib/server/authz', async (importOriginal) => ({
 	...((await importOriginal()) as object),
 	requireUser: vi.fn(async () => ({ id: 'u1', email: 'admin@test.invalid' }) as never),
-	// Backed by the event's own fetch, so the action's writes land in the same
-	// call log the relationship calls do. It throws on a non-2xx the way the
-	// real client does: a mock that resolves whatever the engine answered turns
-	// a refused write into a passing test.
-	authedClient: vi.fn((event: { fetch: typeof fetch }) => {
-		const send = async (method: string, path: string, body: unknown) => {
-			const res = await event.fetch(path, {
-				method,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!res.ok) throw new Error(`${method} ${path} answered ${res.status}`);
-			return res.json();
-		};
-		return {
-			put: (path: string, body: unknown) => send('PUT', path, body),
-			post: (path: string, body: unknown) => send('POST', path, body)
-		} as never;
-	}),
 	stripProtectedFields: vi.fn((v: unknown) => v)
-}));
-
-vi.mock('@lyeve-labs/client', () => ({
-	// Backed by the fetch it is handed, so the localization reads land in the
-	// same call log the entry and revision reads do.
-	createClient: vi.fn((fetchFn: typeof fetch) => ({
-		get: async (path: string) => {
-			const res = await fetchFn(path);
-			if (!res.ok) throw new Error(`GET ${path} answered ${res.status}`);
-			return res.json();
-		}
-	}) as never),
-	ApiError: class ApiError extends Error {
-		status: number;
-		body: unknown;
-		constructor(status = 500, message = '', body?: unknown) {
-			super(message);
-			this.status = status;
-			this.body = body;
-		}
-	}
 }));
 
 vi.mock('@lyeve-labs/client-rest', () => ({

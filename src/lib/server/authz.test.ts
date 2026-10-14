@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
-import { authedClient, authedHeaders, requireUser, requireRole, stripProtectedFields } from './authz';
+import { assertRole, authedClient, authedHeaders, requireUser, requireRole, stripProtectedFields } from './authz';
 import { BUSY, OUTAGE } from '$lib/outage';
 
 // event stub
@@ -124,6 +124,65 @@ describe('authedClient', () => {
 		const [url, init] = mock.mock.calls[0];
 		expect(url).toBe('/api/admin/thing');
 		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sess-tok');
+	});
+
+	it('adds extra headers and never lets one replace the session', async () => {
+		const fetchImpl = vi.fn(
+			async (_url: string, _init: RequestInit): Promise<Response> => jsonResponse({ ok: true })
+		) as unknown as typeof fetch;
+		const event = stubEvent({ token: 'sess-tok', fetchImpl });
+
+		await authedClient(event, { 'X-Tenant-ID': 'acme', Authorization: 'Bearer other' }).get('/api/admin/thing');
+
+		const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } };
+		const headers = mock.mock.calls[0][1].headers as Record<string, string>;
+		expect(headers['X-Tenant-ID']).toBe('acme');
+		expect(headers.Authorization).toBe('Bearer sess-tok');
+	});
+});
+
+describe('authedClient extra headers', () => {
+	function capture(cookies: Record<string, string>) {
+		const fetchImpl = vi.fn(
+			async (_url: string, _init: RequestInit): Promise<Response> => jsonResponse({ ok: true })
+		) as unknown as typeof fetch;
+		const event = { cookies: { get: vi.fn((name: string) => cookies[name]) }, fetch: fetchImpl } as unknown as RequestEvent;
+		const sent = () => {
+			const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } };
+			return new Headers(mock.mock.calls[0][1].headers as Record<string, string>);
+		};
+		return { event, sent };
+	}
+
+	it('never sends a second bearer, whatever the spelling', async () => {
+		const { event, sent } = capture({ '__Host-sys_session': 'sess-tok', '__Host-csrf': 'csrf-tok' });
+		await authedClient(event, { authorization: 'Bearer other', AUTHORIZATION: 'Bearer third' }).get('/api/admin/thing');
+		expect(sent().get('authorization')).toBe('Bearer sess-tok');
+	});
+
+	it('never supplies a CSRF token the session has no cookie for', async () => {
+		const { event, sent } = capture({ '__Host-sys_session': 'sess-tok' });
+		await authedClient(event, { 'x-csrf-token': 'forged', 'X-Csrf-Token': 'forged' }).get('/api/admin/thing');
+		expect(sent().has('x-csrf-token')).toBe(false);
+	});
+});
+
+describe('assertRole', () => {
+	const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
+
+	it('returns a user who holds one of the roles', () => {
+		expect(assertRole(user as never, ['admin', 'super_admin'])).toBe(user);
+	});
+
+	it('throws 403 for a user who holds none of them', () => {
+		const err = (() => {
+			try {
+				assertRole(user as never, ['super_admin']);
+			} catch (e) {
+				return e as { status?: number };
+			}
+		})();
+		expect(err?.status).toBe(403);
 	});
 });
 

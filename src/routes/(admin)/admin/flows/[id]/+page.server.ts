@@ -1,10 +1,10 @@
 import type { Actions, PageServerLoad } from './$types';
 import { error, fail, redirect, type ActionFailure } from '@sveltejs/kit';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { ApiError } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
-import { authedClient, requireUser } from '$lib/server/authz';
+import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
+import { readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
 import { refusalFailure } from '$lib/server/flow-refusal';
@@ -77,8 +77,9 @@ function loadStatus(err: unknown): { status: number; message: string } {
 	return { status: 502, message: 'The flow could not be read from the engine' };
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
-	const client = createClient(fetch, flowAuthHeaders({ cookies, url }));
+export const load: PageServerLoad = async (event) => {
+	const { fetch, cookies, params, url } = event;
+	const client = authedClient(event);
 
 	let flow: Flow;
 	try {
@@ -143,7 +144,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 			// 402 there means the assistant is not enabled, and a tab that could
 			// only say so is better left out. Any other refusal is reported when
 			// the reader asks, not on every load.
-			getLLMCatalog(fetch, flowAuthHeaders({ cookies, url }))
+			getLLMCatalog(fetch, authedHeaders(event))
 				.then(() => 'ready' as const)
 				.catch((err: unknown) => (err instanceof CatalogError && err.status === 402 ? ('hidden' as const) : ('ready' as const))),
 		]);
@@ -336,7 +337,7 @@ export const actions: Actions = {
 		let slug = String(data.get('slug') ?? '').trim();
 		try {
 			if (!slug) slug = (await getFlow(client, event.params.id)).slug;
-			const result = await importFlow(event.fetch, { ...body, mode: 'replace', slug }, flowAuthHeaders(event));
+			const result = await importFlow(event.fetch, { ...body, mode: 'replace', slug }, authedHeaders(event));
 			return {
 				reloaded: await reloaded(client, event.params.id, result),
 				unresolved: result.unresolved_datasources ?? [],

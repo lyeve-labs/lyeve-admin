@@ -1,14 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-vi.mock('$lib/server/authz', () => ({
+// The real session client, so every read goes through the event's fetch with
+// the session's headers.
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/authz')>()),
 	requireUser: vi.fn(async () => ({ id: 'u1' })),
-	authedClient: vi.fn(() => ({ delete: vi.fn() })),
-}));
-
-vi.mock('@lyeve-labs/client', async (importOriginal) => ({
-	...(await importOriginal<typeof import('@lyeve-labs/client')>()),
-	createClient: vi.fn(() => ({})),
 }));
 
 const rest = vi.hoisted(() => ({
@@ -180,6 +177,12 @@ describe('content listing reads its collection', () => {
 
 		const other = await runLoad('?status=famous', { data: [], total_count: 0 });
 		expect(new URL(String((other.fetch.mock.calls[0] as unknown[])[0]), 'http://localhost').searchParams.has('status')).toBe(false);
+	});
+
+	it('reads the listing as the session', async () => {
+		const { fetch } = await runLoad('', { data: [], total_count: 0 });
+		const init = (fetch.mock.calls[0] as unknown[])[1] as RequestInit;
+		expect(init.headers).toMatchObject({ Authorization: 'Bearer tok' });
 	});
 });
 

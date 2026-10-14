@@ -1,6 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { refusalOf, refusalText } from '$lib/api/refusal';
@@ -9,7 +8,6 @@ import { section, type Section } from '$lib/api/gate';
 import { describeMedia, importMedia, importRefusal, parseTags, setMediaPublic, updateMediaDetails, type MediaItem, setFocalPoint, signTransformUrl, transformRequestFrom } from '$lib/api/media';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
-import { sessionToken } from '$lib/server/session-cookie';
 
 export type { MediaItem } from '$lib/api/media';
 
@@ -37,9 +35,9 @@ const LIST_FAILED = 'The media library could not be read. This is not a report t
  * is a page the browser cannot lay out, and the operator has no way to reach
  * the end of it either way.
  */
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
+	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 	const q = (url.searchParams.get('q') ?? '').trim();
 

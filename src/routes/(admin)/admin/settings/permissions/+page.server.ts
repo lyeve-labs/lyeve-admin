@@ -1,5 +1,4 @@
 import type { PageServerLoad, Actions } from './$types';
-import { createClient } from '@lyeve-labs/client';
 import type { Permission, Schema } from '@lyeve-labs/client';
 import { getSchemas, listPermissions, upsertPermission, deletePermission } from '@lyeve-labs/client-rest';
 import { refusalOf } from '$lib/api/refusal';
@@ -9,7 +8,6 @@ import { listAllFlows } from '$lib/api/flows';
 import type { FlowOption } from '$lib/flow/types';
 import { isFlowResource } from '$lib/flow/permissions';
 import { getRoleLimits, type RoleLimits } from '$lib/api/permissions';
-import { sessionToken } from '$lib/server/session-cookie';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { section } from '$lib/api/gate';
 
@@ -18,13 +16,13 @@ import { section } from '$lib/api/gate';
 // whatever the cause.
 const LOAD_FAILED = 'Permission rules could not be read from the engine. This is not a report that the instance has no rules.';
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) {
 		error(403, 'Requires super_admin role');
 	}
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	// The plugin states the role ceiling and how many roles already hold a
 	// rule, the numbers it checks a new role against. A failed read, a plugin
 	// without the route among them, states no ceiling: the plugin still
