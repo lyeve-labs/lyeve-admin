@@ -467,10 +467,44 @@ describe('signing in', () => {
 
 	// A 401 is a challenge the engine no longer honors. No code passes it, so
 	// the form drops it and returns to the password step.
-	it('MFA step: reports a 401 as an expired sign-in and drops the challenge', async () => {
-		const result = await verify(() => json({ error: 'challenge expired', code: 'challenge_expired' }, 401));
+	it('MFA step: reports an expired challenge as an expired sign-in and drops the challenge', async () => {
+		const result = await verify(() =>
+			json({ error: 'The MFA challenge has expired. Please log in again.', code: 'AUTH_CHALLENGE_EXPIRED', request_id: 'r1' }, 401)
+		);
 		expect(result.status).toBe(401);
 		expect(result.data).toEqual({ error: 'This sign-in expired. Sign in again.' });
+	});
+
+	// Signing in again reaches the same challenge, so this one never says the
+	// sign-in expired.
+	it('MFA step: tells an account with no authenticator app to ask an administrator', async () => {
+		const result = await verify(() =>
+			json(
+				{ error: 'Multi-factor authentication is not configured for this account.', code: 'AUTH_MFA_NOT_CONFIGURED', request_id: 'r1' },
+				401
+			)
+		);
+		expect(result.status).toBe(401);
+		expect(result.data).toEqual({
+			error: 'This account has no authenticator app to check the code against. Ask an administrator to restore your access.',
+		});
+	});
+
+	// A spent challenge and a locked account answer alike. Neither takes another
+	// code, so the form leaves the code step.
+	it('MFA step: leaves a challenge that has used up its attempts', async () => {
+		const result = await verify(() =>
+			json(
+				{
+					error: 'Too many MFA verification attempts. Please log in again to receive a new challenge.',
+					code: 'AUTH_MFA_LOCKED_OUT',
+					request_id: 'r1',
+				},
+				429
+			)
+		);
+		expect(result.status).toBe(429);
+		expect(result.data).toEqual({ error: 'Too many verification attempts. Wait, then sign in again.' });
 	});
 
 	// A code the engine never checked may be right. Calling it wrong sends the

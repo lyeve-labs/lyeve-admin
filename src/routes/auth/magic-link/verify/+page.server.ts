@@ -57,10 +57,10 @@ export const actions: Actions = {
 			const res = await mfaVerify(challengeToken, code, createClient(event.fetch));
 			setSessionCookie(event, res.token);
 		} catch (e) {
-			const failed = secondFactorFailure(e);
 			// The link was spent when the challenge was issued, so a new sign-in
 			// starts from a new link.
-			if (failed.expired) return fail(failed.status, { error: 'This sign-in expired. Request a new link to sign in again.' });
+			const failed = secondFactorFailure(e, 'request a new link to sign in again');
+			if (failed.restart) return fail(failed.status, { error: failed.error });
 			return fail(failed.status, { error: failed.error, mfa_required: true, challenge_token: challengeToken });
 		}
 		redirect(303, LANDING);

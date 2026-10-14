@@ -101,7 +101,7 @@ describe('auth/magic-link/verify actions', () => {
 	});
 
 	it('drops an expired challenge and asks for a new link', async () => {
-		const fetch = vi.fn(async () => json({ error: 'challenge expired' }, 401)) as unknown as typeof globalThis.fetch;
+		const fetch = vi.fn(async () => json({ error: 'The MFA challenge has expired. Please log in again.', code: 'AUTH_CHALLENGE_EXPIRED', request_id: 'r1' }, 401)) as unknown as typeof globalThis.fetch;
 		const result = (await actions.mfa(event({ challenge_token: 'ch', code: '000000' }, fetch))) as {
 			status: number;
 			data: Record<string, unknown>;

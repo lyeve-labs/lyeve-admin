@@ -113,7 +113,7 @@ export const actions: Actions = {
 				setSessionCookie(event, res.token);
 			} catch (e) {
 				const failed = secondFactorFailure(e);
-				if (failed.expired) return fail(failed.status, { error: failed.error });
+				if (failed.restart) return fail(failed.status, { error: failed.error });
 				return fail(failed.status, { error: failed.error, mfa_required: true, challenge_token: challengeToken });
 			}
 			redirect(302, returnTo(event.url));
