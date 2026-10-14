@@ -3,6 +3,8 @@ import { fail } from '@sveltejs/kit';
 import { staticGroups, type EndpointGroup } from '$lib/api/reference';
 import { buildReference, type OpenAPIDocument } from '$lib/api/openapi';
 import { sessionToken } from '$lib/server/session-cookie';
+import { ApiError } from '@lyeve-labs/client';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 
 // The engine's double-submit CSRF cookie, secure name first. Named here rather
 // than imported because the server helper that owns them builds a whole client,
@@ -71,9 +73,19 @@ async function readGroups(
 	return { groups: staticGroups, source: 'catalog' };
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const { groups, source } = await readGroups(fetch, sessionToken({ cookies, url }) ?? '');
-	const grpc = await readGrpcRoutes(fetch, sessionToken({ cookies, url }) ?? '');
+/** What the gRPC tab says when the listener's status could not be read. */
+const GRPC_FAILED = 'The gRPC listener status could not be read. This is not a report that the plugin is absent.';
+
+export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+	const { user } = await parent();
+	const token = sessionToken({ cookies, url }) ?? '';
+	const { groups, source } = await readGroups(fetch, token);
+	// The listener's status and the invoke route are a super admin's, so the
+	// read is not made for anyone else, and the tab says the role is why
+	// rather than that the plugin is missing.
+	const grpc = user.roles.includes('super_admin')
+		? await readGrpcRoutes(fetch, token)
+		: { listening: false, routes: [], gate: { state: 'forbidden' } as Gate };
 	return { endpoints: labEndpoints(groups), source, grpc };
 };
 
@@ -93,20 +105,25 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 async function readGrpcRoutes(
 	fetch: typeof globalThis.fetch,
 	token: string,
-): Promise<{ listening: boolean; routes: string[]; reachable: boolean }> {
+): Promise<{ listening: boolean; routes: string[]; gate: Gate }> {
 	try {
 		const res = await fetch('/api/admin/grpc/status', {
 			headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
 		});
-		if (!res.ok) return { listening: false, routes: [], reachable: false };
+		// The status is kept and sorted the way every page sorts a refused read:
+		// only a 404 says the plugin is not here, and an outage offers a retry.
+		if (!res.ok) {
+			const said = await res.json().catch(() => ({}));
+			return { listening: false, routes: [], gate: gateOf(new ApiError(res.status, res.statusText, said), GRPC_FAILED) };
+		}
 		const body = (await res.json()) as { listening?: boolean; transcoded_routes?: string[] };
 		return {
 			listening: body.listening === true,
 			routes: body.transcoded_routes ?? [],
-			reachable: true,
+			gate: GATE_OK,
 		};
-	} catch {
-		return { listening: false, routes: [], reachable: false };
+	} catch (err) {
+		return { listening: false, routes: [], gate: gateOf(err, GRPC_FAILED) };
 	}
 }
 

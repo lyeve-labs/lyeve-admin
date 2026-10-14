@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	/**
 	 * Every plugin the engine reports, with the state it reports.
 	 *
@@ -62,7 +63,7 @@
 	const failed = $derived(failedCount(rows));
 
 	const summary = $derived.by(() => {
-		if (data.error) return 'The plugins this engine carries, and whether each one runs.';
+		if (data.gate.state !== 'ok') return 'The plugins this engine carries, and whether each one runs.';
 		if (counts.compiled === 0) return 'This engine carries no plugins.';
 		const noun = counts.compiled === 1 ? 'plugin' : 'plugins';
 		return `${counts.running} of ${counts.compiled} ${noun} running`;
@@ -121,12 +122,10 @@
 	actions={licensePage ? manageLicense : undefined}
 >
 
-	{#if data.error}
-		<Alert tone="danger" title="Could not read the plugin status">
-			{#snippet children()}
-				{data.error} Every row comes from it, so no plugin is listed until the engine answers.
-			{/snippet}
-		</Alert>
+	{#if data.gate.state !== 'ok'}
+		<!-- Every row comes from the status report, so no plugin is listed
+		     until the engine answers. -->
+		<GateNotice gate={data.gate} title="the plugin status" absent="This engine does not report its plugins." />
 	{/if}
 
 	{#if failed > 0}
@@ -140,7 +139,7 @@
 	{/if}
 
 	{#if rows.length === 0}
-		{#if !data.error}
+		{#if data.gate.state === 'ok'}
 			<EmptyState
 				title="No plugins in this build"
 				description="This engine was built without plugins, so it serves only its own pages."
@@ -161,6 +160,7 @@
 					options={categoryOptions}
 					value={category}
 					onvaluechange={(v) => (category = v)}
+					searchable
 					class="w-44"
 				/>
 				<CheckboxGroup

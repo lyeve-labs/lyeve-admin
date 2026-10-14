@@ -21,7 +21,7 @@
 
 	async function askDelete(name: string) {
 		const ok = await confirmDialog(
-			`Delete ${name}?`,
+			`Delete provider ${name}?`,
 			'Calls that named it fall back to the next row by priority. The key goes with it.',
 			{ confirmLabel: 'Delete' }
 		);
@@ -54,6 +54,7 @@
 	);
 
 	const saveCaps = tracked(() => async ({ update }) => update({ reset: false }));
+	const saveConfig = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
 
 <PageTitle title={p?.name ?? 'Provider'} />
@@ -115,10 +116,11 @@
 							{@const c = capabilities}
 							<div class="flex flex-wrap items-center gap-2" data-testid="capabilities">
 								<span class="text-xs text-muted">{c.model}</span>
-								<Badge tone={c.text ? 'success' : 'neutral'} size="sm">text</Badge>
-								<Badge tone={c.embed ? 'success' : 'neutral'} size="sm">embed</Badge>
-								<Badge tone={c.image ? 'success' : 'neutral'} size="sm">image</Badge>
-								<Badge tone={c.vision ? 'success' : 'neutral'} size="sm">vision</Badge>
+								<!-- The words say which it can do, so the tone is not the only sign. -->
+								<Badge tone={c.text ? 'success' : 'neutral'} size="sm">{c.text ? 'text' : 'no text'}</Badge>
+								<Badge tone={c.embed ? 'success' : 'neutral'} size="sm">{c.embed ? 'embed' : 'no embed'}</Badge>
+								<Badge tone={c.image ? 'success' : 'neutral'} size="sm">{c.image ? 'image' : 'no image'}</Badge>
+								<Badge tone={c.vision ? 'success' : 'neutral'} size="sm">{c.vision ? 'vision' : 'no vision'}</Badge>
 								{#if c.max_tokens > 0}<span class="text-xs text-faint">{c.max_tokens} tokens</span>{/if}
 							</div>
 						{/if}
@@ -134,7 +136,7 @@
 							id="provider-update"
 							method="POST"
 							action="?/update"
-							use:enhance={() => async ({ update }) => update({ reset: false })}
+							use:enhance={saveConfig.enhance}
 							class="flex flex-col gap-4"
 						>
 							{#key p.updated_at}
@@ -149,7 +151,7 @@
 								<Button variant="ghost" onclick={() => askDelete(p.name)}>
 									<Trash2 size={ICON.sm} aria-hidden="true" class="text-danger" /> Delete
 								</Button>
-								<Button variant="primary" type="submit" loading={saveCaps.pending}>Save</Button>
+								<Button variant="primary" type="submit" loading={saveConfig.pending}>Save</Button>
 							</div>
 						</form>
 					</Card>

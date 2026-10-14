@@ -30,7 +30,7 @@ describe('plugin pages', () => {
 							upgrade_url: ''
 						}
 					],
-					error: null
+					gate: { state: 'ok' }
 				}
 			} as never
 		});
@@ -42,10 +42,9 @@ describe('plugin pages', () => {
 	// says why, rather than reading as a build with no plugins.
 	it('plugins index says it could not read the status, and lists nothing', () => {
 		const { container } = render(PluginsPage, {
-			props: { data: { plugins: [], error: 'engine unreachable' } } as never
+			props: { data: { plugins: [], gate: { state: 'unavailable' } } } as never
 		});
-		expect(container.textContent).toContain('Could not read the plugin status');
-		expect(container.textContent).toContain('engine unreachable');
+		expect(container.textContent).toContain('the plugin status could not be read');
 		expect(container.querySelector('a[href^="/admin/plugins/"]')).toBeNull();
 		expect(container.textContent).not.toContain('No plugins in this build');
 	});
@@ -67,7 +66,7 @@ describe('plugin pages', () => {
 							upgrade_url: ''
 						}
 					],
-					error: null
+					gate: { state: 'ok' }
 				}
 			} as never
 		});

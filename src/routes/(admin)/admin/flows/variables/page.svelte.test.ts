@@ -17,9 +17,9 @@ const variables: Variable[] = [
 	{ key: 'api_key', is_secret: true, updated_at: '2026-09-01T00:00:00Z' },
 ];
 
-function setup(rows: Variable[] = variables, form: unknown = null, locked = false, loadError: string | null = null) {
+function setup(rows: Variable[] = variables, form: unknown = null, locked = false, gate: unknown = { state: 'ok' }, roles: string[] = ['super_admin']) {
 	return render(VariablesPage, {
-		props: { data: { variables: rows, locked, loadError, entitlements: licensed }, form } as never,
+		props: { data: { variables: rows, locked, gate, user: { roles }, entitlements: licensed }, form } as never,
 	});
 }
 
@@ -107,9 +107,28 @@ describe('variables page', () => {
 		expect((form.querySelector('[name="key"]') as HTMLInputElement).value).toBe('');
 	});
 
-	it('shows the action error', () => {
-		const { container } = setup(variables, { error: 'value too long', key: 'region' });
-		expect(container.textContent).toContain('value too long');
+	it('shows a failed delete on the page', () => {
+		const { container } = setup(variables, { action: 'delete', error: 'Failed to delete variable' });
+		expect(container.textContent).toContain('Failed to delete variable');
+	});
+
+	// The drawer and the delete share one form result.
+	it('keeps a failed delete out of the drawer opened after it', async () => {
+		const { container, getAllByText } = setup(variables, { action: 'delete', error: 'Failed to delete variable' });
+		await fireEvent.click(getAllByText('New variable')[0]);
+		const drawer = container.ownerDocument.querySelector('#variable-form') as HTMLElement;
+		expect(drawer.textContent).not.toContain('Failed to delete variable');
+	});
+
+	it('shows a failed save inside the open drawer', async () => {
+		const { container, getAllByText, rerender } = setup();
+		await fireEvent.click(getAllByText('New variable')[0]);
+		await rerender({
+			data: { variables, locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed },
+			form: { action: 'put', error: 'value too long', key: 'region' },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#variable-form') as HTMLElement;
+		expect(drawer.textContent).toContain('value too long');
 	});
 
 	it('renders the not-enabled state when locked', () => {
@@ -118,8 +137,37 @@ describe('variables page', () => {
 	});
 
 	it('shows a failed load as an alert and not as an empty list', () => {
-		const { container, queryByText } = setup([], null, false, 'Variables could not be read from the engine.');
+		const { container, queryByText } = setup([], null, false, { state: 'error', message: 'Variables could not be read from the engine.' });
 		expect(container.textContent).toContain('Variables could not be read from the engine.');
 		expect(queryByText('No variables yet')).toBeNull();
+	});
+});
+
+describe('variables search', () => {
+	it('searches by the address and says when nothing matches', () => {
+		const { container, getByLabelText } = render(VariablesPage, {
+			props: { data: { variables: [], total: 0, q: 'zz', limit: 50, offset: 0, locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed }, form: null } as never,
+		});
+		const form = container.querySelector('[data-testid="variable-filters"]') as HTMLFormElement;
+		expect(form.getAttribute('method')).toBe('GET');
+		expect((getByLabelText('Search variables') as HTMLInputElement).value).toBe('zz');
+		expect(container.textContent).toContain('No variables match');
+		expect(container.textContent).not.toContain('No variables yet');
+	});
+});
+
+describe('variables page for a role the plugin refuses', () => {
+	it('says the role cannot read variables and offers nothing to create', () => {
+		const { container, queryByText } = setup([], null, false, { state: 'forbidden' }, ['editor']);
+		expect(container.textContent).toContain('Your role cannot open flow variables.');
+		expect(container.textContent).not.toContain('Reload');
+		expect(queryByText('New variable')).toBeNull();
+		expect(queryByText('No variables yet')).toBeNull();
+	});
+
+	it('offers nothing to create while the list could not be read', () => {
+		const { container, queryByText } = setup([], null, false, { state: 'unavailable' });
+		expect(container.textContent).toContain('flow variables could not be read');
+		expect(queryByText('New variable')).toBeNull();
 	});
 });

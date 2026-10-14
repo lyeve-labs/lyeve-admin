@@ -6,7 +6,7 @@ vi.mock('$lib/server/authz', () => ({
 	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
 }));
 
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
 
 function event(form: Record<string, string>) {
 	const data = new FormData();
@@ -48,5 +48,38 @@ describe('experiment significance threshold', () => {
 		expect(out.status).toBe(400);
 		expect(out.data.error).toContain('confidence');
 		expect(engine.post).not.toHaveBeenCalled();
+	});
+});
+
+describe('experiments list', () => {
+	function loadEvent(href: string) {
+		return {
+			url: new URL(href),
+			parent: async () => ({ plugins: { state: 'named', running: ['ab-testing'], withheld: [] } }),
+		} as never;
+	}
+
+	// A page past the end of a list that shrank is not an empty list.
+	it('sends a page past the end back to the last page', async () => {
+		engine.get.mockResolvedValue({ data: [], total_count: 30 });
+
+		await expect(load(loadEvent('http://localhost/admin/experiments?limit=25&offset=50'))).rejects.toMatchObject({
+			status: 307,
+			location: expect.stringContaining('offset=25'),
+		});
+	});
+});
+
+// The drawer reads only a failure tagged as a save, so each failure is tagged.
+describe('experiment action failures', () => {
+	it('tags a failed delete as a delete', async () => {
+		engine.delete.mockRejectedValue(new Error('down'));
+		const out = (await actions.delete(event({ id: 'e1' }))) as { data: { action: string } };
+		expect(out.data.action).toBe('delete');
+	});
+
+	it('tags a refused save as a save', async () => {
+		const out = (await actions.create(event({ name: '' }))) as { data: { action: string } };
+		expect(out.data.action).toBe('save');
 	});
 });

@@ -350,3 +350,14 @@ describe('FlowInspector slug and endpoints', () => {
 		expect(container.textContent).toContain('starting with a letter');
 	});
 });
+
+describe('FlowInspector on error', () => {
+	// Each choice changes what a failure does to the rest of the run, so each
+	// says so beside it.
+	it('offers stop and continue as choices that each say what they do', () => {
+		const { getAllByRole, container } = setup(null, []);
+		const radios = getAllByRole('radio').filter((r) => (r as HTMLInputElement).name === 'settings-on-error');
+		expect(radios).toHaveLength(2);
+		expect(container.textContent).toContain('The run ends at the first node that fails');
+	});
+});

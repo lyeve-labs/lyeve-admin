@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import DatasourcesPage from './+page.svelte';
 import type { Entitlements } from '$lib/entitlements';
 import type { Datasource } from '$lib/api/flows';
+import { AUTH_TYPES } from '$lib/flow/datasources';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/datasources') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -33,9 +34,9 @@ const inventory: Datasource = {
 	allow_writes: true,
 };
 
-function setup(datasources: Datasource[] = [warehouse, inventory], form: unknown = null, locked = false, loadError: string | null = null) {
+function setup(datasources: Datasource[] = [warehouse, inventory], form: unknown = null, locked = false, gate: unknown = { state: 'ok' }, roles: string[] = ['super_admin']) {
 	return render(DatasourcesPage, {
-		props: { data: { datasources, locked, loadError, entitlements: licensed }, form } as never,
+		props: { data: { datasources, locked, gate, user: { roles }, entitlements: licensed }, form } as never,
 	});
 }
 
@@ -62,17 +63,20 @@ describe('datasources page', () => {
 		expect(form.querySelector('[name="password"]')).toBeTruthy();
 		expect(form.querySelector('[name="base_url"]')).toBeNull();
 		expect(form.querySelector('[name="chat_id"]')).toBeNull();
-		expect((form.querySelector('input[name="ssl"]') as HTMLInputElement).value).toBe('require');
+		expect((form.querySelector('input[name="ssl"]:checked') as HTMLInputElement).value).toBe('require');
 	});
 
 	it('offers the TLS modes of the chosen kind and submits the stored one on edit', async () => {
-		const { getByLabelText, container } = setup();
+		const { getByLabelText, getByRole, container } = setup();
 		await fireEvent.click(getByLabelText('Edit warehouse'));
 		const form = container.querySelector('#datasource-form') as HTMLFormElement;
-		expect((form.querySelector('input[name="ssl"]') as HTMLInputElement).value).toBe('prefer');
-		await fireEvent.click(getByLabelText('TLS'));
-		const modes = [...container.querySelectorAll('[role="option"]')].map((o) => o.textContent?.trim());
-		expect(modes).toEqual(['Require TLS', 'Prefer TLS', 'No TLS']);
+		expect((form.querySelector('input[name="ssl"]:checked') as HTMLInputElement).value).toBe('prefer');
+		// Each mode says what it tells the driver, so they are choices with a
+		// sentence each rather than a strip of bare words.
+		const radios = [...form.querySelectorAll('input[type="radio"][name="ssl"]')] as HTMLInputElement[];
+		expect(radios.map((r) => r.value)).toEqual(['require', 'prefer', 'disable']);
+		expect(getByRole('radio', { name: /Prefer TLS/ })).toBeTruthy();
+		expect(form.textContent).toContain('connects in the clear when it does not');
 	});
 
 	it('opens the edit drawer with the stored config and a per-header secret toggle', async () => {
@@ -91,8 +95,8 @@ describe('datasources page', () => {
 	});
 
 	async function chooseAuth(container: HTMLElement, label: string) {
-		await fireEvent.click(container.querySelector('#ds-auth-type') as HTMLElement);
-		await fireEvent.click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent?.trim() === label) as HTMLElement);
+		const value = AUTH_TYPES.find((t) => t.label === label)?.value;
+		await fireEvent.click(container.querySelector(`[data-testid="auth-section"] input[name="auth_type"][value="${value}"]`) as HTMLElement);
 	}
 
 	it('shows the auth section for the http kind, with the fields and a required secret per type', async () => {
@@ -104,11 +108,11 @@ describe('datasources page', () => {
 		expect((form.querySelector('[name="chat_id"]') as HTMLInputElement).value).toBe('');
 		const section = getByTestId('auth-section');
 		expect(section.textContent).toContain('Authentication');
-		expect((form.querySelector('input[name="auth_type"]') as HTMLInputElement).value).toBe('none');
+		expect((form.querySelector('input[name="auth_type"]:checked') as HTMLInputElement).value).toBe('none');
 		expect(section.textContent).toContain('No credential beyond the headers');
 
 		await chooseAuth(container, 'Bearer token');
-		expect((form.querySelector('input[name="auth_type"]') as HTMLInputElement).value).toBe('bearer');
+		expect((form.querySelector('input[name="auth_type"]:checked') as HTMLInputElement).value).toBe('bearer');
 		const token = form.querySelector('[name="auth_token"]') as HTMLInputElement;
 		expect(token.type).toBe('password');
 		expect(token.required).toBe(true);
@@ -141,7 +145,7 @@ describe('datasources page', () => {
 		const { getByLabelText, container, getByTestId } = setup([oauth]);
 		await fireEvent.click(getByLabelText('Edit weather'));
 		const form = container.querySelector('#datasource-form') as HTMLFormElement;
-		expect((form.querySelector('input[name="auth_type"]') as HTMLInputElement).value).toBe('oauth2_client_credentials');
+		expect((form.querySelector('input[name="auth_type"]:checked') as HTMLInputElement).value).toBe('oauth2_client_credentials');
 		expect((form.querySelector('[name="auth_token_url"]') as HTMLInputElement).value).toBe('https://auth.example.test/token');
 		expect((form.querySelector('[name="auth_client_id"]') as HTMLInputElement).value).toBe('cid');
 		expect((form.querySelector('[name="auth_scopes"]') as HTMLInputElement).value).toBe('read write');
@@ -188,7 +192,7 @@ describe('datasources page', () => {
 	});
 
 	it('shows a failed load as an alert and not as an empty list', () => {
-		const { container, queryByText } = setup([], null, false, 'Datasources could not be read from the engine.');
+		const { container, queryByText } = setup([], null, false, { state: 'error', message: 'Datasources could not be read from the engine.' });
 		expect(container.textContent).toContain('Datasources could not be read from the engine.');
 		expect(queryByText('No datasources yet')).toBeNull();
 	});
@@ -202,7 +206,7 @@ describe('datasources page', () => {
 describe('datasources page when the plugin says they are not enabled', () => {
 	function unavailable(datasources: Datasource[] = [], form: unknown = null) {
 		return render(DatasourcesPage, {
-			props: { data: { datasources, available: false, locked: false, loadError: null, entitlements: licensed }, form } as never,
+			props: { data: { datasources, available: false, locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed }, form } as never,
 		});
 	}
 
@@ -217,6 +221,15 @@ describe('datasources page when the plugin says they are not enabled', () => {
 		expect(create.disabled).toBe(true);
 	});
 
+	// The plugin refuses an edit and a test as it refuses a create, so neither
+	// stays live beside a create that is disabled.
+	it('disables edit and test on a stored row, and leaves delete', () => {
+		const { getByLabelText } = unavailable([warehouse]);
+		expect((getByLabelText('Edit warehouse') as HTMLButtonElement).disabled).toBe(true);
+		expect((getByLabelText('Test warehouse') as HTMLButtonElement).disabled).toBe(true);
+		expect((getByLabelText('Delete warehouse') as HTMLButtonElement).disabled).toBe(false);
+	});
+
 	it('lists the stored rows and says it once, in the header', () => {
 		const { getAllByTestId, getByText } = unavailable([warehouse]);
 		expect(getByText('warehouse')).toBeTruthy();
@@ -224,7 +237,7 @@ describe('datasources page when the plugin says they are not enabled', () => {
 	});
 
 	it('renders a refused write as not enabled, naming no capability', () => {
-		const { container } = unavailable([], { error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
+		const { container } = unavailable([], { action: 'test', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
 		expect(container.textContent).toContain('Datasources are not enabled on this instance, so nothing was changed.');
 		expect(container.textContent).not.toMatch(/capability|license/i);
 	});
@@ -252,5 +265,92 @@ describe('datasources page chat channels', () => {
 		const text = (setup().container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('EVENT_BUS');
 		expect(text).toContain('stop the engine from starting');
+	});
+});
+
+describe('datasources page and the role of the reader', () => {
+	it('says the role cannot read datasources and offers nothing to create', () => {
+		const { container, queryByText } = setup([], null, false, { state: 'forbidden' }, ['editor']);
+		expect(container.textContent).toContain('Your role cannot open datasources.');
+		expect(container.textContent).not.toContain('Reload');
+		expect(queryByText('New datasource')).toBeNull();
+	});
+
+	// The plugin takes either grant from a super admin only.
+	it('shows an admin the write and private grants fixed, with the reason', async () => {
+		const { getByLabelText, getAllByText } = setup(undefined, null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		expect((getByLabelText('Allow writes') as HTMLButtonElement).disabled).toBe(true);
+		expect((getByLabelText('Allow private addresses') as HTMLButtonElement).disabled).toBe(true);
+		expect(document.body.textContent).toContain('Only a super admin can change this.');
+	});
+
+	it('leaves both grants to a super admin', async () => {
+		const { getByLabelText, getAllByText } = setup();
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		expect((getByLabelText('Allow writes') as HTMLButtonElement).disabled).toBe(false);
+		expect(document.body.textContent).not.toContain('Only a super admin can change this.');
+	});
+});
+
+// The drawer and the row actions share one form result.
+describe('where a datasource failure shows', () => {
+	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
+		const { container, getAllByText } = setup([warehouse], { action: 'delete', error: 'Failed to delete datasource' });
+		expect(container.textContent).toContain('Failed to delete datasource');
+
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		const drawer = container.ownerDocument.querySelector('#datasource-form') as HTMLElement;
+		expect(drawer.textContent).not.toContain('Failed to delete datasource');
+	});
+
+	it('shows a failed save inside the open drawer and not on the page behind it', async () => {
+		const { container, getAllByText, rerender } = setup([warehouse]);
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		await rerender({
+			data: { datasources: [warehouse], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed },
+			form: { action: 'save', error: 'A datasource needs a name.' },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#datasource-form') as HTMLElement;
+		expect(drawer.textContent).toContain('A datasource needs a name.');
+		// Once, in the drawer, and not again on the page behind it.
+		expect(document.body.textContent?.split('A datasource needs a name.').length).toBe(2);
+	});
+});
+
+// The plugin refuses an admin who moves the target of a granted row.
+describe('the target of a granted datasource', () => {
+	const granted: Datasource = { ...warehouse, id: 'd9', name: 'ledger', allow_private: true };
+
+	it('is fixed for an admin, with the reason, and still posts the stored values', async () => {
+		const { container, getByLabelText } = setup([granted], null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getByLabelText('Edit ledger'));
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		expect((form.querySelector('#ds-host') as HTMLInputElement).disabled).toBe(true);
+		expect((form.querySelector('#ds-port') as HTMLInputElement).disabled).toBe(true);
+		expect((form.querySelector('input[type="hidden"][name="host"]') as HTMLInputElement).value).toBe('db.example.test');
+		expect((form.querySelector('input[type="hidden"][name="port"]') as HTMLInputElement).value).toBe('5432');
+		expect(form.textContent).toContain('Only a super admin can change this.');
+		// The database and the user are not the target, so they stay open.
+		expect((form.querySelector('[name="database"]') as HTMLInputElement).disabled).toBe(false);
+	});
+
+	it('stays open on a row with no grant', async () => {
+		const { container, getByLabelText } = setup([warehouse], null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getByLabelText('Edit warehouse'));
+		expect((container.querySelector('#ds-host') as HTMLInputElement).disabled).toBe(false);
+	});
+
+	it('stays open for a super admin', async () => {
+		const { container, getByLabelText } = setup([granted]);
+		await fireEvent.click(getByLabelText('Edit ledger'));
+		expect((container.querySelector('#ds-host') as HTMLInputElement).disabled).toBe(false);
+	});
+
+	it('fixes the base URL of a granted http row for an admin', async () => {
+		const { container, getByLabelText } = setup([inventory], null, false, { state: 'ok' }, ['admin']);
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		expect((container.querySelector('#ds-base-url') as HTMLInputElement).disabled).toBe(true);
+		expect((container.querySelector('input[type="hidden"][name="base_url"]') as HTMLInputElement).value).toBe('https://inventory.example.test');
 	});
 });

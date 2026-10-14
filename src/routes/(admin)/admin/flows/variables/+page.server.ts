@@ -1,31 +1,58 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { flowLoadOutcome } from '$lib/server/flow-load';
+import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';
-import { pageWindow, rowsOf, totalOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 import { sessionToken } from '$lib/server/session-cookie';
 
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
+
+/**
+ * The window the read names. The plugin answers every variable whatever
+ * window it is asked for, so this bounds nothing today. It is the window the
+ * flow editor asks for, so the two read the same list should the plugin
+ * start to honor it.
+ */
+const ALL = 500;
+
+/** Whether a variable matches the search: its key, or a value that is not secret. */
+function matches(v: Variable, q: string): boolean {
+	const needle = q.toLowerCase();
+	return v.key.toLowerCase().includes(needle) || (!v.is_secret && (v.value ?? '').toLowerCase().includes(needle));
+}
 
 export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
 	const { limit, offset } = pageWindow(url, 50, 500);
+	const q = (url.searchParams.get('q') ?? '').trim();
 	let variables: Variable[] = [];
 	let total = 0;
 	let locked = false;
-	let loadError: string | null = null;
+	// Why the list could not be read. The plugin answers it to an admin only,
+	// so a reader below admin sees the role refusal and nothing to create.
+	let gate: Gate = GATE_OK;
 	try {
-		const res = await listVariables(client, limit, offset);
-		variables = rowsOf(res);
-		total = Math.max(totalOf(res), offset + variables.length);
+		// The plugin answers every variable in one list whatever window is
+		// asked for, so the search and the window are applied here. Asking the
+		// plugin for a window would hand back the whole list on every page.
+		const all = rowsOf(await listVariables(client, ALL, 0));
+		const found = q ? all.filter((v) => matches(v, q)) : all;
+		total = found.length;
+		variables = found.slice(offset, offset + limit);
 	} catch (err) {
-		({ locked, loadError } = flowLoadOutcome(err, { cookies, url }, 'variables'));
+		({ locked } = flowLoadOutcome(err, { cookies, url }, 'variables'));
+		if (!locked) gate = gateOf(err, engineBanner('variables'));
 	}
-	return { variables, total, limit, offset, locked, loadError };
+	if (gate.state === 'ok' && !locked) {
+		const back = pastEndOffset(variables.length, limit, offset, total);
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
+	return { variables, total, limit, offset, q, locked, gate };
 };
 
 export const actions: Actions = {
@@ -37,7 +64,7 @@ export const actions: Actions = {
 		const value = String(data.get('value') ?? '');
 		const isSecret = data.get('is_secret') === 'true' || data.get('is_secret') === 'on';
 		if (!KEY.test(key)) {
-			return fail(400, { error: 'A key is lower case letters, digits and underscores, starting with a letter.', key });
+			return fail(400, { action: 'put', error: 'A key is lower case letters, digits and underscores, starting with a letter.', key });
 		}
 		// A secret is write-only: the edit form shows an empty field and blank
 		// means keep what is stored, so there is nothing to send.
@@ -45,7 +72,7 @@ export const actions: Actions = {
 		try {
 			await putVariable(client, { key, value, is_secret: isSecret });
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to save variable'), key });
+			return fail(400, { action: 'put', error: actionError(err, 'Failed to save variable'), key });
 		}
 		return { saved: key };
 	},
@@ -58,7 +85,7 @@ export const actions: Actions = {
 		try {
 			await deleteVariable(client, key);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete variable') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete variable') });
 		}
 	},
 };

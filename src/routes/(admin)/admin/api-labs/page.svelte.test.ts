@@ -45,7 +45,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		endpoints: [endpoint()],
 		source: 'engine',
-		grpc: { listening: true, routes: ['GET /api/schemas'], reachable: true },
+		grpc: { listening: true, routes: ['GET /api/schemas'], gate: { state: 'ok' } },
 		...over,
 	} as never,
 	form: form as never,
@@ -151,15 +151,36 @@ describe('gRPC', () => {
 
 	it('says the plugin is absent rather than showing an empty list', async () => {
 		const { container } = render(LabsPage, {
-			props: props({ grpc: { listening: false, routes: [], reachable: false } }),
+			props: props({ grpc: { listening: false, routes: [], gate: { state: 'absent' } } }),
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
 		expect(said(container)).toContain('no listener to call');
 	});
 
+	// The status route is a super admin's, and an admin is not told the
+	// plugin is missing.
+	it('tells a role below super admin that the role is why', async () => {
+		const { container } = render(LabsPage, {
+			props: props({ grpc: { listening: false, routes: [], gate: { state: 'forbidden' } } }),
+		});
+		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
+		expect(said(container)).toContain('Your role cannot open the gRPC listener.');
+		expect(said(container)).not.toContain('not part of this build');
+	});
+
+	it('offers a retry when the status could not be read', async () => {
+		const { container } = render(LabsPage, {
+			props: props({ grpc: { listening: false, routes: [], gate: { state: 'unavailable' } } }),
+		});
+		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
+		expect(said(container)).toContain('the gRPC listener could not be read');
+		expect(said(container)).not.toContain('not part of this build');
+		expect(said(container)).toContain('Try again');
+	});
+
 	it('separates a missing plugin from one that is present and down', async () => {
 		const { container } = render(LabsPage, {
-			props: props({ grpc: { listening: false, routes: [], reachable: true } }),
+			props: props({ grpc: { listening: false, routes: [], gate: { state: 'ok' } } }),
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
 		expect(said(container)).toContain('present and nothing is listening');

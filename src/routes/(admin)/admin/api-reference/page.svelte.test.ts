@@ -172,6 +172,14 @@ describe('api reference rows', () => {
 
 		expect(screen.getByLabelText('Search endpoints')).toBeTruthy();
 	});
+
+	// The search narrows the list, so it sits on the list's row, not the header.
+	it('puts the search on the list toolbar', () => {
+		setup();
+
+		const toolbar = screen.getByRole('toolbar', { name: 'Filter endpoints' });
+		expect(toolbar.querySelector('#endpoint-search')).not.toBeNull();
+	});
 });
 
 /*

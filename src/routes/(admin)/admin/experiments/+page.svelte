@@ -1,7 +1,6 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Drawer,
@@ -21,6 +20,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, FlaskConical, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
@@ -38,7 +38,20 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * The drawer and the row actions share one `form` result. Each failure
+	 * names its action: a save shows in the drawer, a delete or a move on the
+	 * page, so a failed delete never reads as a failed save in the next drawer.
+	 * Opening the drawer clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string') return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const saveFailure = $derived(failure?.action === 'save' ? failure.error : undefined);
+	const pageFailure = $derived(failure && failure.action !== 'save' ? failure.error : undefined);
 
 	let narrow = $state('');
 	const visible = $derived(
@@ -60,6 +73,7 @@
 	let autoStop = $state(false);
 
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		name = '';
 		description = '';
@@ -70,6 +84,7 @@
 	}
 
 	function openEdit(e: Experiment) {
+		cleared = form;
 		editing = e;
 		name = e.name;
 		description = e.description ?? '';
@@ -88,6 +103,7 @@
 	 * itself on the original's numbers.
 	 */
 	function openDuplicate(source: Experiment) {
+		cleared = form;
 		const draft = duplicateRow(source as unknown as Record<string, unknown>, {
 			taken: data.experiments.map((x) => x.name),
 		});
@@ -146,7 +162,7 @@
 	function removeExperiment(e: Experiment): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Delete ${e.name}?`,
+				`Delete experiment ${e.name}?`,
 				'Its variants, its metrics and every exposure recorded against it go with it.',
 				{ confirmLabel: 'Delete' },
 			);
@@ -186,9 +202,7 @@
 			absent="The A/B testing plugin is not part of this build, so no traffic is being split."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={pageFailure} />
 
 		{#if data.experiments.length === 0}
 			<EmptyState
@@ -331,6 +345,7 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<FormErrors message={saveFailure} />
 			<Input id="exp-name" name="name" label="Name" bind:value={name} required />
 			<Textarea
 				id="exp-description"

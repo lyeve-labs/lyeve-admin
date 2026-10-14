@@ -57,6 +57,9 @@ describe('AI provider detail page', () => {
 		cleanup();
 		const caps = setup({}, { scope: 'capabilities', capabilities: { model: 'gpt-4o', kind: 'openai', max_tokens: 128000, text: true, embed: false, image: true, vision: true } });
 		expect(caps.getByTestId('capabilities').textContent).toContain('128000 tokens');
+		// What a model cannot do is said in words, not by a muted color alone.
+		expect(caps.getByTestId('capabilities').textContent).toContain('no embed');
+		expect(caps.getByTestId('capabilities').textContent).not.toContain('no text');
 	});
 
 	it('paints the off state with the switch instead of the row', () => {

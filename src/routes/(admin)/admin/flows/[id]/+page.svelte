@@ -16,6 +16,7 @@
 		Drawer,
 		Modal,
 		PageShell,
+		Pagination,
 		SectionHeading,
 		SegmentedControl,
 		Select,
@@ -72,6 +73,9 @@
 	import FlowGuide from '$lib/components/flow/FlowGuide.svelte';
 	import AssistantPanel from '$lib/components/flow/AssistantPanel.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { pageHref, pageNumber } from '$lib/api/list';
 	import { useInstance } from '$lib/instance.svelte';
 	import { csrfHeaders } from '$lib/api/csrf';
 	import { submitter } from '$lib/forms.svelte';
@@ -119,6 +123,9 @@
 	// still decides and its 403 renders inline. Update covers save and
 	// import. Activate covers publish, disable, rollback and test.
 	const can = $derived(flowGrants(data.flow?.actions));
+	// The datasources and the variables are admin routes, so the shortcuts to
+	// them are drawn only for a role the plugin answers there.
+	const isAdmin = $derived(data.user.roles.includes('admin') || data.user.roles.includes('super_admin'));
 
 	// The 402 the plugin answered, when the last action was one. Read
 	// through the type because the action data is a union of every
@@ -189,6 +196,17 @@
 		runBlocked = false;
 	}
 
+	/*
+	 * The editor validates the draft, lists a datasource's tables and runs a
+	 * test from the browser rather than through a load or an action. Each is
+	 * a read about a draft that exists only on this page: validation follows
+	 * every edit half a second later, and a form action would post the whole
+	 * definition and rerun the page's load on every keystroke, which would
+	 * reread the catalog and the runs and could not keep up. None of them
+	 * writes anything the engine stores. The session cookie and the CSRF
+	 * header ride along on a same-origin request, so the engine applies the
+	 * same role and tenant as it does to the page's own reads.
+	 */
 	function browserClient() {
 		return createClient(fetch, csrfHeaders());
 	}
@@ -440,15 +458,22 @@
 	let exportFormat = $state<'json' | 'yaml'>('json');
 	let exportText = $state('');
 	let exportError = $state('');
+	let exportLoading = $state(false);
 
 	async function loadExport(format: 'json' | 'yaml') {
 		exportFormat = format;
 		exportError = '';
+		// The text of the other format is not this one's, so it goes while the
+		// new one loads.
+		exportText = '';
+		exportLoading = true;
 		try {
 			const text = await exportFlow(fetch, flowId, format, csrfHeaders());
 			exportText = format === 'json' ? JSON.stringify(JSON.parse(text), null, 2) : text;
 		} catch {
 			exportError = 'The export could not be loaded. Save the draft and try again.';
+		} finally {
+			exportLoading = false;
 		}
 	}
 
@@ -459,19 +484,56 @@
 	}
 
 	let showImport = $state(false);
-	let showDelete = $state(false);
+	// The import drawer shows an import's failure, so the notice above the
+	// canvas leaves it out. Opening the drawer clears what an earlier attempt
+	// left, and no other action's failure is drawn in it.
+	let importCleared = $state<unknown>(null);
+	const importFailure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown; refusal?: unknown; locked?: unknown } | null;
+		if (!f || f === importCleared || f.action !== 'import' || typeof f.error !== 'string') return null;
+		return {
+			error: f.error,
+			refusal: f.refusal ? (f.refusal as RefusalNotice) : null,
+			// A refusal of the flow routes as a whole carries no notice, only the flag.
+			refused: !!f.refusal || f.locked === true,
+		};
+	});
+	const importTagged = $derived(!!form && 'action' in form && form.action === 'import');
+	function openImport() {
+		importCleared = form;
+		showImport = true;
+	}
+	// Delete asks through the kit's confirm dialog, then posts a hidden form,
+	// so the button never posts on its own and the delete stays a form action.
+	let deleteFlowForm = $state<HTMLFormElement>();
+	async function askDelete() {
+		const ok = await confirm(`Delete flow ${definition.name || data.flow?.name || ''}?`, 'Its versions and run history go with it.', { confirmLabel: 'Delete' });
+		if (!ok) return;
+		deleteFlowForm?.requestSubmit();
+	}
 	let disableForm = $state<HTMLFormElement | undefined>();
 
 	// Drawer
 	let drawerOpen = $state(true);
-	let tab = $state('test');
+	// A page of runs is a link, so an address that names one opens on the
+	// runs tab.
+	let tab = $state(page.url.searchParams.has('offset') ? 'runs' : 'test');
+	const runs = $derived(data.runs.ok ? data.runs.value : null);
+	// The list's filter rides along, so the way back still lands on it.
+	const runsHref = $derived(
+		pageHref(
+			page.url.pathname,
+			runs?.limit ?? 20,
+			Object.fromEntries(['status', 'q'].flatMap((k) => (page.url.searchParams.get(k) ? [[k, page.url.searchParams.get(k) ?? '']] : []))),
+		),
+	);
 	// The Assistant tab exists only when the engine offers the assistant's
 	// catalog. A tab that could only say it is not enabled is left out rather
 	// than shown locked.
 	const assistantOn = $derived(data.assistant === 'ready');
 	const tabs = $derived([
 		{ id: 'test', label: 'Test' },
-		{ id: 'runs', label: 'Runs', count: data.runs?.length ?? 0 },
+		{ id: 'runs', label: 'Runs', count: runs ? (runs.total ?? runs.rows.length) : undefined },
 		...(assistantOn ? [{ id: 'assistant', label: 'Assistant' }] : []),
 		{ id: 'guide', label: 'Guide' },
 	]);
@@ -683,7 +745,7 @@
 	const overflow = $derived([
 		...(hasFlowCanvas ? [{ label: 'Auto layout', icon: LayoutGrid, onclick: () => canvas?.autoLayout() }] : []),
 		...(can.update ? [{ label: 'Use a template', icon: LayoutTemplate, onclick: () => (showGallery = true) }] : []),
-		...(can.update ? [{ label: 'Import', icon: Upload, onclick: () => (showImport = true) }] : []),
+		...(can.update ? [{ label: 'Import', icon: Upload, onclick: openImport }] : []),
 		{ label: 'Export', icon: Download, onclick: openExport },
 		{ label: 'Shortcuts', icon: Keyboard, onclick: () => (showKeys = !showKeys) },
 		{
@@ -714,6 +776,9 @@
 	const publishFlow = submitter();
 	const disableFlow = submitter();
 
+	/** This page's route, so a navigation that stays on this flow is told apart. */
+	const EDITOR_ROUTE = '/(admin)/admin/flows/[id]';
+
 	// A delete answers with a redirect to the list, which is the one way out
 	// that must not ask about the edits it is throwing away.
 	let leaving = false;
@@ -725,6 +790,10 @@
 	// once the answer is yes. A reload or a closed tab is beforeUnload's.
 	beforeNavigate(({ cancel, to, type }) => {
 		if (leaving || !dirty || type === 'leave' || !to) return;
+		// A page of runs is this same editor at another address. The draft is
+		// seeded once and a reload never replaces it, so nothing is lost and
+		// there is nothing to ask.
+		if (to.route.id === EDITOR_ROUTE && to.params?.id === data.flow?.id) return;
 		cancel();
 		void (async () => {
 			const ok = await confirm(
@@ -790,14 +859,16 @@
 					     or a variable is what a node most often turns out to be missing,
 					     so both are a click from the canvas. The words show once the row
 					     has room for them. -->
-					<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/datasources', flowId)} aria-label="Datasources" data-testid="flow-datasources">
-						<Database size={ICON.sm} />
-						<span class="hidden 2xl:inline">Datasources</span>
-					</Button>
-					<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/variables', flowId)} aria-label="Variables" data-testid="flow-variables">
-						<Variable size={ICON.sm} />
-						<span class="hidden 2xl:inline">Variables</span>
-					</Button>
+					{#if isAdmin}
+						<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/datasources', flowId)} aria-label="Datasources" data-testid="flow-datasources">
+							<Database size={ICON.sm} />
+							<span class="hidden 2xl:inline">Datasources</span>
+						</Button>
+						<Button variant="ghost" size="sm" href={fromFlow('/admin/flows/variables', flowId)} aria-label="Variables" data-testid="flow-variables">
+							<Variable size={ICON.sm} />
+							<span class="hidden 2xl:inline">Variables</span>
+						</Button>
+					{/if}
 					<Dropdown items={overflow} align="left">
 						{#snippet trigger({ open, toggle })}
 							<Button variant="ghost" size="sm" aria-label="More actions" aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
@@ -894,7 +965,7 @@
 							</Button>
 						{/if}
 						{#if can.delete}
-							<Button variant="ghost" size="sm" class="text-danger" aria-label="Delete flow" hint="Delete the flow, its versions and its runs" onclick={() => (showDelete = true)}>
+							<Button variant="ghost" size="sm" class="text-danger" aria-label="Delete flow" hint="Delete the flow, its versions and its runs" onclick={askDelete}>
 								<Trash2 size={ICON.sm} />
 							</Button>
 						{/if}
@@ -940,6 +1011,14 @@
 				{/if}
 			</div>
 
+			{#if data.catalogGate.state !== 'ok'}
+				<!-- The palette and every inspector form come from the node types,
+				     so the editor says they could not be read rather than offering
+				     an empty palette. -->
+				<div class="shrink-0 px-3 pt-2" data-testid="flow-catalog-unread">
+					<GateNotice gate={data.catalogGate} title="the node types" absent="The flow plugin did not send its node types, so the palette has nothing to offer." />
+				</div>
+			{/if}
 			{#if blocked}
 				<div class="shrink-0 px-3 pt-2" data-testid="flow-blocked">
 					<Alert tone="warn" title="This flow is blocked">
@@ -947,7 +1026,9 @@
 					</Alert>
 				</div>
 			{/if}
-			{#if refusal}
+			{#if importTagged}
+				<!-- The import drawer says it. -->
+			{:else if refusal}
 				<!-- The refusal is drawn where a validation problem is: the ids
 				     are in the problems list and on the canvas, and this says
 				     what they have in common and where the feature is turned on. -->
@@ -979,6 +1060,7 @@
 				<SidePanel name="palette" label="Palette" side="start" bind:open={paletteOpen} overlay={showPalette}>
 					<NodePalette
 						catalog={data.catalog}
+						unread={data.catalogGate.state !== 'ok'}
 						onadd={(type) => {
 							canvas?.addNodeAtCenter(type);
 							showPalette = false;
@@ -1017,7 +1099,7 @@
 											Use a template
 										</Button>
 										{#if can.update}
-											<Button variant="secondary" full onclick={() => (showImport = true)}>
+											<Button variant="secondary" full onclick={openImport}>
 												<Upload size={ICON.sm} />
 												Import YAML or JSON
 											</Button>
@@ -1096,7 +1178,7 @@
 								mono
 							/>
 							<Toggle id="test-live" label="Live side effects" hint="Off runs writes and calls as dry runs." bind:checked={live} />
-							<Select id="test-until" label="Until node" options={nodeOptions} placeholder="Run to the end" bind:value={untilNode} />
+							<Select id="test-until" label="Until node" options={nodeOptions} placeholder="Run to the end" searchable bind:value={untilNode} />
 							{#if testError}
 								<Alert tone="danger">
 									{#snippet children()}{testError}{/snippet}
@@ -1112,11 +1194,13 @@
 						</div>
 					</div>
 				{:else if tab === 'runs'}
-					<div class="h-full overflow-y-auto p-3">
-						{#if data.runs.length === 0}
+					<div class="flex h-full flex-col gap-3 overflow-y-auto p-3">
+						{#if !data.runs.ok}
+							<GateNotice gate={data.runs.gate} title="the runs" absent="This flow is no longer there, so it has no runs." />
+						{:else if data.runs.value.rows.length === 0}
 							<p class="text-sm text-muted">No runs recorded yet.</p>
 						{:else}
-							<Table hoverable label="Versions">
+							<Table hoverable label="Runs">
 								<thead>
 									<tr>
 										<th scope="col">Status</th>
@@ -1128,7 +1212,7 @@
 									</tr>
 								</thead>
 								<tbody>
-									{#each data.runs as run (run.id)}
+									{#each data.runs.value.rows as run (run.id)}
 										<tr>
 											<td><Badge tone={statusTone(run.status)} dot>{run.status}</Badge></td>
 											<td data-cell="nowrap" class="text-muted">{triggerLabel(run.trigger_type)}</td>
@@ -1147,6 +1231,15 @@
 									{/each}
 								</tbody>
 							</Table>
+							<Pagination
+								page={pageNumber(data.runs.value.offset, data.runs.value.limit)}
+								perPage={data.runs.value.limit}
+								count={data.runs.value.rows.length}
+								total={data.runs.value.total ?? undefined}
+								hasNext={data.runs.value.hasMore}
+								noun="runs"
+								href={runsHref}
+							/>
 						{/if}
 					</div>
 				{:else if tab === 'assistant' && assistantOn}
@@ -1199,7 +1292,11 @@
 							{#snippet children()}{exportError}{/snippet}
 						</Alert>
 					{/if}
-					<pre class="max-h-96 overflow-auto rounded-md border border-line bg-surface-2 p-3 font-mono text-xs text-fg">{exportText || 'Loading'}</pre>
+					{#if exportLoading}
+						<p class="text-sm text-muted" aria-live="polite">Loading the export.</p>
+					{:else if exportText}
+						<pre class="max-h-96 overflow-auto rounded-md border border-line bg-surface-2 p-3 font-mono text-xs text-fg">{exportText}</pre>
+					{/if}
 					{#if exportText}
 						<a
 							class="text-xs text-brand underline"
@@ -1289,6 +1386,13 @@
 			use:enhance={submit.enhance}
 			class="flex flex-col gap-4"
 		>
+			<FormErrors message={importFailure?.error} />
+			{#if importFailure?.refused && enableLink}
+				<!-- The notice above the canvas leaves an import's refusal to this
+				     drawer, so the way to raise the limit or enable the feature is
+				     here too. -->
+				<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? (importFailure.refusal?.limit != null ? 'How to raise the limit' : 'How to enable it')}</a>
+			{/if}
 			<input type="hidden" name="slug" value={data.flow.slug} />
 			<p class="text-sm text-muted">The imported definition replaces the draft of this flow. The published version is not touched until you publish again.</p>
 			<FileInput id="import-file" name="file" label="Definition file" accept=".json,.yaml,.yml,application/json,application/yaml" />
@@ -1300,22 +1404,7 @@
 		{/snippet}
 	</Drawer>
 
-	{#if showDelete}
-		<Modal open title="Delete {data.flow.name}?" onclose={() => (showDelete = false)}>
-			{#snippet children()}
-				<p class="mb-6 text-sm text-fg">Its versions and run history go with it.</p>
-				<form
-					method="POST"
-					action="?/delete"
-					use:enhance={deleteFlow.enhance}
-					class="flex justify-end gap-3"
-				>
-					<Button variant="secondary" type="button" onclick={() => (showDelete = false)}>Cancel</Button>
-					<Button variant="danger" type="submit" loading={deleteFlow.pending}>Delete</Button>
-				</form>
-			{/snippet}
-		</Modal>
-	{/if}
+	<form method="POST" action="?/delete" use:enhance={deleteFlow.enhance} bind:this={deleteFlowForm} class="hidden"></form>
 {:else}
 	<PageShell title="Flows" width="wide">
 		<NotEnabled

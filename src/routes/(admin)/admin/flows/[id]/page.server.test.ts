@@ -102,9 +102,11 @@ describe('admin/flows/[id] load', () => {
 		expect(result.flows.map((f: FlowOption) => f.slug)).toEqual([fixtureFlow.slug, 'send-receipt']);
 		expect(calls.find((c) => c.url.includes('/api/admin/flows?'))?.url).toContain('status=active');
 		expect(result.eventTypes).toEqual(fixtureEventTypes);
-		expect(result.runs.map((r: FlowRun) => r.id)).toEqual(['r1']);
+		expect(result.runs.ok && result.runs.value.rows.map((r: FlowRun) => r.id)).toEqual(['r1']);
+		expect(result.catalogGate).toEqual({ state: 'ok' });
 		expect(result.versions.map((v: FlowVersion) => v.version)).toEqual([1]);
-		expect(calls.find((c) => c.url.includes('/runs'))?.url).toContain('limit=20');
+		// One row past the page says whether another follows.
+		expect(calls.find((c) => c.url.includes('/runs'))?.url).toContain('limit=21');
 	});
 
 	it('loads the editor on an engine without the event-types route, with the pickers as free text', async () => {
@@ -179,7 +181,38 @@ describe('admin/flows/[id] load', () => {
 		const { event } = loadEvent({ '/api/admin/flows/f1': () => json(fixtureFlow) });
 		const result = (await load(event)) as Loaded;
 		expect(result.catalog).toEqual([]);
-		expect(result.runs).toEqual([]);
+		expect(result.catalogGate.state).toBe('absent');
+	});
+
+	// Neither draws as a palette or a history with nothing in it.
+	it('keeps an outage on the catalog or the runs apart from an empty answer', async () => {
+		const { event } = loadEvent({
+			...everything,
+			'/api/admin/flows/catalog': () => json({ error: 'down' }, 503),
+			'/api/admin/flows/f1/runs': () => json({ error: 'down' }, 503),
+		});
+		const result = (await load(event)) as Loaded;
+		expect(result.catalog).toEqual([]);
+		expect(result.catalogGate).toEqual({ state: 'unavailable' });
+		expect(result.runs).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('pages the runs by the address and states whether another page follows', async () => {
+		const { fetch, calls } = fetchFor({
+			...everything,
+			'/api/admin/flows/f1/runs': () => json({ data: Array.from({ length: 21 }, (_, i) => ({ ...fixtureRun, id: `r${i}` })) }),
+		});
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			params: { id: 'f1' },
+			url: new URL('http://localhost/admin/flows/f1?offset=20'),
+			parent: async () => ({ user: { roles: ['super_admin'] } }),
+		} as never;
+		const result = (await load(event)) as Loaded;
+		expect(calls.find((c) => c.url.includes('/runs'))?.url).toContain('offset=20');
+		expect(result.runs.ok && result.runs.value.rows).toHaveLength(20);
+		expect(result.runs.ok && result.runs.value.hasMore).toBe(true);
 	});
 });
 

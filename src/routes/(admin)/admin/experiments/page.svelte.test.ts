@@ -161,3 +161,30 @@ describe('the confidence level', () => {
 		expect(threshold(container)).toBe('0.95');
 	});
 });
+
+/*
+ * The drawer and the row actions share one form result. A failed delete or
+ * move belongs to the page, and a newly opened drawer starts clean.
+ */
+describe('where a failure shows', () => {
+	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
+		const { container, getAllByText } = render(ExperimentsPage, {
+			props: props({}, { action: 'delete', error: 'The experiment could not be removed.' }),
+		});
+		expect(said(container)).toContain('The experiment could not be removed.');
+
+		await fireEvent.click(getAllByText('New experiment')[0]);
+		const drawer = container.ownerDocument.querySelector('#experiment-form') as HTMLElement;
+		expect(said(drawer)).not.toContain('could not be removed');
+	});
+
+	it('shows a failed save inside the open drawer', async () => {
+		const { container, getAllByText, rerender } = render(ExperimentsPage, { props: props() });
+		await fireEvent.click(getAllByText('New experiment')[0]);
+
+		await rerender(props({}, { action: 'save', error: 'Name the experiment so a result can be attributed to it.' }));
+
+		const drawer = container.ownerDocument.querySelector('#experiment-form') as HTMLElement;
+		expect(said(drawer)).toContain('Name the experiment');
+	});
+});

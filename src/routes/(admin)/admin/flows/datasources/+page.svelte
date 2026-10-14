@@ -11,6 +11,7 @@
 		PageShell,
 		PasswordInput,
 		SectionHeading,
+		RadioGroup,
 		Select,
 		Table,
 		Textarea,
@@ -21,10 +22,12 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { flowBack } from '$lib/flow/back';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 	import type { Datasource, DatasourceKind } from '$lib/api/flows';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { useInstance } from '$lib/instance.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { formatDuration } from '$lib/flow/time';
@@ -44,6 +47,14 @@
 	// disabled and the page says the feature is not enabled rather than that
 	// there are none yet.
 	const available = $derived(data.available !== false);
+	// The plugin refuses an edit and a connection test as it refuses a create
+	// while datasources are not enabled. A delete it still takes.
+	const UNAVAILABLE = 'Datasources are not enabled on this instance';
+	// Only a super admin may grant writes or private addresses, or change
+	// either grant. An admin sees both and the reason they are fixed.
+	const superAdmin = $derived(data.user.roles.includes('super_admin'));
+	const GRANT_HINT = 'Only a super admin can change this.';
+
 	const instance = useInstance();
 	const enableLink = $derived(instance.upgradeLink());
 
@@ -79,7 +90,23 @@
 		return typeof v === 'string' || typeof v === 'number' ? String(v) : '';
 	}
 
+	/*
+	 * The drawer and the row actions share one `form` result. A save shows its
+	 * failure in the drawer, and a delete or a test on the page, so a failed
+	 * delete never reads as a failed save in the next drawer opened. Opening
+	 * the drawer clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown; refused?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return { action: String(f.action ?? ''), error: f.error, refused: f.refused === true };
+	});
+	const saveFailure = $derived(failure?.action === 'save' ? failure : null);
+	const pageFailure = $derived(failure && failure.action !== 'save' ? failure : null);
+
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		kind = 'postgres';
 		host = '';
@@ -98,6 +125,7 @@
 	}
 
 	function openEdit(ds: Datasource) {
+		cleared = form;
 		editing = ds;
 		kind = ds.kind;
 		host = str(ds.config.host);
@@ -151,6 +179,37 @@
 	const isSql = $derived(sqlKind !== null);
 	const sslOptions = $derived(sqlKind ? SSL_MODES[sqlKind] : []);
 
+	/*
+	 * A row granted writes or private addresses keeps its target for a super
+	 * admin to change: the plugin refuses an admin who moves its host, port or
+	 * any address origin, because the grant was given for that target. Those
+	 * fields are fixed for an admin on such a row, with the reason, and still
+	 * post their stored values.
+	 */
+	const targetFixed = $derived(!!editing && (editing.allow_writes || editing.allow_private) && !superAdmin);
+	// The token URL is a target too, so an OAuth2 row keeps its scheme.
+	const authFixed = $derived(targetFixed && !!editing && authFieldsOf(editing.config).type === 'oauth2_client_credentials');
+
+	// What each TLS mode tells the driver, keyed by the value the driver takes.
+	const SSL_SAYS: Record<string, string> = {
+		require: 'Encrypts the connection and refuses a server that will not.',
+		prefer: 'Encrypts when the server offers it, and connects in the clear when it does not.',
+		disable: 'Connects in the clear.',
+		true: 'Encrypts the connection and checks the server certificate.',
+		'skip-verify': 'Encrypts the connection without checking whose certificate it is. Use it only for a server you trust on its address alone.',
+		false: 'Connects in the clear.',
+	};
+	const sslChoices = $derived(sslOptions.map((m) => ({ ...m, description: SSL_SAYS[m.value] })));
+
+	// What each scheme sends, so the choice says it before the fields appear.
+	const AUTH_SAYS: Record<string, string> = {
+		none: 'Sends no credential beyond the headers below.',
+		bearer: 'Sends a token in the Authorization header.',
+		basic: 'Sends a user and a password in the Authorization header.',
+		oauth2_client_credentials: 'Asks a token URL for a token with a client id and secret, and sends that token.',
+	};
+	const authChoices = AUTH_TYPES.map((t) => ({ ...t, description: AUTH_SAYS[t.value] }));
+
 	// Delete goes through the kit's confirm dialog, then a hidden form, so the
 	// row's button never posts on its own and the action stays a form action.
 	let deleteId = $state('');
@@ -158,13 +217,13 @@
 
 	async function askDelete(ds: Datasource) {
 		const ok = await confirm(
-			'Delete datasource',
-			`Delete ${ds.name}? A flow that names it will fail at that node until you create it again.`,
+			`Delete datasource ${ds.name}?`,
+			'A flow that names it will fail at that node until you create it again.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
 		deleteId = ds.id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -200,10 +259,12 @@
 			{#if !available && data.datasources.length > 0}
 				<NotEnabled compact title="Datasources" />
 			{/if}
-			<Button variant="primary" size="sm" onclick={openCreate} disabled={!available} title={available ? undefined : 'Not enabled on this instance'}>
-				<Plus size={ICON.sm} />
-				New datasource
-			</Button>
+			{#if data.gate.state === 'ok'}
+				<Button variant="primary" size="sm" onclick={openCreate} disabled={!available} title={available ? undefined : 'Not enabled on this instance'}>
+					<Plus size={ICON.sm} />
+					New datasource
+				</Button>
+			{/if}
 		{/snippet}
 
 		<!-- Chat lives here because a chat channel is a datasource and nothing
@@ -236,28 +297,26 @@
 			</div>
 		</Card>
 
-		{#if data.loadError}
-			<Alert tone="danger" title="Datasources could not be loaded">
-				{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if data.gate.state !== 'ok'}
+			<GateNotice gate={data.gate} title="datasources" absent="The flow plugin does not serve datasources on this instance." />
 		{/if}
 
-		{#if form && 'refused' in form && form.refused}
+		{#if pageFailure?.refused}
 			<Alert tone="warn" title="Not enabled on this instance">
 				{#snippet children()}
-					{'error' in form ? form.error : ''}
+					{pageFailure.error}
 					{#if enableLink}
 						<a class="ml-1 underline" href={enableLink.href}>{enableLink.label ?? 'How to enable it'}</a>
 					{/if}
 				{/snippet}
 			</Alert>
-		{:else if form && 'error' in form && form.error}
+		{:else if pageFailure}
 			<Alert tone="danger">
-				{#snippet children()}{form.error}{/snippet}
+				{#snippet children()}{pageFailure.error}{/snippet}
 			</Alert>
 		{/if}
 
-		{#if data.loadError}
+		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if !available && data.datasources.length === 0}
 			<NotEnabled title="Datasources" description="A flow that uses one is refused when it is saved." />
@@ -318,11 +377,11 @@
 								<div class="flex items-center gap-2">
 									<form method="POST" action="?/test" use:enhance>
 										<input type="hidden" name="id" value={ds.id} />
-										<Button variant="ghost" size="sm" type="submit" title="Test connection" aria-label="Test {ds.name}">
+										<Button variant="ghost" size="sm" type="submit" title={available ? 'Test connection' : UNAVAILABLE} aria-label="Test {ds.name}" disabled={!available}>
 											<PlugZap size={ICON.sm} />
 										</Button>
 									</form>
-									<Button variant="ghost" size="sm" onclick={() => openEdit(ds)} title="Edit" aria-label="Edit {ds.name}">
+									<Button variant="ghost" size="sm" onclick={() => openEdit(ds)} title={available ? 'Edit' : UNAVAILABLE} aria-label="Edit {ds.name}" disabled={!available}>
 										<Pencil size={ICON.sm} />
 									</Button>
 									<Button variant="ghost" size="sm" onclick={() => askDelete(ds)} title="Delete" aria-label="Delete {ds.name}">
@@ -337,6 +396,13 @@
 		{/if}
 	</PageShell>
 
+	<!-- A target field an admin may not move on a granted row: shown, fixed,
+	     with the reason, and posted as stored. -->
+	{#snippet fixedTarget(id: string, name: string, label: string, value: string)}
+		<input type="hidden" {name} {value} />
+		<Input {id} {label} {value} disabled hint={GRANT_HINT} />
+	{/snippet}
+
 	<Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New datasource'}>
 		<form
 			method="POST"
@@ -345,6 +411,10 @@
 			use:enhance={submit.enhance}
 			class="flex flex-col gap-4"
 		>
+			<FormErrors message={saveFailure?.error} />
+			{#if saveFailure?.refused && enableLink}
+				<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? 'How to enable it'}</a>
+			{/if}
 			{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 			<Input id="ds-name" name="name" label="Name" hint="How a node refers to it." value={editing?.name ?? ''} required />
 			<Select
@@ -359,8 +429,13 @@
 			{#if editing}<input type="hidden" name="kind" value={kind} />{/if}
 
 			{#if isSql}
-				<Input id="ds-host" name="host" label="Host" bind:value={host} required />
-				<Input id="ds-port" name="port" label="Port" inputmode="numeric" bind:value={port} />
+				{#if targetFixed}
+					{@render fixedTarget('ds-host', 'host', 'Host', host)}
+					{@render fixedTarget('ds-port', 'port', 'Port', port)}
+				{:else}
+					<Input id="ds-host" name="host" label="Host" bind:value={host} required />
+					<Input id="ds-port" name="port" label="Port" inputmode="numeric" bind:value={port} />
+				{/if}
 				<Input id="ds-database" name="database" label="Database" bind:value={database} required />
 				<Input id="ds-user" name="user" label="User" bind:value={user} />
 				<PasswordInput
@@ -369,16 +444,20 @@
 					label="Password"
 					hint={editing?.has_secret ? 'Stored and never shown. Leave blank to keep it.' : 'Encrypted at rest.'}
 				/>
-				<Select
-					id="ds-ssl"
+				<RadioGroup
 					name="ssl"
 					label="TLS"
-					options={sslOptions}
-					bind:value={ssl}
 					hint="What the driver is told about the connection's encryption."
+					options={sslChoices}
+					value={ssl ?? ''}
+					onchange={(v) => (ssl = v)}
 				/>
 			{:else if kind === 'http'}
-				<Input id="ds-base-url" name="base_url" label="Base URL" placeholder="https://api.example.com" bind:value={baseUrl} required />
+				{#if targetFixed}
+					{@render fixedTarget('ds-base-url', 'base_url', 'Base URL', baseUrl)}
+				{:else}
+					<Input id="ds-base-url" name="base_url" label="Base URL" placeholder="https://api.example.com" bind:value={baseUrl} required />
+				{/if}
 				<Input
 					id="ds-chat-id"
 					name="chat_id"
@@ -389,14 +468,17 @@
 				/>
 				<div class="flex flex-col gap-3 rounded-md border border-line p-3" data-testid="auth-section">
 					<SectionHeading level={3} variant="eyebrow">Authentication</SectionHeading>
-					<Select
-						id="ds-auth-type"
-						name="auth_type"
+					{#if authFixed}<input type="hidden" name="auth_type" value={auth.type} />{/if}
+					<RadioGroup
+						name={authFixed ? undefined : 'auth_type'}
 						label="Type"
-						options={AUTH_TYPES}
+						hint={authFixed
+							? `Sent with every request of an http.request node. ${GRANT_HINT}`
+							: 'Sent with every request of an http.request node. An explicit Authorization header on the node wins.'}
+						options={authChoices}
 						value={auth.type}
-						hint="Sent with every request of an http.request node; an explicit Authorization header on the node wins."
-						onvaluechange={(v) => {
+						disabled={authFixed}
+						onchange={(v) => {
 							if (isAuthType(v)) auth = { ...auth, type: v };
 						}}
 					/>
@@ -406,7 +488,11 @@
 						<Input id="ds-auth-user" name="auth_user" label="User" bind:value={auth.user} required />
 						<PasswordInput id="ds-auth-password" name="auth_password" label="Password" hint={secretHint} required={!keepSecret} autocomplete="off" />
 					{:else if auth.type === 'oauth2_client_credentials'}
-						<Input id="ds-auth-token-url" name="auth_token_url" label="Token URL" placeholder="https://auth.example.com/oauth/token" bind:value={auth.token_url} required />
+						{#if authFixed}
+							{@render fixedTarget('ds-auth-token-url', 'auth_token_url', 'Token URL', auth.token_url)}
+						{:else}
+							<Input id="ds-auth-token-url" name="auth_token_url" label="Token URL" placeholder="https://auth.example.com/oauth/token" bind:value={auth.token_url} required />
+						{/if}
 						<Input id="ds-auth-client-id" name="auth_client_id" label="Client id" bind:value={auth.client_id} required />
 						<PasswordInput id="ds-auth-client-secret" name="auth_client_secret" label="Client secret" hint={secretHint} required={!keepSecret} autocomplete="off" />
 						<Input id="ds-auth-scopes" name="auth_scopes" label="Scopes" placeholder="read write" hint="Space separated." bind:value={auth.scopes} />
@@ -454,16 +540,32 @@
 					hint={editing?.has_secret ? 'Stored and never shown. Leave blank to keep it.' : 'The key file Google issued for the service account. Encrypted at rest.'}
 					mono
 				/>
-				<Input id="ds-api-base" name="api_base" label="API base (optional)" placeholder="https://sheets.googleapis.com" bind:value={apiBase} />
+				{#if targetFixed}
+					{@render fixedTarget('ds-api-base', 'api_base', 'API base', apiBase)}
+				{:else}
+					<Input id="ds-api-base" name="api_base" label="API base (optional)" placeholder="https://sheets.googleapis.com" bind:value={apiBase} />
+				{/if}
 			{/if}
 
 			<div>
 				<input type="hidden" name="allow_writes" value={allowWrites ? 'true' : 'false'} />
-				<Toggle id="ds-allow-writes" label="Allow writes" hint="A db.query node may commit when this is on." bind:checked={allowWrites} />
+				<Toggle
+					id="ds-allow-writes"
+					label="Allow writes"
+					hint={superAdmin ? 'A db.query node may commit when this is on.' : `A db.query node may commit when this is on. ${GRANT_HINT}`}
+					disabled={!superAdmin}
+					bind:checked={allowWrites}
+				/>
 			</div>
 			<div>
 				<input type="hidden" name="allow_private" value={allowPrivate ? 'true' : 'false'} />
-				<Toggle id="ds-allow-private" label="Allow private addresses" hint="Off refuses hosts that resolve to a private range." bind:checked={allowPrivate} />
+				<Toggle
+					id="ds-allow-private"
+					label="Allow private addresses"
+					hint={superAdmin ? 'Off refuses hosts that resolve to a private range.' : `Off refuses hosts that resolve to a private range. ${GRANT_HINT}`}
+					disabled={!superAdmin}
+					bind:checked={allowPrivate}
+				/>
 			</div>
 		</form>
 		{#snippet footer()}

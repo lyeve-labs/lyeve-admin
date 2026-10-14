@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -145,5 +145,54 @@ describe('the gRPC action takes its allowlist from the engine', () => {
 		expect(result.status).toBe(400);
 		expect(result.data.error).toContain('schema');
 		expect(sent.some((s) => s.url.includes('grpc/invoke'))).toBe(false);
+	});
+});
+
+/*
+ * The gRPC tab's status read. The route is a super admin's, so the read is
+ * made for one alone, and only a 404 says the plugin is not here.
+ */
+describe('admin/api-labs gRPC status', () => {
+	function loadEvent(roles: string[], status: () => Response) {
+		const asked: string[] = [];
+		const fetch = vi.fn(async (url: string) => {
+			asked.push(String(url));
+			if (String(url).includes('grpc/status')) return status();
+			return json(OPENAPI);
+		}) as unknown as typeof globalThis.fetch;
+		return {
+			asked,
+			event: { fetch, cookies: mockCookies(null), url: new URL('http://x/admin/api-labs'), parent: async () => ({ user: { roles } }) } as never,
+		};
+	}
+	type Loaded = { grpc: { gate: { state: string }; routes: string[] } };
+
+	it('does not ask for the status below super admin, and says the role is why', async () => {
+		const { asked, event } = loadEvent(['admin'], () => json({ listening: true }));
+		const d = (await load(event)) as unknown as Loaded;
+		expect(asked.some((u) => u.includes('grpc/status'))).toBe(false);
+		expect(d.grpc.gate).toEqual({ state: 'forbidden' });
+	});
+
+	it('reads the routes for a super admin', async () => {
+		const { event } = loadEvent(['super_admin'], () => json({ listening: true, transcoded_routes: ['GET /api/schemas'] }));
+		const d = (await load(event)) as unknown as Loaded;
+		expect(d.grpc.gate).toEqual({ state: 'ok' });
+		expect(d.grpc.routes).toEqual(['GET /api/schemas']);
+	});
+
+	it('says absent only for a 404', async () => {
+		const { event } = loadEvent(['super_admin'], () => json({ error: 'not found' }, 404));
+		expect(((await load(event)) as unknown as Loaded).grpc.gate).toEqual({ state: 'absent' });
+	});
+
+	it('reads an outage as one, with a retry', async () => {
+		const { event } = loadEvent(['super_admin'], () => json({ error: 'down' }, 503));
+		expect(((await load(event)) as unknown as Loaded).grpc.gate).toEqual({ state: 'unavailable' });
+	});
+
+	it('reads a refusal as the role it is', async () => {
+		const { event } = loadEvent(['super_admin'], () => json({ error: 'forbidden' }, 403));
+		expect(((await load(event)) as unknown as Loaded).grpc.gate).toEqual({ state: 'forbidden' });
 	});
 });

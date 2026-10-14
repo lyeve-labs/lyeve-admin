@@ -1,6 +1,8 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Alert, Badge, Button, Drawer, EmptyState, Input, PageShell, PasswordInput, Table, Toggle, confirm, Pagination } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Input, PageShell, PasswordInput, SearchInput, Table, Toggle, confirm, Pagination } from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { Pencil, Plus, Trash2, Variable as VariableIcon } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
@@ -9,6 +11,8 @@
 	import type { ActionData, PageData } from './$types';
 	import type { Variable } from '$lib/api/flows';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { relativeTime, formatDateTime } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -30,7 +34,23 @@
 	let value = $state('');
 	let secret = $state(false);
 
+	/*
+	 * The drawer and a row's delete share one `form` result. A save shows its
+	 * failure in the drawer and a delete on the page, so a failed delete never
+	 * reads as a failed save in the next drawer opened. Opening the drawer
+	 * clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const saveFailure = $derived(failure?.action === 'put' ? failure.error : undefined);
+	const pageFailure = $derived(failure && failure.action !== 'put' ? failure.error : undefined);
+
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		key = '';
 		value = '';
@@ -39,6 +59,7 @@
 	}
 
 	function openEdit(v: Variable) {
+		cleared = form;
 		editing = v;
 		key = v.key;
 		value = v.is_secret ? '' : (v.value ?? '');
@@ -56,14 +77,19 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(v: Variable) {
-		const ok = await confirm('Delete variable', `Delete vars.${v.key}? Expressions that read it will fail.`, { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete variable vars.${v.key}?`, 'Expressions that read it will fail.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteKey = v.key;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
 	const save = submitter(() => (open = false));
+
+	// The flow this page was opened from rides along with the search and the
+	// pager, so the way back still leads to it.
+	const fromFlow = $derived(page.url.searchParams.get('flow') ?? '');
+	const keep = $derived({ ...(data.q ? { q: data.q } : {}), ...(fromFlow ? { flow: fromFlow } : {}) });
 </script>
 
 <PageTitle title="Variables - Flows" />
@@ -76,26 +102,44 @@
 		back={flowBack(page.url)}
 	>
 		{#snippet actions()}
-			<Button variant="primary" size="sm" onclick={openCreate}>
-				<Plus size={ICON.sm} />
-				New variable
-			</Button>
+			{#if data.gate.state === 'ok'}
+				<Button variant="primary" size="sm" onclick={openCreate}>
+					<Plus size={ICON.sm} />
+					New variable
+				</Button>
+			{/if}
 		{/snippet}
 
-		{#if data.loadError}
-			<Alert tone="danger" title="Variables could not be loaded">
-				{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if data.gate.state !== 'ok'}
+			<GateNotice gate={data.gate} title="flow variables" absent="The flow plugin does not serve variables on this instance." />
 		{/if}
 
-		{#if form && 'error' in form && form.error && !open}
-			<Alert tone="danger">
-				{#snippet children()}{form.error}{/snippet}
-			</Alert>
+		<FormErrors message={pageFailure} />
+
+		{#if data.gate.state === 'ok' && (data.total > 0 || data.q)}
+			<!-- A GET form, so the search lives in the address and the pager
+			     keeps it. -->
+			<form method="GET" data-testid="variable-filters">
+				{#if fromFlow}<input type="hidden" name="flow" value={fromFlow} />{/if}
+				<ListToolbar label="Filter variables">
+					{#snippet search()}
+						<div class="flex items-center gap-2">
+							<label for="variable-search" class="sr-only">Search variables</label>
+							<SearchInput id="variable-search" name="q" value={data.q} placeholder="Key or value" class="min-w-0 flex-1" />
+							<Button type="submit" variant="secondary">Search</Button>
+							{#if data.q}
+								<Button variant="ghost" href="/admin/flows/variables">Clear</Button>
+							{/if}
+						</div>
+					{/snippet}
+				</ListToolbar>
+			</form>
 		{/if}
 
-		{#if data.loadError}
+		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
+		{:else if data.variables.length === 0 && data.q}
+			<EmptyState title="No variables match" description="No key, and no value that is not secret, holds that text." />
 		{:else if data.variables.length === 0}
 			<EmptyState title="No variables yet" description="Expressions read one as vars.<key>.">
 				{#snippet iconSnippet()}<VariableIcon size={ICON.lg} />{/snippet}
@@ -151,18 +195,14 @@
 				count={data.variables.length}
 				total={data.total ?? undefined}
 				noun="variables"
-				href={pageHref('/admin/flows/variables', data.limit)}
+				href={pageHref('/admin/flows/variables', data.limit, keep)}
 			/>
 		{/if}
 	</PageShell>
 
 	<Drawer bind:open title={editing ? `Edit vars.${editing.key}` : 'New variable'}>
 		<form method="POST" action="?/put" id="variable-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-			{#if form && 'error' in form && form.error}
-				<Alert tone="danger">
-					{#snippet children()}{form.error}{/snippet}
-				</Alert>
-			{/if}
+			<FormErrors message={saveFailure} />
 			{#if editing}
 				<!-- The key is the variable's name in every expression, so it is not renamed here. -->
 				<input type="hidden" name="key" value={editing.key} />

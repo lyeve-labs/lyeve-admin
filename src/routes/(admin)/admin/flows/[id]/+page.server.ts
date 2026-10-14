@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect, type ActionFailure } from '@sveltejs/kit';
 import { ApiError, createClient } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser } from '$lib/server/authz';
@@ -32,15 +32,35 @@ import {
 	saveDraft,
 	validationErrors,
 	type Flow,
+	type FlowRun,
 	deleteTemplate,
 	saveTemplate,
 } from '$lib/api/flows';
 import { emptyDefinition, type FlowDefinition, type SchemaOption } from '$lib/flow/types';
 import { normalizeDefinition } from '$lib/flow/graph';
 import type { HttpClient } from '@lyeve-labs/client';
-import { rowsOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, withOffset, type PagedList } from '$lib/api/list';
+import { GATE_OK, gateOf, section, type Gate, type Section } from '$lib/api/gate';
+import type { NodeSpec } from '$lib/flow/types';
 
-const RECENT_RUNS = 20;
+/** The runs tab pages through a flow's runs this many at a time. */
+const RUNS_PER_PAGE = 20;
+
+const LOCKED = {
+	locked: true as const,
+	flow: null,
+	catalog: [],
+	catalogGate: GATE_OK,
+	datasources: [],
+	variables: [],
+	schemas: [],
+	flows: [],
+	eventTypes: null,
+	runs: { ok: true, value: { rows: [], limit: RUNS_PER_PAGE, offset: 0, total: 0, hasMore: false } } as Section<PagedList<FlowRun>>,
+	versions: [],
+	templates: [],
+	assistant: 'hidden' as const,
+};
 
 /**
  * The status a failed read answers with. Only a 404 means the flow is gone.
@@ -64,9 +84,7 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 	try {
 		flow = await getFlow(client, params.id);
 	} catch (err) {
-		if (err instanceof ApiError && err.status === 402) {
-			return { locked: true as const, flow: null, catalog: [], datasources: [], variables: [], schemas: [], flows: [], eventTypes: null, runs: [], versions: [], templates: [], assistant: 'hidden' as const };
-		}
+		if (err instanceof ApiError && err.status === 402) return LOCKED;
 		// An expired session goes where the shell sends one, not to an error page.
 		if (err instanceof ApiError && err.status === 401) {
 			clearSessionCookie({ cookies, url });
@@ -77,12 +95,23 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 	}
 	if (!flow?.id) error(404, 'Flow not found');
 
+	// The runs tab pages by the address, so a page of runs is a link.
+	const { offset: runsOffset } = pageWindow(url, RUNS_PER_PAGE, RUNS_PER_PAGE);
+
 	// The catalog is the one read the editor cannot do without: the palette
-	// and every inspector form come from it. The rest degrade to empty.
+	// and every inspector form come from it, so a failed read keeps its gate
+	// and the editor says the node types could not be read. The rest degrade
+	// to empty.
 	let loaded;
 	try {
 		loaded = await Promise.all([
-			getCatalog(client).catch(() => []),
+			getCatalog(client).then(
+				(catalog): { catalog: NodeSpec[]; gate: Gate } => ({ catalog, gate: GATE_OK }),
+				(err: unknown) => ({
+					catalog: [] as NodeSpec[],
+					gate: gateOf(err, 'The node types could not be read, so the palette has nothing to offer.'),
+				}),
+			),
 			listDatasources(client).then((list) => list.rows).catch(() => []),
 			listVariables(client, 500, 0).catch(() => []),
 			// The pickers read the content schemas, the published flows and the
@@ -96,7 +125,18 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 				if (err instanceof ApiError && err.status === 402) throw err;
 				return null;
 			}),
-			listRuns(client, flow.id, { limit: RECENT_RUNS, offset: 0 }).then((p) => p.rows).catch(() => []),
+			// One row past the page says whether another page follows when the
+			// plugin states no total.
+			section(
+				listRuns(client, flow.id, { limit: RUNS_PER_PAGE + 1, offset: runsOffset }).then(
+					(p): PagedList<FlowRun> => {
+						const rows = p.rows.slice(0, RUNS_PER_PAGE);
+						const hasMore = p.total === null ? p.rows.length > RUNS_PER_PAGE : runsOffset + rows.length < p.total;
+						return { rows, limit: RUNS_PER_PAGE, offset: runsOffset, total: p.total, hasMore };
+					},
+				),
+				'The runs could not be read. This is not a report that the flow never ran.',
+			),
 			listVersions(client, flow.id).catch(() => []),
 			getTemplates(client).catch(() => []),
 			// The assistant's catalog decides whether the tab exists at all: a
@@ -108,9 +148,14 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 				.catch((err: unknown) => (err instanceof CatalogError && err.status === 402 ? ('hidden' as const) : ('ready' as const))),
 		]);
 	} catch {
-		return { locked: true as const, flow: null, catalog: [], datasources: [], variables: [], schemas: [], flows: [], eventTypes: null, runs: [], versions: [], templates: [], assistant: 'hidden' as const };
+		return LOCKED;
 	}
-	const [catalog, datasources, variables, schemas, flows, eventTypes, runs, versions, templates, assistant] = loaded;
+	const [read, datasources, variables, schemas, flows, eventTypes, runs, versions, templates, assistant] = loaded;
+
+	if (runs.ok) {
+		const back = pastEndOffset(runs.value.rows.length, RUNS_PER_PAGE, runsOffset, runs.value.total);
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
 
 	const schemaOptions: SchemaOption[] = schemas.map((s) => ({
 		name: s.name,
@@ -121,7 +166,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 	return {
 		locked: false as const,
 		flow: { ...flow, draft: normalizeDefinition(flow.draft ?? emptyDefinition(flow.name, flow.slug)) },
-		catalog,
+		catalog: read.catalog,
+		catalogGate: read.gate,
 		datasources: datasources.map((d) => ({ id: d.id, name: d.name, kind: d.kind })),
 		variables: rowsOf(variables).map((v) => v.key),
 		schemas: schemaOptions,
@@ -141,6 +187,14 @@ function definitionField(data: FormData): FlowDefinition | null {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * An import's failure, tagged so the import drawer shows it and the notice
+ * above the canvas does not draw it a second time behind the open drawer.
+ */
+function importFailed<F extends ActionFailure<Record<string, unknown>>>(failure: F) {
+	return fail(failure.status, { ...(failure.data as F['data']), action: 'import' });
 }
 
 function refused(err: unknown, fallback: string) {
@@ -278,7 +332,7 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const body = await readImportForm(data);
-		if (!body) return fail(400, { error: 'Paste a definition or choose a file.' });
+		if (!body) return fail(400, { action: 'import', error: 'Paste a definition or choose a file.' });
 		let slug = String(data.get('slug') ?? '').trim();
 		try {
 			if (!slug) slug = (await getFlow(client, event.params.id)).slug;
@@ -289,16 +343,16 @@ export const actions: Actions = {
 			};
 		} catch (err) {
 			if (err instanceof ImportError && err.status === 422) {
-				return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.body) });
+				return fail(422, { action: 'import', error: 'The definition did not validate.', errors: validationErrors(err.body) });
 			}
-			if (err instanceof FlowRefusal) return refusalFailure(err);
+			if (err instanceof FlowRefusal) return importFailed(refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {
-				return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
+				return fail(402, { action: 'import', error: 'Flows are not enabled on this instance.', locked: true });
 			}
 			if (err instanceof ImportError) {
-				return fail(400, { error: err.status < 500 && err.message ? err.message : 'Import failed' });
+				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Import failed' });
 			}
-			return refused(err, 'Import failed');
+			return importFailed(refused(err, 'Import failed'));
 		}
 	},
 

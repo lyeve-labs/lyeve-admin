@@ -11,7 +11,29 @@ import { SHELL_KEY, type Shell } from '$lib/shell.svelte';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/f1') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}) }));
+const nav = vi.hoisted(() => ({ guard: null as null | ((n: unknown) => void) }));
+vi.mock('$app/navigation', () => ({
+	beforeNavigate: vi.fn((fn: (n: unknown) => void) => {
+		nav.guard = fn;
+	}),
+	goto: vi.fn(async () => {}),
+}));
+
+// The instance the layout provides, so a refusal has a way to enable to name.
+vi.mock('$lib/instance.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/instance.svelte')>();
+	const { licensingOf } = await import('$lib/api/license');
+	const licensing = licensingOf({ links: [{ rel: 'upgrade', label: 'Turn it on', url: '/admin/settings/license' }], renew: true });
+	return { ...real, useInstance: () => real.instanceFrom(() => ({ licensing })) };
+});
+
+// The kit's confirm renders through a container the layout mounts and this
+// test does not, so the call is captured and answered here.
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
 
 // The page is tested with the list editor whatever the build carries, so the
 // suite reads the same with the visual editor mounted and without it. A case
@@ -49,6 +71,8 @@ function refusingTestFetch(body: unknown) {
 }
 let fetchMock: ReturnType<typeof validFetch> | ReturnType<typeof refusingTestFetch> = validFetch();
 beforeEach(() => {
+	kit.confirm.mockReset();
+	kit.confirm.mockResolvedValue(false);
 	fetchMock = validFetch();
 	vi.stubGlobal('fetch', fetchMock);
 	localStorage.clear();
@@ -68,14 +92,16 @@ function setup(form: unknown = null, overrides: Record<string, unknown> = {}, co
 				locked: false,
 				flow: fixtureFlow,
 				catalog: fixtureCatalog,
+				catalogGate: { state: 'ok' },
 				datasources: [{ id: 'd1', name: 'warehouse', kind: 'postgres' }],
 				variables: ['region'],
 				schemas: [],
-				runs: [fixtureRun],
+				runs: { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 0, total: 1, hasMore: false } },
 				versions: [],
 				templates: fixtureTemplates,
 				entitlements: licensed,
 				assistant: 'ready',
+				user: { roles: ['admin'] },
 				...overrides,
 			},
 			form,
@@ -172,6 +198,37 @@ describe('flow editor page', () => {
 		expect((form.querySelector('[name="slug"]') as HTMLInputElement).value).toBe(fixtureFlow.slug);
 	});
 
+	// The import drawer and the rest of the editor share one form result.
+	it('keeps a failed save out of the import drawer opened after it', async () => {
+		const { container, getByRole } = setup({ error: 'A flow needs a name.' });
+		expect(container.textContent).toContain('A flow needs a name.');
+		await pickOverflow(getByRole, 'Import');
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('A flow needs a name.');
+	});
+
+	it('shows a failed import inside the import drawer and not above the canvas', async () => {
+		const { container, getByRole, rerender } = setup();
+		await pickOverflow(getByRole, 'Import');
+		await rerender({ form: { action: 'import', error: 'Paste a definition or choose a file.' } } as never);
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Paste a definition or choose a file.');
+		expect(document.body.textContent?.split('Paste a definition or choose a file.').length).toBe(2);
+	});
+
+	// The notice above the canvas leaves an import's refusal to the drawer, so
+	// the way to enable it is drawn there.
+	it('names the way to enable a refused import inside the import drawer', async () => {
+		const { container, getByRole, rerender } = setup();
+		await pickOverflow(getByRole, 'Import');
+		await rerender({
+			form: { action: 'import', error: '7 of 7 flows are in use, the most this instance keeps.', refusal: { nodeIds: [], limit: 7, current: 7 } },
+		} as never);
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).toContain('7 of 7 flows are in use');
+		expect(form.querySelector('a[href="/admin/settings/license"]')?.textContent).toContain('Turn it on');
+	});
+
 	it('validates the draft 500 ms after a change through the flow endpoint', async () => {
 		vi.useFakeTimers();
 		try {
@@ -255,6 +312,12 @@ describe('flow editor page', () => {
 		]);
 	});
 
+	it('draws no datasource or variable shortcut for a role those routes refuse', () => {
+		const { queryByTestId } = setup(null, { user: { roles: ['editor'] } });
+		expect(queryByTestId('flow-datasources')).toBeNull();
+		expect(queryByTestId('flow-variables')).toBeNull();
+	});
+
 	it('links the datasources and variables from the toolbar, carrying the way back to this flow', () => {
 		const { getByTestId } = setup();
 		expect(getByTestId('flow-datasources').getAttribute('href')).toBe('/admin/flows/datasources?flow=f1');
@@ -269,8 +332,20 @@ describe('flow editor page', () => {
 		expect(queryByTestId('flow-inspector')?.textContent ?? '').not.toContain('Delete flow');
 		const remove = getByRole('button', { name: 'Delete flow' });
 		expect(remove.className).toContain('text-danger');
+		const form = document.querySelector('form[action="?/delete"]') as HTMLFormElement;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+
+		kit.confirm.mockResolvedValueOnce(false);
 		await fireEvent.click(remove);
-		expect(getByRole('dialog').textContent).toContain('Delete');
+		await tick();
+		// The title names the flow. The body says what the delete takes with it.
+		expect(kit.confirm).toHaveBeenCalledWith(`Delete flow ${fixtureFlow.name}?`, expect.stringContaining('run history'), { confirmLabel: 'Delete' });
+		expect(submit).not.toHaveBeenCalled();
+
+		kit.confirm.mockResolvedValueOnce(true);
+		await fireEvent.click(remove);
+		await tick();
+		expect(submit).toHaveBeenCalled();
 	});
 
 	it('names the save state beside the status, as the schema builder does', async () => {
@@ -512,6 +587,71 @@ describe('flow editor page', () => {
 		expect(rows[0].querySelector('form[action="?/run"] input[name="run_id"]')?.getAttribute('value')).toBe('r1');
 	});
 
+	// The tab is a table of runs, named for what it lists.
+	it('names the runs table for its runs and pages past the first twenty', async () => {
+		const runs = { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 20, total: 41, hasMore: true } };
+		const { getByRole, container } = setup(null, { runs });
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
+		expect(getByRole('region', { name: 'Runs' })).toBeTruthy();
+		const next = [...drawer.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+		expect(next).toContain('/admin/flows/f1?limit=20&offset=40');
+		expect(getByRole('tab', { name: /Runs/ }).textContent).toContain('41');
+	});
+
+	it('says the runs could not be read rather than that none were recorded', async () => {
+		const { getByRole, container } = setup(null, { runs: { ok: false, gate: { state: 'unavailable' } } });
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
+		expect(drawer.textContent).toContain('the runs could not be read');
+		expect(drawer.textContent).not.toContain('No runs recorded yet.');
+	});
+
+	it('says the node types could not be read rather than that none matches', () => {
+		const { getByTestId } = setup(null, { catalog: [], catalogGate: { state: 'error', message: 'The node types could not be read, so the palette has nothing to offer.' } });
+		expect(getByTestId('flow-catalog-unread').textContent).toContain('The node types could not be read');
+		expect(getByTestId('node-palette').textContent).toContain('could not be read');
+		expect(getByTestId('node-palette').textContent).not.toContain('No node type matches.');
+	});
+
+	// The export panel said Loading under its own error, so the reader could
+	// not tell the read had ended.
+	it('says the export could not be loaded and stops saying it is loading', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) =>
+				String(url).includes('/export')
+					? new Response('{"error":"down"}', { status: 503, headers: { 'content-type': 'application/json' } })
+					: new Response(JSON.stringify({ ok: true, errors: [] }), { status: 200, headers: { 'content-type': 'application/json' } }),
+			),
+		);
+		const { getByRole } = setup();
+		await pickOverflow(getByRole, 'Export');
+		await vi.waitFor(() => expect(document.body.textContent).toContain('The export could not be loaded.'));
+		expect(document.body.textContent).not.toContain('Loading the export.');
+		expect(document.body.querySelector('pre')).toBeNull();
+	});
+
+	// A page of runs is this editor at another address, and the draft survives it.
+	it('pages the runs with an unsaved draft and asks nothing', async () => {
+		const { container } = setup();
+		await fireEvent.input(container.querySelector('#flow-name') as HTMLInputElement, { target: { value: 'Renamed' } });
+		const cancel = vi.fn();
+		nav.guard?.({
+			cancel,
+			type: 'link',
+			to: { url: new URL('http://localhost/admin/flows/f1?limit=20&offset=20'), route: { id: '/(admin)/admin/flows/[id]' }, params: { id: 'f1' } },
+		});
+		await tick();
+		expect(cancel).not.toHaveBeenCalled();
+		expect(kit.confirm).not.toHaveBeenCalled();
+
+		nav.guard?.({ cancel, type: 'link', to: { url: new URL('http://localhost/admin/flows'), route: { id: '/(admin)/admin/flows' }, params: {} } });
+		await tick();
+		expect(cancel).toHaveBeenCalled();
+		expect(kit.confirm).toHaveBeenCalledWith(expect.stringContaining('Discard the changes'), expect.anything(), { confirmLabel: 'Discard' });
+	});
+
 	it('carries the in-product guide', async () => {
 		const { getByRole, container } = setup();
 		await fireEvent.click(getByRole('tab', { name: 'Guide' }));
@@ -520,7 +660,7 @@ describe('flow editor page', () => {
 	});
 
 	it('renders the not-enabled state when the engine answered 402', () => {
-		const { getByTestId } = setup(null, { locked: true, flow: null, catalog: [], runs: [] });
+		const { getByTestId } = setup(null, { locked: true, flow: null, catalog: [] });
 		expect(getByTestId('not-enabled')).toBeTruthy();
 	});
 

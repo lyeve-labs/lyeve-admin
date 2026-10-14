@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 import { fixtureLocalProvider, fixtureProvider, fixtureSettings } from '$lib/components/ai/fixtures';
@@ -9,7 +9,7 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 afterEach(cleanup);
 
-function setup(overrides: Record<string, unknown> = {}) {
+function setup(overrides: Record<string, unknown> = {}, form: unknown = null) {
 	return render(Page, {
 		props: {
 			data: {
@@ -25,7 +25,7 @@ function setup(overrides: Record<string, unknown> = {}) {
 				isSuperAdmin: true,
 				...overrides,
 			},
-			form: null,
+			form,
 		} as never,
 	});
 }
@@ -45,6 +45,16 @@ describe('AI providers page', () => {
 		expect(rows[1].textContent).toContain('Needs key');
 		expect(rows[1].textContent).toContain('Disabled');
 		expect(rows[1].querySelector('a')?.getAttribute('href')).toBe(`/admin/ai/providers/${fixtureLocalProvider.id}`);
+	});
+
+	// A long form announces its failure at the top, where the reader is.
+	it('puts a failed create first in the drawer, above the fields', async () => {
+		const { container, getAllByText } = setup({}, { error: 'Failed to create the provider' });
+		await fireEvent.click(getAllByText('New provider')[0]);
+		const form = container.ownerDocument.querySelector('#provider-create') as HTMLFormElement;
+		const alert = form.querySelector('[aria-live]') as HTMLElement;
+		expect(alert.textContent).toContain('Failed to create the provider');
+		expect(form.firstElementChild).toBe(alert);
 	});
 
 	it('offers the create control to a super admin only', () => {

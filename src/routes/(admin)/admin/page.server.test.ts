@@ -30,6 +30,8 @@ const admin = {
 	created_at: '',
 };
 
+const superAdmin = { ...admin, roles: ['super_admin'] };
+
 /**
  * One apply attempt.
  *
@@ -203,7 +205,7 @@ const schemaList = [{ name: 'post', display_name: 'Post', fields: [] }];
  */
 describe('admin dashboard load', () => {
 	it('asks no plugin anything on an engine that runs none, and still reads its own security report', async () => {
-		const { event, seen } = loadEvent({}, admin, 'http://localhost/admin', {
+		const { event, seen } = loadEvent({}, superAdmin, 'http://localhost/admin', {
 			plugins: { state: 'named', running: [], withheld: [] },
 		});
 
@@ -219,11 +221,11 @@ describe('admin dashboard load', () => {
 			webhooks: false,
 			audit: false,
 		});
-		expect(d.schemas).toEqual([]);
+		expect(d.schemas).toBeNull();
 	});
 
 	it('reads what each running plugin answers, and nothing else', async () => {
-		const { event, seen } = loadEvent({ '/api/admin/schemas': schemaList }, admin, 'http://localhost/admin', {
+		const { event, seen } = loadEvent({ '/api/admin/schemas': schemaList }, superAdmin, 'http://localhost/admin', {
 			plugins: { state: 'named', running: ['schema', 'cron'], withheld: [] },
 		});
 
@@ -280,7 +282,7 @@ describe('admin dashboard load', () => {
 				'/api/admin/customization/dashboard': { entitled: true, custom: false, widgets: [], updated_at: null },
 				'/api/admin/schemas': schemaList,
 			},
-			admin,
+			superAdmin,
 			'http://localhost/admin',
 			customized,
 		);
@@ -289,7 +291,7 @@ describe('admin dashboard load', () => {
 		expect(seen.some((p) => p.includes('/api/admin/jobs'))).toBe(true);
 	});
 
-	it('reads every tile and list for an admin', async () => {
+	it('reads every tile and list for a super admin', async () => {
 		const { event } = loadEvent({
 			'/api/admin/schemas': schemaList,
 			'/api/admin/content': { data: [{ id: 'e1', schema: 'post', title: 'Hello', slug: 'hello', status: 'draft', updated_at: '' }], total_count: 42 },
@@ -304,10 +306,11 @@ describe('admin dashboard load', () => {
 			'/api/admin/webhooks/health': { total_webhooks: 4, unhealthy_webhooks: 1, pending_dlq: 2 },
 			'/api/admin/webhook-dead-letters': { data: [{ id: 'd1', webhook_name: 'inventory', event_type: 'content.created', total_attempts: 5 }], total_count: 1 },
 			'/api/admin/audit-log': { data: [{ id: 'a1', action: 'schema.update', resource_type: 'schema', resource_id: 'post', created_at: '' }], total: 1 },
-		});
+		}, superAdmin);
 
 		const d = (await load(event)) as Loaded;
 
+		expect(d.schemas).toEqual({ ok: true, value: schemaList });
 		expect(d.entryTotal).toBe(42);
 		expect(d.entries.map((e: { id: string }) => e.id)).toEqual(['e1']);
 		expect(d.requests).toEqual({ total: 1200, errorRate: 0.02, p95: 0 });
@@ -351,11 +354,12 @@ describe('admin dashboard load', () => {
 			'/api/admin/schemas': schemaList,
 			'/api/admin/content': { data: [], total_count: 0 },
 			'/api/admin/jobs': [],
-		});
+		}, superAdmin);
 
 		const d = (await load(event)) as Loaded;
 
 		expect(d.entryTotal).toBe(0);
+		expect(d.entries).toEqual([]);
 		expect(d.jobs).toEqual({ enabled: 0, failed: [] });
 		expect(d.requests).toBeNull();
 		expect(d.errorsLogged).toBeNull();
@@ -363,30 +367,78 @@ describe('admin dashboard load', () => {
 		expect(d.endpoints).toBeNull();
 		expect(d.entriesByStatus).toEqual({ published: 0, drafts: 0 });
 		expect(d.webhooks).toBeNull();
-		expect(d.deadLetters).toEqual([]);
-		expect(d.audit).toEqual([]);
-		expect(d.errors).toEqual([]);
+		expect(d.deadLetters).toBeNull();
+		expect(d.audit).toBeNull();
+		expect(d.errors).toBeNull();
 	});
 
-	it('does not attempt the admin reads for an editor', async () => {
+	it('keeps a failed schemas read apart from an instance with no schemas', async () => {
+		const { event } = loadEvent({});
+		const inner = (event as { fetch: typeof globalThis.fetch }).fetch;
+		(event as { fetch: typeof globalThis.fetch }).fetch = (async (url: string, init?: RequestInit) => {
+			if (new URL(String(url), 'http://x').pathname === '/api/admin/schemas') return json({ error: 'down' }, 503);
+			return inner(url, init);
+		}) as typeof globalThis.fetch;
+
+		const d = (await load(event)) as Loaded;
+
+		expect(d.schemas).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('keeps a failed content read apart from an empty one', async () => {
+		const { event } = loadEvent({ '/api/admin/schemas': schemaList });
+
+		const d = (await load(event)) as Loaded;
+
+		expect(d.entries).toBeNull();
+		expect(d.entryTotal).toBeNull();
+		expect(d.entriesByStatus).toBeNull();
+	});
+
+	// The content list and every tile but the schemas are admin routes, so an
+	// editor is asked for none of them rather than shown their refusal as zero.
+	it('reads only the schemas for an editor', async () => {
 		const { seen, event } = loadEvent(
-			{ '/api/admin/schemas': schemaList, '/api/admin/content': { data: [], total_count: 3 } },
+			{ '/api/admin/schemas': schemaList },
 			{ ...admin, roles: ['editor'] }
 		);
 
 		const d = (await load(event)) as Loaded;
 
 		expect(d.isAdmin).toBe(false);
-		expect(d.entryTotal).toBe(3);
-		expect(seen.filter((p) => !p.includes('/schemas') && !p.includes('/content'))).toEqual([]);
+		expect(seen).toEqual(['/api/admin/schemas']);
+		expect(d.entryTotal).toBeNull();
+		expect(d.entries).toBeNull();
 		expect(d.requests).toBeNull();
+	});
+
+	// The security report is a super admin route, so an admin's visit does not
+	// cost a refused read.
+	it('does not ask an admin for the security report', async () => {
+		const { seen, event } = loadEvent({ '/api/admin/schemas': schemaList });
+
+		const d = (await load(event)) as Loaded;
+
+		expect(seen).not.toContain('/api/admin/security/controls');
+		expect(d.controlFailures).toBeNull();
+	});
+
+	// The scheduler lists its jobs to a super admin only.
+	it('does not ask the scheduler for an admin', async () => {
+		const { seen, event } = loadEvent({ '/api/admin/schemas': schemaList, '/api/admin/jobs': [] });
+
+		const d = (await load(event)) as Loaded;
+
+		expect(d.superAdmin).toBe(false);
+		expect(seen.some((p) => p.startsWith('/api/admin/jobs'))).toBe(false);
+		expect(d.jobs).toBeNull();
 	});
 
 	it('reads a jobs list wrapped in an object as well as a bare array', async () => {
 		const { event } = loadEvent({
 			'/api/admin/schemas': schemaList,
 			'/api/admin/jobs': { jobs: [{ id: 'j1', enabled: true, last_status: 'error' }] },
-		});
+		}, superAdmin);
 
 		const d = (await load(event)) as Loaded;
 

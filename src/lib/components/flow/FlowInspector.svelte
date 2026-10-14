@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Badge, Button, Collapsible, CopyField, Input, NumberInput, SectionHeading, Select, Textarea } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Collapsible, CopyField, Input, NumberInput, RadioGroup, SectionHeading, Select, Textarea } from '@lyeve-labs/ui-kit';
 	import { BookOpen, Lock, WandSparkles } from '@lucide/svelte';
 	import NodeConfigForm from './NodeConfigForm.svelte';
 	import EventTriggerForm from './EventTriggerForm.svelte';
@@ -142,8 +142,8 @@
 	}
 
 	const ON_ERROR = [
-		{ value: 'stop', label: 'Stop the run at the first failure' },
-		{ value: 'continue', label: 'Mark the node failed and continue' },
+		{ value: 'stop', label: 'Stop', description: 'The run ends at the first node that fails, and nothing after it runs.' },
+		{ value: 'continue', label: 'Continue', description: 'The node is marked failed and the run goes on to the nodes after it.' },
 	];
 </script>
 
@@ -244,6 +244,7 @@
 		<Select
 			id="trigger-type"
 			label="Trigger type"
+			searchable
 			options={triggerOptions}
 			value={definition.trigger.type}
 			onvaluechange={(v) => {
@@ -356,12 +357,12 @@
 					value={definition.settings.max_steps}
 					onchange={(n) => patchSettings({ max_steps: n })}
 				/>
-				<Select
-					id="settings-on-error"
+				<RadioGroup
+					name="settings-on-error"
 					label="On error"
 					options={ON_ERROR}
 					value={definition.settings.on_error}
-					onvaluechange={(v) => patchSettings({ on_error: v === 'continue' ? 'continue' : 'stop' })}
+					onchange={(v) => patchSettings({ on_error: v === 'continue' ? 'continue' : 'stop' })}
 				/>
 			</div>
 		</Collapsible>

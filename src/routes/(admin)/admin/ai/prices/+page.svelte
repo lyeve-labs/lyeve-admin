@@ -1,13 +1,15 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Alert, Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, Select, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Input, NumberInput, PageShell, SegmentedControl, Table, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { tracked } from '$lib/forms.svelte';
 	import { Coins, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 	import type { ModelPrice } from '$lib/api/ai';
 	import AiSection from '$lib/components/ai/AiSection.svelte';
-	import { PROVIDER_KINDS, providerKindLabel } from '$lib/api/ai';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import { PROVIDER_KINDS, effectiveGate, providerKindLabel } from '$lib/api/ai';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 
@@ -26,7 +28,23 @@
 	let output = $state(0);
 	let image = $state(0);
 
+	/*
+	 * The drawer and a row's delete share one `form` result. A save shows its
+	 * failure in the drawer and a delete on the page, so a failed delete never
+	 * reads as a failed save in the next drawer opened. Opening the drawer
+	 * clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const saveFailure = $derived(failure?.action === 'save' ? failure.error : undefined);
+	const pageFailure = $derived(failure && failure.action !== 'save' ? failure.error : undefined);
+
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		kind = 'openai';
 		model = '';
@@ -37,6 +55,7 @@
 	}
 
 	function openEdit(p: ModelPrice) {
+		cleared = form;
 		editing = p;
 		kind = p.kind;
 		model = p.model;
@@ -65,11 +84,14 @@
 		);
 		if (!ok) return;
 		deleteTarget = p;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
-	const canWrite = $derived(data.isSuperAdmin && data.gate.state === 'ok');
+	// The layout's word on the plugin wins over the page's, as it does for the
+	// section around the list, so a plugin the layout says is off or absent
+	// offers no write here either.
+	const canWrite = $derived(data.isSuperAdmin && effectiveGate(data.gate, data.aiLayoutGate).state === 'ok');
 
 	const save = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
@@ -90,9 +112,7 @@
 	{/snippet}
 
 	<AiSection tab="prices" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prices">
-		{#if form?.error && !open}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={pageFailure} />
 
 		{#if data.prices.length === 0}
 			<EmptyState
@@ -160,16 +180,14 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.model}` : 'New price'}>
 	<form method="POST" action="?/save" id="price-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if form?.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={saveFailure} />
 		{#if editing}
 			<input type="hidden" name="kind" value={editing.kind} />
 			<input type="hidden" name="model" value={editing.model} />
 			<Input id="price-kind" label="Kind" value={providerKindLabel(editing.kind)} disabled />
 			<Input id="price-model" label="Model" value={editing.model} disabled />
 		{:else}
-			<Select id="price-kind" name="kind" label="Kind" options={kindOptions} value={kind} onvaluechange={(v) => (kind = v)} />
+			<SegmentedControl name="kind" label="Kind" options={kindOptions} bind:value={kind} />
 			<Input id="price-model" name="model" label="Model" required placeholder="gpt-4o-mini" bind:value={model} />
 		{/if}
 		<NumberInput id="price-in" name="input_per_1k" label="Input per 1K" min={0} step={0.0001} bind:value={input} />

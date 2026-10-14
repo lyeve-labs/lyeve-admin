@@ -43,8 +43,8 @@ const PLUGINS: DescribedPluginStatus[] = [
 	status('extra', {}),
 ];
 
-function renderPage(plugins: DescribedPluginStatus[] = PLUGINS, error: string | null = null) {
-	return render(PluginsPage, { props: { data: { plugins, error } } as never });
+function renderPage(plugins: DescribedPluginStatus[] = PLUGINS, gate: unknown = { state: 'ok' }) {
+	return render(PluginsPage, { props: { data: { plugins, gate } } as never });
 }
 
 function row(container: HTMLElement, name: string): HTMLElement {
@@ -136,7 +136,7 @@ const base = { plan: 'example', state: 'active', features: [], tenant_quota: 0 }
 // A role query over the whole page is slow.
 // A selector finds the one link directly.
 function mountWithEntitlements(entitlements: Record<string, unknown> | null) {
-	const { container } = render(PluginsPage, { props: { data: { plugins: [], error: null, entitlements } } as never });
+	const { container } = render(PluginsPage, { props: { data: { plugins: [], gate: { state: 'ok' }, entitlements } } as never });
 	return {
 		licenseLink: container.querySelector<HTMLAnchorElement>('[data-testid="page-actions"] a[href="/admin/settings/license"]'),
 		actions: container.querySelector('[data-testid="page-actions"]'),

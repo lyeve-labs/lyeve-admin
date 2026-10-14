@@ -27,9 +27,9 @@ function fetchFor(routes: Record<string, Route>) {
 	return { fetch, calls };
 }
 
-function loadEvent(routes: Record<string, Route>) {
+function loadEvent(routes: Record<string, Route>, search = '') {
 	const { fetch } = fetchFor(routes);
-	return { fetch, cookies: mockCookies(), url: new URL('http://localhost/admin/flows/variables'), parent: async () => ({}) } as never;
+	return { fetch, cookies: mockCookies(), url: new URL(`http://localhost/admin/flows/variables${search}`), parent: async () => ({}) } as never;
 }
 
 function actionEvent(form: FormData, routes: Record<string, Route>) {
@@ -49,10 +49,30 @@ describe('admin/flows/variables load', () => {
 		expect(result.variables[1].value).toBeUndefined();
 	});
 
+	// The plugin answers the whole list whatever window is asked for, so the
+	// page windows and searches it.
+	it('windows and searches the whole list the plugin answers', async () => {
+		const many = Array.from({ length: 60 }, (_, i) => ({ key: `k${String(i).padStart(2, '0')}`, value: i === 7 ? 'eu-west' : 'x', is_secret: false, updated_at: 'x' }));
+		const first = (await load(loadEvent({ '/variables': () => json({ data: many, total_count: 60, limit: 60, offset: 0 }) }))) as Loaded;
+		expect(first.variables).toHaveLength(50);
+		expect(first.total).toBe(60);
+
+		const second = (await load(loadEvent({ '/variables': () => json({ data: many, total_count: 60, limit: 60, offset: 0 }) }, '?offset=50'))) as Loaded;
+		expect(second.variables.map((v: Variable) => v.key)).toEqual(['k50', 'k51', 'k52', 'k53', 'k54', 'k55', 'k56', 'k57', 'k58', 'k59']);
+
+		const found = (await load(loadEvent({ '/variables': () => json({ data: many, total_count: 60, limit: 60, offset: 0 }) }, '?q=eu-'))) as Loaded;
+		expect(found.variables.map((v: Variable) => v.key)).toEqual(['k07']);
+	});
+
+	it('sends a page past the end back to the last page', async () => {
+		const few = [{ key: 'region', value: 'eu', is_secret: false, updated_at: 'x' }];
+		await expect(load(loadEvent({ '/variables': () => json({ data: few }) }, '?offset=100'))).rejects.toMatchObject({ status: 307 });
+	});
+
 	it('maps a 402 to the locked state', async () => {
 		const result = (await load(loadEvent({ '/variables': () => json({ error: 'nope' }, 402) }))) as Loaded;
 		expect(result.locked).toBe(true);
-		expect(result.loadError).toBeNull();
+		expect(result.gate).toEqual({ state: 'ok' });
 	});
 
 	it('sends an expired session to the login page with the cookie cleared', async () => {
@@ -64,7 +84,7 @@ describe('admin/flows/variables load', () => {
 	it('names the role as the reason for a 403', async () => {
 		const result = (await load(loadEvent({ '/variables': () => json({ error: 'forbidden' }, 403) }))) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBe('Your role cannot read variables.');
+		expect(result.gate).toEqual({ state: 'forbidden' });
 	});
 
 	it('keeps the engine banner for a network failure', async () => {
@@ -75,14 +95,13 @@ describe('admin/flows/variables load', () => {
 				},
 			})
 		)) as Loaded;
-		expect(result.loadError).toContain('could not be read from the engine');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 
 	it('reports a failed read as a static message rather than an empty list', async () => {
 		const result = (await load(loadEvent({ '/variables': () => json({ error: 'pq: connection refused' }, 503) }))) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBeTruthy();
-		expect(result.loadError).not.toContain('pq:');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 });
 

@@ -7,7 +7,7 @@
 	 * only the fields, so the owner decides where the buttons go: a drawer
 	 * footer on create, a card on the detail page.
 	 */
-	import { Checkbox, Input, NumberInput, PasswordInput, Select, Toggle } from '@lyeve-labs/ui-kit';
+	import { Checkbox, Input, NumberInput, PasswordInput, SegmentedControl, Select, Toggle } from '@lyeve-labs/ui-kit';
 	import { MODALITIES, PRESETS, PROVIDER_KINDS, isCompatibleKind, providerKindLabel, type AiProvider, type Modality, type ProviderKind } from '$lib/api/ai';
 
 	let {
@@ -72,15 +72,11 @@
 
 <div class="grid gap-4 md:grid-cols-2">
 	<Input id="{id}-name" name="name" label="Name" required value={provider?.name ?? ''} placeholder="openai-primary" />
-	<Select
-		id="{id}-kind"
-		name="kind"
-		label="Kind"
-		required
-		options={kindOptions}
-		value={kind}
-		onvaluechange={(v) => (kind = v as ProviderKind)}
-	/>
+	<!-- Four kinds fit in sight, so they are segments rather than a list.
+	     The strip takes the row, since its labels are wider than a column. -->
+	<div class="md:col-span-2">
+		<SegmentedControl name="kind" label="Kind" options={kindOptions} bind:value={kind} />
+	</div>
 
 	{#if compatible && !anthropicShaped}
 		<Select
@@ -89,6 +85,7 @@
 			label="Preset"
 			hint="Fills the base URL and the key header for a server people run. The row stays OpenAI-compatible."
 			options={presetOptions}
+			searchable
 			value={preset}
 			onvaluechange={applyPreset}
 		/>

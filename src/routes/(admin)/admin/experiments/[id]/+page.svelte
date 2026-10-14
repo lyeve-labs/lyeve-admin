@@ -9,7 +9,7 @@
 		Input,
 		PageShell,
 		SectionHeading,
-		Select,
+		SegmentedControl,
 		Stat,
 		Table,
 		Textarea,
@@ -37,16 +37,39 @@
 		type Variant,
 	} from '$lib/api/ab-testing';
 	import { NO_VALUE } from '$lib/format';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * The page's forms share one `form` result. Each failure names the action
+	 * that caused it, and only that action's form shows it: a failed remove
+	 * shows on the page, never in the next New variant drawer. Opening a
+	 * drawer clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string') return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const pageFailure = $derived(
+		failure && (failure.action === 'removeVariant' || failure.action === 'removeMetric') ? failure.error : undefined
+	);
+	const variantFailure = $derived(failure?.action === 'addVariant' ? failure.error : undefined);
+	const metricFailure = $derived(failure?.action === 'addMetric' ? failure.error : undefined);
+
 	const exp = $derived(data.experiment);
-	const soundSplit = $derived(splitIsSound(data.variants));
-	const thin = $derived(underpowered(exp, data.results));
-	const exposures = $derived(totalSample(data.results));
+	const variants = $derived(data.variants.ok ? data.variants.value : []);
+	const results = $derived(data.results.ok ? data.results.value : null);
+	const soundSplit = $derived(splitIsSound(variants));
+	const thin = $derived(underpowered(exp, results));
+	const exposures = $derived(totalSample(results));
+
+	const METRIC_OPTIONS = METRIC_TYPES.map((t) => ({ value: t, label: t }));
 
 	let addingVariant = $state(false);
 	let variantName = $state('');
@@ -67,8 +90,9 @@
 		variantConfig = '';
 		// What is left of a hundred, so a second variant defaults to completing
 		// the split rather than to a number somebody has to work out.
-		variantShare = String(Math.max(0, Math.round((100 - splitTotal(data.variants)) * 10) / 10));
-		variantIsControl = data.variants.length === 0;
+		variantShare = String(Math.max(0, Math.round((100 - splitTotal(variants)) * 10) / 10));
+		variantIsControl = variants.length === 0;
+		cleared = form;
 		addingVariant = true;
 	}
 
@@ -77,6 +101,7 @@
 		metricDescription = '';
 		metricEvent = '';
 		metricKind = 'conversion';
+		cleared = form;
 		addingMetric = true;
 	}
 
@@ -101,7 +126,7 @@
 	function removeVariant(v: Variant): SubmitFunction {
 		return async ({ cancel }) => {
 			const confirmed = await confirmDialog(
-				`Remove ${v.name}?`,
+				`Remove variant ${v.name}?`,
 				'Exposures already recorded against it stay, so the results keep counting people who saw it.',
 				{ confirmLabel: 'Remove' },
 			);
@@ -118,7 +143,7 @@
 
 	function removeMetric(m: Metric): SubmitFunction {
 		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(`Remove ${m.name}?`, 'The events it counted stay recorded.', {
+			const confirmed = await confirmDialog(`Remove metric ${m.name}?`, 'The events it counted stay recorded.', {
 				confirmLabel: 'Remove',
 			});
 			if (!confirmed) {
@@ -148,18 +173,20 @@
 		<Badge tone={statusTone(exp.status)} dot>{STATUS_LABELS[exp.status]}</Badge>
 	{/snippet}
 
-	{#if formError}
-		<Alert tone="danger">{formError}</Alert>
-	{/if}
+	<FormErrors message={pageFailure} />
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>What the results support</SectionHeading>
 		<!-- The sentence, not the number. "Not significant" is the most misread
 		     result in the product: it is not a tie, it is an experiment that has
 		     not answered, and reading it as a tie ships changes on noise. -->
-		<Alert tone={hasWinner(data.results) ? 'success' : 'brand'}>
-			{verdict(data.results)}
-		</Alert>
+		{#if data.results.ok}
+			<Alert tone={hasWinner(results) ? 'success' : 'brand'}>
+				{verdict(results)}
+			</Alert>
+		{:else}
+			<GateNotice gate={data.results.gate} title="the results" absent="This experiment is no longer there, so it has no results." />
+		{/if}
 
 		{#if thin}
 			<Alert tone="warn">
@@ -171,12 +198,12 @@
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
-			<Stat size="sm" mono label="Exposures" value={totalSample(data.results)} />
-			<Stat size="sm" mono label="Variants" value={data.variants.length} />
-			<Stat size="sm" mono label="Metrics" value={data.metrics.length} />
+			<Stat size="sm" mono label="Exposures" value={data.results.ok ? exposures : 'unknown'} />
+			<Stat size="sm" mono label="Variants" value={data.variants.ok ? data.variants.value.length : 'unknown'} />
+			<Stat size="sm" mono label="Metrics" value={data.metrics.ok ? data.metrics.value.length : 'unknown'} />
 		</div>
 
-		{#if data.results && data.results.variants.length > 0}
+		{#if results && results.variants.length > 0}
 			<Table label="What the results support">
 				<thead>
 					<tr>
@@ -188,14 +215,14 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.results.variants as v (v.variant_id)}
+					{#each results.variants as v (v.variant_id)}
 						<tr>
 							<td data-cell="nowrap">
 								<span class="font-medium text-fg">{v.variant_name}</span>
 								{#if v.is_control}
 									<Badge tone="neutral">Control</Badge>
 								{/if}
-								{#if hasWinner(data.results) && data.results.winner === v.variant_name}
+								{#if hasWinner(results) && results.winner === v.variant_name}
 									<Badge tone="success">Ahead</Badge>
 								{/if}
 							</td>
@@ -212,17 +239,19 @@
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Variants</SectionHeading>
-		{#if !soundSplit && data.variants.length > 0}
+		{#if !soundSplit && variants.length > 0}
 			<!-- Each variant carries its own percentage and nothing reconciles them,
 			     so a split of 60/60 is storable and means whatever the bucketing
 			     does with it. Nothing else in the product says so. -->
 			<Alert tone="warn">
-				The shares add up to {splitTotal(data.variants)}%, not 100%. Traffic is still split, but
+				The shares add up to {splitTotal(variants)}%, not 100%. Traffic is still split, but
 				not in the proportions written here.
 			</Alert>
 		{/if}
 
-		{#if data.variants.length === 0}
+		{#if !data.variants.ok}
+			<GateNotice gate={data.variants.gate} title="the variants" absent="This experiment is no longer there, so it has no variants." />
+		{:else if variants.length === 0}
 			<EmptyState
 				title="No variant yet"
 				description="An experiment with no variants splits nothing. Add a control and at least one alternative."
@@ -247,7 +276,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.variants as v (v.id)}
+					{#each variants as v (v.id)}
 						<tr>
 							<td data-cell="nowrap">
 								<span class="font-medium text-fg">{v.name}</span>
@@ -286,7 +315,9 @@
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Metrics</SectionHeading>
-		{#if data.metrics.length === 0}
+		{#if !data.metrics.ok}
+			<GateNotice gate={data.metrics.gate} title="the metrics" absent="This experiment is no longer there, so it has no metrics." />
+		{:else if data.metrics.value.length === 0}
 			<EmptyState
 				title="No metric yet"
 				description="Nothing is being counted, so this experiment can never produce a result."
@@ -311,7 +342,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.metrics as m (m.id)}
+					{#each data.metrics.value as m (m.id)}
 						<tr>
 							<td data-cell="nowrap">
 								<span class="font-medium text-fg">{m.name}</span>
@@ -347,6 +378,7 @@
 <Drawer bind:open={addingVariant} title="New variant">
 	<form id="variant-form" method="POST" action="?/addVariant" use:enhance={saveVariantSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={variantFailure} />
 			<Input id="variant-name" name="name" label="Name" bind:value={variantName} required />
 			<Input
 				id="variant-share"
@@ -388,6 +420,7 @@
 <Drawer bind:open={addingMetric} title="New metric">
 	<form id="metric-form" method="POST" action="?/addMetric" use:enhance={saveMetricSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={metricFailure} />
 			<Input id="metric-name" name="name" label="Name" bind:value={metricName} required />
 			<Input
 				id="metric-event"
@@ -397,13 +430,7 @@
 				bind:value={metricEvent}
 				required
 			/>
-			<Select
-				id="metric-type"
-				name="metric_type"
-				label="Type"
-				bind:value={metricKind}
-				options={METRIC_TYPES.map((t) => ({ value: t, label: t }))}
-			/>
+			<SegmentedControl name="metric_type" label="Type" bind:value={metricKind} options={METRIC_OPTIONS} />
 			<Textarea
 				id="metric-description"
 				name="description"

@@ -20,8 +20,16 @@ describe('InlineDataEditor', () => {
 		const { getByTestId, getByRole, onchange } = setup({ format: 'json', content: '[{"a":1},{"a":2}]' });
 		expect(getByTestId('code-editor').getAttribute('data-language')).toBe('json');
 		expect(getByTestId('inline-preview').textContent).toContain('2 rows');
-		await fireEvent.click(getByRole('radio', { name: 'CSV' }));
+		// Five formats are chips that wrap, each a pressed or unpressed button.
+		expect(getByRole('button', { name: 'JSON' }).getAttribute('aria-pressed')).toBe('true');
+		await fireEvent.click(getByRole('button', { name: 'CSV' }));
 		expect(onchange).toHaveBeenLastCalledWith({ format: 'csv', content: '[{"a":1},{"a":2}]' });
+	});
+
+	it('keeps a strip of segments when the schema narrows the formats to a few', () => {
+		const narrow = { ...inline.config_schema, properties: { ...inline.config_schema.properties, format: { type: 'string', enum: ['json', 'csv'] } } };
+		const { getByRole } = render(InlineDataEditor, { props: { schema: narrow, value: { format: 'json' }, onchange: vi.fn() } });
+		expect(getByRole('radio', { name: 'CSV' })).toBeTruthy();
 	});
 
 	it('offers the header toggle for csv only and stores header false', async () => {

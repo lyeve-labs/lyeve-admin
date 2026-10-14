@@ -9,10 +9,10 @@
 		FileInput,
 		Input,
 		PageShell,
+		FilterChips,
 		Pagination,
+		RadioGroup,
 		SearchInput,
-		SegmentedControl,
-		Select,
 		Table,
 		Textarea,
 		Tooltip,
@@ -20,16 +20,19 @@
 	} from '@lyeve-labs/ui-kit';
 	import { Database, Plus, Trash2, Upload, Variable, Workflow } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { slugify, statusTone, triggerLabel } from '$lib/flow/triggers';
 	import { blockedText } from '$lib/flow/blocked';
 	import { flowGrants } from '$lib/flow/permissions';
 	import type { RefusalNotice } from '$lib/flow/types';
 	import { useInstance } from '$lib/instance.svelte';
-	import type { Flow } from '$lib/api/flows';
+	import type { Flow, ValidationError } from '$lib/api/flows';
 	import { listQuery } from '$lib/back';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { relativeTime, formatDateTime } from '$lib/format';
@@ -48,7 +51,10 @@
 	// beside the list whether the caller may create, and on each flow what
 	// it may do to it. The engine still decides, and a refusal it answers
 	// renders below like any other.
-	const canCreate = $derived(data.canCreate !== false);
+	const canCreate = $derived(data.gate.state === 'ok' && data.canCreate !== false);
+	// The datasources and the variables are admin routes, so a reader below
+	// admin is not sent to a page that can only refuse them.
+	const isAdmin = $derived(data.user.roles.includes('admin') || data.user.roles.includes('super_admin'));
 	const canDelete = (flow: Flow) => flowGrants(flow.actions).delete;
 
 	// The dialog asks for a name and derives the slug, and nothing else. A
@@ -61,6 +67,7 @@
 	let slugTouched = $state(false);
 
 	function openCreate() {
+		cleared = form;
 		slugTouched = false;
 		createName = '';
 		createSlug = '';
@@ -73,7 +80,12 @@
 	}
 
 	let showImport = $state(false);
-	let importMode = $state<string | null>('create');
+	let importMode = $state('create');
+
+	function openImport() {
+		cleared = form;
+		showImport = true;
+	}
 
 	// Delete goes through the kit's confirm dialog, then a hidden form, so the
 	// row's button never posts on its own and the action stays a form action.
@@ -82,27 +94,58 @@
 
 	async function askDelete(id: string, name: string) {
 		const ok = await confirmDialog(
-			`Delete ${name}?`,
+			`Delete flow ${name}?`,
 			'Its versions and run history go with it.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
 		deleteId = id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
-	const errorList = $derived(
-		form && 'errors' in form && Array.isArray(form.errors) ? form.errors : []
-	);
+	/*
+	 * The create drawer, the import drawer and a row's delete share one `form`
+	 * result. Each failure names the form that caused it, and each drawer
+	 * shows only its own, so a failed delete never reads as a failed create in
+	 * the next drawer opened. Opening a drawer clears what an earlier attempt
+	 * left.
+	 */
+	interface Failure {
+		action: string;
+		error: string;
+		refusal: RefusalNotice | null;
+		forbidden: boolean;
+		errors: ValidationError[];
+	}
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by((): Failure | null => {
+		const f = form as Record<string, unknown> | null;
+		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
+		return {
+			action: String(f.action ?? ''),
+			error: f.error,
+			refusal: f.refusal ? (f.refusal as RefusalNotice) : null,
+			forbidden: f.forbidden === true,
+			errors: Array.isArray(f.errors) ? (f.errors as ValidationError[]) : [],
+		};
+	});
+	const createFailure = $derived(failure?.action === 'create' ? failure : null);
+	const importFailure = $derived(failure?.action === 'import' ? failure : null);
+	const pageFailure = $derived(failure && failure.action !== 'create' && failure.action !== 'import' ? failure : null);
+	const errorList = $derived(pageFailure?.errors ?? []);
 	const imported = $derived(form && 'imported' in form ? form.imported : null);
-	const refusal = $derived(form && 'refusal' in form && form.refusal ? (form.refusal as RefusalNotice) : null);
+	const refusal = $derived(pageFailure?.refusal ?? null);
 	const instance = useInstance();
 	const enableLink = $derived(instance.upgradeLink());
 
 	const MODES = [
-		{ value: 'create', label: 'Create a new flow' },
-		{ value: 'replace', label: 'Replace the draft of an existing flow' },
+		{ value: 'create', label: 'Create a new flow', description: 'The definition becomes a flow of its own, under the slug it carries.' },
+		{
+			value: 'replace',
+			label: 'Replace the draft of an existing flow',
+			description: 'The definition overwrites that flow\'s draft. Its published version runs until you publish again.',
+		},
 	];
 
 	// The filter lives in the URL, so a filtered view is a link someone can
@@ -140,16 +183,18 @@
 	>
 		{#snippet actions()}
 			<Badge tone="violet" size="sm">Beta</Badge>
-			<Button variant="ghost" size="sm" href="/admin/flows/datasources">
-				<Database size={ICON.sm} />
-				Datasources
-			</Button>
-			<Button variant="ghost" size="sm" href="/admin/flows/variables">
-				<Variable size={ICON.sm} />
-				Variables
-			</Button>
+			{#if isAdmin}
+				<Button variant="ghost" size="sm" href="/admin/flows/datasources">
+					<Database size={ICON.sm} />
+					Datasources
+				</Button>
+				<Button variant="ghost" size="sm" href="/admin/flows/variables">
+					<Variable size={ICON.sm} />
+					Variables
+				</Button>
+			{/if}
 			{#if canCreate}
-				<Button variant="secondary" size="sm" onclick={() => (showImport = true)}>
+				<Button variant="secondary" size="sm" onclick={openImport}>
 					<Upload size={ICON.sm} />
 					Import
 				</Button>
@@ -160,16 +205,14 @@
 			{/if}
 		{/snippet}
 
-		{#if data.loadError}
-			<Alert tone="danger" title="Flows could not be loaded">
-				{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-			</Alert>
+		{#if data.gate.state !== 'ok'}
+			<GateNotice gate={data.gate} title="flows" absent="The flow plugin does not serve its list on this instance." />
 		{/if}
 
 		{#if refusal}
 			<Alert tone="warn" title={refusal.limit !== null ? 'Flow limit reached' : 'Not enabled on this instance'}>
 				{#snippet children()}
-					{form && 'error' in form ? form.error : ''}
+					{pageFailure?.error ?? ''}
 					{#if enableLink}
 						<a class="ml-1 underline" href={enableLink.href}>{enableLink.label ?? (refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
 					{/if}
@@ -182,14 +225,14 @@
 					{/if}
 				{/snippet}
 			</Alert>
-		{:else if form && 'forbidden' in form && form.forbidden}
+		{:else if pageFailure?.forbidden}
 			<Alert tone="danger" title="Your role cannot do that">
-				{#snippet children()}{form.error}{/snippet}
+				{#snippet children()}{pageFailure.error}{/snippet}
 			</Alert>
-		{:else if form && 'error' in form && form.error}
+		{:else if pageFailure}
 			<Alert tone="danger">
 				{#snippet children()}
-					{form.error}
+					{pageFailure.error}
 					{#if errorList.length > 0}
 						<ul class="mt-1 list-disc pl-5">
 							{#each errorList as err (`${err.node_id ?? ''}${err.path}${err.message}`)}
@@ -210,30 +253,32 @@
 			</Alert>
 		{/if}
 
-		<!-- The field's label is for the screen reader only, so nothing sits
-		     above the row to push its middle down. -->
-		<form method="GET" data-testid="flow-filters">
-			{#if data.status}<input type="hidden" name="status" value={data.status} />{/if}
-			<ListToolbar label="Filter flows">
-				{#snippet search()}
-					<div class="flex items-center gap-2">
-						<label for="flow-search" class="sr-only">Search flows</label>
-						<SearchInput id="flow-search" name="q" bind:value={q} placeholder="Name or slug" class="min-w-0 flex-1" />
-						<Button type="submit" variant="secondary">Search</Button>
-						{#if filtered}
-							<Button variant="ghost" href="/admin/flows">Clear</Button>
-						{/if}
-					</div>
-				{/snippet}
-				{#snippet filters()}
-					<nav aria-label="Status">
-						<SegmentedControl label="Status" labelHidden value={data.status} options={statusOptions} />
-					</nav>
-				{/snippet}
-			</ListToolbar>
-		</form>
+		<!-- A role the plugin refuses has nothing to filter. -->
+		{#if data.gate.state !== 'forbidden'}
+			<!-- The field's label is for the screen reader only, so nothing sits
+			     above the row to push its middle down. -->
+			<form method="GET" data-testid="flow-filters">
+				{#if data.status}<input type="hidden" name="status" value={data.status} />{/if}
+				<ListToolbar label="Filter flows">
+					{#snippet search()}
+						<div class="flex items-center gap-2">
+							<label for="flow-search" class="sr-only">Search flows</label>
+							<SearchInput id="flow-search" name="q" bind:value={q} placeholder="Name or slug" class="min-w-0 flex-1" />
+							<Button type="submit" variant="secondary">Search</Button>
+							{#if filtered}
+								<Button variant="ghost" href="/admin/flows">Clear</Button>
+							{/if}
+						</div>
+					{/snippet}
+					{#snippet filters()}
+						<!-- Five statuses do not fit one strip, so they are chips that wrap. -->
+						<FilterChips label="Status" value={data.status} options={statusOptions} />
+					{/snippet}
+				</ListToolbar>
+			</form>
+		{/if}
 
-		{#if data.loadError}
+		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.flows.length === 0 && filtered}
 			<EmptyState title="No flows match" description="Widen the status or clear the search to see more." />
@@ -327,12 +372,30 @@
 		{/if}
 	</PageShell>
 
+	<!-- A drawer's own failure, first in its form: the sentence, where the
+	     feature is turned on when the plugin refused it, and each problem the
+	     plugin found in the definition. -->
+	{#snippet drawerFailure(f: Failure | null)}
+		<FormErrors message={f?.error} />
+		{#if f?.refusal && enableLink}
+			<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? (f.refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+		{/if}
+		{#if f && f.errors.length > 0}
+			<ul class="list-disc pl-5" aria-label="Problems in the definition">
+				{#each f.errors as err (`${err.node_id ?? ''}${err.path}${err.message}`)}
+					<li class="font-mono text-xs text-danger">{err.node_id ? `${err.node_id} ` : ''}{err.path}: {err.message}</li>
+				{/each}
+			</ul>
+		{/if}
+	{/snippet}
+
 	<!-- The drawer asks for a name and derives the slug, and nothing else. A
 	     template is a question for a reader who has a canvas to put it on, so
 	     the editor asks it, from its empty state, beside the palette and the
 	     import. -->
 	<Drawer bind:open={showCreate} title="New flow">
 		<form method="POST" action="?/create" id="flow-create-form" use:enhance={submit1.enhance} class="flex flex-col gap-4">
+			{@render drawerFailure(createFailure)}
 			<Input
 				id="create-name"
 				name="name"
@@ -367,6 +430,7 @@
 			use:enhance={submit2.enhance}
 			class="flex flex-col gap-4"
 		>
+			{@render drawerFailure(importFailure)}
 			<FileInput
 				id="import-file"
 				name="file"
@@ -382,7 +446,7 @@
 				placeholder={'version: 1\nname: Orders with shipments'}
 				mono
 			/>
-			<Select id="import-mode" name="mode" label="Mode" options={MODES} bind:value={importMode} />
+			<RadioGroup name="mode" label="Mode" options={MODES} bind:value={importMode} />
 			{#if importMode === 'replace'}
 				<Input id="import-slug" name="slug" label="Slug of the flow to replace" required />
 			{/if}

@@ -21,6 +21,7 @@ import {
 	type Summary,
 } from '@lyeve-labs/client-rest';
 import { applyMigrations } from '$lib/api/migrate';
+import { section, type Section } from '$lib/api/gate';
 import { rowsOf, statedTotal, type ListEnvelope } from '$lib/api/list';
 import { actionError } from '$lib/server/action-error';
 import { localPath } from '$lib/server/local-path';
@@ -50,7 +51,8 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	const { user, entitlements, customization, plugins } = await parent();
 	const token = sessionToken({ cookies, url }) ?? '';
 	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
-	const isAdmin = user.roles.includes('admin') || user.roles.includes('super_admin');
+	const superAdmin = user.roles.includes('super_admin');
+	const isAdmin = superAdmin || user.roles.includes('admin');
 
 	/*
 	 * Every windowed read is told the window. The analytics summary with no
@@ -92,17 +94,23 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 		audit: runs(plugins, PLUGIN.audit),
 	};
 
+	/*
+	 * Every read below is one the engine admits only from an admin, so a
+	 * reader below admin is not asked about it and sees no tile for it. A
+	 * refusal there would draw as a count of nothing. A read that failed
+	 * comes back null, which each tile and list draws as unknown.
+	 */
 	const ifAdmin = <T>(offered: boolean, read: () => Promise<T>): Promise<T | null> =>
 		isAdmin && stock && offered ? read().catch(() => null) : Promise.resolve(null);
-	const ifStock = <T>(offered: boolean, read: () => Promise<T>): Promise<T | null> =>
-		stock && offered ? read() : Promise.resolve(null);
+	// The jobs list is the scheduler's super admin route.
+	const ifSuperAdmin = <T>(offered: boolean, read: () => Promise<T>): Promise<T | null> =>
+		superAdmin ? ifAdmin(offered, read) : Promise.resolve(null);
 
 	const count = (status: string) =>
-		ifStock(offers.content, () =>
+		ifAdmin(offers.content, () =>
 			client
 				.get<ListEnvelope<RecentEntry>>(`/api/admin/content?status=${status}&limit=1&offset=0`)
-				.then(statedTotal)
-				.catch(() => null),
+				.then(statedTotal),
 		);
 
 	const [
@@ -121,16 +129,19 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 		errors,
 		controls,
 	] = await Promise.all([
-		offers.schema ? getSchemas(client).catch(() => [] as Schema[]) : Promise.resolve([] as Schema[]),
-		ifStock(offers.content, () =>
-			client.get<ListEnvelope<RecentEntry>>(`/api/admin/content?limit=${RECENT}&offset=0`).catch(() => null),
+		// Any signed-in reader may list the schemas.
+		offers.schema
+			? section(getSchemas(client), 'The schemas could not be read. This is not a report that there are none.')
+			: Promise.resolve(null),
+		ifAdmin(offers.content, () =>
+			client.get<ListEnvelope<RecentEntry>>(`/api/admin/content?limit=${RECENT}&offset=0`),
 		),
 		count('published'),
 		count('draft'),
 		ifAdmin(offers.analytics, () => getSummary({ from }, client)),
 		ifAdmin(offers.analytics, () => getTrend({ from }, client)),
 		ifAdmin(offers.analytics, () => getEndpoints({ from, limit: RECENT }, client)),
-		ifAdmin(offers.jobs, () => client.get<Job[] | { jobs: Job[] }>('/api/admin/jobs')),
+		ifSuperAdmin(offers.jobs, () => client.get<Job[] | { jobs: Job[] }>('/api/admin/jobs')),
 		ifAdmin(offers.logs, () => getLogVolume(client, window)),
 		ifAdmin(offers.webhooks, () => getGlobalHealth(client)),
 		// Not listDeadLetters(): its declared envelope is items and total, and
@@ -150,9 +161,9 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 				`/api/admin/logs/search?level=ERROR&from=${encodeURIComponent(from)}&limit=${RECENT}`
 			)
 		),
-		// super_admin only. An admin's 403 reads as null, and the tile that
-		// would say "no failures" is not drawn from a report nobody read.
-		ifAdmin(true, () => getSecurityControls(client)),
+		// The security report is a super admin route, so no other role is
+		// asked for it. Null means it was not read, and nothing is drawn from it.
+		ifSuperAdmin(true, () => getSecurityControls(client)),
 	]);
 
 	const jobList = jobs === null ? null : Array.isArray(jobs) ? jobs : (jobs.jobs ?? []);
@@ -177,8 +188,9 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	const homeBlocks = homePage ? await resolveBlocks(client, homePage.blocks) : [];
 
 	return {
-		schemas,
+		schemas: schemas as Section<Schema[]> | null,
 		isAdmin,
+		superAdmin,
 		offers,
 		window,
 		welcome: customization?.entitled ? customization.settings.brand.welcome : '',
@@ -186,16 +198,18 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 		now: now.toISOString(),
 		homePage: homePage ? { slug: homePage.slug, title: homePage.title } : null,
 		homeBlocks,
-		entries: rowsOf(content),
+		// Each list is null when its read failed or was not made, so a failure
+		// never draws as a quiet instance.
+		entries: content ? rowsOf(content) : null,
 		entryTotal: statedTotal(content),
 		entriesByStatus: published === null || drafts === null ? null : { published, drafts },
 		...data,
 		attention: attentionOf(data, window),
 		traffic: trend ? hoursOf(trend.points, since, now) : null,
 		endpoints: endpoints ? endpoints.items.map(endpointOf) : null,
-		deadLetters: rowsOf(deadLetters),
-		audit: audit ? rowsOf(audit) : [],
-		errors: errors?.results ?? [],
+		deadLetters: deadLetters ? rowsOf(deadLetters) : null,
+		audit: audit ? rowsOf(audit) : null,
+		errors: errors ? (errors.results ?? []) : null,
 	};
 };
 
