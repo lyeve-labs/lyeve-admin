@@ -273,18 +273,15 @@
 	 * color. A stored grant is a filled dot and an inherited one a ring,
 	 * because the ring comes from the parent rule and holds only until this
 	 * resource has a rule of its own. A denial is a dash and an exempt role a
-	 * shield. The two dots are drawn here and the other two are icons.
+	 * shield. Every mark is drawn in currentColor, never as a background, so
+	 * a forced-colors theme repaints it in its own ink instead of erasing it.
 	 */
-	const MARK_DOT: Partial<Record<Mark, string>> = {
-		stored: 'bg-brand',
-		inherited: 'border-2 border-brand',
-	};
 
-	/** A role's summary fills its bar: empty for none, half for some, full for all. */
-	const SUMMARY_FILL: Record<TriState, string> = {
-		none: 'w-0',
-		some: 'w-1/2',
-		all: 'w-full',
+	/** A role's summary fills its bar, out of 32: empty for none, half for some, full for all. */
+	const SUMMARY_FILL: Record<TriState, number> = {
+		none: 0,
+		some: 16,
+		all: 32,
 	};
 
 	let schemaFilter = $state('');
@@ -443,13 +440,17 @@
 		</span>
 	{:else}
 		{@const state = summaryState(role, action)}
-		<span
-			class="inline-flex h-2 w-8 overflow-hidden rounded-full border border-brand align-middle"
+		<svg
+			width="32"
+			height="8"
+			viewBox="0 0 32 8"
+			class="inline-block align-middle text-brand"
 			aria-hidden="true"
 			data-summary={state}
 		>
-			<span class="h-full bg-brand {SUMMARY_FILL[state]}"></span>
-		</span>
+			<rect x="0.5" y="0.5" width="31" height="7" rx="3.5" fill="none" stroke="currentColor" />
+			<rect width={SUMMARY_FILL[state]} height="8" rx="4" fill="currentColor" data-fill />
+		</svg>
 		<span class="sr-only">{summaryText(role, action)}</span>
 	{/if}
 {/snippet}
@@ -462,11 +463,13 @@
 		{:else if mark === 'none'}
 			<Minus size={ICON.sm} class="inline-block align-middle text-muted" aria-hidden="true" data-mark="none" />
 		{:else}
-			<span
-				class="inline-block h-3.5 w-3.5 rounded-full align-middle {MARK_DOT[mark]}"
-				aria-hidden="true"
-				data-mark={mark}
-			></span>
+			<svg width="14" height="14" viewBox="0 0 14 14" class="inline-block align-middle text-brand" aria-hidden="true" data-mark={mark}>
+				{#if mark === 'stored'}
+					<circle cx="7" cy="7" r="7" fill="currentColor" />
+				{:else}
+					<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2" />
+				{/if}
+			</svg>
 		{/if}
 		<span class="sr-only">{markText(role, schema, action)}</span>
 	{:else}

@@ -723,12 +723,19 @@ describe('permissions page drawers', () => {
 
 describe('permissions page marks without color', () => {
 	// Each state has a shape of its own, so a reader who cannot tell the
-	// colors apart, or a forced-colors theme that paints them all one ink,
-	// still reads the matrix.
+	// colors apart still reads the matrix. Every mark is an SVG drawn in
+	// currentColor and none is a background, which a forced-colors theme
+	// would erase, so the shapes also hold when that theme paints them all
+	// one ink.
 	function shapeOf(el: Element | null): string {
 		expect(el).toBeTruthy();
-		if (el!.tagName.toLowerCase() === 'svg') return [...el!.classList].find((c) => c.startsWith('lucide-') && c !== 'lucide-icon') ?? 'svg';
-		return el!.classList.contains('border-2') ? 'ring' : 'dot';
+		expect(el!.tagName.toLowerCase()).toBe('svg');
+		const icon = [...el!.classList].find((c) => c.startsWith('lucide-') && c !== 'lucide-icon');
+		if (icon) return icon;
+		const circle = el!.querySelector('circle');
+		if (circle?.getAttribute('fill') === 'currentColor') return 'dot';
+		if (circle?.getAttribute('stroke') === 'currentColor') return 'ring';
+		return 'unknown';
 	}
 
 	it('draws a stored grant, an inherited one, a denial and an exempt role as four shapes', async () => {
@@ -758,11 +765,18 @@ describe('permissions page marks without color', () => {
 			[rule('editor', 'article', ['read']), rule('reviewer', '*', ['read']), rule('reviewer', 'flows', ['read'])],
 			['article', 'page'],
 		);
-		const fill = (role: string, state: string) =>
-			roleRow(container, role).querySelector(`[data-summary="${state}"] > span`)?.className ?? '';
-		expect(fill('admin', 'none')).toContain('w-0');
-		expect(fill('editor', 'some')).toContain('w-1/2');
-		expect(fill('reviewer', 'all')).toContain('w-full');
+		const fill = (role: string, state: string) => {
+			const bar = roleRow(container, role).querySelector(`svg[data-summary="${state}"]`);
+			// The outline and the fill are both drawn in currentColor, so the bar
+			// keeps its shape under forced colors.
+			expect(bar?.querySelector('rect:not([data-fill])')?.getAttribute('stroke')).toBe('currentColor');
+			const rect = bar?.querySelector('rect[data-fill]');
+			expect(rect?.getAttribute('fill')).toBe('currentColor');
+			return rect?.getAttribute('width');
+		};
+		expect(fill('admin', 'none')).toBe('0');
+		expect(fill('editor', 'some')).toBe('16');
+		expect(fill('reviewer', 'all')).toBe('32');
 		expect(roleRow(container, 'super_admin').querySelector('[data-mark="exempt"]')).toBeTruthy();
 	});
 });
