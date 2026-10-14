@@ -60,6 +60,7 @@ function engine(routes: Record<string, () => Response> = {}) {
 }
 
 interface Loaded {
+	limit: number;
 	results: Read | null;
 	ranking: Read;
 	synonyms: Read;
@@ -98,6 +99,18 @@ describe('the search load', () => {
 		expect(asked.searchParams.get('limit')).toBe('20');
 		expect(asked.searchParams.get('offset')).toBe('0');
 		expect(result.results).toEqual({ ok: true, value: { results: [{ entry_id: 'e1' }], total: 73 } });
+	});
+
+	it('pages by the 200 results the search store returns at most, so no result is skipped', async () => {
+		const page = Array.from({ length: 200 }, (_, i) => ({ entry_id: `e${i}` }));
+		const { result, calls } = await runLoad('?q=cats&limit=300&offset=200', {
+			'GET /api/admin/search?': () => json({ results: page, total: 650 }),
+		});
+
+		const asked = new URL(calls.find((c) => c.path.startsWith('/api/admin/search?'))!.path, 'http://x');
+		expect(asked.searchParams.get('limit')).toBe('200');
+		expect(asked.searchParams.get('offset')).toBe('200');
+		expect(result.limit).toBe(200);
 	});
 
 	it('keeps a failed search as a gate instead of an empty result set', async () => {

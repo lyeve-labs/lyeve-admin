@@ -26,8 +26,12 @@ import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 /** The results a page shows when the request names no limit. */
 const RESULTS_LIMIT = 20;
 
-/** The engine's own page ceiling, which the plugin clamps to. */
-const MAX_RESULTS_LIMIT = 500;
+/**
+ * The most results the search store returns in one page. The handler lets
+ * the engine's ceiling through, but the store cuts a page to 200, so a larger
+ * page would hold 200 and the offsets past them would skip the rest.
+ */
+const MAX_RESULTS_LIMIT = 200;
 
 /** Runs f so that a synchronous throw lands in the same catch as a rejection. */
 const attempt = <T>(f: () => Promise<T>): Promise<T> => Promise.resolve().then(f);
