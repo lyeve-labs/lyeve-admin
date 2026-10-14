@@ -212,13 +212,14 @@ describe('a license without paid quotas', () => {
 		expect(said(document.body)).toContain('Storage (GiB)');
 	});
 
-	// Every footer in the console leads with the secondary Cancel.
-	it('orders the footer Cancel, Delete, Save', async () => {
+	// Delete leads the footer, apart from the primary Save, so a hurried
+	// press of the button beside Save never removes the quota.
+	it('orders the footer Delete, Cancel, Save', async () => {
 		const { getByRole } = render(UsagePage, { props: props({ quotas: [stored], quotaTotal: 1 }) });
 		await fireEvent.click(getByRole('button', { name: 'Edit the quota for acme' }));
 		const labels = [...document.body.querySelectorAll('button')]
 			.map((b) => b.textContent?.trim())
 			.filter((t) => t === 'Delete' || t === 'Cancel' || t === 'Save');
-		expect(labels).toEqual(['Cancel', 'Delete', 'Save']);
+		expect(labels).toEqual(['Delete', 'Cancel', 'Save']);
 	});
 });

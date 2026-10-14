@@ -727,6 +727,10 @@ describe('action-button', () => {
     expect(
       check('action-button', modal("{#snippet footer()}<Button variant=\"secondary\">Cancel</Button><Button variant={d ? 'danger' : 'primary'}>Go</Button>{/snippet}")),
     ).toEqual([]);
+    // A delete may lead a footer of three, apart from the primary.
+    expect(
+      check('action-button', modal('<div><Button variant="danger">Delete</Button><Button variant="secondary">Cancel</Button><Button variant="primary">Save</Button></div>')),
+    ).toEqual([]);
   });
 });
 

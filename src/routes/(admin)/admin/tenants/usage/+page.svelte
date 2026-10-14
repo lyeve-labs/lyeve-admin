@@ -498,10 +498,10 @@
 		<Toggle id="quota-warn90" label="Warn at 90%" bind:checked={warn90} />
 	</form>
 	{#snippet footer()}
-		<Button variant="secondary" onclick={() => (editorOpen = false)}>Cancel</Button>
 		{#if editing}
 			<Button variant="danger" onclick={askClear}>Delete</Button>
 		{/if}
+		<Button variant="secondary" onclick={() => (editorOpen = false)}>Cancel</Button>
 		<Button variant="primary" type="submit" form="quota-form" disabled={!editing && !tenantId.trim()} loading={saveQuota.pending}>
 			{editing ? 'Save' : 'Create'}
 		</Button>
