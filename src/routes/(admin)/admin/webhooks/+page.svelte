@@ -25,7 +25,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { Webhook } from '@lyeve-labs/client';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import {
@@ -212,6 +212,8 @@
 		Record<string, { success: boolean; status_code: number; message: string }>
 	>({});
 
+	// The map is read untracked: an effect that tracks the map it rewrites
+	// reruns on its own write until Svelte stops it.
 	$effect(() => {
 		if (form && 'testResult' in form && form.testResult) {
 			const tr = form.testResult as {
@@ -220,7 +222,7 @@
 				status_code: number;
 				message: string;
 			};
-			testResults = { ...testResults, [tr.id]: tr };
+			testResults = { ...untrack(() => testResults), [tr.id]: tr };
 		}
 	});
 

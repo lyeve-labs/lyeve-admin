@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge, Button, Drawer, EmptyState, Table } from '@lyeve-labs/ui-kit';
 	import type { DeadLetter } from '@lyeve-labs/client';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { RotateCcw, Skull, Trash2, XCircle } from '@lucide/svelte';
 	import { formatDateTime } from '$lib/format';
@@ -28,14 +29,16 @@
 
 	let deadLetterResults = $state<Record<string, string>>({});
 
+	// The map is read untracked: an effect that tracks the map it rewrites
+	// reruns on its own write until Svelte stops it.
 	$effect(() => {
 		if (form && 'deadLetterReplay' in form && form.deadLetterReplay) {
 			const r = form.deadLetterReplay as { id: string; status: string };
-			deadLetterResults = { ...deadLetterResults, [r.id]: `Replayed with status ${r.status}` };
+			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: `Replayed with status ${r.status}` };
 		}
 		if (form && 'deadLetterDismiss' in form && form.deadLetterDismiss) {
 			const r = form.deadLetterDismiss as { id: string; status: string };
-			deadLetterResults = { ...deadLetterResults, [r.id]: 'Dismissed' };
+			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: 'Dismissed' };
 		}
 	});
 </script>

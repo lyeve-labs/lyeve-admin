@@ -183,3 +183,23 @@ describe('the webhook drawer and the failures of other actions', () => {
 		expect(form.firstElementChild?.textContent).toContain('Failed to create webhook');
 	});
 });
+
+/*
+ * The test result lands in a map keyed by webhook. An effect that tracked the
+ * map it rewrote reran on its own write until Svelte threw.
+ */
+describe('the result of a webhook test', () => {
+	const props = (form: unknown) =>
+		({
+			data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements, user: { roles: ['admin'] } },
+			form,
+		}) as never;
+
+	it('settles and shows under the row it tested', async () => {
+		const { container, rerender } = render(WebhooksPage, { props: props(null) });
+		await rerender(props({ testResult: { id: 'w1', success: false, status_code: 502, message: 'Bad gateway' } }));
+		expect(container.querySelector('tbody')?.textContent).toContain('HTTP 502: Bad gateway');
+		await rerender(props({ testResult: { id: 'w1', success: true, status_code: 200, message: 'OK' } }));
+		expect(container.querySelector('tbody')?.textContent).toContain('HTTP 200: OK');
+	});
+});

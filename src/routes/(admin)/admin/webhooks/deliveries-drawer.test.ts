@@ -64,6 +64,22 @@ describe('the delivery history drawer', () => {
 	});
 });
 
+/*
+ * A retry result lands in a map keyed by delivery. An effect that tracked the
+ * map it rewrote reran on its own write until Svelte threw.
+ */
+describe('the result of a delivery retry', () => {
+	it('settles and shows under the failed delivery, which keeps its retry button', async () => {
+		const history = named();
+		const listed = { deliveries: { id: 'w1', items: [delivery('d1', true), delivery('d2', false)] } };
+		const { rerender } = render(DeliveriesDrawer, { props: { form: listed, history } });
+		await rerender({ form: { retryResult: { delivery_id: 'd2', success: true, status_code: 200, message: 'Delivered' } }, history });
+		const row = [...document.body.querySelectorAll('tbody tr')][1];
+		expect(row.textContent).toContain('Delivered');
+		expect(row.querySelector('form[action="?/retry-delivery"]')).toBeTruthy();
+	});
+});
+
 describe('asking for a webhook history', () => {
 	it('names the row and clears the last list before the result applies', async () => {
 		const history = new DeliveryHistory();

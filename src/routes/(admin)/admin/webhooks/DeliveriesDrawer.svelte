@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge, Button, Drawer, EmptyState, Table } from '@lyeve-labs/ui-kit';
 	import type { WebhookDelivery } from '@lyeve-labs/client';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { CheckCircle, XCircle, History, RotateCcw } from '@lucide/svelte';
 	import { formatDateTime } from '$lib/format';
@@ -26,10 +27,12 @@
 
 	let retryResults = $state<Record<string, { success: boolean; message: string }>>({});
 
+	// The map is read untracked: an effect that tracks the map it rewrites
+	// reruns on its own write until Svelte stops it.
 	$effect(() => {
 		if (form && 'retryResult' in form && form.retryResult) {
 			const r = form.retryResult as { delivery_id: string; success: boolean; message: string };
-			retryResults = { ...retryResults, [r.delivery_id]: { success: r.success, message: r.message } };
+			retryResults = { ...untrack(() => retryResults), [r.delivery_id]: { success: r.success, message: r.message } };
 		}
 	});
 </script>
@@ -107,7 +110,11 @@
 												<RotateCcw class="h-3.5 w-3.5" />
 											</Button>
 										</form>
-									{:else if retryResults[d.id]}
+									{/if}
+									<!-- The plugin answers a retry under the failed delivery's own id,
+									     so the result shows under that row's button, which stays for
+									     another try. -->
+									{#if retryResults[d.id]}
 										{@const rr = retryResults[d.id]}
 										<span class="text-xs {rr.success ? 'text-success' : 'text-danger'}">
 											{rr.message.slice(0, 30)}
