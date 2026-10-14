@@ -38,7 +38,7 @@
 		type RuleMethod,
 		type SetReplay,
 	} from '$lib/api/request-capture';
-	import { formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatDateTime } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import { httpStatusTone } from '$lib/tones';
@@ -162,7 +162,9 @@
 
 <PageShell
 	title="Request capture"
-	description="Requests this tenant sent, kept with their responses so they can be replayed and compared."
+	description={data.superAdmin
+		? 'Requests every tenant sent, kept with their responses so they can be replayed and compared.'
+		: 'Requests this tenant sent, kept with their responses so they can be replayed and compared.'}
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -412,7 +414,7 @@
 
 		<section class="flex flex-col gap-4" aria-label="Captures">
 			<div class="flex flex-wrap items-center justify-between gap-2">
-				<SectionHeading level={2}>Captures</SectionHeading>
+				<SectionHeading level={2}>{data.superAdmin ? 'Captures from every tenant' : 'Captures'}</SectionHeading>
 				{#if data.captures.length > 0}
 					<Button
 						variant="secondary"
@@ -425,6 +427,12 @@
 					</Button>
 				{/if}
 			</div>
+			{#if data.superAdmin && data.captures.length > 0}
+				<p class="text-sm text-muted">
+					The list and its total cover every tenant. A replay set holds only captures your own tenant sent, and the
+					plugin refuses a set that names another tenant's.
+				</p>
+			{/if}
 			{#if selected.length > MAX_SET_CAPTURES}
 				<Alert tone="warn">A set holds at most {MAX_SET_CAPTURES} captures, because a replay runs them in one request.</Alert>
 			{/if}
@@ -443,6 +451,9 @@
 						<tr>
 							<th scope="col"><span class="sr-only">Select</span></th>
 							<th scope="col">Request</th>
+							{#if data.superAdmin}
+								<th scope="col">Tenant</th>
+							{/if}
 							<th scope="col">Status</th>
 							<th scope="col">Took</th>
 							<th scope="col">Captured</th>
@@ -463,6 +474,9 @@
 								<td class="max-w-md truncate font-mono text-xs" title={c.url}>
 									{c.method} {capturePath(c.url)}
 								</td>
+								{#if data.superAdmin}
+									<td data-cell="nowrap" class="font-mono text-xs">{c.tenant_id || NO_VALUE}</td>
+								{/if}
 								<td data-cell="nowrap">
 									<Badge tone={httpStatusTone(c.status_code)}>
 										{c.status_code}
@@ -480,7 +494,7 @@
 					count={data.captures.length}
 					total={data.total ?? undefined}
 					hasNext={data.hasMore}
-					noun="captures"
+					noun={data.superAdmin ? 'captures across every tenant' : 'captures'}
 					href={pageHref('/admin/observability/captures', data.limit)}
 				/>
 			{/if}

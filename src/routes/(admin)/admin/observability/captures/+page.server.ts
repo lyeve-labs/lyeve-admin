@@ -35,9 +35,13 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 export const load: PageServerLoad = async (event) => {
-	const { plugins } = await event.parent();
+	const { plugins, user } = await event.parent();
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
+	// The plugin applies no tenant filter to a super admin's read that names
+	// none, so their list holds every tenant's requests.
+	const superAdmin = user?.roles?.includes('super_admin') ?? false;
 	const empty = {
+		superAdmin,
 		captures: [] as Capture[],
 		total: null as number | null,
 		limit,
@@ -84,6 +88,7 @@ export const load: PageServerLoad = async (event) => {
 	if (licensed === null && typeof rules.licensed === 'boolean') licensed = rules.licensed;
 
 	return {
+		superAdmin,
 		captures: page.rows,
 		total: page.total,
 		limit,
