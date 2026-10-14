@@ -70,7 +70,12 @@
 	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
 	let openedOver = $state.raw<unknown>(null);
 	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
-	const pageForm = $derived(inDrawer || OTHER_DRAWERS.includes((form as Failure)?.action ?? '') ? null : form);
+	// A rotation that succeeds settles the result shown before it. The secret
+	// never reaches the form, so the earlier result is set aside instead.
+	let settled = $state.raw<unknown>(null);
+	const pageForm = $derived(
+		inDrawer || OTHER_DRAWERS.includes((form as Failure)?.action ?? '') || (form !== null && form === settled) ? null : form,
+	);
 
 	/*
 	 * The plugin says nothing about its license until a paid write is
@@ -259,6 +264,7 @@
 		if (result.type === 'success' && result.data && 'rotated' in result.data) {
 			const r = result.data.rotated as { name: string; secret: string };
 			reveal = { name: r.name, secret: r.secret };
+			settled = form;
 			return;
 		}
 		await update();

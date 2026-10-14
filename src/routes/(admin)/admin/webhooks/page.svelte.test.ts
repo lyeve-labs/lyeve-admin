@@ -267,6 +267,14 @@ describe('a rotated signing secret', () => {
 		expect(document.body.textContent).not.toContain('New signing secret');
 	});
 
+	it('clears an earlier failure once a rotation succeeds', async () => {
+		const { container } = render(WebhooksPage, { props: props({ action: 'test', error: 'Failed to test webhook' }) });
+		expect(container.textContent).toContain('Failed to test webhook');
+		const update = await rotate({ type: 'success', data: { rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } } });
+		expect(container.textContent).not.toContain('Failed to test webhook');
+		expect(update).not.toHaveBeenCalled();
+	});
+
 	it('applies a failed rotation so the page reports it', async () => {
 		render(WebhooksPage, { props: props(null) });
 		const update = await rotate({ type: 'failure', data: { action: 'rotate-secret', error: 'Failed to rotate webhook secret' } });
