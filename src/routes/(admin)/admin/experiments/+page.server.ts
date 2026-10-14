@@ -99,9 +99,12 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		return fail(400, { action, error: 'The minimum sample size has to be at least one exposure.' });
 	}
 
+	// The plugin reads an absent description as "keep" and an empty string as
+	// a clear, so an edit sends the field as it stands, empty included.
+	const description = String(form.get('description') ?? '').trim();
 	const body = {
 		name,
-		description: String(form.get('description') ?? '').trim() || undefined,
+		description: id ? description : description || undefined,
 		auto_stop_enabled: form.get('auto_stop_enabled') === 'true',
 		significance_threshold: threshold,
 		min_sample_size: minSample,

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
-vi.mock('$lib/server/authz', () => ({
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...((await importOriginal()) as object),
 	authedClient: vi.fn(() => engine),
 	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
 }));
 
+import { ApiError } from '@lyeve-labs/client';
+import { assertRole, requireRole } from '$lib/server/authz';
 import { actions, load } from './+page.server';
 
 function event(form: Record<string, string>) {
@@ -81,5 +84,51 @@ describe('experiment action failures', () => {
 	it('tags a refused save as a save', async () => {
 		const out = (await actions.create(event({ name: '' }))) as { data: { action: string } };
 		expect(out.data.action).toBe('save');
+	});
+});
+
+describe('experiment description', () => {
+	it('sends an emptied description on an edit as a clear', async () => {
+		await actions.update(event({ id: 'e1', name: 'Checkout button', description: '' }));
+		expect(engine.put.mock.calls[0][1]).toMatchObject({ description: '' });
+	});
+
+	it('leaves an empty description out of a create', async () => {
+		await actions.create(event({ name: 'Checkout button', description: '  ' }));
+		expect(engine.post.mock.calls[0][1].description).toBeUndefined();
+	});
+});
+
+describe('experiment moves', () => {
+	it('posts the move to its own route', async () => {
+		const out = await actions.move(event({ id: 'e1', move: 'start' }));
+		expect(out).toEqual({ moved: 'start' });
+		expect(engine.post.mock.calls[0][0]).toBe('/api/admin/ab/experiments/e1/start');
+	});
+
+	it('relays the reason the plugin refuses a move with', async () => {
+		engine.post.mockRejectedValue(new ApiError(409, 'cannot start an experiment that is stopped'));
+		const out = (await actions.move(event({ id: 'e1', move: 'start' }))) as { status: number; data: { action: string; error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data).toEqual({ action: 'move', error: 'cannot start an experiment that is stopped' });
+	});
+
+	it('keeps driver text out of a move that meets an outage', async () => {
+		engine.post.mockRejectedValue(new ApiError(503, 'pq: connection refused'));
+		const out = (await actions.move(event({ id: 'e1', move: 'pause' }))) as { data: { action: string; error: string } };
+		expect(out.data.action).toBe('move');
+		expect(out.data.error).not.toContain('pq:');
+	});
+
+	it('refuses a move that is not one of the four', async () => {
+		const out = (await actions.move(event({ id: 'e1', move: 'archive' }))) as { status: number };
+		expect(out.status).toBe(400);
+		expect(engine.post).not.toHaveBeenCalled();
+	});
+
+	it('refuses an editor before calling the plugin', async () => {
+		vi.mocked(requireRole).mockImplementationOnce(async (_event, roles) => assertRole({ id: 'u2', roles: ['editor'] } as never, roles));
+		await expect(actions.move(event({ id: 'e1', move: 'start' }))).rejects.toMatchObject({ status: 403 });
+		expect(engine.post).not.toHaveBeenCalled();
 	});
 });
