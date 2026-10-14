@@ -5,7 +5,6 @@ import type { Cookies, RequestEvent } from '@sveltejs/kit';
 // @ts-expect-error SvelteKit ships this module without type declarations.
 import { get_cookies } from '../../../node_modules/@sveltejs/kit/src/runtime/server/cookie.js';
 import { authedHeaders } from '$lib/server/authz';
-import { resetRateLimitStore } from '$lib/server/rate-limit';
 import { refreshSession, needsRefresh, resetSessionRefresh, tradeOnce } from './session-refresh';
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');
@@ -41,7 +40,8 @@ function renewing(token = RENEWED, refresh = RT2) {
 interface Shape {
 	method?: string;
 	scheme?: 'https' | 'http';
-	address?: string;
+	/** null stands for an adapter that cannot tell the address. */
+	address?: string | null;
 }
 
 /** A request event whose cookies behave as SvelteKit's do inside handle. */
@@ -53,8 +53,11 @@ function event(path: string, cookies: Record<string, string>, fetch: typeof glob
 	const request = new Request(url, { method: shape.method ?? 'GET', headers: header ? { cookie: header } : {} });
 	const jar = get_cookies(request, url);
 	jar.set_trailing_slash('never');
-	const address = shape.address ?? '203.0.113.7';
-	return { url, request, fetch, cookies: jar.cookies as Cookies, getClientAddress: () => address } as unknown as RequestEvent;
+	const getClientAddress = () => {
+		if (shape.address === null) throw new Error('Could not determine clientAddress');
+		return shape.address ?? '203.0.113.7';
+	};
+	return { url, request, fetch, cookies: jar.cookies as Cookies, getClientAddress } as unknown as RequestEvent;
 }
 
 function signedIn(token: string, fetch: typeof globalThis.fetch, path = '/admin/users', shape: Shape = {}) {
@@ -76,7 +79,6 @@ beforeEach(() => {
 	vi.useFakeTimers({ toFake: ['Date'] });
 	vi.setSystemTime(NOW);
 	resetSessionRefresh();
-	resetRateLimitStore();
 });
 
 afterEach(() => {
@@ -248,21 +250,39 @@ describe('a refresh cookie the engine could not have written', () => {
 });
 
 describe('trades from one address', () => {
-	it('stop at the rate limit and leave the session as it is', async () => {
-		const fetch = renewing();
-		for (let n = 1; n <= 10; n++) {
-			await refreshSession(event('/admin/users', { '__Host-sys_session': jwt({ exp: secs(NOW) + n }), '__Host-console_refresh': refreshOf(n) }, fetch));
-		}
+	const expiring = (n: number) => ({ '__Host-sys_session': jwt({ exp: secs(NOW) + 60, sub: `user-${n}` }), '__Host-console_refresh': refreshOf(n) });
+
+	// An office network signs many readers in from one address, and each of
+	// them renews. Renewals never count.
+	it('all reach the engine when the engine renews them', async () => {
+		const fetch = vi.fn(async () => json({ token: RENEWED, refresh_token: RT2 }));
+		for (let n = 1; n <= 20; n++) await refreshSession(event('/admin/users', expiring(n), fetch));
+		expect(fetch).toHaveBeenCalledTimes(20);
+	});
+
+	it('are held back after ten refusals, and the session is left as it is', async () => {
+		const fetch = vi.fn(async () => json({ error: 'token reuse' }, 401));
+		for (let n = 1; n <= 10; n++) await refreshSession(event('/settings', expiring(n), fetch));
 		expect(fetch).toHaveBeenCalledTimes(10);
 
-		const over = event('/admin/users', { '__Host-sys_session': CLOSE, '__Host-console_refresh': refreshOf(11) }, fetch);
-		await refreshSession(over);
+		const held = event('/admin/users', expiring(11), fetch);
+		expect(await redirectOf(() => refreshSession(held))).toBeNull();
 		expect(fetch).toHaveBeenCalledTimes(10);
-		expect(over.cookies.get('__Host-sys_session')).toBe(CLOSE);
-		expect(over.cookies.get('__Host-console_refresh')).toBe(refreshOf(11));
+		expect(held.cookies.get('__Host-console_refresh')).toBe(refreshOf(11));
 
-		await refreshSession(event('/admin/users', { '__Host-sys_session': CLOSE, '__Host-console_refresh': refreshOf(12) }, fetch, { address: '192.0.2.1' }));
+		await refreshSession(event('/settings', expiring(12), fetch, { address: '192.0.2.1' }));
 		expect(fetch).toHaveBeenCalledTimes(11);
+
+		vi.setSystemTime(NOW + 61_000);
+		await refreshSession(event('/settings', expiring(13), fetch));
+		expect(fetch).toHaveBeenCalledTimes(12);
+	});
+
+	it('still renew where the adapter cannot tell the address', async () => {
+		const fetch = renewing();
+		const e = signedIn(CLOSE, fetch, '/admin/users', { address: null });
+		await refreshSession(e);
+		expect(e.cookies.get('__Host-sys_session')).toBe(RENEWED);
 	});
 });
 

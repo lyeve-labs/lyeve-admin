@@ -4,7 +4,7 @@ import type { LayoutServerLoad } from './$types';
 import { getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
 import { NO_ENTITLEMENTS, type LicenseEntitlements } from '$lib/entitlements';
 import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
-import { SESSION_ENDED } from '$lib/server/session-refresh';
+import { sessionEndedTarget } from '$lib/server/session-refresh';
 import { pendingMigrations } from '$lib/api/migrate';
 import { getCustomization, NO_CUSTOMIZATION, type Customization } from '$lib/api/customization';
 import { brandOf } from '$lib/brand';
@@ -43,7 +43,10 @@ export const load: LayoutServerLoad = async (event) => {
 	const user = await sessionUser(authed);
 	if (!user) {
 		clearSessionCookie(event);
-		redirect(302, SESSION_ENDED);
+		// The address is read only here, on the way out, so a session that
+		// stands does not make this load depend on it and re-run on every
+		// navigation.
+		redirect(302, sessionEndedTarget(event.url, 'GET'));
 	}
 
 	/*

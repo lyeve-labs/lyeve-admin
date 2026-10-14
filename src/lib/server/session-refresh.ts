@@ -23,7 +23,7 @@
  */
 import { createHash } from 'node:crypto';
 import { redirect, type RequestEvent } from '@sveltejs/kit';
-import { checkRateLimit } from '$lib/server/rate-limit';
+import { clientAddressOf } from '$lib/server/engine';
 import {
 	clearRefreshCookie,
 	clearSessionCookie,
@@ -67,12 +67,46 @@ interface Shared {
 const running = new Map<string, Shared & { trade: Promise<Trade> }>();
 const kept = new Map<string, Shared & { trade: Trade; until: number }>();
 
+/**
+ * How many refreshes the engine may refuse for one address in a minute before
+ * that address stops asking. Only a refusal counts: a renewal is what every
+ * signed-in reader does, and a shared address such as an office network
+ * renews often. A stream of copied or stale refresh tokens is refused, so it
+ * runs out here, and the engine's own limit for this console stays for the
+ * readers.
+ */
+const REFUSALS_MAX = 10;
+const REFUSALS_WINDOW_MS = 60 * 1000;
+/** The most addresses counted at once. The oldest go first. */
+const ADDRESSES_MAX = 10_000;
+const refusals = new Map<string, { count: number; resetAt: number }>();
+
+function refusedTooOften(address: string, now = Date.now()): boolean {
+	const bucket = refusals.get(address);
+	return !!bucket && bucket.resetAt > now && bucket.count >= REFUSALS_MAX;
+}
+
+function countRefusal(address: string, now = Date.now()): void {
+	const bucket = refusals.get(address);
+	if (bucket && bucket.resetAt > now) {
+		bucket.count++;
+		return;
+	}
+	refusals.delete(address);
+	for (const [old, entry] of refusals) {
+		if (entry.resetAt > now && refusals.size < ADDRESSES_MAX) break;
+		refusals.delete(old);
+	}
+	refusals.set(address, { count: 1, resetAt: now + REFUSALS_WINDOW_MS });
+}
+
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /** Forgets every trade, for a test that needs a fresh process. */
 export function resetSessionRefresh(): void {
 	running.clear();
 	kept.clear();
+	refusals.clear();
 }
 
 /**
@@ -128,10 +162,10 @@ function keep(key: string, session: string, result: Trade): void {
 
 /**
  * The answer for this refresh token: a kept one or the trade already running,
- * when it was started with the same session cookie, or else a new trade. A new
- * trade counts against the caller's address, and one over the limit is
- * answered as an outage, so the cookies stay. An outage is not kept, so the
- * next request asks again.
+ * when it was started with the same session cookie, or else a new trade. An
+ * address the engine has refused too often in the last minute is not let
+ * through to it, and the answer reads as an outage, so the cookies stay. An
+ * outage is not kept, so the next request asks again.
  */
 export function tradeOnce(
 	refresh: string,
@@ -145,10 +179,11 @@ export function tradeOnce(
 	if (hit && mark === hit.session && hit.until > Date.now()) return Promise.resolve(hit.trade);
 	const inFlight = running.get(key);
 	if (inFlight && mark === inFlight.session) return inFlight.trade;
-	if (!checkRateLimit(`refresh:${address}`).allowed) return Promise.resolve({ kind: 'unavailable' });
+	if (refusedTooOften(address)) return Promise.resolve({ kind: 'unavailable' });
 
 	const started = trade(refresh, fetch).then((result) => {
 		if (running.get(key)?.trade === started) running.delete(key);
+		if (result.kind === 'refused') countRefusal(address);
 		if (result.kind !== 'unavailable' && mark) keep(key, mark, result);
 		return result;
 	});
@@ -157,7 +192,7 @@ export function tradeOnce(
 }
 
 /** Where a request whose session ended goes, so the reader comes back to the same page. */
-function endedTarget(url: URL, method: string): string {
+export function sessionEndedTarget(url: URL, method: string): string {
 	// A form action's address names the action. Sending the reader back there
 	// after sign-in would show the page, not repeat the write, so only the
 	// path goes along.
@@ -182,7 +217,7 @@ export async function refreshSession(event: RequestEvent): Promise<void> {
 		return;
 	}
 
-	const result = await tradeOnce(refresh, current, event.getClientAddress(), event.fetch);
+	const result = await tradeOnce(refresh, current, clientAddressOf(event), event.fetch);
 	if (result.kind === 'unavailable') return;
 	if (result.kind === 'renewed') {
 		// A session cookie written by a later sign-in for another account wins
@@ -198,6 +233,6 @@ export async function refreshSession(event: RequestEvent): Promise<void> {
 	clearSessionCookie(event);
 	clearRefreshCookie(event);
 	if (event.url.pathname === '/admin' || event.url.pathname.startsWith('/admin/')) {
-		redirect(303, endedTarget(event.url, event.request.method));
+		redirect(303, sessionEndedTarget(event.url, event.request.method));
 	}
 }
