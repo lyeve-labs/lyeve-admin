@@ -28,6 +28,9 @@ const TENANT = {
 	updated_at: '2026-01-01T00:00:00Z',
 };
 
+/** The license the instance holds, read by the page itself. */
+const LICENSE = { plan: 'example', state: 'active', features: ['search', 'flow'], tenant_quota: 0 };
+
 type Call = { url: string; query: string; method: string; body: unknown };
 
 /** An event whose fetch answers by route and records every call. */
@@ -38,7 +41,8 @@ function event(routes: Record<string, unknown>, form?: FormData) {
 		const asked = new URL(String(url), 'http://localhost');
 		const path = asked.pathname;
 		calls.push({ url: path, query: asked.search, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-		const hit = routes[`${method} ${path}`];
+		const answers: Record<string, unknown> = { 'GET /api/admin/entitlements': LICENSE, ...routes };
+		const hit = answers[`${method} ${path}`];
 		if (hit === undefined) return json({ error: 'not found' }, 404);
 		if (hit instanceof Response) return hit;
 		return json(hit);
@@ -51,7 +55,9 @@ function event(routes: Record<string, unknown>, form?: FormData) {
 			params: { id: 't1' },
 			url: new URL('http://localhost/admin/tenants/t1'),
 			request: form ? new Request('http://localhost', { method: 'POST', body: form }) : undefined,
-			parent: async () => ({ user: { roles: ['super_admin'] }, entitlements: { features: ['search', 'flow'] } }),
+			// The shell's entitlements are its failed read, so nothing here may
+			// take the license from them.
+			parent: async () => ({ user: { roles: ['super_admin'] }, entitlements: { plan: '', state: '', features: [], tenant_quota: 0 } }),
 		} as never,
 	};
 }
@@ -97,6 +103,17 @@ describe('admin/tenants/[id] load', () => {
 
 		const refused = event({ 'GET /api/admin/tenants/t1': json({ error: 'forbidden' }, 403) });
 		await expect(load(refused.event)).rejects.toMatchObject({ status: 403 });
+	});
+
+	it('keeps a license that could not be read as its gate, never as nothing to offer', async () => {
+		const { event: ev } = event({
+			'GET /api/admin/tenants/t1': TENANT,
+			'GET /api/admin/entitlements': json({ error: 'database unavailable' }, 503),
+			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: [], known: ['flow'] },
+			'GET /api/admin/tenant-members/acme': { members: [], total: 0 },
+		});
+		const data = (await load(ev)) as Exclude<Awaited<ReturnType<typeof load>>, void>;
+		expect(data.choices).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 
 	it('keeps an outage on the members read apart from a tenant with no members', async () => {

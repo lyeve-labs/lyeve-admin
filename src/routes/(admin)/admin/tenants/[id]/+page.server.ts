@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
-import { archiveTenant, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
+import { archiveTenant, getEntitlements, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
@@ -27,7 +27,7 @@ import {
 } from '$lib/api/tenant-access';
 
 export const load: PageServerLoad = async (event) => {
-	const { user, entitlements } = await event.parent();
+	const { user } = await event.parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 
@@ -42,22 +42,27 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, MEMBERS_LIMIT, MEMBERS_MAX);
 
 	// Each half is read on its own: a members list that fails is no reason to
-	// hide what the tenant may use, and the reverse.
-	const [features, members] = await Promise.all([
+	// hide what the tenant may use, and the reverse. The license is read here
+	// rather than taken from the shell, which reads a failed read as a license
+	// with nothing in it, and an empty list here would offer only what is
+	// already withheld.
+	const [features, license, members] = await Promise.all([
 		section(getTenantFeatures(client, tenant.slug), "This tenant's features could not be read."),
+		section(getEntitlements(client), 'The license could not be read, so what this tenant may use cannot be offered.'),
 		section(
 			listTenantMembers(client, tenant.slug, limit, offset),
 			"This tenant's members could not be read. This is not a report that it has none.",
 		),
 	]);
 
-	// The entitlements the layout read are the signed-in super admin's, whose
-	// tenant is not this one, so only `features` is read from them: the
-	// license, which is the same for every tenant.
-	const licensed = entitlements?.features ?? [];
-	const choices: Section<FeatureChoice[]> = features.ok
-		? { ok: true, value: featureChoices(features.value.known, licensed, features.value.withheld) }
-		: features;
+	// The entitlements are the signed-in super admin's, whose tenant is not
+	// this one, so only `features` is read from them: the license, which is
+	// the same for every tenant.
+	const choices: Section<FeatureChoice[]> = !features.ok
+		? features
+		: !license.ok
+			? license
+			: { ok: true, value: featureChoices(features.value.known, license.value.features ?? [], features.value.withheld) };
 	if (members.ok) {
 		const back = pastEndOffset(members.value.members?.length ?? 0, limit, offset, members.value.total ?? null);
 		if (back !== null) redirect(307, withOffset(event.url, back));

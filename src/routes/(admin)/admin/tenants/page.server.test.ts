@@ -264,9 +264,18 @@ describe('admin/tenants load provisioning', () => {
 		expect((await run(eventFor(() => json({ enabled: false })))).canProvision).toBe(false);
 	});
 
-	it('reads a plugin without the route, or a failed read, as not enabled', async () => {
-		expect((await run(eventFor(() => json({ error: 'not found' }, 404))))).toMatchObject({ canProvision: false, total: 1 });
-		expect((await run(eventFor(() => json({ error: 'unavailable' }, 503))))).toMatchObject({ canProvision: false, total: 1 });
+	it('reads a plugin without the route, or a refusal, as not enabled', async () => {
+		expect(await run(eventFor(() => json({ error: 'not found' }, 404)))).toMatchObject({ canProvision: false, provisionGate: null, total: 1 });
+		expect(await run(eventFor(() => json({ error: 'payment_required' }, 402)))).toMatchObject({ canProvision: false, provisionGate: null });
+	});
+
+	// An outage says nothing about the license, so it is never drawn as
+	// creating not being enabled.
+	it('keeps a provisioning read that did not answer as its gate', async () => {
+		const result = await run(eventFor(() => json({ error: 'unavailable' }, 503)));
+		expect(result).toMatchObject({ canProvision: false, provisionGate: { state: 'unavailable' }, total: 1 });
+		const busy = await run(eventFor(() => json({ error: 'slow down' }, 429)));
+		expect(busy.provisionGate).toEqual({ state: 'busy' });
 	});
 });
 

@@ -190,3 +190,19 @@ describe('the tenant drawer and the failures of other actions', () => {
 		expect(outside).not.toContain('Failed to create tenant');
 	});
 });
+
+/*
+ * A provisioning read that did not answer says nothing about the license, so
+ * the page never draws the not-enabled card for it.
+ */
+describe('Tenants when provisioning could not be read', () => {
+	it('says it could not tell, offers no create and makes no licensing claim', () => {
+		const { container, queryByTestId, queryByRole } = render(TenantsPage, {
+			props: props({ canProvision: false, provisionGate: { state: 'unavailable' } }),
+		});
+		expect(container.textContent).toContain('so Tenant provisioning could not be read');
+		expect(queryByTestId('not-enabled')).toBeNull();
+		expect(queryByRole('button', { name: /new tenant/i })).toBeNull();
+		expect(container.textContent).toContain('tenant-0');
+	});
+});

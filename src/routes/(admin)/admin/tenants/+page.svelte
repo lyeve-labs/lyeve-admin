@@ -150,7 +150,13 @@
 
 	<FormErrors message={(pageForm as Failure)?.error || undefined} />
 
-	{#if data.tenants.ok && !canProvision}
+	{#if data.tenants.ok && data.provisionGate}
+		<GateNotice
+			gate={data.provisionGate}
+			title="Tenant provisioning"
+			absent="This instance does not say whether it may create tenants."
+		/>
+	{:else if data.tenants.ok && !canProvision}
 		<NotEnabled
 			title="Tenant provisioning"
 			description="Creating a tenant from this page. The tenants below can still be edited, disabled and deleted."
