@@ -16,7 +16,7 @@ vi.mock('@lyeve-labs/client-rest', () => rest);
 
 import { ApiError } from '@lyeve-labs/client';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
-import { load } from './+page.server';
+import { actions, load } from './+page.server';
 
 /**
  * The load's own return type is widened by the framework to include void, so
@@ -281,3 +281,53 @@ describe('content listing names linked entries', () => {
 		expect(fetch).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('deleting an entry', () => {
+	function json(body: unknown, status: number): Response {
+		return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+	}
+
+	function deleteEvent(answer: () => Promise<Response>, id = 'e/1') {
+		const calls: { method: string; path: string }[] = [];
+		const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+			calls.push({ method: init?.method ?? 'GET', path });
+			return answer();
+		}) as unknown as typeof globalThis.fetch;
+		const fd = new FormData();
+		fd.set('id', id);
+		const event = {
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok', '__Host-csrf': 'csrf' }),
+			params: { schema: 'posts' },
+			request: { formData: async () => fd },
+		} as never;
+		return { event, calls };
+	}
+
+	it('deletes the entry it names, with the id encoded', async () => {
+		const { event, calls } = deleteEvent(async () => new Response(null, { status: 204 }));
+		const out = await actions.delete(event);
+		expect(out).toEqual({ ok: true });
+		expect(calls).toEqual([{ method: 'DELETE', path: '/api/admin/content/e%2F1' }]);
+	});
+
+	it('relays the reason the plugin refused', async () => {
+		const { event } = deleteEvent(async () => json({ error: 'entry is referenced by another entry' }, 409));
+		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('entry is referenced by another entry');
+	});
+
+	it('relays the role refusal the engine sends', async () => {
+		const { event } = deleteEvent(async () => json({ error: 'insufficient permissions' }, 403));
+		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
+		expect(out.data.error).toBe('insufficient permissions');
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		const { event } = deleteEvent(async () => json({ error: 'pq: connection refused' }, 503));
+		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
+		expect(out.data.error).toBe('Failed to delete entry');
+	});
+});
+
