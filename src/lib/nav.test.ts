@@ -94,10 +94,11 @@ describe('adminNav role gate', () => {
 		// An admin issues admin tokens of their own. The rest of Access (users,
 		// keys, identity providers) stays the super admin's.
 		expect(ids(find(tree, 'access').children ?? [])).toEqual(['admin-tokens']);
-		// Plugins, AI and Tenant costs are the operations entries an
+		// Plugins, AI, quotas and tenant costs are the operations entries an
 		// admin may reach: the AI switch, prompts and transcripts are the
-		// tenant's own, and the cost ledger reads the caller's tenant.
-		expect(ids(find(tree, 'operations').children ?? [])).toEqual(['plugins', 'ai', 'tenant-costs']);
+		// tenant's own, and the quota reads and the cost ledger read the
+		// caller's tenant.
+		expect(ids(find(tree, 'operations').children ?? [])).toEqual(['plugins', 'ai', 'tenant-usage', 'tenant-costs']);
 		// Customizing the tenant's admin, its captcha and its own rate limits
 		// are the tenant admin's, so they are the settings entries an admin
 		// reaches.

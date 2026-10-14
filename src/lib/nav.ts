@@ -427,21 +427,18 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 						icon: Building2,
 						match: 'exact' as const,
 					},
-					// Quotas cover every tenant, so the page refuses anybody but a
-					// super admin. The row follows the page rather than sitting
-					// beside tenant costs, which an admin may read.
+			  ]
+			: []),
+		// The quota reads and the cost ledger both answer an admin with the
+		// caller's own tenant, and a super admin with every tenant.
+		...(operator
+			? [
 					{
 						id: 'tenant-usage',
 						label: 'Quotas and usage',
 						href: '/admin/tenants/usage',
 						icon: Gauge,
 					},
-			  ]
-			: []),
-		// The cost ledger reads the caller's own tenant, and its routes take an
-		// admin as well as a super admin.
-		...(operator
-			? [
 					{
 						id: 'tenant-costs',
 						label: 'Tenant costs',
