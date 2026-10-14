@@ -247,7 +247,7 @@ describe('admin/flows create action', () => {
 		const form = new FormData();
 		form.set('name', 'Orders');
 		form.set('slug', 'orders');
-		const { event } = actionEvent({ '/api/admin/flows': () => json({ error: 'failed to create flow' }, 409) }, form);
+		const { event } = actionEvent({ '/api/admin/flows': () => json({ error: 'failed to create flow', code: 'conflict' }, 409) }, form);
 		const result = (await actions.create(event)) as { status: number; data: { action: string; error: string; field: string } };
 		expect(result.status).toBe(409);
 		expect(result.data).toEqual({ action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' });

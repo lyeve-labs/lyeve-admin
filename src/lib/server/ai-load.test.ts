@@ -33,9 +33,19 @@ describe('aiGate', () => {
 });
 
 describe('aiActionError', () => {
-	it('says the budget is spent when the 402 carries the budget sentence', () => {
-		const budget = new ApiError(402, 'ai budget exhausted for this billing period', { error: 'ai budget exhausted for this billing period' });
+	it('names the lowest role the route admits on a role refusal', () => {
+		const refused = new ApiError(403, 'insufficient permissions', { error: 'insufficient permissions', code: 'forbidden' });
+		expect(aiActionError(refused, 'f')).toBe('Your role cannot change this. Ask an admin if you need it.');
+		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Your role cannot change this. Ask a super admin if you need it.');
+	});
+
+	it('says the budget is spent only when the 402 names the budget', () => {
+		const budget = new ApiError(402, 'ai budget exhausted for this billing period', { error: 'ai budget exhausted for this billing period', code: 'http_402' });
 		expect(aiActionError(budget, 'f')).toBe(AI_BUDGET_TEXT);
+		const other = new ApiError(402, 'this request needs a paid plan', { error: 'this request needs a paid plan', code: 'http_402' });
+		expect(aiActionError(other, 'f')).toBe('AI is not enabled on this instance.');
+		const ceiling = new ApiError(402, 'cap_exceeded', { error: 'cap_exceeded', cap: 'ai.providers', limit: 2, current: 2, upgrade_url: '' });
+		expect(aiActionError(ceiling, 'f')).toBe('AI is not enabled on this instance.');
 		const license = new ApiError(402, 'payment_required', { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' });
 		expect(aiActionError(license, 'f')).toBe('AI is not enabled on this instance.');
 	});

@@ -57,21 +57,30 @@ export const AI_BUDGET_TEXT =
 
 /**
  * Whether a 402 is the spent budget rather than the license. The plugin
- * answers both with 402. The license refusal carries the code
- * payment_required and the budget refusal a sentence of its own, so a body
- * whose error is any other text is the budget. A 402 with no readable body
- * stays the license, the state it always meant.
+ * answers both with 402. The budget refusal is the one sentence that names
+ * the budget ("ai budget exhausted for this billing period"), so that word
+ * decides. Every other 402, a ceiling included, is read as the license, the
+ * state a 402 always meant here.
  */
 export function aiBudgetSpent(err: unknown): boolean {
 	if (!(err instanceof ApiError) || err.status !== 402) return false;
-	const code = (err.body as { error?: unknown } | null | undefined)?.error;
-	return typeof code === 'string' && code !== '' && code !== 'payment_required' && code !== 'cap_exceeded';
+	const said = (err.body as { error?: unknown } | null | undefined)?.error;
+	return typeof said === 'string' && /\bbudget\b/i.test(said);
 }
 
-const ROLE_TEXT = 'Your role cannot change this. Ask a super admin if you need it.';
+/** The lowest role a refused route admits, which is who the reader can ask. */
+export type AiWriteRole = 'admin' | 'super_admin';
 
-/** Words for a refused write, by status. The static fallback for the rest. */
-export function aiActionError(err: unknown, fallback: string): string {
+const ROLE_TEXT: Record<AiWriteRole, string> = {
+	admin: 'Your role cannot change this. Ask an admin if you need it.',
+	super_admin: 'Your role cannot change this. Ask a super admin if you need it.',
+};
+
+/**
+ * Words for a refused write, by status. The static fallback for the rest.
+ * `lowest` is the lowest role the route admits, which a role refusal names.
+ */
+export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRole = 'admin'): string {
 	if (err instanceof ApiError) {
 		if (aiBudgetSpent(err)) return AI_BUDGET_TEXT;
 		if (err.status === 402) return 'AI is not enabled on this instance.';
@@ -79,7 +88,7 @@ export function aiActionError(err: unknown, fallback: string): string {
 			// The engine's role gate answers a bare "insufficient permissions".
 			// The plugin's own 403 is a sentence about the tenant, worth relaying.
 			const msg = err.message?.trim();
-			if (!msg || msg === 'insufficient permissions' || msg === '403') return ROLE_TEXT;
+			if (!msg || msg === 'insufficient permissions' || msg === '403') return ROLE_TEXT[lowest];
 			return msg;
 		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';

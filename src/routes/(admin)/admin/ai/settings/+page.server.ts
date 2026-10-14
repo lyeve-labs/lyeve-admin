@@ -98,7 +98,7 @@ export const actions: Actions = {
 			// refused list, with no error field to relay.
 			const whole = err instanceof ApiError && err.status === 409 ? refusalOf(err.body) : null;
 			if (whole) return fail(409, { scope: 'config', key, error: whole });
-			if (err instanceof ApiError) return fail(err.status, { scope: 'config', key, error: aiActionError(err, 'Could not save the setting') });
+			if (err instanceof ApiError) return fail(err.status, { scope: 'config', key, error: aiActionError(err, 'Could not save the setting', 'super_admin') });
 			return fail(500, { scope: 'config', key, error: 'Could not save the setting' });
 		}
 	},
