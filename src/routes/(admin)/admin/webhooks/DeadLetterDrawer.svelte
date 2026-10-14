@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { Badge, Button, Drawer, EmptyState, Pagination, Table } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, Pagination, Table, confirm } from '@lyeve-labs/ui-kit';
 	import type { DeadLetter } from '@lyeve-labs/client';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { RotateCcw, Skull, Trash2, XCircle } from '@lucide/svelte';
@@ -70,6 +71,27 @@
 			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: { text: 'Dismissed', done: true } };
 		}
 	});
+
+	/** Deleting drops the delivery for good, so it asks first and names it. */
+	function deletePermanently(dl: DeadLetter): SubmitFunction {
+		return async ({ cancel }) => {
+			const ok = await confirm(
+				`Delete the dead letter from ${dl.webhook_name}`,
+				`The ${dl.event_type} delivery that died ${formatDateTime(dl.dead_at)} is removed for good and cannot be replayed.`,
+				{ confirmLabel: 'Delete' },
+			);
+			if (!ok) {
+				cancel();
+				return;
+			}
+			return async ({ result, update }) => {
+				if (result.type === 'success') {
+					deadLetterItems = deadLetterItems.filter((x) => x.id !== dl.id);
+				}
+				await update({ reset: false });
+			};
+		};
+	}
 
 	// A page of the queue is another read of the same action, posted from the
 	// hidden form below with the offset it names.
@@ -166,17 +188,7 @@
 													<XCircle class="h-3.5 w-3.5" />
 												</Button>
 											</form>
-											<form
-												method="POST"
-												action="?/dead-letter-delete"
-												use:enhance={() =>
-													async ({ result, update }) => {
-														if (result.type === 'success') {
-															deadLetterItems = deadLetterItems.filter((x) => x.id !== dl.id);
-														}
-														await update({ reset: false });
-													}}
-											>
+											<form method="POST" action="?/dead-letter-delete" use:enhance={deletePermanently(dl)}>
 												<input type="hidden" name="id" value={dl.id} />
 												<Button
 													variant="ghost"

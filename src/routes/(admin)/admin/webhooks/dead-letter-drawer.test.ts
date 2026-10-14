@@ -15,12 +15,29 @@ vi.mock('$app/forms', () => ({
 	},
 }));
 
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
+	const actual = await importOriginal<Record<string, unknown>>();
+	return { ...actual, confirm: kit.confirm };
+});
+
 import DeadLetterDrawer from './DeadLetterDrawer.svelte';
 
 afterEach(() => {
 	cleanup();
 	forms.submits.length = 0;
+	kit.confirm.mockReset();
+	kit.confirm.mockResolvedValue(true);
 });
+
+type After = (input: { result: { type: string }; update: () => Promise<void> }) => Promise<void>;
+type Submit = (input: { cancel: () => void }) => Promise<After | void>;
+
+/** The submit function enhance holds for the connected delete form. */
+function deleteSubmit(): Submit {
+	const del = forms.submits.find((f) => f.node.getAttribute('action') === '?/dead-letter-delete' && f.node.isConnected);
+	return del?.submit as Submit;
+}
 
 const entry = (id: string, status: string) => ({
 	id,
@@ -63,20 +80,30 @@ describe('the dead letter drawer', () => {
 
 	it('drops a deleted entry from the list once the delete succeeds', async () => {
 		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending'), entry('c', 'pending')] } } });
-		const del = forms.submits.find((f) => f.node.getAttribute('action') === '?/dead-letter-delete' && f.node.isConnected);
-		const submit = del?.submit as () => (input: { result: { type: string }; update: () => Promise<void> }) => Promise<void>;
-		await submit()({ result: { type: 'success' }, update: async () => {} });
+		const after = (await deleteSubmit()({ cancel: vi.fn() })) as After;
+		await after({ result: { type: 'success' }, update: async () => {} });
 		flushSync();
 		expect(dialog()?.querySelectorAll('tbody tr')).toHaveLength(1);
 	});
 
 	it('keeps an entry whose delete failed', async () => {
 		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
-		const del = forms.submits.find((f) => f.node.getAttribute('action') === '?/dead-letter-delete' && f.node.isConnected);
-		const submit = del?.submit as () => (input: { result: { type: string }; update: () => Promise<void> }) => Promise<void>;
-		await submit()({ result: { type: 'failure' }, update: async () => {} });
+		const after = (await deleteSubmit()({ cancel: vi.fn() })) as After;
+		await after({ result: { type: 'failure' }, update: async () => {} });
 		flushSync();
 		expect(dialog()?.querySelectorAll('tbody tr')).toHaveLength(1);
+	});
+
+	// One click used to delete the delivery for good with no question asked.
+	it('asks first, naming the webhook and when the delivery died, and sends nothing when declined', async () => {
+		kit.confirm.mockResolvedValue(false);
+		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		const cancel = vi.fn();
+		expect(await deleteSubmit()({ cancel })).toBeUndefined();
+		expect(cancel).toHaveBeenCalled();
+		const [title, detail] = kit.confirm.mock.calls[0] as unknown as [string, string];
+		expect(title).toBe('Delete the dead letter from Ship it');
+		expect(detail).toContain('2026');
 	});
 });
 
