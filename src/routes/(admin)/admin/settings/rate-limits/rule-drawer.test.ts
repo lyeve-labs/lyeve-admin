@@ -95,4 +95,13 @@ describe('the rule drawer', () => {
 		flushSync();
 		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The rule could not be saved.');
 	});
+
+	it('shows a failure that arrives while it is open', async () => {
+		const { component, rerender } = setup();
+		component.openCreate();
+		flushSync();
+		expect(form()?.textContent).not.toContain('The rule could not be saved.');
+		await rerender({ error: 'The rule could not be saved.', routes: [], superAdmin: true });
+		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The rule could not be saved.');
+	});
 });

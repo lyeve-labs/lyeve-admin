@@ -49,4 +49,13 @@ describe('the protection drawer', () => {
 		flushSync();
 		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The protection could not be saved.');
 	});
+
+	it('shows a failure that arrives while it is open', async () => {
+		const { component, rerender } = render(ProtectionDrawer, { props: { error: '' } });
+		component.openProtection(protection);
+		flushSync();
+		expect(form()?.textContent).not.toContain('The protection could not be saved.');
+		await rerender({ error: 'The protection could not be saved.' });
+		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The protection could not be saved.');
+	});
 });

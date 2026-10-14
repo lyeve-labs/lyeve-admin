@@ -44,4 +44,13 @@ describe('the global limit drawer', () => {
 		flushSync();
 		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The global limit could not be saved.');
 	});
+
+	it('shows a failure that arrives while it is open', async () => {
+		const { component, rerender } = render(GlobalDrawer, { props: { error: '' } });
+		component.openGlobal(null);
+		flushSync();
+		expect(form()?.textContent).not.toContain('The global limit could not be saved.');
+		await rerender({ error: 'The global limit could not be saved.' });
+		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The global limit could not be saved.');
+	});
 });
