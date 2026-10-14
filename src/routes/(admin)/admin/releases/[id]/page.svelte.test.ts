@@ -119,3 +119,28 @@ describe('confirmed release actions', () => {
 		expect(group.querySelectorAll('[role="radio"], input[type="radio"]').length).toBe(2);
 	});
 });
+
+describe('release drawers', () => {
+	it('keeps a failed delete out of the edit drawer', async () => {
+		const { getByRole, getByText, getAllByText } = setup({}, { action: 'delete', error: 'The release could not be deleted.' });
+		expect(getByText('The release could not be deleted.')).toBeTruthy();
+		await fireEvent.click(getByRole('button', { name: /Edit/ }));
+		expect(getAllByText('The release could not be deleted.')).toHaveLength(1);
+		const drawerForm = document.querySelector('form#release-edit') as HTMLFormElement;
+		expect(drawerForm.textContent).not.toContain('The release could not be deleted.');
+	});
+
+	it('shows a failed edit in the edit drawer and not in the include drawer', async () => {
+		const { getByRole } = setup({ choices: [] }, { action: 'update', error: 'name already in use' });
+		await fireEvent.click(getByRole('button', { name: /Edit/ }));
+		expect((document.querySelector('form#release-edit') as HTMLFormElement).textContent).toContain('name already in use');
+		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
+		expect((document.querySelector('form#release-add') as HTMLFormElement).textContent).not.toContain('name already in use');
+	});
+
+	it('says why the conflicts could not be checked', () => {
+		const { getByText } = setup({ conflictsRead: false, conflictsGate: { state: 'forbidden' } });
+		expect(getByText(/Your role cannot open/)).toBeTruthy();
+	});
+});
+

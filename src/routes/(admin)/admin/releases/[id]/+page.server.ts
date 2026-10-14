@@ -3,7 +3,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
-import { gateOf } from '$lib/api/gate';
+import { GATE_OK, gateOf, section, type Gate } from '$lib/api/gate';
 import { rowsOf, type ListEnvelope } from '$lib/api/list';
 import {
 	addReleaseItem,
@@ -80,6 +80,9 @@ async function entryLabel(client: HttpClient, id: string): Promise<EntryLabel | 
 	}
 }
 
+/** What the page says when the conflicts could not be read, which is never a report that there are none. */
+const CONFLICTS_FAILED = 'Conflicts could not be checked. The engine checks again before the release goes out.';
+
 export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	let release;
@@ -93,15 +96,14 @@ export const load: PageServerLoad = async (event) => {
 			gate,
 			conflicts: [] as ReleaseConflict[],
 			conflictsRead: false,
+			conflictsGate: GATE_OK as Gate,
 			labels: {} as Record<string, EntryLabel | null>,
 			choices: null as EntryChoice[] | null,
 		};
 	}
 	const items = release.items ?? [];
 	const [conflicts, named, choices] = await Promise.all([
-		releaseConflicts(client, release.id)
-			.then((c) => ({ rows: c, read: true }))
-			.catch(() => ({ rows: [] as ReleaseConflict[], read: false })),
+		section(releaseConflicts(client, release.id), CONFLICTS_FAILED),
 		Promise.all(items.slice(0, NAMED).map(async (it) => [it.entry_id, await entryLabel(client, it.entry_id)] as const)),
 		// Only a release that can still change takes entries.
 		editable(release) ? entryChoices(client, new Set(items.map((it) => it.entry_id))) : Promise.resolve(null),
@@ -109,8 +111,9 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		release,
 		gate: { state: 'ok' } as const,
-		conflicts: conflicts.rows,
-		conflictsRead: conflicts.read,
+		conflicts: conflicts.ok ? conflicts.value : [],
+		conflictsRead: conflicts.ok,
+		conflictsGate: conflicts.ok ? GATE_OK : conflicts.gate,
 		labels: Object.fromEntries(named) as Record<string, EntryLabel | null>,
 		choices,
 	};
@@ -120,12 +123,22 @@ export const load: PageServerLoad = async (event) => {
  * The failure for a schedule or a publish. A 409 carries the conflicts that
  * stopped it, which the page lists against the entries they name.
  */
-function goOutFailure(err: unknown, fallback: string) {
+function goOutFailure(action: string, err: unknown, fallback: string) {
 	const conflicts = conflictsOf(err);
 	if (conflicts) {
-		return fail(409, { error: actionError(err, fallback), conflicts });
+		return fail(409, { action, error: actionError(err, fallback), conflicts });
 	}
-	return actionFailure(err, fallback);
+	return failed(action, err, fallback);
+}
+
+/**
+ * A refused write named by its action. The edit and include drawers share
+ * one `form` result with the hidden publish, cancel, delete and remove forms,
+ * so each drawer shows only its own action's failure.
+ */
+function failed(action: string, err: unknown, fallback: string) {
+	const out = actionFailure(err, fallback);
+	return fail(out.status, { ...out.data, action });
 }
 
 
@@ -135,11 +148,11 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const description = String(form.get('description') ?? '').trim();
-		if (!name) return fail(400, { error: 'Check the highlighted fields.', fields: { name: 'Name is required' } });
+		if (!name) return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { name: 'Name is required' } });
 		try {
 			await updateRelease(authedClient(event), event.params.id, { name, description });
 		} catch (err) {
-			return actionFailure(err, 'The release could not be saved.');
+			return failed('update', err, 'The release could not be saved.');
 		}
 		return { saved: true };
 	},
@@ -149,14 +162,14 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const entryId = String(form.get('entry_id') ?? '').trim();
 		const action = String(form.get('action') ?? '');
-		if (!entryId) return fail(400, { error: 'Check the highlighted fields.', fields: { entry_id: 'Pick an entry' } });
+		if (!entryId) return fail(400, { action: 'addItem', error: 'Check the highlighted fields.', fields: { entry_id: 'Pick an entry' } });
 		if (action !== 'publish' && action !== 'unpublish') {
-			return fail(400, { error: 'An entry is either published or unpublished by the release.' });
+			return fail(400, { action: 'addItem', error: 'An entry is either published or unpublished by the release.' });
 		}
 		try {
 			await addReleaseItem(authedClient(event), event.params.id, entryId, action);
 		} catch (err) {
-			return actionFailure(err, 'The entry could not be added.');
+			return failed('addItem', err, 'The entry could not be added.');
 		}
 		return { added: entryId };
 	},
@@ -165,11 +178,11 @@ export const actions: Actions = {
 		await requireUser(event);
 		const form = await event.request.formData();
 		const entryId = String(form.get('entry_id') ?? '').trim();
-		if (!entryId) return fail(400, { error: 'No entry was named.' });
+		if (!entryId) return fail(400, { action: 'removeItem', error: 'No entry was named.' });
 		try {
 			await removeReleaseItem(authedClient(event), event.params.id, entryId);
 		} catch (err) {
-			return actionFailure(err, 'The entry could not be removed.');
+			return failed('removeItem', err, 'The entry could not be removed.');
 		}
 		return { removed: entryId };
 	},
@@ -181,12 +194,12 @@ export const actions: Actions = {
 		// does not know the operator's time zone.
 		const at = String(form.get('publish_at') ?? '').trim();
 		if (!at || Number.isNaN(Date.parse(at))) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { publish_at: 'Pick when the release goes out' } });
+			return fail(400, { action: 'schedule', error: 'Check the highlighted fields.', fields: { publish_at: 'Pick when the release goes out' } });
 		}
 		try {
 			await scheduleRelease(authedClient(event), event.params.id, new Date(at).toISOString());
 		} catch (err) {
-			return goOutFailure(err, 'The release could not be scheduled.');
+			return goOutFailure('schedule', err, 'The release could not be scheduled.');
 		}
 		return { scheduled: true };
 	},
@@ -196,7 +209,7 @@ export const actions: Actions = {
 		try {
 			await unscheduleRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return actionFailure(err, 'The schedule could not be removed.');
+			return failed('unschedule', err, 'The schedule could not be removed.');
 		}
 		return { unscheduled: true };
 	},
@@ -206,7 +219,7 @@ export const actions: Actions = {
 		try {
 			await publishRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return goOutFailure(err, 'The release could not be published.');
+			return goOutFailure('publish', err, 'The release could not be published.');
 		}
 		return { published: true };
 	},
@@ -216,7 +229,7 @@ export const actions: Actions = {
 		try {
 			await cancelRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return actionFailure(err, 'The release could not be canceled.');
+			return failed('cancel', err, 'The release could not be canceled.');
 		}
 		return { canceled: true };
 	},
@@ -226,7 +239,7 @@ export const actions: Actions = {
 		try {
 			await deleteRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return actionFailure(err, 'The release could not be deleted.');
+			return failed('delete', err, 'The release could not be deleted.');
 		}
 		redirect(303, '/admin/releases');
 	},

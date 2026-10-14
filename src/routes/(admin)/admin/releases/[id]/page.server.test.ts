@@ -105,3 +105,65 @@ describe('release actions', () => {
 		expect(engine.delete).toHaveBeenCalledWith('/api/admin/content/releases/r1/items/e1');
 	});
 });
+
+type Failure = { status: number; data: Record<string, unknown> };
+
+describe('release writes', () => {
+	it('saves the name and the description', async () => {
+		engine.put.mockResolvedValue(release);
+		expect(await actions.update(event({ name: ' Launch ', description: 'Spring' }))).toEqual({ saved: true });
+		expect(engine.put).toHaveBeenCalledWith('/api/admin/content/releases/r1', { name: 'Launch', description: 'Spring' });
+	});
+
+	// The drawers share one form result with the hidden forms, so each failure
+	// names the action that caused it.
+	it.each([
+		['update', () => actions.update(event({ name: 'Launch' })), 'put'],
+		['unschedule', () => actions.unschedule(event()), 'delete'],
+		['cancel', () => actions.cancel(event()), 'post'],
+		['delete', () => actions.delete(event()), 'delete'],
+	] as const)('names %s on a refusal and relays its reason', async (action, run, method) => {
+		engine[method].mockRejectedValue(new ApiError(409, 'the release is publishing'));
+		const out = (await run()) as Failure;
+		expect(out.data).toMatchObject({ action, error: 'the release is publishing' });
+	});
+
+	it.each([
+		['update', () => actions.update(event({ name: 'Launch' })), 'put', 'The release could not be saved.'],
+		['unschedule', () => actions.unschedule(event()), 'delete', 'The schedule could not be removed.'],
+		['cancel', () => actions.cancel(event()), 'post', 'The release could not be canceled.'],
+		['delete', () => actions.delete(event()), 'delete', 'The release could not be deleted.'],
+	] as const)('keeps outage detail out of %s', async (action, run, method, sentence) => {
+		engine[method].mockRejectedValue(new ApiError(503, 'pq: down'));
+		expect(((await run()) as Failure).data).toMatchObject({ action, error: sentence });
+	});
+
+	it('relays the role refusal the engine sends', async () => {
+		engine.post.mockRejectedValue(new ApiError(403, 'insufficient permissions'));
+		expect(((await actions.cancel(event())) as Failure).data).toMatchObject({ action: 'cancel', error: 'insufficient permissions' });
+	});
+
+	it('unschedules, cancels and deletes the release it names', async () => {
+		engine.delete.mockResolvedValue(release);
+		engine.post.mockResolvedValue(release);
+		expect(await actions.unschedule(event())).toEqual({ unscheduled: true });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/content/releases/r1/schedule');
+		expect(await actions.cancel(event())).toEqual({ canceled: true });
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/content/releases/r1/cancel', {});
+		await expect(actions.delete(event())).rejects.toMatchObject({ status: 303, location: '/admin/releases' });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/content/releases/r1');
+	});
+
+	it('keeps a refused conflict read as its gate, never as no conflicts', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.endsWith('/conflicts')) throw new ApiError(403, 'forbidden');
+			if (url === '/api/admin/content/e1') return { title: 'Hello', schema: 'posts', status: 'draft' };
+			if (url.startsWith('/api/admin/content?')) return { data: [] };
+			return release;
+		});
+		const out = (await load(event())) as Record<string, unknown>;
+		expect(out.conflictsRead).toBe(false);
+		expect(out.conflictsGate).toEqual({ state: 'forbidden' });
+	});
+});
+
