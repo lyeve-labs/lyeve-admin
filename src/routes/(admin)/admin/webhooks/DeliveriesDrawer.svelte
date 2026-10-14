@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge, Button, Drawer, EmptyState, Table } from '@lyeve-labs/ui-kit';
 	import type { WebhookDelivery } from '@lyeve-labs/client';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { CheckCircle, XCircle, History, RotateCcw } from '@lucide/svelte';
 	import { formatDateTime } from '$lib/format';
@@ -16,9 +17,14 @@
 
 	let { form, history }: Props = $props();
 
+	// Two rows asked in quick succession can answer out of order. A history
+	// applies only to the webhook the drawer names last, or its rows would show
+	// under another webhook's name and each retry would post that webhook's id.
+	// The name is read untracked, so naming a row never replays an old result.
 	$effect(() => {
 		if (form && 'deliveries' in form && form.deliveries) {
 			const d = form.deliveries as { id: string; items: WebhookDelivery[] };
+			if (d.id !== untrack(() => history.webhookId)) return;
 			history.items = d.items ?? [];
 			history.open = true;
 		}
@@ -26,10 +32,12 @@
 
 	let retryResults = $state<Record<string, { success: boolean; message: string }>>({});
 
+	// The map is read untracked: an effect that tracks the map it rewrites
+	// reruns on its own write until Svelte stops it.
 	$effect(() => {
 		if (form && 'retryResult' in form && form.retryResult) {
 			const r = form.retryResult as { delivery_id: string; success: boolean; message: string };
-			retryResults = { ...retryResults, [r.delivery_id]: { success: r.success, message: r.message } };
+			retryResults = { ...untrack(() => retryResults), [r.delivery_id]: { success: r.success, message: r.message } };
 		}
 	});
 </script>
@@ -107,7 +115,11 @@
 												<RotateCcw class="h-3.5 w-3.5" />
 											</Button>
 										</form>
-									{:else if retryResults[d.id]}
+									{/if}
+									<!-- The plugin answers a retry under the failed delivery's own id,
+									     so the result shows under that row's button, which stays for
+									     another try. -->
+									{#if retryResults[d.id]}
 										{@const rr = retryResults[d.id]}
 										<span class="text-xs {rr.success ? 'text-success' : 'text-danger'}">
 											{rr.message.slice(0, 30)}

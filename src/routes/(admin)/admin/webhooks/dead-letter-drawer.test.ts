@@ -79,3 +79,22 @@ describe('the dead letter drawer', () => {
 		expect(dialog()?.querySelectorAll('tbody tr')).toHaveLength(1);
 	});
 });
+
+/*
+ * Replay and dismiss results land in one map keyed by entry. An effect that
+ * tracked the map it rewrote reran on its own write until Svelte threw.
+ */
+describe('the result of a replay or a dismissal', () => {
+	it('settles, shows in place of the entry\'s actions, and keeps the earlier result', async () => {
+		const queue = { deadLetters: [entry('a', 'pending'), entry('c', 'pending')] };
+		const { rerender } = render(DeadLetterDrawer, { props: { form: queue } });
+		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'delivered' } } });
+		const rows = () => [...(dialog()?.querySelectorAll('tbody tr') ?? [])];
+		expect(rows()[0].textContent).toContain('Replayed with status delivered');
+		expect(rows()[0].querySelector('form')).toBeNull();
+		await rerender({ form: { deadLetterDismiss: { id: 'c', status: 'dismissed' } } });
+		expect(rows()[1].textContent).toContain('Dismissed');
+		expect(rows()[1].querySelector('form')).toBeNull();
+		expect(rows()[0].textContent).toContain('Replayed with status delivered');
+	});
+});
