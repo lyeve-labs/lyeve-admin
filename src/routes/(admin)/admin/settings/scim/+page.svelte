@@ -53,7 +53,6 @@
 		return actions.includes(failure.action ?? '') ? failure.error : undefined;
 	}
 	const rowError = $derived(failure?.error && failure.action !== 'create' && failure.action !== 'rotate' ? failure.error : '');
-	const deprovisioning = $derived(data.providers.filter((p) => p.deprovision_on_delete).length);
 
 	// An admin may read the connections. Every write is the super admin's, so an
 	// admin is shown the list and no control that would only be refused.
@@ -165,7 +164,6 @@
 
 		<div class="grid gap-4 sm:grid-cols-2">
 			<Stat size="sm" mono label="Connections" value={data.providers.length} />
-			<Stat size="sm" mono label="Deprovisioning accounts" value={deprovisioning} />
 		</div>
 
 		<section class="flex flex-col gap-4">

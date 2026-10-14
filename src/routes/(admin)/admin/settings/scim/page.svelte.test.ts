@@ -114,6 +114,16 @@ describe('the rows', () => {
 		expect(said(container)).not.toContain('Left alone');
 	});
 
+	// Every connection acts on a directory delete, whatever its switch says, so
+	// a count of the connections whose switch is on would read as a count of
+	// the ones that act.
+	it('counts no connections by their removal switch', () => {
+		const { container } = render(ScimPage, {
+			props: props({ providers: [provider({ deprovision_on_delete: false })] }),
+		});
+		expect(said(container)).not.toContain('Deprovisioning accounts');
+	});
+
 	it('counts connections in the pager, the word the page uses for them', () => {
 		const { container } = render(ScimPage, { props: props() });
 		expect(said(container)).toContain('connections 1 to 1 of 1');
