@@ -276,7 +276,9 @@
 							<td class="text-xs text-muted">{m.home ? 'Home tenant' : 'Membership'}</td>
 							<td>
 								<div class="flex items-center justify-end gap-2">
-									{#if superHome(m)}
+									{#if lostSuperAdmin.includes(m)}
+										<span class="text-xs text-muted">Neither this page nor the Users page changes this home membership.</span>
+									{:else if superHome(m)}
 										<span class="text-xs text-muted">A super admin's home roles are managed on the Users page.</span>
 									{/if}
 									<Button

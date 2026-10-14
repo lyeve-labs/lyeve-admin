@@ -169,6 +169,18 @@ describe('the home row of a super admin', () => {
 		expect(edit('lost@example.com').disabled).toBe(true);
 	});
 
+	// The warning says no page changes that membership, so the row must not
+	// send the reader to the Users page for it.
+	it('does not send the reader to the Users page for a home row that lost super admin', () => {
+		const { container } = render(TenantPage, {
+			props: props({ members: { ok: true, value: [lost] }, homeSuperAdmins: ['u3'] }),
+		});
+		const row = edit('lost@example.com').closest('tr') as HTMLElement;
+		expect(row.textContent).not.toContain('managed on the Users page');
+		expect(row.textContent).toContain('Neither this page nor the Users page changes this home membership.');
+		expect(container.textContent).not.toContain('managed on the Users page');
+	});
+
 	it('leaves any other account editable, and posts no role it was not given', async () => {
 		const { container } = render(TenantPage, { props: props() });
 		expect(container.textContent).not.toContain('signs in here without super admin');
