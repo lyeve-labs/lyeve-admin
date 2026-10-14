@@ -66,6 +66,26 @@ describe('GateNotice for a role the engine refused', () => {
 	});
 });
 
+describe('GateNotice with a heading-only title', () => {
+	const named = (gate: Gate) =>
+		render(GateNotice, { props: { gate, title: 'The schema list', subject: 'the schema list', absent: ABSENT } });
+
+	it('names the subject in lower case inside the role refusal', () => {
+		const { container } = named({ state: 'forbidden' });
+		expect(container.textContent?.trim()).toBe('Your role cannot open the schema list. Ask a super admin if you need it.');
+	});
+
+	it('names the subject in lower case inside the outage sentence', () => {
+		const { container } = named({ state: 'unavailable' });
+		expect(container.textContent).toContain('did not answer, so the schema list could not be read.');
+	});
+
+	it('keeps the title as the heading', () => {
+		const { container } = named({ state: 'full', limit: 3, current: 3, upgradeUrl: '' });
+		expect(container.textContent).toContain('The schema list is at its limit');
+	});
+});
+
 describe('GateNotice for a read nothing answered', () => {
 	it('says it is temporary, names what could not be read and that nothing changed', () => {
 		const { container } = mount({ state: 'unavailable' });

@@ -51,6 +51,13 @@ describe('Search page results panel', () => {
 		expect(queryByText('No results for "cats".')).toBeNull();
 	});
 
+	it('names the schemas in lower case inside the role refusal', () => {
+		const { container } = render(SearchPage, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'forbidden' } } }) as never, form: null },
+		});
+		expect(container.textContent).toContain('Your role cannot open the schemas.');
+	});
+
 	it('still reports an empty result set when the search succeeded', () => {
 		const { getByText, queryByText } = render(SearchPage, {
 			props: { data: data() as never, form: null },

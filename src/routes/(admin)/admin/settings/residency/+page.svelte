@@ -155,6 +155,7 @@
 				<GateNotice
 					gate={data.reportGate}
 					title="The residency report"
+					subject="the residency report"
 					absent="This instance serves no residency report, so it cannot say where tenants are."
 				/>
 			{:else if summary}

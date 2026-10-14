@@ -15,12 +15,18 @@
 	let {
 		gate,
 		title,
+		subject = title,
 		absent,
 		level = 3,
 	}: {
 		gate: Gate;
 		/** The feature's name. */
 		title: string;
+		/**
+		 * The name inside a sentence, for a title that reads right only as a
+		 * heading ("The schema list"). The title by default.
+		 */
+		subject?: string;
 		/** What the page says when the route is not there. */
 		absent: string;
 		/**
@@ -53,7 +59,7 @@
 	<Alert tone="warn" title="{title} is at its limit">{fullText(gate)}</Alert>
 {:else if gate.state === 'forbidden'}
 	<!-- Trying again cannot change a role, so this one offers nothing to press. -->
-	<Alert tone="warn">{forbiddenText(title)}</Alert>
+	<Alert tone="warn">{forbiddenText(subject)}</Alert>
 {:else if gate.state === 'busy'}
 	<Alert tone="warn" title={BUSY.title}>
 		<p>{BUSY.body}</p>
@@ -63,7 +69,7 @@
 	<!-- The page around this notice rendered, so unlike the full-page outage it
 	     names only the part that could not be read. -->
 	<Alert tone="warn" title={OUTAGE.title}>
-		<p>The engine or its database did not answer, so {title} could not be read. Nothing was changed. Try again in a moment.</p>
+		<p>The engine or its database did not answer, so {subject} could not be read. Nothing was changed. Try again in a moment.</p>
 		{@render retry()}
 	</Alert>
 {:else if gate.state === 'error'}

@@ -108,7 +108,7 @@ describe('the report', () => {
 			props: props({ report: null, reportGate: { state: 'forbidden' } }),
 		});
 		const text = said(container);
-		expect(text).toContain('The residency report');
+		expect(text).toContain('Your role cannot open the residency report.');
 		expect(text).not.toContain('did not answer');
 		expect(text).not.toContain('Nothing to report yet');
 	});

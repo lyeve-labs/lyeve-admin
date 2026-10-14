@@ -180,7 +180,7 @@ describe('plugin detail page', () => {
 
 	it('tells a reader the engine refuses the status to that it is not theirs', () => {
 		const { container } = renderPage(null, { roles: ['editor'], statusGate: { state: 'forbidden' } });
-		expect(container.textContent).toContain('Your role cannot open');
+		expect(container.textContent).toContain('Your role cannot open search. Ask a super admin if you need it.');
 	});
 
 	it('names the plugin by its name when nothing describes it', () => {
