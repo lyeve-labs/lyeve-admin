@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 const KEY = '0123456789abcdef0123456789abcdef';
 
@@ -97,5 +97,61 @@ describe('handleFetch', () => {
 		} as unknown as Parameters<typeof handleFetch>[0]);
 		expect(set).toHaveBeenCalledTimes(1);
 		expect(set).toHaveBeenCalledWith('__Host-csrf', 'pair', expect.objectContaining({ path: '/', secure: true }));
+	});
+});
+
+describe('handleFetch without CORE_INTERNAL_URL', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		vi.resetModules();
+	});
+
+	/** The hook as a console started with only the dev proxy's targets loads it. */
+	async function fallbackHook(): Promise<typeof handleFetch> {
+		vi.stubEnv('CORE_INTERNAL_URL', '');
+		vi.stubEnv('CORE_API_INTERNAL_URL', '');
+		vi.stubEnv('PROXY_ADMIN_TARGET', 'http://engine.local:3001');
+		vi.stubEnv('PROXY_API_TARGET', 'http://engine.local:3002');
+		vi.resetModules();
+		return (await import('./hooks.server')).handleFetch;
+	}
+
+	async function sendWith(hook: typeof handleFetch, url: string, set = vi.fn()): Promise<Request> {
+		const sent: Request[] = [];
+		const fetch = vi.fn(async (req: Request) => {
+			sent.push(req);
+			const headers = new Headers();
+			headers.append('Set-Cookie', '__Host-csrf=pair; Path=/; Max-Age=900; Secure; SameSite=Strict');
+			return new Response('{}', { status: 200, headers });
+		});
+		await hook({
+			request: new Request(url, { method: 'POST' }),
+			fetch,
+			event: {
+				url: new URL('https://admin.example.com/admin/users'),
+				getClientAddress: () => '203.0.113.9',
+				cookies: { set }
+			}
+		} as unknown as Parameters<typeof handleFetch>[0]);
+		return sent[0];
+	}
+
+	// Left inside this app, the call runs the console's own hooks with the
+	// browser's cookies, and a session renewal sent that way waits on itself.
+	it('sends an admin call to the admin listener the dev proxy names', async () => {
+		const req = await sendWith(await fallbackHook(), 'https://admin.example.com/api/admin/auth/refresh');
+		expect(req.url).toBe('http://engine.local:3001/api/admin/auth/refresh');
+		expect(req.headers.get(CONSOLE_CLIENT_HEADER)).toBe('203.0.113.9');
+	});
+
+	it('sends a content call to the content listener the dev proxy names', async () => {
+		const req = await sendWith(await fallbackHook(), 'https://admin.example.com/api/v1/auth/token');
+		expect(req.url).toBe('http://engine.local:3002/api/v1/auth/token');
+	});
+
+	it('still passes the engine\'s CSRF cookie on to the browser', async () => {
+		const set = vi.fn();
+		await sendWith(await fallbackHook(), 'https://admin.example.com/api/admin/auth/login', set);
+		expect(set).toHaveBeenCalledWith('__Host-csrf', 'pair', expect.objectContaining({ path: '/' }));
 	});
 });
