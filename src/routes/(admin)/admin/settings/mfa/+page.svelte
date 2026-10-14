@@ -142,7 +142,7 @@
 		<Card>
 			<form method="POST" action="?/setup" use:enhance={setup.enhance} class="flex flex-col gap-4">
 				<p class="text-fg text-sm">
-					Set up an authenticator app as well. If one is set up already, the new key replaces it once you verify a code.
+					Set up an authenticator app as well. Starting setup replaces any authenticator app already set up on this account, so finish it once you start.
 				</p>
 				<div class="flex justify-end">
 					<Button type="submit" variant="secondary" loading={setup.pending}>

@@ -29,6 +29,17 @@ describe('an account with a passkey', () => {
 	});
 });
 
+describe('setting up an app beside a passkey', () => {
+	// The engine stores the new key as soon as setup starts, so an app set up
+	// earlier stops working before any code is verified.
+	it('says before setup that starting it replaces an app already set up', () => {
+		const { container } = setup(true, null, true);
+		const text = container.querySelector('form[action="?/setup"]')?.textContent ?? '';
+		expect(text).toContain('Starting setup replaces any authenticator app already set up on this account, so finish it once you start.');
+		expect(text).not.toContain('once you verify a code');
+	});
+});
+
 describe('two-factor authentication page', () => {
 	it('offers to turn it on through the setup action', () => {
 		const { container, getByRole } = setup(false);
