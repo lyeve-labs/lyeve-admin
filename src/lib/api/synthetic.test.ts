@@ -3,6 +3,7 @@ import { ApiError } from '@lyeve-labs/client';
 import {
 	everyLabel,
 	intervalHint,
+	listOpenAlerts,
 	readProbeLimits,
 	runOutcome,
 	runProbeNow,
@@ -191,5 +192,13 @@ describe('the probe limits', () => {
 			'At least 15. A probe is this instance calling itself.',
 		);
 		expect(intervalHint(null)).toBe('A probe is this instance calling itself.');
+	});
+});
+
+describe('the open alerts', () => {
+	// The plugin answers a bare array, which the callers read as a list envelope.
+	it('reads a bare array as an envelope', async () => {
+		const alert = { id: 'a1', probe_id: 'p1' };
+		expect(await listOpenAlerts(fakeClient([alert]).client)).toEqual({ data: [alert], total_count: 1 });
 	});
 });

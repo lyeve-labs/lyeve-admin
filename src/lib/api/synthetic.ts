@@ -14,7 +14,7 @@
 import { toChannels, type AlertChannels } from './alert-channels';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
-import type { ListEnvelope } from './list';
+import { rowsOf, type ListEnvelope } from './list';
 
 export const PROBES_URL = '/api/admin/synthetic-monitoring/probes';
 export const ALERTS_URL = '/api/admin/synthetic-monitoring/alerts';
@@ -159,13 +159,12 @@ export async function listProbes(
  * Outstanding alerts. Acknowledged ones are history and are not asked for.
  * The plugin answers a bare array.
  */
-export async function listOpenAlerts(
-	client: HttpClient,
-	limit = 50,
-): Promise<ListEnvelope<ProbeAlert> | ProbeAlert[]> {
-	return client.get<ListEnvelope<ProbeAlert> | ProbeAlert[]>(
+export async function listOpenAlerts(client: HttpClient, limit = 50): Promise<ListEnvelope<ProbeAlert>> {
+	const raw = await client.get<ListEnvelope<ProbeAlert> | ProbeAlert[]>(
 		`${ALERTS_URL}?acknowledged=false&limit=${limit}&offset=0`
 	);
+	const data = rowsOf(raw);
+	return { data, total_count: Array.isArray(raw) ? data.length : (raw?.total_count ?? data.length) };
 }
 
 export interface SaveProbe {
