@@ -141,6 +141,32 @@ describe('authedClient', () => {
 	});
 });
 
+describe('authedClient extra headers', () => {
+	function capture(cookies: Record<string, string>) {
+		const fetchImpl = vi.fn(
+			async (_url: string, _init: RequestInit): Promise<Response> => jsonResponse({ ok: true })
+		) as unknown as typeof fetch;
+		const event = { cookies: { get: vi.fn((name: string) => cookies[name]) }, fetch: fetchImpl } as unknown as RequestEvent;
+		const sent = () => {
+			const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } };
+			return new Headers(mock.mock.calls[0][1].headers as Record<string, string>);
+		};
+		return { event, sent };
+	}
+
+	it('never sends a second bearer, whatever the spelling', async () => {
+		const { event, sent } = capture({ '__Host-sys_session': 'sess-tok', '__Host-csrf': 'csrf-tok' });
+		await authedClient(event, { authorization: 'Bearer other', AUTHORIZATION: 'Bearer third' }).get('/api/admin/thing');
+		expect(sent().get('authorization')).toBe('Bearer sess-tok');
+	});
+
+	it('never supplies a CSRF token the session has no cookie for', async () => {
+		const { event, sent } = capture({ '__Host-sys_session': 'sess-tok' });
+		await authedClient(event, { 'x-csrf-token': 'forged', 'X-Csrf-Token': 'forged' }).get('/api/admin/thing');
+		expect(sent().has('x-csrf-token')).toBe(false);
+	});
+});
+
 describe('assertRole', () => {
 	const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
 

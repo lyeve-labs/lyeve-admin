@@ -6,6 +6,9 @@ import { sessionToken } from '$lib/server/session-cookie';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { BUSY, OUTAGE } from '$lib/outage';
 
+/** The headers that carry the session, in lower case. Only `authedHeaders` sets them. */
+const SESSION_HEADERS = new Set(['authorization', 'x-csrf-token']);
+
 // The engine's double-submit CSRF cookie, secure name first.
 const CSRF_COOKIE = '__Host-csrf';
 const CSRF_COOKIE_INSECURE = 'csrf';
@@ -44,10 +47,14 @@ export function authedHeaders(event: RequestEvent): Record<string, string> {
  * is present.
  *
  * `extra` adds headers to every request, such as X-Tenant-ID for a super
- * admin acting in another tenant. It never replaces the session's own.
+ * admin acting in another tenant. It never sets the session's own headers.
+ * Header names are case-insensitive, so an `authorization` in `extra` would
+ * travel beside the session's bearer, and a CSRF header in `extra` would stand
+ * in for the cookie's when there is none. Both are dropped in any spelling.
  */
 export function authedClient(event: RequestEvent, extra: Record<string, string> = {}): HttpClient {
-	const headers = { ...extra, ...authedHeaders(event) };
+	const allowed = Object.entries(extra).filter(([name]) => !SESSION_HEADERS.has(name.toLowerCase()));
+	const headers = { ...Object.fromEntries(allowed), ...authedHeaders(event) };
 	return createClient((url, init) =>
 		event.fetch(url, {
 			...init,
