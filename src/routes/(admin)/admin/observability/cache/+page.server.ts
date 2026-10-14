@@ -55,6 +55,11 @@ export const load: PageServerLoad = async (event) => {
 	// serves them to a super admin only. A tenant admin's page is its own
 	// rules and the providers, and never asks for the rest.
 	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	// The plugin flushes only the request's tenant whenever the request names
+	// one. A session names its own tenant, and a tenant admin's session always
+	// resolves to one. Only a super admin with no tenant of their own can reach
+	// the whole store, and only on an install that keeps many tenants.
+	const flushScoped = Boolean(user?.tenant_id) || !superAdmin;
 
 	const client = authedClient(event);
 	let stats: CacheStats | null = null;
@@ -107,9 +112,15 @@ export const load: PageServerLoad = async (event) => {
 	// said nothing is cached beside a counter of thousands of entries.
 	let entries: { rows: CacheEntry[]; total: number | null; hasMore: boolean } = { rows: [], total: null, hasMore: false };
 	let entriesGate: Gate | null = null;
+	// A provider that cannot list what it holds answers an empty page with a
+	// note. Drawn as an empty list, it said nothing is cached beside a counter
+	// of thousands of entries.
+	let unlisted = false;
 	if (gate.state === 'ok' && superAdmin) {
 		try {
-			entries = pageOf(await listEntries(client, limit + 1, offset), limit, offset);
+			const read = await listEntries(client, limit + 1, offset);
+			unlisted = typeof read?.note === 'string' && read.note !== '';
+			entries = pageOf(read, limit, offset);
 		} catch (err) {
 			entriesGate = gateOf(err, 'The stored entries could not be read. This is not a report that nothing is cached.');
 		}
@@ -129,6 +140,8 @@ export const load: PageServerLoad = async (event) => {
 		rules,
 		entries: entries.rows,
 		entriesGate,
+		unlisted,
+		flushScoped,
 		total: entries.total,
 		limit,
 		offset,
