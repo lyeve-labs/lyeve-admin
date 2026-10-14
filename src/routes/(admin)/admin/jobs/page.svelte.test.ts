@@ -213,6 +213,15 @@ describe('a failure from one form', () => {
 		expect(form.textContent).not.toContain('Payload must be valid JSON.');
 	});
 
+	it('keeps a drawer failure off the page behind another drawer', async () => {
+		const rendered = setup();
+		await fireEvent.click(rendered.getByRole('button', { name: /New job/ }));
+		await rendered.rerender({ form: { error: 'Payload must be valid JSON.', action: 'create' } } as never);
+		await fireEvent.click(rendered.getByRole('button', { name: 'Cancel' }));
+		await fireEvent.click(rendered.getByRole('button', { name: 'Edit Nightly purge' }));
+		expect(document.body.textContent).not.toContain('Payload must be valid JSON.');
+	});
+
 	it('keeps a failed update out of the next New job drawer', async () => {
 		const rendered = setup();
 		await fireEvent.click(rendered.getByRole('button', { name: 'Edit Nightly purge' }));

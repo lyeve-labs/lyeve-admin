@@ -151,7 +151,7 @@
 		{/if}
 	{/snippet}
 
-	{#if !open || !drawerFailed}
+	{#if !(form && 'action' in form && (form.action === 'create' || form.action === 'update'))}
 		<FormErrors message={formError} {refused} />
 	{/if}
 
