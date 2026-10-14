@@ -71,6 +71,12 @@ describe('headings', () => {
 		expect(list).toContain(2);
 		expect(skips(list)).toBe(false);
 	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(AnalyticsPage, { props: props({ summary: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }) });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
+	});
 });
 
 describe('what the page counts', () => {
@@ -154,20 +160,5 @@ describe('a read that failed', () => {
 		});
 		const text = said(container);
 		expect(text.split('not part of this build').length - 1).toBe(1);
-	});
-});
-
-// A heading list that jumps from h1 to h3 reads to a screen reader as a
-// missing section.
-describe('heading outline', () => {
-	it('steps its headings down one level at a time', () => {
-		const { container } = render(AnalyticsPage, { props: props() });
-		expect(outlineSkips(container)).toEqual([]);
-	});
-
-	it('steps its headings down one level at a time while the feature is not enabled', () => {
-		const { container } = render(AnalyticsPage, { props: props({ summary: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }) });
-		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
-		expect(outlineSkips(container)).toEqual([]);
 	});
 });
