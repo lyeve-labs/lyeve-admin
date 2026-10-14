@@ -51,17 +51,36 @@ describe('privacy request failures', () => {
 // erasure cannot be undone, so the action asks before it sends anything.
 describe('privacy requests', () => {
 	it('exports the named subject and hands back what the engine found', async () => {
-		rest.exportSubject.mockResolvedValue({ users: [{ id: 'u9' }] });
+		const bundle = {
+			identifier: 'jane@example.com',
+			plugins: { users: { id: 'u9', email: 'jane@example.com' } },
+			incomplete: false,
+			scope: { mode: 'tenant', tenants: ['acme'], tenants_requested: 1, tenants_covered: 1 },
+			summary: { total_records: 1, plugins_queried: 4, plugins_with_data: 1 },
+			errors: [],
+		};
+		rest.exportSubject.mockResolvedValue(bundle);
 		const out = await actions.export(formEvent({ subject: ' jane@example.com ' }));
 		expect(rest.exportSubject).toHaveBeenCalledWith('jane@example.com', expect.anything());
-		expect(out).toEqual({ action: 'export', ok: true, subject: 'jane@example.com', result: { users: [{ id: 'u9' }] } });
+		expect(out).toEqual({ action: 'export', ok: true, subject: 'jane@example.com', result: bundle });
 	});
 
 	it('erases the subject once the confirmation matches', async () => {
-		rest.eraseSubject.mockResolvedValue({ erased: 3 });
+		const erased = { identifier: 'jane@example.com', total_rows: 3, errors: [] };
+		rest.eraseSubject.mockResolvedValue(erased);
 		const out = await actions.erase(formEvent({ subject: 'jane@example.com', confirm: 'jane@example.com' }));
 		expect(rest.eraseSubject).toHaveBeenCalledWith('jane@example.com', expect.anything());
-		expect(out).toEqual({ action: 'erase', ok: true, subject: 'jane@example.com', result: { erased: 3 } });
+		expect(out).toEqual({ action: 'erase', ok: true, subject: 'jane@example.com', result: erased });
+	});
+
+	// The engine answers 200 for an erasure a legal hold stopped. The holds are
+	// the only sign that nothing was erased, so they reach the page intact.
+	it('hands back the holds that stopped an erasure', async () => {
+		const held = { identifier: 'jane@example.com', total_rows: 0, errors: [], holds: [{ id: 'h1', reason: 'Litigation 42' }] };
+		rest.eraseSubject.mockResolvedValue(held);
+		const out = (await actions.erase(formEvent({ subject: 'jane@example.com', confirm: 'jane@example.com' }))) as { result: typeof held };
+		expect(out.result.holds).toEqual([{ id: 'h1', reason: 'Litigation 42' }]);
+		expect(out.result.total_rows).toBe(0);
 	});
 
 	it('erases nothing when the confirmation names someone else', async () => {

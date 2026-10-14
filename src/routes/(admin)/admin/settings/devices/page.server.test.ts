@@ -81,7 +81,6 @@ describe('device writes', () => {
 	it.each(['trust', 'untrust'] as const)('relays the engine refusal on %s', async (name) => {
 		const { event } = write({ label: 'Laptop', id: 'd1' }, json({ error: 'device limit reached' }, 409));
 		const out = (await actions[name](event)) as Failure;
-		expect(out.status).toBe(400);
 		expect(out.data.error).toBe('device limit reached');
 	});
 

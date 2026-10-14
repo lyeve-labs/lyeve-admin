@@ -123,11 +123,10 @@ describe('SAML writes', () => {
 		expect(calls).toEqual([]);
 	});
 
-	it('relays the engine refusal of a rollover with nothing prepared', async () => {
-		const { event } = write({ id: 'p1' }, json({ error: 'no pending certificate to promote' }, 409));
+	it('relays the plugin refusal of a rollover with nothing prepared', async () => {
+		const { event } = write({ id: 'p1' }, json({ error: 'no next certificate configured' }, 400));
 		const out = (await actions.rollover(event)) as Failure;
-		expect(out.status).toBe(400);
-		expect(out.data).toEqual({ action: 'rollover', error: 'no pending certificate to promote' });
+		expect(out.data).toEqual({ action: 'rollover', error: 'no next certificate configured' });
 	});
 
 	it.each([

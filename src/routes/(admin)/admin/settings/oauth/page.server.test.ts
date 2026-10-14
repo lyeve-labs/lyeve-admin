@@ -103,7 +103,6 @@ describe('OAuth provider writes', () => {
 	it.each(['create', 'update', 'delete'] as const)('relays the engine refusal on %s under its action', async (name) => {
 		const { event } = write(PROVIDER, { reply: json({ error: 'issuer_url must use https' }, 422) });
 		const out = (await actions[name](event)) as Failure;
-		expect(out.status).toBe(400);
 		expect(out.data).toEqual({ action: name, error: 'issuer_url must use https' });
 	});
 

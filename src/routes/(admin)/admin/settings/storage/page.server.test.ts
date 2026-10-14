@@ -117,8 +117,10 @@ describe('creating a provider', () => {
 	});
 
 	it('relays a refusal in the drawer and hides an outage', async () => {
-		const refused = engine(S3, { reply: json({ error: 'a provider with this name exists' }, 409) });
-		expect(((await actions.create(refused.event)) as Failure).data).toEqual({ providerError: 'a provider with this name exists' });
+		const refused = engine(S3, { reply: json({ error: 'region must be 1 to 32 lower-case letters, digits and hyphens for s3 providers' }, 422) });
+		expect(((await actions.create(refused.event)) as Failure).data).toEqual({
+			providerError: 'region must be 1 to 32 lower-case letters, digits and hyphens for s3 providers',
+		});
 		const down = engine(S3, { reply: OUTAGE });
 		expect(((await actions.create(down.event)) as Failure).data).toEqual({ providerError: 'The provider could not be created.' });
 	});
@@ -142,8 +144,8 @@ describe('saving a provider', () => {
 	});
 
 	it('relays a refusal in the drawer and hides an outage', async () => {
-		const refused = engine({ id: 'p1', ...S3 }, { reply: json({ error: 'region is not valid for this endpoint' }, 422) });
-		expect(((await actions.update(refused.event)) as Failure).data).toEqual({ providerError: 'region is not valid for this endpoint' });
+		const refused = engine({ id: 'p1', ...S3 }, { reply: json({ error: 'invalid provider ID' }, 400) });
+		expect(((await actions.update(refused.event)) as Failure).data).toEqual({ providerError: 'invalid provider ID' });
 		const down = engine({ id: 'p1', ...S3 }, { reply: OUTAGE });
 		expect(((await actions.update(down.event)) as Failure).data).toEqual({ providerError: 'The provider could not be saved.' });
 	});
@@ -157,8 +159,8 @@ describe('removing a provider', () => {
 	});
 
 	it('relays a refusal and hides an outage', async () => {
-		const refused = engine({ id: 'p1' }, { reply: json({ error: 'provider holds files' }, 409) });
-		expect(((await actions.delete(refused.event)) as Failure).data).toEqual({ error: 'provider holds files' });
+		const refused = engine({ id: 'p1' }, { reply: json({ error: 'failed to delete provider' }, 404) });
+		expect(((await actions.delete(refused.event)) as Failure).data).toEqual({ error: 'failed to delete provider' });
 		const down = engine({ id: 'p1' }, { reply: OUTAGE });
 		expect(((await actions.delete(down.event)) as Failure).data).toEqual({ error: 'The provider could not be removed.' });
 	});

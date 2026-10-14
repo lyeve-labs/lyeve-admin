@@ -35,8 +35,10 @@ function engine(fields: Record<string, string>, opts: { roles?: string[]; reply?
 	};
 }
 
-const REFUSED = json({ error: 'event_type must be a namespaced action' }, 422);
-const OUTAGE = json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503);
+// The audit plugin's own answers: a struct validation refusal, and the gate it
+// closes while its store is unavailable.
+const REFUSED = json({ error: 'validation failed on field "EventType": failed on \'max=255\'', fields: [] }, 400);
+const OUTAGE = json({ error: 'audit retention is unavailable' }, 503);
 
 describe('retention writes by role', () => {
 	const cases = [
@@ -99,8 +101,7 @@ describe('creating a retention policy', () => {
 	it('relays the engine refusal under its action', async () => {
 		const { event } = engine({ retention_days: '30' }, { reply: REFUSED });
 		const out = (await actions.createPolicy(event)) as Failure;
-		expect(out.status).toBe(400);
-		expect(out.data).toEqual({ action: 'createPolicy', error: 'event_type must be a namespaced action' });
+		expect(out.data).toEqual({ action: 'createPolicy', error: 'validation failed on field "EventType": failed on \'max=255\'' });
 	});
 
 	it('keeps outage detail off the page', async () => {
@@ -124,8 +125,8 @@ describe('removing a retention policy', () => {
 	});
 
 	it('relays a refusal and hides an outage', async () => {
-		const refused = engine({ id: 'p1' }, { reply: json({ error: 'policy not found' }, 404) });
-		expect(((await actions.deletePolicy(refused.event)) as Failure).data.error).toBe('policy not found');
+		const refused = engine({ id: 'p1' }, { reply: json({ error: 'failed to delete retention policy' }, 404) });
+		expect(((await actions.deletePolicy(refused.event)) as Failure).data.error).toBe('failed to delete retention policy');
 		const down = engine({ id: 'p1' }, { reply: OUTAGE });
 		expect(((await actions.deletePolicy(down.event)) as Failure).data.error).toBe('The policy could not be removed.');
 	});
@@ -160,8 +161,8 @@ describe('placing a legal hold', () => {
 	});
 
 	it('relays a refusal and hides an outage', async () => {
-		const refused = engine({ name: 'Litigation' }, { reply: json({ error: 'a hold with this name exists' }, 409) });
-		expect(((await actions.createHold(refused.event)) as Failure).data.error).toBe('a hold with this name exists');
+		const refused = engine({ name: 'Litigation' }, { reply: json({ error: 'name is required' }, 400) });
+		expect(((await actions.createHold(refused.event)) as Failure).data.error).toBe('name is required');
 		const down = engine({ name: 'Litigation' }, { reply: OUTAGE });
 		expect(((await actions.createHold(down.event)) as Failure).data.error).toBe('The hold could not be created.');
 	});

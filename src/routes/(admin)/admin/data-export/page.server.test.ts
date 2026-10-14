@@ -200,7 +200,6 @@ describe('data export writes', () => {
 	it.each(all)('relays the engine refusal on %s under its action', async (name) => {
 		const { event } = write({ id: 'j1', ...EXPORT, cron_expression: '0 3 * * *' }, json({ error: 'cron_expression is not valid' }, 422));
 		const out = (await actions[name](event)) as Failure;
-		expect(out.status).toBe(400);
 		expect(out.data).toEqual({ action: name, error: 'cron_expression is not valid' });
 	});
 

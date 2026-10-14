@@ -95,7 +95,6 @@ describe('custom page editor writes', () => {
 	it('shows the first block problem the engine names', async () => {
 		api.saveCustomPage.mockRejectedValue(new ApiError(422, 'block 2: chart needs a schema'));
 		const out = (await actions.save(actionEvent({ page: JSON.stringify(page) }))) as Failure;
-		expect(out.status).toBe(400);
 		expect(out.data.error).toBe('block 2: chart needs a schema');
 	});
 

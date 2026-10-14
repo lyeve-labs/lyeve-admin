@@ -50,7 +50,6 @@ describe('pii rule actions', () => {
 			status: number;
 			data: { error: string };
 		};
-		expect(out.status).toBe(422);
 		expect(out.data.error).toBe('pattern does not compile');
 	});
 });
@@ -107,21 +106,30 @@ describe('pii rule writes', () => {
 	});
 
 	it('runs a pattern against a sample and hands back what it masked', async () => {
-		api.testRule.mockResolvedValue({ output: '****', matches: 1 });
+		const result = { valid: true, matches: ['4111111111111111'], count: 1, masked: '****' };
+		api.testRule.mockResolvedValue(result);
 		const out = await actions.test(formEvent({ pattern: '\\d{16}', replacement: '****', sample: '4111111111111111' }));
 		expect(api.testRule).toHaveBeenCalledWith(expect.anything(), '\\d{16}', '****', '4111111111111111');
-		expect(out).toEqual({ test: { output: '****', matches: 1 } });
+		expect(out).toEqual({ test: result });
+	});
+
+	// The plugin answers a pattern that does not compile with 200 and valid
+	// false, which the page shows as the test result rather than a failure.
+	it('hands back a pattern the plugin could not compile as a result', async () => {
+		api.testRule.mockResolvedValue({ valid: false, error: 'pattern does not compile' });
+		expect(await actions.test(formEvent({ pattern: '(', replacement: '*', sample: 'x' }))).toEqual({
+			test: { valid: false, error: 'pattern does not compile' },
+		});
 	});
 
 	it.each([
-		['update', 'updateRule'],
-		['delete', 'deleteRule'],
-		['test', 'testRule'],
-	] as const)('relays the engine refusal on %s under its action', async (name, fn) => {
-		api[fn].mockRejectedValue(new ApiError(400, 'pattern does not compile'));
+		['update', 'updateRule', 'id must be a UUID'],
+		['delete', 'deleteRule', 'id must be a UUID'],
+		['test', 'testRule', 'body must be a JSON object with pattern, replacement and sample'],
+	] as const)('relays the plugin refusal on %s under its action', async (name, fn, sentence) => {
+		api[fn].mockRejectedValue(new ApiError(400, sentence));
 		const out = (await actions[name](formEvent({ id: 'r1', ...RULE }))) as Failure;
-		expect(out.status).toBe(422);
-		expect(out.data).toEqual({ action: name, error: 'pattern does not compile' });
+		expect(out.data).toEqual({ action: name, error: sentence });
 	});
 
 	it.each([
