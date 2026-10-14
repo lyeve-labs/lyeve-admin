@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
-import { actions, load } from './+page.server';
+import { actions, load, type TelemetryPage } from './+page.server';
 
-type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
+type Loaded = TelemetryPage;
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -40,7 +40,28 @@ lyeve_db_pool_max_connections 25
 ${TENANT_VIEW}lyeve_requests_total{code="2xx",method="GET",plugin="core",tenant="globex"} 3
 `;
 
-const EXPORTERS = { data: [{ name: 'pushgateway', healthy: true, exports: 2, failures: 0 }], total_count: 1, limit: 50, offset: 0 };
+// The plugin's exporter page. Its times are Go time values, which JSON
+// writes as the zero time rather than leaving them out.
+const EXPORTERS = {
+	data: [
+		{
+			name: 'pushgateway',
+			healthy: true,
+			last_export: '2026-10-14T09:00:00Z',
+			last_failure: '0001-01-01T00:00:00Z',
+			exports: 2,
+			failures: 0,
+		},
+	],
+	limit: 50,
+	offset: 0,
+	total_count: 1,
+};
+
+/** An engine error as the plugin writes one. */
+function refused(status: number, error: string, code: string): Response {
+	return json({ error, code }, status);
+}
 
 function loadEvent(routes: Record<string, Route>, roles: string[]) {
 	const { fetch, calls } = fetchFor(routes, roles);
@@ -73,10 +94,17 @@ describe('telemetry load', () => {
 		const { event, calls } = loadEvent({ '/telemetry/metrics': () => text(TENANT_VIEW) }, ['admin']);
 		const result = (await load(event)) as Loaded;
 		expect(result.superAdmin).toBe(false);
-		expect(result.families?.map((f: { name: string }) => f.name)).toEqual(['lyeve_requests_total']);
-		expect(result.families?.[0].samples).toHaveLength(1);
+		expect(result.families.ok && result.families.value.map((f) => f.name)).toEqual(['lyeve_requests_total']);
+		expect(result.families.ok && result.families.value[0].samples).toHaveLength(1);
 		expect(result.exporters).toBeNull();
 		expect(calls.some((c) => c.url.includes('/telemetry/exporters'))).toBe(false);
+	});
+
+	// The scrape is built outside the JSON client, so it has to carry the
+	// same session every other read carries, the CSRF token included.
+	it('sends the scrape with the session headers', async () => {
+		const { event, calls } = loadEvent({ '/telemetry/metrics': () => text(TENANT_VIEW) }, ['admin']);
+		await load(event);
 		const scrape = calls.find((c) => c.url.includes('/telemetry/metrics'));
 		expect(scrape?.init?.headers).toMatchObject({ Authorization: 'Bearer tok', 'X-CSRF-Token': 'tok', Accept: 'text/plain' });
 	});
@@ -88,25 +116,54 @@ describe('telemetry load', () => {
 		);
 		const result = (await load(event)) as Loaded;
 		expect(result.superAdmin).toBe(true);
-		expect(result.families?.map((f: { name: string }) => f.name)).toEqual(['lyeve_db_pool_max_connections', 'lyeve_requests_total']);
-		expect(result.families?.[1].samples).toHaveLength(2);
-		expect(result.exporters).toEqual(EXPORTERS.data);
+		expect(result.families.ok && result.families.value.map((f) => f.name)).toEqual([
+			'lyeve_db_pool_max_connections',
+			'lyeve_requests_total',
+		]);
+		expect(result.families.ok && result.families.value[1].samples).toHaveLength(2);
+		expect(result.exporters).toEqual({ ok: true, value: EXPORTERS.data });
 	});
 
-	it('reports a scrape the plugin refused as absent, not as an empty registry', async () => {
-		const { event } = loadEvent({ '/telemetry/metrics': () => json({ error: 'metrics not initialized' }, 503) }, ['admin']);
+	it('reports a registry that is not initialized as an outage, not as an empty registry', async () => {
+		const { event } = loadEvent(
+			{ '/telemetry/metrics': () => refused(503, 'metrics not initialized', 'service_unavailable') },
+			['admin'],
+		);
 		const result = (await load(event)) as Loaded;
-		expect(result.families).toBeNull();
+		expect(result.families).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('reports a scrape refused for the role as forbidden', async () => {
+		const { event } = loadEvent(
+			{ '/telemetry/metrics': () => refused(403, 'instance-wide metrics need super_admin', 'forbidden') },
+			['admin'],
+		);
+		const result = (await load(event)) as Loaded;
+		expect(result.families).toEqual({ ok: false, gate: { state: 'forbidden' } });
+	});
+
+	it('reports a build without the plugin as absent', async () => {
+		const { event } = loadEvent({}, ['super_admin']);
+		const result = (await load(event)) as Loaded;
+		expect(result.families).toEqual({ ok: false, gate: { state: 'absent' } });
+		expect(result.exporters).toEqual({ ok: false, gate: { state: 'absent' } });
+		expect(result.destination).toEqual({ ok: false, gate: { state: 'absent' } });
 	});
 
 	it('keeps the metrics when only the exporter list failed', async () => {
 		const { event } = loadEvent(
-			{ '/telemetry/metrics': () => text(WHOLE_VIEW), '/telemetry/exporters': () => json({ error: 'down' }, 503) },
+			{
+				'/telemetry/metrics': () => text(WHOLE_VIEW),
+				'/telemetry/exporters': () => refused(500, 'internal error', 'internal_error'),
+			},
 			['super_admin'],
 		);
 		const result = (await load(event)) as Loaded;
-		expect(result.families).toHaveLength(2);
-		expect(result.exporters).toBeNull();
+		expect(result.families.ok && result.families.value).toHaveLength(2);
+		expect(result.exporters).toEqual({
+			ok: false,
+			gate: { state: 'error', message: 'The exporters could not be read. This is not a report that none is configured.' },
+		});
 	});
 
 	it('refuses a role below admin', async () => {
@@ -131,7 +188,7 @@ describe('the export action', () => {
 	it('says the cooldown on a 429 rather than a failure', async () => {
 		const { event } = actionEvent(
 			{ name: 'otlp' },
-			{ '/telemetry/exporters/otlp/export': () => json({ error: 'export cooldown active' }, 429) },
+			{ '/telemetry/exporters/otlp/export': () => refused(429, 'export cooldown active; minimum 5 seconds between manual exports', 'rate_limited') },
 			['super_admin'],
 		);
 		const result = await actions.export(event);
@@ -170,13 +227,22 @@ describe('the tenant destination', () => {
 			['admin'],
 		);
 		const result = (await load(event)) as Loaded;
-		expect(result.destination).toEqual(STORED);
+		expect(result.destination).toEqual({ ok: true, value: STORED });
 	});
 
-	it('reports an unread destination as null rather than as none set', async () => {
-		const { event } = loadEvent({ '/telemetry/metrics': () => text(TENANT_VIEW) }, ['admin']);
+	it('reports an unread destination as a failed read rather than as none set', async () => {
+		const { event } = loadEvent(
+			{
+				'/telemetry/metrics': () => text(TENANT_VIEW),
+				'/telemetry/destination': () => refused(500, 'failed to read the destination', 'internal_error'),
+			},
+			['admin'],
+		);
 		const result = (await load(event)) as Loaded;
-		expect(result.destination).toBeNull();
+		expect(result.destination).toEqual({
+			ok: false,
+			gate: { state: 'error', message: 'The destination could not be read. This is not a report that none is set.' },
+		});
 	});
 
 	// Header values are write-only: keeping the stored ones means leaving the
@@ -244,7 +310,10 @@ describe('the tenant destination', () => {
 	it('relays any other 422 without asking for the headers', async () => {
 		const { event } = actionEvent(
 			{ kind: 'otlp', url: 'https://elsewhere.example.net', headers_mode: 'keep' },
-			{ '/telemetry/destination': () => json({ error: 'the target is on another host the guard refuses' }, 422) },
+			{
+				'/telemetry/destination': () =>
+					refused(422, 'the destination is on a network this instance does not send to', 'http_422'),
+			},
 			['admin'],
 		);
 		const result = (await actions.saveDestination(event)) as {
@@ -252,7 +321,7 @@ describe('the tenant destination', () => {
 			data: { hostMoved?: boolean; destinationError: string };
 		};
 		expect(result.data.hostMoved).toBeUndefined();
-		expect(result.data.destinationError).toBe('the target is on another host the guard refuses');
+		expect(result.data.destinationError).toBe('the destination is on a network this instance does not send to');
 	});
 
 	it('returns the license refusal under its own keys', async () => {
@@ -260,7 +329,7 @@ describe('the tenant destination', () => {
 			{ kind: 'otlp', url: 'https://x.example.com', headers_mode: 'replace' },
 			{
 				'/telemetry/destination': () =>
-					json({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature' }, 402),
+					json({ error: 'payment_required', plugin: 'telemetry', feature: 'feature:example_feature', upgrade_url: '' }, 402),
 			},
 			['admin'],
 		);

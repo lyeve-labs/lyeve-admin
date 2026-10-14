@@ -25,18 +25,36 @@ function said(c: HTMLElement): string {
 	return (c.textContent ?? '').replace(/\s+/g, ' ');
 }
 
+// A stored destination as the plugin answers it. The health is the plugin's
+// exporter health, named for the tenant, with Go times that JSON writes as
+// the zero time rather than leaving out.
 const STORED = {
 	kind: 'otlp',
 	url: 'https://otlp.example.com/v1/metrics',
 	header_names: ['Authorization', 'X-Scope'],
-	health: { healthy: false, last_error: 'status 401', exports: 3, failures: 2 },
+	health: {
+		name: 'acme',
+		healthy: false,
+		last_export: '2026-10-13T08:00:00Z',
+		last_failure: '2026-10-14T09:00:00Z',
+		last_error: 'pushgateway: HTTP 401: unauthorized',
+		last_error_class: 'rejected',
+		exports: 3,
+		failures: 2,
+	},
 };
 
+/** The page's data, with the destination read as given. */
+function pageData(destination: unknown) {
+	const read =
+		destination !== null && typeof destination === 'object' && 'ok' in destination
+			? destination
+			: { ok: true, value: destination };
+	return { superAdmin: false, families: { ok: true, value: [] }, exporters: null, destination: read } as never;
+}
+
 function props(destination: unknown, form: Record<string, unknown> | null = null) {
-	return {
-		data: { superAdmin: false, families: [], exporters: null, destination } as never,
-		form: form as never,
-	};
+	return { data: pageData(destination), form: form as never };
 }
 
 describe('the tenant destination', () => {
@@ -46,7 +64,7 @@ describe('the tenant destination', () => {
 		expect(said(container)).toContain('Their values are never shown');
 		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe(STORED.url);
 		expect(said(container)).toContain('Failing');
-		expect(said(container)).toContain('status 401');
+		expect(said(container)).toContain('HTTP 401: unauthorized');
 	});
 
 	it('warns before a save that moves the host while keeping the headers', async () => {
@@ -61,7 +79,11 @@ describe('the tenant destination', () => {
 			TelemetryPage,
 			props(
 				{ destination: STORED, licensed: true },
-				{ destinationError: 'the destination moved to another host, send its headers again', hostMoved: true },
+				{
+					destinationAction: 'save',
+					destinationError: 'the destination moved to another host, send its headers again',
+					hostMoved: true,
+				},
 			),
 		);
 		expect(said(container)).toContain('Send the headers again for the new host');
@@ -112,14 +134,26 @@ describe('the tenant destination', () => {
 			TelemetryPage,
 			props(
 				{ destination: null, licensed: false },
-				{ destinationError: 'x', refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },
+				{
+					destinationAction: 'save',
+					destinationError: 'x',
+					refused: { kind: 'feature', feature: 'example-feature', plugin: 'telemetry', upgradeUrl: '' },
+				},
 			),
 		);
 		expect(screen.getByTestId('refusal-notice')).toBeTruthy();
 	});
 
-	it('reports an unread destination as a failure', () => {
-		const { container } = render(TelemetryPage, props(null));
-		expect(said(container)).toContain('The destination could not be read');
+	it('reports an unread destination as a failure with its own sentence', () => {
+		const message = 'The destination could not be read. This is not a report that none is set.';
+		const { container } = render(TelemetryPage, props({ ok: false, gate: { state: 'error', message } }));
+		expect(said(container)).toContain(message);
+		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+	});
+
+	it('says the engine did not answer the destination read', () => {
+		const { container } = render(TelemetryPage, props({ ok: false, gate: { state: 'unavailable' } }));
+		expect(said(container)).toContain('so Tenant destination could not be read');
+		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
 	});
 });

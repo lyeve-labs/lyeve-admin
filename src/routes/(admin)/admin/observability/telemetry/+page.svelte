@@ -21,6 +21,7 @@
 	import { Activity, AlertTriangle, CheckCircle, Plus, RefreshCw, Send, Trash2, Upload } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { confirmed, tracked } from '$lib/forms.svelte';
 	import {
@@ -67,7 +68,7 @@
 		{ value: 'summary', label: 'Summaries' },
 	];
 
-	const families = $derived(data.families ?? []);
+	const families = $derived(data.families.ok ? data.families.value : []);
 	const shown = $derived(
 		familiesMatching(families, query).filter((f) => typeFilter === 'all' || f.type === typeFilter),
 	);
@@ -108,7 +109,10 @@
 	const refusal = $derived(formRefusal(form));
 	const destinationError = $derived((form as { destinationError?: string } | null)?.destinationError ?? '');
 	const hostMoved = $derived((form as { hostMoved?: boolean } | null)?.hostMoved === true);
-	const destination = $derived(data.destination?.destination ?? null);
+
+	const destinationRead = $derived(data.destination.ok ? data.destination.value : null);
+	const destination = $derived(destinationRead?.destination ?? null);
+	const licensed = $derived(destinationRead?.licensed === true);
 
 	let kind = $state<DestinationKind>('otlp');
 	let destUrl = $state('');
@@ -201,22 +205,24 @@
 			</span>
 		</div>
 
-		<ListToolbar label="Filter the metrics">
-			{#snippet search()}
-				<SearchInput label="Filter families" placeholder="Family, help text or label value" bind:value={query} />
-			{/snippet}
-			{#snippet filters()}
-				<span class="text-xs text-muted">{shown.length} of {families.length} families, {sampleCount} samples</span>
-				<label for="metric-type" class="sr-only">Type</label>
-				<Select id="metric-type" options={TYPE_OPTIONS} value={typeFilter} onvaluechange={(v) => { typeFilter = v; }} class="w-40" />
-			{/snippet}
-		</ListToolbar>
+		{#if data.families.ok}
+			<ListToolbar label="Filter the metrics">
+				{#snippet search()}
+					<SearchInput label="Filter families" placeholder="Family, help text or label value" bind:value={query} />
+				{/snippet}
+				{#snippet filters()}
+					<span class="text-xs text-muted">{shown.length} of {families.length} families, {sampleCount} samples</span>
+					<label for="metric-type" class="sr-only">Type</label>
+					<Select id="metric-type" options={TYPE_OPTIONS} value={typeFilter} onvaluechange={(v) => { typeFilter = v; }} class="w-40" />
+				{/snippet}
+			</ListToolbar>
+		{/if}
 
-		{#if data.families === null}
-			<EmptyState
-				iconSnippet={noMetrics}
-				title="Metrics unavailable"
-				description="The telemetry plugin did not answer the scrape. It may not be in this build, or the registry is not initialized yet."
+		{#if !data.families.ok}
+			<GateNotice
+				gate={data.families.gate}
+				title="Telemetry metrics"
+				absent="The telemetry plugin is not in this build, so there is no metrics registry to show."
 			/>
 		{:else if families.length === 0}
 			<EmptyState
@@ -285,8 +291,12 @@
 			</span>
 		</div>
 
-		{#if !data.destination}
-			<Alert tone="danger">The destination could not be read. This is not a report that none is set.</Alert>
+		{#if !data.destination.ok}
+			<GateNotice
+				gate={data.destination.gate}
+				title="Tenant destination"
+				absent="This build of the telemetry plugin does not serve tenant destinations."
+			/>
 		{:else}
 			{#if refusal}
 				<RefusalNotice {refusal} />
@@ -301,7 +311,7 @@
 				<Alert tone="danger">{destinationError}</Alert>
 			{/if}
 
-			{#if !data.destination.licensed}
+			{#if !licensed}
 				<p class="text-sm text-muted" id="destination-unlicensed">
 					Setting or changing a destination needs a license this install does not hold. A destination already
 					saved keeps receiving, and deleting it is always allowed.
@@ -334,8 +344,8 @@
 					<!-- A save the license refuses is not offered. The fields stay in
 					     sight, so the reader sees what is set, and the reason is
 					     beside the button. -->
-					<fieldset class="contents" disabled={!data.destination.licensed}>
-						<SegmentedControl label="Protocol" name="kind" bind:value={kind} options={[...DESTINATION_KINDS]} disabled={!data.destination.licensed} />
+					<fieldset class="contents" disabled={!licensed}>
+						<SegmentedControl label="Protocol" name="kind" bind:value={kind} options={[...DESTINATION_KINDS]} disabled={!licensed} />
 						<Input
 							id="destination-url"
 							name="url"
@@ -406,12 +416,12 @@
 								variant="primary"
 								type="submit"
 								loading={saveDest.pending}
-								disabled={!data.destination.licensed}
-								aria-describedby={data.destination.licensed ? undefined : 'destination-unlicensed'}
+								disabled={!licensed}
+								aria-describedby={licensed ? undefined : 'destination-unlicensed'}
 							>
 								Save
 							</Button>
-							{#if !data.destination.licensed}
+							{#if !licensed}
 								<span class="text-xs text-muted">Not enabled on this instance.</span>
 							{/if}
 						</div>
@@ -426,7 +436,7 @@
 		{/if}
 	</section>
 
-	{#if data.superAdmin}
+	{#if data.exporters}
 		<!-- The exporters are the instance's export configuration, which no tenant
 		     owns, so a tenant admin's page has no such section rather than an
 		     empty one. -->
@@ -444,13 +454,13 @@
 				<Alert tone="success" autoDismiss>{form.message}</Alert>
 			{/if}
 
-			{#if data.exporters === null}
-				<EmptyState
-					iconSnippet={noExporters}
-					title="Exporters unavailable"
-					description="The telemetry plugin did not answer with its exporter list."
+			{#if !data.exporters.ok}
+				<GateNotice
+					gate={data.exporters.gate}
+					title="Telemetry exporters"
+					absent="The telemetry plugin is not in this build, so no exporter is running."
 				/>
-			{:else if data.exporters.length === 0}
+			{:else if data.exporters.value.length === 0}
 				<EmptyState
 					iconSnippet={noExporters}
 					title="No exporter configured"
@@ -470,7 +480,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.exporters as exporter (exporter.name)}
+						{#each data.exporters.value as exporter (exporter.name)}
 							<tr>
 								<td data-cell="nowrap" class="font-mono text-xs">{exporter.name}</td>
 								<td>

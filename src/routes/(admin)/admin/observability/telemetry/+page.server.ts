@@ -22,6 +22,7 @@ import {
 import { errorCodeOf } from '$lib/api/limits';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { actionError } from '$lib/server/action-error';
+import { section, type Section } from '$lib/api/gate';
 import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
 
 /**
@@ -30,17 +31,16 @@ import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
  * The metrics view is every admin's, already narrowed by the engine to the
  * caller's tenant unless the caller is a super admin. The exporters are the
  * instance's export configuration, so they are read for a super admin only
- * and are null, not empty, for anyone else: a tenant admin's page carries no
- * exporters section at all rather than an empty one.
+ * and are null, not a section, for anyone else: a tenant admin's page carries
+ * no exporters section at all rather than an empty one.
  */
 export interface TelemetryPage {
 	superAdmin: boolean;
-	/** null when the scrape route refused or did not answer. */
-	families: MetricFamily[] | null;
-	/** null for a tenant admin, and for a super admin the plugin did not answer. */
-	exporters: ExporterHealth[] | null;
-	/** The tenant's own destination read, null when the plugin did not answer it. */
-	destination: DestinationRead | null;
+	families: Section<MetricFamily[]>;
+	/** null for a tenant admin, who has no exporters section. */
+	exporters: Section<ExporterHealth[]> | null;
+	/** The tenant's own destination. */
+	destination: Section<DestinationRead>;
 }
 
 export const load: PageServerLoad = async (event) => {
@@ -53,11 +53,14 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 
 	const [families, exporters, destination] = await Promise.all([
-		readMetricsText(fetch, authedHeaders(event))
-			.then(parseExposition)
-			.catch(() => null),
-		superAdmin ? listExporters(client).catch(() => null) : Promise.resolve(null),
-		readDestination(client).catch(() => null),
+		section(
+			readMetricsText(fetch, authedHeaders(event)).then(parseExposition),
+			'The metrics could not be read. This is not a report that no series exist.',
+		),
+		superAdmin
+			? section(listExporters(client), 'The exporters could not be read. This is not a report that none is configured.')
+			: Promise.resolve(null),
+		section(readDestination(client), 'The destination could not be read. This is not a report that none is set.'),
 	]);
 
 	const page: TelemetryPage = { superAdmin, families, exporters, destination };
