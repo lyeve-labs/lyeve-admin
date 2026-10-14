@@ -32,7 +32,10 @@
 	const tenant = $derived(data.tenant);
 
 	// A membership names roles inside one tenant. super_admin is an instance
-	// role held on the account itself, so it is not offered here.
+	// role held on the account itself, so it is not offered here. A row that
+	// already holds it keeps it: the engine signs a home tenant in with the
+	// roles saved here, so a save without it would end the account's super
+	// admin at its next sign-in, and this page offers no way back.
 	const MEMBER_ROLES = ['viewer', 'editor', 'admin'].map((r) => ({ value: r, label: r }));
 
 	const facts = $derived([
@@ -288,6 +291,12 @@
 		{#if editingMember}
 			<input type="hidden" name="user_id" value={editingMember.id} />
 			<Input id="member-email" label="Account" value={memberEmail} disabled />
+			{#if editingMember.roles.includes('super_admin')}
+				<input type="hidden" name="roles" value="super_admin" />
+				<p class="text-xs text-muted" data-testid="keeps-super-admin">
+					This account is a super admin, and saving here keeps that role. The super admin role is managed on the Users page.
+				</p>
+			{/if}
 		{:else}
 			<Input
 				id="member-email"

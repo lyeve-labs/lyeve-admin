@@ -295,3 +295,118 @@ describe('admin/tenants load past the end', () => {
 		expect(result.tenants).toEqual({ ok: true, value: [] });
 	});
 });
+
+/** An action event whose fetch answers the session read, then `answer` for the write. */
+function writeEvent(
+	fields: Record<string, string>,
+	answer: (url: string, init?: RequestInit) => Response,
+	roles = ['super_admin'],
+) {
+	const form = new FormData();
+	for (const [key, value] of Object.entries(fields)) form.append(key, value);
+	const fetch = vi.fn(async (url: string, init?: RequestInit) =>
+		init?.method && init.method !== 'GET'
+			? answer(String(url), init)
+			: json({ id: 'u1', email: 'admin@b.co', roles })
+	) as unknown as typeof globalThis.fetch;
+	return {
+		request: { formData: async () => form },
+		fetch,
+		cookies: mockCookies(),
+		url: new URL('http://localhost/admin/tenants'),
+	} as never;
+}
+
+/** The body of the one write the action sent. */
+function writtenBody(event: unknown): Record<string, unknown> {
+	const calls = (event as { fetch: { mock: { calls: [unknown, RequestInit | undefined][] } } }).fetch.mock.calls;
+	const write = calls.find(([, init]) => init?.method && init.method !== 'GET');
+	return JSON.parse(String(write?.[1]?.body));
+}
+
+describe('admin/tenants create refusals', () => {
+	it('puts a slug the engine refuses on the Slug field', async () => {
+		const message = 'invalid slug: must be lowercase alphanumeric + underscore, 1-63 chars, starting with a letter';
+		const result = await actions.create(
+			writeEvent({ slug: 'acme-corp', name: 'ACME' }, () => json({ error: message }, 400))
+		);
+		expect(result).toEqual({
+			status: 400,
+			data: { action: 'create', error: 'Check the highlighted fields.', fields: { slug: message } },
+		});
+	});
+
+	it('renders a license refusal through the refusal notice, never as its code', async () => {
+		const result = await actions.create(
+			writeEvent({ slug: 'acme', name: 'ACME' }, () =>
+				json({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature', upgrade_url: '' }, 402)
+			)
+		);
+		expect(result).toMatchObject({
+			status: 402,
+			data: { action: 'create', refused: { kind: 'feature', feature: 'example-feature' } },
+		});
+		expect(JSON.stringify(result)).not.toContain('payment_required');
+	});
+
+	it('relays a 402 that carries its own sentence', async () => {
+		const sentence = 'tenant quota reached (3); upgrade your plan to add more tenants';
+		const result = await actions.create(
+			writeEvent({ slug: 'acme', name: 'ACME' }, () => json({ error: sentence }, 402))
+		);
+		expect(result).toEqual({ status: 400, data: { action: 'create', error: sentence } });
+	});
+});
+
+describe('admin/tenants update, toggle and delete', () => {
+	const tenant = { id: 't1', slug: 'acme', name: 'ACME', plan: 'free', enabled: true };
+
+	it('sends the plan a create with none gets when the field is emptied', async () => {
+		const event = writeEvent({ id: 't1', name: 'ACME', plan: '  ' }, () => json(tenant));
+		await actions.update(event);
+		expect(writtenBody(event)).toEqual({ name: 'ACME', plan: 'free' });
+	});
+
+	it('sends the plan as typed on an edit', async () => {
+		const event = writeEvent({ id: 't1', name: 'ACME', plan: 'gold' }, () => json(tenant));
+		await actions.update(event);
+		expect(writtenBody(event)).toEqual({ name: 'ACME', plan: 'gold' });
+	});
+
+	it('flips the enabled state it was handed', async () => {
+		const event = writeEvent({ id: 't1', enabled: 'true' }, () => json(tenant));
+		await actions.toggle(event);
+		expect(writtenBody(event)).toEqual({ enabled: false });
+	});
+
+	it('names the action that failed, for each write', async () => {
+		const refuse = () => json({ error: 'tenant not found' }, 404);
+		expect(await actions.update(writeEvent({ id: 't1', name: 'ACME' }, refuse))).toEqual({
+			status: 400,
+			data: { action: 'update', error: 'tenant not found' },
+		});
+		expect(await actions.toggle(writeEvent({ id: 't1', enabled: 'true' }, refuse))).toMatchObject({
+			data: { action: 'toggle', error: 'tenant not found' },
+		});
+		expect(await actions.delete(writeEvent({ id: 't1' }, refuse))).toMatchObject({
+			data: { action: 'delete', error: 'tenant not found' },
+		});
+	});
+
+	it('keeps driver text out of an outage on delete', async () => {
+		const result = await actions.delete(writeEvent({ id: 't1' }, () => json({ error: 'pq: connection refused' }, 503)));
+		expect(result).toEqual({ status: 400, data: { action: 'delete', error: 'Failed to delete tenant' } });
+	});
+
+	it('deletes a tenant the engine accepts', async () => {
+		const event = writeEvent({ id: 't1' }, () => new Response(null, { status: 204 }));
+		expect(await actions.delete(event)).toBeUndefined();
+	});
+
+	it.each(['create', 'update', 'toggle', 'delete'] as const)('refuses %s to an admin', async (name) => {
+		const answer = vi.fn(() => json({}));
+		const event = writeEvent({ id: 't1', slug: 'acme', name: 'ACME', enabled: 'true' }, answer, ['admin']);
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(answer).not.toHaveBeenCalled();
+	});
+});

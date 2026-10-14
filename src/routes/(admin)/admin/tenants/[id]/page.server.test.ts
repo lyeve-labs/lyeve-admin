@@ -227,3 +227,73 @@ describe('admin/tenants/[id] members paging', () => {
 		await expect(load(ev)).rejects.toMatchObject({ status: 307, location: '/admin/tenants/t1?limit=50&offset=0' });
 	});
 });
+
+describe('admin/tenants/[id] revoke, archive and restore', () => {
+	function revokeForm(): FormData {
+		const form = new FormData();
+		form.append('user_id', 'u2');
+		return form;
+	}
+
+	const ADMIN = { id: 'u9', email: 'admin@example.com', roles: ['admin'] };
+
+	it('removes a membership the engine accepts', async () => {
+		const { event: ev, calls } = event(
+			{ 'GET /api/admin/auth/me': ME, 'GET /api/admin/tenants/t1': TENANT, 'DELETE /api/admin/users/u2/memberships/acme': {} },
+			revokeForm(),
+		);
+		expect(await actions.revoke(ev)).toEqual({ memberRevoked: true });
+		expect(calls.some((c) => c.method === 'DELETE' && c.url === '/api/admin/users/u2/memberships/acme')).toBe(true);
+	});
+
+	it('relays the refusal of a home tenant removal under its action', async () => {
+		const { event: ev } = event(
+			{
+				'GET /api/admin/auth/me': ME,
+				'GET /api/admin/tenants/t1': TENANT,
+				'DELETE /api/admin/users/u2/memberships/acme': json({ error: 'the home tenant has no membership to revoke' }, 409),
+			},
+			revokeForm(),
+		);
+		expect(await actions.revoke(ev)).toEqual({
+			status: 400,
+			data: { action: 'revoke', memberError: 'the home tenant has no membership to revoke' },
+		});
+	});
+
+	it('keeps driver text out of a removal during an outage', async () => {
+		const { event: ev } = event(
+			{
+				'GET /api/admin/auth/me': ME,
+				'GET /api/admin/tenants/t1': TENANT,
+				'DELETE /api/admin/users/u2/memberships/acme': json({ error: 'pq: connection refused' }, 503),
+			},
+			revokeForm(),
+		);
+		expect(await actions.revoke(ev)).toMatchObject({ data: { memberError: 'The membership could not be removed.' } });
+	});
+
+	it('archives and restores a tenant the engine accepts', async () => {
+		const archive = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': { ...TENANT, archived: true } });
+		expect(await actions.archive(archive.event)).toEqual({ archived: true });
+		const restore = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': TENANT });
+		expect(await actions.restore(restore.event)).toEqual({ restored: true });
+	});
+
+	it('relays a refused archive and restore, and hides an outage behind a sentence', async () => {
+		const refused = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': json({ error: 'tenant is already archived' }, 409) });
+		expect(await actions.archive(refused.event)).toEqual({ status: 400, data: { stateError: 'tenant is already archived' } });
+		const down = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': json({ error: 'pq: timeout' }, 503) });
+		expect(await actions.restore(down.event)).toEqual({ status: 400, data: { stateError: 'The tenant could not be restored.' } });
+		const downArchive = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': json({ error: 'pq: timeout' }, 503) });
+		expect(await actions.archive(downArchive.event)).toEqual({ status: 400, data: { stateError: 'The tenant could not be archived.' } });
+		const refusedRestore = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': json({ error: 'tenant is not archived' }, 409) });
+		expect(await actions.restore(refusedRestore.event)).toEqual({ status: 400, data: { stateError: 'tenant is not archived' } });
+	});
+
+	it.each(['revoke', 'archive', 'restore'] as const)('refuses %s to an admin', async (name) => {
+		const { event: ev, calls } = event({ 'GET /api/admin/auth/me': ADMIN }, revokeForm());
+		await expect(actions[name](ev)).rejects.toMatchObject({ status: 403 });
+		expect(calls.filter((c) => c.method !== 'GET')).toEqual([]);
+	});
+});

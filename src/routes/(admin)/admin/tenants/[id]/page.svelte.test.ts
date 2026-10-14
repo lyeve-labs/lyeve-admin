@@ -143,3 +143,30 @@ describe('unsaved plugin picks', () => {
 		expect(kept()).toEqual(['flow']);
 	});
 });
+
+/*
+ * The engine signs a home tenant in with the roles saved on its home row, so
+ * a save that dropped super_admin there ended the account's super admin at
+ * its next sign-in.
+ */
+describe('editing the roles of a super admin', () => {
+	const root = { id: 'u1', email: 'root@example.com', disabled: false, home: true, roles: ['super_admin', 'admin'] };
+
+	it('posts super_admin back with the roles picked, and says where it is managed', async () => {
+		render(TenantPage, { props: props({ members: { ok: true, value: [root] } }) });
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit roles for root@example.com' }));
+		const form = document.body.querySelector<HTMLFormElement>('form#member-form');
+		const posted = new FormData(form!).getAll('roles');
+		expect(posted).toContain('super_admin');
+		expect(posted).toContain('admin');
+		expect(drawerText()).toContain('The super admin role is managed on the Users page.');
+	});
+
+	it('adds nothing for an account that is not a super admin', async () => {
+		render(TenantPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit roles for ada@example.com' }));
+		const form = document.body.querySelector<HTMLFormElement>('form#member-form');
+		expect(new FormData(form!).getAll('roles')).not.toContain('super_admin');
+		expect(screen.queryByTestId('keeps-super-admin')).toBeNull();
+	});
+});

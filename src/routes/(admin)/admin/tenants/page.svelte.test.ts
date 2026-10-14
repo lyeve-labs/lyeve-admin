@@ -206,3 +206,34 @@ describe('Tenants when provisioning could not be read', () => {
 		expect(container.textContent).toContain('tenant-0');
 	});
 });
+
+describe('the tenant drawer fields', () => {
+	it('suggests a slug the engine accepts and states the rule', async () => {
+		const { getAllByRole } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
+		const slug = document.body.querySelector<HTMLInputElement>('#slug');
+		expect(slug?.placeholder).toMatch(/^[a-z][a-z0-9_]{0,62}$/);
+		expect(document.body.textContent).toContain('Lowercase letters, digits and underscores, starting with a letter.');
+	});
+
+	it('says what an emptied plan is stored as', async () => {
+		const { getAllByRole } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /^edit tenant-0|^edit tenant 0/i })[0]);
+		expect(document.body.textContent).toContain('Left empty, it is stored as free.');
+	});
+
+	it('draws a license refusal inside the drawer', async () => {
+		const { getAllByRole, rerender } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
+		await rerender({
+			data: data() as never,
+			form: {
+				action: 'create',
+				error: 'x',
+				refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' },
+			} as never,
+		});
+		const drawer = document.body.querySelector('form#tenant-form');
+		expect(drawer?.querySelector('[data-testid="refusal-notice"]')).not.toBeNull();
+	});
+});

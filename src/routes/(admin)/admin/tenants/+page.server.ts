@@ -8,7 +8,8 @@ import {
 	deleteTenant,
 	type Tenant
 } from '@lyeve-labs/client-rest';
-import { actionError } from '$lib/server/action-error';
+import { ApiError } from '@lyeve-labs/client';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { getProvisioning } from '$lib/api/tenants';
 import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
@@ -29,6 +30,27 @@ const LIST_FAILED = 'The tenants could not be read. This is not a report that th
 
 /** What the page says when it cannot tell whether a tenant may be created. */
 const PROVISIONING_FAILED = 'Whether this instance may create tenants could not be read.';
+
+/** The plan the plugin stores for a tenant created with none. */
+const DEFAULT_PLAN = 'free';
+
+/**
+ * The failure of a create the plugin refused. A slug the engine does not
+ * accept lands on the Slug field. A 402 that names a capability is the
+ * license refusal, and any other 402 carries its own sentence, such as the
+ * tenant quota, which the refusal notice would misname.
+ */
+function createFailure(err: unknown) {
+	if (err instanceof ApiError && err.status === 400 && err.message?.startsWith('invalid slug')) {
+		return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: { slug: err.message } });
+	}
+	const body = err instanceof ApiError ? ((err.body ?? {}) as { error?: unknown }) : {};
+	if (err instanceof ApiError && err.status === 402 && (body.error === 'payment_required' || body.error === 'cap_exceeded')) {
+		const refused = actionFailure(err, 'Failed to create tenant');
+		return fail(402, { ...refused.data, action: 'create' });
+	}
+	return fail(400, { action: 'create', error: actionError(err, 'Failed to create tenant') });
+}
 
 export const load: PageServerLoad = async (event) => {
 	const { url, parent } = event;
@@ -93,7 +115,7 @@ export const actions: Actions = {
 		try {
 			await createTenant({ slug, name, plan: plan || undefined }, client);
 		} catch (err) {
-			return fail(400, { action: 'create', error: actionError(err, 'Failed to create tenant') });
+			return createFailure(err);
 		}
 	},
 
@@ -107,7 +129,9 @@ export const actions: Actions = {
 		const plan = String(data.get('plan') ?? '').trim();
 		if (!name) return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { name: 'Display name is required' } });
 		try {
-			await updateTenant(id, { name, plan: plan || undefined }, client);
+			// The plugin keeps the stored plan when the key is absent, so an
+			// emptied field sends the plan a create with none is given.
+			await updateTenant(id, { name, plan: plan || DEFAULT_PLAN }, client);
 		} catch (err) {
 			return fail(400, { action: 'update', error: actionError(err, 'Failed to update tenant') });
 		}

@@ -26,6 +26,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 	import { pageHref, pageNumber } from '$lib/api/list';
+	import { formRefusal } from '$lib/api/refusal';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -300,7 +301,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New tenant'}>
 	<form method="post" action={editing ? '?/update' : '?/create'} id="tenant-form" use:enhance={saveTenantSubmit.enhance} class="flex flex-col gap-4">
-		<FormErrors message={(drawerForm as Failure)?.error || undefined} fields={errors} />
+		<FormErrors message={(drawerForm as Failure)?.error || undefined} fields={errors} refused={formRefusal(drawerForm)} />
 
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
@@ -312,7 +313,8 @@
 				label="Slug"
 				name="slug"
 				required
-				placeholder="acme-corp"
+				placeholder="acme_corp"
+				hint="Lowercase letters, digits and underscores, starting with a letter. At most 63 characters, and fewer on some databases. It cannot be changed later."
 				bind:value={slug}
 				error={errors.slug}
 			/>
@@ -330,7 +332,7 @@
 			id="plan"
 			label="Plan"
 			name="plan"
-			hint="A label stored with the tenant. Left empty, the engine picks its default."
+			hint="A label stored with the tenant. Left empty, it is stored as free."
 			bind:value={plan}
 			autocomplete="off"
 		/>
