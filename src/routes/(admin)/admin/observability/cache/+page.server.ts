@@ -1,6 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
+import { sessionTenant } from '$lib/server/session-refresh';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
@@ -59,7 +60,7 @@ export const load: PageServerLoad = async (event) => {
 	// one. A session names its own tenant, and a tenant admin's session always
 	// resolves to one. Only a super admin with no tenant of their own can reach
 	// the whole store, and only on an install that keeps many tenants.
-	const flushScoped = Boolean(user?.tenant_id) || !superAdmin;
+	const flushScoped = Boolean(sessionTenant(event)) || !superAdmin;
 
 	const client = authedClient(event);
 	let stats: CacheStats | null = null;

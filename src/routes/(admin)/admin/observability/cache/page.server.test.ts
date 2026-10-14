@@ -35,12 +35,20 @@ import { load, actions } from './+page.server';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
-function loadEvent(roles: string[], tenant_id = '') {
+// The session cookie as the engine signs it. The engine's me answer carries no
+// tenant, so the page takes it from the token.
+function sessionCookies(tenant: string) {
+	const part = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
+	const token = `${part({ alg: 'HS256' })}.${part({ sub: 'u', roles: ['super_admin'], ...(tenant ? { tenant_id: tenant } : {}) })}.s`;
+	return { get: (name: string) => (name === 'sys_session' ? token : undefined) };
+}
+
+function loadEvent(roles: string[], tenant = '') {
 	return {
 		url: new URL('http://admin/admin/observability/cache'),
 		fetch: vi.fn(),
-		cookies: {},
-		parent: async () => ({ user: { roles, tenant_id } }),
+		cookies: sessionCookies(tenant),
+		parent: async () => ({ user: { roles } }),
 	} as never;
 }
 
