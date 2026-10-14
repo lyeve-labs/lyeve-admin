@@ -35,8 +35,12 @@ function engine(fields: Record<string, string>, opts: { roles?: string[]; reply?
 	};
 }
 
-
 const OUTAGE = json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503);
+
+/** The storage plugin's answer to a ping. It is 200 whether or not the provider answered. */
+function ping(healthy: boolean, error = '') {
+	return json({ provider_id: 'p1', provider_type: 's3', provider_name: 'Uploads', healthy, latency_ms: healthy ? 41.2 : 0, error });
+}
 const S3 = { provider_type: 's3', name: ' Uploads ', bucket: 'uploads', region: 'us-east-1', access_key: 'AK', secret_key: 'SK', priority: '5', enabled: 'on' };
 
 describe('storage writes by role', () => {
@@ -51,7 +55,7 @@ describe('storage writes by role', () => {
 	});
 
 	it('lets an admin test a provider', async () => {
-		const { event, calls } = engine({ id: 'p1' }, { roles: ['admin'], reply: json({ success: true }) });
+		const { event, calls } = engine({ id: 'p1' }, { roles: ['admin'], reply: ping(true) });
 		expect(await actions.test(event)).toEqual({ tested: 'p1' });
 		expect(calls).toEqual([{ method: 'POST', path: '/api/admin/storage/providers/p1/test', body: {} }]);
 	});
@@ -64,16 +68,15 @@ describe('storage writes by role', () => {
 });
 
 describe('testing a provider', () => {
-	it('reads an answer without an explicit success as a refusal', async () => {
-		const { event } = engine({ id: 'p1' }, { reply: json({ message: 'access denied by bucket policy' }) });
-		const out = (await actions.test(event)) as Failure;
-		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('The provider refused: access denied by bucket policy');
+	it('passes a provider the plugin reports healthy', async () => {
+		const { event } = engine({ id: 'p1' }, { reply: ping(true) });
+		expect(await actions.test(event)).toEqual({ tested: 'p1' });
 	});
 
-	it('accepts success under its second field name', async () => {
-		const { event } = engine({ id: 'p1' }, { reply: json({ ok: true }) });
-		expect(await actions.test(event)).toEqual({ tested: 'p1' });
+	it('names why an unhealthy provider failed', async () => {
+		const { event } = engine({ id: 'p1' }, { reply: ping(false, 'AccessDenied: access denied by bucket policy') });
+		const out = (await actions.test(event)) as Failure;
+		expect(out.data.error).toBe('The provider refused: AccessDenied: access denied by bucket policy');
 	});
 
 	it('relays a refusal and hides an outage', async () => {
