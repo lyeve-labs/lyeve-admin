@@ -25,6 +25,7 @@
 		scopeLabel,
 		scopeTone,
 		windowLabel,
+		type LimiterState,
 		type Protection,
 		type RateRule,
 	} from '$lib/api/rate-limit';
@@ -56,6 +57,28 @@
 	const blocking = $derived(data.rules.filter(blocksEverything));
 	const live = $derived(data.status.ok ? data.status.value : []);
 	const spent = $derived(exhausted(live));
+	/*
+	 * A bucket is one rule, tenant, caller and endpoint, so the row key names
+	 * all four. The engine masks the end of each address, so two callers on one
+	 * network can still share all four. A repeat then takes a counter, which
+	 * keeps both rows on the page.
+	 */
+	const liveRows = $derived.by(() => {
+		const seen = new Map<string, number>();
+		return live.map((s) => {
+			const key = [s.rule_id, s.tenant_id ?? '', s.client_ip, s.endpoint].join('\u001f');
+			const n = seen.get(key) ?? 0;
+			seen.set(key, n + 1);
+			return { s, key: n === 0 ? key : `${key}\u001f${n}` };
+		});
+	});
+	/*
+	 * A bucket with no tenant means one of two things. The global limit counts
+	 * one address across every tenant. Any other rule without a tenant counts
+	 * only the requests that resolved none.
+	 */
+	const countedBy = (s: LimiterState & { kind?: string }) =>
+		s.tenant_id ? `Tenant ${s.tenant_id}` : s.kind === 'global' ? 'Whole instance' : 'No tenant';
 	const overview = $derived(data.overview);
 	// Unknown is its own state: a failed read is neither locked nor unlocked.
 	const customEnabled = $derived(overview?.custom_licensed ?? null);
@@ -508,9 +531,12 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each live as s (s.rule_id + s.client_ip + s.endpoint)}
+						{#each liveRows as { s, key } (key)}
 							<tr>
-								<td data-cell="nowrap" class="font-mono text-xs">{s.client_ip}</td>
+								<td data-cell="nowrap" class="text-xs">
+									<span class="block font-mono">{s.client_ip}</span>
+									<span class="block text-faint">{countedBy(s)}</span>
+								</td>
 								<td data-cell="nowrap" class="font-mono text-xs text-faint">{s.endpoint}</td>
 								<td data-cell="nowrap">
 									<Badge tone={s.remaining <= 0 ? 'danger' : 'neutral'}>
