@@ -11,11 +11,10 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Globe, MapPin, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -101,21 +100,11 @@
 	 * the point at which a residency record can silently stop being true.
 	 */
 	function removeRegion(r: Region): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete region ${r.display_name}`,
-				'Tenants assigned to it are not moved. Move them first, or the report stops accounting for where their data is.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${r.display_name}`);
-			};
-		};
+		return confirmed(
+			`Delete region ${r.display_name}`,
+			'Tenants assigned to it are not moved. Move them first, or the report stops accounting for where their data is.',
+			{ confirmLabel: 'Delete', success: `Deleted ${r.display_name}` },
+		);
 	}
 
 	const saveRegionSubmit = tracked(saveRegion);

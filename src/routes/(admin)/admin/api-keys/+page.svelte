@@ -16,8 +16,6 @@
 		SegmentedControl,
 		Pagination,
 		Table,
-		confirm as confirmDialog,
-		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -27,7 +25,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { fieldErrors, submitter } from '$lib/forms.svelte';
+	import { confirmed, fieldErrors, submitter } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
 	import { formatCount, formatDate } from '$lib/format';
@@ -146,21 +144,11 @@
 	 * so canceling here means the request is never made.
 	 */
 	function deleteKey(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete API key ${name}`,
-				'Anything signing with it stops working, and the key leaves the list.',
-				{ confirmLabel: 'Delete' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${name}`);
-			};
-		};
+		return confirmed(
+			`Delete API key ${name}`,
+			'Anything signing with it stops working, and the key leaves the list.',
+			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+		);
 	}
 
 	/** Revoking leaves the row in place, so nothing on screen says it worked. */
@@ -171,21 +159,11 @@
 	 * nothing on the caller's side says why. So it asks first, as delete does.
 	 */
 	function revokeKey(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Revoke key ${name}?`,
-				'Anything signing with it stops working at once. The key stays listed and cannot be used again.',
-				{ confirmLabel: 'Revoke' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Revoked ${name}`);
-			};
-		};
+		return confirmed(
+			`Revoke key ${name}?`,
+			'Anything signing with it stops working at once. The key stays listed and cannot be used again.',
+			{ confirmLabel: 'Revoke', success: `Revoked ${name}` },
+		);
 	}
 
 	// The endpoint takes no search, so the box narrows the page on screen.

@@ -15,14 +15,13 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { OAuthProvider } from '@lyeve-labs/client';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import { KeyRound, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -69,21 +68,11 @@
 	 * anything, so canceling here means the request is never made.
 	 */
 	function deleteProvider(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete provider ${providerLabel(name)}?`,
-				'Everyone who signs in through it loses that way in.',
-				{ confirmLabel: 'Delete provider' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${providerLabel(name)}`);
-			};
-		};
+		return confirmed(
+			`Delete provider ${providerLabel(name)}?`,
+			'Everyone who signs in through it loses that way in.',
+			{ confirmLabel: 'Delete provider', success: `Deleted ${providerLabel(name)}` },
+		);
 	}
 
 	let name = $state('');

@@ -13,7 +13,6 @@
 		SegmentedControl,
 		Select,
 		Table,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
@@ -23,7 +22,7 @@
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import {
 		DESTINATION_KINDS,
 		familiesMatching,
@@ -148,21 +147,14 @@
 		if (result.type === 'success') toast.success('Saved the destination');
 	});
 
-	const removeDest: SubmitFunction = async ({ cancel }) => {
-		const confirmed = await confirmDialog(
+	// Built at submit time, so the question names the destination on screen
+	// then rather than the one there when the page first drew.
+	const removeDest: SubmitFunction = (input) =>
+		confirmed(
 			destination ? `Delete the destination ${destination.url}?` : 'Delete the destination?',
 			"This tenant's series stop being pushed there, and its stored headers are deleted.",
-			{ confirmLabel: 'Delete' },
-		);
-		if (!confirmed) {
-			cancel();
-			return;
-		}
-		return async ({ result, update }) => {
-			await update();
-			if (result.type === 'success') toast.success('Removed the destination');
-		};
-	};
+			{ confirmLabel: 'Delete', success: 'Removed the destination' },
+		)(input);
 </script>
 
 {#snippet noMetrics()}

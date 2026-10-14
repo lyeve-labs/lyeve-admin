@@ -13,7 +13,6 @@
 		Pagination,
 		SectionHeading,
 		Table,
-		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -25,7 +24,7 @@
 	import type { TenantMember } from '$lib/api/tenant-access';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import { fieldErrors } from '$lib/forms.svelte';
+	import { confirmed, fieldErrors } from '$lib/forms.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -112,26 +111,24 @@
 		};
 	};
 
+	// Each question is built at submit time, so it names the tenant as it
+	// reads after a rename rather than as it read when the row first drew.
 	function revokeMember(email: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(
+		return (input) =>
+			confirmed(
 				`Remove ${email} from ${tenant.name}?`,
 				'The account keeps its home tenant and every other membership. Its open sessions here end at their next refresh.',
 				{ confirmLabel: 'Delete' },
-			);
-			if (!ok) cancel();
-		};
+			)(input);
 	}
 
 	function confirmArchive(): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(
+		return (input) =>
+			confirmed(
 				`Archive ${tenant.name}?`,
 				'Reads keep working and every write is refused until the tenant is restored.',
 				{ confirmLabel: 'Archive' },
-			);
-			if (!ok) cancel();
-		};
+			)(input);
 	}
 </script>
 

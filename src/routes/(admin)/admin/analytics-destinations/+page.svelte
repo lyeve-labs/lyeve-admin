@@ -16,7 +16,6 @@
 		Select,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
@@ -26,7 +25,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		CONFIG_FIELDS,
@@ -98,19 +97,11 @@
 	}
 
 	function deleteDestination(p: Provider): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(`Delete ${p.name}?`, 'Events stop going to it, and its queued deliveries go with it.', {
-				confirmLabel: 'Delete',
-			});
-			if (!ok) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete ${p.name}?`,
+			'Events stop going to it, and its queued deliveries go with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 
 	const replaySubmit: SubmitFunction = () => async ({ result, update }) => {

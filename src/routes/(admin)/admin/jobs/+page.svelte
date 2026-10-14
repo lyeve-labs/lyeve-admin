@@ -15,8 +15,6 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
-		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -26,7 +24,7 @@
 	import { Plus, Trash2, Pencil, Clock, CheckCircle, XCircle, Inbox } from '@lucide/svelte';
 	import type { Job } from './+page.server';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
@@ -105,21 +103,11 @@
 	 * canceling here means the request is never made.
 	 */
 	function deleteJob(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${name}?`,
-				'Its schedule stops and its run history goes with it.',
-				{ confirmLabel: 'Delete' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${name}`);
-			};
-		};
+		return confirmed(
+			`Delete ${name}?`,
+			'Its schedule stops and its run history goes with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+		);
 	}
 
 	// The endpoint takes no search, so the box narrows the page on screen and

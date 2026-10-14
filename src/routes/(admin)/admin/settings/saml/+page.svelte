@@ -14,12 +14,11 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { KeyRound, Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -153,21 +152,11 @@
 	 * no undo: the private key is deleted with the row.
 	 */
 	function removeProvider(p: SamlProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete SAML provider ${p.name}`,
-				'Anyone who signs in through this provider will lose access, and the private key is deleted with it.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete SAML provider ${p.name}`,
+			'Anyone who signs in through this provider will lose access, and the private key is deleted with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 
 	/**
@@ -175,21 +164,11 @@
 	 * first and says what has to be true before it is safe.
 	 */
 	function promote(p: SamlProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Promote the new certificate for ${p.name}?`,
-				'Every request will be signed with it from now on. Do this once the identity provider has read the metadata document and trusts it.',
-				{ confirmLabel: 'Promote' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`${p.name} is using the new certificate`);
-			};
-		};
+		return confirmed(
+			`Promote the new certificate for ${p.name}?`,
+			'Every request will be signed with it from now on. Do this once the identity provider has read the metadata document and trusts it.',
+			{ confirmLabel: 'Promote', success: `${p.name} is using the new certificate` },
+		);
 	}
 
 	const saveProviderSubmit = tracked(saveProvider);

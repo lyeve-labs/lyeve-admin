@@ -14,12 +14,12 @@
 		SearchInput,
 		SectionHeading,
 		Stat,
-		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageData, ActionData } from './$types';
 	import { ArrowRight, Database, Plus, Search, Shuffle, Trash2 } from '@lucide/svelte';
+	import { confirmed } from '$lib/forms.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -49,12 +49,11 @@
 	};
 
 	function confirmDelete(term: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(`Delete the synonyms of ${term}?`, 'Searches for it match only the term itself again.', {
-				confirmLabel: 'Delete',
-			});
-			if (!ok) cancel();
-		};
+		return confirmed(
+			`Delete the synonyms of ${term}?`,
+			'Searches for it match only the term itself again.',
+			{ confirmLabel: 'Delete' },
+		);
 	}
 
 	// Seed the input with the active query so it survives navigation.

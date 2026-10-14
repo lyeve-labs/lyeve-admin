@@ -15,7 +15,6 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 		RadioGroup,
@@ -25,7 +24,7 @@
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { submitter, tracked } from '$lib/forms.svelte';
+	import { confirmed, submitter, tracked } from '$lib/forms.svelte';
 	import AlertChannelFields from '$lib/components/AlertChannelFields.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
@@ -212,21 +211,11 @@
 	}
 
 	function removeProbe(p: Probe): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
-				'Its results and its alert history go with it.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete ${p.name}?`,
+			'Its results and its alert history go with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 
 	const saveProbeSubmit = tracked(saveProbe);

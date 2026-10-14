@@ -14,8 +14,6 @@
 		Select,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
-		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -23,7 +21,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import AlertChannelFields from '$lib/components/AlertChannelFields.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { channelSummary } from '$lib/api/alert-channels';
 	import { LOG_ALERT_LEVELS, ruleScope, type LogAlertRule } from '$lib/api/log-alerts';
@@ -72,21 +70,11 @@
 	}
 
 	function deleteRule(rule: LogAlertRule): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(
-				`Delete the rule on ${ruleScope(rule).toLowerCase()}?`,
-				'It stops firing. Its channels go with it.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!ok) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success('Rule deleted');
-			};
-		};
+		return confirmed(
+			`Delete the rule on ${ruleScope(rule).toLowerCase()}?`,
+			'It stops firing. Its channels go with it.',
+			{ confirmLabel: 'Delete', success: 'Rule deleted' },
+		);
 	}
 
 	// A new webhook URL's signing secret arrives once, in the write's answer.

@@ -1,13 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SubmitFunction } from '@sveltejs/kit';
-import { submitter, tracked } from './forms.svelte';
+import { confirmed, submitter, tracked } from './forms.svelte';
+
+const kit = vi.hoisted(() => ({
+	confirm: vi.fn(async () => true),
+	success: vi.fn(),
+}));
+vi.mock('@lyeve-labs/ui-kit', () => ({
+	confirm: kit.confirm,
+	toast: { success: kit.success },
+}));
 
 /** The half of the enhance contract a test has to supply. */
-const opts = (type: 'success' | 'failure' | 'error' = 'success') => ({
+const opts = (type: 'success' | 'failure' | 'error' = 'success', data: Record<string, unknown> = {}) => ({
 	formData: new FormData(),
 	formElement: {} as HTMLFormElement,
 	action: new URL('http://x/?/create'),
-	result: { type, status: 200, data: {} } as never,
+	result: { type, status: 200, data } as never,
 	update: vi.fn(async () => {}),
 });
 
@@ -121,5 +130,79 @@ describe('a handler that cancels', () => {
 		expect(t.pending).toBe(true);
 		await after!(o as never);
 		expect(t.pending).toBe(false);
+	});
+});
+
+describe('confirmed', () => {
+	function start(type: 'success' | 'failure' | 'error' = 'success', data: Record<string, unknown> = {}) {
+		const o = opts(type, data);
+		const cancel = vi.fn();
+		return { o, cancel, input: { ...o, cancel, submitter: null, controller: new AbortController() } as never };
+	}
+
+	beforeEach(() => {
+		kit.confirm.mockReset();
+		kit.confirm.mockResolvedValue(true);
+		kit.success.mockReset();
+	});
+
+	it('asks the question with its detail and only the kit options', async () => {
+		const { input } = start();
+		await confirmed('Delete job nightly?', 'Its history goes with it.', {
+			confirmLabel: 'Delete',
+			detail: 'job-1',
+			success: 'Deleted nightly',
+		})(input);
+		expect(kit.confirm).toHaveBeenCalledWith('Delete job nightly?', 'Its history goes with it.', {
+			confirmLabel: 'Delete',
+			detail: 'job-1',
+		});
+	});
+
+	it('cancels the request and applies nothing when the question is declined', async () => {
+		kit.confirm.mockResolvedValue(false);
+		const { o, cancel, input } = start();
+		const after = await confirmed('Delete it?', 'Gone.', { confirmLabel: 'Delete', success: 'Deleted' })(input);
+		expect(cancel).toHaveBeenCalledOnce();
+		expect(after).toBeUndefined();
+		expect(o.update).not.toHaveBeenCalled();
+		expect(kit.success).not.toHaveBeenCalled();
+	});
+
+	it('applies the result and says what happened once the write goes through', async () => {
+		const { o, cancel, input } = start();
+		const after = await confirmed('Delete it?', 'Gone.', { confirmLabel: 'Delete', success: 'Deleted it' })(input);
+		await after!(o as never);
+		expect(cancel).not.toHaveBeenCalled();
+		expect(o.update).toHaveBeenCalledWith();
+		expect(kit.success).toHaveBeenCalledWith('Deleted it');
+	});
+
+	it('raises no toast over a refused write, which the page shows itself', async () => {
+		for (const type of ['failure', 'error'] as const) {
+			const { o, input } = start(type);
+			const after = await confirmed('Delete it?', 'Gone.', { confirmLabel: 'Delete', success: 'Deleted it' })(input);
+			await after!(o as never);
+			expect(o.update).toHaveBeenCalledOnce();
+		}
+		expect(kit.success).not.toHaveBeenCalled();
+	});
+
+	it('raises no toast when the caller names none', async () => {
+		const { o, input } = start();
+		const after = await confirmed('Archive it?', 'Writes stop.', { confirmLabel: 'Archive' })(input);
+		await after!(o as never);
+		expect(o.update).toHaveBeenCalledOnce();
+		expect(kit.success).not.toHaveBeenCalled();
+	});
+
+	it("builds the toast from the action's answer when it is a function", async () => {
+		const { o, input } = start('success', { purged: 3 });
+		const after = await confirmed('Purge it?', 'Recomputed.', {
+			confirmLabel: 'Purge',
+			success: (data) => `Purged ${String(data?.purged)}`,
+		})(input);
+		await after!(o as never);
+		expect(kit.success).toHaveBeenCalledWith('Purged 3');
 	});
 });

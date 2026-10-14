@@ -11,14 +11,13 @@
 		SectionHeading,
 		SegmentedControl,
 		Table,
-		confirm as confirmDialog,
-		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { Schema, SchemaField } from '@lyeve-labs/client';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import { confirmed } from '$lib/forms.svelte';
 	import { listQuery } from '$lib/back';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -118,22 +117,15 @@
 	 * request is never made.
 	 */
 	function deleteEntry(item: EntryItem): SubmitFunction {
-		return async ({ cancel }) => {
+		return (input) => {
 			const title = entryTitle(item, userFields);
 			const named =
 				title.source === 'none' ? `the untitled entry ${shortId(item.id)}` : title.label;
-			const confirmed = await confirmDialog(`Delete ${named}?`, 'Its revisions and translations go with it.', {
+			return confirmed(`Delete ${named}?`, 'Its revisions and translations go with it.', {
 				confirmLabel: 'Delete',
-				detail: item.id
-			});
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${named}`);
-			};
+				detail: item.id,
+				success: `Deleted ${named}`
+			})(input);
 		};
 	}
 

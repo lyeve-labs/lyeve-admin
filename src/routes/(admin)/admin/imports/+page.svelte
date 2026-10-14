@@ -17,7 +17,6 @@
 		Spinner,
 		Stat,
 		Table,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
@@ -43,7 +42,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import TransformField from '$lib/components/imports/TransformField.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		OUTCOME_LABELS,
@@ -133,39 +132,19 @@
 	}
 
 	function cancel(j: ImportJob): SubmitFunction {
-		return async ({ cancel: stop }) => {
-			const confirmed = await confirmDialog(
-				`Cancel the import of ${j.source_name}?`,
-				'Rows already written stay written. Canceling stops the job where it is, it does not undo it.',
-				{ confirmLabel: 'Cancel import' },
-			);
-			if (!confirmed) {
-				stop();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success('Import canceled');
-			};
-		};
+		return confirmed(
+			`Cancel the import of ${j.source_name}?`,
+			'Rows already written stay written. Canceling stops the job where it is, it does not undo it.',
+			{ confirmLabel: 'Cancel import', success: 'Import canceled' },
+		);
 	}
 
 	function rollback(j: ImportJob): SubmitFunction {
-		return async ({ cancel: stop }) => {
-			const confirmed = await confirmDialog(
-				`Roll back the import of ${j.source_name}?`,
-				`The ${formatCount(j.inserted_rows)} entries it created are deleted, with any edits made to them since. Entries it updated keep the imported values. The history of the import stays.`,
-				{ confirmLabel: 'Roll back' },
-			);
-			if (!confirmed) {
-				stop();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success('Import rolled back');
-			};
-		};
+		return confirmed(
+			`Roll back the import of ${j.source_name}?`,
+			`The ${formatCount(j.inserted_rows)} entries it created are deleted, with any edits made to them since. Entries it updated keep the imported values. The history of the import stays.`,
+			{ confirmLabel: 'Roll back', success: 'Import rolled back' },
+		);
 	}
 
 	const detailItems = $derived(
@@ -256,21 +235,11 @@
 	});
 
 	function removeTemplate(t: MappingTemplate): SubmitFunction {
-		return async ({ cancel: stop }) => {
-			const confirmed = await confirmDialog(
-				`Delete template ${t.name}`,
-				'Imports that already ran with it keep their history. Nothing else changes.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				stop();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${t.name}`);
-			};
-		};
+		return confirmed(
+			`Delete template ${t.name}`,
+			'Imports that already ran with it keep their history. Nothing else changes.',
+			{ confirmLabel: 'Delete', success: `Deleted ${t.name}` },
+		);
 	}
 </script>
 

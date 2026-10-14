@@ -10,14 +10,13 @@
 		SearchInput,
 		SegmentedControl,
 		Table,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { Building2, Coins, Pencil, Plus, Trash2, ToggleLeft, ToggleRight } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { fieldErrors, tracked } from '$lib/forms.svelte';
+	import { confirmed, fieldErrors, tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -61,19 +60,11 @@
 	 * so canceling here means the request is never made.
 	 */
 	function deleteTenant(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(`Delete ${name}?`, 'Every row, file and user scoped to it goes with it.', {
-				confirmLabel: 'Delete',
-			});
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${name}`);
-			};
-		};
+		return confirmed(
+			`Delete ${name}?`,
+			'Every row, file and user scoped to it goes with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+		);
 	}
 
 	/** Enabling and disabling both leave the row in place, so the toast says it worked. */

@@ -8,12 +8,11 @@
 		SectionHeading,
 		Stat,
 		Table,
-		confirm as confirmDialog,
-		toast,
 		Pagination,
 		SearchInput,
 		SegmentedControl,
 	} from '@lyeve-labs/ui-kit';
+	import { confirmed } from '$lib/forms.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { enhance } from '$app/forms';
@@ -59,21 +58,11 @@
 	 * write would then happen twice, which is what the key exists to prevent.
 	 */
 	function release(k: IdempotencyKey): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Release the key ${k.key}?`,
-				'The next request carrying it runs the handler again. If the original request is still running, the write happens twice, which is what the key exists to prevent.',
-				{ confirmLabel: 'Release' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success('Key released');
-			};
-		};
+		return confirmed(
+			`Release the key ${k.key}?`,
+			'The next request carrying it runs the handler again. If the original request is still running, the write happens twice, which is what the key exists to prevent.',
+			{ confirmLabel: 'Release', success: 'Key released' },
+		);
 	}
 </script>
 

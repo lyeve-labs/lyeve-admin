@@ -16,11 +16,10 @@
 		SegmentedControl,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Gauge, Plus, ShieldBan, Trash2 } from '@lucide/svelte';
 	import {
@@ -115,40 +114,20 @@
 	});
 
 	function removeAddress(e: AddressEntry): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Remove ${e.cidr} from the ${e.list} list?`,
-				e.list === 'allow'
-					? 'Requests from it are counted against the tenant rules again.'
-					: 'Requests from it are served again from the next request.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Removed ${e.cidr}`);
-			};
-		};
+		return confirmed(
+			`Remove ${e.cidr} from the ${e.list} list?`,
+			e.list === 'allow'
+				? 'Requests from it are counted against the tenant rules again.'
+				: 'Requests from it are served again from the next request.',
+			{ confirmLabel: 'Delete', success: `Removed ${e.cidr}` },
+		);
 	}
 
-	const clearLimit: SubmitFunction = async ({ cancel }) => {
-		const confirmed = await confirmDialog(
-			'Clear the tenant limit?',
-			'This tenant goes back to the install-wide limit alone.',
-			{ confirmLabel: 'Clear' },
-		);
-		if (!confirmed) {
-			cancel();
-			return;
-		}
-		return async ({ result, update }) => {
-			await update();
-			if (result.type === 'success') toast.success('Cleared the tenant limit');
-		};
-	};
+	const clearLimit = confirmed(
+		'Clear the tenant limit?',
+		'This tenant goes back to the install-wide limit alone.',
+		{ confirmLabel: 'Clear', success: 'Cleared the tenant limit' },
+	);
 
 	// The window is the address, so the server render already marks the one
 	// it read, the links work before the page hydrates, and going back shows

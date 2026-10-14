@@ -16,7 +16,6 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
@@ -40,7 +39,7 @@
 		type ExportSchedule,
 	} from '$lib/api/data-export';
 	import { NO_VALUE, formatBytes, formatCount, formatDateTime } from '$lib/format';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -158,15 +157,11 @@
 	const createSchedule = submitter(() => (scheduleOpen = false));
 
 	function removeSchedule(s: ExportSchedule): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(
-				`Delete schedule ${s.name}`,
-				'It stops starting exports. The exports it already started stay in the list.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!ok) cancel();
-			return async ({ update }) => update();
-		};
+		return confirmed(
+			`Delete schedule ${s.name}`,
+			'It stops starting exports. The exports it already started stay in the list.',
+			{ confirmLabel: 'Delete' },
+		);
 	}
 </script>
 

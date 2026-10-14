@@ -13,12 +13,11 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, Gauge, Pencil, Plus, RotateCcw, ShieldBan, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
@@ -203,41 +202,21 @@
 	};
 
 	function removeRule(r: RateRule): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete rule ${r.endpoint}`,
-				r.enforced
-					? 'That endpoint stops being limited by it immediately.'
-					: 'The rule is not being enforced, so nothing changes for callers.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success('Rule deleted');
-			};
-		};
+		return confirmed(
+			`Delete rule ${r.endpoint}`,
+			r.enforced
+				? 'That endpoint stops being limited by it immediately.'
+				: 'The rule is not being enforced, so nothing changes for callers.',
+			{ confirmLabel: 'Delete', success: 'Rule deleted' },
+		);
 	}
 
 	function resetOne(p: Protection): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Reset ${p.name}?`,
-				`It returns to ${windowLabel(p.default_requests, p.default_window_seconds)}.`,
-				{ confirmLabel: 'Reset' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Reset ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Reset ${p.name}?`,
+			`It returns to ${windowLabel(p.default_requests, p.default_window_seconds)}.`,
+			{ confirmLabel: 'Reset', success: `Reset ${p.name}` },
+		);
 	}
 
 	const saveRuleSubmit = tracked(saveRule);

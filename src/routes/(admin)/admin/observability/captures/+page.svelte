@@ -21,7 +21,7 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { FileStack, History, Pencil, Play, Plus, Trash2 } from '@lucide/svelte';
 	import {
@@ -128,17 +128,11 @@
 	});
 
 	function remove(what: string, detail: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(`Delete ${what}?`, detail, { confirmLabel: 'Delete' });
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${what}`);
-			};
-		};
+		return confirmed(
+			`Delete ${what}?`,
+			detail,
+			{ confirmLabel: 'Delete', success: `Deleted ${what}` },
+		);
 	}
 
 	/**
@@ -147,14 +141,14 @@
 	 */
 	function runSet(s: ReplaySet, writes: boolean): SubmitFunction {
 		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
+			const ok = await confirmDialog(
 				writes ? `Replay ${s.name}, writes included?` : `Replay ${s.name}?`,
 				writes
 					? 'Every request in the set runs again with your credentials, and each write is repeated.'
 					: 'Every request in the set runs again against this instance with your credentials in place of the ones that were redacted.',
 				{ confirmLabel: 'Replay' },
 			);
-			if (!confirmed) {
+			if (!ok) {
 				cancel();
 				return;
 			}

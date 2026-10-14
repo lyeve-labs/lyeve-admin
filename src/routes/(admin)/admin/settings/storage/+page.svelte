@@ -14,7 +14,6 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -23,7 +22,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, HardDrive, Pencil, Plug, Plus, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import {
 		PROVIDER_FIELDS,
 		PROVIDER_LABELS,
@@ -142,21 +141,11 @@
 	}
 
 	function remove(p: StorageProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete provider ${p.name}`,
-				'Objects already stored there stay where they are, and nothing in this instance can read them afterwards.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete provider ${p.name}`,
+			'Objects already stored there stay where they are, and nothing in this instance can read them afterwards.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 </script>
 
