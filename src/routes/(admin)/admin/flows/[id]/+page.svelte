@@ -2,22 +2,15 @@
 	import {
 		Alert,
 		Badge,
-		Collapsible,
 		Button,
 		ButtonGroup,
-		Card,
-		CopyButton,
 		Dropdown,
 		EmptyState,
-		FileInput,
 		Input,
 		Kbd,
-		Drawer,
-		Modal,
 		PageShell,
 		Pagination,
 		SectionHeading,
-		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
@@ -39,7 +32,6 @@
 		Keyboard,
 		LayoutGrid,
 		LayoutTemplate,
-		Lock,
 		Trash2,
 		PanelLeft,
 		PanelRight,
@@ -71,8 +63,10 @@
 	import RunViewer from '$lib/components/flow/RunViewer.svelte';
 	import FlowGuide from '$lib/components/flow/FlowGuide.svelte';
 	import AssistantPanel from '$lib/components/flow/AssistantPanel.svelte';
+	import FlowExportModal from '$lib/components/flow/FlowExportModal.svelte';
+	import FlowTemplateGallery from '$lib/components/flow/FlowTemplateGallery.svelte';
+	import FlowImportDrawer, { type ImportFailure } from '$lib/components/flow/FlowImportDrawer.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
-	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { useInstance } from '$lib/instance.svelte';
@@ -108,7 +102,6 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const submit = submitter(() => (showImport = false));
 	// The list's filter rides on the row link, so the way back lands on the
 	// same slice of Flows the reader opened this one from.
 	const back = $derived(listBack('/admin/flows', 'Flows', page.url, ['status', 'q']));
@@ -283,35 +276,6 @@
 	// doors GitHub Actions opens on a new workflow, from inside the editor
 	// rather than before it exists.
 	let showGallery = $state(false);
-	// Templates the tenant keeps: this flow, a URL, a file or a paste.
-	let templateError = $state('');
-	let templateSaving = $state(false);
-	let templateDeleteForm = $state<HTMLFormElement | undefined>();
-	let templateDeleteId = $state('');
-	const templateSave: SubmitFunction = () => {
-		templateSaving = true;
-		templateError = '';
-		return async ({ result, update, formElement }) => {
-			templateSaving = false;
-			if (result.type === 'failure') {
-				templateError = String((result.data as { templateError?: string })?.templateError ?? 'The template could not be saved.');
-				return;
-			}
-			if (result.type === 'success') {
-				if (formElement !== templateDeleteForm) formElement.reset();
-				const d = result.data as { savedTemplate?: string; deletedTemplate?: string } | undefined;
-				toast.success(d?.deletedTemplate ? 'Template deleted' : 'Template saved');
-			}
-			await update({ reset: false, invalidateAll: true });
-		};
-	};
-	async function deleteTemplate(id: string, name: string) {
-		const ok = await confirm(`Delete the template ${name}?`, 'Flows already started from it keep what they have.', { confirmLabel: 'Delete' });
-		if (!ok) return;
-		templateDeleteId = id;
-		await tick();
-		templateDeleteForm?.requestSubmit();
-	}
 
 	/** Opens the palette where it is closed, and puts the cursor in its filter. */
 	async function startFromPalette() {
@@ -452,34 +416,12 @@
 		}
 	}
 
-	// Export
-	let showExport = $state(false);
-	let exportFormat = $state<'json' | 'yaml'>('json');
-	let exportText = $state('');
-	let exportError = $state('');
-	let exportLoading = $state(false);
-
-	async function loadExport(format: 'json' | 'yaml') {
-		exportFormat = format;
-		exportError = '';
-		// The text of the other format is not this one's, so it goes while the
-		// new one loads.
-		exportText = '';
-		exportLoading = true;
-		try {
-			const text = await exportFlow(fetch, flowId, format, csrfHeaders());
-			exportText = format === 'json' ? JSON.stringify(JSON.parse(text), null, 2) : text;
-		} catch {
-			exportError = 'The export could not be loaded. Save the draft and try again.';
-		} finally {
-			exportLoading = false;
-		}
-	}
-
+	// Export. The panel keeps its own format and text, and the request is
+	// made here with the browser client's CSRF header like the editor's other
+	// reads about the draft.
+	let exportPanel = $state<FlowExportModal>();
 	function openExport() {
-		exportText = '';
-		showExport = true;
-		void loadExport(exportFormat);
+		exportPanel?.show();
 	}
 
 	let showImport = $state(false);
@@ -487,7 +429,7 @@
 	// canvas leaves it out. Opening the drawer clears what an earlier attempt
 	// left, and no other action's failure is drawn in it.
 	let importCleared = $state<unknown>(null);
-	const importFailure = $derived.by(() => {
+	const importFailure = $derived.by((): ImportFailure | null => {
 		const f = form as { action?: unknown; error?: unknown; refusal?: unknown; locked?: unknown } | null;
 		if (!f || f === importCleared || f.action !== 'import' || typeof f.error !== 'string') return null;
 		return {
@@ -1265,141 +1207,18 @@
 		</div>
 	</PageShell>
 
-	{#if showExport}
-		<Modal open title="Export {definition.name}" onclose={() => (showExport = false)}>
-			{#snippet children()}
-				<div class="flex flex-col gap-3">
-					<div class="flex items-center justify-between gap-2">
-						<SegmentedControl
-							label="Format"
-							labelHidden
-							size="sm"
-							value={exportFormat}
-							options={[
-								{ value: 'json', label: 'JSON' },
-								{ value: 'yaml', label: 'YAML' },
-							]}
-							onchange={(v) => void loadExport(v)}
-						/>
-						<CopyButton value={exportText} label="Copy" />
-					</div>
-					<p class="text-xs text-muted">The saved draft, secrets stripped. Datasources are named, not carried.</p>
-					{#if exportError}
-						<Alert tone="danger">
-							{#snippet children()}{exportError}{/snippet}
-						</Alert>
-					{/if}
-					{#if exportLoading}
-						<p class="text-sm text-muted" aria-live="polite">Loading the export.</p>
-					{:else if exportText}
-						<pre class="max-h-96 overflow-auto rounded-md border border-line bg-surface-2 p-3 font-mono text-xs text-fg">{exportText}</pre>
-					{/if}
-					{#if exportText}
-						<a
-							class="text-xs text-brand underline"
-							download="{definition.slug || 'flow'}.{exportFormat}"
-							href={`data:${exportFormat === 'json' ? 'application/json' : 'application/yaml'};charset=utf-8,${encodeURIComponent(exportText)}`}
-						>
-							Download {exportFormat.toUpperCase()}
-						</a>
-					{/if}
-				</div>
-			{/snippet}
-			{#snippet footer()}
-				<Button variant="secondary" onclick={() => (showExport = false)}>Close</Button>
-			{/snippet}
-		</Modal>
-	{/if}
+	<FlowExportModal bind:this={exportPanel} name={definition.name} slug={definition.slug} load={(format) => exportFlow(fetch, flowId, format, csrfHeaders())} />
 
-	<!-- Drawers, like the schema builder's presets and import: a gallery and a
-	     form are panels beside the canvas, and a Modal is for a confirmation. -->
-	<Drawer bind:open={showGallery} title="Use a template" size="lg">
-		<div class="flex flex-col gap-4">
-			<p class="text-sm text-muted">A template puts its trigger and nodes on this canvas. The flow keeps its name and slug, and nothing is saved until you save.</p>
-			{#if can.update}
-				<Collapsible label="Save a template">
-					<div class="flex flex-col gap-4 pt-2">
-						<p class="text-sm text-muted">A saved template is listed here beside the built-in ones. It is named by its slug. Saving the same slug again replaces it, so reading the URL again refreshes it.</p>
-						<form method="POST" action="?/saveTemplate" use:enhance={templateSave}>
-							<input type="hidden" name="document" value={JSON.stringify({ ...definition, name: data.flow.name, slug: data.flow.slug })} />
-							<Button variant="secondary" type="submit" loading={templateSaving}>Save this flow as a template</Button>
-						</form>
-						<form method="POST" action="?/saveTemplate" enctype="multipart/form-data" use:enhance={templateSave} class="flex flex-col gap-4">
-							<Input id="template-url" name="url" type="url" label="URL" placeholder="https://example.com/flows/welcome.yaml" hint="Read over http or https. Private and loopback addresses are refused." />
-							<FileInput id="template-file" name="file" label="Or a file" accept=".json,.yaml,.yml,application/json,application/yaml" />
-							<Textarea id="template-document" name="document" label="Or paste the definition" rows={6} class="[&_textarea]:text-xs" mono />
-							<div class="flex justify-end">
-								<Button variant="primary" type="submit" loading={templateSaving}>Save</Button>
-							</div>
-						</form>
-						{#if templateError}
-							<Alert tone="danger">{templateError}</Alert>
-						{/if}
-					</div>
-				</Collapsible>
-			{/if}
-			{#if data.templates.length === 0}
-				<EmptyState title="No templates" description="The engine offered none. Start from the palette or import a definition instead." />
-			{:else}
-				<div class="grid gap-3 sm:grid-cols-2" data-testid="template-gallery">
-					{#each data.templates as t (t.id)}
-						<Card heading={t.name} headingLevel={3} description={t.description}>
-							<div class="flex flex-wrap items-center gap-2">
-								{#if t.source === 'saved'}
-									<Badge tone="brand" size="sm">Saved</Badge>
-								{/if}
-								{#if t.enabled === false}
-									<span data-testid="template-locked"><Badge tone="neutral" size="sm"><Lock size={ICON.xs} aria-hidden="true" /> Not enabled on this instance</Badge></span>
-								{/if}
-								<span class="text-xs text-faint">{triggerLabel(t.definition.trigger.type)} trigger, {t.definition.nodes.length} node{t.definition.nodes.length === 1 ? '' : 's'}</span>
-								{#if t.source === 'saved' && can.delete}
-									<Button variant="ghost" size="sm" class="ms-auto" aria-label="Delete the template {t.name}" onclick={() => void deleteTemplate(t.id, t.name)}>
-										<Trash2 size={ICON.sm} class="text-danger" />
-									</Button>
-								{/if}
-							</div>
-							{#snippet footer()}
-								<Button variant="primary" onclick={() => void startFromTemplate(t)}>Use</Button>
-							{/snippet}
-						</Card>
-					{/each}
-				</div>
-			{/if}
-		</div>
-		<form method="POST" action="?/deleteTemplate" use:enhance={templateSave} bind:this={templateDeleteForm} class="hidden">
-			<input type="hidden" name="id" value={templateDeleteId} />
-		</form>
-		{#snippet footer()}
-			<Button variant="secondary" onclick={() => (showGallery = false)}>Cancel</Button>
-		{/snippet}
-	</Drawer>
+	<FlowTemplateGallery
+		bind:open={showGallery}
+		templates={data.templates}
+		flowDocument={JSON.stringify({ ...definition, name: data.flow.name, slug: data.flow.slug })}
+		canUpdate={can.update}
+		canDelete={can.delete}
+		onuse={(t) => void startFromTemplate(t)}
+	/>
 
-	<Drawer bind:open={showImport} title="Import a definition">
-		<form
-			method="POST"
-			action="?/import"
-			id="flow-import-form"
-			enctype="multipart/form-data"
-			use:enhance={submit.enhance}
-			class="flex flex-col gap-4"
-		>
-			<FormErrors message={importFailure?.error} />
-			{#if importFailure?.refused && enableLink}
-				<!-- The notice above the canvas leaves an import's refusal to this
-				     drawer, so the way to raise the limit or enable the feature is
-				     here too. -->
-				<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? (importFailure.refusal?.limit != null ? 'How to raise the limit' : 'How to enable it')}</a>
-			{/if}
-			<input type="hidden" name="slug" value={data.flow.slug} />
-			<p class="text-sm text-muted">The imported definition replaces the draft of this flow. The published version is not touched until you publish again.</p>
-			<FileInput id="import-file" name="file" label="Definition file" accept=".json,.yaml,.yml,application/json,application/yaml" />
-			<Textarea id="import-text" name="text" label="Or paste the definition" rows={10} mono />
-		</form>
-		{#snippet footer()}
-			<Button variant="secondary" type="button" onclick={() => (showImport = false)}>Cancel</Button>
-			<Button variant="primary" type="submit" form="flow-import-form">Import</Button>
-		{/snippet}
-	</Drawer>
+	<FlowImportDrawer bind:open={showImport} slug={data.flow.slug} failure={importFailure} {enableLink} />
 
 	<form method="POST" action="?/delete" use:enhance={deleteFlow.enhance} bind:this={deleteFlowForm} class="hidden"></form>
 {:else}
