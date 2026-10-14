@@ -107,33 +107,61 @@ describe('the row text', () => {
 	});
 });
 
+// One exporter's health as the plugin encodes it. Its times are Go time
+// values, which JSON writes as the zero time rather than leaving them out.
+const PUSHGATEWAY = {
+	name: 'pushgateway',
+	healthy: true,
+	last_export: '2026-10-14T09:00:00Z',
+	last_failure: '0001-01-01T00:00:00Z',
+	exports: 3,
+	failures: 0,
+};
+
+const SESSION = { Authorization: 'Bearer tok', 'X-CSRF-Token': 'csrf-tok' };
+
 describe('the routes', () => {
-	it('scrapes the metrics route as the session with a text accept', async () => {
+	it('scrapes the metrics route with the session headers and a text accept', async () => {
 		const fetchFn = vi.fn(async () => new Response('x 1\n', { status: 200 })) as unknown as typeof fetch;
-		expect(await readMetricsText(fetchFn, 'tok')).toBe('x 1\n');
-		expect(fetchFn).toHaveBeenCalledWith('/api/admin/telemetry/metrics', {
-			headers: { Authorization: 'Bearer tok', Accept: 'text/plain' },
-		});
+		expect(await readMetricsText(fetchFn, SESSION)).toBe('x 1\n');
+		expect(fetchFn).toHaveBeenCalledWith(
+			'/api/admin/telemetry/metrics',
+			expect.objectContaining({
+				headers: { Authorization: 'Bearer tok', 'X-CSRF-Token': 'csrf-tok', Accept: 'text/plain' },
+			}),
+		);
 	});
 
-	it('lets a refused scrape reach the caller with its status', async () => {
-		const fetchFn = vi.fn(async () => new Response('{"error":"forbidden"}', { status: 403 })) as unknown as typeof fetch;
-		await expect(readMetricsText(fetchFn, 'tok')).rejects.toMatchObject({ status: 403 });
+	it('bounds the scrape so an engine that never answers reads as an outage', async () => {
+		const fetchFn = vi.fn(async () => new Response('x 1\n', { status: 200 })) as unknown as typeof fetch;
+		await readMetricsText(fetchFn, SESSION);
+		const init = vi.mocked(fetchFn).mock.calls[0][1];
+		expect(init?.signal).toBeInstanceOf(AbortSignal);
+	});
+
+	it('lets a refused scrape reach the caller with its status, message and body', async () => {
+		const refusal = { error: 'instance-wide metrics need super_admin', code: 'forbidden' };
+		const fetchFn = vi.fn(async () => new Response(JSON.stringify(refusal), { status: 403 })) as unknown as typeof fetch;
+		await expect(readMetricsText(fetchFn, SESSION)).rejects.toMatchObject({
+			status: 403,
+			message: 'instance-wide metrics need super_admin',
+			body: refusal,
+		});
 	});
 
 	it('lists the exporters off the paginated answer and posts a manual export by name', async () => {
 		const client = {
-			get: vi.fn(async () => ({ data: [{ name: 'pushgateway', healthy: true, exports: 3, failures: 0 }], total_count: 1 })),
+			get: vi.fn(async () => ({ data: [PUSHGATEWAY], limit: 50, offset: 0, total_count: 1 })),
 			post: vi.fn(async () => ({ status: 'ok', message: 'export triggered for pushgateway' })),
 		} as unknown as HttpClient;
-		expect(await listExporters(client)).toEqual([{ name: 'pushgateway', healthy: true, exports: 3, failures: 0 }]);
+		expect(await listExporters(client)).toEqual([PUSHGATEWAY]);
 		expect(client.get).toHaveBeenCalledWith('/api/admin/telemetry/exporters?offset=0&limit=50');
 		await triggerExport(client, 'push/gateway');
 		expect(client.post).toHaveBeenCalledWith('/api/admin/telemetry/exporters/push%2Fgateway/export', undefined);
 	});
 
-	it('answers an exporter list with no data as empty', async () => {
-		const client = { get: vi.fn(async () => null) } as unknown as HttpClient;
+	it('answers an instance with no exporter as an empty list', async () => {
+		const client = { get: vi.fn(async () => ({ data: [], limit: 50, offset: 0, total_count: 0 })) } as unknown as HttpClient;
 		expect(await listExporters(client)).toEqual([]);
 	});
 });

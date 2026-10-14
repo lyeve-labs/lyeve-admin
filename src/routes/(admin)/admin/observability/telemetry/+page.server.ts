@@ -22,8 +22,8 @@ import {
 import { errorCodeOf } from '$lib/api/limits';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { actionError } from '$lib/server/action-error';
-import { authedClient, requireRole } from '$lib/server/authz';
-import { sessionToken } from '$lib/server/session-cookie';
+import { section, type Section } from '$lib/api/gate';
+import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
 
 /**
  * What the page renders.
@@ -31,17 +31,16 @@ import { sessionToken } from '$lib/server/session-cookie';
  * The metrics view is every admin's, already narrowed by the engine to the
  * caller's tenant unless the caller is a super admin. The exporters are the
  * instance's export configuration, so they are read for a super admin only
- * and are null, not empty, for anyone else: a tenant admin's page carries no
- * exporters section at all rather than an empty one.
+ * and are null, not a section, for anyone else: a tenant admin's page carries
+ * no exporters section at all rather than an empty one.
  */
 export interface TelemetryPage {
 	superAdmin: boolean;
-	/** null when the scrape route refused or did not answer. */
-	families: MetricFamily[] | null;
-	/** null for a tenant admin, and for a super admin the plugin did not answer. */
-	exporters: ExporterHealth[] | null;
-	/** The tenant's own destination read, null when the plugin did not answer it. */
-	destination: DestinationRead | null;
+	families: Section<MetricFamily[]>;
+	/** null for a tenant admin, who has no exporters section. */
+	exporters: Section<ExporterHealth[]> | null;
+	/** The tenant's own destination. */
+	destination: Section<DestinationRead>;
 }
 
 export const load: PageServerLoad = async (event) => {
@@ -54,13 +53,14 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 
 	const [families, exporters, destination] = await Promise.all([
-		// The exposition is plain text, which the JSON client cannot read, so
-		// it goes out with the session's bearer alone.
-		readMetricsText(fetch, sessionToken(event) ?? '')
-			.then(parseExposition)
-			.catch(() => null),
-		superAdmin ? listExporters(client).catch(() => null) : Promise.resolve(null),
-		readDestination(client).catch(() => null),
+		section(
+			readMetricsText(fetch, authedHeaders(event)).then(parseExposition),
+			'The metrics could not be read. This is not a report that no series exist.',
+		),
+		superAdmin
+			? section(listExporters(client), 'The exporters could not be read. This is not a report that none is configured.')
+			: Promise.resolve(null),
+		section(readDestination(client), 'The destination could not be read. This is not a report that none is set.'),
 	]);
 
 	const page: TelemetryPage = { superAdmin, families, exporters, destination };
@@ -70,19 +70,27 @@ export const load: PageServerLoad = async (event) => {
 /** The most headers a destination carries, as the plugin bounds them. */
 const MAX_HEADERS = 16;
 
+/** Which destination write failed, so each form shows only its own failure. */
+type DestinationAction = 'save' | 'remove';
+
 /**
  * A destination write's failure, under keys of its own so it never shows in
- * the exporters' section. A 402 carries the refusal for RefusalNotice.
+ * the exporters' section. A 402 carries the refusal for the form's notice.
  */
-function destinationFailure(err: unknown, fallback: string) {
+function destinationFailure(action: DestinationAction, err: unknown, fallback: string) {
 	const refused = refusalOf(err);
-	if (refused) return fail(402, { destinationError: refusalText(refused), refused });
+	if (refused) return fail(402, { destinationAction: action, destinationError: refusalText(refused), refused });
 	// The plugin keeps stored headers only while the URL keeps its host, so
 	// a key is never sent somewhere the caller just chose.
 	if (errorCodeOf(err) === DESTINATION_HEADERS_REQUIRED) {
-		return fail(422, { destinationError: actionError(err, fallback), hostMoved: true });
+		return fail(422, { destinationAction: action, destinationError: actionError(err, fallback), hostMoved: true });
 	}
-	return fail(400, { destinationError: actionError(err, fallback) });
+	return fail(400, { destinationAction: action, destinationError: actionError(err, fallback) });
+}
+
+/** A save refused before the round trip. */
+function saveRefused(destinationError: string) {
+	return fail(400, { destinationAction: 'save' as const, destinationError });
 }
 
 export const actions: Actions = {
@@ -92,7 +100,7 @@ export const actions: Actions = {
 		const kind = String(data.get('kind') ?? '') as DestinationKind;
 		const url = String(data.get('url') ?? '').trim();
 		if (!DESTINATION_KINDS.some((k) => k.value === kind)) {
-			return fail(400, { destinationError: 'Choose OTLP or Pushgateway.' });
+			return saveRefused('Choose OTLP or Pushgateway.');
 		}
 		let parsed: URL | null = null;
 		try {
@@ -101,10 +109,10 @@ export const actions: Actions = {
 			parsed = null;
 		}
 		if (!parsed || !['http:', 'https:'].includes(parsed.protocol) || url.length > 2048) {
-			return fail(400, { destinationError: 'The URL is an absolute http or https address.' });
+			return saveRefused('The URL is an absolute http or https address.');
 		}
 		if (parsed.username || parsed.password) {
-			return fail(400, { destinationError: 'Put credentials in a header, not in the URL.' });
+			return saveRefused('Put credentials in a header, not in the URL.');
 		}
 
 		const body: SaveDestination = { kind, url };
@@ -115,18 +123,18 @@ export const actions: Actions = {
 			for (const [i, name] of names.entries()) {
 				if (!name) continue;
 				if (!headerNameIsSound(name)) {
-					return fail(400, { destinationError: `${name} is not a header name.` });
+					return saveRefused(`${name} is not a header name.`);
 				}
 				if (RESERVED_HEADERS.includes(name.toLowerCase())) {
-					return fail(400, { destinationError: `${name} is set by the exporter itself.` });
+					return saveRefused(`${name} is set by the exporter itself.`);
 				}
 				if (/[\r\n]/.test(values[i] ?? '')) {
-					return fail(400, { destinationError: 'A header value is a single line.' });
+					return saveRefused('A header value is a single line.');
 				}
 				headers[name] = values[i] ?? '';
 			}
 			if (Object.keys(headers).length > MAX_HEADERS) {
-				return fail(400, { destinationError: `A destination carries at most ${MAX_HEADERS} headers.` });
+				return saveRefused(`A destination carries at most ${MAX_HEADERS} headers.`);
 			}
 			body.headers = headers;
 		}
@@ -134,7 +142,7 @@ export const actions: Actions = {
 		try {
 			await saveDestination(authedClient(event), body);
 		} catch (err) {
-			return destinationFailure(err, 'The destination could not be saved.');
+			return destinationFailure('save', err, 'The destination could not be saved.');
 		}
 		return { savedDestination: true };
 	},
@@ -145,7 +153,7 @@ export const actions: Actions = {
 		try {
 			await removeDestination(authedClient(event));
 		} catch (err) {
-			return destinationFailure(err, 'The destination could not be removed.');
+			return destinationFailure('remove', err, 'The destination could not be removed.');
 		}
 		return { removedDestination: true };
 	},

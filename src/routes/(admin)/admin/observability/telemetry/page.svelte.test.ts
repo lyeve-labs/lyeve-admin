@@ -23,10 +23,41 @@ const POOL: MetricFamily = {
 	samples: [{ labels: {}, value: 25 }],
 };
 
+// The exporters as the plugin encodes them. Its times are Go time values,
+// which JSON writes as the zero time rather than leaving them out, and an
+// error has its addresses and URLs redacted.
 const EXPORTERS = [
-	{ name: 'pushgateway', healthy: true, last_export: '2026-09-21T10:00:00Z', exports: 4, failures: 0 },
-	{ name: 'otlp', healthy: false, last_error: 'dial refused', exports: 1, failures: 3 },
+	{
+		name: 'pushgateway',
+		healthy: true,
+		last_export: '2026-09-21T10:00:00Z',
+		last_failure: '0001-01-01T00:00:00Z',
+		exports: 4,
+		failures: 0,
+	},
+	{
+		name: 'otlp',
+		healthy: false,
+		last_export: '2026-09-21T09:00:00Z',
+		last_failure: '2026-09-21T10:00:00Z',
+		last_error: 'otlp: export: Post "[redacted]": dial tcp [redacted]: connect: connection refused',
+		last_error_class: 'unreachable',
+		exports: 1,
+		failures: 3,
+	},
 ];
+
+/** A read that answered. */
+function ok<T>(value: T) {
+	return { ok: true, value };
+}
+
+/** A read that failed, as the load hands it over. */
+function failed(gate: Record<string, unknown>) {
+	return { ok: false, gate };
+}
+
+const NO_DESTINATION = ok({ destination: null, licensed: true });
 
 /** A status report whose telemetry row names the given maturity in its manifest. */
 function statusSaying(maturity: string | undefined) {
@@ -47,8 +78,21 @@ function statusSaying(maturity: string | undefined) {
 	};
 }
 
+/**
+ * The page's data. Families and exporters are given as their values and
+ * wrapped as answered reads, unless a test passes a whole section.
+ */
 function props(data: Record<string, unknown>, form: Record<string, unknown> | null = null) {
-	return { data: data as never, form: form as never };
+	const section = (v: unknown) => (v === null || (typeof v === 'object' && 'ok' in (v as object)) ? v : ok(v));
+	return {
+		data: {
+			destination: NO_DESTINATION,
+			...data,
+			families: section(data.families),
+			exporters: section(data.exporters),
+		} as never,
+		form: form as never,
+	};
 }
 
 afterEach(cleanup);
@@ -76,7 +120,7 @@ describe('the role split', () => {
 		expect(container.textContent).toContain('lyeve_db_pool_max_connections');
 		expect(container.textContent).toContain('Healthy');
 		expect(container.textContent).toContain('Unhealthy');
-		expect(container.textContent).toContain('dial refused');
+		expect(container.textContent).toContain('connection refused');
 	});
 
 	it('wears the Beta badge the plugin asks for, with the gaps named', () => {
@@ -102,10 +146,32 @@ describe('the role split', () => {
 });
 
 describe('the metrics view', () => {
-	it('says the scrape was refused rather than showing an empty registry', () => {
-		const { container } = render(TelemetryPage, props({ superAdmin: false, families: null, exporters: null }));
-		expect(container.textContent).toContain('Metrics unavailable');
+	it('says the engine did not answer the scrape rather than showing an empty registry', () => {
+		const { container, queryByRole } = render(
+			TelemetryPage,
+			props({ superAdmin: false, families: failed({ state: 'unavailable' }), exporters: null }),
+		);
+		expect(container.textContent).toContain('so Telemetry metrics could not be read');
 		expect(container.textContent).not.toContain('No series yet');
+		expect(queryByRole('searchbox', { name: 'Filter families' })).toBeNull();
+	});
+
+	it('says the role cannot read the metrics and offers no retry', () => {
+		const { container, queryByRole } = render(
+			TelemetryPage,
+			props({ superAdmin: false, families: failed({ state: 'forbidden' }), exporters: null }),
+		);
+		expect(container.textContent).toContain('Your role cannot open Telemetry metrics.');
+		expect(queryByRole('link', { name: /Try again/ })).toBeNull();
+	});
+
+	it('keeps the sentence of a failed scrape', () => {
+		const message = 'The metrics could not be read. This is not a report that no series exist.';
+		const { container } = render(
+			TelemetryPage,
+			props({ superAdmin: true, families: failed({ state: 'error', message }), exporters: [] }),
+		);
+		expect(container.textContent).toContain(message);
 	});
 
 	it('tells a tenant admin with no series that none has been recorded under their tenant', () => {
@@ -148,13 +214,23 @@ describe('the exporters section', () => {
 		expect(container.textContent).toContain('Wait five seconds');
 	});
 
+	it('says the exporter list failed rather than that none is configured', () => {
+		const message = 'The exporters could not be read. This is not a report that none is configured.';
+		const { container, queryByTestId } = render(
+			TelemetryPage,
+			props({ superAdmin: true, families: [], exporters: failed({ state: 'error', message }) }),
+		);
+		expect(queryByTestId('telemetry-exporters')?.textContent).toContain(message);
+		expect(container.textContent).not.toContain('No exporter configured');
+	});
+
 	it('says no exporter is configured rather than rendering an empty table', () => {
 		const { container } = render(TelemetryPage, props({ superAdmin: true, families: [], exporters: [] }));
 		expect(container.textContent).toContain('No exporter configured');
 	});
 
 	it('reads Never for an exporter that has not exported', () => {
-		const { container } = render(TelemetryPage, props({ superAdmin: true, families: [], exporters: [{ name: 'statsd', healthy: true, last_export: '0001-01-01T00:00:00Z', exports: 0, failures: 0 }] }));
+		const { container } = render(TelemetryPage, props({ superAdmin: true, families: [], exporters: [{ name: 'statsd', healthy: true, last_export: '0001-01-01T00:00:00Z', last_failure: '0001-01-01T00:00:00Z', exports: 0, failures: 0 }] }));
 		expect(container.textContent).toContain('Never');
 		expect(container.textContent).not.toContain('Invalid Date');
 	});

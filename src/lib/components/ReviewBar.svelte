@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Card, Input, MultiSelect, SectionHeading, Select, Textarea } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Card, Input, MultiSelect, SectionHeading, Select, Textarea, type StatusTone } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { Check, Eye, EyeOff, RotateCcw, X } from '@lucide/svelte';
 	import {
@@ -65,7 +65,7 @@
 		rejected: 'Rejected',
 		published: 'Published',
 	};
-	const STATUS_TONE: Record<ReviewStatus, 'neutral' | 'brand' | 'success' | 'warn' | 'danger'> = {
+	const STATUS_TONE: Record<ReviewStatus, StatusTone> = {
 		draft: 'neutral',
 		pending_review: 'brand',
 		in_review: 'brand',

@@ -5,6 +5,7 @@
  * a test that starts from them exercises the same expressions.
  */
 
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { NodeSpec } from './types';
 
 const TRIGGER_DEFAULTS: Record<string, unknown> = {
@@ -65,9 +66,7 @@ export function triggerLabel(type: string | null | undefined): string {
 }
 
 /** The Badge tone for a flow or run status. */
-export function statusTone(
-	status: string | null | undefined
-): 'neutral' | 'brand' | 'success' | 'warn' | 'danger' {
+export function statusTone(status: string | null | undefined): StatusTone {
 	switch (status) {
 		case 'active':
 		case 'succeeded':

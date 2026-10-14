@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
@@ -25,18 +26,43 @@ function said(c: HTMLElement): string {
 	return (c.textContent ?? '').replace(/\s+/g, ' ');
 }
 
+// A stored destination as the plugin answers it. The health is the plugin's
+// exporter health, named for the tenant, with Go times that JSON writes as
+// the zero time rather than leaving out. An OTLP push that fails is always
+// reported unreachable, with addresses and URLs redacted from its error.
 const STORED = {
 	kind: 'otlp',
 	url: 'https://otlp.example.com/v1/metrics',
 	header_names: ['Authorization', 'X-Scope'],
-	health: { healthy: false, last_error: 'status 401', exports: 3, failures: 2 },
+	health: {
+		name: 'acme',
+		healthy: false,
+		last_export: '2026-10-13T08:00:00Z',
+		last_failure: '2026-10-14T09:00:00Z',
+		last_error: 'otlp: export: Post "[redacted]": dial tcp [redacted]: connect: connection refused',
+		last_error_class: 'unreachable',
+		exports: 3,
+		failures: 2,
+	},
 };
 
+/** The page's data, with the destination read as given. */
+function pageData(destination: unknown) {
+	const read =
+		destination !== null && typeof destination === 'object' && 'ok' in destination
+			? destination
+			: { ok: true, value: destination };
+	return { superAdmin: false, families: { ok: true, value: [] }, exporters: null, destination: read } as never;
+}
+
 function props(destination: unknown, form: Record<string, unknown> | null = null) {
-	return {
-		data: { superAdmin: false, families: [], exporters: null, destination } as never,
-		form: form as never,
-	};
+	return { data: pageData(destination), form: form as never };
+}
+
+function formFor(container: HTMLElement, action: string): HTMLFormElement {
+	const form = container.querySelector<HTMLFormElement>(`form[action="${action}"]`);
+	if (!form) throw new Error(`no form for ${action}`);
+	return form;
 }
 
 describe('the tenant destination', () => {
@@ -46,7 +72,7 @@ describe('the tenant destination', () => {
 		expect(said(container)).toContain('Their values are never shown');
 		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe(STORED.url);
 		expect(said(container)).toContain('Failing');
-		expect(said(container)).toContain('status 401');
+		expect(said(container)).toContain('connect: connection refused');
 	});
 
 	it('warns before a save that moves the host while keeping the headers', async () => {
@@ -61,7 +87,11 @@ describe('the tenant destination', () => {
 			TelemetryPage,
 			props(
 				{ destination: STORED, licensed: true },
-				{ destinationError: 'the destination moved to another host, send its headers again', hostMoved: true },
+				{
+					destinationAction: 'save',
+					destinationError: 'the destination moved to another host, send its headers again',
+					hostMoved: true,
+				},
 			),
 		);
 		expect(said(container)).toContain('Send the headers again for the new host');
@@ -91,6 +121,16 @@ describe('the tenant destination', () => {
 		expect((screen.getByRole('button', { name: 'Delete destination' }) as HTMLButtonElement).disabled).toBe(false);
 	});
 
+	// A disabled fieldset stops a press but not the arrow keys, which the
+	// header choice handles itself, so the choice has to be disabled too.
+	it('leaves the header choice unmovable on an unlicensed install', async () => {
+		const { container } = render(TelemetryPage, props({ destination: STORED, licensed: false }));
+		const keep = screen.getByRole('radio', { name: 'Keep the stored headers' });
+		await fireEvent.keyDown(keep, { key: 'ArrowRight' });
+		expect(said(container)).toContain('Their values are never shown');
+		expect(screen.queryByRole('button', { name: /Add header/ })).toBeNull();
+	});
+
 	it('keeps the save live on a licensed install', () => {
 		render(TelemetryPage, props({ destination: STORED, licensed: true }));
 		expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
@@ -112,14 +152,106 @@ describe('the tenant destination', () => {
 			TelemetryPage,
 			props(
 				{ destination: null, licensed: false },
-				{ destinationError: 'x', refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },
+				{
+					destinationAction: 'save',
+					destinationError: 'x',
+					refused: { kind: 'feature', feature: 'example-feature', plugin: 'telemetry', upgradeUrl: '' },
+				},
 			),
 		);
 		expect(screen.getByTestId('refusal-notice')).toBeTruthy();
 	});
 
-	it('reports an unread destination as a failure', () => {
-		const { container } = render(TelemetryPage, props(null));
-		expect(said(container)).toContain('The destination could not be read');
+	it('reports an unread destination as a failure with its own sentence', () => {
+		const message = 'The destination could not be read. This is not a report that none is set.';
+		const { container } = render(TelemetryPage, props({ ok: false, gate: { state: 'error', message } }));
+		expect(said(container)).toContain(message);
+		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+	});
+
+	it('says the engine did not answer the destination read', () => {
+		const { container } = render(TelemetryPage, props({ ok: false, gate: { state: 'unavailable' } }));
+		expect(said(container)).toContain('so Tenant destination could not be read');
+		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+	});
+});
+
+describe('the destination failures', () => {
+	it('shows a failed save inside the save form', () => {
+		const { container } = render(
+			TelemetryPage,
+			props({ destination: STORED, licensed: true }, { destinationAction: 'save', destinationError: 'The destination could not be saved.' }),
+		);
+		expect(formFor(container, '?/saveDestination').textContent).toContain('The destination could not be saved.');
+		expect(formFor(container, '?/removeDestination').textContent).not.toContain('could not be saved');
+	});
+
+	// The save and the delete share one form result, so a failed delete
+	// must not read as the save having failed.
+	it('shows a failed delete beside the delete, never in the save form', () => {
+		const { container } = render(
+			TelemetryPage,
+			props(
+				{ destination: STORED, licensed: true },
+				{ destinationAction: 'remove', destinationError: 'The destination could not be removed.' },
+			),
+		);
+		expect(formFor(container, '?/removeDestination').textContent).toContain('The destination could not be removed.');
+		expect(formFor(container, '?/saveDestination').textContent).not.toContain('could not be removed');
+	});
+
+	it('shows no destination failure for an export failure', () => {
+		const { container } = render(
+			TelemetryPage,
+			props({ destination: STORED, licensed: true }, { name: 'otlp', error: 'The otlp export failed.' }),
+		);
+		expect(screen.getByTestId('telemetry-destination').textContent).not.toContain('export failed');
+		expect(formFor(container, '?/saveDestination').querySelector('[role="alert"]')?.textContent ?? '').toBe('');
+	});
+});
+
+describe('the destination form across reloads', () => {
+	// A refresh or an export reloads the page data, which hands the page a
+	// new destination object holding the same values.
+	it('keeps an edit in progress through a reload that changed nothing', async () => {
+		const { rerender } = render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		const url = screen.getByLabelText(/^URL/) as HTMLInputElement;
+		await fireEvent.input(url, { target: { value: 'https://otlp.example.com/v2/metrics' } });
+		await rerender(props({ destination: { ...STORED, header_names: [...STORED.header_names] }, licensed: true }));
+		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe('https://otlp.example.com/v2/metrics');
+	});
+
+	// A save that changed only header values leaves what the page reads the
+	// same, so nothing but the save itself clears the values typed.
+	it('clears the header values typed once a save of them succeeds', async () => {
+		const { rerender } = render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		await fireEvent.click(screen.getByRole('radio', { name: 'Replace them' }));
+		await fireEvent.click(screen.getByRole('button', { name: /Add header/ }));
+		await fireEvent.input(screen.getByLabelText('Header'), { target: { value: 'Authorization' } });
+		await fireEvent.input(screen.getByLabelText('Value'), { target: { value: 'Bearer new-key' } });
+		expect((screen.getByLabelText('Value') as HTMLInputElement).value).toBe('Bearer new-key');
+
+		const submit = forms.submits.get('?/saveDestination') as (i: unknown) => (o: unknown) => Promise<void>;
+		const after = submit({ cancel: vi.fn(), formData: new FormData() });
+		await after({
+			result: { type: 'success', status: 200, data: { savedDestination: true } },
+			update: async () => {
+				await rerender(props({ destination: { ...STORED, header_names: [...STORED.header_names] }, licensed: true }));
+			},
+		});
+		await tick();
+
+		expect(screen.queryByLabelText('Value')).toBeNull();
+		expect(screen.queryByDisplayValue('Bearer new-key')).toBeNull();
+		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe(STORED.url);
+		expect(said(document.body)).toContain('Their values are never shown');
+	});
+
+	it('follows a stored destination that changed', async () => {
+		const { rerender } = render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		const url = screen.getByLabelText(/^URL/) as HTMLInputElement;
+		await fireEvent.input(url, { target: { value: 'https://otlp.example.com/v2/metrics' } });
+		await rerender(props({ destination: { ...STORED, url: 'https://collector.example.net/v1/metrics' }, licensed: true }));
+		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe('https://collector.example.net/v1/metrics');
 	});
 });

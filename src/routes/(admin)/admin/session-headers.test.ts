@@ -80,11 +80,7 @@ describe('page loads read as the session', () => {
 		expect(calls.length).toBeGreaterThan(0);
 		for (const headers of calls) {
 			expect(headers.get('authorization')).toBe('Bearer sess-tok');
-			// The one plain-text read, the metrics exposition, is built by a
-			// helper that sends the bearer alone.
-			if (headers.get('accept') !== 'text/plain') {
-				expect(headers.get('x-csrf-token')).toBe('csrf-tok');
-			}
+			expect(headers.get('x-csrf-token')).toBe('csrf-tok');
 		}
 	});
 });
