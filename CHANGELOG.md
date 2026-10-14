@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Experiments: the detail page reads variants and metrics again instead of answering 500, the minimum sample size reads as a total across variants, and an emptied description clears on save.
 - Usage: a quota request names its requester by email. An admin sees their own tenant's quota, pending requests and usage. Approving or denying a request no longer fails with invalid JSON, a stored byte limit survives a save, storage and bandwidth read in GiB, and the page says when more requests wait than it shows. The quota drawer sets Delete apart from Save.
 - GraphQL: schema field names no longer break mid-word.
+- Observability: from 768 up to 1280 pixels wide the goroutine engine stats sit two to a row in each card, and the connection pool stats sit four to a row instead of seven, so Leak threshold, Completed, Goroutines and the engine name no longer run past their boxes at 1024 pixels.
 - Events: the replay page says a replay reaches every listener and that the field is a run name.
 - Permissions: a schema rule reads as replacing the wildcard rule, as the engine applies it, and an empty rule that closes a schema to a role can be saved. A role ceiling refusal prints the numbers it carried.
 - Message broker: with no broker set, the page says events are discarded instead of claiming delivery, and it reads the outbox.

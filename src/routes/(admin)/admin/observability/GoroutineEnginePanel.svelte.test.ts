@@ -28,6 +28,20 @@ function setup(over: Record<string, unknown> = {}, form: Record<string, unknown>
 	return render(GoroutineEnginePanel, { props: { engine: engine(over) as never, form: form as never } });
 }
 
+describe('goroutine engine stat grids', () => {
+	// From the medium breakpoint the cards sit two across, and four stats in a
+	// half-width card at 1024px cut "Leak threshold" and "Completed".
+	it('puts four stats in a row only where a half-width card is wide enough', () => {
+		const { getByTestId } = setup();
+		const grids = getByTestId('goroutine-views').querySelectorAll('.sm\\:grid-cols-4');
+		expect(grids.length).toBe(3);
+		for (const grid of grids) {
+			expect(grid.className).toContain('md:grid-cols-2');
+			expect(grid.className).toContain('xl:grid-cols-4');
+		}
+	});
+});
+
 const field = (container: HTMLElement, id: string) => container.querySelector(`#${id}`) as HTMLInputElement;
 const fieldset = (container: HTMLElement, action: string) => container.querySelector(`form[action="?/${action}"] fieldset`) as HTMLFieldSetElement;
 

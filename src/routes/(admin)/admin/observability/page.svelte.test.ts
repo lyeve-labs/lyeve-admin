@@ -132,6 +132,14 @@ const health = (over: Record<string, unknown>) => ({
 });
 
 describe('Pool health badge', () => {
+	// Seven stats across a 1024px screen cut "Goroutines" and the engine name.
+	it('puts the pool stats seven across only from the extra large breakpoint', () => {
+		const { container } = render(ObservabilityPage, { props: props() });
+		const row = container.querySelector('[data-testid="pool-stats"]') as HTMLElement;
+		expect(row.className).toContain('xl:grid-cols-7');
+		expect(row.className).not.toContain('lg:grid-cols-7');
+	});
+
 	it('reads Healthy with its counts for a measured pool', () => {
 		const { container } = render(ObservabilityPage, { props: props() });
 		const row = container.querySelector('[data-testid="pool-stats"]') as HTMLElement;

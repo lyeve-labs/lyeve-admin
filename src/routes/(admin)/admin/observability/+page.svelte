@@ -101,7 +101,7 @@
 				absent="This engine does not report pool health."
 			/>
 		{:else if pool?.engine}
-			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7" data-testid="pool-stats">
+			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-7" data-testid="pool-stats">
 				<Stat size="sm" label="Engine" value={pool.engine} />
 				<Stat
 					size="sm"
