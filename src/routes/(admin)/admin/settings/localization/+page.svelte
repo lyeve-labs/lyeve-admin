@@ -1,5 +1,5 @@
 <script lang="ts">
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -96,11 +96,8 @@
 			absent="The localization plugin is not part of this build, so content is kept in one language."
 		/>
 	{:else}
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if form?.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{:else if form?.saved}
+		<FormErrors message={form?.error ?? undefined} refused={pageRefusal} />
+		{#if form?.saved}
 			<Alert tone="success" autoDismiss>Locales saved.</Alert>
 		{/if}
 

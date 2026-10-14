@@ -39,7 +39,7 @@
 	} from '$lib/api/goroutine-engine';
 	import { LATENCY_TOP_CHOICES } from '$lib/api/observability';
 	import { LICENSE_PAGE, formRefusal } from '$lib/api/refusal';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		LOG_LEVELS,
 		NO_VALUE,
@@ -295,11 +295,8 @@
 {#snippet tunableStatus(which: TunableForm)}
 	{@const note = tunableNote(which)}
 	{@const refusal = formRefusal(note)}
-	{#if refusal}
-		<RefusalNotice {refusal} />
-	{:else if note?.error}
-		<Alert tone="danger">{note.error}</Alert>
-	{:else if note?.saved}
+	<FormErrors message={note?.error} refused={refusal} />
+	{#if note?.saved}
 		<!-- The confirmation clears itself. The caveat is a standing fact about
 		     the value now in force, so it stays beside the form. -->
 		<Alert tone="success" autoDismiss>Applied.</Alert>

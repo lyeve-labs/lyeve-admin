@@ -63,7 +63,7 @@ describe('locales page', () => {
 
 	it('reports the refusal and the save', () => {
 		render(LocalesPage, { props: { data: data(), form: { error: 'The fallback chain names de, which is not an enabled locale.', saved: false } as never } });
-		expect(screen.getByText(/names de/)).toBeTruthy();
+		expect(screen.getByText(/names de/).closest('.contents[aria-live="assertive"]')).toBeTruthy();
 		cleanup();
 		render(LocalesPage, { props: { data: data(), form: { saved: true, error: null, locales: LOCALES } as never } });
 		expect(screen.getByText('Locales saved.')).toBeTruthy();
