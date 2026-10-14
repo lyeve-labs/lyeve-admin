@@ -24,8 +24,7 @@
 		type ChoiceOption
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
-	import type { SubmitFunction } from '@sveltejs/kit';
-	import type { Webhook, WebhookDelivery, DeadLetter } from '@lyeve-labs/client';
+	import type { Webhook } from '@lyeve-labs/client';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
@@ -39,17 +38,19 @@
 		CheckCircle,
 		XCircle,
 		History,
-		RotateCcw,
 		KeyRound,
 		Skull
 	} from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import { formatDateTime } from '$lib/format';
 	import { narrows } from '$lib/narrow';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
+	import { eventTone } from './event-tone';
+	import { DeliveryHistory } from './delivery-history.svelte';
+	import DeliveriesDrawer from './DeliveriesDrawer.svelte';
+	import DeadLetterDrawer from './DeadLetterDrawer.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -223,35 +224,8 @@
 		}
 	});
 
-	let showDeliveries = $state(false);
-	let deliveriesWebhookId = $state('');
-	let deliveriesWebhookName = $state('');
-	let deliveryItems = $state<WebhookDelivery[]>([]);
-
-	$effect(() => {
-		if (form && 'deliveries' in form && form.deliveries) {
-			const d = form.deliveries as { id: string; items: WebhookDelivery[] };
-			deliveryItems = d.items ?? [];
-			showDeliveries = true;
-		}
-	});
-
-	/**
-	 * Names the row being inspected, then lets the action result through.
-	 *
-	 * A submit handler that returns without awaiting `update()` tells SvelteKit
-	 * to skip applying the result, so `form.deliveries` would never arrive and
-	 * the history modal would open empty.
-	 */
-	function loadDeliveries(wh: Webhook): SubmitFunction {
-		return () =>
-			async ({ update }) => {
-				deliveriesWebhookId = wh.id;
-				deliveriesWebhookName = wh.name;
-				deliveryItems = [];
-				await update({ reset: false });
-			};
-	}
+	// The history drawer reads what the row's submit names, so the two share it.
+	const history = new DeliveryHistory();
 
 	/**
 	 * Every write in this application reports through the toast, which is one
@@ -264,44 +238,6 @@
 			toast.success(`Rotated the secret for ${wh.name}`);
 		}
 	});
-
-	let retryResults = $state<Record<string, { success: boolean; message: string }>>({});
-
-	$effect(() => {
-		if (form && 'retryResult' in form && form.retryResult) {
-			const r = form.retryResult as { delivery_id: string; success: boolean; message: string };
-			retryResults = { ...retryResults, [r.delivery_id]: { success: r.success, message: r.message } };
-		}
-	});
-
-	let showDeadLetters = $state(false);
-	let deadLetterItems = $state<DeadLetter[]>([]);
-	let deadLetterTotal = $state<number | null>(null);
-
-	$effect(() => {
-		if (form && 'deadLetters' in form && form.deadLetters) {
-			deadLetterItems = form.deadLetters as DeadLetter[];
-			deadLetterTotal = (form.deadLetterTotal as number | null | undefined) ?? null;
-			showDeadLetters = true;
-		}
-	});
-
-	let deadLetterResults = $state<Record<string, string>>({});
-
-	$effect(() => {
-		if (form && 'deadLetterReplay' in form && form.deadLetterReplay) {
-			const r = form.deadLetterReplay as { id: string; status: string };
-			deadLetterResults = { ...deadLetterResults, [r.id]: `Replayed with status ${r.status}` };
-		}
-		if (form && 'deadLetterDismiss' in form && form.deadLetterDismiss) {
-			const r = form.deadLetterDismiss as { id: string; status: string };
-			deadLetterResults = { ...deadLetterResults, [r.id]: 'Dismissed' };
-		}
-	});
-
-	function eventTone(event: string): 'success' | 'warn' {
-		return event.startsWith('after_') ? 'success' : 'warn';
-	}
 
 	function truncate(url: string, max = 48): string {
 		return url.length > max ? url.slice(0, max) + '...' : url;
@@ -431,7 +367,7 @@
 										<FlaskConical size={ICON.sm} />
 									</Button>
 								</form>
-								<form method="POST" action="?/deliveries" use:enhance={loadDeliveries(wh)}>
+								<form method="POST" action="?/deliveries" use:enhance={history.load(wh)}>
 									<input type="hidden" name="id" value={wh.id} />
 									<Button
 										variant="ghost"
@@ -611,212 +547,6 @@
 
 <!-- A row's history is a read on that row, so it opens over the list the way
      its edit does, and the queue does the same. -->
-<Drawer bind:open={showDeliveries} title="Delivery history for {deliveriesWebhookName}" size="xl">
-	{#snippet children()}
-			{#if deliveryItems.length === 0}
-				<EmptyState
-					title="No deliveries recorded yet"
-					description="Every attempt this webhook makes is listed here."
-				>
-					{#snippet iconSnippet()}<History size={ICON.lg} />{/snippet}
-				</EmptyState>
-			{:else}
-				<Table label="Delivery history">
-					<thead>
-						<tr>
-							<th scope="col">Time</th>
-							<th scope="col">Event</th>
-							<th scope="col">Schema</th>
-							<th scope="col">Status</th>
-							<th scope="col">Duration</th>
-							<th scope="col">Result</th>
-							<th scope="col">Retry</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each deliveryItems as d (d.id)}
-							<tr>
-								<td class="font-mono text-xs whitespace-nowrap text-muted">
-									{formatDateTime(d.attempted_at)}
-								</td>
-								<td><Badge tone={eventTone(d.event_type)}>{d.event_type}</Badge></td>
-								<td data-cell="nowrap">{d.schema_name}</td>
-								<td data-cell="nowrap" class="font-mono text-xs">
-									{#if d.status_code != null}
-										<span class={d.success ? 'text-success' : 'text-danger'}>{d.status_code}</span>
-									{:else}
-										<span class="text-faint">No response</span>
-									{/if}
-								</td>
-								<td data-cell="nowrap" class="text-xs text-muted">
-									{d.duration_ms != null ? `${d.duration_ms}ms` : 'Not recorded'}
-								</td>
-								<td data-cell="nowrap">
-									{#if d.success}
-										<span class="flex items-center gap-1 text-xs text-success">
-											<CheckCircle class="h-3.5 w-3.5" /> OK
-										</span>
-									{:else if d.error}
-										<span class="flex items-center gap-1 text-xs text-danger" title={d.error}>
-											<XCircle class="h-3.5 w-3.5" />
-											{d.error.slice(0, 40)}
-										</span>
-									{:else}
-										<span class="flex items-center gap-1 text-xs text-danger">
-											<XCircle class="h-3.5 w-3.5" /> Failed
-										</span>
-									{/if}
-								</td>
-								<td>
-									{#if !d.success}
-										<form method="POST" action="?/retry-delivery" use:enhance>
-											<input type="hidden" name="id" value={deliveriesWebhookId} />
-											<input type="hidden" name="delivery_id" value={d.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												title="Retry this delivery"
-												aria-label="Retry the delivery attempted at {formatDateTime(
-													d.attempted_at
-												)}"
-											>
-												<RotateCcw class="h-3.5 w-3.5" />
-											</Button>
-										</form>
-									{:else if retryResults[d.id]}
-										{@const rr = retryResults[d.id]}
-										<span class="text-xs {rr.success ? 'text-success' : 'text-danger'}">
-											{rr.message.slice(0, 30)}
-										</span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-			{/if}
-		{/snippet}
-		{#snippet footer()}
-			<Button variant="secondary" type="button" onclick={() => (showDeliveries = false)}>
-				Close
-			</Button>
-		{/snippet}
-</Drawer>
+<DeliveriesDrawer {form} {history} />
 
-<Drawer bind:open={showDeadLetters} title="Dead letter queue" size="xl">
-	{#snippet children()}
-			{#if deadLetterItems.length === 0}
-				<EmptyState
-					title="No dead letter entries"
-					description="Exhausted deliveries appear here when retries are depleted."
-				>
-					{#snippet iconSnippet()}<Skull size={ICON.lg} />{/snippet}
-				</EmptyState>
-			{:else}
-				{#if deadLetterTotal !== null && deadLetterTotal > deadLetterItems.length}
-					<p class="mb-2 text-xs text-faint">
-						Showing {deadLetterItems.length} of {deadLetterTotal} entries.
-					</p>
-				{/if}
-				<Table label="Dead letters">
-					<thead>
-						<tr>
-							<th scope="col">Webhook</th>
-							<th scope="col">Event</th>
-							<th scope="col">Schema</th>
-							<th scope="col">Attempts</th>
-							<th scope="col">Last error</th>
-							<th scope="col">Status</th>
-							<th scope="col">Dead at</th>
-							<th scope="col">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each deadLetterItems as dl (dl.id)}
-							<tr>
-								<td data-cell="nowrap" class="text-xs font-medium text-fg">{dl.webhook_name}</td>
-								<td><Badge tone={eventTone(dl.event_type)}>{dl.event_type}</Badge></td>
-								<td data-cell="nowrap" class="text-xs">{dl.schema_name}</td>
-								<td data-cell="nowrap" class="font-mono text-xs text-muted">{dl.total_attempts}</td>
-								<td class="max-w-48 truncate text-xs text-muted" title={dl.last_error ?? ''}>
-									{dl.last_error ? dl.last_error.slice(0, 60) : 'None'}
-								</td>
-								<td>
-									{#if dl.status === 'pending'}
-										<Badge tone="warn">{dl.status}</Badge>
-									{:else if dl.status === 'replayed'}
-										<Badge tone="success">{dl.status}</Badge>
-									{:else}
-										<Badge tone="neutral">{dl.status}</Badge>
-									{/if}
-								</td>
-								<td class="font-mono text-xs whitespace-nowrap text-muted">
-									{formatDateTime(dl.dead_at)}
-								</td>
-								<td>
-									{#if deadLetterResults[dl.id]}
-										<span class="text-xs text-muted">{deadLetterResults[dl.id]}</span>
-									{:else if dl.status === 'pending'}
-										<div class="flex items-center gap-1">
-											<form method="POST" action="?/dead-letter-replay" use:enhance>
-												<input type="hidden" name="id" value={dl.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													title="Replay"
-													aria-label="Replay the dead letter from {dl.webhook_name}"
-												>
-													<RotateCcw class="h-3.5 w-3.5" />
-												</Button>
-											</form>
-											<form method="POST" action="?/dead-letter-dismiss" use:enhance>
-												<input type="hidden" name="id" value={dl.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													title="Dismiss"
-													aria-label="Dismiss the dead letter from {dl.webhook_name}"
-												>
-													<XCircle class="h-3.5 w-3.5" />
-												</Button>
-											</form>
-											<form
-												method="POST"
-												action="?/dead-letter-delete"
-												use:enhance={() =>
-													async ({ result, update }) => {
-														if (result.type === 'success') {
-															deadLetterItems = deadLetterItems.filter((x) => x.id !== dl.id);
-														}
-														await update({ reset: false });
-													}}
-											>
-												<input type="hidden" name="id" value={dl.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													title="Delete permanently"
-													aria-label="Delete the dead letter from {dl.webhook_name} permanently"
-												>
-													<Trash2 class="h-3.5 w-3.5 text-danger" />
-												</Button>
-											</form>
-										</div>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-			{/if}
-		{/snippet}
-		{#snippet footer()}
-			<Button variant="secondary" type="button" onclick={() => (showDeadLetters = false)}>
-				Close
-			</Button>
-		{/snippet}
-</Drawer>
+<DeadLetterDrawer {form} />
