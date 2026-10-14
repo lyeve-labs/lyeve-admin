@@ -162,6 +162,83 @@ function sourceOf(expected: Expected): string {
 	return typeof expected === 'string' ? JSON.stringify(expected) : expected.expr;
 }
 
+/**
+ * One way a template can render: how many tab titles it writes, capped at
+ * two, and whether it draws anything at all. A page that only redirects, or
+ * a branch left empty, draws nothing and needs no title.
+ */
+type Path = { titles: number; content: boolean };
+
+const key = (p: Path) => `${p.titles}:${p.content}`;
+
+function dedupe(paths: Path[]): Path[] {
+	return [...new Map(paths.map((p) => [key(p), p])).values()];
+}
+
+/** Every way a run of sibling nodes can render, branch by branch. */
+function sequence(nodes: unknown[]): Path[] {
+	let paths: Path[] = [{ titles: 0, content: false }];
+	for (const node of nodes) {
+		const next: Path[] = [];
+		for (const a of paths) {
+			for (const b of ways(node as Node)) {
+				next.push({ titles: Math.min(2, a.titles + b.titles), content: a.content || b.content });
+			}
+		}
+		paths = dedupe(next);
+	}
+	return paths;
+}
+
+const nodesOf = (fragment: unknown): unknown[] => ((fragment as { nodes?: unknown[] } | null)?.nodes ?? []);
+
+function ways(node: Node): Path[] {
+	switch (node.type) {
+		case 'Text':
+			return [{ titles: 0, content: String(node.data).trim() !== '' }];
+		case 'Comment':
+		case 'SnippetBlock':
+		case 'ConstTag':
+		case 'DebugTag':
+		case 'SvelteHead':
+		case 'SvelteWindow':
+		case 'SvelteDocument':
+		case 'SvelteBody':
+		case 'TitleElement':
+			// Rendered elsewhere or not at all: a snippet renders where it is
+			// called, and the head and the window draw nothing on the page.
+			return [{ titles: 0, content: false }];
+		case 'IfBlock':
+			return dedupe([...sequence(nodesOf(node.consequent)), ...sequence(nodesOf(node.alternate))]);
+		case 'EachBlock':
+			return dedupe([...sequence(nodesOf(node.body)), ...sequence(nodesOf(node.fallback))]);
+		case 'AwaitBlock':
+			return dedupe([
+				...sequence(nodesOf(node.pending)),
+				...sequence(nodesOf(node.then)),
+				...sequence(nodesOf(node.catch)),
+			]);
+		default: {
+			const own: Path =
+				node.type === 'Component' && (node.name === 'PageShell' || node.name === 'PageTitle')
+					? { titles: 1, content: node.name === 'PageShell' }
+					: { titles: 0, content: true };
+			return sequence(nodesOf(node.fragment)).map((p) => ({
+				titles: Math.min(2, own.titles + p.titles),
+				content: own.content || p.content,
+			}));
+		}
+	}
+}
+
+/** The ways a route file renders that write no tab title, or more than one. */
+function untitled(file: string): string[] {
+	const ast = parse(readFileSync(file, 'utf8'), { modern: true }) as unknown as { fragment: unknown };
+	return sequence(nodesOf(ast.fragment))
+		.filter((p) => p.titles > 1 || (p.content && p.titles === 0))
+		.map((p) => (p.titles > 1 ? 'a branch writes two tab titles' : 'a branch draws the page with no tab title'));
+}
+
 afterEach(() => {
 	cleanup();
 	state.page.data = {};
@@ -208,6 +285,33 @@ describe('tab titles', () => {
 		render(Harness, { props: { title: 'Audit log', documentTitle: 'Audit streaming' } });
 		await tick();
 		expect(document.title).toBe('Audit streaming - Acme Studio');
+	});
+
+	// The table above holds the pages that existed when the tab moved to the
+	// PageShell. This holds every page, including one added later, and reads
+	// each branch: a page that draws a PageShell under one condition and
+	// nothing titled under the other leaves the tab on the last page's title.
+	const routeFiles = globSync('src/routes/**/{+page,+error}.svelte').sort();
+
+	it('reads every page and error page', () => {
+		expect(routeFiles.length).toBeGreaterThanOrEqual(TAB_TITLES.length);
+	});
+
+	it.each(routeFiles)('%s writes one tab title on every branch that draws the page', (file) => {
+		expect(untitled(file)).toEqual([]);
+	});
+
+	it('finds a branch that draws the page with no tab title', () => {
+		const body = (markup: string) => {
+			const ast = parse(markup, { modern: true }) as unknown as { fragment: unknown };
+			return sequence(nodesOf(ast.fragment)).filter((p) => p.titles > 1 || (p.content && p.titles === 0)).length;
+		};
+		expect(body('{#if a}<PageShell title="A">x</PageShell>{:else}<p>No access</p>{/if}')).toBe(1);
+		expect(body('{#if a}<PageShell title="A">x</PageShell>{/if}')).toBe(0);
+		expect(body('<PageTitle title="A" /><PageShell title="A">x</PageShell>')).toBe(1);
+		expect(body('{#if a}<PageShell title="A">x</PageShell>{:else}<PageShell title="B">y</PageShell>{/if}')).toBe(0);
+		expect(body('<PageTitle title="Sign in" /><AuthShell title="Sign in">x</AuthShell>')).toBe(0);
+		expect(body('{#snippet row()}<p>x</p>{/snippet}<PageShell title="A">{@render row()}</PageShell>')).toBe(0);
 	});
 
 	it('leaves no file rendering both a PageShell and a PageTitle', () => {
