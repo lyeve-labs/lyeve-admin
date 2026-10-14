@@ -202,3 +202,13 @@ describe('a failure from one form', () => {
 		expect(form.textContent).toContain('Payload must be valid JSON.');
 	});
 });
+
+describe('a job with a payload', () => {
+	it('says what clearing the payload sends', async () => {
+		const { getByLabelText } = setup();
+		await fireEvent.click(getByLabelText('Edit Nightly purge'));
+		const form = document.querySelector('#job-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Clearing it sends an empty JSON object on each run.');
+		expect((form.querySelector('input[name="had_payload"]') as HTMLInputElement).value).toBe('true');
+	});
+});

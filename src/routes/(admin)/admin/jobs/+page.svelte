@@ -288,6 +288,7 @@
 	>
 		<FormErrors message={drawerFailed ? formError : undefined} refused={drawerFailed ? refused : null} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
+		{#if editing?.payload}<input type="hidden" name="had_payload" value="true" />{/if}
 
 		<Input id="job-name" label="Name" name="name" required placeholder="send-daily-digest" value={editing?.name ?? ''} />
 		<Input
@@ -321,6 +322,9 @@
 			name="payload"
 			rows={4}
 			placeholder={'{\n  "key": "value"\n}'}
+			hint={editing?.payload
+				? 'Clearing it sends an empty JSON object on each run. Once a job has a payload, it cannot go back to sending none.'
+				: undefined}
 			bind:value={payload}
 		/>
 		<!-- Toggle is a switch button rather than a form control, so the value

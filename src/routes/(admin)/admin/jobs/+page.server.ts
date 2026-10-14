@@ -127,6 +127,11 @@ function jobBody(form: FormData): { body: Record<string, unknown> } | { error: s
 		} catch {
 			return { error: 'Payload must be valid JSON.' };
 		}
+	} else if (form.get('had_payload') === 'true') {
+		// The cron plugin reads a null payload as "leave it", so a cleared
+		// field would keep the old payload. An empty object is the nearest
+		// clear it accepts, and the form says so.
+		body.payload = {};
 	}
 	if (!body.name || !body.schedule || !body.endpoint) {
 		return { error: 'Name, schedule, and endpoint are required' };

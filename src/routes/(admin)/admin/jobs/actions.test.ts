@@ -40,6 +40,24 @@ describe('the jobs role check', () => {
 	});
 });
 
+describe('clearing a payload', () => {
+	// The plugin reads a null payload as "leave it", so a cleared field
+	// travels as an empty object.
+	it('sends an empty object when a job that had a payload is saved without one', async () => {
+		engine.put.mockResolvedValue({});
+		await expect(actions.update(event({ ...job, id: 'j1', payload: '', had_payload: 'true' }))).rejects.toMatchObject({
+			status: 303,
+		});
+		expect(engine.put.mock.calls[0][1].payload).toEqual({});
+	});
+
+	it('sends no payload for a job that never had one', async () => {
+		engine.put.mockResolvedValue({});
+		await expect(actions.update(event({ ...job, id: 'j1', payload: '' }))).rejects.toMatchObject({ status: 303 });
+		expect(engine.put.mock.calls[0][1].payload).toBeNull();
+	});
+});
+
 describe('which form a failure belongs to', () => {
 	it('tags a failed update for the drawer', async () => {
 		engine.put.mockRejectedValue(new ApiError(422, 'schedule fires more than once a minute', {}));
