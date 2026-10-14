@@ -24,7 +24,8 @@ const POOL: MetricFamily = {
 };
 
 // The exporters as the plugin encodes them. Its times are Go time values,
-// which JSON writes as the zero time rather than leaving them out.
+// which JSON writes as the zero time rather than leaving them out, and an
+// error has its addresses and URLs redacted.
 const EXPORTERS = [
 	{
 		name: 'pushgateway',
@@ -39,7 +40,7 @@ const EXPORTERS = [
 		healthy: false,
 		last_export: '2026-09-21T09:00:00Z',
 		last_failure: '2026-09-21T10:00:00Z',
-		last_error: 'otlp: export: dial tcp 10.0.0.9:4318: connect: connection refused',
+		last_error: 'otlp: export: Post "[redacted]": dial tcp [redacted]: connect: connection refused',
 		last_error_class: 'unreachable',
 		exports: 1,
 		failures: 3,

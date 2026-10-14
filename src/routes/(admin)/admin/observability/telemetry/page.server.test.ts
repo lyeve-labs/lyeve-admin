@@ -124,13 +124,46 @@ describe('telemetry load', () => {
 		expect(result.exporters).toEqual({ ok: true, value: EXPORTERS.data });
 	});
 
-	it('reports a registry that is not initialized as an outage, not as an empty registry', async () => {
+	// A proxy in front of the engine answers 503 when it has no engine to
+	// send the scrape to, with a body of its own rather than the engine's.
+	it('reports a scrape a proxy could not deliver as an outage, not as an empty registry', async () => {
 		const { event } = loadEvent(
-			{ '/telemetry/metrics': () => refused(503, 'metrics not initialized', 'service_unavailable') },
+			{
+				'/telemetry/metrics': () =>
+					new Response('<html><body>503 Service Unavailable</body></html>', {
+						status: 503,
+						headers: { 'content-type': 'text/html' },
+					}),
+			},
 			['admin'],
 		);
 		const result = (await load(event)) as Loaded;
 		expect(result.families).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('reports a scrape that ran out of time as an outage', async () => {
+		const { event } = loadEvent(
+			{
+				'/telemetry/metrics': () => {
+					throw new DOMException('t', 'TimeoutError');
+				},
+			},
+			['admin'],
+		);
+		const result = (await load(event)) as Loaded;
+		expect(result.families).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('reports a destination the database could not read as an outage', async () => {
+		const { event } = loadEvent(
+			{
+				'/telemetry/metrics': () => text(TENANT_VIEW),
+				'/telemetry/destination': () => refused(503, 'failed to read the destination', 'service_unavailable'),
+			},
+			['admin'],
+		);
+		const result = (await load(event)) as Loaded;
+		expect(result.destination).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 
 	it('reports a scrape refused for the role as forbidden', async () => {

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
@@ -27,7 +28,8 @@ function said(c: HTMLElement): string {
 
 // A stored destination as the plugin answers it. The health is the plugin's
 // exporter health, named for the tenant, with Go times that JSON writes as
-// the zero time rather than leaving out.
+// the zero time rather than leaving out. An OTLP push that fails is always
+// reported unreachable, with addresses and URLs redacted from its error.
 const STORED = {
 	kind: 'otlp',
 	url: 'https://otlp.example.com/v1/metrics',
@@ -37,8 +39,8 @@ const STORED = {
 		healthy: false,
 		last_export: '2026-10-13T08:00:00Z',
 		last_failure: '2026-10-14T09:00:00Z',
-		last_error: 'pushgateway: HTTP 401: unauthorized',
-		last_error_class: 'rejected',
+		last_error: 'otlp: export: Post "[redacted]": dial tcp [redacted]: connect: connection refused',
+		last_error_class: 'unreachable',
 		exports: 3,
 		failures: 2,
 	},
@@ -70,7 +72,7 @@ describe('the tenant destination', () => {
 		expect(said(container)).toContain('Their values are never shown');
 		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe(STORED.url);
 		expect(said(container)).toContain('Failing');
-		expect(said(container)).toContain('HTTP 401: unauthorized');
+		expect(said(container)).toContain('connect: connection refused');
 	});
 
 	it('warns before a save that moves the host while keeping the headers', async () => {
@@ -217,6 +219,32 @@ describe('the destination form across reloads', () => {
 		await fireEvent.input(url, { target: { value: 'https://otlp.example.com/v2/metrics' } });
 		await rerender(props({ destination: { ...STORED, header_names: [...STORED.header_names] }, licensed: true }));
 		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe('https://otlp.example.com/v2/metrics');
+	});
+
+	// A save that changed only header values leaves what the page reads the
+	// same, so nothing but the save itself clears the values typed.
+	it('clears the header values typed once a save of them succeeds', async () => {
+		const { rerender } = render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		await fireEvent.click(screen.getByRole('radio', { name: 'Replace them' }));
+		await fireEvent.click(screen.getByRole('button', { name: /Add header/ }));
+		await fireEvent.input(screen.getByLabelText('Header'), { target: { value: 'Authorization' } });
+		await fireEvent.input(screen.getByLabelText('Value'), { target: { value: 'Bearer new-key' } });
+		expect((screen.getByLabelText('Value') as HTMLInputElement).value).toBe('Bearer new-key');
+
+		const submit = forms.submits.get('?/saveDestination') as (i: unknown) => (o: unknown) => Promise<void>;
+		const after = submit({ cancel: vi.fn(), formData: new FormData() });
+		await after({
+			result: { type: 'success', status: 200, data: { savedDestination: true } },
+			update: async () => {
+				await rerender(props({ destination: { ...STORED, header_names: [...STORED.header_names] }, licensed: true }));
+			},
+		});
+		await tick();
+
+		expect(screen.queryByLabelText('Value')).toBeNull();
+		expect(screen.queryByDisplayValue('Bearer new-key')).toBeNull();
+		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe(STORED.url);
+		expect(said(document.body)).toContain('Their values are never shown');
 	});
 
 	it('follows a stored destination that changed', async () => {
