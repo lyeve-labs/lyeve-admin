@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -128,8 +127,6 @@
 		)
 	);
 </script>
-
-<PageTitle title="Incoming webhooks" />
 
 <PageShell
 	title="Incoming webhooks"

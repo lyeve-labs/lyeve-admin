@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
@@ -165,8 +164,6 @@
 		};
 	}
 </script>
-
-<PageTitle title="Request capture" />
 
 <PageShell
 	title="Request capture"

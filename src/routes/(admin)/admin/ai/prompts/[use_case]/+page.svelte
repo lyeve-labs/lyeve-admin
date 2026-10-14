@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { Alert, Badge, Breadcrumb, Button, Card, Collapsible, PageShell, SectionHeading, Table, Textarea } from '@lyeve-labs/ui-kit';
@@ -33,8 +32,6 @@
 
 	const save = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
-
-<PageTitle title={p ? useCaseLabel(p.use_case) : 'Prompt'} />
 
 <PageShell title={p ? useCaseLabel(p.use_case) : 'Prompt'} description={p ? `The system prompt for ${p.use_case}.` : ''} width="wide" {back}>
 	{#snippet breadcrumb()}

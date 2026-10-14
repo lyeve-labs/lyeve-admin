@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Alert, Badge, Breadcrumb, Button, Card, DescriptionList, PageShell, SectionHeading, Stat } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { crumbsAfter } from '$lib/breadcrumb';
@@ -41,8 +40,6 @@
 		return 'neutral';
 	}
 </script>
-
-<PageTitle title="Transcript" />
 
 <PageShell title="Transcript" description={t ? formatDateTime(t.created_at) : ''} width="wide" {back}>
 	{#snippet breadcrumb()}

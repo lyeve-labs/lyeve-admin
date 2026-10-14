@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -150,10 +149,9 @@
 	};
 </script>
 
-<PageTitle title="Dashboard - Customization" />
-
 <PageShell
 	title="Dashboard"
+	documentTitle="Dashboard - Customization"
 	description="Compose the dashboard this tenant opens on, from widgets over data the admin already has. Each widget can be limited to roles."
 	width="wide"
 	back={{ href: '/admin/settings/customization', label: 'Customization' }}

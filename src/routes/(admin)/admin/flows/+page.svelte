@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -172,8 +171,6 @@
 	// link returns to the same slice of the list.
 	const rowQuery = $derived(listQuery({ status: data.status, q: data.q }));
 </script>
-
-<PageTitle title="Flows" />
 
 {#if enabled}
 	<PageShell

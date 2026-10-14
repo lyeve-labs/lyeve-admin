@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Button,
@@ -179,8 +178,6 @@
 
 	const saveExperimentSubmit = tracked(saveExperiment);
 </script>
-
-<PageTitle title="Experiments" />
 
 <PageShell
 	title="Experiments"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Button,
@@ -57,8 +56,6 @@
 		{/each}
 	</span>
 {/snippet}
-
-<PageTitle title="Account and appearance" />
 
 <PageShell
 	title="Account and appearance"

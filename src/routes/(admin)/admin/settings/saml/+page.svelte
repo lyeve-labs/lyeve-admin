@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -195,8 +194,6 @@
 
 	const saveProviderSubmit = tracked(saveProvider);
 </script>
-
-<PageTitle title="SAML SSO" />
 
 <PageShell
 	title="SAML SSO"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -135,8 +134,6 @@
 		};
 	}
 </script>
-
-<PageTitle title={tenant.name} />
 
 <PageShell
 	title={tenant.name}

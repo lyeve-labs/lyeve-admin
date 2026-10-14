@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, EmptyState, PageShell, Table } from '@lyeve-labs/ui-kit';
 	import { ChevronRight, MessageSquareText } from '@lucide/svelte';
 	import type { PageData } from './$types';
@@ -10,8 +9,6 @@
 
 	let { data }: { data: PageData } = $props();
 </script>
-
-<PageTitle title="AI prompts" />
 
 <PageShell
 	title="AI prompts"

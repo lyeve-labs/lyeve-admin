@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
@@ -79,8 +78,6 @@
 	let enabledJSON = $derived(JSON.stringify(enabled));
 	let chainJSON = $derived(JSON.stringify(chain));
 </script>
-
-<PageTitle title="Locales" />
 
 <PageShell
 	title="Locales"

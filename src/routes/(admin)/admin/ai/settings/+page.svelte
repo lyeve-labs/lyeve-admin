@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Alert, Badge, Card, DescriptionList, PageShell, SectionHeading, Toggle } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { ActionData, PageData } from './$types';
@@ -21,8 +20,6 @@
 	const retention = $derived(data.instance.find((s) => s.key === 'ai_transcript_retention'));
 	const instanceTranscripts = $derived(data.instance.find((s) => s.key === 'ai_transcripts_enabled'));
 </script>
-
-<PageTitle title="AI settings" />
 
 <PageShell title="AI settings" description="The switch for this tenant, transcript storage and how long a transcript is kept." width="wide">
 	<AiSection tab="settings" gate={AI_OK} layoutGate={data.aiLayoutGate} noun="settings">

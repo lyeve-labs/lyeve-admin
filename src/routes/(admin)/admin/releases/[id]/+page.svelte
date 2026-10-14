@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -154,8 +153,6 @@
 		return label?.schema ? `/admin/content/${encodeURIComponent(label.schema)}/${encodeURIComponent(id)}` : null;
 	}
 </script>
-
-<PageTitle title={release?.name ?? 'Release'} />
 
 <PageShell title={release?.name ?? 'Release'} description={release?.description || undefined} width="wide" {back}>
 	{#snippet actions()}

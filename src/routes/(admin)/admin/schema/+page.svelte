@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -1081,9 +1080,6 @@
 		})();
 	});
 </script>
-
-
-<PageTitle title="Schema builder" />
 
 <!-- A field the server owns. It sits in the same columns as an editable row so
      the Req and Idx boxes below stay under their headings. -->

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Autocomplete,
@@ -140,8 +139,6 @@
 
 	const back = { href: '/admin/content', label: 'Content' };
 </script>
-
-<PageTitle title={data.schemaDef.display_name || data.activeSchema} />
 
 <PageShell
 	title={data.schemaDef.display_name || data.activeSchema}

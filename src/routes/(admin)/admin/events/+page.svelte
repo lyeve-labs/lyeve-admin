@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -65,8 +64,6 @@
 
 	const failures = $derived(failedOnly(data.events).length);
 </script>
-
-<PageTitle title="Events" />
 
 <PageShell
 	title="Events"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	/**
 	 * The license this instance runs on, as the license module reports it.
 	 *
@@ -82,8 +81,6 @@
 	// else, so the form is not offered to them.
 	const canRenew = $derived(data.user?.roles?.includes('super_admin') ?? false);
 </script>
-
-<PageTitle title="License" />
 
 <PageShell
 	title="License"

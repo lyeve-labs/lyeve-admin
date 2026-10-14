@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { ActionData, PageData } from './$types';
 	import type { EndpointDoc, EndpointParam, HttpMethod } from '$lib/api/reference';
 	import { VALUES_SHOWN } from '$lib/api/openapi';
@@ -172,8 +171,6 @@
 	// Plugin rows would fill most of the rail, so they open on demand.
 	let pluginsOpen = $state(false);
 </script>
-
-<PageTitle title="API reference" />
 
 <!-- What a row shows, rendered inside the disclosure button when there is
      something to disclose and in a plain container when there is not. The two

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { enhance } from '$app/forms';
 	import { Alert, Button, Card, DescriptionList, EmptyState, Input, PageShell } from '@lyeve-labs/ui-kit';
 	import { CircleCheck, CircleX, Clock, SearchX, ShieldAlert, TriangleAlert } from '@lucide/svelte';
@@ -76,11 +75,10 @@
 	const showCodeField = $derived(view === 'enter' || view === 'unknown' || view === 'expired' || view === 'decided');
 </script>
 
-<PageTitle title="Approve a device" />
-
 <PageShell
 	width="narrow"
 	title="Approve a device sign-in"
+	documentTitle="Approve a device"
 	description="Signed in as {data.email}. A device you approve gets a short session as you."
 	back={{ href: '/admin', label: 'Admin' }}
 >

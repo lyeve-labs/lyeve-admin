@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Alert, Button, Card, CopyField, Input, PageShell, PasswordInput, SectionHeading, Table } from '@lyeve-labs/ui-kit';
 	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
@@ -26,8 +25,6 @@
 		{ role: 'admin', read: true, write: true, schemas: true },
 	];
 </script>
-
-<PageTitle title="API access" />
 
 <!-- The icon carries no name of its own, so the cell states the answer in text.
      A screen reader reads the cell, not the glyph inside it. -->

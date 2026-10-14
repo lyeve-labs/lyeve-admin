@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
@@ -117,10 +116,9 @@
 	}
 </script>
 
-<PageTitle title="Email triggers - Settings" />
-
 <PageShell
 	title="Email triggers"
+	documentTitle="Email triggers - Settings"
 	description="Send a template when a record is written or a review moves, without building a flow. For a condition or a second step, use a flow with the send templated email node."
 	width="wide"
 	back={{ href: '/admin/settings/email', label: 'Email' }}

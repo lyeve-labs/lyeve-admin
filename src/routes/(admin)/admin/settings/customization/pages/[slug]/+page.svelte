@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -116,10 +115,9 @@
 	};
 </script>
 
-<PageTitle title={`${page.title || 'Page'} - Customization`} />
-
 <PageShell
 	title={data.customPage.title}
+	documentTitle={`${page.title || 'Page'} - Customization`}
 	description="Build the page from blocks. It opens at /admin/pages/{data.customPage.slug}."
 	width="wide"
 	back={{ href: '/admin/settings/customization', label: 'Customization' }}

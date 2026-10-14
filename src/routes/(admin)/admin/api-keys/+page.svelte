@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -220,8 +219,6 @@
 	const create = submitter(() => (showCreate = false));
 	const limit = submitter(() => (limitOpen = false));
 </script>
-
-<PageTitle title="API keys" />
 
 <PageShell
 	title="API keys"

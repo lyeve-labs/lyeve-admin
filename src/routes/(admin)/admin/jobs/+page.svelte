@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Button,
@@ -140,8 +139,6 @@
 		)
 	);
 </script>
-
-<PageTitle title="Scheduled jobs" />
 
 <PageShell title="Scheduled jobs" {description} width="wide">
 	{#snippet actions()}

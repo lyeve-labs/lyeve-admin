@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -164,8 +163,6 @@
 			: data.entries,
 	);
 </script>
-
-<PageTitle title="PII masking" />
 
 <PageShell
 	title="PII masking"

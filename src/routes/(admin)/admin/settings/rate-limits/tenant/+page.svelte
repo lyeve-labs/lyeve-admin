@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -156,8 +155,6 @@
 	// the window that address named.
 	const windows = HISTORY_WINDOWS.map((w) => ({ value: w.value, label: w.label, href: `?hours=${w.value}` }));
 </script>
-
-<PageTitle title="Tenant rate limits" />
 
 {#snippet addressCard(which: AddressList, rows: AddressEntry[], title: string)}
 	<Card pad="md">

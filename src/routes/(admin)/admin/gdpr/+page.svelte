@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Alert, Button, Card, Input, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
 	import type { ActionData } from './$types';
 	import { enhance } from '$app/forms';
@@ -55,8 +54,6 @@
 			: ''
 	);
 </script>
-
-<PageTitle title="Privacy requests" />
 
 <PageShell
 	title="Privacy requests"

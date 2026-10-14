@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -149,8 +148,6 @@
 	const saveConnectionSubmit = tracked(saveConnection);
 	const saveTokenSubmit = tracked(saveToken);
 </script>
-
-<PageTitle title="SCIM provisioning" />
 
 <PageShell
 	title="SCIM provisioning"

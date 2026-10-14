@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { Alert, Button, Card, CopyField, Input, PageShell, Skeleton } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
@@ -68,8 +67,6 @@
 		setTimeout(() => (copiedCodes = false), 2000);
 	}
 </script>
-
-<PageTitle title="Two-factor authentication" />
 
 <PageShell
 	title="Two-factor authentication"

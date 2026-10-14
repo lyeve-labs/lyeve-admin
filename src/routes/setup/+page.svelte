@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
@@ -114,9 +113,7 @@
 	const read = submitter();
 </script>
 
-<PageTitle title="Set up" />
-
-<PageShell width="narrow" title="Set up LyEve" description="Finish configuring the engine and create the first super admin.">
+<PageShell width="narrow" title="Set up LyEve" documentTitle="Set up" description="Finish configuring the engine and create the first super admin.">
 	<div class="space-y-6">
 		<StepIndicator {steps} current={currentStep} />
 

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -94,8 +93,6 @@
 	const pageHref = (offset: number) => `/admin/audit-log${listQuery({ ...data.filter, offset: offset || null })}`;
 	const prunedCount = $derived(Number(page.url.searchParams.get('pruned') ?? 0));
 </script>
-
-<PageTitle title="Audit log" />
 
 {#snippet emptyIcon()}
 	<ScrollText size={ICON.lg} />

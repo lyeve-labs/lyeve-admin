@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Alert, Card, Breadcrumb, Button, PageShell, Select } from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SchemaField } from '@lyeve-labs/client';
@@ -49,8 +48,6 @@
 
 	const back = $derived({ href: `/admin/content/${schemaName}`, label: schemaLabel });
 </script>
-
-<PageTitle title="New entry" />
 
 <PageShell
 	title="New entry"

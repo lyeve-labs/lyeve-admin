@@ -613,19 +613,26 @@ export const rules = [
     id: 'page-title',
     files: PAGES,
     /**
-     * A page that names no tab title.
+     * A page that names no tab title, or names it twice.
      *
      * The layouts carry no fallback title. During server rendering Svelte keeps
      * one title per document and a layout's could outrank the page's, so a
      * page would render titled with the bare product name until the script
-     * runs. Each page says what it is through
-     * PageTitle instead, which also ends the title in the tenant's name. A page
-     * that only redirects renders no markup and is left alone.
+     * runs. The root layout states the format once, and a PageShell titles the
+     * tab from its `title`, or from `documentTitle` when the tab reads
+     * differently. A page with no PageShell, such as a signed-out card,
+     * renders PageTitle instead. Both end the title in the tenant's name. A
+     * page that renders both writes two title elements, and the tab shows
+     * whichever the browser reads first. A page that only redirects renders
+     * no markup and is left alone.
      */
     test: (src) => {
       const body = markup(src).replace(/<!--[\s\S]*?-->/g, '').trim();
       if (!body) return [];
-      return /<PageTitle\b/.test(body) ? [] : ['page sets no tab title; render <PageTitle title="..." />'];
+      const shell = /<PageShell\b/.test(body);
+      const title = /<PageTitle\b/.test(body);
+      if (shell && title) return ['page renders a PageShell and a PageTitle; pass documentTitle to the PageShell instead'];
+      return shell || title ? [] : ['page sets no tab title; render a PageShell, or <PageTitle title="..." /> on a page without one'];
     },
   },
   {
@@ -1228,12 +1235,12 @@ export const rules = [
           const inner = enclosed(body, el)?.replace(HEADING_SNIPPET, '');
           if (inner != null && !/[<{]/.test(inner)) labels.push(inner);
         }
-        for (const name of ['title', 'label']) {
+        for (const name of ['title', 'label', 'documentTitle']) {
           const a = attr(el.attrs, name);
           if (!a || a.dynamic) continue;
           // A tab title names the page, then the section it sits in, so each
           // part is its own phrase and starts with a capital.
-          if (el.name === 'PageTitle') labels.push(...a.value.split(' - '));
+          if (el.name === 'PageTitle' || name === 'documentTitle') labels.push(...a.value.split(' - '));
           else labels.push(a.value);
         }
       }

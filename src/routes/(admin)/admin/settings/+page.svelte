@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
 	import { ChevronRight } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
@@ -28,8 +27,6 @@
 		),
 	);
 </script>
-
-<PageTitle title="Settings" />
 
 <PageShell
 	title="Settings"

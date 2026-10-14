@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -170,8 +169,6 @@
 		};
 	}
 </script>
-
-<PageTitle title="Data export" />
 
 <PageShell
 	title="Data export"

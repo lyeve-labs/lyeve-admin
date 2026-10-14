@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -81,8 +80,6 @@
 		allocs: 'Allocations',
 	};
 </script>
-
-<PageTitle title="Profiler" />
 
 {#snippet noEndpoints()}
 	<Gauge size={ICON.lg} />

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -280,8 +279,6 @@
 		closeLogStream();
 	});
 </script>
-
-<PageTitle title="Observability" />
 
 {#snippet noPoolHealth()}
 	<Database size={ICON.lg} />

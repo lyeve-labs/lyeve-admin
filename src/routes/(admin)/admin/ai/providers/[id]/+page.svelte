@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import { Alert, Badge, Breadcrumb, Button, Card, DescriptionList, Input, PageShell, SectionHeading, Tag, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
@@ -56,8 +55,6 @@
 	const saveCaps = tracked(() => async ({ update }) => update({ reset: false }));
 	const saveConfig = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
-
-<PageTitle title={p?.name ?? 'Provider'} />
 
 <PageShell
 	title={p?.name ?? 'Provider'}

@@ -283,8 +283,13 @@ describe('native-control', () => {
 });
 
 describe('page-title', () => {
-  it('accepts a page that names its tab title', () => {
-    expect(check('page-title', '<PageTitle title="Users" />\n<PageShell title="Users"></PageShell>')).toEqual([]);
+  it('accepts a page whose PageShell titles the tab', () => {
+    expect(check('page-title', '<PageShell title="Users"></PageShell>')).toEqual([]);
+    expect(check('page-title', '<PageShell title="Email" documentTitle="Email providers"></PageShell>')).toEqual([]);
+  });
+
+  it('accepts a page without a PageShell that names its tab title', () => {
+    expect(check('page-title', '<PageTitle title="Sign in" />\n<AuthShell title="Sign in to your account"></AuthShell>')).toEqual([]);
   });
 
   it('leaves a page that only redirects alone', () => {
@@ -292,8 +297,12 @@ describe('page-title', () => {
   });
 
   it('fails a page that renders with no tab title', () => {
-    expect(check('page-title', '<PageShell title="Users"></PageShell>')).toHaveLength(1);
-    expect(check('page-title', '<!-- <PageTitle title="Users" /> -->\n<PageShell title="Users"></PageShell>')).toHaveLength(1);
+    expect(check('page-title', '<AuthShell title="Sign in"></AuthShell>')).toHaveLength(1);
+    expect(check('page-title', '<!-- <PageTitle title="Users" /> -->\n<div></div>')).toHaveLength(1);
+  });
+
+  it('fails a page that writes two tab titles', () => {
+    expect(check('page-title', '<PageTitle title="Users" />\n<PageShell title="Users"></PageShell>')).toHaveLength(1);
   });
 });
 
@@ -305,7 +314,7 @@ describe('page-shell', () => {
   });
 
   it('looks past the tab title, which renders into the head', () => {
-    expect(check('page-shell', `<PageTitle title="Users" />\n<PageShell title="Users">\n\t<Table />\n</PageShell>`)).toEqual([]);
+    expect(check('page-shell', `<PageShell title="Users">\n\t<Table />\n</PageShell>`)).toEqual([]);
     expect(check('page-shell', `<PageTitle title="Users" />\n<div class="mx-auto max-w-7xl"></div>`)).toHaveLength(1);
   });
 
@@ -757,6 +766,8 @@ describe('title-case', () => {
   it('reads each part of a tab title as its own phrase', () => {
     expect(check('title-case', '<PageTitle title="Retention and holds - Audit log" />')).toEqual([]);
     expect(check('title-case', '<PageTitle title="Retention And Holds - Audit log" />')).toHaveLength(1);
+    expect(check('title-case', '<PageShell title="Audit log" documentTitle="Retention and holds - Audit log"></PageShell>')).toEqual([]);
+    expect(check('title-case', '<PageShell title="Audit log" documentTitle="Retention And Holds - Audit log"></PageShell>')).toHaveLength(1);
   });
 
   it('leaves a label built by an expression alone', () => {

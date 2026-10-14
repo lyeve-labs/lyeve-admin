@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Button,
@@ -141,8 +140,6 @@
 		}
 	}
 </script>
-
-<PageTitle title="Media library" />
 
 <PageShell
 	title="Media library"

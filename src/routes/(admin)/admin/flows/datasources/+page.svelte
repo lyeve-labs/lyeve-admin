@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -243,11 +242,10 @@
 	}
 </script>
 
-<PageTitle title="Datasources - Flows" />
-
 {#if enabled}
 	<PageShell
 		title="Datasources"
+		documentTitle="Datasources - Flows"
 		description="Stored, encrypted connections a flow refers to by name: an external database, an HTTP base with headers, or a Google service account."
 		width="wide"
 		back={flowBack(page.url)}
@@ -578,7 +576,7 @@
 		<input type="hidden" name="id" value={deleteId} />
 	</form>
 {:else}
-	<PageShell title="Flows" width="wide">
+	<PageShell title="Flows" documentTitle="Datasources - Flows" width="wide">
 		<NotEnabled title="Flows" description="Datasources belong to the flow plugin, and the engine refused its routes." />
 	</PageShell>
 {/if}
