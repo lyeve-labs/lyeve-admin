@@ -214,8 +214,24 @@ export async function putAlertSettings(client: HttpClient, body: AlertSettingsIn
 	return toAlertSettings(await client.put<unknown>(SETTINGS_URL, body));
 }
 
+/** The largest page the plugin serves. */
+const CODES_PAGE = 500;
+
+/**
+ * Every registered code. The plugin pages the catalog, 50 to a page unless
+ * asked for more, so a lookup that read one page labeled every alert past it
+ * as an unclassified failure.
+ */
 export async function listCodes(client: HttpClient): Promise<ListEnvelope<ErrorCode>> {
-	return client.get<ListEnvelope<ErrorCode>>(CODES_URL);
+	const all: ErrorCode[] = [];
+	for (let offset = 0; ; offset += CODES_PAGE) {
+		const page = await client.get<ListEnvelope<ErrorCode>>(`${CODES_URL}?limit=${CODES_PAGE}&offset=${offset}`);
+		const rows = rowsOf(page);
+		all.push(...rows);
+		const total = statedTotal(page);
+		if (rows.length < CODES_PAGE || (total !== null && all.length >= total)) break;
+	}
+	return { data: all, total_count: all.length };
 }
 
 export async function acknowledge(client: HttpClient, id: string): Promise<void> {

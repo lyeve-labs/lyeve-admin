@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
+const authz = vi.hoisted(() => ({ roles: ['admin'] as string[] }));
 vi.mock('$lib/server/authz', async (importOriginal) => ({
 	...((await importOriginal()) as object),
 	authedClient: vi.fn(() => engine),
-	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
+	requireRole: vi.fn(async (_event: unknown, allowed: string[]) => {
+		if (!allowed.some((r) => authz.roles.includes(r))) throw new Error('403');
+		return { id: 'u1', roles: authz.roles };
+	}),
 }));
 
 import { actions, load } from './+page.server';
@@ -38,7 +42,10 @@ function route(map: Record<string, unknown>) {
 	});
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+	vi.clearAllMocks();
+	authz.roles = ['admin'];
+});
 
 describe('the errors load', () => {
 	it('asks the plugin for the status the address names', async () => {
@@ -153,5 +160,31 @@ describe('the alert pager', () => {
 			status: 307,
 			location: expect.stringContaining('offset=50'),
 		});
+	});
+});
+
+describe('acknowledging an alert', () => {
+	it('acknowledges the alert it names', async () => {
+		engine.post.mockResolvedValue({});
+		expect(await actions.acknowledge(actionEvent({ id: 'a1' }))).toEqual({ acknowledged: 'a1' });
+		expect(engine.post.mock.calls[0][0]).toContain('/alerts/a1/acknowledge');
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
+		await expect(actions.acknowledge(actionEvent({ id: 'a1' }))).rejects.toThrow('403');
+		expect(engine.post).not.toHaveBeenCalled();
+	});
+
+	it("relays the plugin's refusal", async () => {
+		engine.post.mockRejectedValue(new ApiError(404, 'alert not found', {}));
+		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
+		expect(out.data.error).toBe('alert not found');
+	});
+
+	it('says an outage failed the acknowledgment', async () => {
+		engine.post.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
+		expect(out.data.error).toBe('The alert could not be acknowledged.');
 	});
 });
