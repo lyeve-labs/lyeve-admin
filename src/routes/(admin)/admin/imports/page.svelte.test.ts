@@ -8,6 +8,7 @@ vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/impo
 
 import ImportsPage from './+page.svelte';
 import type { ImportJob } from '$lib/api/bulk-import';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -182,5 +183,19 @@ describe('Imports failures stay where they were made', () => {
 			props: props({ templates: [], templatesRead: true }, { action: 'saveTemplate', error: 'Map at least one column.' }),
 		});
 		expect(said(container)).not.toContain('Map at least one column.');
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(ImportsPage, { props: props() });
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time with nothing in it yet', () => {
+		const { container } = render(ImportsPage, { props: props({ jobs: [], total: 0 }) });
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

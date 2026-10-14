@@ -2,6 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import EditorPage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 /**
  * The engine stores a page with empty fields left out. A callout saved with no
@@ -61,5 +62,15 @@ describe('custom page block controls', () => {
 		});
 		expect(document.body.textContent).toContain('The schemas could not be read');
 		expect(document.querySelector('#block-2-schemas')?.closest('div')?.parentElement?.textContent).toContain('articles');
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		cleanup();
+		mount();
+		expect(outlineSkips(document.body)).toEqual([]);
 	});
 });

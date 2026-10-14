@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tick } from 'svelte';
 import { setThemePreference } from '@lyeve-labs/ui-kit';
 import AccountPage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 /**
  * The appearance picker.
@@ -137,5 +138,15 @@ describe('appearance', () => {
 
 		expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
 		expect(segment('System').getAttribute('aria-checked')).toBe('true');
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		cleanup();
+		mount();
+		expect(outlineSkips(document.body)).toEqual([]);
 	});
 });

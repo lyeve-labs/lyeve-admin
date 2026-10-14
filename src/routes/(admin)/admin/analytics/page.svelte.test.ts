@@ -3,6 +3,7 @@ import { render, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import AnalyticsPage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -153,5 +154,14 @@ describe('a read that failed', () => {
 		});
 		const text = said(container);
 		expect(text.split('not part of this build').length - 1).toBe(1);
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(AnalyticsPage, { props: props() });
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

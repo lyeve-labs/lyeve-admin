@@ -6,6 +6,7 @@ import type { PageData } from './$types';
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 import LocalesPage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -87,5 +88,14 @@ describe('the fallback picker', () => {
 		render(LocalesPage, { props: { data: data({ locales: { ok: true, value: { ...LOCALES, fallback_chain: [] } } }), form: null } });
 		await fireEvent.click(document.body.querySelector('#chain-pick') as HTMLElement);
 		expect(screen.getByRole('combobox', { name: 'Search Append a locale' })).toBeTruthy();
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(LocalesPage, { props: { data: data(), form: null } });
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

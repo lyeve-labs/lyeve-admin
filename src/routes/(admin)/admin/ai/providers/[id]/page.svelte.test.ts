@@ -3,6 +3,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 import { fixtureLocalProvider, fixtureProvider, fixtureSettings } from '$lib/components/ai/fixtures';
+import { outlineSkips } from '$lib/test-outline';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -82,5 +83,14 @@ describe('AI provider detail page', () => {
 		const { getByText, container } = setup({ gate: { state: 'off' }, provider: null });
 		expect(getByText('AI is switched off for this tenant')).toBeTruthy();
 		expect(container.querySelector('form[action="?/update"]')).toBeNull();
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = setup();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });
