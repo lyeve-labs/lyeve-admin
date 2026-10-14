@@ -30,7 +30,7 @@ describe('RunViewer', () => {
 	// The plugin serves a run whose values the reader may not see with
 	// withheld set and every input, output and error emptied.
 	it('says the values are withheld and still shows that the run failed', () => {
-		const withheld = {
+		const withheld: FlowRun = {
 			...fixtureRun,
 			withheld: true,
 			input: null,
