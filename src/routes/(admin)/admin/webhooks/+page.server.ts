@@ -26,6 +26,12 @@ const LIST_FAILED = 'The webhooks could not be read. This is not a report that t
 /** What the drawer says when the schema names could not be read. */
 const SCHEMAS_FAILED = 'The schemas could not be read.';
 
+/** One page of the dead letter queue. */
+const DEAD_LETTER_PAGE = 50;
+
+/** How many attempts the delivery history asks for. The plugin offers no offset. */
+const DELIVERY_LIMIT = 50;
+
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const client = authedClient(event);
@@ -71,8 +77,8 @@ export const load: PageServerLoad = async (event) => {
  * every form, so the drawer shows only its own writes' failures and the page
  * shows the rest.
  */
-function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
-	return fail(failure.status, { ...failure.data, action });
+function tagged(action: string, failure: ActionFailure<Record<string, unknown>>, id?: string) {
+	return fail(failure.status, { ...failure.data, action, ...(id ? { id } : {}) });
 }
 
 export const actions: Actions = {
@@ -132,7 +138,7 @@ export const actions: Actions = {
 			const result = await testWebhook(id, client);
 			return { testResult: { id, ...result } };
 		} catch (err) {
-			return actionFailure(err, 'Failed to test webhook');
+			return tagged('test', actionFailure(err, 'Failed to test webhook'));
 		}
 	},
 
@@ -144,10 +150,10 @@ export const actions: Actions = {
 			const id = String(data.get('id') ?? '');
 
 			try {
-				const items = await listDeliveries(id, client, 50);
-				return { deliveries: { id, items } };
+				const items = await listDeliveries(id, client, DELIVERY_LIMIT);
+				return { deliveries: { id, items, limit: DELIVERY_LIMIT } };
 			} catch (err) {
-				return actionFailure(err, 'Failed to load deliveries');
+				return tagged('deliveries', actionFailure(err, 'Failed to load deliveries'));
 			}
 		},
 
@@ -161,10 +167,15 @@ export const actions: Actions = {
 			const newSecret = data.get('new_secret');
 
 			try {
-				const result = await rotateSecret(id, client, newSecret ? String(newSecret) : undefined);
-				return { rotateSecretResult: result };
+				// The plugin answers the webhook and the new secret beside it, and
+				// shows the secret this once, so both are handed to the page.
+				const result = (await rotateSecret(id, client, newSecret ? String(newSecret) : undefined)) as unknown as {
+					webhook?: { name?: string };
+					new_secret?: string;
+				};
+				return { rotated: { id, name: result.webhook?.name ?? '', secret: result.new_secret ?? '' } };
 			} catch (err) {
-				return actionFailure(err, 'Failed to rotate webhook secret');
+				return tagged('rotate-secret', actionFailure(err, 'Failed to rotate webhook secret'));
 			}
 		},
 
@@ -180,7 +191,7 @@ export const actions: Actions = {
 				const result = await retryDelivery(id, deliveryId, client);
 				return { retryResult: result };
 			} catch (err) {
-				return actionFailure(err, 'Failed to retry delivery');
+				return tagged('retry-delivery', actionFailure(err, 'Failed to retry delivery'));
 			}
 		},
 
@@ -196,16 +207,28 @@ export const actions: Actions = {
 			const client = authedClient(event);
 			const data = await request.formData();
 			const status = data.get('status');
-			const qs = new URLSearchParams({ limit: '50', offset: '0' });
+			// The open queue's pager says it turned a page, which page 1 alone
+			// cannot tell apart from the first read.
+			const turned = data.get('turn') === 'page';
+			const asked = Number(data.get('offset') ?? 0);
+			const offset = Number.isInteger(asked) && asked > 0 ? asked : 0;
+			const qs = new URLSearchParams({ limit: String(DEAD_LETTER_PAGE), offset: String(offset) });
 			if (status) qs.set('status', String(status));
 
 			try {
 				const res = await client.get<ListEnvelope<DeadLetter> | DeadLetter[]>(
 					`/api/admin/webhook-dead-letters?${qs}`
 				);
-				return { deadLetters: rowsOf(res), deadLetterTotal: statedTotal(res) };
+				return {
+					deadLetters: rowsOf(res),
+					deadLetterTotal: statedTotal(res),
+					deadLetterOffset: offset,
+					deadLetterLimit: DEAD_LETTER_PAGE
+				};
 			} catch (err) {
-				return actionFailure(err, 'Failed to load dead letters');
+				// A page turned inside the open queue reports there, and the first
+				// read reports above the list, where the button was.
+				return tagged(turned ? 'dead-letters-page' : 'dead-letters', actionFailure(err, 'Failed to load dead letters'));
 			}
 		},
 
@@ -220,7 +243,7 @@ export const actions: Actions = {
 				const result = await replayDeadLetter(id, client);
 				return { deadLetterReplay: result };
 			} catch (err) {
-				return actionFailure(err, 'Failed to replay dead letter');
+				return tagged('dead-letter-replay', actionFailure(err, 'Failed to replay dead letter'), id);
 			}
 		},
 
@@ -235,7 +258,7 @@ export const actions: Actions = {
 				const result = await dismissDeadLetter(id, client);
 				return { deadLetterDismiss: result };
 			} catch (err) {
-				return actionFailure(err, 'Failed to dismiss dead letter');
+				return tagged('dead-letter-dismiss', actionFailure(err, 'Failed to dismiss dead letter'), id);
 			}
 		},
 
@@ -249,7 +272,7 @@ export const actions: Actions = {
 			try {
 				await deleteDeadLetter(id, client);
 			} catch (err) {
-				return actionFailure(err, 'Failed to delete dead letter');
+				return tagged('dead-letter-delete', actionFailure(err, 'Failed to delete dead letter'), id);
 			}
 		}
 };

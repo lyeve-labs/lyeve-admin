@@ -190,3 +190,63 @@ describe('the tenant drawer and the failures of other actions', () => {
 		expect(outside).not.toContain('Failed to create tenant');
 	});
 });
+
+/*
+ * A provisioning read that did not answer says nothing about the license, so
+ * the page never draws the not-enabled card for it.
+ */
+describe('Tenants when provisioning could not be read', () => {
+	it('says it could not tell, offers no create and makes no licensing claim', () => {
+		const { container, queryByTestId, queryByRole } = render(TenantsPage, {
+			props: props({ canProvision: false, provisionGate: { state: 'unavailable' } }),
+		});
+		expect(container.textContent).toContain('so Tenant provisioning could not be read');
+		expect(queryByTestId('not-enabled')).toBeNull();
+		expect(queryByRole('button', { name: /new tenant/i })).toBeNull();
+		expect(container.textContent).toContain('tenant-0');
+	});
+});
+
+describe('the tenant drawer fields', () => {
+	it('suggests a slug the engine accepts and states the rule', async () => {
+		const { getAllByRole } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
+		const slug = document.body.querySelector<HTMLInputElement>('#slug');
+		expect(slug?.placeholder).toMatch(/^[a-z][a-z0-9_]{0,62}$/);
+		expect(document.body.textContent).toContain('Lowercase letters, digits and underscores, starting with a letter.');
+		// The plugin allows 63 characters on every database.
+		expect(document.body.textContent).toContain('At most 63 characters. It cannot be changed later.');
+	});
+
+	it('says what an emptied plan is stored as', async () => {
+		const { getAllByRole } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /^edit tenant-0|^edit tenant 0/i })[0]);
+		expect(document.body.textContent).toContain('Left empty, it is stored as free.');
+	});
+
+	it('draws a license refusal inside the drawer', async () => {
+		const { getAllByRole, rerender } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
+		await rerender({
+			data: data() as never,
+			form: {
+				action: 'create',
+				error: 'x',
+				refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' },
+			} as never,
+		});
+		const drawer = document.body.querySelector('form#tenant-form');
+		expect(drawer?.querySelector('[data-testid="refusal-notice"]')).not.toBeNull();
+	});
+});
+
+describe('the tenant name link on a touch screen', () => {
+	// The link is 17 pixels tall. The kit's hit area extends what a finger can
+	// reach without moving the row.
+	it('carries the extended hit area', () => {
+		const { container } = render(TenantsPage, { props: props() });
+		const link = container.querySelector('a[href="/admin/tenants/t0"]');
+		expect(link?.classList.contains('hit-area')).toBe(true);
+		expect(link?.classList.contains('relative')).toBe(true);
+	});
+});

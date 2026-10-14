@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
-import { archiveTenant, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
+import { archiveTenant, getEntitlements, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
@@ -16,18 +16,20 @@ const MEMBERS_MAX = 200;
 import {
 	featureChoices,
 	findUserByEmail,
+	findUserById,
 	getTenantFeatures,
 	grantMembership,
 	listTenantMembers,
 	revokeMembership,
 	setTenantFeatures,
+	superAdminsAmong,
 	withheldFrom,
 	type FeatureChoice,
 	type TenantMember,
 } from '$lib/api/tenant-access';
 
 export const load: PageServerLoad = async (event) => {
-	const { user, entitlements } = await event.parent();
+	const { user } = await event.parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 
@@ -42,32 +44,46 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, MEMBERS_LIMIT, MEMBERS_MAX);
 
 	// Each half is read on its own: a members list that fails is no reason to
-	// hide what the tenant may use, and the reverse.
-	const [features, members] = await Promise.all([
+	// hide what the tenant may use, and the reverse. The license is read here
+	// rather than taken from the shell, which reads a failed read as a license
+	// with nothing in it, and an empty list here would offer only what is
+	// already withheld.
+	const [features, license, members] = await Promise.all([
 		section(getTenantFeatures(client, tenant.slug), "This tenant's features could not be read."),
+		section(getEntitlements(client), 'The license could not be read, so what this tenant may use cannot be offered.'),
 		section(
 			listTenantMembers(client, tenant.slug, limit, offset),
 			"This tenant's members could not be read. This is not a report that it has none.",
 		),
 	]);
 
-	// The entitlements the layout read are the signed-in super admin's, whose
-	// tenant is not this one, so only `features` is read from them: the
-	// license, which is the same for every tenant.
-	const licensed = entitlements?.features ?? [];
-	const choices: Section<FeatureChoice[]> = features.ok
-		? { ok: true, value: featureChoices(features.value.known, licensed, features.value.withheld) }
-		: features;
+	// The entitlements are the signed-in super admin's, whose tenant is not
+	// this one, so only `features` is read from them: the license, which is
+	// the same for every tenant.
+	const choices: Section<FeatureChoice[]> = !features.ok
+		? features
+		: !license.ok
+			? license
+			: { ok: true, value: featureChoices(features.value.known, license.value.features ?? [], features.value.withheld) };
 	if (members.ok) {
 		const back = pastEndOffset(members.value.members?.length ?? 0, limit, offset, members.value.total ?? null);
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 	const people: Section<TenantMember[]> = members.ok ? { ok: true, value: members.value.members ?? [] } : members;
 
+	// A home row lists the roles its membership sets, which can leave out the
+	// account's own super_admin, and the engine signs the account in here with
+	// those roles. Only the account says whether it holds super_admin. A failed
+	// read leaves these rows as they are listed: their roles already lack
+	// super_admin, so an edit cannot take it away.
+	const quiet = people.ok ? people.value.filter((m) => m.home && !m.roles.includes('super_admin')).map((m) => m.id) : [];
+	const homeSuperAdmins = await superAdminsAmong(client, quiet).catch(() => [] as string[]);
+
 	return {
 		tenant,
 		choices,
 		members: people,
+		homeSuperAdmins,
 		memberTotal: members.ok ? members.value.total : 0,
 		limit,
 		offset,
@@ -104,15 +120,27 @@ export const actions: Actions = {
 		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
 		const client = authedClient(event);
 		try {
-			let id = userId;
-			if (!id) {
-				const found = await findUserByEmail(client, email);
-				if (!found) {
-					return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
-				}
-				id = found.id;
+			const slug = await tenantSlug(event);
+			const found = userId ? await findUserById(client, userId) : await findUserByEmail(client, email);
+			if (!found && !userId) {
+				return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
 			}
-			await grantMembership(client, id, await tenantSlug(event), roles);
+			// An account the lookup did not reach could be a super admin at home
+			// here, so nothing is saved for it.
+			if (!found) {
+				return fail(404, { action: 'grant', memberError: 'The account could not be found, so nothing was saved.' });
+			}
+			// A membership in the home tenant replaces the account's roles when it
+			// signs in there. Written for a super admin, it would either drop
+			// super_admin or hold it past a removal on the Users page.
+			if (found && found.tenant_id === slug && (found.roles ?? []).includes('super_admin')) {
+				return fail(409, {
+					action: 'grant',
+					memberError: `${found.email} is a super admin whose home is this tenant. Its roles are set on the Users page.`,
+					fields: userId ? undefined : { email: 'A super admin at home' },
+				});
+			}
+			await grantMembership(client, found.id, slug, roles);
 			return { memberSaved: true };
 		} catch (err) {
 			const full = seatRefusal(err);

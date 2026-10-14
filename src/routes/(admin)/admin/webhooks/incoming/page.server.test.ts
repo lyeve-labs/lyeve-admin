@@ -54,6 +54,60 @@ describe('admin/webhooks/incoming load', () => {
 	});
 });
 
+/** A load event at the given address whose list read answers with the given body. */
+function listEvent(body: unknown, query = '') {
+	const asked: string[] = [];
+	const fetch = vi.fn(async (url: string) => {
+		const u = String(url);
+		asked.push(u);
+		if (u.includes('/schemas')) return json([]);
+		return json(body);
+	}) as unknown as typeof globalThis.fetch;
+	const event = {
+		fetch,
+		cookies: mockCookies(),
+		url: new URL(`http://localhost/admin/webhooks/incoming${query}`),
+	} as never;
+	return { event, asked };
+}
+
+const row = (id: string) => ({ id, name: id, schema_name: 'orders', enabled: true, field_map: { a: 'b' } });
+
+/*
+ * The plugin pages its list. A page that asked for every endpoint at once
+ * showed only the plugin's default page and said nothing of the rest.
+ */
+describe('admin/webhooks/incoming paging', () => {
+	it('asks for the page the address names and one row past it', async () => {
+		const { event, asked } = listEvent({ data: [row('a')], total_count: 26 }, '?limit=25&offset=25');
+		const result = (await load(event)) as Loaded;
+		expect(asked.find((u) => u.includes('/incoming-webhooks'))).toContain('limit=26&offset=25');
+		expect(result).toMatchObject({ limit: 25, offset: 25, total: 26 });
+	});
+
+	it('sends a page past the end back to the last page', async () => {
+		const { event } = listEvent({ data: [], total_count: 3 }, '?limit=25&offset=50');
+		await expect(load(event)).rejects.toMatchObject({ status: 307, location: '/admin/webhooks/incoming?limit=25&offset=0' });
+	});
+});
+
+/*
+ * The plugin says on its list whether its license opens create and update.
+ * Only a stated value reaches the page, so an older plugin that sends nothing
+ * leaves both live.
+ */
+describe('admin/webhooks/incoming license flag', () => {
+	it.each([
+		[false, false],
+		[true, true],
+		[undefined, null],
+		['no', null],
+	])('reads licensed %s as %s', async (sent, read) => {
+		const { event } = listEvent({ data: [], total_count: 0, licensed: sent });
+		expect(((await load(event)) as Loaded).licensed).toBe(read);
+	});
+});
+
 /*
  * The plugin serves create, update and delete to a super admin only, so an
  * admin's direct POST stops here before it reaches the engine.

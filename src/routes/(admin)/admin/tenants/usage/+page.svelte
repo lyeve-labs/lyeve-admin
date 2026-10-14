@@ -26,10 +26,11 @@
 	import { Check, Gauge, Pencil, Plus, X } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
-	import { formRefusal } from '$lib/api/refusal';
+	import { formRefusal, refusalText, type Refusal } from '$lib/api/refusal';
 	import {
 		blocked,
 		bytesToGib,
+		keptBytes,
 		enforcementLabel,
 		enforcementTone,
 		enforces,
@@ -49,10 +50,29 @@
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+	// The plugin serves every quota write to a super admin only. An admin reads
+	// their own tenant's quota and requests, and is told the rest.
+	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
 	// The tenant list is the super admin's. An admin who can read this page
 	// would be sent to a 403 by a way back that names it.
-	const back = $derived(
-		data.user?.roles?.includes('super_admin') ? { href: '/admin/tenants', label: 'Tenants' } : undefined,
+	const back = $derived(isSuperAdmin ? { href: '/admin/tenants', label: 'Tenants' } : undefined);
+
+	/*
+	 * The plugin says nothing about its license until a write is refused, so
+	 * the first refusal of a quota or an approval is what this page learns it
+	 * from. From then on it holds the paid fields and Approve, with the
+	 * reason beside them, and keeps the free writes live.
+	 */
+	let paidRefusal = $state.raw<Refusal | null>(null);
+	$effect(() => {
+		const refused = formRefusal(form);
+		const action = (form as { action?: string } | null)?.action;
+		if (refused?.kind === 'feature' && (action === 'quota' || action === 'review')) paidRefusal = refused;
+	});
+	const paidReason = $derived(
+		paidRefusal
+			? `${refusalText(paidRefusal)} Raising a limit, turning enforcement on and approving a request need it. Lowering a limit to 0, turning enforcement off and denying stay open.`
+			: '',
 	);
 
 	/*
@@ -75,6 +95,11 @@
 	let requestsLimit = $state(0);
 	let storageGib = $state(0);
 	let bandwidthGib = $state(0);
+	// What the GiB fields showed when the editor opened, and the bytes behind
+	// them. A field left as it was sends the stored bytes back, because two
+	// decimals of a GiB cannot hold every byte limit the plugin stores.
+	let shownStorageGib = $state(0);
+	let shownBandwidthGib = $state(0);
 	let hardLimit = $state(false);
 	let blockOnExceeded = $state(false);
 	let graceHours = $state(0);
@@ -89,6 +114,8 @@
 		requestsLimit = q?.requests_limit ?? 0;
 		storageGib = bytesToGib(q?.storage_bytes_limit ?? 0);
 		bandwidthGib = bytesToGib(q?.bandwidth_bytes_limit ?? 0);
+		shownStorageGib = storageGib;
+		shownBandwidthGib = bandwidthGib;
 		hardLimit = q?.is_hard_limit ?? false;
 		blockOnExceeded = q?.block_on_exceeded ?? false;
 		graceHours = q?.grace_period_hours ?? 0;
@@ -109,7 +136,7 @@
 		await tick();
 		clearForm?.requestSubmit();
 	}
-	const waiting = $derived(pending(data.requests));
+	const waiting = $derived(data.requests.ok ? pending(data.requests.value) : []);
 	const stopped = $derived(blocked(data.quotas));
 	const reportingOnly = $derived(
 		data.quotas.filter((q) => hasAnyLimit(q) && !enforces(q)),
@@ -118,7 +145,7 @@
 	// the pager below still walks every quota.
 	let query = $state('');
 	const visibleQuotas = $derived(data.quotas.filter((q) => narrows(query, q.tenant_id)));
-	const usageByTenant = $derived(new Map(data.usage.map((u) => [u.tenant_id, u])));
+	const usageByTenant = $derived(new Map((data.usage.ok ? data.usage.value : []).map((u) => [u.tenant_id, u])));
 
 	function review(r: QuotaRequest, decision: 'approve' | 'deny'): SubmitFunction {
 		return async ({ cancel }) => {
@@ -150,7 +177,7 @@
 	{back}
 >
 	{#snippet actions()}
-		{#if data.permitted && data.gate.state === 'ok'}
+		{#if data.permitted && data.gate.state === 'ok' && isSuperAdmin}
 			<Button variant="primary" size="sm" onclick={() => openQuota(null)}>
 				<Plus size={ICON.sm} /> New quota
 			</Button>
@@ -159,7 +186,7 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			Quotas cover every tenant, so reading and reviewing them is a super admin's.
+			Quotas are read by admins and set by super admins. Your role reads neither.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
@@ -169,6 +196,9 @@
 		/>
 	{:else}
 		<FormErrors message={(pageForm as Failure)?.error || undefined} refused={formRefusal(pageForm)} />
+		{#if !isSuperAdmin}
+			<Alert tone="brand">Your role reads this tenant's quota and its requests. Setting a quota or reviewing a request takes a super admin.</Alert>
+		{/if}
 		{#if form && 'quotaSaved' in form}
 			<Alert tone="success" autoDismiss>Quota saved for {form.quotaSaved}.</Alert>
 		{:else if form && 'quotaCleared' in form}
@@ -188,7 +218,7 @@
 				size="sm"
 				mono
 				label="Requests waiting"
-				value={data.requestsRead ? waiting.length : '?'}
+				value={data.requests.ok ? waiting.length : '?'}
 				tone={waiting.length > 0 ? 'warn' : 'neutral'}
 			/>
 		</div>
@@ -211,15 +241,17 @@
 			{#if data.quotas.length === 0}
 				<EmptyState
 					title="No quota is set"
-					description="Every tenant may use as much as it likes."
+					description={isSuperAdmin ? 'Every tenant may use as much as it likes.' : 'This tenant may use as much as it likes.'}
 				>
 					{#snippet iconSnippet()}
 						<Gauge size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={() => openQuota(null)}>
-							<Plus size={ICON.sm} /> New quota
-						</Button>
+						{#if isSuperAdmin}
+							<Button variant="secondary" onclick={() => openQuota(null)}>
+								<Plus size={ICON.sm} /> New quota
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
@@ -229,11 +261,8 @@
 						<SearchInput id="quota-search" bind:value={query} placeholder="Tenant on this page" />
 					{/snippet}
 				</ListToolbar>
-				{#if !data.usageRead}
-					<Alert tone="warn">
-						What each tenant used could not be read, so the quotas below show their limits alone.
-						This is not a report that nothing was used.
-					</Alert>
+				{#if !data.usage.ok}
+					<GateNotice gate={data.usage.gate} title="what each tenant used" absent="This instance does not report usage per tenant, so the quotas below show their limits alone." />
 				{/if}
 				{#if visibleQuotas.length === 0}
 					<EmptyState
@@ -304,9 +333,11 @@
 									<Badge tone={enforcementTone(q)}>{enforcementLabel(q)}</Badge>
 								</td>
 								<td class="text-right">
-									<Button variant="ghost" size="sm" onclick={() => openQuota(q)} aria-label="Edit the quota for {q.tenant_id}">
-										<Pencil size={ICON.sm} />
-									</Button>
+									{#if isSuperAdmin}
+										<Button variant="ghost" size="sm" onclick={() => openQuota(q)} aria-label="Edit the quota for {q.tenant_id}">
+											<Pencil size={ICON.sm} />
+										</Button>
+									{/if}
 								</td>
 							</tr>
 						{/each}
@@ -326,10 +357,8 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Requests for more</SectionHeading>
-			{#if !data.requestsRead}
-				<Alert tone="danger">
-					The requests could not be read. This is not a report that nobody is waiting.
-				</Alert>
+			{#if !data.requests.ok}
+				<GateNotice gate={data.requests.gate} title="the requests for more" absent="This instance does not take requests for more quota." />
 			{:else if waiting.length === 0}
 				<EmptyState
 					title="Nobody is waiting"
@@ -340,6 +369,14 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.requestTotal !== null && data.requestTotal > waiting.length}
+					<p class="text-xs text-muted">
+						Showing the newest {waiting.length} of {data.requestTotal} waiting requests. Review these to reach the rest.
+					</p>
+				{/if}
+				{#if isSuperAdmin && paidReason}
+					<p class="text-xs text-muted" data-testid="approve-held">{paidReason}</p>
+				{/if}
 				<Table label="Requests for more">
 					<thead>
 						<tr>
@@ -373,6 +410,7 @@
 									{formatDateTime(r.created_at)}
 								</td>
 								<td data-cell="nowrap">
+									{#if isSuperAdmin}
 									<div class="flex items-center justify-end gap-1">
 										<form method="POST" action="?/review" use:enhance={review(r, 'approve')}>
 											<input type="hidden" name="id" value={r.id} />
@@ -381,6 +419,7 @@
 												variant="ghost"
 												size="sm"
 												type="submit"
+												disabled={paidRefusal !== null}
 												aria-label="Approve the request from {r.tenant_id}"
 											>
 												<Check size={ICON.sm} class="text-success" />
@@ -399,6 +438,7 @@
 											</Button>
 										</form>
 									</div>
+									{/if}
 								</td>
 							</tr>
 						{/each}
@@ -422,15 +462,34 @@
 			<Input id="quota-tenant" name="tenant_id" label="Tenant" required bind:value={tenantId} error={errors.tenant_id} placeholder="acme" />
 		{/if}
 		<p class="text-xs text-muted">0 leaves a dimension unchecked.</p>
-		<NumberInput id="quota-requests" name="requests_limit" label="API calls a month" min={0} bind:value={requestsLimit} />
+		{#if paidReason}
+			<p class="text-xs text-muted" data-testid="paid-held">{paidReason}</p>
+		{/if}
+		<!-- The values post through hidden fields, so a field held for the
+		     license still sends what the quota stores. -->
+		<input type="hidden" name="requests_limit" value={requestsLimit} />
+		<input type="hidden" name="storage_bytes_limit" value={keptBytes(storageGib, shownStorageGib, editing?.storage_bytes_limit ?? 0)} />
+		<input type="hidden" name="bandwidth_bytes_limit" value={keptBytes(bandwidthGib, shownBandwidthGib, editing?.bandwidth_bytes_limit ?? 0)} />
+		<NumberInput id="quota-requests" label="API calls a month" min={0} disabled={paidRefusal !== null} bind:value={requestsLimit} />
 		<div class="grid gap-4 sm:grid-cols-2">
-			<NumberInput id="quota-storage" name="storage_gib" label="Storage (GB)" min={0} bind:value={storageGib} />
-			<NumberInput id="quota-bandwidth" name="bandwidth_gib" label="Bandwidth a month (GB)" min={0} bind:value={bandwidthGib} />
+			<NumberInput id="quota-storage" label="Storage (GiB)" min={0} disabled={paidRefusal !== null} bind:value={storageGib} />
+			<NumberInput id="quota-bandwidth" label="Bandwidth a month (GiB)" min={0} disabled={paidRefusal !== null} bind:value={bandwidthGib} />
 		</div>
 		<input type="hidden" name="is_hard_limit" value={hardLimit ? 'true' : 'false'} />
-		<Toggle id="quota-hard" label="Hard limit" hint="Off, the limits are reported and never enforced." bind:checked={hardLimit} />
+		<Toggle
+			id="quota-hard"
+			label="Hard limit"
+			hint="Off, the limits are reported and never enforced."
+			disabled={paidRefusal !== null && !(editing?.is_hard_limit ?? false)}
+			bind:checked={hardLimit}
+		/>
 		<input type="hidden" name="block_on_exceeded" value={blockOnExceeded ? 'true' : 'false'} />
-		<Toggle id="quota-block" label="Block the tenant past a limit" bind:checked={blockOnExceeded} />
+		<Toggle
+			id="quota-block"
+			label="Block the tenant past a limit"
+			disabled={paidRefusal !== null && !(editing?.block_on_exceeded ?? false)}
+			bind:checked={blockOnExceeded}
+		/>
 		<NumberInput id="quota-grace" name="grace_period_hours" label="Grace period (hours)" min={0} bind:value={graceHours} hint="How long a tenant may stay over before the block." />
 		<input type="hidden" name="warn_at_pct_80" value={warn80 ? 'true' : 'false'} />
 		<Toggle id="quota-warn80" label="Warn at 80%" bind:checked={warn80} />

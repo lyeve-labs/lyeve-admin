@@ -4,7 +4,17 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Entitlements } from '$lib/entitlements';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a rotation and apply a result to it.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy() {} };
+	},
+}));
 
 const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
 vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
@@ -14,7 +24,10 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
 
 import WebhooksPage from './+page.svelte';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	forms.submits.length = 0;
+});
 beforeEach(() => {
 	kit.confirm.mockReset();
 	kit.confirm.mockResolvedValue(false);
@@ -113,6 +126,8 @@ describe('the webhook list when it could not be read', () => {
 		expect(container.textContent).toContain('so Webhooks could not be read. Nothing was changed.');
 		expect(container.textContent).not.toContain('No webhooks configured yet');
 		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
+		// The queue is the same plugin's read, so it is not offered either.
+		expect(queryByRole('button', { name: /dead letters/i })).toBeNull();
 		expect(container.querySelector('table')).toBeNull();
 	});
 
@@ -201,5 +216,90 @@ describe('the result of a webhook test', () => {
 		expect(container.querySelector('tbody')?.textContent).toContain('HTTP 502: Bad gateway');
 		await rerender(props({ testResult: { id: 'w1', success: true, status_code: 200, message: 'OK' } }));
 		expect(container.querySelector('tbody')?.textContent).toContain('HTTP 200: OK');
+	});
+});
+
+/*
+ * The plugin generates the new secret and shows it once. The page used to
+ * toast "Rotated the secret for undefined" and drop the secret, so the
+ * receiver could no longer verify a signature and nobody could learn why.
+ */
+describe('a rotated signing secret', () => {
+	const props = (form: unknown) =>
+		({
+			data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements, user: { roles: ['super_admin'] } },
+			form,
+		}) as never;
+
+	type After = (input: { result: { type: string; data?: unknown }; update: () => Promise<void> }) => Promise<void>;
+
+	/** Runs the rotation's submit with a result, as enhance would. */
+	async function rotate(result: { type: string; data?: unknown }) {
+		const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/rotate-secret' && f.node.isConnected);
+		const after = (await (entry?.submit as () => Promise<After>)()) as After;
+		const update = vi.fn(async () => {});
+		await after({ result, update });
+		await tick();
+		return update;
+	}
+
+	const secretShown = () =>
+		[...document.body.querySelectorAll('[role="dialog"] input')].some((i) => (i as HTMLInputElement).value === 'c0ffee-secret');
+
+	it('is shown once in a panel that names the webhook and copies the secret', async () => {
+		render(WebhooksPage, { props: props(null) });
+		const update = await rotate({ type: 'success', data: { rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } } });
+		const dialog = document.body.querySelector('[role="dialog"]') as HTMLElement;
+		expect(dialog.textContent).toContain('New signing secret for Ship it');
+		expect(dialog.textContent).toContain('It is not shown again.');
+		expect(secretShown()).toBe(true);
+		// Applying the result would keep the secret in the page's form.
+		expect(update).not.toHaveBeenCalled();
+	});
+
+	it('is gone once the panel closes', async () => {
+		render(WebhooksPage, { props: props(null) });
+		await rotate({ type: 'success', data: { rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } } });
+		const close = [...document.body.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent?.trim() === 'Close');
+		await fireEvent.click(close!);
+		await tick();
+		expect(secretShown()).toBe(false);
+		expect(document.body.textContent).not.toContain('New signing secret');
+	});
+
+	it('clears an earlier failure once a rotation succeeds', async () => {
+		const { container } = render(WebhooksPage, { props: props({ action: 'test', error: 'Failed to test webhook' }) });
+		expect(container.textContent).toContain('Failed to test webhook');
+		const update = await rotate({ type: 'success', data: { rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } } });
+		expect(container.textContent).not.toContain('Failed to test webhook');
+		expect(update).not.toHaveBeenCalled();
+	});
+
+	it('applies a failed rotation so the page reports it', async () => {
+		render(WebhooksPage, { props: props(null) });
+		const update = await rotate({ type: 'failure', data: { action: 'rotate-secret', error: 'Failed to rotate webhook secret' } });
+		expect(update).toHaveBeenCalled();
+		expect(secretShown()).toBe(false);
+	});
+});
+
+describe('the failures of the history and the queue', () => {
+	const props = (form: unknown) =>
+		({
+			data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements, user: { roles: ['admin'] } },
+			form,
+		}) as never;
+
+	it.each(['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'])(
+		'leaves a failed %s to its drawer rather than the page behind it',
+		(action) => {
+			const { container } = render(WebhooksPage, { props: props({ action, error: 'refused here' }) });
+			expect(container.textContent).not.toContain('refused here');
+		},
+	);
+
+	it('still reports a queue that could not be opened above the list', () => {
+		const { container } = render(WebhooksPage, { props: props({ action: 'dead-letters', error: 'Failed to load dead letters' }) });
+		expect(container.textContent).toContain('Failed to load dead letters');
 	});
 });

@@ -27,6 +27,7 @@ function props(over: Record<string, unknown> = {}, form: unknown = null) {
 			tenant,
 			choices: { ok: true, value: [{ name: 'flow', available: true }] },
 			members: { ok: true, value: [member] },
+			homeSuperAdmins: [],
 			memberTotal: 1,
 			limit: 50,
 			offset: 0,
@@ -141,5 +142,46 @@ describe('unsaved plugin picks', () => {
 			}),
 		);
 		expect(kept()).toEqual(['flow']);
+	});
+});
+
+/*
+ * The engine signs a home tenant in with the roles its home membership sets.
+ * A save there either ended an account's super admin at its next sign-in or
+ * held it past a removal on the Users page.
+ */
+describe('the home row of a super admin', () => {
+	const root = { id: 'u1', email: 'root@example.com', disabled: false, home: true, roles: ['super_admin', 'admin'] };
+	const lost = { id: 'u3', email: 'lost@example.com', disabled: false, home: true, roles: ['editor'] };
+	const edit = (email: string) => screen.getByRole('button', { name: `Edit roles for ${email}` }) as HTMLButtonElement;
+
+	it('is not edited here and names the Users page', () => {
+		const { container } = render(TenantPage, { props: props({ members: { ok: true, value: [root] } }) });
+		expect(edit('root@example.com').disabled).toBe(true);
+		expect(container.textContent).toContain("A super admin's home roles are managed on the Users page.");
+	});
+
+	it('warns when the home membership already leaves super admin out', () => {
+		const { container } = render(TenantPage, {
+			props: props({ members: { ok: true, value: [lost, member] }, homeSuperAdmins: ['u3'] }),
+		});
+		expect(container.textContent).toContain('lost@example.com signs in here without super admin');
+		expect(edit('lost@example.com').disabled).toBe(true);
+	});
+
+	it('leaves any other account editable, and posts no role it was not given', async () => {
+		const { container } = render(TenantPage, { props: props() });
+		expect(container.textContent).not.toContain('signs in here without super admin');
+		await fireEvent.click(edit('ada@example.com'));
+		const form = document.body.querySelector<HTMLFormElement>('form#member-form');
+		expect(new FormData(form!).getAll('roles')).not.toContain('super_admin');
+	});
+});
+
+describe('a tenant with no members', () => {
+	it('offers the action that adds one', () => {
+		const { container } = render(TenantPage, { props: props({ members: { ok: true, value: [] }, memberTotal: 0 }) });
+		expect(container.textContent).toContain('No members');
+		expect(screen.getAllByRole('button', { name: /new member/i }).length).toBe(2);
 	});
 });

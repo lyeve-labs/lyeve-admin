@@ -1,22 +1,23 @@
 <script lang="ts">
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { filtersText, keptJSON, type WebhookRecord } from '$lib/api/webhook-options';
-	import { formRefusal } from '$lib/api/refusal';
+	import { formRefusal, type Refusal } from '$lib/api/refusal';
 	import {
 		Alert,
 		Badge,
 		Button,
 		CheckboxGroup,
+		CopyField,
 		Drawer,
 		EmptyState,
 		Input,
+		Modal,
 		MultiSelect,
 		PageShell,
 		Pagination,
 		PasswordInput,
 		SearchInput,
 		SegmentedControl,
-		toast,
 		Table,
 		Textarea,
 		Toggle,
@@ -27,6 +28,7 @@
 	import type { Webhook } from '@lyeve-labs/client';
 	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import {
 		Plus,
@@ -62,10 +64,31 @@
 	 */
 	type Failure = { action?: string; error?: string } | null;
 	const DRAWER_ACTIONS = ['create', 'update'];
+	// The history and the queue draw their own writes' failures inside them,
+	// where the reader clicked, rather than behind the open panel.
+	const OTHER_DRAWERS = ['retry-delivery', 'dead-letters-page', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
 	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
 	let openedOver = $state.raw<unknown>(null);
 	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
-	const pageForm = $derived(inDrawer ? null : form);
+	// A rotation that succeeds settles the result shown before it. The secret
+	// never reaches the form, so the earlier result is set aside instead.
+	let settled = $state.raw<unknown>(null);
+	const pageForm = $derived(
+		inDrawer || OTHER_DRAWERS.includes((form as Failure)?.action ?? '') || (form !== null && form === settled) ? null : form,
+	);
+
+	/*
+	 * The plugin says nothing about its license until a paid write is
+	 * refused, so the first refusal of a retry, a replay or a dismissal is
+	 * what the page learns it from. The drawers then hold those three with the
+	 * reason beside them.
+	 */
+	const PAID_ACTIONS = ['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss'];
+	let held = $state.raw<Refusal | null>(null);
+	$effect(() => {
+		const refused = formRefusal(form);
+		if (refused?.kind === 'feature' && PAID_ACTIONS.includes((form as Failure)?.action ?? '')) held = refused;
+	});
 	const drawerError = $derived((drawerForm as Failure)?.error || undefined);
 	const pageError = $derived((pageForm as Failure)?.error || undefined);
 	const drawerRefusal = $derived(formRefusal(drawerForm));
@@ -229,17 +252,23 @@
 	// The history drawer reads what the row's submit names, so the two share it.
 	const history = new DeliveryHistory();
 
-	/**
-	 * Every write in this application reports through the toast, which is one
-	 * place a reader learns to look, so a rotated secret is announced there too
-	 * and not in the row.
+	/*
+	 * The plugin shows a rotated secret once and never again, and the old one
+	 * stops verifying at once, so the new one is shown in a panel the reader
+	 * copies from, naming the webhook it signs for.
 	 */
-	$effect(() => {
-		if (form && 'rotateSecretResult' in form && form.rotateSecretResult) {
-			const wh = form.rotateSecretResult as Webhook;
-			toast.success(`Rotated the secret for ${wh.name}`);
+	let reveal = $state<{ name: string; secret: string } | null>(null);
+	// The secret is taken straight from the result and never applied to the
+	// page's form, so closing the panel leaves no copy of it behind.
+	const takeSecret: SubmitFunction = () => async ({ result, update }) => {
+		if (result.type === 'success' && result.data && 'rotated' in result.data) {
+			const r = result.data.rotated as { name: string; secret: string };
+			reveal = { name: r.name, secret: r.secret };
+			settled = form;
+			return;
 		}
-	});
+		await update();
+	};
 
 	function truncate(url: string, max = 48): string {
 		return url.length > max ? url.slice(0, max) + '...' : url;
@@ -256,12 +285,16 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<form method="POST" action="?/dead-letters" use:enhance>
-			<Button variant="secondary" size="sm" type="submit" title="View dead letter queue">
-				<Skull size={ICON.sm} />
-				Dead letters
-			</Button>
-		</form>
+		<!-- The queue is the same plugin's read: a list that could not be
+		     read offers no queue either. -->
+		{#if data.webhooks.ok}
+			<form method="POST" action="?/dead-letters" use:enhance>
+				<Button variant="secondary" size="sm" type="submit" title="View dead letter queue">
+					<Skull size={ICON.sm} />
+					Dead letters
+				</Button>
+			</form>
+		{/if}
 		<!-- A list that could not be read offers no write against it. -->
 		{#if data.webhooks.ok && isSuperAdmin}
 			<Button variant="primary" size="sm" onclick={openCreate}>
@@ -382,7 +415,7 @@
 									</Button>
 								</form>
 								{#if isSuperAdmin}
-									<form method="POST" action="?/rotate-secret" use:enhance>
+									<form method="POST" action="?/rotate-secret" use:enhance={takeSecret}>
 										<input type="hidden" name="id" value={wh.id} />
 										<Button
 											variant="ghost"
@@ -549,6 +582,20 @@
 
 <!-- A row's history is a read on that row, so it opens over the list the way
      its edit does, and the queue does the same. -->
-<DeliveriesDrawer {form} {history} />
+<DeliveriesDrawer {form} {history} {held} />
 
-<DeadLetterDrawer {form} />
+<DeadLetterDrawer {form} {held} />
+
+{#if reveal}
+	<Modal open title="New signing secret for {reveal.name}" onclose={() => (reveal = null)}>
+		<div class="flex flex-col gap-3">
+			<p class="text-sm text-fg">
+				{reveal.name} now signs every delivery with this secret, and the old one no longer verifies. Copy it to the receiver now. It is not shown again.
+			</p>
+			<CopyField value={reveal.secret} label="Signing secret" mono secret />
+		</div>
+		{#snippet footer()}
+			<Button variant="secondary" onclick={() => (reveal = null)}>Close</Button>
+		{/snippet}
+	</Modal>
+{/if}

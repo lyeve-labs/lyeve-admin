@@ -26,6 +26,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 	import { pageHref, pageNumber } from '$lib/api/list';
+	import { formRefusal } from '$lib/api/refusal';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -150,7 +151,13 @@
 
 	<FormErrors message={(pageForm as Failure)?.error || undefined} />
 
-	{#if data.tenants.ok && !canProvision}
+	{#if data.tenants.ok && data.provisionGate}
+		<GateNotice
+			gate={data.provisionGate}
+			title="Tenant provisioning"
+			absent="This instance does not say whether it may create tenants."
+		/>
+	{:else if data.tenants.ok && !canProvision}
 		<NotEnabled
 			title="Tenant provisioning"
 			description="Creating a tenant from this page. The tenants below can still be edited, disabled and deleted."
@@ -212,7 +219,7 @@
 					<tr>
 						<td data-cell="nowrap" class="font-mono text-xs">{tenant.slug}</td>
 						<td data-cell="nowrap">
-							<a href="/admin/tenants/{tenant.id}" class="text-fg transition-colors hover:text-brand">{tenant.name}</a>
+							<a href="/admin/tenants/{tenant.id}" class="relative hit-area text-fg transition-colors hover:text-brand">{tenant.name}</a>
 						</td>
 						<td>
 							{#if tenant.plan}
@@ -294,7 +301,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New tenant'}>
 	<form method="post" action={editing ? '?/update' : '?/create'} id="tenant-form" use:enhance={saveTenantSubmit.enhance} class="flex flex-col gap-4">
-		<FormErrors message={(drawerForm as Failure)?.error || undefined} fields={errors} />
+		<FormErrors message={(drawerForm as Failure)?.error || undefined} fields={errors} refused={formRefusal(drawerForm)} />
 
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
@@ -306,7 +313,8 @@
 				label="Slug"
 				name="slug"
 				required
-				placeholder="acme-corp"
+				placeholder="acme_corp"
+				hint="Lowercase letters, digits and underscores, starting with a letter. At most 63 characters. It cannot be changed later."
 				bind:value={slug}
 				error={errors.slug}
 			/>
@@ -324,7 +332,7 @@
 			id="plan"
 			label="Plan"
 			name="plan"
-			hint="A label stored with the tenant. Left empty, the engine picks its default."
+			hint="A label stored with the tenant. Left empty, it is stored as free."
 			bind:value={plan}
 			autocomplete="off"
 		/>

@@ -15,12 +15,29 @@ vi.mock('$app/forms', () => ({
 	},
 }));
 
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
+	const actual = await importOriginal<Record<string, unknown>>();
+	return { ...actual, confirm: kit.confirm };
+});
+
 import DeadLetterDrawer from './DeadLetterDrawer.svelte';
 
 afterEach(() => {
 	cleanup();
 	forms.submits.length = 0;
+	kit.confirm.mockReset();
+	kit.confirm.mockResolvedValue(true);
 });
+
+type After = (input: { result: { type: string }; update: () => Promise<void> }) => Promise<void>;
+type Submit = (input: { cancel: () => void }) => Promise<After | void>;
+
+/** The submit function enhance holds for the connected delete form. */
+function deleteSubmit(): Submit {
+	const del = forms.submits.find((f) => f.node.getAttribute('action') === '?/dead-letter-delete' && f.node.isConnected);
+	return del?.submit as Submit;
+}
 
 const entry = (id: string, status: string) => ({
 	id,
@@ -42,14 +59,14 @@ describe('the dead letter drawer', () => {
 	});
 
 	it('opens on the returned queue and states the total when it is larger than the page', () => {
-		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending'), entry('b', 'replayed')], deadLetterTotal: 9 } } });
+		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending'), entry('b', 'replayed')], deadLetterTotal: 9, deadLetterOffset: 0, deadLetterLimit: 2 } } });
 		expect(dialog()?.textContent).toContain('Dead letter queue');
-		expect(dialog()?.textContent).toContain('Showing 2 of 9 entries.');
+		expect(dialog()?.textContent).toContain('entries 1 to 2 of 9');
 	});
 
 	it('leaves the total out when the queue did not state one', () => {
 		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')], deadLetterTotal: null } } });
-		expect(dialog()?.textContent).not.toContain('Showing');
+		expect(dialog()?.textContent).not.toMatch(/ of \d/);
 	});
 
 	it('offers replay, dismiss and delete on a pending entry only, each posting its id', () => {
@@ -63,20 +80,30 @@ describe('the dead letter drawer', () => {
 
 	it('drops a deleted entry from the list once the delete succeeds', async () => {
 		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending'), entry('c', 'pending')] } } });
-		const del = forms.submits.find((f) => f.node.getAttribute('action') === '?/dead-letter-delete' && f.node.isConnected);
-		const submit = del?.submit as () => (input: { result: { type: string }; update: () => Promise<void> }) => Promise<void>;
-		await submit()({ result: { type: 'success' }, update: async () => {} });
+		const after = (await deleteSubmit()({ cancel: vi.fn() })) as After;
+		await after({ result: { type: 'success' }, update: async () => {} });
 		flushSync();
 		expect(dialog()?.querySelectorAll('tbody tr')).toHaveLength(1);
 	});
 
 	it('keeps an entry whose delete failed', async () => {
 		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
-		const del = forms.submits.find((f) => f.node.getAttribute('action') === '?/dead-letter-delete' && f.node.isConnected);
-		const submit = del?.submit as () => (input: { result: { type: string }; update: () => Promise<void> }) => Promise<void>;
-		await submit()({ result: { type: 'failure' }, update: async () => {} });
+		const after = (await deleteSubmit()({ cancel: vi.fn() })) as After;
+		await after({ result: { type: 'failure' }, update: async () => {} });
 		flushSync();
 		expect(dialog()?.querySelectorAll('tbody tr')).toHaveLength(1);
+	});
+
+	// One click used to delete the delivery for good with no question asked.
+	it('asks first, naming the webhook and when the delivery died, and sends nothing when declined', async () => {
+		kit.confirm.mockResolvedValue(false);
+		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		const cancel = vi.fn();
+		expect(await deleteSubmit()({ cancel })).toBeUndefined();
+		expect(cancel).toHaveBeenCalled();
+		const [title, detail] = kit.confirm.mock.calls[0] as unknown as [string, string];
+		expect(title).toBe('Delete the dead letter from Ship it');
+		expect(detail).toContain('2026');
 	});
 });
 
@@ -88,13 +115,62 @@ describe('the result of a replay or a dismissal', () => {
 	it('settles, shows in place of the entry\'s actions, and keeps the earlier result', async () => {
 		const queue = { deadLetters: [entry('a', 'pending'), entry('c', 'pending')] };
 		const { rerender } = render(DeadLetterDrawer, { props: { form: queue } });
-		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'delivered' } } });
+		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'replayed', http_status: 200 } } });
 		const rows = () => [...(dialog()?.querySelectorAll('tbody tr') ?? [])];
-		expect(rows()[0].textContent).toContain('Replayed with status delivered');
+		expect(rows()[0].textContent).toContain('Delivered (HTTP 200)');
 		expect(rows()[0].querySelector('form')).toBeNull();
 		await rerender({ form: { deadLetterDismiss: { id: 'c', status: 'dismissed' } } });
 		expect(rows()[1].textContent).toContain('Dismissed');
 		expect(rows()[1].querySelector('form')).toBeNull();
-		expect(rows()[0].textContent).toContain('Replayed with status delivered');
+		expect(rows()[0].textContent).toContain('Delivered (HTTP 200)');
+	});
+
+	// The plugin's status always reads "replayed", and the receiver's code is
+	// what says whether the delivery arrived.
+	it('reports the code a refusing receiver answered and keeps the entry pending', async () => {
+		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'replayed', http_status: 502 } } });
+		const row = dialog()?.querySelector('tbody tr');
+		expect(row?.textContent).toContain('The receiver answered HTTP 502. The entry is still pending.');
+		expect(row?.querySelector('form[action="?/dead-letter-replay"]')).not.toBeNull();
+	});
+});
+
+describe('the queue and its own failures', () => {
+	const refused = { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' };
+
+	it('shows a failed replay inside the drawer', async () => {
+		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		await rerender({ form: { action: 'dead-letter-replay', id: 'a', error: 'dead letter entry is not pending' } });
+		expect(dialog()?.textContent).toContain('dead letter entry is not pending');
+	});
+
+	it('ignores a failure of another action', async () => {
+		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		await rerender({ form: { action: 'delete', error: 'Failed to delete webhook' } });
+		expect(dialog()?.textContent).not.toContain('Failed to delete webhook');
+	});
+
+	it('holds replay and dismiss with the reason once the license refused one, and keeps delete', () => {
+		render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] }, held: refused as never } });
+		const button = (name: RegExp) =>
+			[...(dialog()?.querySelectorAll('button') ?? [])].find((b) => name.test(b.getAttribute('aria-label') ?? '')) as HTMLButtonElement;
+		expect(button(/^Replay/).disabled).toBe(true);
+		expect(button(/^Dismiss/).disabled).toBe(true);
+		expect(button(/^Delete/).disabled).toBe(false);
+		expect(dialog()?.textContent).toContain('example-feature');
+	});
+
+	it('turns the page by posting the offset it names', async () => {
+		render(DeadLetterDrawer, {
+			props: { form: { deadLetters: [entry('a', 'pending'), entry('b', 'pending')], deadLetterTotal: 5, deadLetterOffset: 0, deadLetterLimit: 2 } },
+		});
+		const pager = document.body.querySelector<HTMLFormElement>('form[action="?/dead-letters"]')!;
+		const submit = vi.spyOn(pager, 'requestSubmit').mockImplementation(() => {});
+		const next = [...(dialog()?.querySelectorAll('button') ?? [])].find((b) => /next/i.test(b.getAttribute('aria-label') ?? b.textContent ?? ''));
+		next?.click();
+		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
+		expect(new FormData(pager).get('offset')).toBe('2');
+		expect(new FormData(pager).get('turn')).toBe('page');
 	});
 });

@@ -32,8 +32,22 @@
 	const tenant = $derived(data.tenant);
 
 	// A membership names roles inside one tenant. super_admin is an instance
-	// role held on the account itself, so it is not offered here.
+	// role held on the account itself, so it is not offered here. A super
+	// admin's home row is not edited here at all: the engine signs a home
+	// tenant in with the roles its membership sets, so a save would either end
+	// the account's super admin or keep it past a removal on the Users page.
 	const MEMBER_ROLES = ['viewer', 'editor', 'admin'].map((r) => ({ value: r, label: r }));
+
+	/** A super admin's own home row, which this page leaves alone. */
+	function superHome(m: TenantMember): boolean {
+		return m.home && (m.roles.includes('super_admin') || data.homeSuperAdmins.includes(m.id));
+	}
+
+	// A super admin whose home membership already leaves the role out signs in
+	// here without it.
+	const lostSuperAdmin = $derived(
+		data.members.ok ? data.members.value.filter((m) => m.home && !m.roles.includes('super_admin') && data.homeSuperAdmins.includes(m.id)) : [],
+	);
 
 	const facts = $derived([
 		{ term: 'Slug', value: tenant.slug },
@@ -216,6 +230,11 @@
 		{#if revokeError}
 			<Alert tone="danger">{revokeError}</Alert>
 		{/if}
+		{#each lostSuperAdmin as m (m.id)}
+			<Alert tone="warn" title="{m.email} signs in here without super admin">
+				This is the account's home tenant, and its membership here sets roles that leave super admin out. The engine signs it in here with those roles. Neither this page nor the Users page changes a home membership.
+			</Alert>
+		{/each}
 		{#if !data.members.ok}
 			<GateNotice
 				gate={data.members.gate}
@@ -223,7 +242,11 @@
 				absent="The multitenant plugin does not serve tenant members on this instance."
 			/>
 		{:else if data.members.value.length === 0}
-			<EmptyState title="No members" description="No account calls this tenant home or holds a membership in it." />
+			<EmptyState title="No members" description="No account calls this tenant home or holds a membership in it.">
+				{#snippet action()}
+					<Button variant="secondary" onclick={openNewMember}><Plus size={ICON.sm} /> New member</Button>
+				{/snippet}
+			</EmptyState>
 		{:else}
 			<Table label="Members">
 				<thead>
@@ -253,7 +276,16 @@
 							<td class="text-xs text-muted">{m.home ? 'Home tenant' : 'Membership'}</td>
 							<td>
 								<div class="flex items-center justify-end gap-2">
-									<Button variant="ghost" size="sm" aria-label="Edit roles for {m.email}" onclick={() => openEditMember(m)}>
+									{#if superHome(m)}
+										<span class="text-xs text-muted">A super admin's home roles are managed on the Users page.</span>
+									{/if}
+									<Button
+										variant="ghost"
+										size="sm"
+										aria-label="Edit roles for {m.email}"
+										disabled={superHome(m)}
+										onclick={() => openEditMember(m)}
+									>
 										<Pencil size={ICON.sm} />
 									</Button>
 									{#if !m.home}
