@@ -13,10 +13,21 @@ afterEach(() => {
 
 const licensed = { plan: 'example', state: 'active', features: ['mfa'], tenant_quota: 1 };
 
-function setup(mfaEnabled: boolean | { ok: false; gate: unknown }, form: unknown = null) {
-	const mfa = typeof mfaEnabled === 'boolean' ? { ok: true, value: mfaEnabled } : mfaEnabled;
+function setup(mfaEnabled: boolean | { ok: false; gate: unknown }, form: unknown = null, hasPasskeys = false) {
+	const mfa = typeof mfaEnabled === 'boolean' ? { ok: true, value: { enabled: mfaEnabled, hasPasskeys } } : mfaEnabled;
 	return render(Page, { props: { data: { mfa, entitlements: licensed }, form } as never });
 }
+
+describe('an account with a passkey', () => {
+	it('says passkeys keep two-factor on and offers both app controls', () => {
+		const { container, getByRole } = setup(true, null, true);
+		expect(container.textContent).toContain('This account has a passkey');
+		expect(container.textContent).not.toContain('takes a TOTP code');
+		expect(getByRole('button', { name: /Set up an authenticator app/ })).toBeTruthy();
+		expect(container.querySelector('form[action="?/setup"]')).not.toBeNull();
+		expect(container.querySelector('form[action="?/disable"]')).not.toBeNull();
+	});
+});
 
 describe('two-factor authentication page', () => {
 	it('offers to turn it on through the setup action', () => {

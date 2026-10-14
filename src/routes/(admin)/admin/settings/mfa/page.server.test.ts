@@ -27,11 +27,25 @@ function event(replies: Record<string, Reply>, form: Record<string, string> = {}
 describe('mfa load', () => {
 	it('reads the account state and keeps an unreadable one unknown, never off', async () => {
 		const on = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: true } } });
-		expect(await load(on.ev)).toEqual({ mfa: { ok: true, value: true } });
+		expect(await load(on.ev)).toEqual({ mfa: { ok: true, value: { enabled: true, hasPasskeys: false } } });
 		const off = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: false } } });
-		expect(await load(off.ev)).toEqual({ mfa: { ok: true, value: false } });
+		expect(await load(off.ev)).toEqual({ mfa: { ok: true, value: { enabled: false, hasPasskeys: false } } });
 		const down = event({ '/api/admin/mfa/status': { status: 503, body: { error: 'x' } } });
 		expect(await load(down.ev)).toEqual({ mfa: { ok: false, gate: { state: 'unavailable' } } });
+	});
+
+	it('keeps a passkey apart from the authenticator app', async () => {
+		const passkey = event({ '/api/admin/mfa/status': { status: 200, body: { enabled: true, has_passkeys: true, passkeys: [] } } });
+		expect(await load(passkey.ev)).toEqual({ mfa: { ok: true, value: { enabled: true, hasPasskeys: true } } });
+	});
+});
+
+describe('mfa disable with no app set up', () => {
+	it('says there is no authenticator app to turn off', async () => {
+		const { ev } = event({ '/api/admin/mfa/totp/disable': { status: 400, body: { error: 'MFA not enabled' } } }, { code: '123456' });
+		const r = (await actions.disable(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(400);
+		expect(r.data.error).toBe('No authenticator app is set up on this account, so there is nothing to turn off.');
 	});
 });
 
