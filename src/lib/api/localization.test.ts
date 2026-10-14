@@ -63,6 +63,12 @@ describe('translationInput', () => {
 			body: { title: 'Bonjour', body: '<p>Salut</p>' },
 		});
 	});
+
+	it('leaves an empty field out, so the reader gets the source value', () => {
+		expect(translationInput({ title: '', body: '<p>Salut</p>', summary: '  ' })).toEqual({
+			body: { body: '<p>Salut</p>' },
+		});
+	});
 });
 
 describe('toTranslation', () => {

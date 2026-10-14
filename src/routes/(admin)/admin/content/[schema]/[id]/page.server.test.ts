@@ -586,6 +586,9 @@ describe('content editor translations', () => {
 		);
 		expect(out).toMatchObject({ status: 303 });
 		const post = calls.find((c) => c.method === 'POST');
-		expect(JSON.parse(post?.body ?? '{}')).toMatchObject({ title: 'One' });
+		const sent = JSON.parse(post?.body ?? '{}');
+		expect(sent).toMatchObject({ title: 'One', body: { body: '<p>Salut</p>' } });
+		// An empty title in the body would be laid over the title column.
+		expect(sent.body).not.toHaveProperty('title');
 	});
 });

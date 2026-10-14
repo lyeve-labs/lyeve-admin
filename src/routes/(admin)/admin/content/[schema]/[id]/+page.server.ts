@@ -486,9 +486,9 @@ export const actions: Actions = {
 			if (exists) {
 				await updateTranslation(client, params.id, locale, input);
 			} else {
-				// The localization plugin refuses a new translation with no title.
-				// A title left empty means the reader of this locale gets the
-				// source, so the first save sends the source title.
+				// The localization plugin refuses a new translation with no title,
+				// so a title left empty saves the source title as it is now. The
+				// panel says so beside the empty box.
 				if (!input.title?.trim()) {
 					const source = await client.get<{ title?: string }>(`/api/admin/content/${encodeURIComponent(params.id)}`);
 					if (source?.title) input.title = source.title;

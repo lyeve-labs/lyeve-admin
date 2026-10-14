@@ -282,9 +282,17 @@
 								     being empty means French or Spanish reaches the
 								     reader. -->
 								{#if (values[active][field.name] ?? '').trim() === ''}
-									{@const from = resolvedFrom(field.name, active)}
+									<!-- Once the locale has a translation, the reader gets that
+									     one row, and a field it leaves out reads from the source.
+									     The plugin keeps a saved title when a save sends none, and
+									     a new translation cannot be saved without one. -->
+									{@const from = t ? locales.default_locale : resolvedFrom(field.name, active)}
 									<p class="text-xs text-faint">
-										{#if from === locales.default_locale}
+										{#if field.name === 'title' && !t}
+											A new translation needs a title. Left empty, it saves the source title as it is now, and later changes to the source do not reach it.
+										{:else if field.name === 'title'}
+											Left empty, the title saved for {active} stays as it is.
+										{:else if from === locales.default_locale}
 											Empty, so a reader of {active} gets the source.
 										{:else}
 											Empty, so a reader of {active} gets this field in {from}.
