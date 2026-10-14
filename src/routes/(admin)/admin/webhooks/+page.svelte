@@ -28,6 +28,7 @@
 	import type { Webhook } from '@lyeve-labs/client';
 	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import {
 		Plus,
@@ -252,12 +253,16 @@
 	 * copies from, naming the webhook it signs for.
 	 */
 	let reveal = $state<{ name: string; secret: string } | null>(null);
-	$effect(() => {
-		if (form && 'rotated' in form && form.rotated) {
-			const r = form.rotated as { name: string; secret: string };
+	// The secret is taken straight from the result and never applied to the
+	// page's form, so closing the panel leaves no copy of it behind.
+	const takeSecret: SubmitFunction = () => async ({ result, update }) => {
+		if (result.type === 'success' && result.data && 'rotated' in result.data) {
+			const r = result.data.rotated as { name: string; secret: string };
 			reveal = { name: r.name, secret: r.secret };
+			return;
 		}
-	});
+		await update();
+	};
 
 	function truncate(url: string, max = 48): string {
 		return url.length > max ? url.slice(0, max) + '...' : url;
@@ -404,7 +409,7 @@
 									</Button>
 								</form>
 								{#if isSuperAdmin}
-									<form method="POST" action="?/rotate-secret" use:enhance>
+									<form method="POST" action="?/rotate-secret" use:enhance={takeSecret}>
 										<input type="hidden" name="id" value={wh.id} />
 										<Button
 											variant="ghost"

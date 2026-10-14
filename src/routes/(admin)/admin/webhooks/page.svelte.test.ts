@@ -4,7 +4,17 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Entitlements } from '$lib/entitlements';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a rotation and apply a result to it.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy() {} };
+	},
+}));
 
 const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
 vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
@@ -14,7 +24,10 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
 
 import WebhooksPage from './+page.svelte';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	forms.submits.length = 0;
+});
 beforeEach(() => {
 	kit.confirm.mockReset();
 	kit.confirm.mockResolvedValue(false);
@@ -218,14 +231,47 @@ describe('a rotated signing secret', () => {
 			form,
 		}) as never;
 
+	type After = (input: { result: { type: string; data?: unknown }; update: () => Promise<void> }) => Promise<void>;
+
+	/** Runs the rotation's submit with a result, as enhance would. */
+	async function rotate(result: { type: string; data?: unknown }) {
+		const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/rotate-secret' && f.node.isConnected);
+		const after = (await (entry?.submit as () => Promise<After>)()) as After;
+		const update = vi.fn(async () => {});
+		await after({ result, update });
+		await tick();
+		return update;
+	}
+
+	const secretShown = () =>
+		[...document.body.querySelectorAll('[role="dialog"] input')].some((i) => (i as HTMLInputElement).value === 'c0ffee-secret');
+
 	it('is shown once in a panel that names the webhook and copies the secret', async () => {
-		const { rerender } = render(WebhooksPage, { props: props(null) });
-		await rerender(props({ rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } }));
+		render(WebhooksPage, { props: props(null) });
+		const update = await rotate({ type: 'success', data: { rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } } });
 		const dialog = document.body.querySelector('[role="dialog"]') as HTMLElement;
 		expect(dialog.textContent).toContain('New signing secret for Ship it');
 		expect(dialog.textContent).toContain('It is not shown again.');
-		const values = [...dialog.querySelectorAll('input')].map((i) => i.value);
-		expect(values).toContain('c0ffee-secret');
+		expect(secretShown()).toBe(true);
+		// Applying the result would keep the secret in the page's form.
+		expect(update).not.toHaveBeenCalled();
+	});
+
+	it('is gone once the panel closes', async () => {
+		render(WebhooksPage, { props: props(null) });
+		await rotate({ type: 'success', data: { rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } } });
+		const close = [...document.body.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent?.trim() === 'Close');
+		await fireEvent.click(close!);
+		await tick();
+		expect(secretShown()).toBe(false);
+		expect(document.body.textContent).not.toContain('New signing secret');
+	});
+
+	it('applies a failed rotation so the page reports it', async () => {
+		render(WebhooksPage, { props: props(null) });
+		const update = await rotate({ type: 'failure', data: { action: 'rotate-secret', error: 'Failed to rotate webhook secret' } });
+		expect(update).toHaveBeenCalled();
+		expect(secretShown()).toBe(false);
 	});
 });
 
