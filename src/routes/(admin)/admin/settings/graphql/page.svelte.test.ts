@@ -163,3 +163,22 @@ describe('a persisted query list past one page', () => {
 		expect(container.textContent).not.toContain('Showing the first');
 	});
 });
+
+describe('layout on narrow and medium screens', () => {
+	// With the endpoint cells held on one line, the notes beside them got 43px
+	// on a phone and ran forty lines tall.
+	it('gives each endpoint note a minimum width, so the table scrolls in its box', () => {
+		const { getByText } = render(GraphqlPage, { props: props() });
+		for (const text of [/A GET on the same path/, /WebSocket, the graphql-ws protocol/]) {
+			expect((getByText(text).closest('td') as HTMLElement).className).toContain('min-w-48');
+		}
+	});
+
+	// Three tables across at 1024px left the description column 55px wide.
+	it('puts the three schema tables side by side only from the extra large breakpoint', () => {
+		const { container } = render(GraphqlPage, { props: props() });
+		const grid = nameCell(container, 'landing_page').closest('.grid') as HTMLElement;
+		expect(grid.className).toContain('xl:grid-cols-3');
+		expect(grid.className).not.toContain('lg:grid-cols-3');
+	});
+});

@@ -97,3 +97,13 @@ describe('AI prices page', () => {
 		expect(off.queryByRole('button', { name: /new price/i })).toBeNull();
 	});
 });
+
+describe('AI prices table', () => {
+	// The timestamp wrapped to four lines in a 42px column.
+	it('keeps the updated time on one line', () => {
+		const { container } = setup();
+		const row = container.querySelector('tbody tr') as HTMLElement;
+		const updated = [...row.querySelectorAll('td')][5];
+		expect(updated.getAttribute('data-cell')).toBe('nowrap');
+	});
+});

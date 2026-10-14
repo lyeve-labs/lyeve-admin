@@ -356,3 +356,29 @@ describe('reviews page, failures and unread stages', () => {
 	});
 });
 
+describe('definition stages', () => {
+	// Every other column holds its text on one line, so on a phone a stage
+	// name got 7px and stacked one or two letters a line.
+	it('keeps each stage on one line', () => {
+		render(ReviewsPage, { props: { data: data(), form: null } });
+		for (const chip of screen.getAllByTestId('stage-chip')) {
+			expect(chip.className).toContain('whitespace-nowrap');
+		}
+	});
+});
+
+describe('the definition drawer stages', () => {
+	it('keeps the stage name beside its number and wraps the stage buttons as one group', async () => {
+		render(ReviewsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: /New definition/ }));
+		const field = (document.body.querySelector('input[id^="stage-name-"]') as HTMLElement).closest('.min-w-48') as HTMLElement;
+		expect(field.className).toContain('flex-1');
+		const row = field.parentElement as HTMLElement;
+		expect(row.className).toContain('flex-wrap');
+		const group = (document.body.querySelector('[aria-label="Move stage 1 up"]') as HTMLElement).closest('.ms-auto') as HTMLElement;
+		expect(group.parentElement).toBe(row);
+		for (const name of ['Move stage 1 up', 'Move stage 1 down', 'Remove stage 1']) {
+			expect(group.querySelector(`[aria-label="${name}"]`), name).not.toBeNull();
+		}
+	});
+});
