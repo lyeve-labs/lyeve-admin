@@ -137,9 +137,9 @@
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.variables.length === 0 && data.q}
-			<EmptyState title="No variables match" description="No key, and no value that is not secret, holds that text." />
+			<EmptyState level={2} title="No variables match" description="No key, and no value that is not secret, holds that text." />
 		{:else if data.variables.length === 0}
-			<EmptyState title="No variables yet" description="Expressions read one as vars.<key>.">
+			<EmptyState level={2} title="No variables yet" description="Expressions read one as vars.<key>.">
 				{#snippet iconSnippet()}<VariableIcon size={ICON.lg} />{/snippet}
 				{#snippet action()}
 					<Button variant="secondary" onclick={openCreate}>

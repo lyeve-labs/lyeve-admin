@@ -41,6 +41,7 @@
 
 		{#if data.providers.length === 0}
 			<EmptyState
+				level={2}
 				title="No providers yet"
 				description={data.isSuperAdmin
 					? 'Nothing is sent anywhere until a provider is added. Add one with your own key or point at a server on your network.'

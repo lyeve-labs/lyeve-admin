@@ -172,6 +172,7 @@
 		/>
 	{:else if data.tenants.value.length === 0}
 		<EmptyState
+			level={2}
 			title="No tenants yet"
 			description="Create a tenant to start serving content on this instance."
 		>
@@ -199,6 +200,7 @@
 
 		{#if visible.length === 0}
 			<EmptyState
+				level={2}
 				title="No tenant on this page matches"
 				description="Clear the search, or turn the page: the box narrows what is on screen."
 			/>

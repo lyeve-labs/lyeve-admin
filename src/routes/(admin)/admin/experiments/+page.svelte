@@ -193,6 +193,7 @@
 
 		{#if data.experiments.length === 0}
 			<EmptyState
+				level={2}
 				title="No experiment is set up"
 				description="Create one to split traffic between variants and measure the difference."
 			>
@@ -220,6 +221,7 @@
 
 			{#if visible.length === 0}
 				<EmptyState
+					level={2}
 					title="No experiment matches"
 					description="Nothing here is named or described that way."
 				>

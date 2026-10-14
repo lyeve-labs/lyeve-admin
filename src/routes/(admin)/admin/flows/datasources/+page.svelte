@@ -321,6 +321,7 @@
 			<NotEnabled title="Datasources" description="A flow that uses one is refused when it is saved." />
 		{:else if data.datasources.length === 0}
 			<EmptyState
+				level={2}
 				title="No datasources yet"
 				description="A db.query, http.request or sheets node names one of these."
 			>

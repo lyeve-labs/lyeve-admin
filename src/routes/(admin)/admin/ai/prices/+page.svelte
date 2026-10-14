@@ -113,6 +113,7 @@
 
 		{#if data.prices.length === 0}
 			<EmptyState
+				level={2}
 				title="No prices yet"
 				description="Without a row for a model its cost is estimated as zero. Prices are dollars per thousand tokens, and per call for an image."
 			>

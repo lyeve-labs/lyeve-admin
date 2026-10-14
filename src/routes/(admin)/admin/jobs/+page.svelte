@@ -153,7 +153,7 @@
 			absent="The cron plugin is not part of this build, so no job runs on a schedule."
 		/>
 	{:else if data.jobs.value.length === 0}
-		<EmptyState title="No jobs yet" description="Schedule HTTP jobs to run on a cron expression.">
+		<EmptyState level={2} title="No jobs yet" description="Schedule HTTP jobs to run on a cron expression.">
 			{#snippet iconSnippet()}
 				<Inbox size={ICON.lg} />
 			{/snippet}
@@ -175,7 +175,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState title="No job on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
+			<EmptyState level={2} title="No job on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
 		{:else}
 		<Table label="Scheduled jobs">
 			<thead>

@@ -318,6 +318,7 @@
 		/>
 	{:else if data.webhooks.value.length === 0}
 		<EmptyState
+			level={2}
 			title="No webhooks configured yet"
 			description="Add one to receive HTTP callbacks on content events."
 		>
@@ -343,7 +344,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState title="No webhook on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
+			<EmptyState level={2} title="No webhook on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
 		{:else}
 		<Table label="Webhooks">
 			<thead>

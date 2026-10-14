@@ -17,7 +17,7 @@
 >
 	<AiSection tab="prompts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prompts">
 		{#if data.prompts.length === 0}
-			<EmptyState title="No use cases" description="The plugin listed no prompt use cases. This is not a state a mounted plugin answers with.">
+			<EmptyState level={2} title="No use cases" description="The plugin listed no prompt use cases. This is not a state a mounted plugin answers with.">
 				{#snippet iconSnippet()}
 					<MessageSquareText size={ICON.lg} />
 				{/snippet}

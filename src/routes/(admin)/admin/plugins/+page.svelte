@@ -138,6 +138,7 @@
 	{#if rows.length === 0}
 		{#if data.gate.state === 'ok'}
 			<EmptyState
+				level={2}
 				title="No plugins in this build"
 				description="This engine was built without plugins, so it serves only its own pages."
 			>
@@ -172,6 +173,7 @@
 
 		{#if filtered.length === 0}
 			<EmptyState
+				level={2}
 				title="No plugins match your filters"
 				description="Widen the search, choose a different category, or clear the state filter."
 			>

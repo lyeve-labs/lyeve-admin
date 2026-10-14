@@ -61,6 +61,7 @@
 
 		{#if data.transcripts.length === 0}
 			<EmptyState
+				level={2}
 				title={filtered ? 'No transcripts match' : 'No transcripts yet'}
 				description={filtered
 					? 'Nothing recorded matches these filters.'

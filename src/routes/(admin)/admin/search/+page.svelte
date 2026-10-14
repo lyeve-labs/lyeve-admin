@@ -89,6 +89,7 @@
 		<div class="lg:col-span-2">
 			{#if data.results === null}
 				<EmptyState
+					level={2}
 					title="Search the content library"
 					description="Enter a query above to search."
 				>
@@ -98,6 +99,7 @@
 				<GateNotice gate={data.results.gate} title="Search" absent="This build does not serve content search." />
 			{:else if data.results.value.results.length === 0}
 				<EmptyState
+					level={2}
 					title={`No results for "${data.q}".`}
 					description="Try a broader term, or check the spelling."
 				/>

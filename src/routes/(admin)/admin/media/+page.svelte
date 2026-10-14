@@ -219,9 +219,9 @@
 			absent="The media plugin does not run on this instance, so there is no library to show."
 		/>
 	{:else if items.length === 0 && data.q}
-		<EmptyState title="No files match" description="Clear the search to see the whole library." />
+		<EmptyState level={2} title="No files match" description="Clear the search to see the whole library." />
 	{:else if items.length === 0}
-		<EmptyState title="No files uploaded yet." description="Images, PDFs, video and audio.">
+		<EmptyState level={2} title="No files uploaded yet." description="Images, PDFs, video and audio.">
 			{#snippet iconSnippet()}
 				<Image size={ICON.lg} />
 			{/snippet}

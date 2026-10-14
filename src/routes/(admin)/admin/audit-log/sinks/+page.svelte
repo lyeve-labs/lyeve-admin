@@ -168,6 +168,7 @@
 
 			{#if data.sinks.length === 0}
 				<EmptyState
+					level={2}
 					title="Nothing receives the audit log"
 					description="Add an HTTPS endpoint, a Splunk collector or Datadog, and every entry is sent there as it is written."
 				>

@@ -72,6 +72,7 @@
 
 		{#if data.releases.length === 0}
 			<EmptyState
+				level={2}
 				title={data.status ? 'No release has this status' : 'No releases yet'}
 				description={data.status
 					? 'Pick another status to see the rest.'

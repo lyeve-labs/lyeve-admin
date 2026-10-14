@@ -260,6 +260,7 @@
 		<GateNotice gate={data.tokens.gate} title="Admin tokens" absent="This engine does not serve admin tokens." />
 	{:else if tokens.length === 0}
 		<EmptyState
+			level={2}
 			title="No admin tokens yet"
 			description="An admin token lets a script or a CI job call the admin API with only the grants you give it, and it stops working within {MAX_TOKEN_DAYS} days."
 		>
@@ -285,6 +286,7 @@
 
 		{#if visible.length === 0}
 			<EmptyState
+				level={2}
 				title="No token on this page matches"
 				description="Clear the search or the status, or turn the page: the box narrows what is on screen."
 			/>

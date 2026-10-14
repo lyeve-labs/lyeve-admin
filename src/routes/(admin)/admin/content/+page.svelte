@@ -181,6 +181,7 @@
 		/>
 	{:else if rows.length === 0 && data.filter === 'all' && !data.query}
 		<EmptyState
+			level={2}
 			title="No schemas yet"
 			description="Build a schema first, then come back here to manage content."
 		>

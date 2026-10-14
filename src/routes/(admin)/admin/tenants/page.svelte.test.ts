@@ -82,6 +82,12 @@ describe('Tenants provisioning gate', () => {
 		expect(container.textContent).toContain('No tenants yet');
 		expect(container.textContent).not.toContain('New tenant');
 	});
+
+	it('heads the first-run empty state one level under the page title', () => {
+		const { getByRole } = render(TenantsPage, { props: props({ tenants: [], total: 0, canProvision: true }) });
+
+		expect(getByRole('heading', { level: 2, name: 'No tenants yet' })).toBeTruthy();
+	});
 });
 
 describe('Tenants plan', () => {

@@ -507,6 +507,7 @@
 
 				{#if filtered.length === 0}
 					<EmptyState
+						level={2}
 						title={`No endpoints match "${query}"`}
 						description="Clear the search to see every endpoint."
 					/>
