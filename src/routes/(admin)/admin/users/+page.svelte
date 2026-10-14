@@ -35,7 +35,29 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const errors = $derived(fieldErrors(form));
+	/*
+	 * Every action answers into the one `form`, so each failure names its
+	 * action and each surface shows only its own. A drawer shows a failure only
+	 * when it came back after the drawer opened, so a failed delete never
+	 * appears inside the next New user form as if that form had failed.
+	 */
+	type Failure = { action?: string; error?: string; fields?: Record<string, string> };
+	const failure = $derived(form && typeof form === 'object' && 'error' in form ? (form as Failure) : null);
+	let accountOpenedOver = $state.raw<unknown>(null);
+	let passwordOpenedOver = $state.raw<unknown>(null);
+	const accountFailure = $derived(
+		form !== accountOpenedOver && (failure?.action === 'create' || failure?.action === 'updateRoles') ? failure : null
+	);
+	const passwordFailure = $derived(
+		form !== passwordOpenedOver && failure?.action === 'setPassword' ? failure : null
+	);
+	const pageFailure = $derived(
+		failure && failure.action !== 'create' && failure.action !== 'updateRoles' && failure.action !== 'setPassword'
+			? failure
+			: null
+	);
+	const errors = $derived(fieldErrors(accountFailure));
+	const passwordErrors = $derived(fieldErrors(passwordFailure));
 
 	// One drawer for both writes. A null target is a new account. A user is the
 	// account whose roles are being changed.
@@ -54,6 +76,7 @@
 	]);
 
 	function openCreate() {
+		accountOpenedOver = form;
 		editing = null;
 		email = '';
 		password = '';
@@ -63,6 +86,7 @@
 	}
 
 	function openEdit(user: User) {
+		accountOpenedOver = form;
 		editing = user;
 		email = user.email;
 		password = '';
@@ -91,6 +115,7 @@
 	let newPassword = $state('');
 
 	function openSetPassword(user: User) {
+		passwordOpenedOver = form;
 		passwordFor = user;
 		newPassword = '';
 		passwordOpen = true;
@@ -169,7 +194,11 @@
 		{/if}
 	{/snippet}
 
-	<FormErrors message={form?.error} fields={errors} />
+	<FormErrors message={pageFailure?.error} />
+
+	<!-- The kit's empty state titles itself as an h3. This names the list
+	     under the page title so a heading list never skips a level. -->
+	<h2 class="sr-only">Accounts</h2>
 
 	{#if !data.users.ok}
 		<GateNotice gate={data.users.gate} title="Users" absent="This engine does not serve the accounts list." />
@@ -292,7 +321,7 @@
 		use:enhance={saveAccountSubmit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={form?.error} fields={errors} />
+		<FormErrors message={accountFailure?.error} fields={errors} />
 
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
@@ -315,7 +344,7 @@
 				bind:value={password}
 				required
 				autocomplete="new-password"
-				hint="At least 12 characters, with upper case, lower case and a digit"
+				hint="The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
 				error={errors.password}
 			/>
 			{#if !data.tenants.ok}
@@ -370,7 +399,7 @@
 		use:enhance={savePasswordSubmit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={form?.error} fields={errors} />
+		<FormErrors message={passwordFailure?.error} fields={passwordErrors} />
 
 		{#if passwordFor}
 			<input type="hidden" name="id" value={passwordFor.id} />
@@ -382,7 +411,7 @@
 			bind:value={newPassword}
 			required
 			autocomplete="new-password"
-			error={errors.new_password}
+			error={passwordErrors.new_password}
 		/>
 	</form>
 	{#snippet footer()}

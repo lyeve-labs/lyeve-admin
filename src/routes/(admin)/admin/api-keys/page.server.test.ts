@@ -88,3 +88,49 @@ describe('API keys load', () => {
 		expect(out.catalogFailed).toBe(false);
 	});
 });
+
+/** An action event whose engine knows the session's roles and answers the write with `reply`. */
+function write(roles: string[], reply: () => Response | Promise<Response>) {
+	const calls: { method: string; path: string }[] = [];
+	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+		const path = String(url);
+		if (path.startsWith('/api/admin/auth/me')) return json({ id: 'u1', email: 'a@b.co', roles });
+		calls.push({ method: init?.method ?? 'GET', path });
+		return reply();
+	}) as unknown as typeof globalThis.fetch;
+	const form = new FormData();
+	form.set('id', 'k1');
+	const url = new URL('http://localhost/admin/api-keys');
+	return { calls, event: { fetch, cookies, url, request: new Request(url, { method: 'POST', body: form }) } as never };
+}
+
+describe('API keys revoke and delete', () => {
+	it.each([
+		['revoke', 'POST', '/api/admin/api-keys/k1/revoke'],
+		['delete', 'DELETE', '/api/admin/api-keys/k1'],
+	] as const)('sends %s for the named key', async (name, method, path) => {
+		const { actions } = await import('./+page.server');
+		const { event, calls } = write(['super_admin'], () => json({}));
+		const out = await actions[name](event);
+		expect(out).toBeUndefined();
+		expect(calls).toEqual([{ method, path }]);
+	});
+
+	it.each([
+		['revoke', 'Failed to revoke API key'],
+		['delete', 'Failed to delete API key'],
+	] as const)('names %s on a refusal and keeps outage detail off the page', async (name, fallback) => {
+		const { actions } = await import('./+page.server');
+		const refused = write(['super_admin'], () => json({ error: 'api key not found' }, 404));
+		expect(await actions[name](refused.event)).toMatchObject({ status: 400, data: { action: name, error: 'api key not found' } });
+		const down = write(['super_admin'], () => json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503));
+		expect(await actions[name](down.event)).toMatchObject({ status: 400, data: { action: name, error: fallback } });
+	});
+
+	it.each(['revoke', 'delete'] as const)('holds %s to a super admin', async (name) => {
+		const { actions } = await import('./+page.server');
+		const { event, calls } = write(['admin'], () => json({}));
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(calls).toEqual([]);
+	});
+});

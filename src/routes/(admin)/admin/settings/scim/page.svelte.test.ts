@@ -232,3 +232,18 @@ describe('the delete', () => {
 		expect(await deleteTitle()).toBe('Delete SCIM connection Azure AD');
 	});
 });
+
+// The plugin acts on every removal and drops the field, so the form cannot
+// offer to turn that off.
+describe('the removal switch', () => {
+	it('shows acting on removals as on and fixed, with the reason', async () => {
+		const { container } = render(ScimPage, { props: props({}) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /new connection/i })[0]);
+		const control = container.ownerDocument.getElementById('scim-deprovision');
+		expect(control?.hasAttribute('disabled')).toBe(true);
+		expect(control?.getAttribute('aria-checked')).toBe('true');
+		expect(container.ownerDocument.body.textContent).toContain('Always on.');
+		const field = container.ownerDocument.querySelector<HTMLInputElement>('input[name="deprovision_on_delete"]');
+		expect(field?.value).toBe('true');
+	});
+});

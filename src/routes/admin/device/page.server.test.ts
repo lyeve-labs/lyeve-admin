@@ -149,6 +149,21 @@ describe('admin/device load', () => {
 		const data = await load(loadEvent('?code=WDJB-MJHT', fetch));
 		expect(data).toMatchObject({ view: 'error' });
 	});
+
+	it('reads a rate refusal as busy, not as an outage', async () => {
+		const fetch = engine(['admin'], { '/api/admin/auth/device/WDJB-MJHT': () => json({ error: 'rate limit exceeded' }, 429) });
+		const data = await load(loadEvent('?code=WDJB-MJHT', fetch));
+		expect(data).toMatchObject({ view: 'busy' });
+	});
+
+	it('reads a 402 as a refusal with its own sentence, not as an outage', async () => {
+		const fetch = engine(['admin'], {
+			'/api/admin/auth/device/WDJB-MJHT': () => json({ error: 'not licensed', code: 'feature_not_licensed', feature: 'device-login' }, 402),
+		});
+		const data = await load(loadEvent('?code=WDJB-MJHT', fetch));
+		expect(data).toMatchObject({ view: 'refused' });
+		expect((data as { refusal: string }).refusal).not.toBe('');
+	});
 });
 
 function actionEvent(code: string, fetch: ReturnType<typeof engine>, extra: Record<string, string> = { step: 'password', password: 'correct-horse' }) {

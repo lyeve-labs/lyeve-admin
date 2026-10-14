@@ -89,6 +89,21 @@ describe('the outcome of a decision', () => {
 	});
 });
 
+describe('a refusal that is not an outage', () => {
+	it('says the engine is busy and retries the same code', () => {
+		render(DevicePage, { props: props({ view: 'busy', code: 'WDJB-MJHT' }) });
+		expect(screen.getByText('Too many requests')).toBeTruthy();
+		expect(screen.queryByText('The engine did not answer')).toBeNull();
+		expect(screen.getByRole('link', { name: 'Try again' }).getAttribute('href')).toBe('/admin/device?code=WDJB-MJHT');
+	});
+
+	it('shows the sentence a 402 carried', () => {
+		render(DevicePage, { props: props({ view: 'refused', code: 'WDJB-MJHT', refusal: 'The license does not include it.' }) });
+		expect(screen.getByText('The license does not include it.')).toBeTruthy();
+		expect(screen.queryByText('The engine did not answer')).toBeNull();
+	});
+});
+
 describe('the first visit', () => {
 	it('asks for the code shown on the device', () => {
 		render(DevicePage, { props: props({}) });

@@ -270,7 +270,7 @@ const cases: Case[] = [
 	{
 		route: 'settings/security',
 		component: SettingsSecurity,
-		data: { report: null, unavailable: 'down' },
+		data: { report: { ok: false, gate: { state: 'unavailable' } } },
 		href: '/admin/settings',
 		label: 'Settings',
 	},

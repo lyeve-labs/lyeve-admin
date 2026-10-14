@@ -55,7 +55,7 @@ function mockEvent(overrides: Record<string, unknown> = {}) {
 
 // load
 
-describe('login/+page.server.ts load', () => {
+describe('opening the sign-in page', () => {
 	it('redirects to the dashboard when the session cookie still authenticates', async () => {
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			const s = String(url);
@@ -85,7 +85,7 @@ describe('login/+page.server.ts load', () => {
 
 		const result = await load({ fetch, cookies } as never);
 
-		expect(result).toEqual({ oauthProviders: [], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: [] });
 		expect(cookies.delete).toHaveBeenCalledWith('__Host-sys_session', {
 			path: '/',
 			httpOnly: true,
@@ -132,7 +132,7 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: [], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: [] });
 	});
 
 	it('returns oauthProviders when providers endpoint responds', async () => {
@@ -145,7 +145,7 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: ['github', 'google'], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: ['github', 'google'], samlProviders: [] });
 	});
 
 	it('returns samlProviders when the saml route responds', async () => {
@@ -159,7 +159,7 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: [], samlProviders: ['Azure AD'] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: ['Azure AD'] });
 	});
 
 	// A refused provider route is not an error on the login page: somebody
@@ -175,13 +175,34 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: [], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: [] });
+	});
+
+	// Both recovery routes take POST only, so a GET answers 405 while the
+	// plugin runs and 404 when it does not.
+	it('reads which recovery plugins run from their routes', async () => {
+		const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
+			const s = String(url);
+			if (s.includes('/password-reset/request')) return json({ error: 'not allowed' }, 405);
+			if (s.includes('/magic-link/request')) return json({ error: 'not found' }, 404);
+			return json([]);
+		}) as unknown as typeof globalThis.fetch;
+
+		const result = await load({ fetch, cookies: mockCookies() } as never);
+		expect(result).toMatchObject({ passwordReset: true, magicLink: false });
+	});
+
+	it('keeps both recovery links when the engine does not answer the check', async () => {
+		const fetch = vi.fn(async () => Promise.reject(new TypeError('fetch failed'))) as unknown as typeof globalThis.fetch;
+
+		const result = await load({ fetch, cookies: mockCookies() } as never);
+		expect(result).toMatchObject({ passwordReset: true, magicLink: true });
 	});
 });
 
 // actions.default
 
-describe('login/+page.server.ts actions.default', () => {
+describe('signing in', () => {
 	beforeEach(() => {
 		resetRateLimitStore();
 	});
@@ -436,15 +457,54 @@ describe('login/+page.server.ts actions.default', () => {
 		}) as never) as Promise<{ status: number; data: Record<string, unknown> }>;
 	}
 
-	// The engine answers 422 for a code that does not match and 401 for a
-	// challenge it no longer honors. Both are the code's fault.
-	it.each([
-		[422, 'invalid code'],
-		[401, 'challenge expired'],
-	])('MFA step: reports a %i as an invalid code and keeps the challenge', async (status, message) => {
-		const result = await verify(() => json({ error: message }, status));
+	// The engine answers 422 for a code that does not match. That one is the
+	// code's fault, and the challenge still holds.
+	it('MFA step: reports a 422 as an invalid code and keeps the challenge', async () => {
+		const result = await verify(() => json({ error: 'invalid code' }, 422));
 		expect(result.status).toBe(400);
 		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch-tok' });
+	});
+
+	// A 401 is a challenge the engine no longer honors. No code passes it, so
+	// the form drops it and returns to the password step.
+	it('MFA step: reports an expired challenge as an expired sign-in and drops the challenge', async () => {
+		const result = await verify(() =>
+			json({ error: 'The MFA challenge has expired. Please log in again.', code: 'AUTH_CHALLENGE_EXPIRED', request_id: 'r1' }, 401)
+		);
+		expect(result.status).toBe(401);
+		expect(result.data).toEqual({ error: 'This sign-in expired. Sign in again.' });
+	});
+
+	// Signing in again reaches the same challenge, so this one never says the
+	// sign-in expired.
+	it('MFA step: tells an account with no authenticator app to ask an administrator', async () => {
+		const result = await verify(() =>
+			json(
+				{ error: 'Multi-factor authentication is not configured for this account.', code: 'AUTH_MFA_NOT_CONFIGURED', request_id: 'r1' },
+				401
+			)
+		);
+		expect(result.status).toBe(401);
+		expect(result.data).toEqual({
+			error: 'This account has no authenticator app to check the code against. Ask an administrator to restore your access.',
+		});
+	});
+
+	// A spent challenge and a locked account answer alike. Neither takes another
+	// code, so the form leaves the code step.
+	it('MFA step: leaves a challenge that has used up its attempts', async () => {
+		const result = await verify(() =>
+			json(
+				{
+					error: 'Too many MFA verification attempts. Please log in again to receive a new challenge.',
+					code: 'AUTH_MFA_LOCKED_OUT',
+					request_id: 'r1',
+				},
+				429
+			)
+		);
+		expect(result.status).toBe(429);
+		expect(result.data).toEqual({ error: 'Too many verification attempts. Wait, then sign in again.' });
 	});
 
 	// A code the engine never checked may be right. Calling it wrong sends the
@@ -466,7 +526,7 @@ describe('login/+page.server.ts actions.default', () => {
 // The captcha plugin challenges the login after repeated failures. The form
 // has to carry the challenge to the page and the token back to the engine.
 
-describe('login/+page.server.ts captcha challenge', () => {
+describe('a sign-in the engine challenges', () => {
 	beforeEach(() => {
 		resetRateLimitStore();
 	});

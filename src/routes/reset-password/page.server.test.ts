@@ -28,6 +28,19 @@ describe('reset-password load', () => {
 });
 
 describe('reset-password action', () => {
+	// An outage says nothing about what the visitor typed, so it reads as the
+	// engine being away rather than as a bad address or an expired link.
+	it.each([
+		['answers 503', () => json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503)],
+		['answers 502', () => json({ error: 'bad gateway' }, 502)],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('says the engine is unavailable when it %s', async (_case, answer) => {
+		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
+		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG }, fetch)) as { status: number; data: { error: string } };
+		expect(result.status).toBeGreaterThanOrEqual(500);
+		expect(result.data.error).toBe('Password reset is unavailable right now. Please try again shortly.');
+	});
+
 	beforeEach(() => resetRateLimitStore());
 
 	it('sets the new password with the token from the link', async () => {
@@ -49,6 +62,17 @@ describe('reset-password action', () => {
 			data: { error: string };
 		};
 		expect(result.data.error).toBe('Use at least 12 characters.');
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	it('refuses a password over 72 bytes before spending the token', async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+		// 37 characters, 74 bytes in UTF-8.
+		const long = 'é'.repeat(37);
+		const result = (await submit({ token: 't1', password: long, confirm: long }, fetch)) as {
+			data: { error: string };
+		};
+		expect(result.data.error).toMatch(/at most 72 bytes/);
 		expect(fetch).not.toHaveBeenCalled();
 	});
 

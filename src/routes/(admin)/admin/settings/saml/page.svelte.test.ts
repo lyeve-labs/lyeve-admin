@@ -191,6 +191,19 @@ describe('the form', () => {
 		}
 	});
 
+	// The plugin turns these three on for every new provider whatever the
+	// form sends, so a create cannot offer them off.
+	it('shows the three signing switches on and fixed on a new provider', async () => {
+		const { container } = render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new provider/i }));
+		for (const id of ['saml-want-assertions-signed', 'saml-want-response-signed', 'saml-sign-authn']) {
+			const control = container.ownerDocument.getElementById(id);
+			expect(control?.hasAttribute('disabled'), id).toBe(true);
+			expect(control?.getAttribute('aria-checked'), id).toBe('true');
+		}
+		expect(said(container)).toContain('Edit it after creating to turn one off.');
+	});
+
 	it('shows the action error where the form is', () => {
 		const { container } = render(SamlPage, {
 			props: props({}, { error: 'The provider could not be created.' }),

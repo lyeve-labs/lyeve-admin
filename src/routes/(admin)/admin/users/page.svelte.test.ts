@@ -92,6 +92,19 @@ describe('Users create', () => {
 		expect(getByRole('button', { name: /close/i })).toBeTruthy();
 	});
 
+	// An install may set its own minimum and drop the complexity rule, and the
+	// console cannot read either, so the hint gives the default as a default.
+	it('names the engine\'s policy and gives its rules only as the default', async () => {
+		const { container, getAllByRole } = render(UsersPage, { props: props() });
+
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+
+		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+		expect(dialog.textContent).toContain(
+			"The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
+		);
+	});
+
 	// The roles offered here and on the API key page are the same list.
 	it('offers every role the instance issues', async () => {
 		const { container, getAllByRole } = render(UsersPage, { props: props() });
@@ -163,15 +176,18 @@ describe('Users pagination', () => {
  */
 describe('Users form errors', () => {
 	const rejected = {
+		action: 'create',
 		error: 'Check the highlighted fields.',
-		fields: { email: 'Email is required', password: 'Password must be at least 8 characters' },
+		fields: { email: 'Email is required', password: 'Password must be at least 12 characters' },
 	};
 
+	// The failure comes back while the drawer is open, as a submit's does.
 	async function openCreate(form: unknown) {
 		const rendered = render(UsersPage, {
-			props: { data: data() as never, form: form as never },
+			props: { data: data() as never, form: null as never },
 		});
 		await fireEvent.click(rendered.getAllByRole('button', { name: /new user/i })[0]);
+		await rendered.rerender({ data: data() as never, form: form as never });
 		return rendered;
 	}
 
@@ -196,7 +212,7 @@ describe('Users form errors', () => {
 
 		expect(container.querySelector('#new-pw')?.getAttribute('aria-invalid')).toBe('true');
 		expect(container.querySelector('#new-pw-error')?.textContent).toBe(
-			'Password must be at least 8 characters'
+			'Password must be at least 12 characters'
 		);
 	});
 
@@ -206,7 +222,7 @@ describe('Users form errors', () => {
 	it('announces the rejection through a live region', async () => {
 		const { container } = await openCreate(rejected);
 
-		const region = container.querySelector('[aria-live="assertive"]');
+		const region = container.querySelector('[role="dialog"] [aria-live="assertive"]');
 		expect(region).toBeTruthy();
 		expect(region?.textContent).toContain('2 fields need attention.');
 	});
@@ -225,15 +241,17 @@ describe('Users form errors', () => {
  */
 describe('Users set password', () => {
 	const refused = {
+		action: 'setPassword',
 		error: 'Check the highlighted field.',
 		fields: { new_password: 'password must be at least 12 characters' },
 	};
 
 	async function openSetPassword(form: unknown) {
 		const rendered = render(UsersPage, {
-			props: { data: data({ users: accounts(1) }) as never, form: form as never },
+			props: { data: data({ users: accounts(1) }) as never, form: null as never },
 		});
 		await fireEvent.click(rendered.getByRole('button', { name: /set password for user0@b\.co/i }));
+		await rendered.rerender({ data: data({ users: accounts(1) }) as never, form: form as never });
 		return rendered;
 	}
 
@@ -280,6 +298,42 @@ describe('Users set password', () => {
 		const { container } = await openSetPassword(null);
 
 		expect(container.querySelector('#set-pw')?.hasAttribute('aria-invalid')).toBe(false);
+	});
+});
+
+// Every action answers into one `form`. A failure from one action must not
+// read as another form's failure.
+describe('Users failures stay with their own action', () => {
+	const deleteFailed = { action: 'delete', error: 'Failed to delete user' };
+
+	it('shows a failed delete on the page and never inside the next New user drawer', async () => {
+		const { getAllByRole, container } = render(UsersPage, {
+			props: { data: data({ users: accounts(1) }) as never, form: deleteFailed as never },
+		});
+		expect(container.textContent).toContain('Failed to delete user');
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).not.toContain('Failed to delete user');
+	});
+
+	it('keeps a failed password set out of the roles drawer', async () => {
+		const failed = { action: 'setPassword', error: 'Failed to set password' };
+		const { getByRole, container } = render(UsersPage, {
+			props: { data: data({ users: accounts(1) }) as never, form: failed as never },
+		});
+		await fireEvent.click(getByRole('button', { name: /edit roles for user0@b\.co/i }));
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).not.toContain('Failed to set password');
+	});
+
+	it('drops a create failure from an earlier opening of the drawer', async () => {
+		const failed = { action: 'create', error: 'Failed to create user' };
+		const { getAllByRole, container } = render(UsersPage, {
+			props: { data: data() as never, form: failed as never },
+		});
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).not.toContain('Failed to create user');
 	});
 });
 

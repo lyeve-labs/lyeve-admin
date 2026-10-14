@@ -18,6 +18,15 @@ import { listSchemaNames } from '$lib/api/search-settings';
 import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
 
+/**
+ * A failed write tagged with the action that made it. Every action answers
+ * into one `form`, and the page shows each failure only where it belongs.
+ */
+function failed(action: 'create' | 'limit' | 'revoke' | 'delete', err: unknown, fallback: string) {
+	const f = actionFailure(err, fallback);
+	return fail(f.status, { ...f.data, action });
+}
+
 export interface UsageSummary {
 	api_key_id: string;
 	tenant_id: string;
@@ -124,18 +133,20 @@ export const actions: Actions = {
 		const name = String(data.get('name') ?? '').trim();
 		if (!name) {
 			return fail(400, {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { name: 'Name is required' },
 			});
 		}
 		const parsedLimits = parseLimits(data);
 		if ('fields' in parsedLimits) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: parsedLimits.fields });
+			return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: parsedLimits.fields });
 		}
 		const { limits } = parsedLimits;
 		const expiryProblem = keyExpiryProblem(roles, expiresRaw ?? '');
 		if (expiryProblem) {
 			return fail(400, {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { expires_at: expiryProblem },
 			});
@@ -144,6 +155,7 @@ export const actions: Actions = {
 		const scopeProblem = keyScopeProblem(roles, scopes);
 		if (scopeProblem) {
 			return fail(400, {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { scopes: scopeProblem },
 			});
@@ -162,7 +174,7 @@ export const actions: Actions = {
 			});
 			return { created: true, raw_key: result.raw_key, key_name: result.name };
 		} catch (err) {
-			return actionFailure(err, 'Failed to create API key');
+			return failed('create', err, 'Failed to create API key');
 		}
 	},
 
@@ -170,15 +182,15 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No key was named.' });
+		if (!id) return fail(400, { action: 'limit', error: 'No key was named.' });
 		const parsed = parseLimits(data);
 		if ('fields' in parsed) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: parsed.fields });
+			return fail(400, { action: 'limit', error: 'Check the highlighted fields.', fields: parsed.fields });
 		}
 		try {
 			await setLimits(authedClient(event), id, parsed.limits);
 		} catch (err) {
-			return actionFailure(err, 'The request limits could not be saved.');
+			return failed('limit', err, 'The request limits could not be saved.');
 		}
 		return { limited: id };
 	},
@@ -192,7 +204,7 @@ export const actions: Actions = {
 		try {
 			await revokeAPIKey(id, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to revoke API key') });
+			return fail(400, { action: 'revoke', error: actionError(err, 'Failed to revoke API key') });
 		}
 	},
 
@@ -205,7 +217,7 @@ export const actions: Actions = {
 		try {
 			await deleteAPIKey(id, client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete API key') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete API key') });
 		}
 	}
 };

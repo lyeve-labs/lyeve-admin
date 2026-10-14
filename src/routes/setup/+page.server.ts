@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { createClient, ApiError } from '@lyeve-labs/client';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { claimSetup, getSetupModeStatus } from '$lib/api/setup';
+import { passwordTooLong } from '$lib/api/users';
 import { readEngineSetup, safeNext } from '$lib/server/setup-gate';
 import { LANDING } from '$lib/landing';
 import { setSessionCookie } from '$lib/server/session-cookie';
@@ -84,6 +85,10 @@ export const actions: Actions = {
 		if (password !== confirm) {
 			return { error: 'Passwords do not match.' };
 		}
+		// The engine's hasher reads 72 bytes at most and fails a longer password
+		// with a 500 that names no rule, so the limit is checked here.
+		const tooLong = passwordTooLong(password);
+		if (tooLong) return fail(400, { error: tooLong, fields: { password: tooLong } });
 
 		const client = createClient(fetch);
 		try {

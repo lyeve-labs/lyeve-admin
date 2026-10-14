@@ -165,6 +165,20 @@ describe('setup actions.create', () => {
 		expect(result).toEqual({ error: 'Passwords do not match.' });
 	});
 
+	// The engine's hasher fails a password over 72 bytes with a 500 that names
+	// no rule, so the action refuses one first and puts the limit on the field.
+	it('refuses a password over 72 bytes before asking the engine', async () => {
+		const fetch = vi.fn();
+		const long = 'é'.repeat(37);
+		const result = (await actions.create(actionEvent({ ...valid, password: long, confirm: long }, fetch))) as {
+			status: number;
+			data: { error: string; fields: { password: string } };
+		};
+		expect(result.status).toBe(400);
+		expect(result.data.fields.password).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
 	it('names the rule the engine refused the password for', async () => {
 		const refusal = { code: 'AUTH_PASSWORD_TOO_SHORT', error: 'Password must be at least 12 characters.' };
 		const result = (await actions.create(

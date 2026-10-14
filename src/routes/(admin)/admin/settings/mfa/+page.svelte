@@ -50,7 +50,8 @@
 		};
 	});
 
-	const mfaEnabled = $derived(data.mfa.ok && data.mfa.value);
+	const mfaEnabled = $derived(data.mfa.ok && data.mfa.value.enabled);
+	const hasPasskeys = $derived(data.mfa.ok && data.mfa.value.hasPasskeys);
 	const description = $derived(
 		!data.mfa.ok ? 'The state of this account could not be read.' : mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'
 	);
@@ -133,6 +134,42 @@
 		</Card>
 	{:else if !data.mfa.ok}
 		<GateNotice gate={data.mfa.gate} title="Two-factor authentication" absent="This engine does not serve two-factor authentication." />
+	{:else if hasPasskeys}
+		<Alert tone="success" title="Two-factor authentication is on">
+			This account has a passkey, so signing in takes a second factor. While a passkey is registered the engine does
+			not report whether an authenticator app is also set up.
+		</Alert>
+		<Card>
+			<form method="POST" action="?/setup" use:enhance={setup.enhance} class="flex flex-col gap-4">
+				<p class="text-fg text-sm">
+					Set up an authenticator app as well. If one is set up already, the new key replaces it once you verify a code.
+				</p>
+				<div class="flex justify-end">
+					<Button type="submit" variant="secondary" loading={setup.pending}>
+						<Shield size={ICON.sm} aria-hidden="true" />
+						Set up an authenticator app
+					</Button>
+				</div>
+			</form>
+		</Card>
+		<Card>
+			<form method="POST" action="?/disable" use:enhance={disable.enhance} class="flex flex-col gap-4">
+				<Input
+					id="dis-code"
+					name="code"
+					label="Code"
+					hint="A current code from the authenticator app, or a backup code. This turns off the app only. Passkeys stay."
+					bind:value={disableCode}
+					autocomplete="one-time-code"
+					inputmode="numeric"
+				/>
+				<div class="flex justify-end">
+					<Button type="submit" variant="danger" disabled={disableCode.trim().length === 0} loading={disable.pending}>
+						Turn off the authenticator app
+					</Button>
+				</div>
+			</form>
+		</Card>
 	{:else if mfaEnabled}
 		<Alert tone="success" title="Two-factor authentication is on">
 			Signing in to this account takes a TOTP code.

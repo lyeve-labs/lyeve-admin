@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { confirmPasswordReset, RESET_MIN_PASSWORD_LENGTH } from '$lib/api/password-reset';
+import { passwordTooLong } from '$lib/api/users';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
@@ -27,6 +28,10 @@ export const actions: Actions = {
 		if (password.length < RESET_MIN_PASSWORD_LENGTH) {
 			return fail(400, { error: `Use at least ${RESET_MIN_PASSWORD_LENGTH} characters.` });
 		}
+		// Checked here because the engine spends the link before it hashes the
+		// password, so a refusal there would cost the reader the link.
+		const tooLong = passwordTooLong(password);
+		if (tooLong) return fail(400, { error: tooLong });
 		if (password !== confirm) return fail(400, { error: 'The two passwords do not match.' });
 
 		try {

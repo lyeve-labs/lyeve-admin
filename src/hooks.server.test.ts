@@ -24,12 +24,12 @@ function engineAnswering(body: unknown) {
 	);
 }
 
-function stubEvent(path = '/', fetch = engineAnswering({ setup_required: false })) {
+function stubEvent(path = '/', fetch = engineAnswering({ setup_required: false }), session?: string) {
 	return {
 		fetch,
 		url: new URL(`http://localhost${path}`),
 		request: new Request('http://localhost/'),
-		cookies: {} as never,
+		cookies: { get: (name: string) => (name === 'sys_session' ? session : undefined) } as never,
 		locals: {},
 		params: {},
 		route: { id: null },
@@ -40,7 +40,7 @@ function stubEvent(path = '/', fetch = engineAnswering({ setup_required: false }
 
 // tests
 
-describe('hooks.server.ts handle', () => {
+describe('every response', () => {
 	// A response passed through from fetch has immutable headers. Setting the
 	// security headers on one throws.
 	it('sets its headers on a response whose own headers are immutable', async () => {
@@ -102,7 +102,7 @@ describe('hooks.server.ts handle', () => {
 		expect(response.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
 	});
 
-	it('calls resolve(event) and returns the response', async () => {
+	it('serves the page the route renders', async () => {
 		const event = stubEvent();
 		const resolve = stubResolve();
 		const response = await handle({ event: event as never, resolve });
@@ -129,7 +129,7 @@ describe('hooks.server.ts handle', () => {
 	});
 });
 
-describe('hooks.server.ts setup gate', () => {
+describe('the setup gate on a page request', () => {
 	it('sends a page to the setup screen while the engine is in setup mode', async () => {
 		resetSetupGateCache();
 		const resolve = stubResolve();
@@ -150,6 +150,24 @@ describe('hooks.server.ts setup gate', () => {
 		await expect(handle({ event: stubEvent('/login', down) as never, resolve })).rejects.toMatchObject({
 			location: '/setup?next=%2Flogin',
 		});
+	});
+
+	it('lets a signed-in page through while the engine cannot be reached, so the outage page shows', async () => {
+		resetSetupGateCache();
+		const down = vi.fn(async (): Promise<Response> => {
+			throw new Error('ECONNREFUSED');
+		});
+		const resolve = stubResolve();
+		await handle({ event: stubEvent('/admin/schema', down, 'tok') as never, resolve });
+		expect(resolve).toHaveBeenCalled();
+	});
+
+	it('still sends a signed-in page to the setup screen while the engine is in setup mode', async () => {
+		resetSetupGateCache();
+		const resolve = stubResolve();
+		const event = stubEvent('/admin/schema', engineAnswering({ setup_required: true, mode: 'setup' }), 'tok');
+		await expect(handle({ event: event as never, resolve })).rejects.toMatchObject({ status: 303 });
+		expect(resolve).not.toHaveBeenCalled();
 	});
 
 	it('serves the setup screen itself whatever the engine says', async () => {

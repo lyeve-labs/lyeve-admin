@@ -80,9 +80,11 @@
 				required
 			/>
 
-			<div class="flex justify-end">
-				<a href="/forgot-password" class="text-sm text-brand transition-colors hover:underline">Forgot password?</a>
-			</div>
+			{#if data.passwordReset}
+				<div class="flex justify-end">
+					<a href="/forgot-password" class="text-sm text-brand transition-colors hover:underline">Forgot password?</a>
+				</div>
+			{/if}
 
 			{#if challenge}
 				<!-- A provider token is single use, so every answer from the engine
@@ -103,7 +105,9 @@
 			</Button>
 		</form>
 
-		<Button href="/login/magic-link" variant="ghost" size="sm" full class="mt-3">Email me a sign-in link</Button>
+		{#if data.magicLink}
+			<Button href="/login/magic-link" variant="ghost" size="sm" full class="mt-3">Email me a sign-in link</Button>
+		{/if}
 
 		{#if data.oauthProviders.length > 0 || data.samlProviders.length > 0}
 			<Divider class="my-5">or continue with</Divider>

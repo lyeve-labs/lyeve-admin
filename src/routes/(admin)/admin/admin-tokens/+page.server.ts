@@ -20,7 +20,8 @@ import {
 	type StepUp,
 } from '$lib/api/admin-tokens';
 import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
-import { section, type Section } from '$lib/api/gate';
+import { forbiddenText, gateOf, section, type Section } from '$lib/api/gate';
+import { BUSY } from '$lib/outage';
 
 /** The engine pages this list at fifty and refuses more than a hundred. */
 const PAGE = 50;
@@ -37,7 +38,10 @@ export interface RequestLog {
 }
 
 function loadError(err: unknown, what: string): string {
-	if (err instanceof ApiError && err.status === 503) return 'The database is unavailable, so the list could not be read. Try again in a moment.';
+	const gate = gateOf(err, `The ${what} could not be read. Reload the page to try again.`);
+	if (gate.state === 'unavailable') return `The engine or its database did not answer, so the ${what} could not be read. Try again in a moment.`;
+	if (gate.state === 'busy') return BUSY.body;
+	if (gate.state === 'forbidden') return forbiddenText(`the ${what}`);
 	return `The ${what} could not be read. Reload the page to try again.`;
 }
 
@@ -85,19 +89,39 @@ export const load: PageServerLoad = async (event) => {
 	const logToken = url.searchParams.get('log');
 	if (logToken) {
 		const logOffset = Math.max(0, Number(url.searchParams.get('log_offset')) || 0);
-		log = await listAdminTokenRequests(client, logToken, PAGE, logOffset)
-			.then((res) => {
-				const rows = rowsOf(res);
-				return { token: logToken, rows, total: Math.max(totalOf(res), logOffset + rows.length), limit: PAGE, offset: logOffset };
-			})
-			.catch((err) => ({
+		const read = await listAdminTokenRequests(client, logToken, PAGE, logOffset).then(
+			(res) => ({ ok: true as const, res }),
+			(err: unknown) => ({ ok: false as const, err })
+		);
+		if (read.ok) {
+			const logRows = rowsOf(read.res);
+			// A log_offset past the end would draw "No requests yet" for a token
+			// that has some, so it goes back to the last page that holds rows.
+			const back = pastEndOffset(logRows.length, PAGE, logOffset, statedTotal(read.res));
+			if (back !== null) {
+				const next = new URL(url);
+				if (back > 0) next.searchParams.set('log_offset', String(back));
+				else next.searchParams.delete('log_offset');
+				redirect(307, `${next.pathname}${next.search}`);
+			}
+			log = {
+				token: logToken,
+				rows: logRows,
+				total: Math.max(totalOf(read.res), logOffset + logRows.length),
+				limit: PAGE,
+				offset: logOffset,
+			};
+		} else {
+			const err = read.err;
+			log = {
 				token: logToken,
 				rows: [],
 				total: 0,
 				limit: PAGE,
 				offset: logOffset,
 				error: err instanceof ApiError && err.status === 404 ? 'This token is not one you can see.' : loadError(err, 'request log'),
-			}));
+			};
+		}
 	}
 
 	return {

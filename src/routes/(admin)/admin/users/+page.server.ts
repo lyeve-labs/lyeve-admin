@@ -6,10 +6,10 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError } from '$lib/server/action-error';
-import { setUserPassword } from '$lib/api/users';
+import { passwordTooLong, setUserPassword } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { section, type Section } from '$lib/api/gate';
-import { pastEndOffset, withOffset } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 /** The engine's own page size when a request names none. */
 const DEFAULT_LIMIT = 25;
@@ -31,11 +31,8 @@ export const load: PageServerLoad = async (event) => {
 
 	const client = authedClient(event);
 
-	const limit = Math.max(
-		1,
-		Math.min(MAX_LIMIT, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT)
-	);
-	const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+	// Snapped to a page boundary, so the pager numbers the rows on screen.
+	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	/*
 	 * The users endpoint answers with a bare array and no row count, so there is
@@ -96,14 +93,17 @@ export const actions: Actions = {
 		 */
 		const fields: Record<string, string> = {};
 		if (!email) fields.email = 'Email is required';
+		// The engine judges the password, its minimum included, since an install
+		// may set that, and its refusal lands on this field below. Past the
+		// hasher's limit it fails without naming a rule, so that one is caught here.
 		if (!password) fields.password = 'Password is required';
-		else if (password.length < 8) fields.password = 'Password must be at least 8 characters';
+		else if (passwordTooLong(password)) fields.password = passwordTooLong(password) ?? '';
 		// The form offers the choice only where there is one to make, and then
 		// it is required: the engine refuses an account that names no tenant.
 		const tenant = String(form.get('tenant_id') ?? '').trim();
 		if (form.get('tenant_required') === '1' && !tenant) fields.tenant_id = 'Choose the tenant this account belongs to';
 		if (Object.keys(fields).length > 0) {
-			return fail(400, { error: 'Check the highlighted fields.', fields });
+			return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields });
 		}
 		// The engine honors X-Tenant-ID from a super admin only, and checks the
 		// slug against its roster.
@@ -113,8 +113,16 @@ export const actions: Actions = {
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { error: full });
-			return fail(400, { error: actionError(err, 'Failed to create user') });
+			if (full) return fail(402, { action: 'create', error: full });
+			// The email is checked above, so a 422 is the password policy.
+			if (err instanceof ApiError && err.status === 422) {
+				return fail(422, {
+					action: 'create',
+					error: 'Check the highlighted field.',
+					fields: { password: actionError(err, 'The password does not meet the policy') },
+				});
+			}
+			return fail(400, { action: 'create', error: actionError(err, 'Failed to create user') });
 		}
 	},
 
@@ -136,8 +144,8 @@ export const actions: Actions = {
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { error: full });
-			return fail(400, { error: actionError(err, 'Failed to update roles') });
+			if (full) return fail(402, { action: 'updateRoles', error: full });
+			return fail(400, { action: 'updateRoles', error: actionError(err, 'Failed to update roles') });
 		}
 	},
 
@@ -151,7 +159,7 @@ export const actions: Actions = {
 			await deleteUser(id, client);
 			return { ok: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete user') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete user') });
 		}
 	},
 
@@ -164,10 +172,12 @@ export const actions: Actions = {
 		const password = String(form.get('new_password') ?? '');
 		// The field is named apart from the create form's so a refusal lands
 		// on the control that was submitted and never on the other drawer's.
-		if (!password) {
+		const problem = password ? passwordTooLong(password) : 'Password is required';
+		if (problem) {
 			return fail(400, {
+				action: 'setPassword',
 				error: 'Check the highlighted field.',
-				fields: { new_password: 'Password is required' },
+				fields: { new_password: problem },
 			});
 		}
 		try {
@@ -183,11 +193,12 @@ export const actions: Actions = {
 			 */
 			if (err instanceof ApiError && err.status === 422) {
 				return fail(422, {
+					action: 'setPassword',
 					error: 'Check the highlighted field.',
 					fields: { new_password: actionError(err, 'The password does not meet the policy') },
 				});
 			}
-			return fail(400, { error: actionError(err, 'Failed to set password') });
+			return fail(400, { action: 'setPassword', error: actionError(err, 'Failed to set password') });
 		}
 	},
 };

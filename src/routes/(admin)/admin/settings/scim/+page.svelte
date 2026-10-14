@@ -80,7 +80,6 @@
 	let creating = $state(false);
 	let name = $state('');
 	let token = $state('');
-	let deprovisionOnDelete = $state(true);
 	let action = $state('disable');
 
 	// One rotation panel at a time, keyed by the connection it belongs to. The
@@ -91,7 +90,6 @@
 	function openCreate() {
 		name = '';
 		token = '';
-		deprovisionOnDelete = true;
 		action = 'disable';
 		openedOver = form;
 		creating = true;
@@ -311,19 +309,16 @@
 				bind:value={action}
 				options={DEPROVISION_OPTIONS}
 			/>
-			<!-- Toggle renders a button, and a button submits nothing. The action
-			     reads an absent field as false, which would silently store a
-			     connection that never deprovisions anybody. -->
-			<input
-				type="hidden"
-				name="deprovision_on_delete"
-				value={deprovisionOnDelete ? 'true' : 'false'}
-			/>
+			<!-- The plugin acts on every removal whatever this field says, so the
+			     switch shows that fact rather than offering a choice that does
+			     nothing. The field still says true, which is what gets stored. -->
+			<input type="hidden" name="deprovision_on_delete" value="true" />
 			<Toggle
 				id="scim-deprovision"
 				label="Act on removals at all"
-				hint="Off means an account stays exactly as it is when the directory stops listing it."
-				bind:checked={deprovisionOnDelete}
+				hint="Always on. This instance acts on every removal the directory sends, in the way chosen above."
+				checked={true}
+				disabled
 			/>
 		</div>
 	</form>

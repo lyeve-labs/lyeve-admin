@@ -130,6 +130,12 @@ export const actions: Actions = {
 
 		const name = String(form.get('name') ?? '').trim();
 		if (!name) return fail(400, { action: 'update', error: 'Name the provider so people know what they are signing in with.' });
+		// The plugin's update has no required rule, so a cleared field would be
+		// stored and break sign-in through this provider.
+		const entityId = String(form.get('entity_id') ?? '').trim();
+		const ssoUrl = String(form.get('sso_url') ?? '').trim();
+		if (!entityId) return fail(400, { action: 'update', error: 'The IdP entity ID is required.' });
+		if (!ssoUrl) return fail(400, { action: 'update', error: 'The IdP sign-on URL is required.' });
 
 		// An empty certificate field means "leave the stored one alone". Sending
 		// the empty string would wipe the only thing that verifies an assertion.
@@ -138,9 +144,11 @@ export const actions: Actions = {
 		try {
 			await updateProvider(client, id, {
 				name,
-				entity_id: String(form.get('entity_id') ?? '').trim(),
-				sso_url: String(form.get('sso_url') ?? '').trim(),
-				slo_url: String(form.get('slo_url') ?? '').trim() || undefined,
+				entity_id: entityId,
+				sso_url: ssoUrl,
+				// Sent even when empty: the plugin changes the logout URL only
+				// when the key is present, so leaving it out would keep the old one.
+				slo_url: String(form.get('slo_url') ?? '').trim(),
 				...(idpCert ? { idp_cert: idpCert } : {}),
 				name_id_format: String(form.get('name_id_format') ?? '').trim() || undefined,
 				want_assertions_signed: form.get('want_assertions_signed') === 'true',
