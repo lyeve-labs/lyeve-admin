@@ -167,6 +167,15 @@ describe('admin/users/+page.server.ts load', () => {
 		expect(seen[0]).toContain('limit=200');
 	});
 
+	// The pager numbers pages, so an offset between two boundaries snaps down
+	// to the page that holds it rather than drawing rows the pager misnames.
+	it('snaps an offset between two page boundaries to its page', async () => {
+		const { event, seen } = loadEvent(accounts(10, 50), '?limit=10&offset=55');
+		const result = (await load(event)) as { offset: number };
+		expect(result.offset).toBe(50);
+		expect(seen[0]).toContain('offset=50');
+	});
+
 	it('refuses a negative offset rather than passing it on', async () => {
 		const { event, seen } = loadEvent(accounts(5), '?offset=-40');
 

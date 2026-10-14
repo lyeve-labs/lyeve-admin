@@ -20,7 +20,8 @@ import {
 	type StepUp,
 } from '$lib/api/admin-tokens';
 import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
-import { section, type Section } from '$lib/api/gate';
+import { forbiddenText, gateOf, section, type Section } from '$lib/api/gate';
+import { BUSY } from '$lib/outage';
 
 /** The engine pages this list at fifty and refuses more than a hundred. */
 const PAGE = 50;
@@ -37,7 +38,10 @@ export interface RequestLog {
 }
 
 function loadError(err: unknown, what: string): string {
-	if (err instanceof ApiError && err.status === 503) return 'The database is unavailable, so the list could not be read. Try again in a moment.';
+	const gate = gateOf(err, `The ${what} could not be read. Reload the page to try again.`);
+	if (gate.state === 'unavailable') return `The engine or its database did not answer, so the ${what} could not be read. Try again in a moment.`;
+	if (gate.state === 'busy') return BUSY.body;
+	if (gate.state === 'forbidden') return forbiddenText(`the ${what}`);
 	return `The ${what} could not be read. Reload the page to try again.`;
 }
 

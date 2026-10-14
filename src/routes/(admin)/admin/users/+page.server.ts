@@ -9,7 +9,7 @@ import { actionError } from '$lib/server/action-error';
 import { passwordBytes, passwordTooLong, setUserPassword } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { section, type Section } from '$lib/api/gate';
-import { pastEndOffset, withOffset } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 /** The engine's own page size when a request names none. */
 const DEFAULT_LIMIT = 25;
@@ -31,11 +31,8 @@ export const load: PageServerLoad = async (event) => {
 
 	const client = authedClient(event);
 
-	const limit = Math.max(
-		1,
-		Math.min(MAX_LIMIT, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT)
-	);
-	const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+	// Snapped to a page boundary, so the pager numbers the rows on screen.
+	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	/*
 	 * The users endpoint answers with a bare array and no row count, so there is
