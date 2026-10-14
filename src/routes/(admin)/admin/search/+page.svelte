@@ -152,7 +152,7 @@
 		<aside class="space-y-6">
 			<Card pad="sm">
 				{#snippet header()}
-					<SectionHeading level={3}>Public search</SectionHeading>
+					<SectionHeading level={2}>Public search</SectionHeading>
 				{/snippet}
 				{#if !data.publicSchemas.ok}
 					<GateNotice gate={data.publicSchemas.gate} title="Public search" absent="This build does not serve public search." />
@@ -199,7 +199,7 @@
 
 			<Card pad="sm">
 				{#snippet header()}
-					<SectionHeading level={3}>Ranking weights</SectionHeading>
+					<SectionHeading level={2}>Ranking weights</SectionHeading>
 				{/snippet}
 				<!-- A failed read offers no Save: the boxes would hold weights nobody
 				     read, and saving them would overwrite the real ones. -->
@@ -225,7 +225,7 @@
 			<Card pad="sm">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-2">
-						<SectionHeading level={3}>Synonyms</SectionHeading>
+						<SectionHeading level={2}>Synonyms</SectionHeading>
 						{#if data.synonyms.ok}
 							<Button variant="secondary" size="sm" onclick={() => (synonymOpen = true)}>
 								<Plus size={ICON.sm} /> New synonym
@@ -275,7 +275,7 @@
 
 			<Card pad="sm">
 				{#snippet header()}
-					<SectionHeading level={3}>Last 30 days</SectionHeading>
+					<SectionHeading level={2}>Last 30 days</SectionHeading>
 				{/snippet}
 				{#if !data.analytics.ok}
 					<GateNotice gate={data.analytics.gate} title="Search analytics" absent="This build does not record search analytics." />
@@ -301,7 +301,7 @@
 			{#if data.canReindex}
 				<Card pad="sm">
 					{#snippet header()}
-						<SectionHeading level={3}>Index</SectionHeading>
+						<SectionHeading level={2}>Index</SectionHeading>
 					{/snippet}
 					<form method="POST" action="?/reindex" class="flex flex-col gap-3" use:enhance>
 						{#if form?.reindexError}

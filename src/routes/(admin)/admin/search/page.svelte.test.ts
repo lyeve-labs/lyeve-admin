@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import SearchPage from './+page.svelte';
 import type { Entitlements } from '$lib/entitlements';
@@ -59,7 +59,24 @@ describe('Search page results panel', () => {
 	});
 });
 
+/** Each heading level that follows one more than a level shallower, in document order. */
+function skippedLevels(): string[] {
+	const levels = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => ({ level: Number(h.tagName[1]), text: h.textContent?.trim() ?? '' }));
+	return levels.filter((h, i) => i > 0 && h.level > levels[i - 1].level + 1).map((h) => `h${h.level} ${h.text}`);
+}
+
 describe('Search page settings', () => {
+	it('puts its settings cards one level under the page title', () => {
+		const results = ok({ results: [{ entry_id: 'e0', title: 'Entry 0', schema: 'blog', status: 'published', rank: 1 }], total: 1 });
+		render(SearchPage, { props: { data: data({ results, publicSchemas: ok(['blog']) }) as never, form: null } });
+		expect(document.querySelector('h1')).not.toBeNull();
+		expect(skippedLevels()).toEqual([]);
+		// The settings sit beside the results, not under them, so they are peers of its heading.
+		for (const name of ['Public search', 'Ranking weights', 'Synonyms']) {
+			expect(screen.getByRole('heading', { level: 2, name })).toBeTruthy();
+		}
+	});
+
 	it('offers each schema for public search in a searchable picker and names what could not be read', () => {
 		const { container, getByText } = render(SearchPage, {
 			props: { data: data({ publicSchemas: ok(['blog']) }) as never, form: null },

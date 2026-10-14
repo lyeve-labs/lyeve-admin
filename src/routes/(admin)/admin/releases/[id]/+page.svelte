@@ -205,7 +205,7 @@
 
 			<Card>
 				{#snippet header()}
-					<SectionHeading level={3}>Schedule</SectionHeading>
+					<SectionHeading level={2}>Schedule</SectionHeading>
 				{/snippet}
 				{#if release.status === 'scheduled' && release.scheduled_at}
 					<div class="flex flex-wrap items-center justify-between gap-3">
@@ -236,7 +236,7 @@
 			{:else if conflicts.length > 0}
 				<Card>
 					{#snippet header()}
-						<SectionHeading level={3}>Conflicts</SectionHeading>
+						<SectionHeading level={2}>Conflicts</SectionHeading>
 					{/snippet}
 					<p class="mb-3 text-sm text-muted">
 						{blocking.length > 0
@@ -262,7 +262,7 @@
 			<Card pad="none">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-3">
-						<SectionHeading level={3}>Entries ({release.item_count})</SectionHeading>
+						<SectionHeading level={2}>Entries ({release.item_count})</SectionHeading>
 						{#if canEdit}
 							<Button variant="secondary" size="sm" onclick={openAdd}><Plus size={ICON.sm} /> Include entry</Button>
 						{/if}

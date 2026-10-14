@@ -118,7 +118,7 @@
 
 			<Card>
 				<div class="flex flex-col gap-4">
-					<SectionHeading level={3}>Default locale</SectionHeading>
+					<SectionHeading level={2}>Default locale</SectionHeading>
 					<Input
 						id="default-locale"
 						name="default_locale"
@@ -134,7 +134,7 @@
 
 			<Card>
 				<div class="flex flex-col gap-4">
-					<SectionHeading level={3}>Enabled locales</SectionHeading>
+					<SectionHeading level={2}>Enabled locales</SectionHeading>
 					<p class="text-sm text-muted">
 						Each one is a tab in every entry's Translations panel. Language tags such as
 						<span class="font-mono">fr</span> or <span class="font-mono">pt-BR</span>.
@@ -176,7 +176,7 @@
 
 			<Card>
 				<div class="flex flex-col gap-4">
-					<SectionHeading level={3}>Fallback chain</SectionHeading>
+					<SectionHeading level={2}>Fallback chain</SectionHeading>
 					<p class="text-sm text-muted">
 						When a translation is missing, the reader gets the first locale in this order that has
 						one, and the source fields after that.

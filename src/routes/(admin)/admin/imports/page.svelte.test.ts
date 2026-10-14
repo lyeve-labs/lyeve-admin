@@ -53,7 +53,19 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	form: form as never,
 });
 
+/** Each heading level that follows one more than a level shallower, in document order. */
+function skippedLevels(): string[] {
+	const levels = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => ({ level: Number(h.tagName[1]), text: h.textContent?.trim() ?? '' }));
+	return levels.filter((h, i) => i > 0 && h.level > levels[i - 1].level + 1).map((h) => `h${h.level} ${h.text}`);
+}
+
 describe('Imports', () => {
+	it('puts its sections one level under the page title', () => {
+		render(ImportsPage, { props: props({ jobs: [], total: 0 }) });
+		expect(document.querySelector('h1')).not.toBeNull();
+		expect(skippedLevels()).toEqual([]);
+	});
+
 	it('explains the concept and names the sources before anything has run', () => {
 		const { container } = render(ImportsPage, { props: props({ jobs: [], total: 0 }) });
 		const text = said(container);

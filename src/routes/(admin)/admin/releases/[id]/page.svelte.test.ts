@@ -36,7 +36,19 @@ function setup(data: Record<string, unknown> = {}, form: unknown = null) {
 	});
 }
 
+/** Each heading level that follows one more than a level shallower, in document order. */
+function skippedLevels(): string[] {
+	const levels = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => ({ level: Number(h.tagName[1]), text: h.textContent?.trim() ?? '' }));
+	return levels.filter((h, i) => i > 0 && h.level > levels[i - 1].level + 1).map((h) => `h${h.level} ${h.text}`);
+}
+
 describe('release page', () => {
+	it('puts its cards one level under the page title', () => {
+		setup();
+		expect(document.querySelector('h1')).not.toBeNull();
+		expect(skippedLevels()).toEqual([]);
+	});
+
 	it('links each entry to its editor by the collection it lives in', () => {
 		const { getByRole } = setup();
 		expect(getByRole('link', { name: 'Hello' }).getAttribute('href')).toBe('/admin/content/posts/e1');
