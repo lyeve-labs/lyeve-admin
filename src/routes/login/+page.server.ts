@@ -44,6 +44,20 @@ async function providerNames(
 	}
 }
 
+/**
+ * Whether a plugin's public sign-in route is mounted. The recovery routes take
+ * POST only, so a GET answers 405 while the plugin runs and 404 when it does
+ * not, and asks the plugin for nothing. Only a definite 404 hides the link: any
+ * other answer, or none, leaves it, because the form reports a refusal anyway.
+ */
+async function routeMounted(fetch: typeof globalThis.fetch, url: string): Promise<boolean> {
+	try {
+		return (await fetch(url)).status !== 404;
+	} catch {
+		return true;
+	}
+}
+
 export const load: PageServerLoad = async (event) => {
 	const { fetch, cookies } = event;
 
@@ -66,12 +80,14 @@ export const load: PageServerLoad = async (event) => {
 	// refuse, so a non-ok response means no button and never an error on the
 	// form: somebody with a password must still be able to get in when SSO is
 	// unavailable.
-	const [oauthProviders, samlProviders] = await Promise.all([
+	const [oauthProviders, samlProviders, passwordReset, magicLink] = await Promise.all([
 		providerNames(fetch, '/api/admin/auth/oauth-providers'),
 		providerNames(fetch, '/api/admin/auth/saml-providers'),
+		routeMounted(fetch, '/api/admin/auth/password-reset/request'),
+		routeMounted(fetch, '/api/admin/auth/magic-link/request'),
 	]);
 
-	return { oauthProviders, samlProviders };
+	return { oauthProviders, samlProviders, passwordReset, magicLink };
 };
 
 export const actions: Actions = {
@@ -97,6 +113,7 @@ export const actions: Actions = {
 				setSessionCookie(event, res.token);
 			} catch (e) {
 				const failed = secondFactorFailure(e);
+				if (failed.expired) return fail(failed.status, { error: failed.error });
 				return fail(failed.status, { error: failed.error, mfa_required: true, challenge_token: challengeToken });
 			}
 			redirect(302, returnTo(event.url));

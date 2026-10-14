@@ -90,17 +90,24 @@ describe('auth/magic-link/verify actions', () => {
 		expect(JSON.parse(String(init.body))).toEqual({ challenge_token: 'ch', code: '123456' });
 	});
 
-	it.each([
-		[422, 'invalid code'],
-		[401, 'challenge expired'],
-	])('keeps the challenge and calls a %i a wrong code', async (status, message) => {
-		const fetch = vi.fn(async () => json({ error: message }, status)) as unknown as typeof globalThis.fetch;
+	it('keeps the challenge and calls a 422 a wrong code', async () => {
+		const fetch = vi.fn(async () => json({ error: 'invalid code' }, 422)) as unknown as typeof globalThis.fetch;
 		const result = (await actions.mfa(event({ challenge_token: 'ch', code: '000000' }, fetch))) as {
 			status: number;
 			data: Record<string, unknown>;
 		};
 		expect(result.status).toBe(400);
 		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch' });
+	});
+
+	it('drops an expired challenge and asks for a new link', async () => {
+		const fetch = vi.fn(async () => json({ error: 'challenge expired' }, 401)) as unknown as typeof globalThis.fetch;
+		const result = (await actions.mfa(event({ challenge_token: 'ch', code: '000000' }, fetch))) as {
+			status: number;
+			data: Record<string, unknown>;
+		};
+		expect(result.status).toBe(401);
+		expect(result.data).toEqual({ error: 'This sign-in expired. Request a new link to sign in again.' });
 	});
 
 	// A code the engine never checked may be right, so it is not called wrong.

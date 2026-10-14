@@ -11,7 +11,11 @@ const providerLinks = (links: HTMLElement[]) =>
 	links.filter((a) => a.getAttribute('href')?.startsWith('/api/admin/auth/'));
 
 const props = (extra: Record<string, unknown> = {}) =>
-	({ form: null, data: { oauthProviders: [], samlProviders: [] }, ...extra }) as never;
+	({
+		form: null,
+		data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true },
+		...extra,
+	}) as never;
 
 describe('Login page', () => {
 	it('asks the browser for the saved password for this account', () => {
@@ -172,6 +176,15 @@ describe('Login page recovery links', () => {
 
 		expect(getByRole('link', { name: /forgot password/i }).getAttribute('href')).toBe('/forgot-password');
 		expect(getByRole('link', { name: /email me a sign-in link/i }).getAttribute('href')).toBe('/login/magic-link');
+	});
+
+	it('leaves out each link whose plugin is not running', () => {
+		const { queryByRole } = render(LoginPage, {
+			props: props({ data: { oauthProviders: [], samlProviders: [], passwordReset: false, magicLink: false } }),
+		});
+
+		expect(queryByRole('link', { name: /forgot password/i })).toBeNull();
+		expect(queryByRole('link', { name: /email me a sign-in link/i })).toBeNull();
 	});
 
 	it('hides them during the second factor step', () => {

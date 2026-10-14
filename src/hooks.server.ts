@@ -9,6 +9,7 @@ import {
 	signEngineRequest
 } from '$lib/server/engine';
 import { relayEngineCookies } from '$lib/server/engine-cookies';
+import { sessionToken } from '$lib/server/session-cookie';
 
 const ENGINE_URL = process.env.CORE_INTERNAL_URL;
 
@@ -33,9 +34,12 @@ setInterval(cleanupRateLimitStore, WINDOW_MS).unref();
 export const handle: Handle = async ({ event, resolve }) => {
 	// Every page goes to the setup screen until the engine has an account:
 	// while it is unreachable, in setup mode, or waiting for its first admin.
+	// A request with a session passes an unreachable engine, so the page's own
+	// session check shows the outage page instead.
 	// This is the only setup check. A data request carries the page's own
 	// path here, so client-side navigation is gated the same way.
-	const target = await setupGateRedirect(event.url, event.fetch);
+	const signedIn = sessionToken(event) !== undefined;
+	const target = await setupGateRedirect(event.url, event.fetch, Date.now(), signedIn);
 	if (target) {
 		redirect(303, target);
 	}

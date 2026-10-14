@@ -85,7 +85,7 @@ describe('login/+page.server.ts load', () => {
 
 		const result = await load({ fetch, cookies } as never);
 
-		expect(result).toEqual({ oauthProviders: [], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: [] });
 		expect(cookies.delete).toHaveBeenCalledWith('__Host-sys_session', {
 			path: '/',
 			httpOnly: true,
@@ -132,7 +132,7 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: [], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: [] });
 	});
 
 	it('returns oauthProviders when providers endpoint responds', async () => {
@@ -145,7 +145,7 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: ['github', 'google'], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: ['github', 'google'], samlProviders: [] });
 	});
 
 	it('returns samlProviders when the saml route responds', async () => {
@@ -159,7 +159,7 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: [], samlProviders: ['Azure AD'] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: ['Azure AD'] });
 	});
 
 	// A refused provider route is not an error on the login page: somebody
@@ -175,7 +175,28 @@ describe('login/+page.server.ts load', () => {
 		const cookies = mockCookies();
 
 		const result = await load({ fetch, cookies } as never);
-		expect(result).toEqual({ oauthProviders: [], samlProviders: [] });
+		expect(result).toMatchObject({ oauthProviders: [], samlProviders: [] });
+	});
+
+	// Both recovery routes take POST only, so a GET answers 405 while the
+	// plugin runs and 404 when it does not.
+	it('reads which recovery plugins run from their routes', async () => {
+		const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
+			const s = String(url);
+			if (s.includes('/password-reset/request')) return json({ error: 'not allowed' }, 405);
+			if (s.includes('/magic-link/request')) return json({ error: 'not found' }, 404);
+			return json([]);
+		}) as unknown as typeof globalThis.fetch;
+
+		const result = await load({ fetch, cookies: mockCookies() } as never);
+		expect(result).toMatchObject({ passwordReset: true, magicLink: false });
+	});
+
+	it('keeps both recovery links when the engine does not answer the check', async () => {
+		const fetch = vi.fn(async () => Promise.reject(new TypeError('fetch failed'))) as unknown as typeof globalThis.fetch;
+
+		const result = await load({ fetch, cookies: mockCookies() } as never);
+		expect(result).toMatchObject({ passwordReset: true, magicLink: true });
 	});
 });
 
@@ -436,15 +457,20 @@ describe('login/+page.server.ts actions.default', () => {
 		}) as never) as Promise<{ status: number; data: Record<string, unknown> }>;
 	}
 
-	// The engine answers 422 for a code that does not match and 401 for a
-	// challenge it no longer honors. Both are the code's fault.
-	it.each([
-		[422, 'invalid code'],
-		[401, 'challenge expired'],
-	])('MFA step: reports a %i as an invalid code and keeps the challenge', async (status, message) => {
-		const result = await verify(() => json({ error: message }, status));
+	// The engine answers 422 for a code that does not match. That one is the
+	// code's fault, and the challenge still holds.
+	it('MFA step: reports a 422 as an invalid code and keeps the challenge', async () => {
+		const result = await verify(() => json({ error: 'invalid code' }, 422));
 		expect(result.status).toBe(400);
 		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch-tok' });
+	});
+
+	// A 401 is a challenge the engine no longer honors. No code passes it, so
+	// the form drops it and returns to the password step.
+	it('MFA step: reports a 401 as an expired sign-in and drops the challenge', async () => {
+		const result = await verify(() => json({ error: 'challenge expired', code: 'challenge_expired' }, 401));
+		expect(result.status).toBe(401);
+		expect(result.data).toEqual({ error: 'This sign-in expired. Sign in again.' });
 	});
 
 	// A code the engine never checked may be right. Calling it wrong sends the

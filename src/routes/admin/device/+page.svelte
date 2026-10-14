@@ -6,13 +6,18 @@
 	import { relativeTime } from '$lib/format';
 	import StepUpField from '$lib/components/admin-tokens/StepUpField.svelte';
 	import { expiresIn, rolesLabel, sessionLength, tenantLabel, type DeviceOutcome } from '$lib/device-login';
+	import { BUSY } from '$lib/outage';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	/** A decision just made wins over what the reload read back. */
 	const view = $derived(
-		((form && 'outcome' in form ? form.outcome : undefined) as DeviceOutcome | undefined) ?? data.view
+		((form && 'outcome' in form ? form.outcome : undefined) as DeviceOutcome | 'busy' | 'refused' | undefined) ??
+			data.view
+	);
+	const refusal = $derived(
+		form && 'refusal' in form && typeof form.refusal === 'string' && form.refusal ? form.refusal : data.refusal
 	);
 
 	/** A refused confirmation: the request is still open and the field says why. */
@@ -143,6 +148,11 @@
 					</div>
 				</div>
 			</Card>
+		{:else if view === 'busy'}
+			<Alert tone="warn" title={BUSY.title}>{BUSY.body}</Alert>
+			<Button href="/admin/device?code={encodeURIComponent(data.code)}" variant="secondary">Try again</Button>
+		{:else if view === 'refused'}
+			<Alert tone="warn" title="Device sign-in is not available">{refusal}</Alert>
 		{:else if view === 'error'}
 			<Alert tone="danger" title="The engine did not answer">
 				The sign-in request could not be read, most likely because the database is unavailable. Try again in a
