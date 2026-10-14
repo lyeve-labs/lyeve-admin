@@ -4,6 +4,8 @@
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { RotateCcw, Skull, Trash2, XCircle } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import { formRefusal } from '$lib/api/refusal';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import { eventTone } from './event-tone';
@@ -14,6 +16,9 @@
 	}
 
 	let { form }: Props = $props();
+
+	/** The queue's own writes, whose failures this drawer draws. */
+	const OWN_ACTIONS = ['dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
 
 	let showDeadLetters = $state(false);
 	let deadLetterItems = $state<DeadLetter[]>([]);
@@ -26,6 +31,10 @@
 			showDeadLetters = true;
 		}
 	});
+
+	const failure = $derived(
+		form && OWN_ACTIONS.includes(String(form.action ?? '')) ? (form as { error?: string }) : null,
+	);
 
 	/** What a row's last replay or dismissal came to. `done` means it left the queue. */
 	type Outcome = { text: string; done: boolean };
@@ -58,6 +67,7 @@
 
 <Drawer bind:open={showDeadLetters} title="Dead letter queue" size="xl">
 	{#snippet children()}
+			<FormErrors message={failure?.error || undefined} refused={formRefusal(failure)} />
 			{#if deadLetterItems.length === 0}
 				<EmptyState
 					title="No dead letter entries"

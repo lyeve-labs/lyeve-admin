@@ -295,3 +295,62 @@ describe('admin/webhooks/+page.server.ts rotate-secret', () => {
 		});
 	});
 });
+
+/*
+ * Every one of these actions is the plugin's GroupAdmin route, so any signed
+ * in admin may call it. Each answers a write the plugin accepts, a refusal
+ * under its own action name, and an outage without driver text.
+ */
+describe('admin/webhooks/+page.server.ts reads and writes an admin makes', () => {
+	const cases = {
+		test: { fields: { id: 'w1' }, ok: { success: true, status_code: 200, message: 'OK' }, fallback: 'Failed to test webhook' },
+		deliveries: { fields: { id: 'w1' }, ok: [], fallback: 'Failed to load deliveries' },
+		'retry-delivery': {
+			fields: { id: 'w1', delivery_id: 'd1' },
+			ok: { delivery_id: 'd1', success: true, message: 'Delivered' },
+			fallback: 'Failed to retry delivery',
+		},
+		'dead-letter-replay': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'replayed', http_status: 200 }, fallback: 'Failed to replay dead letter' },
+		'dead-letter-dismiss': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'dismissed' }, fallback: 'Failed to dismiss dead letter' },
+		'dead-letter-delete': { fields: { id: 'dl1' }, ok: null, fallback: 'Failed to delete dead letter' },
+	} as const;
+	const names = Object.keys(cases) as (keyof typeof cases)[];
+
+	it.each(names)('%s succeeds for an admin', async (name) => {
+		const { event, seen } = postEvent(cases[name].fields, () =>
+			cases[name].ok === null ? new Response(null, { status: 204 }) : json(cases[name].ok),
+		);
+		const result = await actions[name](event);
+		expect(seen).toHaveLength(1);
+		// A failure comes back as fail(), which carries a status. A success does not.
+		expect((result as { status?: number } | undefined)?.status).toBeUndefined();
+	});
+
+	it.each(names)('%s names its action on a refusal', async (name) => {
+		const { event } = postEvent(cases[name].fields, () => json({ error: 'dead letter entry is not pending' }, 409));
+		expect(await actions[name](event)).toMatchObject({ status: 400, data: { action: name, error: 'dead letter entry is not pending' } });
+	});
+
+	it.each(names)('%s keeps driver text out of an outage', async (name) => {
+		const { event } = postEvent(cases[name].fields, () => json({ error: 'pq: connection refused' }, 503));
+		expect(await actions[name](event)).toMatchObject({ data: { action: name, error: cases[name].fallback } });
+	});
+
+	it('passes the replay result through, the receiver code included', async () => {
+		const { event } = postEvent({ id: 'dl1' }, () => json({ id: 'dl1', status: 'replayed', http_status: 502 }));
+		expect(await actions['dead-letter-replay'](event)).toEqual({
+			deadLetterReplay: { id: 'dl1', status: 'replayed', http_status: 502 },
+		});
+	});
+
+	it.each([...names, 'dead-letters'] as const)('%s is refused to a session the engine does not sign in', async (name) => {
+		const fetch = vi.fn(async () => json({ error: 'unauthorized' }, 401)) as unknown as typeof globalThis.fetch;
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			request: { formData: async () => new FormData() },
+			url: new URL('http://localhost/admin/webhooks'),
+		} as never;
+		await expect(actions[name](event)).rejects.toBeDefined();
+	});
+});

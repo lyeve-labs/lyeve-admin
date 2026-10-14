@@ -63,10 +63,13 @@
 	 */
 	type Failure = { action?: string; error?: string } | null;
 	const DRAWER_ACTIONS = ['create', 'update'];
+	// The history and the queue draw their own writes' failures inside them,
+	// where the reader clicked, rather than behind the open panel.
+	const OTHER_DRAWERS = ['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
 	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
 	let openedOver = $state.raw<unknown>(null);
 	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
-	const pageForm = $derived(inDrawer ? null : form);
+	const pageForm = $derived(inDrawer || OTHER_DRAWERS.includes((form as Failure)?.action ?? '') ? null : form);
 	const drawerError = $derived((drawerForm as Failure)?.error || undefined);
 	const pageError = $derived((pageForm as Failure)?.error || undefined);
 	const drawerRefusal = $derived(formRefusal(drawerForm));

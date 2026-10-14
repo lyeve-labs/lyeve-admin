@@ -71,8 +71,8 @@ export const load: PageServerLoad = async (event) => {
  * every form, so the drawer shows only its own writes' failures and the page
  * shows the rest.
  */
-function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
-	return fail(failure.status, { ...failure.data, action });
+function tagged(action: string, failure: ActionFailure<Record<string, unknown>>, id?: string) {
+	return fail(failure.status, { ...failure.data, action, ...(id ? { id } : {}) });
 }
 
 export const actions: Actions = {
@@ -132,7 +132,7 @@ export const actions: Actions = {
 			const result = await testWebhook(id, client);
 			return { testResult: { id, ...result } };
 		} catch (err) {
-			return actionFailure(err, 'Failed to test webhook');
+			return tagged('test', actionFailure(err, 'Failed to test webhook'));
 		}
 	},
 
@@ -147,7 +147,7 @@ export const actions: Actions = {
 				const items = await listDeliveries(id, client, 50);
 				return { deliveries: { id, items } };
 			} catch (err) {
-				return actionFailure(err, 'Failed to load deliveries');
+				return tagged('deliveries', actionFailure(err, 'Failed to load deliveries'));
 			}
 		},
 
@@ -185,7 +185,7 @@ export const actions: Actions = {
 				const result = await retryDelivery(id, deliveryId, client);
 				return { retryResult: result };
 			} catch (err) {
-				return actionFailure(err, 'Failed to retry delivery');
+				return tagged('retry-delivery', actionFailure(err, 'Failed to retry delivery'));
 			}
 		},
 
@@ -210,7 +210,7 @@ export const actions: Actions = {
 				);
 				return { deadLetters: rowsOf(res), deadLetterTotal: statedTotal(res) };
 			} catch (err) {
-				return actionFailure(err, 'Failed to load dead letters');
+				return tagged('dead-letters', actionFailure(err, 'Failed to load dead letters'));
 			}
 		},
 
@@ -225,7 +225,7 @@ export const actions: Actions = {
 				const result = await replayDeadLetter(id, client);
 				return { deadLetterReplay: result };
 			} catch (err) {
-				return actionFailure(err, 'Failed to replay dead letter');
+				return tagged('dead-letter-replay', actionFailure(err, 'Failed to replay dead letter'), id);
 			}
 		},
 
@@ -240,7 +240,7 @@ export const actions: Actions = {
 				const result = await dismissDeadLetter(id, client);
 				return { deadLetterDismiss: result };
 			} catch (err) {
-				return actionFailure(err, 'Failed to dismiss dead letter');
+				return tagged('dead-letter-dismiss', actionFailure(err, 'Failed to dismiss dead letter'), id);
 			}
 		},
 
@@ -254,7 +254,7 @@ export const actions: Actions = {
 			try {
 				await deleteDeadLetter(id, client);
 			} catch (err) {
-				return actionFailure(err, 'Failed to delete dead letter');
+				return tagged('dead-letter-delete', actionFailure(err, 'Failed to delete dead letter'), id);
 			}
 		}
 };

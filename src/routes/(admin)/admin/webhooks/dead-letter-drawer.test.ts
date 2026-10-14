@@ -108,3 +108,17 @@ describe('the result of a replay or a dismissal', () => {
 		expect(row?.querySelector('form[action="?/dead-letter-replay"]')).not.toBeNull();
 	});
 });
+
+describe('the queue and its own failures', () => {
+	it('shows a failed replay inside the drawer', async () => {
+		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		await rerender({ form: { action: 'dead-letter-replay', id: 'a', error: 'dead letter entry is not pending' } });
+		expect(dialog()?.textContent).toContain('dead letter entry is not pending');
+	});
+
+	it('ignores a failure of another action', async () => {
+		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		await rerender({ form: { action: 'delete', error: 'Failed to delete webhook' } });
+		expect(dialog()?.textContent).not.toContain('Failed to delete webhook');
+	});
+});

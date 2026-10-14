@@ -226,3 +226,24 @@ describe('a rotated signing secret', () => {
 		expect(values).toContain('c0ffee-secret');
 	});
 });
+
+describe('the failures of the history and the queue', () => {
+	const props = (form: unknown) =>
+		({
+			data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements, user: { roles: ['admin'] } },
+			form,
+		}) as never;
+
+	it.each(['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'])(
+		'leaves a failed %s to its drawer rather than the page behind it',
+		(action) => {
+			const { container } = render(WebhooksPage, { props: props({ action, error: 'refused here' }) });
+			expect(container.textContent).not.toContain('refused here');
+		},
+	);
+
+	it('still reports a queue that could not be opened above the list', () => {
+		const { container } = render(WebhooksPage, { props: props({ action: 'dead-letters', error: 'Failed to load dead letters' }) });
+		expect(container.textContent).toContain('Failed to load dead letters');
+	});
+});
