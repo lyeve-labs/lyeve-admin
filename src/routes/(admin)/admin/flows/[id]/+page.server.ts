@@ -185,9 +185,25 @@ function importFailed<F extends ActionFailure<Record<string, unknown>>>(failure:
 	return fail(failure.status, { ...(failure.data as F['data']), action: 'import' });
 }
 
+/**
+ * The sentence for a 409 the plugin answered in the validation shape: a slug
+ * another flow holds, or an HTTP path another flow answers.
+ */
+function conflictText(errors: ValidationError[]): string {
+	if (errors.some((e) => e.path === '/slug')) return 'Another flow already uses this slug. Choose another.';
+	if (errors.some((e) => e.path === '/config/path')) return 'Another flow already answers this HTTP path. Choose another path for the trigger.';
+	return 'This conflicts with another flow.';
+}
+
 function refused(err: unknown, fallback: string) {
 	if (err instanceof ApiError && err.status === 422) {
 		return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.message) });
+	}
+	// A conflict comes in the validation shape with no error key, so the list
+	// is read the same way and marks what it names on the canvas.
+	if (err instanceof ApiError && err.status === 409) {
+		const errors = validationErrors(err.message);
+		return fail(409, { error: conflictText(errors), errors });
 	}
 	if (err instanceof FlowRefusal) return refusalFailure(err);
 	if (err instanceof ApiError && err.status === 402) {

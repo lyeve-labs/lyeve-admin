@@ -89,12 +89,12 @@
 	import { tick, untrack } from 'svelte';
 	import { formatDuration } from '$lib/flow/time';
 	import { defaultTriggerJSON, statusTone, triggerLabel } from '$lib/flow/triggers';
-	import { blockedText, isBlockedMessage, missingPluginOf } from '$lib/flow/blocked';
+	import { blockedText, isBlockedMessage, missingPluginOf, notEnabledText } from '$lib/flow/blocked';
 	import { flowGrants } from '$lib/flow/permissions';
 	import { draftIsLive, writeButtons } from '$lib/flow/publish';
 	import { describeError } from '$lib/flow/problems';
 	import ProblemsMenu, { type ProblemItem } from '$lib/components/ProblemsMenu.svelte';
-	import { validationErrors, type ValidationError } from '$lib/api/flows';
+	import { FlowRefusal, refusalAware, validationErrors, type ValidationError } from '$lib/api/flows';
 	import { formatDateTime, relativeTime } from '$lib/format';
 	import { useShell } from '$lib/shell.svelte';
 	import { readFocus, writeFocus } from '$lib/flow/prefs';
@@ -203,7 +203,7 @@
 	 * same role and tenant as it does to the page's own reads.
 	 */
 	function browserClient() {
-		return createClient(fetch, csrfHeaders());
+		return createClient(refusalAware(fetch), csrfHeaders());
 	}
 
 	async function validate(snap: string) {
@@ -211,8 +211,11 @@
 		validating = true;
 		try {
 			validation = await validateFlow(browserClient(), flowId, JSON.parse(snap) as FlowDefinition);
-		} catch {
-			// A refused validation is not a broken draft. The save reports it.
+		} catch (err) {
+			// Nodes this instance does not enable are problems on the canvas,
+			// as the save would mark them.
+			if (err instanceof FlowRefusal && err.errors.length > 0) validation = { ok: false, errors: err.errors };
+			// Any other refused validation is not a broken draft. The save reports it.
 		} finally {
 			validating = false;
 		}
@@ -396,6 +399,16 @@
 			tab = 'test';
 			drawerOpen = true;
 		} catch (err) {
+			// A 402 names the nodes this instance does not enable, or none when
+			// flows are not enabled at all. Either is said in the save's words.
+			if (err instanceof FlowRefusal) {
+				if (err.errors.length > 0) {
+					validation = { ok: false, errors: err.errors };
+					showProblems = true;
+				}
+				testError = notEnabledText(err.nodeIds);
+				return;
+			}
 			const message = err instanceof Error ? err.message : '';
 			// The engine refuses a blocked flow with one static message, and a
 			// definition naming a type no started plugin contributes with the

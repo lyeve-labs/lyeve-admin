@@ -308,6 +308,40 @@ describe('admin/flows/[id] actions', () => {
 		expect(result.data.errors[0].node_id).toBe('render');
 	});
 
+	it('save reads a slug another flow holds out of the 409 list', async () => {
+		const form = new FormData();
+		form.set('definition', JSON.stringify(fixtureFlow.draft));
+		form.set('name', 'Orders');
+		form.set('slug', 'taken');
+		const body = { ok: false, errors: [{ path: '/slug', message: 'another flow in this tenant already uses this slug' }] };
+		const { event } = actionEvent(form, { '/api/admin/flows/f1': () => json(body, 409) });
+		const result = (await actions.save(event)) as { status: number; data: { error: string; errors: unknown[] } };
+		expect(result.status).toBe(409);
+		expect(result.data.error).toBe('Another flow already uses this slug. Choose another.');
+		expect(result.data.errors).toEqual(body.errors);
+	});
+
+	it('publish marks the trigger when another flow answers its HTTP path', async () => {
+		const body = { ok: false, errors: [{ node_id: 'trigger', path: '/config/path', message: 'another flow already answers this path' }] };
+		const { event } = actionEvent(new FormData(), { '/api/admin/flows/f1/publish': () => json(body, 409) });
+		const result = (await actions.publish(event)) as { status: number; data: { error: string; errors: { node_id?: string }[] } };
+		expect(result.status).toBe(409);
+		expect(result.data.error).toContain('Another flow already answers this HTTP path');
+		expect(result.data.errors[0].node_id).toBe('trigger');
+		expect(result.data.error).not.toContain('{');
+	});
+
+	it('rollback reads the same 409 list as a publish', async () => {
+		const form = new FormData();
+		form.set('version', '1');
+		const body = { ok: false, errors: [{ node_id: 'trigger', path: '/config/path', message: 'another flow already answers this path' }] };
+		const { event } = actionEvent(form, { '/api/admin/flows/f1/rollback': () => json(body, 409) });
+		const result = (await actions.rollback(event)) as { status: number; data: { error: string; errors: unknown[] } };
+		expect(result.status).toBe(409);
+		expect(result.data.errors).toHaveLength(1);
+		expect(result.data.error).not.toContain('{');
+	});
+
 	it('publish maps a 402 to the locked state', async () => {
 		const { event } = actionEvent(new FormData(), { '/api/admin/flows/f1/publish': () => json({ error: 'nope' }, 402) });
 		const result = (await actions.publish(event)) as { status: number; data: { locked: boolean } };

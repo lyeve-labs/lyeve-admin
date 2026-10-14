@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import type { FlowRefusal } from '$lib/api/flows';
 import type { RefusalNotice } from '$lib/flow/types';
+import { notEnabledText } from '$lib/flow/blocked';
 
 /**
  * What the page renders for a 402 the flow plugin answered, as the plugin
@@ -22,11 +23,10 @@ export function refusalFailure(err: FlowRefusal) {
 	}
 	const nodeIds = err.nodeIds;
 	if (nodeIds.length === 0) {
-		return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
+		return fail(402, { error: notEnabledText(nodeIds), locked: true });
 	}
-	const named = nodeIds.map((id) => (id === 'trigger' ? 'the trigger' : id)).join(', ');
 	return fail(402, {
-		error: `${nodeIds.length === 1 ? 'One element uses' : `${nodeIds.length} elements use`} what this instance does not enable: ${named}.`,
+		error: notEnabledText(nodeIds),
 		refusal: { nodeIds, limit: null, current: null } satisfies RefusalNotice,
 		errors: err.errors,
 	});

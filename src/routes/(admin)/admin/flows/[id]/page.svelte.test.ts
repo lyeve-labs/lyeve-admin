@@ -744,6 +744,42 @@ describe('flow editor page', () => {
 		expect(queryByTestId('run-failure')).toBeNull();
 	});
 
+	it('names the nodes this instance does not enable when a test run is refused with 402', async () => {
+		const refusal = {
+			error: 'payment_required',
+			plugin: 'flow',
+			feature: 'feature:flow-pro',
+			upgrade_url: '',
+			ok: false,
+			errors: [{ node_id: 'orders', path: '/type', message: 'db.query needs flow-pro' }],
+		};
+		fetchMock = vi.fn(async (url: string) => {
+			const refused = String(url).endsWith('/test');
+			return new Response(JSON.stringify(refused ? refusal : { ok: true, errors: [] }), {
+				status: refused ? 402 : 200,
+				headers: { 'content-type': 'application/json' },
+			});
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const { getByRole, getByTestId, container, queryByText } = setup(null, { flow: { ...fixtureFlow, status: 'active', version: 1 } });
+		await fireEvent.click(getByRole('button', { name: 'Test' }));
+		await vi.waitFor(() => expect(getByTestId('flow-problems')).toBeTruthy());
+		expect(container.textContent).toContain('One element uses what this instance does not enable: orders.');
+		expect(container.querySelector('[data-node-id="orders"]')?.className).toContain('border-danger');
+		expect(queryByText('payment_required')).toBeNull();
+	});
+
+	it('says the versions could not be read, offers no rollback and never calls the draft unpublished', () => {
+		const live = { ...fixtureFlow, status: 'active', version: 2 };
+		const { getByTestId, queryByRole, getByRole } = setup(null, { flow: live, versions: { ok: false, gate: { state: 'unavailable' } } });
+		expect(getByTestId('versions-unread').textContent).toContain('The versions could not be read');
+		expect(queryByRole('button', { name: 'Roll back' })).toBeNull();
+		const publish = getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
+		expect(publish.disabled).toBe(false);
+		expect(publish.className).not.toContain('bg-brand');
+		expect(publish.parentElement?.textContent).toContain('this draft may already be live');
+	});
+
 	it('seeds the test trigger of a contributed trigger with its type alone and says where the payload keys go', () => {
 		const flow = { ...fixtureFlow, draft: { ...fixtureFlow.draft, trigger: { type: 'email.bounced', config: { template: 'welcome' } } } };
 		const { container } = setup(null, { flow });
