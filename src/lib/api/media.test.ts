@@ -72,6 +72,10 @@ describe('formatSize', () => {
 		expect(formatSize(3 * 1048576)).toBe('3.0 MB');
 	});
 
+	it('stops at MB, so a large video reads in the unit beside it', () => {
+		expect(formatSize(2 * 1024 ** 3)).toBe('2048.0 MB');
+	});
+
 	it('does not print a negative or missing count', () => {
 		expect(formatSize(-1)).toBe('0 B');
 		expect(formatSize(Number.NaN)).toBe('0 B');

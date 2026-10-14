@@ -108,6 +108,11 @@ describe('Data export jobs', () => {
 		expect(said(container)).toContain('2.0 KB');
 	});
 
+	it('stops a file size at GB', () => {
+		const { container } = render(ExportPage, { props: props({ jobs: [job({ file_size: 2 * 1024 ** 4 })] }) });
+		expect(said(container)).toContain('2048.0 GB');
+	});
+
 	it('names the error on a failed job rather than only the status', () => {
 		const { container } = render(ExportPage, {
 			props: props({ jobs: [job({ status: 'failed', error: 'storage refused the write' })] }),

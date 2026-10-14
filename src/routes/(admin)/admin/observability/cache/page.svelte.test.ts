@@ -131,6 +131,12 @@ describe('response cache rules', () => {
 });
 
 describe('stored entries', () => {
+	it('stops an entry size at GB', () => {
+		const entry = { key: 'page:/', size: 2 * 1024 ** 4, expires_at: '2026-09-23T12:00:00Z', created_at: '2026-09-23T11:00:00Z', ttl_mode: 'fixed', tags: null };
+		const { container } = render(CachePage, { props: props({ superAdmin: true, entries: [entry], total: 1 }) });
+		expect(said(container)).toContain('2048.0 GB');
+	});
+
 	// The counter above read thousands while the list said nothing was cached.
 	it('says the entries could not be read rather than that nothing is cached', () => {
 		const { container } = render(CachePage, {

@@ -160,8 +160,12 @@ export function formatNs(ns: number): string {
 	return `${Math.round(ns)}ns`;
 }
 
-/** Bytes with a binary unit. */
-export function formatBytes(b: number): string {
+/**
+ * Bytes with a binary unit and a sign, for heap figures that can shrink:
+ * `-512 B`, `2 KiB`, `3.00 GiB`. The rest of the admin reads sizes through
+ * the shared byte formatter, which prints KB and never a negative.
+ */
+export function formatSignedBinaryBytes(b: number): string {
 	if (!Number.isFinite(b)) return '';
 	const abs = Math.abs(b);
 	if (abs >= 1024 ** 3) return `${(b / 1024 ** 3).toFixed(2)} GiB`;

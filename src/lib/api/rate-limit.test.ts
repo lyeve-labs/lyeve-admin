@@ -95,8 +95,6 @@ describe('the live counters', () => {
 		expect(exhausted(rows)).toHaveLength(1);
 	});
 
-	// Against the burst, because the burst is the size of the bucket and the
-	// rate is how fast it refills. Two of fifty left is nearly out.
 	it('counts a reset down rather than printing a timestamp', () => {
 		const now = new Date('2026-09-23T12:00:00Z');
 		expect(resetsIn('2026-09-23T12:00:30Z', now)).toBe('30s');

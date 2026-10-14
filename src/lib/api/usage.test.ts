@@ -100,6 +100,10 @@ describe('usage against a limit', () => {
 		expect(limitLabel(1000)).toBe('1,000');
 		expect(limitLabel(2048, true)).toBe('2.0 KB');
 	});
+
+	it('steps a byte limit up to TB', () => {
+		expect(limitLabel(2 * 1024 ** 4, true)).toBe('2.0 TB');
+	});
 });
 
 describe('the queues', () => {
