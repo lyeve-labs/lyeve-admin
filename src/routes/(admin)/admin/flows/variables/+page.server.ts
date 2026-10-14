@@ -11,7 +11,12 @@ import { sessionToken } from '$lib/server/session-cookie';
 
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
 
-/** The most variables one read asks for, which is more than a tenant keeps. */
+/**
+ * The window the read names. The plugin answers every variable whatever
+ * window it is asked for, so this bounds nothing today. It is the window the
+ * flow editor asks for, so the two read the same list should the plugin
+ * start to honor it.
+ */
 const ALL = 500;
 
 /** Whether a variable matches the search: its key, or a value that is not secret. */
