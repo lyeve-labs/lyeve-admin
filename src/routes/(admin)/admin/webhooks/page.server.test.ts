@@ -270,7 +270,7 @@ function postEvent(fields: Record<string, string>, answer: (url: string) => Resp
 	};
 }
 
-describe('admin/webhooks/+page.server.ts rotate-secret', () => {
+describe('rotating a webhook signing secret', () => {
 	// The plugin answers the webhook and the secret it generated, and shows
 	// the secret this once.
 	it('hands the page the new secret and the webhook it signs for', async () => {
@@ -301,7 +301,7 @@ describe('admin/webhooks/+page.server.ts rotate-secret', () => {
  * in admin may call it. Each answers a write the plugin accepts, a refusal
  * under its own action name, and an outage without driver text.
  */
-describe('admin/webhooks/+page.server.ts reads and writes an admin makes', () => {
+describe('the delivery and dead-letter actions each report their own outcome', () => {
 	const cases = {
 		test: { fields: { id: 'w1' }, ok: { success: true, status_code: 200, message: 'OK' }, fallback: 'Failed to test webhook' },
 		deliveries: { fields: { id: 'w1' }, ok: [], fallback: 'Failed to load deliveries' },
