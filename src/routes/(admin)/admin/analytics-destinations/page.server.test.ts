@@ -8,6 +8,7 @@ vi.mock('$lib/server/authz', async (importOriginal) => ({
 	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
 }));
 
+import { assertRole, requireRole } from '$lib/server/authz';
 import { actions, load } from './+page.server';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
@@ -172,5 +173,31 @@ describe('replaying a delivery', () => {
 		const out = (await actions.replay(actionEvent({ id: 'd1' }))) as Failure;
 		expect(out.status).toBe(402);
 		expect(out.data.refused).toMatchObject({ kind: 'feature' });
+	});
+});
+
+describe('deleting a destination', () => {
+	it('deletes the named destination', async () => {
+		engine.delete.mockResolvedValue(undefined);
+		expect(await actions.delete(actionEvent({ id: 'p1' }))).toEqual({ deleted: 'p1' });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/analytics/providers/p1');
+	});
+
+	it('relays the reason the plugin refused with', async () => {
+		engine.delete.mockRejectedValue(new ApiError(404, 'provider not found'));
+		expect(await actions.delete(actionEvent({ id: 'p1' }))).toMatchObject({ status: 400, data: { error: 'provider not found' } });
+	});
+
+	it('keeps driver text out of a delete that meets an outage', async () => {
+		engine.delete.mockRejectedValue(new ApiError(503, 'pq: connection refused'));
+		const out = (await actions.delete(actionEvent({ id: 'p1' }))) as Failure;
+		expect(out.status).toBe(400);
+		expect(String(out.data.error)).not.toContain('pq:');
+	});
+
+	it('refuses an editor before calling the plugin', async () => {
+		vi.mocked(requireRole).mockImplementationOnce(async (_event, roles) => assertRole({ id: 'u2', roles: ['editor'] } as never, roles));
+		await expect(actions.delete(actionEvent({ id: 'p1' }))).rejects.toMatchObject({ status: 403 });
+		expect(engine.delete).not.toHaveBeenCalled();
 	});
 });

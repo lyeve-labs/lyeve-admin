@@ -83,6 +83,12 @@ describe('analytics destinations', () => {
 		expect((document.querySelector('#destination-attempts') as HTMLInputElement).disabled).toBe(true);
 	});
 
+	it('says a replaced config returns the settings the form does not show to their defaults', async () => {
+		setup();
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit Product' }));
+		expect(screen.getByText(/such as a timeout set through the API, to its default/)).toBeTruthy();
+	});
+
 	it('keeps a stored retry policy editable after a lapse, so it can go back to one attempt', async () => {
 		setup({ licensed: false, providers: [provider({ retry_policy: { max_attempts: 3, backoff_seconds: 30 } })] });
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit Product' }));
