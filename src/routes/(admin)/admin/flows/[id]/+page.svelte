@@ -489,8 +489,14 @@
 	// left, and no other action's failure is drawn in it.
 	let importCleared = $state<unknown>(null);
 	const importFailure = $derived.by(() => {
-		const f = form as { action?: unknown; error?: unknown } | null;
-		return f && f !== importCleared && f.action === 'import' && typeof f.error === 'string' ? f.error : undefined;
+		const f = form as { action?: unknown; error?: unknown; refusal?: unknown; locked?: unknown } | null;
+		if (!f || f === importCleared || f.action !== 'import' || typeof f.error !== 'string') return null;
+		return {
+			error: f.error,
+			refusal: f.refusal ? (f.refusal as RefusalNotice) : null,
+			// A refusal of the flow routes as a whole carries no notice, only the flag.
+			refused: !!f.refusal || f.locked === true,
+		};
 	});
 	const importTagged = $derived(!!form && 'action' in form && form.action === 'import');
 	function openImport() {
@@ -1380,7 +1386,13 @@
 			use:enhance={submit.enhance}
 			class="flex flex-col gap-4"
 		>
-			<FormErrors message={importFailure} />
+			<FormErrors message={importFailure?.error} />
+			{#if importFailure?.refused && enableLink}
+				<!-- The notice above the canvas leaves an import's refusal to this
+				     drawer, so the way to raise the limit or enable the feature is
+				     here too. -->
+				<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? (importFailure.refusal?.limit != null ? 'How to raise the limit' : 'How to enable it')}</a>
+			{/if}
 			<input type="hidden" name="slug" value={data.flow.slug} />
 			<p class="text-sm text-muted">The imported definition replaces the draft of this flow. The published version is not touched until you publish again.</p>
 			<FileInput id="import-file" name="file" label="Definition file" accept=".json,.yaml,.yml,application/json,application/yaml" />

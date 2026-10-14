@@ -19,6 +19,14 @@ vi.mock('$app/navigation', () => ({
 	goto: vi.fn(async () => {}),
 }));
 
+// The instance the layout provides, so a refusal has a way to enable to name.
+vi.mock('$lib/instance.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/instance.svelte')>();
+	const { licensingOf } = await import('$lib/api/license');
+	const licensing = licensingOf({ links: [{ rel: 'upgrade', label: 'Turn it on', url: '/admin/settings/license' }], renew: true });
+	return { ...real, useInstance: () => real.instanceFrom(() => ({ licensing })) };
+});
+
 // The kit's confirm renders through a container the layout mounts and this
 // test does not, so the call is captured and answered here.
 const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
@@ -206,6 +214,19 @@ describe('flow editor page', () => {
 		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
 		expect(form.textContent).toContain('Paste a definition or choose a file.');
 		expect(document.body.textContent?.split('Paste a definition or choose a file.').length).toBe(2);
+	});
+
+	// The notice above the canvas leaves an import's refusal to the drawer, so
+	// the way to enable it is drawn there.
+	it('names the way to enable a refused import inside the import drawer', async () => {
+		const { container, getByRole, rerender } = setup();
+		await pickOverflow(getByRole, 'Import');
+		await rerender({
+			form: { action: 'import', error: '7 of 7 flows are in use, the most this instance keeps.', refusal: { nodeIds: [], limit: 7, current: 7 } },
+		} as never);
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).toContain('7 of 7 flows are in use');
+		expect(form.querySelector('a[href="/admin/settings/license"]')?.textContent).toContain('Turn it on');
 	});
 
 	it('validates the draft 500 ms after a change through the flow endpoint', async () => {
