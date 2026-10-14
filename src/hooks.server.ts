@@ -10,6 +10,7 @@ import {
 } from '$lib/server/engine';
 import { relayEngineCookies } from '$lib/server/engine-cookies';
 import { sessionToken } from '$lib/server/session-cookie';
+import { refreshSession } from '$lib/server/session-refresh';
 
 const ENGINE_URL = process.env.CORE_INTERNAL_URL;
 
@@ -43,6 +44,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (target) {
 		redirect(303, target);
 	}
+	await refreshSession(event);
 
 	const response = withMutableHeaders(await resolve(event));
 	response.headers.set('X-Frame-Options', 'DENY');

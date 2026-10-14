@@ -242,3 +242,15 @@ describe('setup actions.create', () => {
 		expect(result).toEqual({ error: 'Setup failed.' });
 	});
 });
+
+describe('setup and the refresh cookie', () => {
+	beforeEach(() => resetRateLimitStore());
+
+	it('drops a refresh token left from an earlier session, since setup answers none', async () => {
+		const fetch = fetchReturning({ user: { id: 'u1' }, token: 'setup-session-token' });
+		const cookies = mockCookies();
+		const valid = { setup_token: 'tok', email: 'a@b.co', password: 'password123', confirm: 'password123' };
+		await catchRedirect(() => actions.create(actionEvent(valid, fetch, cookies)));
+		expect(cookies.delete).toHaveBeenCalledWith('__Host-console_refresh', expect.objectContaining({ path: '/', secure: true }));
+	});
+});

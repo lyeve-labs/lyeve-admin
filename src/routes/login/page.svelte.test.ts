@@ -196,3 +196,17 @@ describe('Login page recovery links', () => {
 		expect(queryByRole('link', { name: /email me a sign-in link/i })).toBeNull();
 	});
 });
+
+describe('Login page after a session ended', () => {
+	it('says the session ended', () => {
+		const { container } = render(LoginPage, {
+			props: props({ data: { oauthProviders: [], samlProviders: [], ended: true } }),
+		});
+		expect(container.textContent).toContain('Your session ended. Sign in again to continue.');
+	});
+
+	it('says nothing of it on an ordinary visit', () => {
+		const { container } = render(LoginPage, { props: props() });
+		expect(container.textContent).not.toContain('Your session ended');
+	});
+});

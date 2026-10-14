@@ -65,7 +65,7 @@ describe('the console frame', () => {
 		expect(r.location).toBe('/login');
 	});
 
-	it('deletes the session cookie and redirects to /login when the engine answers 401', async () => {
+	it('deletes the session cookie and tells the sign-in page the session ended when the engine answers 401', async () => {
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			if (String(url).includes('/api/admin/setup')) return json({ setup_required: false });
 			// /me endpoint: return 401 (invalid/expired token)
@@ -73,8 +73,9 @@ describe('the console frame', () => {
 			return json({});
 		}) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies({ '__Host-sys_session': 'expired-token' });
+		const url = new URL('https://admin.example.com/admin/content/posts?offset=40');
 
-		const r = await catchRedirect(() => load({ fetch, cookies } as never));
+		const r = await catchRedirect(() => load({ fetch, cookies, url } as never));
 
 		// The delete has to repeat the attributes the cookie was set with. A
 		// __Host- cookie cleared without Secure is discarded by the browser, the
@@ -86,7 +87,33 @@ describe('the console frame', () => {
 			sameSite: 'strict',
 		});
 		expect(r.status).toBe(302);
-		expect(r.location).toBe('/login');
+		// The reader returns to the page they were on once they sign in again.
+		expect(r.location).toBe('/login?ended=1&next=%2Fadmin%2Fcontent%2Fposts%3Foffset%3D40');
+	});
+
+	// SvelteKit re-runs a load that read the address on every navigation, and
+	// the shell's reads would then repeat on every page. A standing session
+	// must not touch it.
+	it('does not read the address while the session stands', async () => {
+		const user = { id: 'u1', email: 'a@b.co', roles: ['editor'], tenant_id: 't', disabled: false, created_at: '' };
+		const fetch = vi.fn(async (url: string, _init: RequestInit) =>
+			String(url).includes('/api/admin/auth/me') ? json(user) : json({})
+		) as unknown as typeof globalThis.fetch;
+		let read = false;
+		const url = new URL('https://admin.example.com/admin/users');
+		for (const property of ['href', 'pathname', 'search', 'searchParams']) {
+			const value = url[property as keyof URL];
+			Object.defineProperty(url, property, {
+				get: () => {
+					read = true;
+					return value;
+				},
+			});
+		}
+
+		await load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'valid-token' }), url } as never);
+
+		expect(read).toBe(false);
 	});
 
 	/*

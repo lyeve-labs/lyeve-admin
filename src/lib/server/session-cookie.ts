@@ -75,3 +75,46 @@ export function clearSessionCookie(event: SessionEvent): void {
 	event.cookies.delete(SESSION_COOKIE_INSECURE, attrs(false));
 	if (event.cookies.get(SESSION_COOKIE)) event.cookies.delete(SESSION_COOKIE, attrs(true));
 }
+
+/*
+ * The refresh token the engine answers beside the session token on a password
+ * or second-factor sign-in. It is the console's own cookie: the engine never
+ * reads it, and the console trades it for a new session token before the old
+ * one expires. Its name follows the scheme the way the session cookie's does.
+ */
+export const REFRESH_COOKIE = '__Host-console_refresh';
+export const REFRESH_COOKIE_INSECURE = 'console_refresh';
+
+/** The refresh token the browser presented, or undefined. Read like the session token. */
+export function refreshToken(event: SessionRead): string | undefined {
+	if (isSecure(event)) return event.cookies.get(REFRESH_COOKIE) || undefined;
+	return event.cookies.get(REFRESH_COOKIE_INSECURE) || event.cookies.get(REFRESH_COOKIE) || undefined;
+}
+
+/**
+ * Keeps the refresh token a sign-in answered. A sign-in that answered none
+ * clears the cookie instead, so a refresh token left from an earlier session
+ * can never renew this one.
+ *
+ * The engine keeps a refresh family for 30 days by default and does not say
+ * when this token expires. The cookie lasts a day and is written again at
+ * every trade, so it is a 24-hour idle limit inside the engine's own limit.
+ */
+export function setRefreshCookie(event: SessionEvent, token: string | undefined): void {
+	if (!token) {
+		clearRefreshCookie(event);
+		return;
+	}
+	const secure = isSecure(event);
+	event.cookies.set(secure ? REFRESH_COOKIE : REFRESH_COOKIE_INSECURE, token, { ...attrs(secure), maxAge: 86400 });
+}
+
+/** Clears the refresh token under both names, as `clearSessionCookie` does. */
+export function clearRefreshCookie(event: SessionEvent): void {
+	if (isSecure(event)) {
+		event.cookies.delete(REFRESH_COOKIE, attrs(true));
+		return;
+	}
+	event.cookies.delete(REFRESH_COOKIE_INSECURE, attrs(false));
+	if (event.cookies.get(REFRESH_COOKIE)) event.cookies.delete(REFRESH_COOKIE, attrs(true));
+}
