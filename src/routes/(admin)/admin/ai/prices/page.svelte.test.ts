@@ -80,6 +80,11 @@ describe('AI prices page', () => {
 		expect(document.body.textContent?.split('Model is required.').length).toBe(2);
 	});
 
+	it('offers no new price while the layout says AI is off, even with a list answered', () => {
+		const { queryByRole } = setup({ aiLayoutGate: { state: 'off' } });
+		expect(queryByRole('button', { name: /new price/i })).toBeNull();
+	});
+
 	it('paints the empty state and the off state', () => {
 		const empty = setup({ prices: [] });
 		expect(empty.getByText('No prices yet')).toBeTruthy();

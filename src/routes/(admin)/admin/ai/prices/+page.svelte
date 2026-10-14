@@ -9,7 +9,7 @@
 	import type { ModelPrice } from '$lib/api/ai';
 	import AiSection from '$lib/components/ai/AiSection.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import { PROVIDER_KINDS, providerKindLabel } from '$lib/api/ai';
+	import { PROVIDER_KINDS, effectiveGate, providerKindLabel } from '$lib/api/ai';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 
@@ -88,7 +88,10 @@
 		deleteForm?.requestSubmit();
 	}
 
-	const canWrite = $derived(data.isSuperAdmin && data.gate.state === 'ok');
+	// The layout's word on the plugin wins over the page's, as it does for the
+	// section around the list, so a plugin the layout says is off or absent
+	// offers no write here either.
+	const canWrite = $derived(data.isSuperAdmin && effectiveGate(data.gate, data.aiLayoutGate).state === 'ok');
 
 	const save = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
