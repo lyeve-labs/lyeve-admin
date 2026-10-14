@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { actions, load } from './+page.server';
+import { forbiddenText } from '$lib/api/gate';
+import { BUSY, OUTAGE } from '$lib/outage';
 import { blockedFlow, fixtureCatalog, fixtureEventTypes, fixtureFlow, fixtureRun, fixtureTemplates, joinFlow, missingTypeErrors, withLocked } from '$lib/flow/fixtures';
 import type { FlowRun, FlowVersion } from '$lib/api/flows';
 import type { FlowOption, NodeSpec } from '$lib/flow/types';
@@ -155,6 +157,23 @@ describe('admin/flows/[id] load', () => {
 		expect(err.body.message).not.toContain('not found');
 	});
 
+	it('sends an outage to the outage page and a refused rate to the busy sentence', async () => {
+		const gateway = (await Promise.resolve(load(loadEvent({ '/api/admin/flows/f1': () => json({ error: 'bad gateway' }, 504) }).event)).catch(
+			(e: unknown) => e,
+		)) as { status: number; body: { message: string } };
+		expect(gateway).toMatchObject({ status: 503, body: { message: OUTAGE.title } });
+		const busy = (await Promise.resolve(load(loadEvent({ '/api/admin/flows/f1': () => json({ error: 'slow down' }, 429) }).event)).catch(
+			(e: unknown) => e,
+		)) as { status: number; body: { message: string } };
+		expect(busy).toMatchObject({ status: 429, body: { message: BUSY.body } });
+	});
+
+	it('says in the load when the versions could not be read, never an empty history', async () => {
+		const { event } = loadEvent({ ...everything, '/api/admin/flows/f1/versions': () => json({ error: 'down' }, 503) });
+		const result = (await load(event)) as Loaded;
+		expect(result.versions).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
 	it('sends an expired session to the login page with the cookie cleared', async () => {
 		const { event } = loadEvent({ '/api/admin/flows/f1': () => json({ error: 'unauthorized' }, 401) });
 		await expect(load(event)).rejects.toMatchObject({ status: 302, location: '/login' });
@@ -163,7 +182,7 @@ describe('admin/flows/[id] load', () => {
 
 	it('answers a refused role with 403 and names the role as the reason', async () => {
 		const { event } = loadEvent({ '/api/admin/flows/f1': () => json({ error: 'forbidden' }, 403) });
-		await expect(load(event)).rejects.toMatchObject({ status: 403, body: { message: 'Your role cannot read flows' } });
+		await expect(load(event)).rejects.toMatchObject({ status: 403, body: { message: forbiddenText('this page') } });
 	});
 
 	it('offers the Assistant tab when the catalog for a model can be read, and hides it on a 402', async () => {

@@ -11,6 +11,7 @@ import { refusalFailure } from '$lib/server/flow-refusal';
 import { assistRefusal, catalogFor, refusalStatus } from '$lib/server/flow-assist';
 import { CatalogError, assistFlow, explainFlow, getLLMCatalog, type AssistProblem } from '$lib/api/assist';
 import { clearSessionCookie } from '$lib/server/session-cookie';
+import { readError } from '$lib/server/read-error';
 import {
 	ImportError,
 	FlowRefusal,
@@ -64,21 +65,6 @@ const LOCKED = {
 	assistant: 'hidden' as const,
 };
 
-/**
- * The status a failed read answers with. Only a 404 means the flow is gone.
- * Anything else is the engine, the session or the network, and telling the
- * operator "not found" for a 503 sends them looking for a flow that exists.
- * The message is static so driver text never reaches the page.
- */
-function loadStatus(err: unknown): { status: number; message: string } {
-	if (err instanceof ApiError) {
-		if (err.status === 404) return { status: 404, message: 'Flow not found' };
-		if (err.status === 403) return { status: 403, message: 'Your role cannot read flows' };
-		if (err.status >= 400 && err.status < 600) return { status: err.status, message: 'The flow could not be read from the engine' };
-	}
-	return { status: 502, message: 'The flow could not be read from the engine' };
-}
-
 export const load: PageServerLoad = async (event) => {
 	const { fetch, cookies, params, url } = event;
 	const client = authedClient(event);
@@ -93,8 +79,7 @@ export const load: PageServerLoad = async (event) => {
 			clearSessionCookie({ cookies, url });
 			redirect(302, '/login');
 		}
-		const { status, message } = loadStatus(err);
-		error(status, message);
+		readError(err, 'Flow not found');
 	}
 	if (!flow?.id) error(404, 'Flow not found');
 
