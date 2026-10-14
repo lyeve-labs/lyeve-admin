@@ -127,7 +127,6 @@ export const IMPORT_FORMAT_LABELS: Readonly<Record<ImportFormat, string>> = {
  */
 export const MAX_IMPORT_COLUMNS = 1024;
 export const MAX_IMPORT_CELLS = 5_000_000;
-export const MAX_IMPORT_ROWS = 100_000;
 
 /**
  * The codes the plugin gives the two bounds a file can pass. Every parse
@@ -511,13 +510,6 @@ export function suggestMapping(columns: readonly string[], targets: readonly Map
 		out[t.value] = pick;
 	}
 	return out;
-}
-
-/** The mappings a choice of columns describes, leaving out unmapped targets. */
-export function mappingsFrom(chosen: Record<string, string>, targets: readonly MappingTarget[]): FieldMapping[] {
-	return targets
-		.filter((t) => chosen[t.value])
-		.map((t) => ({ source_field: chosen[t.value], target_field: t.value, data_type: t.dataType }));
 }
 
 /** Reads a file into the base64 the engine takes. */

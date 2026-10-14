@@ -218,18 +218,6 @@ export function exhausted(states: readonly LimiterState[]): LimiterState[] {
 	return states.filter((s) => s.remaining <= 0);
 }
 
-/**
- * How close a caller is to its limit, as a fraction of the burst.
- *
- * Against the burst rather than the rate, because the burst is the size of the
- * bucket and the rate is how fast it refills. A caller with two of fifty left
- * is nearly out. The rate does not say that.
- */
-export function headroom(state: LimiterState): number {
-	if (state.burst <= 0) return 0;
-	return Math.max(0, Math.min(1, state.remaining / state.burst));
-}
-
 /** A reset time as a countdown, which is what a person reading it wants. */
 export function resetsIn(when: string, now: Date = new Date()): string {
 	const at = Date.parse(when);

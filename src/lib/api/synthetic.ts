@@ -134,16 +134,6 @@ export async function listOpenAlerts(client: HttpClient, limit = 50): Promise<Li
 	);
 }
 
-export async function listResults(
-	client: HttpClient,
-	probeId: string,
-	limit = 20
-): Promise<ListEnvelope<ProbeResult>> {
-	return client.get<ListEnvelope<ProbeResult>>(
-		`${PROBES_URL}/${encodeURIComponent(probeId)}/results?limit=${limit}&offset=0`
-	);
-}
-
 export interface SaveProbe {
 	name: string;
 	type: ProbeType;

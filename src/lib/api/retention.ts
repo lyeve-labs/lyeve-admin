@@ -22,7 +22,6 @@ import type { ListEnvelope } from './list';
 export const POLICIES_URL = '/api/admin/retention-policies';
 export const HOLDS_URL = '/api/admin/legal-holds';
 export const ENFORCE_URL = '/api/admin/retention/enforce';
-export const EXPORT_URL = '/api/admin/retention/compliance-export';
 
 export interface RetentionPolicy {
 	id: string;

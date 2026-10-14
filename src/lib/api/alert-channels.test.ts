@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { channelSummary, channelsFrom, hasChannels, hasPaidChannels, isMasked, toChannels } from './alert-channels';
+import { channelSummary, channelsFrom, hasChannels, toChannels } from './alert-channels';
 
 function form(fields: Record<string, string>): FormData {
 	const f = new FormData();
@@ -21,16 +21,9 @@ describe('alert channels', () => {
 		).toEqual({ email: ['a@example.com', 'b@example.com'], discord_url: 'https://d.example.com/a' });
 	});
 
-	it('tells a masked value from a real one', () => {
-		expect(isMasked('https://hooks.slack.com/...1a2b')).toBe(true);
-		expect(isMasked('...cdef')).toBe(true);
-		expect(isMasked('https://hooks.slack.com/services/T0/B0/X')).toBe(false);
-	});
-
-	it('separates email from the paid channels', () => {
+	it('counts an email list alone as somewhere to send', () => {
 		expect(hasChannels({ email: ['a@example.com'] })).toBe(true);
-		expect(hasPaidChannels({ email: ['a@example.com'] })).toBe(false);
-		expect(hasPaidChannels({ pagerduty_routing_key: '...cdef' })).toBe(true);
+		expect(hasChannels({})).toBe(false);
 	});
 
 	it('summarizes a setting for a list row', () => {

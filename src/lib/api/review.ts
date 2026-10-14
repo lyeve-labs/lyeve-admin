@@ -259,11 +259,6 @@ export function approvalsNeeded(stage: Pick<ReviewStage, 'quorum'> | null | unde
 	return stage && stage.quorum > 1 ? stage.quorum : 1;
 }
 
-/** Whether a stage carries any setting the plugin may refuse without its license. */
-export function usesPaidSettings(stage: StageInput | ReviewStage): boolean {
-	return (stage.quorum ?? 0) > 1 || !!stage.escalate_to_user_id || !!stage.escalate_to_role || !!stage.condition;
-}
-
 export function toAssignment(raw: Record<string, unknown>): ReviewAssignment {
 	return {
 		id: str(raw.id),
@@ -382,16 +377,6 @@ export async function listAssignments(
 export function getAssignmentByEntry(client: HttpClient, entryId: string): Promise<ReviewAssignment> {
 	return client
 		.get<Record<string, unknown>>(`/api/admin/review/entries/${encodeURIComponent(entryId)}/assignment`)
-		.then(toAssignment);
-}
-
-/**
- * One assignment, with every assignee and who has approved its current
- * stage. The by-entry read leaves both out.
- */
-export function getAssignment(client: HttpClient, id: string): Promise<ReviewAssignment> {
-	return client
-		.get<Record<string, unknown>>(`/api/admin/review/assignments/${encodeURIComponent(id)}`)
 		.then(toAssignment);
 }
 

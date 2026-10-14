@@ -43,26 +43,12 @@ const TEXT: Record<string, string> = {
 	output: 'text-fg',
 };
 
-/** The solid stripe down a node card's left edge. */
-const STRIPE: Record<string, string> = {
-	trigger: 'bg-brand',
-	data: 'bg-violet',
-	integration: 'bg-brand-deep',
-	transform: 'bg-success',
-	control: 'bg-warn',
-	output: 'bg-muted',
-};
-
 export function categoryIcon(category: string | undefined): CategoryIcon {
 	return ICON[category ?? ''] ?? Puzzle;
 }
 
 export function categoryText(category: string | undefined): string {
 	return TEXT[category ?? ''] ?? 'text-muted';
-}
-
-export function categoryStripe(category: string | undefined): string {
-	return STRIPE[category ?? ''] ?? 'bg-muted';
 }
 
 export function categoryLabel(category: string): string {

@@ -51,12 +51,9 @@ export interface DashboardLayout {
 	updated_at: string | null;
 }
 
-export const STOCK_LAYOUT: DashboardLayout = { entitled: false, custom: false, widgets: [], updated_at: null };
-
 /** The most widgets one dashboard holds. The engine refuses more. */
 export const MAX_WIDGETS = 24;
 export const MAX_WIDGET_ROWS = 20;
-export const MAX_WIDGET_SCHEMAS = 12;
 
 export interface WidgetKind {
 	type: WidgetType;

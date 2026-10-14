@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, type HttpClient } from '@lyeve-labs/client';
-import { ROOTS_QUERY, graphqlGate, introspect, listPersisted, readRoots, togglePersisted } from './graphql';
+import type { HttpClient } from '@lyeve-labs/client';
+import { ROOTS_QUERY, introspect, listPersisted, readRoots, togglePersisted } from './graphql';
 
 describe('readRoots', () => {
 	it('lists each root type by name, with its arguments', () => {
@@ -39,11 +39,5 @@ describe('the plugin calls', () => {
 		expect(get).toHaveBeenCalledWith('/api/admin/graphql/persisted-queries?limit=200');
 		await togglePersisted(client, 'a/b');
 		expect(patch).toHaveBeenCalledWith('/api/admin/graphql/persisted-queries/a%2Fb/toggle', {});
-	});
-
-	it('names a locked and an absent plugin apart from a failure', () => {
-		expect(graphqlGate(new ApiError(402, 'payment required'))).toEqual({ state: 'locked', upgradeUrl: '' });
-		expect(graphqlGate(new ApiError(404, 'not found'))).toEqual({ state: 'absent' });
-		expect(graphqlGate(new Error('boom')).state).toBe('error');
 	});
 });

@@ -17,7 +17,6 @@ import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const PROVIDERS_URL = '/api/admin/storage/providers';
-export const HEALTH_URL = '/api/admin/storage/health';
 
 export const PROVIDER_TYPES = ['s3', 'gcs', 'azure_blob', 'minio', 'local'] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
