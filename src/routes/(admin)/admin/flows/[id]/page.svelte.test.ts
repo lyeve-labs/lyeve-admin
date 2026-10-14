@@ -770,7 +770,7 @@ describe('flow editor page', () => {
 		conversation_id: 'c1',
 		model: 'gpt-4.1',
 		tokens: 1234,
-		cost: 0.0031,
+		cost: '0.003100',
 	};
 
 	it('hides the Assistant tab when the catalog for a model answered 402', () => {
@@ -867,7 +867,7 @@ describe('flow editor page', () => {
 		const { getByTestId } = setup({
 			explain: {
 				subject: 'join',
-				answer: { answer: '## Join\n\nIt **joins** `orders` to shipments.\n\n<img src=x onerror="alert(1)">\n\n- left key\n- right key', model: 'm', tokens: 40, cost: 0.0002 },
+				answer: { answer: '## Join\n\nIt **joins** `orders` to shipments.\n\n<img src=x onerror="alert(1)">\n\n- left key\n- right key', model: 'm', tokens: 40, cost: '0.000200' },
 			},
 		});
 		const panel = getByTestId('assist-answer');
