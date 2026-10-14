@@ -27,6 +27,24 @@ describe('RunViewer', () => {
 		expect(container.textContent).not.toContain('join: right_key missing on 3 rows');
 	});
 
+	// The plugin serves a run whose values the reader may not see with
+	// withheld set and every input, output and error emptied.
+	it('says the values are withheld and still shows that the run failed', () => {
+		const withheld = {
+			...fixtureRun,
+			withheld: true,
+			input: null,
+			output: null,
+			error: '',
+			steps: steps.map((s) => ({ ...s, input: null, output: null, error: '' })),
+		};
+		const { container } = render(RunViewer, { props: { run: withheld } });
+		expect(screen.getByTestId('run-withheld').textContent).toContain('Your access does not cover what this run read');
+		expect(screen.getByTestId('run-failure').textContent).toContain('Run failed at join');
+		expect(container.textContent).toContain('Withheld from you.');
+		expect(container.textContent).not.toContain('null');
+	});
+
 	it('leads back to the failed step from another one', async () => {
 		render(RunViewer, { props: { run: fixtureRun, focus: 'orders' } });
 		expect(stepButton('orders').getAttribute('aria-pressed')).toBe('true');

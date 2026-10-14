@@ -8,7 +8,12 @@
 	import { ICON } from '$lib/icon';
 
 	interface Props {
-		run: FlowRun | null;
+		/**
+		 * The run as the plugin served it. `withheld` says the reader's own
+		 * access does not cover what the run read, so every input, output and
+		 * error came back empty.
+		 */
+		run: (FlowRun & { withheld?: boolean }) | null;
 		/** The step to open first. The reader picks another from the list. */
 		focus?: string | null;
 		/** Runs the test again with the same input. */
@@ -25,7 +30,10 @@
 
 	const steps = $derived(run?.steps ?? []);
 
-	const failed = $derived(steps.find((s) => s.status === 'failed' && !!s.error) ?? null);
+	const withheld = $derived(run?.withheld === true);
+
+	// A withheld run carries no error text, so its status says it failed.
+	const failed = $derived(steps.find((s) => s.status === 'failed' && (!!s.error || withheld)) ?? null);
 
 	const current = $derived.by<RunStep | null>(() => {
 		const want = picked ?? focus;
@@ -82,7 +90,14 @@
 		     only says where to look, and carries the text itself only when no
 		     step owns it: a timeout or a refused trigger fails the run as a
 		     whole. -->
-		{#if run.error}
+		{#if withheld}
+			<div class="shrink-0 px-4 pt-3" data-testid="run-withheld">
+				<Alert tone="info" title="Values withheld">
+					{#snippet children()}Your access does not cover what this run read, so its inputs, outputs and errors are not shown.{/snippet}
+				</Alert>
+			</div>
+		{/if}
+		{#if run.error || (withheld && run.status === 'failed')}
 			<div class="shrink-0 px-4 pt-3" data-testid="run-failure">
 				<Alert tone="danger">
 					{#snippet children()}
@@ -92,7 +107,7 @@
 								<button type="button" class="underline hover:text-fg" onclick={() => (picked = failed.node_id)}>Show the step</button>
 							{/if}
 						{:else}
-							{run.error}
+							{run.error || 'The run failed.'}
 						{/if}
 					{/snippet}
 				</Alert>
@@ -155,7 +170,9 @@
 
 {#snippet valueBox(value: unknown)}
 	<div class="max-h-80 overflow-auto rounded-md border border-line bg-surface-2 p-3">
-		{#if view === 'tree'}
+		{#if withheld}
+			<p class="text-xs text-muted">Withheld from you.</p>
+		{:else if view === 'tree'}
 			<JsonTree {value} />
 		{:else}
 			<pre class="font-mono text-xs text-fg">{pretty(value)}</pre>
