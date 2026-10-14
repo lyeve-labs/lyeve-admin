@@ -12,7 +12,7 @@
 		Table,
 	} from '@lyeve-labs/ui-kit';
 	import { TrendingUp, Gauge, Globe, Server } from '@lucide/svelte';
-	import { NO_VALUE, formatCount, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatBytes, formatCount, formatDateTime } from '$lib/format';
 	import type { PageData } from './$types';
 	import type { BreakdownItem, Summary } from '@lyeve-labs/client-rest';
 	import { ICON } from '$lib/icon';
@@ -57,12 +57,6 @@
 
 	function fmtPct(fraction: number): string {
 		return `${(fraction * 100).toFixed(2)}%`;
-	}
-
-	function fmtBytes(b: number): string {
-		if (b >= 1_048_576) return `${(b / 1_048_576).toFixed(1)} MB`;
-		if (b >= 1024) return `${(b / 1024).toFixed(1)} KB`;
-		return `${Math.round(b)} B`;
 	}
 
 	function errorRateVariant(rate: number): 'danger' | 'warn' | 'success' {
@@ -278,7 +272,7 @@
 								<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtMs(item.avg_latency_p95_ms)}</td>
 								<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtMs(item.max_latency_p99_ms)}</td>
 								<td data-cell="nowrap" class="text-right font-mono text-xs">
-									<span class="text-faint">{fmtBytes(item.request_size_avg_bytes)}</span>
+									<span class="text-faint">{formatBytes(item.request_size_avg_bytes, 'MB')}</span>
 								</td>
 							</tr>
 						{/each}

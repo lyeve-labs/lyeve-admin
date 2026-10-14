@@ -271,19 +271,6 @@ export function downloadable(job: ExportJob): boolean {
 	return job.status === 'completed' && !!job.file_key;
 }
 
-/** A byte count a person can read. */
-export function fileSize(bytes: number): string {
-	if (bytes <= 0) return '0 B';
-	const units = ['B', 'KB', 'MB', 'GB'];
-	let n = bytes;
-	let i = 0;
-	while (n >= 1024 && i < units.length - 1) {
-		n /= 1024;
-		i += 1;
-	}
-	return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
-}
-
 /**
  * What a schedule covers, in words.
  *

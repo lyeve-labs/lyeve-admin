@@ -30,7 +30,6 @@
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		blocked,
-		bytes,
 		bytesToGib,
 		enforcementLabel,
 		enforcementTone,
@@ -45,7 +44,7 @@
 		type Quota,
 		type QuotaRequest,
 	} from '$lib/api/usage';
-	import { formatDateTime, formatCount } from '$lib/format';
+	import { formatBytes, formatDateTime, formatCount } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -291,7 +290,7 @@
 										{storePct === null ? limitLabel(q.storage_bytes_limit, true) : `${storePct}%`}
 									</Badge>
 									{#if used}
-										<div class="text-xs text-faint">{bytes(used.storage_bytes)} used</div>
+										<div class="text-xs text-faint">{formatBytes(used.storage_bytes)} used</div>
 									{/if}
 								</td>
 								<td data-cell="nowrap">
@@ -301,7 +300,7 @@
 											: `${bandPct}%`}
 									</Badge>
 									{#if used}
-										<div class="text-xs text-faint">{bytes(used.bandwidth_bytes)} used</div>
+										<div class="text-xs text-faint">{formatBytes(used.bandwidth_bytes)} used</div>
 									{/if}
 								</td>
 								<td data-cell="nowrap">
@@ -366,10 +365,10 @@
 										<div>{formatCount(r.requests_limit)} API calls</div>
 									{/if}
 									{#if r.storage_bytes_limit}
-										<div>{bytes(r.storage_bytes_limit)} storage</div>
+										<div>{formatBytes(r.storage_bytes_limit)} storage</div>
 									{/if}
 									{#if r.bandwidth_bytes_limit}
-										<div>{bytes(r.bandwidth_bytes_limit)} bandwidth</div>
+										<div>{formatBytes(r.bandwidth_bytes_limit)} bandwidth</div>
 									{/if}
 								</td>
 								<td class="max-w-sm text-xs text-faint">{r.reason}</td>

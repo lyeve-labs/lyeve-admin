@@ -8,6 +8,7 @@
  * inline, where the two are one character apart.
  */
 import type { HttpClient } from '@lyeve-labs/client';
+import { formatBytes } from '$lib/format';
 
 /** One row of the media library as the engine lists it. */
 export interface MediaItem {
@@ -109,12 +110,12 @@ export function mediaKindLabel(kind: MediaKind): string {
 	}
 }
 
-/** A byte count in the unit an operator reads it in. */
+/**
+ * A file's size in the unit an operator reads it in. The library stops at MB,
+ * so a 2 GB video reads `2048.0 MB`, the same as every size beside it.
+ */
 export function formatSize(bytes: number): string {
-	if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / 1048576).toFixed(1)} MB`;
+	return formatBytes(bytes, 'MB');
 }
 
 /** `1920 x 1080`, or an empty string when the engine recorded no dimensions. */

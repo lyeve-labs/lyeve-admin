@@ -3,7 +3,6 @@ import { ApiError } from '@lyeve-labs/client';
 import {
 	downloadable,
 	exportGate,
-	fileSize,
 	jobProgress,
 	jobTone,
 	scheduleState,
@@ -91,22 +90,6 @@ describe('downloadable', () => {
 
 	it('is true only for a completed job with a file', () => {
 		expect(downloadable(job())).toBe(true);
-	});
-});
-
-describe('fileSize', () => {
-	it('reads as bytes below a kilobyte, with no decimal', () => {
-		expect(fileSize(512)).toBe('512 B');
-	});
-
-	it('climbs the units', () => {
-		expect(fileSize(2048)).toBe('2.0 KB');
-		expect(fileSize(5 * 1024 * 1024)).toBe('5.0 MB');
-	});
-
-	it('does not render a negative or empty file as a unit', () => {
-		expect(fileSize(0)).toBe('0 B');
-		expect(fileSize(-1)).toBe('0 B');
 	});
 });
 

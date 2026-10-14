@@ -31,7 +31,6 @@
 		ruleCount,
 		ttlLabel,
 		type CacheRule,
-		bytes,
 		circuitState,
 		circuitTone,
 		fullness,
@@ -41,7 +40,7 @@
 		underPressure,
 		type CacheProvider,
 	} from '$lib/api/cache';
-	import { formatDateTime } from '$lib/format';
+	import { formatBytes, formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -498,7 +497,7 @@
 						{#each data.entries as e (e.key)}
 							<tr>
 								<td class="max-w-md truncate font-mono text-xs" title={e.key}>{e.key}</td>
-								<td data-cell="nowrap" class="font-mono text-xs">{bytes(e.size)}</td>
+								<td data-cell="nowrap" class="font-mono text-xs">{formatBytes(e.size, 'GB')}</td>
 								<td data-cell="nowrap" class="text-xs text-faint">
 									{(e.tags ?? []).join(', ') || '-'}
 								</td>

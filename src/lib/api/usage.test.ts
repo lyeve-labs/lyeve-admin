@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
 	blocked,
-	bytes,
 	enforcementLabel,
 	enforcementTone,
 	enforces,
@@ -111,15 +110,6 @@ describe('the queues', () => {
 	it('finds the requests still waiting on somebody', () => {
 		const rows = [request(), request({ id: 'r2', status: 'approved' })];
 		expect(pending(rows).map((r) => r.id)).toEqual(['r1']);
-	});
-});
-
-describe('bytes', () => {
-	it('reads at the largest unit that fits', () => {
-		expect(bytes(512)).toBe('512 B');
-		expect(bytes(10_737_418_240)).toBe('10.0 GB');
-		expect(bytes(0)).toBe('0 B');
-		expect(bytes(null)).toBe('0 B');
 	});
 });
 

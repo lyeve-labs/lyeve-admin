@@ -305,19 +305,6 @@ export function trippedProviders(providers: readonly CacheProvider[]): CacheProv
 	return providers.filter((p) => circuitState(p) === 'open');
 }
 
-/** A byte count a person can read. */
-export function bytes(size: number | null | undefined): string {
-	if (size === null || size === undefined || !Number.isFinite(size) || size <= 0) return '0 B';
-	const units = ['B', 'KB', 'MB', 'GB'];
-	let n = size;
-	let i = 0;
-	while (n >= 1024 && i < units.length - 1) {
-		n /= 1024;
-		i += 1;
-	}
-	return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
-}
-
 /** Every tag in use, so a targeted flush can offer them rather than ask. */
 export function tagsOf(entries: readonly CacheEntry[]): string[] {
 	const seen = new Set<string>();

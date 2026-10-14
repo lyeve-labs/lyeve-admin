@@ -34,14 +34,13 @@
 		active,
 		cronLabel,
 		downloadable,
-		fileSize,
 		jobProgress,
 		jobTone,
 		scheduleState,
 		stageText,
 		type ExportSchedule,
 	} from '$lib/api/data-export';
-	import { NO_VALUE, formatCount, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatBytes, formatCount, formatDateTime } from '$lib/format';
 	import { submitter } from '$lib/forms.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
@@ -316,7 +315,7 @@
 										{#if job.rows_total > 0}<span class="text-faint"> of {formatCount(job.rows_total)}</span>{/if}
 									</td>
 									<td data-cell="nowrap" class="text-xs"
-										>{job.file_size > 0 ? fileSize(job.file_size) : NO_VALUE}</td
+										>{job.file_size > 0 ? formatBytes(job.file_size, 'GB') : NO_VALUE}</td
 									>
 									<td>
 										<div class="flex items-center justify-end gap-2">

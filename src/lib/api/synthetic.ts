@@ -319,13 +319,6 @@ export function everyLabel(seconds: number): string {
 	return `Every ${seconds} seconds`;
 }
 
-/** A response time, at the precision it was measured. */
-export function millis(ms: number | null | undefined): string {
-	if (ms === null || ms === undefined || !Number.isFinite(ms)) return '-';
-	if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
-	return `${Math.round(ms)} ms`;
-}
-
 /**
  * The one line under a probe's name: what it checks.
  *
