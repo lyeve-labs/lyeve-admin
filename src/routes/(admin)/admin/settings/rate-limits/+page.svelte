@@ -1,29 +1,21 @@
 <script lang="ts">
 	import {
-		Autocomplete,
 		Alert,
 		Badge,
 		Button,
-		Drawer,
 		EmptyState,
-		Input,
 		PageShell,
-		RadioGroup,
 		SectionHeading,
 		Stat,
 		Table,
-		Toggle,
-		toast,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { confirmed, tracked } from '$lib/forms.svelte';
+	import { confirmed } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, Gauge, Pencil, Plus, RotateCcw, ShieldBan, Trash2 } from '@lucide/svelte';
-	import { duplicateRow } from '$lib/duplicate';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		audienceLabel,
 		blocksEverything,
@@ -33,13 +25,15 @@
 		scopeLabel,
 		scopeTone,
 		windowLabel,
-		type KeyBy,
 		type Protection,
 		type RateRule,
 	} from '$lib/api/rate-limit';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
+	import RuleDrawer from './RuleDrawer.svelte';
+	import GlobalDrawer from './GlobalDrawer.svelte';
+	import ProtectionDrawer from './ProtectionDrawer.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -74,132 +68,39 @@
 	 */
 	const canChange = (r: RateRule) => data.superAdmin || Boolean(r.tenant_id);
 
-	// Each way of counting needs its sentence, so the choice is a radio group
-	// that shows both rather than a list that hides one.
-	const KEY_OPTIONS = [
-		{ value: 'ip', label: 'Per address', description: 'Each address a request comes from has a budget of its own.' },
-		{
-			value: 'user',
-			label: 'Per signed-in account',
-			description:
-				'One budget across every address an account calls from. A caller who is not signed in is counted by address.',
-		},
-	];
-
-	let open = $state(false);
-	let editing = $state<RateRule | null>(null);
-
-	let endpoint = $state('*');
-	let tenantId = $state('');
-	let rate = $state('10');
-	let burst = $state('20');
-	let role = $state('');
-	let keyBy = $state<KeyBy>('ip');
-	let enabled = $state(true);
+	/*
+	 * Each drawer owns its fields and is opened through the function it
+	 * exports. The page stamps the result each one opened over, because the
+	 * failure tags above are read against that one stamp.
+	 */
+	let ruleDrawer = $state<ReturnType<typeof RuleDrawer>>();
+	let globalDrawer = $state<ReturnType<typeof GlobalDrawer>>();
+	let protectionDrawer = $state<ReturnType<typeof ProtectionDrawer>>();
 
 	function openCreate() {
 		openedOver = form;
-		editing = null;
-		endpoint = '*';
-		tenantId = '';
-		rate = '10';
-		burst = '20';
-		role = '';
-		keyBy = 'ip';
-		enabled = true;
-		open = true;
+		ruleDrawer?.openCreate();
 	}
 
 	function openEdit(r: RateRule) {
 		openedOver = form;
-		editing = r;
-		endpoint = r.endpoint;
-		tenantId = r.tenant_id ?? '';
-		rate = String(r.rate);
-		burst = String(r.burst);
-		role = r.role ?? '';
-		keyBy = r.key_by ?? 'ip';
-		enabled = r.enabled;
-		open = true;
+		ruleDrawer?.openEdit(r);
 	}
 
-	/**
-	 * Copy a rule into the create drawer.
-	 *
-	 * No endpoint is involved: the row is already on screen, so this is the
-	 * create form with its fields filled in. The shared helper is what keeps
-	 * the four rules that matter, and the one that matters here is that the
-	 * copy arrives switched off. A duplicated rate limit that starts enforcing
-	 * the moment it saves is a surprise nobody asked for, and the operator has
-	 * not yet changed the one field they pressed Duplicate to change.
-	 *
-	 * The endpoint stands in for the name, because that is what identifies a
-	 * rule in this list and what a second rule has to differ in.
-	 */
 	function openDuplicate(r: RateRule) {
 		openedOver = form;
-		const draft = duplicateRow(r as unknown as Record<string, unknown>, {
-			nameField: 'endpoint',
-			taken: data.rules.map((x) => x.endpoint),
-		});
-		editing = null;
-		endpoint = String(draft.endpoint ?? r.endpoint);
-		tenantId = String(draft.tenant_id ?? '');
-		rate = String(r.rate);
-		burst = String(r.burst);
-		role = String(draft.role ?? '');
-		// The copy keeps how the original counted callers, which is part of
-		// the shape somebody pressed Duplicate for.
-		keyBy = r.key_by ?? 'ip';
-		enabled = false;
-		open = true;
+		ruleDrawer?.openDuplicate(r, data.rules.map((x) => x.endpoint));
 	}
-
-	let globalOpen = $state(false);
-	let globalRate = $state('50');
-	let globalBurst = $state('100');
-	let globalEnabled = $state(false);
 
 	function openGlobal() {
 		openedOver = form;
-		const g = overview?.global;
-		globalRate = String(g?.rate ?? 50);
-		globalBurst = String(g?.burst ?? 100);
-		globalEnabled = g?.enabled ?? false;
-		globalOpen = true;
+		globalDrawer?.openGlobal(overview?.global);
 	}
-
-	let protectionOpen = $state(false);
-	let protection = $state<Protection | null>(null);
-	let protectionRequests = $state('5');
-	let protectionMinutes = $state('15');
 
 	function openProtection(p: Protection) {
 		openedOver = form;
-		protection = p;
-		protectionRequests = String(p.requests);
-		protectionMinutes = String(p.window_seconds / 60);
-		protectionOpen = true;
+		protectionDrawer?.openProtection(p);
 	}
-
-	function closing(close: () => void, message: string): SubmitFunction {
-		return () =>
-			async ({ result, update }) => {
-				if (result.type !== 'failure') close();
-				await update();
-				if (result.type === 'success') toast.success(message);
-			};
-	}
-
-	const saveRule: SubmitFunction = () => {
-		const subject = endpoint;
-		const verb = editing ? 'Saved' : 'Created';
-		return async ({ result, update }) => {
-			if (result.type !== 'failure') open = false;
-			await update();
-			if (result.type === 'success') toast.success(`${verb} ${subject}`);
-		};
-	};
 
 	function removeRule(r: RateRule): SubmitFunction {
 		return confirmed(
@@ -218,10 +119,6 @@
 			{ confirmLabel: 'Reset', success: `Reset ${p.name}` },
 		);
 	}
-
-	const saveRuleSubmit = tracked(saveRule);
-	const saveGlobalSubmit = tracked(closing(() => (globalOpen = false), 'Saved the global limit'));
-	const saveProtectionSubmit = tracked(closing(() => (protectionOpen = false), 'Saved the protection'));
 </script>
 
 <PageShell
@@ -632,160 +529,8 @@
 	{/if}
 </PageShell>
 
-<Drawer bind:open title={editing ? 'Edit rule' : 'New rule'}>
-	<form
-		id="rate-rule-form"
-		method="POST"
-		action={editing ? '?/update' : '?/create'}
-		use:enhance={saveRuleSubmit.enhance}
-	>
-		<div class="flex flex-col gap-4">
-			<FormErrors message={ruleError || undefined} />
-			{#if editing}
-				<input type="hidden" name="id" value={editing.id} />
-			{/if}
-			<Autocomplete
-				id="rl-route"
-				label="Pick a route"
-				hint="Every route this instance serves, including plugin routes such as the realtime stream and GraphQL, and the URLs your flows answer. Picking one fills the endpoint below."
-				placeholder="Search by path, method or name"
-				options={data.routes}
-				onchange={(v) => {
-					if (v) endpoint = v;
-				}}
-			/>
-			<Input
-				id="rl-endpoint"
-				name="endpoint"
-				label="Endpoint"
-				hint="* for every request, or a method and a path. A segment may be {'{name}'}, and the last may be * for everything below it."
-				bind:value={endpoint}
-				required
-			/>
-			{#if data.superAdmin}
-				<Input
-					id="rl-tenant"
-					name="tenant_id"
-					label="Tenant"
-					hint="Leave empty to apply the rule to every tenant."
-					bind:value={tenantId}
-				/>
-			{/if}
-			<Input
-				id="rl-role"
-				name="role"
-				label="Role"
-				hint="Leave empty for every caller. anonymous matches callers who are not signed in."
-				bind:value={role}
-			/>
-			<RadioGroup label="Count" name="key_by" bind:value={keyBy} options={KEY_OPTIONS} />
-			<div class="grid gap-4 sm:grid-cols-2">
-				<Input
-					id="rl-rate"
-					name="rate"
-					label="Requests per second"
-					hint="Sustained. How fast the allowance refills."
-					bind:value={rate}
-				/>
-				<Input
-					id="rl-burst"
-					name="burst"
-					label="Burst"
-					hint="How many requests can arrive at once. At least one."
-					bind:value={burst}
-				/>
-			</div>
-			<!-- Toggle renders a button, which submits nothing, and the action
-			     reads an absent field as off. -->
-			<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
-			<Toggle id="rl-enabled" label="Enforce this rule" bind:checked={enabled} />
-		</div>
-	</form>
-	{#snippet footer()}
-		<Button variant="secondary" onclick={() => (open = false)}>Cancel</Button>
-		<Button variant="primary" type="submit" form="rate-rule-form" loading={saveRuleSubmit.pending}>
-			{editing ? 'Save' : 'Create'}
-		</Button>
-	{/snippet}
-</Drawer>
+<RuleDrawer bind:this={ruleDrawer} error={ruleError} routes={data.routes} superAdmin={data.superAdmin} />
 
-<Drawer bind:open={globalOpen} title="Global limit">
-	<form id="rate-global-form" method="POST" action="?/global" use:enhance={saveGlobalSubmit.enhance}>
-		<div class="flex flex-col gap-4">
-			<FormErrors message={globalError || undefined} />
-			<div class="grid gap-4 sm:grid-cols-2">
-				<Input
-					id="rl-global-rate"
-					name="rate"
-					label="Requests per second"
-					hint="Per address, across every route."
-					bind:value={globalRate}
-				/>
-				<Input
-					id="rl-global-burst"
-					name="burst"
-					label="Burst"
-					hint="How many requests can arrive at once."
-					bind:value={globalBurst}
-				/>
-			</div>
-			<input type="hidden" name="enabled" value={globalEnabled ? 'true' : 'false'} />
-			<Toggle id="rl-global-enabled" label="Enforce the global limit" bind:checked={globalEnabled} />
-		</div>
-	</form>
-	{#snippet footer()}
-		<Button variant="secondary" onclick={() => (globalOpen = false)}>Cancel</Button>
-		<Button variant="primary" type="submit" form="rate-global-form" loading={saveGlobalSubmit.pending}>
-			Save
-		</Button>
-	{/snippet}
-</Drawer>
+<GlobalDrawer bind:this={globalDrawer} error={globalError} />
 
-<Drawer bind:open={protectionOpen} title={protection ? protection.name : 'Protection'}>
-	<form
-		id="rate-protection-form"
-		method="POST"
-		action="?/protection"
-		use:enhance={saveProtectionSubmit.enhance}
-	>
-		<div class="flex flex-col gap-4">
-			<FormErrors message={protectionError || undefined} />
-			{#if protection}
-				<input type="hidden" name="name" value={protection.name} />
-				<p class="text-xs text-muted">
-					{protection.description} Shipped at {windowLabel(
-						protection.default_requests,
-						protection.default_window_seconds,
-					)}.
-				</p>
-			{/if}
-			<div class="grid gap-4 sm:grid-cols-2">
-				<Input
-					id="rl-protection-requests"
-					name="requests"
-					label="Requests"
-					hint="At least one. Zero would lock everyone out."
-					bind:value={protectionRequests}
-				/>
-				<Input
-					id="rl-protection-window"
-					name="window_minutes"
-					label="Window in minutes"
-					hint="At most a day."
-					bind:value={protectionMinutes}
-				/>
-			</div>
-		</div>
-	</form>
-	{#snippet footer()}
-		<Button variant="secondary" onclick={() => (protectionOpen = false)}>Cancel</Button>
-		<Button
-			variant="primary"
-			type="submit"
-			form="rate-protection-form"
-			loading={saveProtectionSubmit.pending}
-		>
-			Save
-		</Button>
-	{/snippet}
-</Drawer>
+<ProtectionDrawer bind:this={protectionDrawer} error={protectionError} />
