@@ -23,7 +23,7 @@
 	import { enhance } from '$app/forms';
 	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { FileStack, History, Pencil, Play, Plus, Trash2 } from '@lucide/svelte';
+	import { History, Pencil, Play, Plus, Trash2 } from '@lucide/svelte';
 	import {
 		MAX_SET_CAPTURES,
 		RULE_METHODS,
@@ -431,7 +431,7 @@
 						title={canCreate ? undefined : NOT_INCLUDED}
 						onclick={openSet}
 					>
-						<FileStack size={ICON.sm} /> New replay set{selected.length > 0 ? ` from ${selected.length}` : ''}
+						<Plus size={ICON.sm} /> New replay set{selected.length > 0 ? ` from ${selected.length}` : ''}
 					</Button>
 				{/if}
 			</div>

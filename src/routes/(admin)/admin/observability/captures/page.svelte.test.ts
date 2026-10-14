@@ -264,3 +264,11 @@ describe('a failed side read', () => {
 		expect(said(container)).toContain('Your role cannot open the replay sets');
 	});
 });
+
+describe('the new replay set button', () => {
+	it('carries the Plus every New button carries', async () => {
+		render(CapturesPage, { props: props() });
+		const button = screen.getByRole('button', { name: /New replay set/ });
+		expect(button.querySelector('svg.lucide-plus')).toBeTruthy();
+	});
+});
