@@ -34,6 +34,13 @@ afterEach(() => {
  * without, and svelte-dnd-action needs a stable id per item to keep a row under
  * the pointer while the list reorders.
  */
+/** The kit's copy control: the frame that holds the button, its tooltip and its live region. */
+function copyFrame(button: HTMLElement): HTMLElement {
+	let node = button.parentElement;
+	while (node && !node.querySelector(':scope > [role="status"]')) node = node.parentElement;
+	return node!;
+}
+
 function data(overrides: Record<string, unknown> = {}): PageData {
 	return {
 		entitlements: { plan: 'example', state: 'active', features: ['schema'], tenant_quota: 1 },
@@ -222,7 +229,7 @@ describe('schema builder relation panel', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
 		vi.useFakeTimers();
 		const copy = screen.getByRole('button', { name: 'Copy a curl request for POST /api/v1/content/posts' });
-		const status = copy.parentElement!.querySelector('[role="status"]')!;
+		const status = copyFrame(copy).querySelector('[role="status"]')!;
 
 		await fireEvent.click(copy);
 		await vi.advanceTimersByTimeAsync(0);
@@ -232,6 +239,13 @@ describe('schema builder relation panel', () => {
 
 		await vi.advanceTimersByTimeAsync(1500);
 		expect(status.textContent).toBe('');
+	});
+
+	it('shows a tooltip on a collection request copy control', async () => {
+		await openPosts();
+		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
+		const name = 'Copy a curl request for POST /api/v1/content/posts';
+		expect(copyFrame(screen.getByRole('button', { name })).textContent).toContain(name);
 	});
 
 	it('turns off the boxes that do nothing for a relation', async () => {

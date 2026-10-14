@@ -471,6 +471,8 @@
 				label="API key"
 				labelHidden
 				value={rawKey}
+				mono
+				wrap
 				copyLabel="Copy key"
 				hint="If the copy fails, select the key and copy it yourself."
 			/>

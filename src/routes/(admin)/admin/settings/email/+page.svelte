@@ -415,10 +415,13 @@
 			<input type="hidden" name="stored_transport" value={editing.transport} />
 		{/if}
 		<Input id="ep-name" name="name" label="Name" hint="A label for the pool, such as Primary or Marketing." bind:value={providerName} required />
-		<div class="flex flex-col gap-1">
-			<SegmentedControl label="Transport" name="transport" options={TRANSPORT_OPTIONS} bind:value={transport} />
-			<p class="text-xs text-muted">SMTP talks to a mail server. A provider API sends over HTTPS with a key.</p>
-		</div>
+		<SegmentedControl
+			label="Transport"
+			name="transport"
+			options={TRANSPORT_OPTIONS}
+			bind:value={transport}
+			hint="SMTP talks to a mail server. A provider API sends over HTTPS with a key."
+		/>
 		<Input id="ep-from" name="from_addr" label="From address" placeholder="noreply@example.com" value={editing?.from_addr ?? ''} required />
 
 		{#if isApi}
@@ -434,10 +437,13 @@
 					bind:value={apiBaseUrl}
 					required
 				/>
-				<div class="flex flex-col gap-1">
-					<SegmentedControl label="Method" name="api_method" options={METHOD_OPTIONS} bind:value={apiMethod} />
-					<p class="text-xs text-muted">The verb of the send request. POST for nearly every provider.</p>
-				</div>
+				<SegmentedControl
+					label="Method"
+					name="api_method"
+					options={METHOD_OPTIONS}
+					bind:value={apiMethod}
+					hint="The verb of the send request. POST for nearly every provider."
+				/>
 				<Input id="ep-api-path" name="api_path" label="Path" placeholder="/v3/messages" hint="Appended to the base URL. Starts with / and carries no query string." bind:value={apiPath} />
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-xs font-semibold uppercase tracking-wide text-faint">Headers</legend>

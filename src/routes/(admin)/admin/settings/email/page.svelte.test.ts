@@ -295,6 +295,23 @@ describe('email provider controls', () => {
 		await fireEvent.click(segment(container, 'Status', 'Paused'));
 		expect((formEl(container).querySelector('input[name="status"]') as HTMLInputElement).value).toBe('paused');
 	});
+
+	it('names the transport and the method hints as the descriptions of their groups', async () => {
+		const { getAllByText, container } = setup([]);
+		await fireEvent.click(getAllByText('New provider')[0]);
+		await chooseTransport(container, 'Provider API');
+		const hints: Record<string, string> = {
+			Transport: 'SMTP talks to a mail server.',
+			Method: 'The verb of the send request.',
+		};
+		for (const [group, hint] of Object.entries(hints)) {
+			const radios = container.querySelector(`[role="radiogroup"][aria-label="${group}"]`) as HTMLElement;
+			const ids = radios.getAttribute('aria-describedby') ?? '';
+			expect(ids, group).not.toBe('');
+			const read = ids.split(' ').map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+			expect(read, group).toContain(hint);
+		}
+	});
 });
 
 describe('email provider delete', () => {
