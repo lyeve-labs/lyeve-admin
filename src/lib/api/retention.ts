@@ -113,9 +113,13 @@ export async function releaseHold(client: HttpClient, id: string): Promise<void>
 /** One policy's share of an enforcement run, as the audit plugin reports it. */
 export interface EnforceResult {
 	policy_id: string;
+	event_type?: string;
+	resource_type?: string;
 	entries_archived?: number;
 	entries_deleted?: number;
+	/** The archive upload failed, so the plugin deleted nothing for this policy. */
 	archive_failed?: boolean;
+	archive_error?: string;
 }
 
 /** What an enforcement run answers. The plugin counts per policy and never sends a total. */
@@ -132,6 +136,17 @@ export async function enforceNow(client: HttpClient): Promise<EnforceResponse> {
 /** The entries a run deleted across every policy it processed. */
 export function entriesDeleted(run: EnforceResponse): number {
 	return (run.results ?? []).reduce((sum, r) => sum + (r.entries_deleted ?? 0), 0);
+}
+
+/**
+ * The policies whose archive failed in a run, in words. The plugin answers
+ * 200 for those and deletes nothing they cover, so a run that reports zero
+ * deleted may be one that could not archive.
+ */
+export function archiveFailures(run: EnforceResponse): string[] {
+	return (run.results ?? [])
+		.filter((r) => r.archive_failed)
+		.map((r) => policyScope({ event_type: r.event_type ?? '', resource_type: r.resource_type ?? '' } as RetentionPolicy));
 }
 
 /** Holds still in force. A soft-deleted hold protects nothing. */

@@ -33,6 +33,18 @@ interface ConfigRefusal {
 	origin?: string;
 }
 
+function refusalSentence(refusal: ConfigRefusal): string {
+	const where = refusal.origin ? ` (${refusal.origin})` : '';
+	return `${refusal.reason}${where}`;
+}
+
+function refusedIn(body: unknown): ConfigRefusal | null {
+	const first = (body as { refused?: unknown } | null)?.refused;
+	if (!Array.isArray(first) || first.length === 0) return null;
+	const r = first[0] as Partial<ConfigRefusal>;
+	return typeof r?.reason === 'string' ? { key: String(r.key ?? ''), reason: r.reason, origin: r.origin } : null;
+}
+
 export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	const read = await section(
@@ -79,12 +91,13 @@ export const actions: Actions = {
 			}>('/api/admin/config', { values: { [key]: value } });
 
 			const refusal = result.refused?.[0];
-			if (refusal) {
-				const where = refusal.origin ? ` (${refusal.origin})` : '';
-				return fail(409, { key, error: `${refusal.reason}${where}` });
-			}
+			if (refusal) return fail(409, { key, error: refusalSentence(refusal) });
 			return { success: true, key };
 		} catch (e) {
+			// A save whose only key is refused answers 409 with the refusal in
+			// the body and no error field.
+			const refused = e instanceof ApiError && e.status === 409 ? refusedIn(e.body) : null;
+			if (refused) return fail(409, { key, error: refusalSentence(refused) });
 			// A refusal keeps its status and its sentence. A failure of the engine
 			// keeps neither, because its text is not written for the operator.
 			const status = e instanceof ApiError && e.status < 500 ? e.status : 502;

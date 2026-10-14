@@ -238,9 +238,11 @@ describe('license +page.server.ts actions.renew', () => {
 		});
 
 		await actions.renew({ request, fetch, cookies } as never);
-		expect(post).toHaveBeenCalledWith('/api/admin/license/renew', {
-			license_key: 'example-token',
-		});
+		expect(post).toHaveBeenCalledWith(
+			'/api/admin/license/renew',
+			{ license_key: 'example-token' },
+			{ signal: expect.any(AbortSignal) },
+		);
 	});
 
 	// Keys are pasted by hand, so they arrive padded.
@@ -260,9 +262,11 @@ describe('license +page.server.ts actions.renew', () => {
 		});
 
 		await actions.renew({ request, fetch, cookies } as never);
-		expect(post).toHaveBeenCalledWith('/api/admin/license/renew', {
-			license_key: 'example-token',
-		});
+		expect(post).toHaveBeenCalledWith(
+			'/api/admin/license/renew',
+			{ license_key: 'example-token' },
+			{ signal: expect.any(AbortSignal) },
+		);
 	});
 
 	it('rejects a key that is only whitespace', async () => {
@@ -306,7 +310,54 @@ describe('license +page.server.ts actions.renew', () => {
 		expect(result).toMatchObject({ status: 422, data: { error: 'Invalid license key' } });
 	});
 
-	it('returns 500 when the engine fails in a way the client does not classify', async () => {
+	it.each([
+		[502, 'the license server could not be reached', 'Try again in a moment.'],
+		[502, 'the license server returned a token that does not verify', 'Applying the same key again gives the same answer.'],
+		[503, 'license key exchange is not configured on this instance', 'paste the license token instead'],
+	])('says what a %i exchange failure means for trying again', async (status, message, said) => {
+		const { actions } = await import('./+page.server');
+		mockedCreateClient.mockReturnValue({
+			post: vi.fn(async () => {
+				throw new ApiError(status, message, { error: message });
+			}),
+		} as never);
+		const formData = new FormData();
+		formData.set('license_key', 'some-key');
+		const request = new Request('http://localhost/admin/settings/license?/renew', { method: 'POST', body: formData });
+		const result = (await actions.renew({ request, fetch: mockFetch({}), cookies: mockCookies({ '__Host-sys_session': 'valid' }) } as never)) as {
+			data: { error: string };
+		};
+		expect(result.data.error).toContain(said);
+		expect(result.data.error).toContain('The current license is unchanged.');
+	});
+
+	it('does not claim the license is unchanged after a 502 the license module did not word', async () => {
+		const { actions } = await import('./+page.server');
+		mockedCreateClient.mockReturnValue({
+			post: vi.fn(async () => {
+				throw new ApiError(502, 'bad gateway');
+			}),
+		} as never);
+		const formData = new FormData();
+		formData.set('license_key', 'some-key');
+		const request = new Request('http://localhost/admin/settings/license?/renew', { method: 'POST', body: formData });
+		const result = await actions.renew({ request, fetch: mockFetch({}), cookies: mockCookies({ '__Host-sys_session': 'valid' }) } as never);
+		expect(result).toMatchObject({ status: 502, data: { error: 'The engine did not confirm the license. Reload to see which license is in force.' } });
+	});
+
+	it('waits longer than the license server exchange before it gives up', async () => {
+		const { actions } = await import('./+page.server');
+		const timeout = vi.spyOn(AbortSignal, 'timeout');
+		mockedCreateClient.mockReturnValue({ post: vi.fn(async () => ({ plan: 'pro', state: 'active', features: [] })) } as never);
+		const formData = new FormData();
+		formData.set('license_key', 'some-key');
+		const request = new Request('http://localhost/admin/settings/license?/renew', { method: 'POST', body: formData });
+		await actions.renew({ request, fetch: mockFetch({}), cookies: mockCookies({ '__Host-sys_session': 'valid' }) } as never);
+		expect(timeout).toHaveBeenCalledWith(45_000);
+		timeout.mockRestore();
+	});
+
+	it('does not claim the license is unchanged when the answer never came', async () => {
 		const { actions } = await import('./+page.server');
 		const mockClient = {
 			post: vi.fn(async () => {
@@ -328,7 +379,7 @@ describe('license +page.server.ts actions.renew', () => {
 		const result = await actions.renew({ request, fetch, cookies } as never);
 		expect(result).toMatchObject({
 			status: 500,
-			data: { error: 'The license could not be applied. The current license is unchanged.' },
+			data: { error: 'The engine did not confirm the license. Reload to see which license is in force.' },
 		});
 	});
 
@@ -354,7 +405,7 @@ describe('license +page.server.ts actions.renew', () => {
 		} as never);
 		expect(result).toMatchObject({
 			status: 502,
-			data: { error: 'The license could not be applied. The current license is unchanged.' },
+			data: { error: 'The engine did not confirm the license. Reload to see which license is in force.' },
 		});
 	});
 });
@@ -391,7 +442,7 @@ describe('license +page.server.ts actions.renew with a license key', () => {
 
 		const cookies = mockCookies({ '__Host-sys_session': 'valid' });
 		await actions.renew({ request: renewRequest(' example-key\n'), fetch: mockFetch({}), cookies } as never);
-		expect(post).toHaveBeenCalledWith('/api/admin/license/renew', { license_key: 'example-key' });
+		expect(post).toHaveBeenCalledWith('/api/admin/license/renew', { license_key: 'example-key' }, { signal: expect.any(AbortSignal) });
 	});
 
 	it('returns the plan, source and expiry the engine reports', async () => {

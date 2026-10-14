@@ -112,8 +112,14 @@ export async function listRules(
 	return client.get<ListEnvelope<RateRule>>(`${RULES_URL}?limit=${limit}&offset=${offset}${only}`);
 }
 
-export async function readStatus(client: HttpClient): Promise<ListEnvelope<LimiterState>> {
-	return client.get<ListEnvelope<LimiterState>>(STATUS_URL);
+/** The status route answers its buckets under their own key, not data. */
+export interface LimiterStatus {
+	buckets: LimiterState[] | null;
+	count: number;
+}
+
+export async function readStatus(client: HttpClient): Promise<LimiterStatus> {
+	return client.get<LimiterStatus>(STATUS_URL);
 }
 
 export async function readOverview(client: HttpClient): Promise<RateLimitOverview> {
@@ -144,6 +150,7 @@ export interface SaveRule {
 	rate: number;
 	burst: number;
 	enabled?: boolean;
+	/** An empty string clears the role. Null keeps the stored one on an edit. */
 	role?: string | null;
 	key_by?: KeyBy;
 }

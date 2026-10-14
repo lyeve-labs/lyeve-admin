@@ -92,17 +92,30 @@ export const actions: Actions = {
 		if (!displayName) return fail(400, { action: 'create', error: 'Give the region a name a person can read.' });
 		if (!provider) return fail(400, { action: 'create', error: 'Name who runs it: aws, gcp, azure, on-prem.' });
 
+		// The plugin's create takes no enabled field, refuses a body that
+		// names one, and opens every new region. A region asked for closed is
+		// created, then closed by an update.
+		let created: Region;
 		try {
-			await createRegion(client, {
+			created = await createRegion(client, {
 				slug,
 				display_name: displayName,
 				provider,
 				coordinates: coordinates(form),
-				enabled: form.get('enabled') === 'true',
 				is_default: form.get('is_default') === 'true',
 			});
 		} catch (err) {
 			return fail(400, { action: 'create', error: actionError(err, 'The region could not be created.') });
+		}
+		if (form.get('enabled') !== 'true') {
+			try {
+				await updateRegion(client, created.id, { enabled: false });
+			} catch {
+				return fail(400, {
+					action: 'close',
+					error: `Region ${displayName} was created but could not be closed, so it is listed to clients and used for nearest-region routing. Edit it and turn off Accepting new tenants.`,
+				});
+			}
 		}
 		return { saved: slug };
 	},

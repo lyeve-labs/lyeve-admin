@@ -64,6 +64,36 @@ describe('audit-log prune posts to a prefix the engine mounts', () => {
 		expect(headers['X-CSRF-Token']).toBe('csrf-tok');
 	});
 
+	it('relays the reason the plugin gives for a refused prune', async () => {
+		const fetch = vi.fn(async () =>
+			new Response(JSON.stringify({ error: 'older_than must not be later than now' }), {
+				status: 400,
+				headers: { 'content-type': 'application/json' },
+			}),
+		);
+		const form = new FormData();
+		form.set('older_than', '2099-01-01');
+		const out = (await actions.prune({
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			request: { formData: async () => form },
+		} as never)) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('older_than must not be later than now');
+	});
+
+	it('keeps an outage body off the page', async () => {
+		const fetch = vi.fn(async () => new Response(JSON.stringify({ error: 'dial tcp: refused' }), { status: 503 }));
+		const form = new FormData();
+		form.set('older_than', '2026-01-01');
+		const out = (await actions.prune({
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			request: { formData: async () => form },
+		} as never)) as { data: { error: string } };
+		expect(out.data.error).toBe('The audit log could not be pruned.');
+	});
+
 	it('exposes no export as an action', () => {
 		// A form pointing at ?/export would post to a route that answers 404,
 		// and this says so here rather than in a browser.
@@ -215,6 +245,33 @@ describe('audit-log search maps to the endpoint filters', () => {
 	it('drops a day that is not a day', () => {
 		const url = new URL('http://localhost/admin/audit-log?from=yesterday&to=2026-01-31&q=%20x%20');
 		expect(readFilter(url)).toEqual({ q: 'x', action: '', from: '', to: '2026-01-31' });
+	});
+
+	it('swaps a From day later than the To day, which the engine would refuse', () => {
+		const url = new URL('http://localhost/admin/audit-log?from=2026-03-10&to=2026-03-01');
+		expect(readFilter(url)).toMatchObject({ from: '2026-03-01', to: '2026-03-10' });
+	});
+
+	it('offers the other actions in the window while one is in force', async () => {
+		engine.get.mockReset();
+		engine.get
+			.mockResolvedValueOnce({ data: [{ id: 'e1', action: 'content.delete' }], total: 1 })
+			.mockResolvedValueOnce({
+				data: [
+					{ id: 'e1', action: 'content.delete' },
+					{ id: 'e2', action: 'schema.create' },
+				],
+				total: 2,
+			});
+		const event = {
+			fetch: vi.fn() as unknown as typeof globalThis.fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			url: new URL('http://localhost/admin/audit-log?action=content.delete'),
+			parent: async () => ({ user: { roles: ['super_admin'] } }),
+		} as never;
+		const result = (await load(event)) as unknown as { actions: string[] };
+		expect(String(engine.get.mock.calls[1][0])).not.toContain('action=');
+		expect(result.actions).toEqual(['content.delete', 'schema.create']);
 	});
 
 	it('asks again by resource id when an id matched no actor', async () => {

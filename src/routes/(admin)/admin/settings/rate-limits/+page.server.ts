@@ -24,7 +24,8 @@ import {
 	type RateLimitOverview,
 	type RateRule,
 } from '$lib/api/rate-limit';
-import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -76,12 +77,13 @@ export const load: PageServerLoad = async (event) => {
 
 	// The live view is a snapshot from the process that answered, so losing it
 	// must not lose the rules, and an unread one is never drawn as quiet.
-	const status =
+	const status: Section<LimiterState[]> =
 		gate.state === 'ok'
-			? await readStatus(client)
-					.then((r) => ({ rows: rowsOf(r), read: true }))
-					.catch(() => ({ rows: [] as LimiterState[], read: false }))
-			: { rows: [] as LimiterState[], read: false };
+			? await section(
+					readStatus(client).then((r) => r.buckets ?? []),
+					'The live counters could not be read. This is not a report that nobody is being throttled.',
+				)
+			: { ok: false, gate };
 
 	// The routes the instance serves, to pick a rule's endpoint from. The
 	// document is read as the caller: an admin gets the public routes, a super
@@ -97,8 +99,7 @@ export const load: PageServerLoad = async (event) => {
 		hasMore,
 		overview,
 		superAdmin,
-		status: status.rows,
-		statusRead: status.read,
+		status,
 		gate,
 	};
 };
@@ -136,8 +137,10 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		rate,
 		burst,
 		enabled: form.get('enabled') === 'true',
-		// An empty role clears it, so the rule applies to every caller.
-		role: role || null,
+		// An empty role clears it, so the rule applies to every caller. On an
+		// edit the plugin reads null as "keep the stored role" and an empty
+		// string as a clear, so the clear goes as an empty string.
+		role,
 		key_by: keyBy,
 	};
 	// Only a super_admin can place a rule on another tenant or on every
@@ -145,9 +148,12 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	// whatever the form says, so the field is neither shown nor sent.
 	if (user.roles.includes('super_admin')) {
 		const tenant = String(form.get('tenant_id') ?? '').trim();
-		// An empty tenant means every tenant. Sent as null rather than "" so
-		// the engine stores the scope the form actually showed.
-		body.tenant_id = tenant || null;
+		// On create an empty tenant means every tenant, sent as null so the
+		// engine stores the scope the form showed. On an edit the plugin reads
+		// an absent or null tenant as "keep", so only a named tenant is sent,
+		// which moves the rule there.
+		if (!id) body.tenant_id = tenant || null;
+		else if (tenant) body.tenant_id = tenant;
 	}
 
 	try {

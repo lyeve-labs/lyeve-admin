@@ -103,6 +103,15 @@ describe('Data export jobs', () => {
 		expect(running.container.querySelector('[aria-label="Cancel nightly"]')).not.toBeNull();
 	});
 
+	it('says a completed export that wrote the row ceiling reached it', () => {
+		const { container } = render(ExportPage, { props: props({ jobs: [job({ rows_written: 10000, rows_total: 10000 })] }) });
+		expect(said(container)).toContain('Reached the 10,000 entry ceiling. Entries past it are not in the file.');
+		expect(said(container)).not.toContain('Stopped');
+		cleanup();
+		const under = render(ExportPage, { props: props({ jobs: [job({ rows_written: 9999 })] }) });
+		expect(said(under.container)).not.toContain('entry ceiling');
+	});
+
 	it('states a size a person can read', () => {
 		const { container } = render(ExportPage, { props: props() });
 		expect(said(container)).toContain('2.0 KB');

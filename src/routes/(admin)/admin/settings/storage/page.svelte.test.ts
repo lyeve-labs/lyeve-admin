@@ -54,3 +54,12 @@ describe('Storage controls by role', () => {
 		expect(admin.queryByRole('button', { name: /new provider/i })).toBeNull();
 	});
 });
+describe('an edit save', () => {
+	it('sends back the stored cost weight on an edit', async () => {
+		const { getByRole } = render(StoragePage, { props: props() });
+		getByRole('button', { name: 'Edit Uploads bucket' }).click();
+		await new Promise((r) => setTimeout(r, 0));
+		const drawer = document.body.querySelector('form#provider-form') as HTMLFormElement;
+		expect(new FormData(drawer).get('cost_weight')).toBe('1');
+	});
+});

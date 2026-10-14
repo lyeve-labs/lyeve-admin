@@ -60,7 +60,6 @@ describe('the rule drawer', () => {
 		expect(form()?.getAttribute('action')).toBe('?/update');
 		expect(field('id')).toBe('r1');
 		expect(field('endpoint')).toBe('GET /api/content/{schema}');
-		expect(field('tenant_id')).toBe('acme');
 		expect(field('role')).toBe('editor');
 		expect(field('key_by')).toBe('user');
 		expect(document.body.querySelector('button[form="rate-rule-form"]')?.textContent?.trim()).toBe('Save');
@@ -87,6 +86,29 @@ describe('the rule drawer', () => {
 		second.component.openCreate();
 		flushSync();
 		expect(document.body.querySelector('#rl-tenant')).toBeNull();
+	});
+
+	it('moves a rule bound to one tenant only to another tenant, never to every tenant', () => {
+		const { component } = setup();
+		component.openEdit(rule);
+		flushSync();
+		const tenant = document.body.querySelector('#rl-tenant') as HTMLInputElement;
+		expect(tenant.disabled).toBe(false);
+		expect(tenant.required).toBe(true);
+		expect(field('tenant_id')).toBe('acme');
+		expect(form()?.textContent).toContain('A rule cannot move to every tenant on an edit');
+		expect(form()?.textContent).not.toContain('Leave empty to keep the rule on every tenant');
+	});
+
+	it('offers every tenant on edit only for a rule that already applies to every tenant', () => {
+		const { component } = setup();
+		component.openEdit({ ...rule, tenant_id: null } as unknown as RateRule);
+		flushSync();
+		const tenant = document.body.querySelector('#rl-tenant') as HTMLInputElement;
+		expect(tenant.required).toBe(false);
+		expect(tenant.placeholder).toBe('Every tenant');
+		expect(field('tenant_id')).toBe('');
+		expect(form()?.textContent).toContain('Leave empty to keep the rule on every tenant');
 	});
 
 	it('shows its failure first in its form', () => {

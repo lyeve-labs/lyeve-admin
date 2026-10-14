@@ -105,6 +105,7 @@
 			{/if}
 			<Card pad="md">
 				<form id="captcha-form" method="POST" action="?/save" use:enhance={save.enhance} class="flex flex-col gap-4">
+					<input type="hidden" name="failure_threshold" value={data.settings?.tenant?.failure_threshold ?? ''} />
 					<SegmentedControl
 						label="Provider"
 						name="provider"

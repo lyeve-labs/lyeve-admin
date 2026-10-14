@@ -18,12 +18,17 @@ function cookies(): Cookies {
  * An action event against a fake engine. The session check answers with the
  * given roles, and every other request is recorded and answered with `reply`.
  */
-function engine(fields: Record<string, string>, opts: { roles?: string[]; reply?: Response } = {}) {
+function engine(
+	fields: Record<string, string>,
+	opts: { roles?: string[]; reply?: Response; respond?: (call: Call) => Response } = {},
+) {
 	const calls: Call[] = [];
 	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
 		const path = String(url);
 		if (path.includes('/auth/me')) return json({ id: 'u1', roles: opts.roles ?? ['super_admin'], disabled: false });
-		calls.push({ method: init?.method ?? 'GET', path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+		const call = { method: init?.method ?? 'GET', path, body: init?.body ? JSON.parse(String(init.body)) : undefined };
+		calls.push(call);
+		if (opts.respond) return opts.respond(call);
 		return opts.reply?.clone() ?? json({});
 	});
 	const form = new FormData();
@@ -61,11 +66,19 @@ describe('region writes', () => {
 					display_name: 'EU West',
 					provider: 'aws',
 					coordinates: { lat: 53.3, long: -6.2 },
-					enabled: true,
 					is_default: false,
 				},
 			},
 		]);
+	});
+
+	// The plugin's create refuses a body naming enabled and opens every new
+	// region, so a closed one is created and then closed.
+	it('creates a region asked for closed, then closes it', async () => {
+		const { event, calls } = engine({ ...REGION, enabled: 'false' }, { respond: () => json({ id: 'r9' }) });
+		expect(await actions.create(event)).toEqual({ saved: 'eu-west' });
+		expect(calls[0].body).not.toHaveProperty('enabled');
+		expect(calls[1]).toEqual({ method: 'PUT', path: '/api/admin/regions/r9', body: { enabled: false } });
 	});
 
 	it('leaves out coordinates that were never filled in', async () => {

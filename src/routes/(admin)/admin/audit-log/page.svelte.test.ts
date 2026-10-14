@@ -217,6 +217,25 @@ describe('Audit log toolbar', () => {
 		expect(container.querySelector('[role="toolbar"]')?.textContent).toContain('All actions');
 	});
 
+	it('exports the filter in force and says how far an export goes', () => {
+		const { container } = render(AuditLogPage, {
+			props: {
+				data: data({
+					filter: { q: 'content', action: 'content.delete', from: '2026-01-01', to: '' },
+					exportNote: 'An export holds the entries the dates, action and resource type match, at most 100,000.',
+				}) as never,
+				form: null as never,
+			},
+		});
+		const exportForm = container.querySelector('form[action="/api/admin/audit-log/export"]') as HTMLFormElement;
+		const sent = new FormData(exportForm);
+		expect(sent.get('action')).toBe('content.delete');
+		expect(sent.get('from')).toBe('2026-01-01');
+		expect(sent.get('q')).toBe('content');
+		expect(sent.has('to')).toBe(false);
+		expect(container.textContent).toContain('at most 100,000');
+	});
+
 	it('carries the filter through the pager', () => {
 		const { container } = render(AuditLogPage, {
 			props: {

@@ -42,6 +42,7 @@
 	const health = $derived(brokerHealth(data.status));
 	const broker = $derived(hasBroker(data.status));
 	const rate = $derived(deliveryRate(data.status));
+	const outbox = $derived(data.status?.outbox);
 	const guide = $derived(data.status ? connectionGuide(data.status.backend, data.status.topic_prefix) : null);
 	const backendSettings = $derived(data.status ? (BACKEND_SETTINGS[data.status.backend] ?? []) : []);
 </script>
@@ -82,6 +83,28 @@
 				This instance does not enable the plugin, so every event is dropped rather than
 				published. Nothing is wrong with the broker.
 			</Alert>
+		{:else if outbox?.enabled && outbox.available && (outbox.dead > 0 || data.status.failed > 0)}
+			<!-- With an outbox a refused event is retried, so the lost and the
+			     waiting counts lead, and Failed counts attempts. -->
+			<Alert tone={outbox.dead > 0 ? 'danger' : 'warn'}>
+				{#if outbox.dead > 0}
+					{outbox.dead}
+					{outbox.dead === 1 ? 'event' : 'events'} ran out of attempts and never reached the broker.
+				{/if}
+				{outbox.pending}
+				{outbox.pending === 1 ? 'event is' : 'events are'} waiting in the outbox.
+				{#if data.status.failed > 0}
+					The broker refused {data.status.failed} publish
+					{data.status.failed === 1 ? 'attempt' : 'attempts'} since this process started. The outbox
+					retries a refused event until the broker takes it or its attempts run out.
+				{/if}
+			</Alert>
+		{:else if outbox?.enabled && !outbox.available && data.status.failed > 0}
+			<Alert tone="warn">
+				The broker refused {data.status.failed} publish
+				{data.status.failed === 1 ? 'attempt' : 'attempts'} since this process started. The outbox
+				retries them, but its counts could not be read, so whether any event was lost is unknown.
+			</Alert>
 		{:else if data.status.failed > 0}
 			<Alert tone="danger">
 				The broker refused {data.status.failed}
@@ -102,9 +125,9 @@
 			<Stat
 				size="sm"
 				mono
-				label="Refused by the broker"
+				label={outbox?.enabled ? 'Attempts refused by the broker' : 'Refused by the broker'}
 				value={data.status.failed}
-				tone={data.status.failed > 0 ? 'danger' : 'neutral'}
+				tone={data.status.failed > 0 ? (outbox?.enabled ? 'warn' : 'danger') : 'neutral'}
 			/>
 			<Stat
 				size="sm"
@@ -113,6 +136,22 @@
 				value={data.status.dropped}
 				tone={data.status.dropped > 0 ? 'warn' : 'neutral'}
 			/>
+			{#if outbox?.enabled}
+				<Stat
+					size="sm"
+					mono
+					label="Waiting in the outbox"
+					value={outbox.available ? outbox.pending : NO_VALUE}
+					tone={outbox.available && outbox.pending > 0 ? 'warn' : 'neutral'}
+				/>
+				<Stat
+					size="sm"
+					mono
+					label="Lost after every attempt"
+					value={outbox.available ? outbox.dead : NO_VALUE}
+					tone={outbox.available && outbox.dead > 0 ? 'danger' : 'neutral'}
+				/>
+			{/if}
 		</div>
 		<p class="text-xs text-muted">
 			Counted since this process started. A restart sets them back to zero, so a low number is

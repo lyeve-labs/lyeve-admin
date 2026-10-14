@@ -27,6 +27,7 @@
 	import ExportConfigFields from '$lib/components/ExportConfigFields.svelte';
 	import {
 		CRON_PRESETS,
+		EXPORT_ROW_CEILING,
 		FORMAT_LABELS,
 		JOBS_URL,
 		active,
@@ -61,6 +62,18 @@
 
 	const running = $derived(data.jobs.filter(active));
 	const failed = $derived(data.jobs.filter((j) => j.status === 'failed').length);
+	// Running and failed are counted from the rows on this page, so once the
+	// list is paged their tiles say so beside a total that covers every page.
+	const paged = $derived(data.total > data.jobs.length);
+
+	/**
+	 * A completed export that names no limit and wrote the ceiling stopped
+	 * there. The count cannot say whether more entries matched, so the row
+	 * says the ceiling was reached rather than that the file was cut.
+	 */
+	function atCeiling(job: { status: string; rows_written: number; filter?: { limit?: number } | null }): boolean {
+		return job.status === 'completed' && !(job.filter?.limit && job.filter.limit > 0) && job.rows_written >= EXPORT_ROW_CEILING;
+	}
 
 	// A running export moves on the server, not here, so the page re-reads
 	// its load until nothing is left running and then stops asking.
@@ -305,6 +318,11 @@
 									<td data-cell="nowrap" class="text-xs">
 										{formatCount(job.status === 'completed' ? job.rows_written : job.rows_processed)}
 										{#if job.rows_total > 0}<span class="text-faint"> of {formatCount(job.rows_total)}</span>{/if}
+										{#if atCeiling(job)}
+											<div class="text-warn">
+												Reached the {formatCount(EXPORT_ROW_CEILING)} entry ceiling. Entries past it are not in the file.
+											</div>
+										{/if}
 									</td>
 									<td data-cell="nowrap" class="text-xs"
 										>{job.file_size > 0 ? formatBytes(job.file_size, 'GB') : NO_VALUE}</td

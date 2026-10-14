@@ -6,9 +6,11 @@ vi.mock('@lyeve-labs/client', () => {
 		createClient: vi.fn(),
 		ApiError: class ApiError extends Error {
 			status: number;
-			constructor(status: number, message: string) {
+			body: unknown;
+			constructor(status: number, message: string, body?: unknown) {
 				super(message);
 				this.status = status;
+				this.body = body;
 			}
 		},
 	};
@@ -99,6 +101,25 @@ describe('configuration load', () => {
 });
 
 describe('configuration save', () => {
+	it('reads the refusal from a 409 whose only key was refused', async () => {
+		mockedCreateClient.mockReturnValue({
+			put: vi.fn(async () => {
+				throw new ApiError(409, '{"refused":[...]}', {
+					refused: [{ key: 'APP_ENV', reason: 'set by the environment', origin: 'APP_ENV' }],
+				});
+			}),
+		} as never);
+
+		const result = (await actions.save({
+			request: request({ key: 'APP_ENV', value: 'development', secret: 'false' }),
+			fetch: vi.fn(),
+			cookies: authed(),
+		} as never)) as { status: number; data: { error: string } };
+
+		expect(result.status).toBe(409);
+		expect(result.data.error).toBe('set by the environment (APP_ENV)');
+	});
+
 	it('sends one setting', async () => {
 		const put = vi.fn(async () => ({ saved: [{ key: 'STORAGE_DRIVER' }] }));
 		mockedCreateClient.mockReturnValue({ put } as never);

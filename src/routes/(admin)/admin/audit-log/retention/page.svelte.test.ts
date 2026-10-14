@@ -91,6 +91,19 @@ describe('Retention controls by role', () => {
 	});
 });
 
+describe('Retention enforcement outcome', () => {
+	it('keeps a warning naming the policy whose archive failed', () => {
+		const { container } = render(RetentionPage, {
+			props: props(['super_admin'], {}, { enforced: true, deleted: 0, policies: 1, archiveFailed: ['content.delete'] }),
+		});
+		const warning = [...container.querySelectorAll('[role="alert"], [role="status"]')].find((n) =>
+			n.textContent?.includes('Archiving failed for content.delete'),
+		);
+		expect(warning).toBeTruthy();
+		expect(container.textContent).toContain('nothing that policy covers was deleted');
+	});
+});
+
 describe('Retention policy delete', () => {
 	it('names the policy in the confirmation title', async () => {
 		render(RetentionPage, { props: props(['super_admin']) });

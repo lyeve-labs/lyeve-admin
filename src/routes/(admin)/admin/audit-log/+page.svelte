@@ -99,6 +99,14 @@
 	<ScrollText size={ICON.lg} />
 {/snippet}
 
+<!-- The export takes the filter in force, so the file holds what the list
+     shows. -->
+{#snippet exportFilter()}
+	{#each Object.entries(data.filter) as [key, value] (key)}
+		{#if value}<input type="hidden" name={key} value={value} />{/if}
+	{/each}
+{/snippet}
+
 {#snippet pruneBody()}
 	<div class="flex flex-col gap-3">
 		<p class="text-sm text-muted">
@@ -128,6 +136,7 @@
 		<!-- Posts to an endpoint, not an action: SvelteKit refuses a Response from a
 		     form action, and a download has to be one. -->
 		<form method="POST" action="/api/admin/audit-log/export">
+			{@render exportFilter()}
 			<Button type="submit" variant="secondary" size="sm">
 				<Download size={ICON.sm} /> Export JSON
 			</Button>
@@ -135,6 +144,7 @@
 
 		{#if data.isSuperAdmin}
 			<form method="POST" action="/api/admin/audit-log/export-all">
+				{@render exportFilter()}
 				<Button type="submit" variant="secondary" size="sm">
 					<Download size={ICON.sm} /> Export all
 				</Button>
@@ -188,6 +198,7 @@
 			{/snippet}
 		</ListToolbar>
 	</form>
+	<p class="text-xs text-muted">{data.exportNote}</p>
 
 	<!-- The table is over a thousand cells under the page title alone, which is
 	     a screen reader's only landmark on this page and no way to skim it. -->

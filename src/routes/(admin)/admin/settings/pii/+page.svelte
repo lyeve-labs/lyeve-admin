@@ -498,7 +498,9 @@
 			name="priority"
 			label="Priority"
 			type="number"
-			hint="Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them."
+			hint={editing.id
+				? 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them, and 0 before them.'
+				: 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them. A new rule starts at 1 or more: set 0 by editing it.'}
 			bind:value={priorityText}
 		/>
 		<!-- The kit's Toggle is a button and serializes nothing, so the value

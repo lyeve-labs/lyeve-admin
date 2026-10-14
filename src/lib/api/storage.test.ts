@@ -47,6 +47,16 @@ describe('which provider receives uploads', () => {
 		expect(activeProvider(providers)?.id).toBe('b');
 	});
 
+	it('ranks a weighted provider by cost before priority, as the plugin does', () => {
+		const providers = [
+			provider({ id: 'first', priority: 1, cost_weight: 0.8 }),
+			provider({ id: 'cheap', priority: 9, cost_weight: 0.2 }),
+			provider({ id: 'unweighted', priority: 0, cost_weight: 0 }),
+		];
+		expect(activeProvider(providers)?.id).toBe('cheap');
+		expect(activeProvider([provider({ id: 'a', priority: 4, cost_weight: 0 }), provider({ id: 'b', priority: 2, cost_weight: 0 })])?.id).toBe('b');
+	});
+
 	it('skips a provider whose credentials will not decrypt', () => {
 		const providers = [
 			provider({ id: 'broken', priority: 1, credentials_unavailable: true }),

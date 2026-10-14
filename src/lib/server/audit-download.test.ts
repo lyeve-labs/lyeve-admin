@@ -52,6 +52,29 @@ describe('proxyAuditDownload', () => {
 		expect(headers.has('X-CSRF-Token')).toBe(false);
 	});
 
+	it('exports the filter on screen rather than the whole log', async () => {
+		stubFetch(() => new Response('[]', { status: 200 }));
+		const form = new FormData();
+		form.set('action', 'content.delete');
+		form.set('from', '2026-10-05');
+		form.set('to', '2026-10-01');
+		form.set('q', 'article');
+		const filtered = {
+			...event(),
+			request: new Request('http://admin/api/admin/audit-log/export', { method: 'POST', body: form }),
+		} as unknown as RequestEvent;
+
+		await proxyAuditDownload(filtered, '/api/admin/audit-log/export', 'audit-log.json');
+
+		expect(JSON.parse(String(calls[0][1]?.body))).toEqual({
+			format: 'json',
+			action: 'content.delete',
+			resource_type: 'article',
+			from: '2026-10-01T00:00:00Z',
+			to: '2026-10-06T00:00:00Z',
+		});
+	});
+
 	it('passes the engine download headers through untouched', async () => {
 		stubFetch(
 			() =>
