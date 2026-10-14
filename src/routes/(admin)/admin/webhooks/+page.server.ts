@@ -161,10 +161,15 @@ export const actions: Actions = {
 			const newSecret = data.get('new_secret');
 
 			try {
-				const result = await rotateSecret(id, client, newSecret ? String(newSecret) : undefined);
-				return { rotateSecretResult: result };
+				// The plugin answers the webhook and the new secret beside it, and
+				// shows the secret this once, so both are handed to the page.
+				const result = (await rotateSecret(id, client, newSecret ? String(newSecret) : undefined)) as unknown as {
+					webhook?: { name?: string };
+					new_secret?: string;
+				};
+				return { rotated: { id, name: result.webhook?.name ?? '', secret: result.new_secret ?? '' } };
 			} catch (err) {
-				return actionFailure(err, 'Failed to rotate webhook secret');
+				return tagged('rotate-secret', actionFailure(err, 'Failed to rotate webhook secret'));
 			}
 		},
 

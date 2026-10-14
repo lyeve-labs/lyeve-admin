@@ -7,16 +7,17 @@
 		Badge,
 		Button,
 		CheckboxGroup,
+		CopyField,
 		Drawer,
 		EmptyState,
 		Input,
+		Modal,
 		MultiSelect,
 		PageShell,
 		Pagination,
 		PasswordInput,
 		SearchInput,
 		SegmentedControl,
-		toast,
 		Table,
 		Textarea,
 		Toggle,
@@ -229,15 +230,16 @@
 	// The history drawer reads what the row's submit names, so the two share it.
 	const history = new DeliveryHistory();
 
-	/**
-	 * Every write in this application reports through the toast, which is one
-	 * place a reader learns to look, so a rotated secret is announced there too
-	 * and not in the row.
+	/*
+	 * The plugin shows a rotated secret once and never again, and the old one
+	 * stops verifying at once, so the new one is shown in a panel the reader
+	 * copies from, naming the webhook it signs for.
 	 */
+	let reveal = $state<{ name: string; secret: string } | null>(null);
 	$effect(() => {
-		if (form && 'rotateSecretResult' in form && form.rotateSecretResult) {
-			const wh = form.rotateSecretResult as Webhook;
-			toast.success(`Rotated the secret for ${wh.name}`);
+		if (form && 'rotated' in form && form.rotated) {
+			const r = form.rotated as { name: string; secret: string };
+			reveal = { name: r.name, secret: r.secret };
 		}
 	});
 
@@ -552,3 +554,17 @@
 <DeliveriesDrawer {form} {history} />
 
 <DeadLetterDrawer {form} />
+
+{#if reveal}
+	<Modal open title="New signing secret for {reveal.name}" onclose={() => (reveal = null)}>
+		<div class="flex flex-col gap-3">
+			<p class="text-sm text-fg">
+				{reveal.name} now signs every delivery with this secret, and the old one no longer verifies. Copy it to the receiver now. It is not shown again.
+			</p>
+			<CopyField value={reveal.secret} label="Signing secret" mono secret />
+		</div>
+		{#snippet footer()}
+			<Button variant="secondary" onclick={() => (reveal = null)}>Close</Button>
+		{/snippet}
+	</Modal>
+{/if}

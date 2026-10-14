@@ -27,18 +27,31 @@
 		}
 	});
 
-	let deadLetterResults = $state<Record<string, string>>({});
+	/** What a row's last replay or dismissal came to. `done` means it left the queue. */
+	type Outcome = { text: string; done: boolean };
+	let deadLetterResults = $state<Record<string, Outcome>>({});
+
+	/**
+	 * The plugin marks an entry replayed only when the receiver answers 2xx,
+	 * and reports the receiver's code beside a status that always reads
+	 * "replayed", so the code is what says whether it was delivered.
+	 */
+	function replayOutcome(code: unknown): Outcome {
+		if (typeof code !== 'number') return { text: 'Replayed. The receiver sent no status.', done: false };
+		if (code >= 200 && code < 300) return { text: `Delivered (HTTP ${code})`, done: true };
+		return { text: `The receiver answered HTTP ${code}. The entry is still pending.`, done: false };
+	}
 
 	// The map is read untracked: an effect that tracks the map it rewrites
 	// reruns on its own write until Svelte stops it.
 	$effect(() => {
 		if (form && 'deadLetterReplay' in form && form.deadLetterReplay) {
-			const r = form.deadLetterReplay as { id: string; status: string };
-			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: `Replayed with status ${r.status}` };
+			const r = form.deadLetterReplay as { id: string; http_status?: unknown };
+			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: replayOutcome(r.http_status) };
 		}
 		if (form && 'deadLetterDismiss' in form && form.deadLetterDismiss) {
-			const r = form.deadLetterDismiss as { id: string; status: string };
-			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: 'Dismissed' };
+			const r = form.deadLetterDismiss as { id: string };
+			deadLetterResults = { ...untrack(() => deadLetterResults), [r.id]: { text: 'Dismissed', done: true } };
 		}
 	});
 </script>
@@ -73,6 +86,7 @@
 					</thead>
 					<tbody>
 						{#each deadLetterItems as dl (dl.id)}
+							{@const outcome = deadLetterResults[dl.id]}
 							<tr>
 								<td data-cell="nowrap" class="text-xs font-medium text-fg">{dl.webhook_name}</td>
 								<td><Badge tone={eventTone(dl.event_type)}>{dl.event_type}</Badge></td>
@@ -94,9 +108,10 @@
 									{formatDateTime(dl.dead_at)}
 								</td>
 								<td>
-									{#if deadLetterResults[dl.id]}
-										<span class="text-xs text-muted">{deadLetterResults[dl.id]}</span>
-									{:else if dl.status === 'pending'}
+									{#if outcome}
+										<span class="text-xs text-muted" data-testid="dead-letter-outcome">{outcome.text}</span>
+									{/if}
+									{#if dl.status === 'pending' && !outcome?.done}
 										<div class="flex items-center gap-1">
 											<form method="POST" action="?/dead-letter-replay" use:enhance>
 												<input type="hidden" name="id" value={dl.id} />

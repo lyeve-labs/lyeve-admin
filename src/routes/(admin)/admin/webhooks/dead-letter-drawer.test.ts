@@ -88,13 +88,23 @@ describe('the result of a replay or a dismissal', () => {
 	it('settles, shows in place of the entry\'s actions, and keeps the earlier result', async () => {
 		const queue = { deadLetters: [entry('a', 'pending'), entry('c', 'pending')] };
 		const { rerender } = render(DeadLetterDrawer, { props: { form: queue } });
-		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'delivered' } } });
+		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'replayed', http_status: 200 } } });
 		const rows = () => [...(dialog()?.querySelectorAll('tbody tr') ?? [])];
-		expect(rows()[0].textContent).toContain('Replayed with status delivered');
+		expect(rows()[0].textContent).toContain('Delivered (HTTP 200)');
 		expect(rows()[0].querySelector('form')).toBeNull();
 		await rerender({ form: { deadLetterDismiss: { id: 'c', status: 'dismissed' } } });
 		expect(rows()[1].textContent).toContain('Dismissed');
 		expect(rows()[1].querySelector('form')).toBeNull();
-		expect(rows()[0].textContent).toContain('Replayed with status delivered');
+		expect(rows()[0].textContent).toContain('Delivered (HTTP 200)');
+	});
+
+	// The plugin's status always reads "replayed", and the receiver's code is
+	// what says whether the delivery arrived.
+	it('reports the code a refusing receiver answered and keeps the entry pending', async () => {
+		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
+		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'replayed', http_status: 502 } } });
+		const row = dialog()?.querySelector('tbody tr');
+		expect(row?.textContent).toContain('The receiver answered HTTP 502. The entry is still pending.');
+		expect(row?.querySelector('form[action="?/dead-letter-replay"]')).not.toBeNull();
 	});
 });

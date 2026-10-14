@@ -203,3 +203,26 @@ describe('the result of a webhook test', () => {
 		expect(container.querySelector('tbody')?.textContent).toContain('HTTP 200: OK');
 	});
 });
+
+/*
+ * The plugin generates the new secret and shows it once. The page used to
+ * toast "Rotated the secret for undefined" and drop the secret, so the
+ * receiver could no longer verify a signature and nobody could learn why.
+ */
+describe('a rotated signing secret', () => {
+	const props = (form: unknown) =>
+		({
+			data: { webhooks: { ok: true, value: [webhook] }, schemas: { ok: true, value: [] }, entitlements, user: { roles: ['super_admin'] } },
+			form,
+		}) as never;
+
+	it('is shown once in a panel that names the webhook and copies the secret', async () => {
+		const { rerender } = render(WebhooksPage, { props: props(null) });
+		await rerender(props({ rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } }));
+		const dialog = document.body.querySelector('[role="dialog"]') as HTMLElement;
+		expect(dialog.textContent).toContain('New signing secret for Ship it');
+		expect(dialog.textContent).toContain('It is not shown again.');
+		const values = [...dialog.querySelectorAll('input')].map((i) => i.value);
+		expect(values).toContain('c0ffee-secret');
+	});
+});

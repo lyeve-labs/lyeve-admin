@@ -247,3 +247,51 @@ describe('admin/webhooks/+page.server.ts writes by role', () => {
 		expect(seen.some((u) => u.includes('/api/admin/webhooks/w1'))).toBe(true);
 	});
 });
+
+/** An action event whose session reads as `roles` and whose writes answer `answer`. */
+function postEvent(fields: Record<string, string>, answer: (url: string) => Response, roles = ['admin']) {
+	const seen: string[] = [];
+	const fetch = vi.fn(async (url: string) => {
+		const asked = String(url);
+		if (asked.includes('/auth/me')) return json({ id: 'u1', roles, disabled: false });
+		seen.push(asked);
+		return answer(asked);
+	}) as unknown as typeof globalThis.fetch;
+	const form = new FormData();
+	for (const [key, value] of Object.entries(fields)) form.set(key, value);
+	return {
+		seen,
+		event: {
+			fetch,
+			cookies: mockCookies(),
+			request: { formData: async () => form },
+			url: new URL('http://localhost/admin/webhooks'),
+		} as never,
+	};
+}
+
+describe('admin/webhooks/+page.server.ts rotate-secret', () => {
+	// The plugin answers the webhook and the secret it generated, and shows
+	// the secret this once.
+	it('hands the page the new secret and the webhook it signs for', async () => {
+		const { event } = postEvent(
+			{ id: 'w1' },
+			() => json({ webhook: { id: 'w1', name: 'Ship it', secret: '[redacted]' }, new_secret: 'c0ffee-secret' }),
+			['super_admin'],
+		);
+		expect(await actions['rotate-secret'](event)).toEqual({ rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } });
+	});
+
+	it('names its action on a refusal and keeps driver text out of an outage', async () => {
+		const refused = postEvent({ id: 'w1' }, () => json({ error: 'failed to rotate webhook secret' }, 404), ['super_admin']);
+		expect(await actions['rotate-secret'](refused.event)).toEqual({
+			status: 400,
+			data: { action: 'rotate-secret', error: 'failed to rotate webhook secret' },
+		});
+		const down = postEvent({ id: 'w1' }, () => json({ error: 'pq: timeout' }, 503), ['super_admin']);
+		expect(await actions['rotate-secret'](down.event)).toEqual({
+			status: 400,
+			data: { action: 'rotate-secret', error: 'Failed to rotate webhook secret' },
+		});
+	});
+});
