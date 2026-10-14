@@ -129,6 +129,15 @@ describe('email trigger drawer', () => {
 		expect(drawerText()).toContain('The trigger could not be saved.');
 	});
 
+	it('shows the license a refused save needs inside the open drawer', async () => {
+		const { rerender } = render(TriggersPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
+		const refused = { kind: 'feature', feature: 'Email Pro', plugin: 'email', upgradeUrl: '' };
+		await rerender(props({}, { action: 'save', error: 'This needs Email Pro.', refused }));
+		expect(drawerText()).toContain('Email Pro');
+		expect(drawerText()).not.toContain('This needs Email Pro.');
+	});
+
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
 		const { container } = render(TriggersPage, { props: props({}, { action: 'delete', error: 'The trigger could not be deleted.' }) });
 		expect(container.textContent).toContain('The trigger could not be deleted.');

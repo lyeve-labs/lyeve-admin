@@ -24,6 +24,7 @@
 	const saveFailure = $derived(failure?.action === 'save' && form !== openedOver ? failure : null);
 	const deleteFailure = $derived(failure?.action === 'delete' ? failure : null);
 	const pageRefusal = $derived(deleteFailure ? formRefusal(deleteFailure) : null);
+	const saveRefusal = $derived(saveFailure ? formRefusal(saveFailure) : null);
 
 	const eventLabel = (e: string) => TRIGGER_EVENT_LABELS[e] ?? e;
 	const triggers = $derived(data.triggers.ok ? data.triggers.value.triggers : []);
@@ -196,7 +197,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New trigger'}>
 	<form method="POST" action="?/save" id="trigger-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		<FormErrors message={saveFailure?.error} />
+		<FormErrors message={saveFailure?.error} refused={saveRefusal} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
 		<Input id="trigger-name" name="name" label="Name" required placeholder="Order confirmation" bind:value={name} />

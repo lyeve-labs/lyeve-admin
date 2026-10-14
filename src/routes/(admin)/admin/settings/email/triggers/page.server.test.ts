@@ -7,11 +7,15 @@ const api = vi.hoisted(() => ({
 	getSchemas: vi.fn(),
 }));
 
+const authz = vi.hoisted(() => ({ roles: ['admin'] as string[] }));
 vi.mock('$lib/server/authz', async () => {
 	const { createClient } = await vi.importActual<typeof import('@lyeve-labs/client')>('@lyeve-labs/client');
 	return {
 		authedClient: (event: { fetch?: typeof fetch }) => createClient(event.fetch ?? globalThis.fetch),
-		requireUser: async () => ({ id: 'u1', roles: ['admin'] }),
+		requireRole: async (_event: unknown, allowed: string[]) => {
+			if (!allowed.some((r) => authz.roles.includes(r))) throw Object.assign(new Error('403'), { status: 403 });
+			return { id: 'u1', roles: authz.roles };
+		},
 	};
 });
 vi.mock('$lib/api/email-triggers', async (orig) => ({
@@ -27,6 +31,7 @@ type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	authz.roles = ['admin'];
 	api.listEmailTriggers.mockResolvedValue({ triggers: [], events: ['after_create'] });
 	api.listEmailTemplates.mockResolvedValue([{ id: 't1', key: 'welcome', subject: 'Hi', status: 'active' }]);
 	api.getSchemas.mockResolvedValue([{ name: 'posts' }, { name: 'orders' }]);
@@ -113,19 +118,43 @@ describe('email trigger writes', () => {
 		expect(calls).toEqual([]);
 	});
 
-	it('keeps the status of a field the engine rejected', async () => {
-		const { event } = write(TRIGGER, json({ error: 'template welcome does not exist' }, 422));
+	it('keeps the status of a field the plugin rejected', async () => {
+		const { event } = write(TRIGGER, json({ error: 'not an email address: b@example' }, 422));
 		const out = (await actions.save(event)) as Failure;
 		expect(out.status).toBe(422);
-		expect(out.data).toEqual({ action: 'save', error: 'template welcome does not exist' });
+		expect(out.data).toEqual({ action: 'save', error: 'not an email address: b@example' });
 	});
 
-	it('carries a license refusal of a delete with its action', async () => {
-		const { event } = write({ id: 't1' }, json({ error: 'feature_not_licensed', feature: 'email-pro' }, 402));
-		const out = (await actions.delete(event)) as Failure;
-		expect(out.status).toBe(402);
-		expect(out.data.action).toBe('delete');
-		expect(out.data.refused).toMatchObject({ kind: 'feature' });
+	// The plugin sells trigger saves with email-pro and gates the create and
+	// the update, not the delete.
+	it('carries the license refusal of a save so the drawer can say what is missing', async () => {
+		const body = { error: 'payment_required', plugin: 'email', feature: 'feature:email-pro', upgrade_url: '' };
+		for (const id of ['', 't1']) {
+			const { event } = write({ ...TRIGGER, id }, json(body, 402));
+			const out = (await actions.save(event)) as Failure;
+			expect(out.status).toBe(402);
+			expect(out.data.action).toBe('save');
+			expect(out.data.refused).toMatchObject({ kind: 'feature', plugin: 'email' });
+		}
+	});
+
+	it.each(['save', 'delete'] as const)('refuses %s to an editor before it reaches the plugin', async (name) => {
+		authz.roles = ['editor'];
+		const { event, calls } = write({ ...TRIGGER, id: 't1' });
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(calls).toEqual([]);
+	});
+
+	it('lets a super admin save', async () => {
+		authz.roles = ['super_admin'];
+		const { event, calls } = write(TRIGGER);
+		expect(await actions.save(event)).toEqual({ saved: true });
+		expect(calls).toHaveLength(1);
+	});
+
+	it('relays the plugin refusal of a delete', async () => {
+		const { event } = write({ id: 't1' }, json({ error: 'email trigger not found' }, 404));
+		expect(((await actions.delete(event)) as Failure).data).toEqual({ action: 'delete', error: 'email trigger not found' });
 	});
 
 	it('deletes the named trigger', async () => {
@@ -143,10 +172,10 @@ describe('email trigger writes', () => {
 	it.each([
 		['save', 'The trigger could not be saved.'],
 		['delete', 'The trigger could not be deleted.'],
-	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
+	] as const)('answers an outage on %s as an outage, without the engine text', async (name, sentence) => {
 		const { event } = write({ ...TRIGGER, id: 't1' }, json({ error: 'dial tcp 10.0.0.4:5432' }, 503));
 		const out = (await actions[name](event)) as Failure;
-		expect(out.status).toBe(400);
+		expect(out.status).toBe(503);
 		expect(out.data).toEqual({ action: name, error: sentence });
 	});
 });
