@@ -22,8 +22,7 @@ import {
 import { errorCodeOf } from '$lib/api/limits';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { actionError } from '$lib/server/action-error';
-import { authedClient, requireRole } from '$lib/server/authz';
-import { sessionToken } from '$lib/server/session-cookie';
+import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
 
 /**
  * What the page renders.
@@ -54,9 +53,7 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 
 	const [families, exporters, destination] = await Promise.all([
-		// The exposition is plain text, which the JSON client cannot read, so
-		// it goes out with the session's bearer alone.
-		readMetricsText(fetch, sessionToken(event) ?? '')
+		readMetricsText(fetch, authedHeaders(event))
 			.then(parseExposition)
 			.catch(() => null),
 		superAdmin ? listExporters(client).catch(() => null) : Promise.resolve(null),

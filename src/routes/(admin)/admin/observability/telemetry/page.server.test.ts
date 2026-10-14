@@ -78,7 +78,7 @@ describe('telemetry load', () => {
 		expect(result.exporters).toBeNull();
 		expect(calls.some((c) => c.url.includes('/telemetry/exporters'))).toBe(false);
 		const scrape = calls.find((c) => c.url.includes('/telemetry/metrics'));
-		expect(scrape?.init?.headers).toMatchObject({ Authorization: 'Bearer tok', Accept: 'text/plain' });
+		expect(scrape?.init?.headers).toMatchObject({ Authorization: 'Bearer tok', 'X-CSRF-Token': 'tok', Accept: 'text/plain' });
 	});
 
 	it('reads the whole registry and the exporters for a super admin', async () => {
