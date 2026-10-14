@@ -242,6 +242,17 @@ describe('flows list page', () => {
 		expect(drawer.textContent).not.toContain('undefined');
 	});
 
+	it('puts a taken slug at the slug field inside the create drawer', async () => {
+		const data = { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed };
+		const { container, getAllByText, rerender } = render(FlowsPage, { props: { data, form: null } as never });
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({ data, form: { action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' } } as never);
+		const slug = container.ownerDocument.querySelector('#create-slug') as HTMLInputElement;
+		expect(slug.getAttribute('aria-invalid')).toBe('true');
+		const described = (slug.getAttribute('aria-describedby') ?? '').split(' ').map((id) => container.ownerDocument.getElementById(id)?.textContent ?? '');
+		expect(described.join(' ')).toContain('Another flow already uses this slug');
+	});
+
 	// The drawers and the row's delete share one form result.
 	it('shows a failed delete on the page and not in a drawer opened after it', async () => {
 		const { container, getAllByText, getByText } = setup({ flows: [fixtureFlow] }, licensed, { action: 'delete', error: 'Failed to delete flow' });

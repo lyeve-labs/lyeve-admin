@@ -30,7 +30,7 @@ const inventory: Datasource = {
 	id: 'd2',
 	name: 'inventory',
 	kind: 'http',
-	config: { base_url: 'https://inventory.example.test', chat_id: '@releases', headers: { Accept: 'application/json', Authorization: '***' } },
+	config: { base_url: 'https://inventory.example.test', chat_id: '@releases', headers: { Accept: 'application/json' } },
 	allow_writes: true,
 };
 
@@ -79,6 +79,27 @@ describe('datasources page', () => {
 		expect(form.textContent).toContain('connects in the clear when it does not');
 	});
 
+	it('says on edit that every blank secret keeps the stored ones and any typed one replaces them all', async () => {
+		const { getByLabelText, container } = setup();
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		const rule = container.querySelector('[data-testid="secret-rule"]') as HTMLElement;
+		expect(rule.textContent).toContain('Leave every secret field empty to keep');
+		expect(rule.textContent).toContain('Typing any one replaces all of them');
+	});
+
+	it('puts the name rule at the name field when the plugin refused the name', async () => {
+		const { getAllByText, container, rerender } = setup();
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		const rule = 'A name starts with a lower case letter and holds up to 40 lower case letters, digits, dashes and underscores.';
+		await rerender({
+			data: { datasources: [warehouse, inventory], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed },
+			form: { action: 'save', error: rule, nameError: rule },
+		} as never);
+		const name = container.querySelector('#ds-name') as HTMLInputElement;
+		expect(name.getAttribute('aria-invalid')).toBe('true');
+		expect(container.textContent).not.toContain('"ok"');
+	});
+
 	it('opens the edit drawer with the stored config and a per-header secret toggle', async () => {
 		const { getByLabelText, container } = setup();
 		await fireEvent.click(getByLabelText('Edit inventory'));
@@ -88,10 +109,10 @@ describe('datasources page', () => {
 		expect((form.querySelector('[name="base_url"]') as HTMLInputElement).value).toBe('https://inventory.example.test');
 		expect((form.querySelector('[name="chat_id"]') as HTMLInputElement).value).toBe('@releases');
 		const keys = [...form.querySelectorAll('[name="header_key"]')].map((el) => (el as HTMLInputElement).value);
-		expect(keys).toEqual(['Accept', 'Authorization']);
-		// The masked header stays secret, so its value field is a blank password input.
+		// The plugin never returns a secret header, so only the plain one comes back.
+		expect(keys).toEqual(['Accept']);
 		const secrets = [...form.querySelectorAll('[name="header_secret"]')].map((el) => (el as HTMLInputElement).value);
-		expect(secrets).toEqual(['false', 'true']);
+		expect(secrets).toEqual(['false']);
 	});
 
 	async function chooseAuth(container: HTMLElement, label: string) {
@@ -153,7 +174,7 @@ describe('datasources page', () => {
 		const secret = form.querySelector('[name="auth_client_secret"]') as HTMLInputElement;
 		expect(secret.value).toBe('');
 		expect(secret.required).toBe(false);
-		expect(getByTestId('auth-section').textContent).toContain('Leave blank to keep it');
+		expect(getByTestId('auth-section').textContent).toContain('Leave every secret field empty to keep it');
 
 		await chooseAuth(container, 'Bearer token');
 		const token = form.querySelector('[name="auth_token"]') as HTMLInputElement;

@@ -97,9 +97,14 @@
 	 */
 	let cleared = $state<unknown>(null);
 	const failure = $derived.by(() => {
-		const f = form as { action?: unknown; error?: unknown; refused?: unknown } | null;
+		const f = form as { action?: unknown; error?: unknown; refused?: unknown; nameError?: unknown } | null;
 		if (!f || f === cleared || typeof f.error !== 'string' || !f.error) return null;
-		return { action: String(f.action ?? ''), error: f.error, refused: f.refused === true };
+		return {
+			action: String(f.action ?? ''),
+			error: f.error,
+			refused: f.refused === true,
+			nameError: typeof f.nameError === 'string' ? f.nameError : '',
+		};
 	});
 	const saveFailure = $derived(failure?.action === 'save' ? failure : null);
 	const pageFailure = $derived(failure && failure.action !== 'save' ? failure : null);
@@ -134,16 +139,12 @@
 		ssl = isSqlKind(ds.kind) ? sslModeFor(ds.kind, ds.config.ssl) : null;
 		baseUrl = str(ds.config.base_url);
 		chatId = str(ds.config.chat_id);
+		// The plugin keeps secret headers in the encrypted half and never
+		// returns them, so only the plain headers come back to edit.
 		const h = ds.config.headers;
 		headers =
 			h && typeof h === 'object'
-				? Object.entries(h as Record<string, unknown>).map(([key, value]) => ({
-						key,
-						value: str(value),
-						// A masked value is a secret the engine will not return. The
-						// row stays secret and blank means keep it.
-						secret: str(value) === '***',
-				  }))
+				? Object.entries(h as Record<string, unknown>).map(([key, value]) => ({ key, value: str(value), secret: false }))
 				: [];
 		apiBase = str(ds.config.api_base);
 		auth = authFieldsOf(ds.config);
@@ -168,7 +169,7 @@
 	const schemeChanged = $derived(storedAuth !== null && storedAuth.type !== auth.type && auth.type !== 'none');
 	const secretHint = $derived(
 		keepSecret
-			? 'Stored and never shown. Leave blank to keep it.'
+			? 'Stored and never shown. Leave every secret field empty to keep it.'
 			: schemeChanged
 				? 'The scheme changed, so its secret is needed.'
 				: 'Encrypted at rest.'
@@ -414,7 +415,15 @@
 				<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? 'How to enable it'}</a>
 			{/if}
 			{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
-			<Input id="ds-name" name="name" label="Name" hint="How a node refers to it." value={editing?.name ?? ''} required />
+			<Input
+				id="ds-name"
+				name="name"
+				label="Name"
+				hint="How a node refers to it: lower case letters, digits, dashes and underscores, starting with a letter."
+				error={saveFailure?.nameError || undefined}
+				value={editing?.name ?? ''}
+				required
+			/>
 			<Select
 				id="ds-kind"
 				name="kind"
@@ -464,6 +473,14 @@
 					hint="For a Telegram bot API base: the chat a chat.notify node posts to unless the node names one."
 					bind:value={chatId}
 				/>
+				{#if editing?.has_secret}
+					<!-- The plugin stores the token, password, client secret and
+					     secret headers as one sealed value and replaces it whole. -->
+					<p class="text-xs text-muted" data-testid="secret-rule">
+						The stored secrets are never shown, the secret headers included. Leave every secret field empty to keep
+						all of them. Typing any one replaces all of them, so type every secret this datasource needs.
+					</p>
+				{/if}
 				<div class="flex flex-col gap-3 rounded-md border border-line p-3" data-testid="auth-section">
 					<SectionHeading level={3} variant="eyebrow">Authentication</SectionHeading>
 					{#if authFixed}<input type="hidden" name="auth_type" value={auth.type} />{/if}
@@ -505,13 +522,7 @@
 						<div class="flex items-end gap-2">
 							<Input id="ds-header-key-{i}" name="header_key" label="Header" bind:value={h.key} class="min-w-0 flex-1" />
 							{#if h.secret}
-								<PasswordInput
-									id="ds-header-value-{i}"
-									name="header_value"
-									label="Value"
-									hint={h.value === '***' ? 'Stored. Blank keeps it.' : undefined}
-									class="min-w-0 flex-1"
-								/>
+								<PasswordInput id="ds-header-value-{i}" name="header_value" label="Value" class="min-w-0 flex-1" />
 							{:else}
 								<Input id="ds-header-value-{i}" name="header_value" label="Value" bind:value={h.value} class="min-w-0 flex-1" />
 							{/if}

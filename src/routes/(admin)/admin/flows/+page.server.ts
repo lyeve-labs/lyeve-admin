@@ -120,6 +120,11 @@ export const actions: Actions = {
 		try {
 			created = await createFlow(client, { name, slug });
 		} catch (err) {
+			// The plugin answers a slug another flow holds with 409 and a
+			// static sentence that does not say so.
+			if (err instanceof ApiError && err.status === 409) {
+				return fail(409, { action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' });
+			}
 			return tagged('create', validationFailure(err, 'Failed to create flow'));
 		}
 		redirect(303, `/admin/flows/${encodeURIComponent(created.id)}`);

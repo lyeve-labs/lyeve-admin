@@ -243,6 +243,16 @@ describe('admin/flows create action', () => {
 		expect(result.data.error).not.toContain('example-capability');
 	});
 
+	it('says the slug is taken when the plugin answers 409', async () => {
+		const form = new FormData();
+		form.set('name', 'Orders');
+		form.set('slug', 'orders');
+		const { event } = actionEvent({ '/api/admin/flows': () => json({ error: 'failed to create flow' }, 409) }, form);
+		const result = (await actions.create(event)) as { status: number; data: { action: string; error: string; field: string } };
+		expect(result.status).toBe(409);
+		expect(result.data).toEqual({ action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' });
+	});
+
 	it('refuses a blank name before calling the engine', async () => {
 		const form = new FormData();
 		form.set('slug', 'x');

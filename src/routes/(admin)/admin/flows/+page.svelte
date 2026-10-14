@@ -116,6 +116,8 @@
 		refusal: RefusalNotice | null;
 		forbidden: boolean;
 		errors: ValidationError[];
+		/** The form field the failure concerns, when it concerns one. */
+		field: string;
 	}
 	let cleared = $state<unknown>(null);
 	const failure = $derived.by((): Failure | null => {
@@ -127,6 +129,7 @@
 			refusal: f.refusal ? (f.refusal as RefusalNotice) : null,
 			forbidden: f.forbidden === true,
 			errors: Array.isArray(f.errors) ? (f.errors as ValidationError[]) : [],
+			field: typeof f.field === 'string' ? f.field : '',
 		};
 	});
 	const createFailure = $derived(failure?.action === 'create' ? failure : null);
@@ -407,6 +410,7 @@
 				name="slug"
 				label="Slug"
 				hint="The URL segment: lower case letters, digits and underscores."
+				error={createFailure?.field === 'slug' ? createFailure.error : undefined}
 				bind:value={createSlug}
 				oninput={() => (slugTouched = true)}
 				required

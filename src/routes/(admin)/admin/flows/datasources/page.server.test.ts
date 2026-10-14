@@ -332,6 +332,23 @@ describe('admin/flows/datasources actions', () => {
 		expect(sent.secret).toEqual({ headers: { 'X-Api-Key': 'k' } });
 	});
 
+	it('reads a refused name out of the 422 list and never relays the JSON text', async () => {
+		const refused = { ok: false, errors: [{ path: '/name', message: 'a name of the shape [a-z][a-z0-9_-]{0,39} is required' }] };
+		const { event } = actionEvent(httpForm({ name: 'Orders DB' }), { '/datasources': () => json(refused, 422) });
+		const result = (await actions.create(event)) as { status: number; data: { error: string; nameError: string } };
+		expect(result.status).toBe(422);
+		expect(result.data.nameError).toContain('starts with a lower case letter');
+		expect(result.data.error).not.toContain('{');
+	});
+
+	it('relays a refused secret in the plugin words on an update', async () => {
+		const refused = { ok: false, errors: [{ path: '/secret', message: 'invalid datasource config: secret.token is required for bearer auth' }] };
+		const { event } = actionEvent(httpForm({ auth_type: 'bearer' }, 'd2'), { '/datasources/d2': () => json(refused, 422) });
+		const result = (await actions.update(event)) as { status: number; data: { error: string; nameError: string } };
+		expect(result.status).toBe(422);
+		expect(result.data).toMatchObject({ error: 'invalid datasource config: secret.token is required for bearer auth', nameError: '' });
+	});
+
 	it('refuses a scheme missing what it cannot work without, before the engine sees it', async () => {
 		for (const [auth, message] of [
 			[{ auth_type: 'basic', auth_password: 'pw' }, 'needs a user'],
