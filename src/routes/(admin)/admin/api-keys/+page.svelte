@@ -222,6 +222,10 @@
 
 	<FormErrors message={pageFailure?.error} refused={pageRefused} />
 
+	<!-- The kit's empty state titles itself as an h3. This names the list
+	     under the page title so a heading list never skips a level. -->
+	<h2 class="sr-only">Keys</h2>
+
 	{#if !data.keys.ok}
 		<GateNotice gate={data.keys.gate} title="API keys" absent="This engine does not serve API keys." />
 	{:else if keys.length === 0}

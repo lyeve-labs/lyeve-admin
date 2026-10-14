@@ -85,7 +85,7 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>This browser</SectionHeading>
 			{#if thisOne}
-				<Alert tone="success" autoDismiss>
+				<Alert tone="success">
 					This browser is already trusted, as {deviceLabel(thisOne)}.
 				</Alert>
 			{:else}

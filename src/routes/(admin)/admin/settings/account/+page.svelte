@@ -66,7 +66,7 @@
 	<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
 		<Card pad="md">
 			{#snippet header()}
-				<SectionHeading level={3}>Account</SectionHeading>
+				<SectionHeading level={2}>Account</SectionHeading>
 			{/snippet}
 			<div class="flex flex-col gap-4">
 				<DescriptionList
@@ -91,7 +91,7 @@
 
 		<Card pad="md">
 			{#snippet header()}
-				<SectionHeading level={3}>Appearance</SectionHeading>
+				<SectionHeading level={2}>Appearance</SectionHeading>
 			{/snippet}
 			<div class="flex flex-col gap-4">
 				<p class="text-sm text-muted">The color scheme this admin uses in this browser. System follows your desktop, dusk included.</p>

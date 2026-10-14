@@ -167,7 +167,8 @@
 		{:else}
 			<ListToolbar label="Filter providers">
 				{#snippet search()}
-					<SearchInput bind:value={narrow} placeholder="Search providers" />
+					<label for="oauth-search" class="sr-only">Search providers</label>
+					<SearchInput id="oauth-search" bind:value={narrow} placeholder="Search providers" />
 				{/snippet}
 			</ListToolbar>
 

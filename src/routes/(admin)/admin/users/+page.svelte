@@ -196,6 +196,10 @@
 
 	<FormErrors message={pageFailure?.error} />
 
+	<!-- The kit's empty state titles itself as an h3. This names the list
+	     under the page title so a heading list never skips a level. -->
+	<h2 class="sr-only">Accounts</h2>
+
 	{#if !data.users.ok}
 		<GateNotice gate={data.users.gate} title="Users" absent="This engine does not serve the accounts list." />
 	{:else if rows.length === 0}

@@ -17,6 +17,7 @@
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
 	import type { PageData, ActionData } from './$types';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { Permission } from '@lyeve-labs/client';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -169,6 +170,14 @@
 		await tick();
 		deleteForm?.requestSubmit();
 	}
+
+	// The row and the drawer that asked for a removal are gone once it lands,
+	// so focus would fall to the document body and the next Tab would start
+	// from the top of the page. It goes to the filter above the rules instead.
+	const afterDelete: SubmitFunction = () => async ({ result, update }) => {
+		await update();
+		if (result.type === 'success') document.getElementById('schema-filter')?.focus();
+	};
 
 	let roleOpen = $state(false);
 	function openRole() {
@@ -388,7 +397,7 @@
 	ondelete={(perm) => void askDelete(perm)}
 />
 
-<form method="POST" action="?/delete" use:enhance bind:this={deleteForm} class="hidden">
+<form method="POST" action="?/delete" use:enhance={afterDelete} bind:this={deleteForm} class="hidden">
 	<input type="hidden" name="id" value={deleteId} />
 </form>
 

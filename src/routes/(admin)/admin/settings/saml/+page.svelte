@@ -269,7 +269,8 @@
 			{:else}
 				<ListToolbar label="Filter providers">
 					{#snippet search()}
-						<SearchInput bind:value={narrow} placeholder="Search providers" />
+						<label for="saml-search" class="sr-only">Search providers</label>
+						<SearchInput id="saml-search" bind:value={narrow} placeholder="Search providers" />
 					{/snippet}
 				</ListToolbar>
 

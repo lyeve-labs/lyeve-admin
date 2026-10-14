@@ -80,6 +80,19 @@ describe('this browser', () => {
 		expect(said(container)).not.toContain('remembers the browser you are reading this in');
 	});
 
+	// It states a standing condition, so it stays. A confirmation that clears
+	// itself would leave the section a heading over nothing.
+	it('keeps saying this browser is trusted after a while', async () => {
+		vi.useFakeTimers();
+		try {
+			const { container } = render(DevicesPage, { props: props({ userAgent: CHROME_MAC }) });
+			await vi.advanceTimersByTimeAsync(30_000);
+			expect(said(container)).toContain('already trusted, as Work laptop');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('marks the row that looks like this browser', () => {
 		const { container } = render(DevicesPage, { props: props({ userAgent: CHROME_MAC }) });
 		expect(said(container)).toContain('Looks like this one');

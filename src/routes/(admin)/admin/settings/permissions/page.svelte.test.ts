@@ -14,12 +14,13 @@ type SubmitFn = (input: unknown) => EnhanceCallback | void;
 
 // The real enhance is not exercised here, but the submit function each form
 // passes it is: it decides whether the modal closes and whether load reruns.
-const forms = vi.hoisted(() => ({ submits: [] as SubmitFn[] }));
+const forms = vi.hoisted(() => ({ submits: [] as SubmitFn[], byAction: new Map<string, SubmitFn>() }));
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://admin/admin/settings/permissions') } }));
 vi.mock('$app/forms', () => ({
 	enhance: (_node: HTMLFormElement, submit?: SubmitFn) => {
 		if (submit) forms.submits.push(submit);
+		if (submit) forms.byAction.set(_node.getAttribute('action') ?? '', submit);
 		return { destroy() {} };
 	},
 }));
@@ -801,3 +802,17 @@ describe('permissions page marks without color', () => {
 		expect(roleRow(container, 'super_admin').querySelector('[data-mark="exempt"]')).toBeTruthy();
 	});
 });
+
+// The row and the drawer that asked for a removal are gone once it lands, so
+// focus has to go somewhere a keyboard can carry on from.
+describe('after a rule is removed', () => {
+	it('moves focus to the filter above the rules', async () => {
+		const { container } = setup();
+		const submit = forms.byAction.get('?/delete');
+		expect(submit, 'the delete form registered no submit function').toBeTruthy();
+		const callback = (await submit!({})) as EnhanceCallback;
+		await callback({ result: { type: 'success' } as EnhanceResult, update: vi.fn(async () => {}) });
+		expect(document.activeElement).toBe(container.ownerDocument.getElementById('schema-filter'));
+	});
+});
+
