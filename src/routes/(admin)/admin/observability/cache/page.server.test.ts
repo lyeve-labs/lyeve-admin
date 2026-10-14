@@ -229,10 +229,17 @@ describe('cache flush', () => {
 		expect(api.flushAll).toHaveBeenCalled();
 	});
 
-	it('flushes one tag', async () => {
+	it('flushes one tag for a super admin', async () => {
+		authz.roles = ['super_admin'];
 		api.flushTag.mockResolvedValue(undefined);
 		expect(await actions.flush(formEvent({ tag: 'posts' }))).toEqual({ flushed: 'posts' });
 		expect(api.flushTag).toHaveBeenCalledWith(expect.anything(), 'posts');
+	});
+
+	// A tag other than a tenant tag is flushed from every tenant's entries.
+	it('refuses a tag flush from a tenant admin', async () => {
+		await expect(actions.flush(formEvent({ tag: 'posts' }))).rejects.toThrow('403');
+		expect(api.flushTag).not.toHaveBeenCalled();
 	});
 
 	it('refuses a role the plugin does not admit', async () => {
@@ -242,6 +249,7 @@ describe('cache flush', () => {
 	});
 
 	it("relays the plugin's refusal", async () => {
+		authz.roles = ['super_admin'];
 		api.flushTag.mockRejectedValue(new ApiError(403, "cannot flush another tenant's cache entries", {}));
 		const out = (await actions.flush(formEvent({ tag: 'tenant:other' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);

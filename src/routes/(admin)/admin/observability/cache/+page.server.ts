@@ -240,6 +240,9 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const tag = String(form.get('tag') ?? '').trim();
+		// The plugin scopes only a tenant tag to the tenant. Any other tag is
+		// flushed from every tenant's entries, so it stays with a super admin.
+		if (tag) await requireRole(event, ['super_admin']);
 		try {
 			if (tag) await flushTag(client, tag);
 			else await flushAll(client);
