@@ -6,13 +6,12 @@ import { setupGateRedirect } from '$lib/server/setup-gate';
 import {
 	callerOf,
 	contentApiAddressProblem,
+	engineBaseFor,
 	signEngineRequest
 } from '$lib/server/engine';
 import { relayEngineCookies } from '$lib/server/engine-cookies';
 import { sessionToken } from '$lib/server/session-cookie';
 import { refreshSession } from '$lib/server/session-refresh';
-
-const ENGINE_URL = process.env.CORE_INTERNAL_URL;
 
 // A production server that cannot reach the Content API refuses to start.
 // The fallback address is this console's own port in the official image, so
@@ -81,13 +80,12 @@ function withMutableHeaders(response: Response): Response {
 	}
 }
 
-// Rewrite server-side relative /api/* requests to the engine when
-// CORE_INTERNAL_URL is set (prod / adapter-node).  In dev the Vite proxy
-// handles routing. This hook is a no-op when the var is unset.
+// Rewrite server-side relative /api/* requests to the engine, at the address
+// engineBaseFor names, with or without CORE_INTERNAL_URL.
 //
-// Without this hook, SvelteKit's event.fetch resolves relative URLS inside
-// its own router.  There are no matching routes for /api/*, so every
-// server-load fetch returns 404 on adapter-node.
+// Without this hook, SvelteKit's event.fetch resolves relative URLs inside
+// its own router, and the request runs this app's handle again with the
+// browser's cookies. A session renewal made that way waits on itself.
 //
 // Every call bound for the engine is signed for the browser behind event, so
 // the engine counts that browser rather than this server. Only a relative call,
@@ -99,7 +97,7 @@ export const handleFetch: HandleFetch = async ({ request, fetch, event }) => {
 	if (parsed.origin !== event.url.origin || !parsed.pathname.startsWith('/api/')) {
 		return fetch(request);
 	}
-	const target = ENGINE_URL ? new URL(parsed.pathname + parsed.search, ENGINE_URL) : parsed;
+	const target = new URL(parsed.pathname + parsed.search, engineBaseFor(parsed.pathname));
 	const outbound = new Request(target, request);
 	signEngineRequest(outbound.headers, outbound.method, target, callerOf(event));
 	// The engine reads the browser from User-Agent: a sign-in's device and
@@ -110,6 +108,6 @@ export const handleFetch: HandleFetch = async ({ request, fetch, event }) => {
 	const response = await fetch(outbound);
 	// A rewritten call leaves this app, so SvelteKit does not pass the
 	// engine's cookies on to the browser. The CSRF pair has to arrive anyway.
-	if (ENGINE_URL) relayEngineCookies(response.headers, event.cookies);
+	relayEngineCookies(response.headers, event.cookies);
 	return response;
 };
