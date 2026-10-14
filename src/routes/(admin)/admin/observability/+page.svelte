@@ -89,8 +89,6 @@
 						<Badge tone="danger" class="shrink-0 whitespace-nowrap"><AlertTriangle size={ICON.xs} /> Unhealthy</Badge>
 					{:else if measured}
 						<Badge tone="success" class="shrink-0 whitespace-nowrap"><CheckCircle size={ICON.xs} /> Healthy</Badge>
-					{:else}
-						<Badge tone="warn" class="shrink-0 whitespace-nowrap"><AlertTriangle size={ICON.xs} /> Health unconfirmed</Badge>
 					{/if}
 				{/if}
 			</div>
@@ -119,14 +117,6 @@
 					<Stat size="sm" label="Wait count" mono value={pool.wait_count ?? NO_VALUE} />
 				{/if}
 			</div>
-			{#if !measured}
-				<!-- The tiles are omitted rather than dashed. Four dashes in a row
-				     read as four measurements of nothing. -->
-				<p class="mt-3 text-xs text-muted">
-					The engine reported no connection statistics, so nothing here can say how many
-					connections are open or how long callers wait for one.
-				</p>
-			{/if}
 			{#if pool.errors && pool.errors.length > 0}
 				<div class="mt-3">
 					<Alert tone="danger" title="Pool reported errors">
