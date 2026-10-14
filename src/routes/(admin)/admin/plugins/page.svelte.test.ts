@@ -97,6 +97,16 @@ describe('plugins page', () => {
 		expect(row(container, 'search').textContent).not.toContain('How to enable it');
 	});
 
+	// The link is 16px tall. Under a finger its hit area grows to 44px, and the
+	// row pads its foot so that area ends inside its own row.
+	it('gives the enable link a touch hit area that stays inside its row', () => {
+		const { container } = renderPage();
+		const link = row(container, 'example').querySelector('a[href="/admin/settings/license"]') as HTMLElement;
+		expect(link.className).toContain('relative');
+		expect(link.className).toContain('hit-area');
+		expect((link.parentElement as HTMLElement).className).toContain('coarse:pb-3.5');
+	});
+
 	it('links every row to its plugin', () => {
 		const { container } = renderPage();
 		for (const p of PLUGINS) {

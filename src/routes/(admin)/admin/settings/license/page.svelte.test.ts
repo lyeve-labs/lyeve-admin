@@ -187,6 +187,16 @@ describe('License page links', () => {
 		}
 	});
 
+	// Each link's hit area is 44px under a finger, and its negative margin lays
+	// each item out 24px tall, so the gap has to be 20px to put the links 44px
+	// apart.
+	it('spaces the stacked links so each keeps its whole touch hit area', () => {
+		const { getByRole } = mount();
+		const link = getByRole('link', { name: 'Get a license' });
+		expect(link.className).toContain('hit-area');
+		expect((link.closest('ul') as HTMLElement).className).toContain('coarse:gap-5');
+	});
+
 	it('leaves the enable and support links to the rest of the console', () => {
 		const { queryByRole } = mount();
 		expect(queryByRole('link', { name: 'Turn it on' })).toBeNull();

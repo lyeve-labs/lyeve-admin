@@ -225,7 +225,7 @@
 			{#if pluginGroups.length > 0}
 				<button
 					type="button"
-					class="flex w-full items-center justify-between px-4 pt-4 pb-1 text-left"
+					class="flex w-full items-center justify-between px-4 pt-4 pb-1 coarse:min-h-control text-left"
 					onclick={() => (pluginsOpen = !pluginsOpen)}
 					aria-expanded={pluginsOpen}
 				>

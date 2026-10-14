@@ -74,7 +74,7 @@
 			target={away ? '_blank' : undefined}
 			rel={away ? 'noopener noreferrer' : undefined}
 			title={description || title}
-			class="inline-flex rounded-full {cls}"
+			class="relative hit-area inline-flex rounded-full {cls}"
 		>
 			{@render marker()}
 		</a>
