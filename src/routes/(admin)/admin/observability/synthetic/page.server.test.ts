@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
+const authz = vi.hoisted(() => ({ roles: ['admin'] as string[] }));
 vi.mock('$lib/server/authz', async (importOriginal) => ({
 	...((await importOriginal()) as object),
 	authedClient: vi.fn(() => engine),
-	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
+	requireRole: vi.fn(async (_event: unknown, allowed: string[]) => {
+		if (!allowed.some((r) => authz.roles.includes(r))) throw new Error('403');
+		return { id: 'u1', roles: authz.roles };
+	}),
 }));
 
 import { actions, load } from './+page.server';
@@ -28,6 +32,13 @@ function actionEvent(fields: Record<string, string>) {
 	return { request: { formData: async () => data } } as never;
 }
 
+/** An event whose request can be read twice, as the update action reads it. */
+function requestEvent(fields: Record<string, string>) {
+	const body = new FormData();
+	for (const [k, v] of Object.entries(fields)) body.set(k, v);
+	return { request: new Request('http://localhost/admin/observability/synthetic', { method: 'POST', body }) } as never;
+}
+
 function route(channels: unknown) {
 	engine.get.mockImplementation(async (url: string) => {
 		if (url.includes('/alert-channels')) {
@@ -35,12 +46,15 @@ function route(channels: unknown) {
 			return channels;
 		}
 		if (url.includes('/probes')) return { data: [PROBE], total_count: 1 };
-		if (url.includes('/alerts')) return { data: [] };
+		if (url.includes('/alerts')) return [];
 		throw new ApiError(404, 'not found', {});
 	});
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+	vi.clearAllMocks();
+	authz.roles = ['admin'];
+});
 
 describe('the notice channels load', () => {
 	it('reads no channels until the address names a probe', async () => {
@@ -147,6 +161,18 @@ describe('saving a probe', () => {
 });
 
 describe('the probe list load', () => {
+	// The plugin answers the open alerts as a bare array.
+	it('reads an open alert out of the bare array the plugin answers', async () => {
+		const open = { id: 'a1', probe_id: 'p1', probe_name: 'Homepage', probe_type: 'health_check', consecutive_failures: 3, last_failure_at: '2026-10-01T00:00:00Z', message: 'down', acknowledged: false, created_at: '2026-10-01T00:00:00Z' };
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.includes('/probes')) return { data: [PROBE], total_count: 1 };
+			if (url.includes('/alerts')) return [open];
+			throw new ApiError(404, 'not found', {});
+		});
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.alerts).toEqual({ ok: true, value: [open] });
+	});
+
 	it('keeps a failed alert read as a gate rather than no alerts', async () => {
 		engine.get.mockImplementation(async (url: string) => {
 			if (url.includes('/probes')) return { data: [PROBE], total_count: 1 };
@@ -161,7 +187,7 @@ describe('the probe list load', () => {
 	it('sends an offset past the end back to the last page', async () => {
 		engine.get.mockImplementation(async (url: string) => {
 			if (url.includes('/probes')) return { data: [], total_count: 30 };
-			if (url.includes('/alerts')) return { data: [] };
+			if (url.includes('/alerts')) return [];
 			throw new ApiError(404, 'not found', {});
 		});
 		await expect(load(loadEvent('?limit=25&offset=200'))).rejects.toMatchObject({
@@ -179,7 +205,7 @@ describe('a plugin that answers every probe', () => {
 	it('cuts the page from every probe and counts them all', async () => {
 		engine.get.mockImplementation(async (url: string) => {
 			if (url.includes('/probes')) return many;
-			if (url.includes('/alerts')) return { data: [] };
+			if (url.includes('/alerts')) return [];
 			throw new ApiError(404, 'not found', {});
 		});
 		const out = (await load(loadEvent('?limit=25&offset=25'))) as Loaded;
@@ -192,7 +218,7 @@ describe('a plugin that answers every probe', () => {
 	it('sends an offset past every probe back to the last page', async () => {
 		engine.get.mockImplementation(async (url: string) => {
 			if (url.includes('/probes')) return many;
-			if (url.includes('/alerts')) return { data: [] };
+			if (url.includes('/alerts')) return [];
 			throw new ApiError(404, 'not found', {});
 		});
 		await expect(load(loadEvent('?limit=25&offset=100'))).rejects.toMatchObject({
@@ -206,5 +232,134 @@ describe('which surface a failure belongs to', () => {
 	it('tags a failed probe save for the probe drawer', async () => {
 		const out = (await actions.create(actionEvent({ name: '' }))) as { data: Record<string, unknown> };
 		expect(out.data.drawer).toBe('probe');
+	});
+});
+
+describe('editing a probe', () => {
+	const LOGIN = {
+		id: 'p2',
+		name: 'Sign in',
+		type: 'login_flow',
+		config: {
+			login_url: 'https://example.com/login',
+			username: 'probe',
+			password: '***',
+			headers: { 'X-Probe': 'yes', Authorization: '***' },
+			payload: { a: 1 },
+		},
+		regions: ['us-east', 'eu-west'],
+	};
+	const fields = (over: Record<string, string> = {}) => ({
+		id: 'p2',
+		name: 'Sign in',
+		type: 'login_flow',
+		login_url: 'https://example.com/login',
+		username: 'probe',
+		expected_redirect: '/home',
+		interval_seconds: '300',
+		timeout_seconds: '10',
+		enabled: 'true',
+		kept: JSON.stringify({ config: LOGIN.config, regions: LOGIN.regions }),
+		...over,
+	});
+
+	// The plugin replaces the stored config and regions whole, so what the
+	// form does not show travels back from the read.
+	it('sends back the regions and every config key the form does not show', async () => {
+		engine.put.mockResolvedValue(LOGIN);
+		expect(await actions.update(requestEvent(fields()))).toEqual({ saved: 'Sign in' });
+		const [url, body] = engine.put.mock.calls[0];
+		expect(url).toBe('/api/admin/synthetic-monitoring/probes/p2');
+		expect(body.regions).toEqual(['us-east', 'eu-west']);
+		expect(body.config).toMatchObject({ payload: { a: 1 }, headers: { 'X-Probe': 'yes' }, expected_redirect: '/home' });
+	});
+
+	// Sending the mask back would store the mask as the secret.
+	it('never sends a masked secret back', async () => {
+		engine.put.mockResolvedValue(LOGIN);
+		await actions.update(requestEvent(fields()));
+		const body = engine.put.mock.calls[0][1];
+		expect(body.config.password).toBeUndefined();
+		expect(body.config.headers.Authorization).toBeUndefined();
+	});
+
+	it('sends the password typed in the form', async () => {
+		engine.put.mockResolvedValue(LOGIN);
+		await actions.update(requestEvent(fields({ secret: 'hunter2' })));
+		expect(engine.put.mock.calls[0][1].config.password).toBe('hunter2');
+	});
+
+	it('refuses a save that names no probe', async () => {
+		const out = (await actions.update(requestEvent(fields({ id: '' })))) as Failure;
+		expect(out.status).toBe(400);
+		expect(engine.put).not.toHaveBeenCalled();
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
+		await expect(actions.update(requestEvent(fields()))).rejects.toThrow('403');
+	});
+
+	it("relays the plugin's refusal into the drawer", async () => {
+		engine.put.mockRejectedValue(new ApiError(400, 'probe target is not allowed', {}));
+		const out = (await actions.update(requestEvent(fields()))) as Failure;
+		expect(out.data).toMatchObject({ error: 'probe target is not allowed', drawer: 'probe' });
+	});
+
+	it('says an outage failed the save', async () => {
+		engine.put.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.update(requestEvent(fields()))) as Failure;
+		expect(out.data).toMatchObject({ error: 'The probe could not be saved.', drawer: 'probe' });
+	});
+});
+
+describe('deleting a probe', () => {
+	it('deletes the probe it names', async () => {
+		engine.delete.mockResolvedValue(undefined);
+		expect(await actions.delete(actionEvent({ id: 'p1' }))).toEqual({ removed: 'p1' });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1');
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
+		await expect(actions.delete(actionEvent({ id: 'p1' }))).rejects.toThrow('403');
+		expect(engine.delete).not.toHaveBeenCalled();
+	});
+
+	it("relays the plugin's refusal", async () => {
+		engine.delete.mockRejectedValue(new ApiError(404, 'probe not found', {}));
+		const out = (await actions.delete(actionEvent({ id: 'p1' }))) as Failure;
+		expect(out.data.error).toBe('probe not found');
+	});
+
+	it('says an outage failed the delete', async () => {
+		engine.delete.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.delete(actionEvent({ id: 'p1' }))) as Failure;
+		expect(out.data.error).toBe('The probe could not be removed.');
+	});
+});
+
+describe('acknowledging an alert', () => {
+	it('acknowledges the alert it names', async () => {
+		engine.post.mockResolvedValue({});
+		expect(await actions.acknowledge(actionEvent({ id: 'a1' }))).toEqual({ acknowledged: 'a1' });
+		expect(engine.post.mock.calls[0][0]).toBe('/api/admin/synthetic-monitoring/alerts/a1/acknowledge');
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
+		await expect(actions.acknowledge(actionEvent({ id: 'a1' }))).rejects.toThrow('403');
+	});
+
+	it("relays the plugin's refusal", async () => {
+		engine.post.mockRejectedValue(new ApiError(404, 'alert not found', {}));
+		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
+		expect(out.data.error).toBe('alert not found');
+	});
+
+	it('says an outage failed the acknowledgment', async () => {
+		engine.post.mockRejectedValue(new TypeError('fetch failed'));
+		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
+		expect(out.data.error).toBe('The alert could not be acknowledged.');
 	});
 });
