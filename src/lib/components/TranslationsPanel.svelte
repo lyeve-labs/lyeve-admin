@@ -159,7 +159,7 @@
 					<Badge tone="violet" size="sm">Beta</Badge>
 				</span>
 			</SectionHeading>
-			<a href="/admin/settings/localization" class="text-xs text-muted hover:text-fg transition-colors">
+			<a href="/admin/settings/localization" class="relative hit-area text-xs text-muted hover:text-fg transition-colors">
 				Locales
 			</a>
 		</div>

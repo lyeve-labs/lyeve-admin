@@ -329,7 +329,7 @@
 									<form method="POST" action="?/restore" use:enhance class="mt-2">
 										<input type="hidden" name="rev_num" value={rev.revision_num} />
 										<Button variant="secondary" size="sm" type="submit">
-											<RotateCcw size={ICON.xs} /> Restore
+											<RotateCcw size={ICON.sm} /> Restore
 										</Button>
 									</form>
 								{/if}
@@ -344,7 +344,7 @@
 							<form method="POST" action="?/restore" use:enhance class="mt-2">
 								<input type="hidden" name="rev_num" value={openedRevision.revision_num} />
 								<Button variant="secondary" size="sm" type="submit">
-									<RotateCcw size={ICON.xs} /> Restore
+									<RotateCcw size={ICON.sm} /> Restore
 								</Button>
 							</form>
 						</div>

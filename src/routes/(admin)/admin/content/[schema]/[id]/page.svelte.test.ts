@@ -166,6 +166,8 @@ describe('content entry editor, revision history', () => {
 		const opened = screen.getByTestId('opened-revision');
 		expect(opened.textContent).toContain('Revision 4');
 		expect((opened.querySelector('input[name="rev_num"]') as HTMLInputElement).value).toBe('4');
+		// The button text is text-sm, so its icon takes the text-sm rung.
+		expect(opened.querySelector('button svg')?.getAttribute('width')).toBe('14');
 	});
 });
 

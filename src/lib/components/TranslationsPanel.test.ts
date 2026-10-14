@@ -38,6 +38,13 @@ function hidden(name: string): HTMLInputElement {
 }
 
 describe('TranslationsPanel', () => {
+	it('gives the Locales link a touch-sized target', () => {
+		mount([]);
+		const link = screen.getByRole('link', { name: 'Locales' });
+		expect(link.className).toContain('relative');
+		expect(link.className).toContain('hit-area');
+	});
+
 	it('offers every enabled locale but the default as a tab, and wears the beta badge', () => {
 		mount([]);
 		expect(screen.getByText('Beta')).toBeTruthy();

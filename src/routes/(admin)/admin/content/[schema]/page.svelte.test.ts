@@ -77,6 +77,13 @@ describe('content listing states the collection total', () => {
 		vi.clearAllMocks();
 	});
 
+	it('gives the entry name, the only way into an entry, a touch-sized target', () => {
+		render(ContentListPage, { props: { data: data({ items: items(1) }), form: null } });
+		const link = document.querySelector('td[data-cell="truncate"] a') as HTMLAnchorElement;
+		expect(link.className).toContain('hit-area');
+		expect(link.className).toContain('relative');
+	});
+
 	it('reports the total, not the size of the page on screen', () => {
 		render(ContentListPage, { props: { data: data(), form: null } });
 
