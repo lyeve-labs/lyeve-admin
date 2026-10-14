@@ -86,7 +86,6 @@
 				label="Window"
 				labelHidden
 				size="sm"
-				class="coarse:[&_a]:min-w-control"
 				value={data.window}
 				options={windowOptions}
 			/>

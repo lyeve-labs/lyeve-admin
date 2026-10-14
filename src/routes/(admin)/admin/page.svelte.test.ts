@@ -241,8 +241,9 @@ describe('dashboard window', () => {
 		const { container } = render(DashboardPage, {
 			props: { data: data({ window: '7d' }), form: null },
 		});
-		const group = container.querySelector('a[href="/admin?window=6h"]')?.closest('[data-field]') as HTMLElement;
-		expect(group.className).toContain('coarse:[&_a]:min-w-control');
+		for (const link of container.querySelectorAll('a[href^="/admin?window="]')) {
+			expect(link.className).toContain('coarse:min-w-control');
+		}
 	});
 
 	it('does not offer a window to an editor, whose tiles are not windowed', () => {
