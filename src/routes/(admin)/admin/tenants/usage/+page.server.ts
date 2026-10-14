@@ -125,7 +125,7 @@ export const actions: Actions = {
 			return fail(400, { action: 'review', error: 'A review is either an approval or a denial.' });
 		}
 		try {
-			await reviewRequest(client, id, decision === 'approve', String(form.get('note') ?? ''));
+			await reviewRequest(client, id, decision === 'approve');
 		} catch (err) {
 			return tagged('review', actionFailure(err, 'The request could not be reviewed.'));
 		}
