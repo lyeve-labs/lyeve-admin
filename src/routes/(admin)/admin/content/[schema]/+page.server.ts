@@ -7,6 +7,7 @@ import { actionError } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
 import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, totalOf, withOffset, type ListEnvelope } from '$lib/api/list';
+import { fieldKey } from '$lib/utils/content-form';
 
 /** One row of the admin content listing, before it is reshaped for the table. */
 type EntryRow = {
@@ -109,7 +110,9 @@ type ListedItem = { data: Record<string, unknown> };
  * and a column of ids tells the reader nothing. Each linked content type is
  * read once, and every id it holds is replaced by the entry's id and title,
  * the populated shape the table cell already shows by its title. An id the
- * read does not find stays as it is.
+ * read does not find stays as it is. The link is read under its key column,
+ * where the console's form writes it, then under the field name, and is
+ * always handed to the table under the field name.
  */
 async function nameRelatedEntries(
 	client: HttpClient,
@@ -119,9 +122,10 @@ async function nameRelatedEntries(
 	const links = fields.filter(
 		(f) => f.field_type === 'relation' && f.relation_to && (f.relation_type ?? 'belongs_to') === 'belongs_to',
 	);
+	const linkOf = (it: ListedItem, f: SchemaField) => it.data[fieldKey(f)] ?? it.data[f.name];
 	const wanted = new Set<string>();
 	for (const f of links) {
-		if (items.some((it) => typeof it.data[f.name] === 'string' && it.data[f.name] !== '')) {
+		if (items.some((it) => typeof linkOf(it, f) === 'string' && linkOf(it, f) !== '')) {
 			wanted.add(f.relation_to as string);
 		}
 	}
@@ -144,9 +148,11 @@ async function nameRelatedEntries(
 
 	for (const f of links) {
 		for (const it of items) {
-			const id = it.data[f.name];
+			const id = linkOf(it, f);
 			if (typeof id === 'string' && titles.has(id)) {
 				it.data[f.name] = { id, title: titles.get(id) };
+			} else if (id !== undefined) {
+				it.data[f.name] = id;
 			}
 		}
 	}

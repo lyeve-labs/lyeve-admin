@@ -276,6 +276,44 @@ describe('content listing names linked entries', () => {
 		expect(authorReads).toHaveLength(1);
 	});
 
+	it('reads a link stored under its key column, the way the console form writes it', async () => {
+		rest.getSchema.mockResolvedValueOnce({
+			name: 'posts',
+			display_name: 'Posts',
+			fields: [
+				{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' },
+				{ name: 'editor', field_type: 'relation', relation_to: 'author', relation_fk_name: 'edited_by' },
+			],
+		} as never);
+		const posts = {
+			data: [
+				{ ...rows(1)[0], body: { author_id: 'a1', edited_by: 'a1' } },
+				{ ...rows(1, 1)[0], body: { author: 'a1' } },
+				{ ...rows(1, 2)[0], body: { author_id: 'missing' } },
+			],
+			total_count: 3,
+		};
+		const authors = { data: [{ id: 'a1', title: 'Ada Park', created_at: '', updated_at: '' }], total_count: 1 };
+		const fetch = vi.fn(async (input: string | URL | Request) => {
+			const u = new URL(String(input), 'http://localhost');
+			const body = u.searchParams.get('schema') === 'author' ? authors : posts;
+			return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		});
+		const result = (await load({
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			params: { schema: 'posts' },
+			url: new URL('http://localhost/admin/content/posts'),
+		} as never)) as unknown as Loaded;
+
+		if (!result.items.ok) throw new Error('the listing failed');
+		const [byKey, byName, unknown] = result.items.value;
+		expect(byKey.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(byKey.data.editor).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(byName.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(unknown.data.author).toBe('missing');
+	});
+
 	it('reads nothing more when no row links anywhere', async () => {
 		const { fetch } = await runLoad('', { data: rows(3), total_count: 3 });
 		expect(fetch).toHaveBeenCalledTimes(1);
