@@ -30,6 +30,12 @@ describe('decodeEntities', () => {
 		expect(decodeEntities('&#34;a&#39; &quot;b&apos; &#x41;&#65; &amp;lt;')).toBe('"a\' "b\' AA &lt;');
 	});
 
+	it('leaves a name an object inherits as written', () => {
+		expect(decodeEntities('&constructor; &toString; &valueOf; &hasOwnProperty;')).toBe(
+			'&constructor; &toString; &valueOf; &hasOwnProperty;',
+		);
+	});
+
 	it('leaves an unknown or invalid reference as written', () => {
 		expect(decodeEntities('&nbsp; &#0; &#x110000; & alone')).toBe('&nbsp; &#0; &#x110000; & alone');
 	});

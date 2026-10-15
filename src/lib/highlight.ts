@@ -9,7 +9,13 @@ export interface SnippetPart {
 	mark: boolean;
 }
 
-const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const named = new Map([
+	['amp', '&'],
+	['lt', '<'],
+	['gt', '>'],
+	['quot', '"'],
+	['apos', "'"],
+]);
 
 /** Decodes the entities an HTML escaper writes, in one pass. */
 export function decodeEntities(text: string): string {
@@ -19,7 +25,7 @@ export function decodeEntities(text: string): string {
 			const code = Number.parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10);
 			return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;
 		}
-		return named[body.toLowerCase()] ?? entity;
+		return named.get(body.toLowerCase()) ?? entity;
 	});
 }
 
