@@ -5,6 +5,8 @@
 	import { submitter } from '$lib/forms.svelte';
 	import type { InstanceLink } from '$lib/instance.svelte';
 	import type { RefusalNotice } from '$lib/flow/types';
+	import { isExternalHref } from '$lib/links';
+	import { upgradeLabel } from '$lib/api/refusal';
 
 	/** An import's own failure. The page picks it out of the form result every action shares. */
 	export interface ImportFailure {
@@ -26,6 +28,7 @@
 	let { open = $bindable(false), slug, failure, enableLink }: Props = $props();
 
 	const submit = submitter(() => (open = false));
+	const away = $derived(enableLink !== null && isExternalHref(enableLink.href));
 </script>
 
 <Drawer bind:open title="Import a definition">
@@ -42,7 +45,7 @@
 			<!-- The notice above the canvas leaves an import's refusal to this
 			     drawer, so the way to raise the limit or enable the feature is
 			     here too. -->
-			<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? (failure.refusal?.limit != null ? 'How to raise the limit' : 'How to enable it')}</a>
+			<a class="text-sm underline" href={enableLink.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{upgradeLabel(enableLink.href) ?? enableLink.label ?? (failure.refusal?.limit != null ? 'How to raise the limit' : 'How to enable it')}</a>
 		{/if}
 		<input type="hidden" name="slug" value={slug} />
 		<p class="text-sm text-muted">The imported definition replaces the draft of this flow. The published version is not touched until you publish again.</p>

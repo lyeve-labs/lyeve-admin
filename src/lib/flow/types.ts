@@ -123,6 +123,8 @@ export interface RefusalNotice {
 	limit: number | null;
 	/** How many flows there are already, when the plugin said. */
 	current: number | null;
+	/** Where a license allowing more is bought, when the plugin named it. Empty otherwise. */
+	upgradeUrl: string;
 }
 
 /** Whether the flow plugin says this instance may not use a type. */

@@ -44,7 +44,7 @@ describe('FlowImportDrawer', () => {
 	});
 
 	it('names the way to raise the limit for a refused import', () => {
-		setup({ error: '7 of 7 flows are in use.', refusal: { nodeIds: [], limit: 7, current: 7 }, refused: true }, { href: '/admin/settings/license' });
+		setup({ error: '7 of 7 flows are in use.', refusal: { nodeIds: [], limit: 7, current: 7, upgradeUrl: '' }, refused: true }, { href: '/admin/settings/license' });
 		expect(importForm().querySelector('a[href="/admin/settings/license"]')?.textContent).toBe('How to raise the limit');
 	});
 

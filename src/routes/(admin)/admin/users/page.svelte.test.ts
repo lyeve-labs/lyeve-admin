@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { render, cleanup, fireEvent, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({
@@ -377,5 +377,26 @@ describe('Users role filter', () => {
 
 		expect(getByRole('group', { name: 'Role' })).toBeTruthy();
 		expect(getByRole('button', { name: 'super_admin' })).toBeTruthy();
+	});
+});
+
+describe('Users admin seat refusal', () => {
+	// The refusal comes back while the drawer is open, as a submit's does.
+	it('shows the seat count and a button to where more seats are bought', async () => {
+		const link = 'https://shop.example.com/pricing?plan=basic&utm_source=admin&utm_medium=product&utm_campaign=admin.seats';
+		const refused = { kind: 'cap', cap: 'admin.seats', limit: 3, current: 3, upgradeUrl: link };
+		const rendered = render(UsersPage, { props: { data: data() as never, form: null as never } });
+		await fireEvent.click(rendered.getAllByRole('button', { name: /new user/i })[0]);
+		await rendered.rerender({
+			data: data() as never,
+			form: { action: 'create', error: 'Every admin seat is taken.', refused } as never,
+		});
+
+		const dialog = within(rendered.container.ownerDocument.body.querySelector('[role="dialog"]') as HTMLElement);
+		expect(dialog.getByText(/3 of 3 are in use/)).toBeTruthy();
+		expect(dialog.getByText(/A license that allows more lifts the limit\./)).toBeTruthy();
+		const more = dialog.getByRole('link', { name: 'View the plan' });
+		expect(more.getAttribute('href')).toBe(link);
+		expect(more.getAttribute('target')).toBe('_blank');
 	});
 });

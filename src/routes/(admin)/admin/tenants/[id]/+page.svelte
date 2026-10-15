@@ -25,6 +25,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { confirmed, fieldErrors } from '$lib/forms.svelte';
+	import { formRefusal } from '$lib/api/refusal';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -99,6 +100,9 @@
 		memberFailure?.action === 'grant' && form !== openedOver ? memberFailure.memberError : undefined,
 	);
 	const revokeError = $derived(memberFailure?.action === 'revoke' ? memberFailure.memberError : undefined);
+	// A grant refused at the admin seat ceiling renders with the numbers and
+	// the link the engine sent.
+	const grantRefusal = $derived(grantError ? formRefusal(form) : null);
 
 	function openNewMember() {
 		openedOver = form;
@@ -323,7 +327,7 @@
 
 <Drawer bind:open={memberOpen} title={editingMember ? `Roles for ${editingMember.email}` : 'New member'}>
 	<form method="post" action="?/grant" id="member-form" use:enhance={saveMember} class="flex flex-col gap-4">
-		<FormErrors message={grantError} fields={grantError ? fieldErrors(form) : {}} />
+		<FormErrors message={grantError} fields={grantError ? fieldErrors(form) : {}} refused={grantRefusal} />
 		{#if editingMember}
 			<input type="hidden" name="user_id" value={editingMember.id} />
 			<Input id="member-email" label="Account" value={memberEmail} disabled />

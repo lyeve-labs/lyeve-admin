@@ -26,6 +26,8 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { useInstance } from '$lib/instance.svelte';
+	import { isExternalHref } from '$lib/links';
+	import { upgradeLabel } from '$lib/api/refusal';
 	import { csrfHeaders } from '$lib/api/csrf';
 	import { submitter } from '$lib/forms.svelte';
 	import type { TablesState } from '$lib/components/flow/TablesPanel.svelte';
@@ -80,7 +82,10 @@
 	// action's answer and the key is optional on all of them.
 	const refusal = $derived(form && 'refusal' in form && form.refusal ? (form.refusal as RefusalNotice) : null);
 	const instance = useInstance();
-	const enableLink = $derived(instance.upgradeLink());
+	// A ceiling refusal can name where a license allowing more is bought,
+	// and that link goes first when it is safe to follow.
+	const enableLink = $derived(instance.upgradeLink(refusal?.upgradeUrl || null));
+	const enableAway = $derived(enableLink !== null && isExternalHref(enableLink.href));
 
 	// The page owns the definition. The canvas and the inspector both edit it
 	// and the save action posts it. Nothing else holds a copy. It is seeded
@@ -687,7 +692,7 @@
 						{#snippet children()}
 							{form && 'error' in form ? form.error : ''}
 							{#if enableLink}
-								<a class="ml-1 underline" href={enableLink.href}>{enableLink.label ?? (refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+								<a class="ml-1 underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{upgradeLabel(enableLink.href) ?? enableLink.label ?? (refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
 							{/if}
 						{/snippet}
 					</Alert>

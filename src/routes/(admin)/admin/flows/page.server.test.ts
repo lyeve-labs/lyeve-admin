@@ -238,7 +238,7 @@ describe('admin/flows create action', () => {
 		const result = (await actions.create(event)) as { status: number; data: { error: string; locked?: boolean; refusal: unknown } };
 		expect(result.status).toBe(402);
 		expect(result.data.locked).toBeUndefined();
-		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7 });
+		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: '' });
 		expect(result.data.error).toContain('7 of 7 flows');
 		expect(result.data.error).not.toContain('example-capability');
 	});
@@ -251,6 +251,19 @@ describe('admin/flows create action', () => {
 		const result = (await actions.create(event)) as { status: number; data: { action: string; error: string; field: string } };
 		expect(result.status).toBe(409);
 		expect(result.data).toEqual({ action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' });
+	});
+
+	it('carries the link the plugin names for more flows to the page', async () => {
+		const form = new FormData();
+		form.set('name', 'x');
+		form.set('slug', 'x');
+		const link = 'https://shop.example.com/pricing?utm_campaign=flow.flows';
+		const body = { error: 'cap_exceeded', cap: 'flow.flows', limit: 7, current: 7, upgrade_url: link };
+		const { event } = actionEvent({ '/api/admin/flows': () => json(body, 402) }, form);
+		const result = (await actions.create(event)) as { status: number; data: { error: string; refusal: unknown } };
+		expect(result.status).toBe(402);
+		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: link });
+		expect(result.data.error).toContain('A license that allows more lifts the limit.');
 	});
 
 	it('refuses a blank name before calling the engine', async () => {

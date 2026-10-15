@@ -23,6 +23,7 @@
 	import { KeyRound, Pencil, Plus, Trash2, Users } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { formRefusal } from '$lib/api/refusal';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { confirmed, fieldErrors, tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
@@ -58,6 +59,8 @@
 	);
 	const errors = $derived(fieldErrors(accountFailure));
 	const passwordErrors = $derived(fieldErrors(passwordFailure));
+	// A seat refusal renders with the numbers and the link the engine sent.
+	const refused = $derived(formRefusal(accountFailure));
 
 	// One drawer for both writes. A null target is a new account. A user is the
 	// account whose roles are being changed.
@@ -321,7 +324,7 @@
 		use:enhance={saveAccountSubmit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={accountFailure?.error} fields={errors} />
+		<FormErrors message={accountFailure?.error} fields={errors} {refused} />
 
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />

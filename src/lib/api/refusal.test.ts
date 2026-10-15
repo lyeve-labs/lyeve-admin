@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 
-import { capNoun, featureName, formRefusal, refusalOf, refusalText, refusalTitle } from './refusal';
+import { capNoun, featureName, formRefusal, refusalOf, refusalText, refusalTitle, upgradeLabel } from './refusal';
 
 function refused(body: Record<string, unknown>, status = 402): ApiError {
 	return new ApiError(status, String(body.error ?? 'refused'), body);
@@ -11,6 +11,12 @@ describe('refusalOf', () => {
 	it('reads a cap refusal with the numbers the engine sent', () => {
 		const r = refusalOf(refused({ error: 'cap_exceeded', cap: 'example.items', limit: 4, current: 4, upgrade_url: '' }));
 		expect(r).toEqual({ kind: 'cap', cap: 'example.items', limit: 4, current: 4, upgradeUrl: '' });
+	});
+
+	it('keeps the link a cap refusal names for more', () => {
+		const link = 'https://shop.example.com/pricing?utm_source=admin&utm_medium=product&utm_campaign=example.items';
+		const r = refusalOf(refused({ error: 'cap_exceeded', cap: 'example.items', limit: 4, current: 4, upgrade_url: link }));
+		expect(r).toMatchObject({ kind: 'cap', upgradeUrl: link });
 	});
 
 	it('reads a feature refusal by the capability name a license carries', () => {
@@ -33,7 +39,7 @@ describe('refusalOf', () => {
 describe('refusalText', () => {
 	it('says the count against the ceiling in the words of the cap', () => {
 		expect(refusalText({ kind: 'cap', cap: 'example.items', limit: 4, current: 4, upgradeUrl: '' })).toBe(
-			'4 of 4 items are in use, which is the most this instance allows. Remove one, or change the license to allow more.',
+			'4 of 4 items are in use, which is the most this instance allows. A license that allows more lifts the limit. Removing one also makes room.',
 		);
 	});
 
@@ -43,10 +49,16 @@ describe('refusalText', () => {
 		);
 	});
 
-	it('states the seat count and how to free a seat', () => {
+	it('states the seat count, then more seats with a license, then how to free one', () => {
 		expect(refusalText({ kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: '' })).toBe(
-			'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.',
+			'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.',
 		);
+	});
+
+	it('names a license as the way forward before removing one', () => {
+		const text = refusalText({ kind: 'cap', cap: 'example.items', limit: null, current: null, upgradeUrl: '' });
+		expect(text).toBe('This instance allows no more items. A license that allows more lifts the limit. Removing one also makes room.');
+		expect(text.indexOf('license')).toBeLessThan(text.indexOf('Removing'));
 	});
 
 	it('names the capability a feature refusal needs', () => {
@@ -59,6 +71,20 @@ describe('refusalText', () => {
 		const r = { kind: 'feature', feature: '', plugin: '', upgradeUrl: '' } as const;
 		expect(refusalText(r)).toBe('This needs a capability this license does not include. Nothing was changed.');
 		expect(refusalTitle(r)).toBe('This is not enabled on this instance');
+	});
+});
+
+describe('upgradeLabel', () => {
+	it('names a link by what it opens', () => {
+		expect(upgradeLabel('https://shop.example.com/pricing?plan=basic&utm_campaign=admin.seats')).toBe('View the plan');
+		expect(upgradeLabel('https://shop.example.com/pricing?skus=example-pro&utm_campaign=example.items')).toBe('View the add-on');
+		expect(upgradeLabel('https://shop.example.com/pricing?skus=example-pro,other-pro')).toBe('View the add-ons');
+	});
+
+	it('leaves a link that says neither to the caller', () => {
+		expect(upgradeLabel('https://shop.example.com/pricing?utm_campaign=example.items')).toBeNull();
+		expect(upgradeLabel('/admin/settings/license?plugin=example')).toBeNull();
+		expect(upgradeLabel('')).toBeNull();
 	});
 });
 

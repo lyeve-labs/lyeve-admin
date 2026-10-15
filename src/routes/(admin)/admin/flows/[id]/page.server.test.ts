@@ -364,7 +364,7 @@ describe('admin/flows/[id] actions', () => {
 		const result = (await actions.save(event)) as { status: number; data: { error: string; locked?: boolean; refusal: unknown; errors: unknown[] } };
 		expect(result.status).toBe(402);
 		expect(result.data.locked).toBeUndefined();
-		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'orders'], limit: null, current: null });
+		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'orders'], limit: null, current: null, upgradeUrl: '' });
 		expect(result.data.error).toContain('the trigger, orders');
 		expect(result.data.error).not.toContain('example-capability');
 		expect(result.data.errors).toHaveLength(2);
