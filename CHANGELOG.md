@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.38.5.
+- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.39.1.
 - The console's docs link and the README point at the documentation's new address, lyeve.com/docs. The old host redirects there.
 - A release candidate image is published under its exact tag only, `X.Y.Z-rc.N`, and never as `latest` or the minor line.
 - The release jobs that read secrets run in a release environment that admits only version tags. Pull requests no longer run the suite with the visual editors, which needs those secrets and failed on every pull request. The release runs it before it builds.
