@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Moving to another page fades the page content while the sidebar and header stay in place, and pages outside the console frame, such as sign-in, fade whole. Changing only a filter or a page of results does not fade, reduced motion turns the fade off, and a browser without view transitions changes pages as before.
+- Accounts a tenant's identity provider created carry a "Signs in through your identity provider" marker in the users list. The sign-in, password reset and email link pages take an optional organization, used when the address the console is reached on does not already name one, and a link that carries the organization fills the field in, where the reader can change or clear it. A new Sign-in settings page lets a tenant admin set how many days such an account may sign in without its provider, from 0 to 365, 30 by default. These need the engine release that serves them.
 
 ### Changed
 
