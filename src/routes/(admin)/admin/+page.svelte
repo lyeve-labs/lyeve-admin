@@ -106,7 +106,7 @@
 			level={2}
 			gate={data.home.gate}
 			title="The home page"
-			absent="The home page chosen in customization, {data.home.slug}, was not found. Choose another one there."
+			absent="The home page chosen in customization, {data.home.slug}, was not found.{data.isAdmin ? ' Choose another one there.' : ''}"
 		/>
 	{:else if data.homePage}
 		<section class="flex flex-col gap-4" aria-label={data.homePage.title}>

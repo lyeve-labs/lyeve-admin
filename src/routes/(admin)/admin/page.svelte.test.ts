@@ -371,3 +371,19 @@ describe('the chosen home page', () => {
 		expect(document.body.textContent).not.toContain('home page');
 	});
 });
+
+describe('the missing home page for each role', () => {
+	const missing = { homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'absent' } } };
+
+	it('tells an admin where to choose another', () => {
+		render(DashboardPage, { props: { data: data({ ...missing, isAdmin: true }), form: null } });
+		expect(document.body.textContent).toContain('Choose another one there.');
+	});
+
+	// Only an admin can open customization, so a reader is not sent there.
+	it('says the page was not found to a reader who cannot choose another', () => {
+		render(DashboardPage, { props: { data: data({ ...missing, isAdmin: false, superAdmin: false }), form: null } });
+		expect(document.body.textContent).toContain('The home page chosen in customization, welcome, was not found.');
+		expect(document.body.textContent).not.toContain('Choose another');
+	});
+});
