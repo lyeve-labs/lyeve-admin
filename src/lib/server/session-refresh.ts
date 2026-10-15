@@ -48,8 +48,9 @@ const KEPT_MAX = 10_000;
 /** The engine's route that trades a refresh token for a new pair. */
 const REFRESH_PATH = '/api/admin/auth/refresh';
 
-/** Where the sign-in page says the session ended. */
-export const SESSION_ENDED = '/login?ended=1';
+import { SESSION_ENDED } from '$lib/session';
+
+export { SESSION_ENDED };
 
 export type Trade =
 	| { kind: 'renewed'; token: string; refreshToken: string }

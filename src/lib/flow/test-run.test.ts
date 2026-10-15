@@ -46,3 +46,42 @@ describe('testFailure', () => {
 		expect(testFailure(new Error(''))).toEqual({ kind: 'refused', errors: [], text: 'The test run failed.' });
 	});
 });
+
+describe('testFailure for an answer that is not the engine speaking', () => {
+	const OUTAGE_TEXT = 'The engine did not answer, so the test run did not finish. Try again in a moment.';
+
+	// The client puts the raw body of a non-JSON answer in the message, so a
+	// proxy's error page would be printed as the run's failure.
+	it('never prints a proxy error page', () => {
+		const out = testFailure(new ApiError(502, '<html><body>Bad Gateway</body></html>'));
+		expect(out).toEqual({ kind: 'refused', errors: [], text: OUTAGE_TEXT });
+	});
+
+	it('never prints a transport failure or a timeout', () => {
+		expect(testFailure(new TypeError('Failed to fetch'))).toEqual({ kind: 'refused', errors: [], text: OUTAGE_TEXT });
+		const timeout = Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+		expect(testFailure(timeout)).toEqual({ kind: 'refused', errors: [], text: OUTAGE_TEXT });
+	});
+
+	it('says the run failed for a server error and prints none of it', () => {
+		expect(testFailure(new ApiError(500, 'panic: runtime error', { error: 'panic: runtime error' }))).toEqual({
+			kind: 'refused',
+			errors: [],
+			text: 'The test run failed.',
+		});
+	});
+
+	it('sends a reader whose session ended to sign in', () => {
+		expect(testFailure(new ApiError(401, 'unauthorized', { error: 'unauthorized' }))).toEqual({ kind: 'signed-out' });
+	});
+
+	it('relays a refusal the engine worded', () => {
+		const out = testFailure(new ApiError(400, 'trigger payload too large', { error: 'trigger payload too large' }));
+		expect(out).toEqual({ kind: 'refused', errors: [], text: 'trigger payload too large' });
+	});
+
+	it('does not relay a 4xx body the engine did not send', () => {
+		const out = testFailure(new ApiError(413, '<html>Request Entity Too Large</html>'));
+		expect(out).toEqual({ kind: 'refused', errors: [], text: 'The test run failed.' });
+	});
+});

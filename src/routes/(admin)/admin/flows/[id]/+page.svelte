@@ -56,6 +56,7 @@
 	import { formatDateTime, relativeTime } from '$lib/format';
 	import { focusMode } from '$lib/flow/focus.svelte';
 	import { parseTrigger, sampleKey, testFailure, untilOptions } from '$lib/flow/test-run';
+	import { signInAgainHref } from '$lib/session';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -310,6 +311,10 @@
 			drawerOpen = true;
 		} catch (err) {
 			const failure = testFailure(err);
+			if (failure.kind === 'signed-out') {
+				window.location.assign(signInAgainHref(page.url));
+				return;
+			}
 			if (failure.kind === 'blocked') {
 				runBlocked = true;
 				drawerOpen = false;
