@@ -140,9 +140,11 @@ async function send(
 	try {
 		res = await event.fetch(path, { method, headers, body, signal: abort });
 	} catch (err) {
+		// The runtime's own words for a failed connection can name an internal
+		// address, so none of them are shown.
 		const msg = err instanceof Error && err.name === 'TimeoutError'
 			? `The request did not answer within ${TIMEOUT_MS / 1000} seconds.`
-			: `The request could not be sent: ${err instanceof Error ? err.message : 'unknown error'}`;
+			: 'The request could not be sent to the engine. Try again in a moment.';
 		return { error: msg };
 	}
 

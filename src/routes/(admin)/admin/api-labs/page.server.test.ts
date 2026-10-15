@@ -196,3 +196,15 @@ describe('admin/api-labs gRPC status', () => {
 		expect(((await load(event)) as unknown as Loaded).grpc.gate).toEqual({ state: 'forbidden' });
 	});
 });
+
+describe('a lab request that never reached the engine', () => {
+	// The runtime's words for a failed connection can name an internal address.
+	it('says it could not be sent, in the console\'s words only', async () => {
+		const { event } = sendEvent({ document: '{ ping }' });
+		(event as { fetch: unknown }).fetch = vi.fn(async () => {
+			throw new TypeError('fetch failed: connect ECONNREFUSED 10.0.0.5:8080');
+		});
+		const out = (await actions.graphql(event)) as { status: number; data: { error: string } };
+		expect(out.data.error).toBe('The request could not be sent to the engine. Try again in a moment.');
+	});
+});
