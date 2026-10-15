@@ -101,12 +101,15 @@
 	{#if data.welcome}
 		<p class="text-base text-fg" data-testid="tenant-welcome">{data.welcome}</p>
 	{/if}
-	{#if data.home}
+	<!-- The plugin answers 404 for a page hidden from the reader's role as well
+	     as for a missing one. Only an admin, who sees every page, reads a 404
+	     as missing, and a reader outside the page's roles is told nothing. -->
+	{#if data.home && (data.home.gate.state !== 'absent' || data.isAdmin)}
 		<GateNotice
 			level={2}
 			gate={data.home.gate}
 			title="The home page"
-			absent="The home page chosen in customization, {data.home.slug}, was not found.{data.isAdmin ? ' Choose another one there.' : ''}"
+			absent="The home page chosen in customization, {data.home.slug}, was not found. Choose another one there."
 		/>
 	{:else if data.homePage}
 		<section class="flex flex-col gap-4" aria-label={data.homePage.title}>
