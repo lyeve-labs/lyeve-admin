@@ -324,17 +324,19 @@ async function loadReleases(client: HttpClient, entryId: string): Promise<EntryR
 	try {
 		const res = await listReleases(client, '', 100, 0);
 		const open = rowsOf(res).filter(editable);
-		// The list carries no items, so membership is read from each open release.
-		const holding = (
-			await Promise.all(
-				open.map((r) =>
-					client
-						.get<Release>(`/api/admin/content/releases/${encodeURIComponent(r.id)}`)
-						.then((full) => ((full.items ?? []).some((it) => it.entry_id === entryId) ? r.id : null))
-						.catch(() => null),
-				),
-			)
-		).filter((id): id is string => id !== null);
+		// The list carries no items, so membership is read from each open
+		// release. A release whose items could not be read is not one that
+		// leaves the entry out, so one failed read leaves the card unread.
+		const reads = await Promise.all(
+			open.map((r) =>
+				client
+					.get<Release>(`/api/admin/content/releases/${encodeURIComponent(r.id)}`)
+					.then((full) => ((full.items ?? []).some((it) => it.entry_id === entryId) ? r.id : null))
+					.catch(() => undefined),
+			),
+		);
+		if (reads.includes(undefined)) return { open: [], holding: [], failed: true };
+		const holding = reads.filter((id): id is string => typeof id === 'string');
 		return { open: open.map((r) => ({ id: r.id, name: r.name, status: r.status })), holding, failed: false };
 	} catch (err) {
 		if (err instanceof ApiError && err.status === 404) return null;

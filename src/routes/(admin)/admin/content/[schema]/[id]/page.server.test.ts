@@ -592,3 +592,37 @@ describe('content editor translations', () => {
 		expect(sent.body).not.toHaveProperty('title');
 	});
 });
+
+describe('content editor load, releases', () => {
+	function releasesFetch(membership: () => Response) {
+		return vi.fn(async (path: string) => {
+			if (path.includes('/api/admin/content/releases/r1')) return membership();
+			if (path.includes('/api/admin/content/releases')) return json({ data: [{ id: 'r1', name: 'Spring', status: 'draft' }] });
+			if (path.includes('/revisions')) return json([]);
+			if (path.includes('/api/admin/content?')) return json({ data: [] });
+			return json(entry);
+		}) as unknown as typeof globalThis.fetch;
+	}
+
+	async function releasesWith(membership: () => Response) {
+		const out = (await load({
+			fetch: releasesFetch(membership),
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none }),
+		} as never)) as { releases: { open: unknown[]; holding: string[]; failed: boolean } | null };
+		return out.releases;
+	}
+
+	// A release whose items could not be read was counted as one that does not
+	// hold the entry, so Add to release offered a release that already held it.
+	it('says the releases could not be read when one of them could not', async () => {
+		const releases = await releasesWith(() => json({ error: 'unavailable' }, 503));
+		expect(releases).toMatchObject({ failed: true, holding: [] });
+	});
+
+	it('reads a release that holds the entry as holding it', async () => {
+		const releases = await releasesWith(() => json({ id: 'r1', name: 'Spring', status: 'draft', items: [{ entry_id: 'e1' }] }));
+		expect(releases).toMatchObject({ failed: false, holding: ['r1'] });
+	});
+});
