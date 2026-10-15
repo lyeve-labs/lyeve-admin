@@ -301,3 +301,19 @@ describe('the delete', () => {
 		expect(await deleteTitle()).toBe('Delete SAML provider Okta');
 	});
 });
+
+describe('the links on a provider row', () => {
+	// Metadata and Test sign-in are two short links on one line about 8px
+	// apart, so a finger had no target on either.
+	it('gives each link a touch hit area and spaces them so the areas stay apart', () => {
+		render(SamlPage, { props: props() });
+		const metadata = screen.getByRole('link', { name: 'Metadata' });
+		const signIn = screen.getByRole('link', { name: 'Test sign-in' });
+		for (const link of [metadata, signIn]) {
+			expect(link.className.split(/\s+/)).toEqual(expect.arrayContaining(['relative', 'hit-area']));
+		}
+		const between = metadata.nextElementSibling as HTMLElement;
+		expect(between.nextElementSibling).toBe(signIn);
+		expect(between.className.split(/\s+/)).toContain('coarse:mx-4');
+	});
+});

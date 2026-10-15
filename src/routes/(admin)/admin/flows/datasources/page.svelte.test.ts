@@ -8,8 +8,19 @@ import { AUTH_TYPES } from '$lib/flow/datasources';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/datasources') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+const upgrade = vi.hoisted(() => ({ link: null as { href: string; label?: string } | null }));
+vi.mock('$lib/instance.svelte', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/instance.svelte')>();
+	return {
+		...actual,
+		useInstance: () => ({ ...actual.instanceFrom(() => null), upgradeLink: () => upgrade.link }),
+	};
+});
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	upgrade.link = null;
+});
 
 const licensed: Entitlements = { plan: 'example', state: 'active', features: ['flow'], tenant_quota: 1 };
 
@@ -84,7 +95,7 @@ describe('datasources page', () => {
 		await fireEvent.click(getByLabelText('Edit inventory'));
 		const rule = container.querySelector('[data-testid="secret-rule"]') as HTMLElement;
 		expect(rule.textContent).toContain('Leave every secret field empty to keep');
-		expect(rule.textContent).toContain('Typing any one replaces all of them');
+		expect(rule.textContent).toContain('replaces all of them');
 	});
 
 	it('puts the name rule at the name field when the plugin refused the name', async () => {
@@ -373,5 +384,105 @@ describe('the target of a granted datasource', () => {
 		await fireEvent.click(getByLabelText('Edit inventory'));
 		expect((container.querySelector('#ds-base-url') as HTMLInputElement).disabled).toBe(true);
 		expect((container.querySelector('input[type="hidden"][name="base_url"]') as HTMLInputElement).value).toBe('https://inventory.example.test');
+	});
+});
+
+describe('the header rows of an http datasource', () => {
+	function posted(form: HTMLFormElement): [string, string, string][] {
+		const d = new FormData(form);
+		const keys = d.getAll('header_key').map(String);
+		const values = d.getAll('header_value').map(String);
+		const secrets = d.getAll('header_secret').map(String);
+		return keys.map((k, i) => [k, values[i], secrets[i]]);
+	}
+
+	async function addHeader(container: HTMLElement, getByText: (t: string) => HTMLElement, key: string, value: string, secret: boolean) {
+		await fireEvent.click(getByText('Add header'));
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		const rows = form.querySelectorAll('fieldset > div.flex.items-end');
+		const row = rows[rows.length - 1] as HTMLElement;
+		await fireEvent.input(row.querySelector('[name="header_key"]') as HTMLInputElement, { target: { value: key } });
+		if (secret) await fireEvent.click(row.querySelector('[role="switch"], input[type="checkbox"]') as HTMLElement);
+		await fireEvent.input(row.querySelector('[name="header_value"]') as HTMLInputElement, { target: { value } });
+	}
+
+	// A row's secret lived in the field and not in the row, and rows were
+	// keyed by position, so removing one handed its secret to the next.
+	it('keeps each secret with its own header when a row above is removed', async () => {
+		const { getByLabelText, getByText, container } = setup();
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		await addHeader(container, getByText, 'X-One', 'secret-one', true);
+		await addHeader(container, getByText, 'X-Two', 'secret-two', true);
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		expect(posted(form)).toEqual([
+			['Accept', 'application/json', 'false'],
+			['X-One', 'secret-one', 'true'],
+			['X-Two', 'secret-two', 'true'],
+		]);
+		await fireEvent.click(getByLabelText('Remove header X-One'));
+		expect(posted(form)).toEqual([
+			['Accept', 'application/json', 'false'],
+			['X-Two', 'secret-two', 'true'],
+		]);
+	});
+
+	it('keeps the typed value when Secret is turned on, and when it is turned off again', async () => {
+		const { getByLabelText, getByText, container } = setup();
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		await addHeader(container, getByText, 'X-Key', 'typed-first', false);
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		const rows = form.querySelectorAll('fieldset > div.flex.items-end');
+		const row = rows[rows.length - 1] as HTMLElement;
+		const toggle = () => row.querySelector('[role="switch"], input[type="checkbox"]') as HTMLElement;
+		await fireEvent.click(toggle());
+		expect(posted(form)[1]).toEqual(['X-Key', 'typed-first', 'true']);
+		await fireEvent.click(toggle());
+		expect(posted(form)[1]).toEqual(['X-Key', 'typed-first', 'false']);
+	});
+});
+
+describe('the link that enables datasources', () => {
+	const away = 'https://shop.example.com/pricing?skus=example-pro';
+
+	it('names a link to an add-on by what it opens and opens it in a new tab, on the page and in the drawer', async () => {
+		upgrade.link = { href: away, label: 'Manage the license' };
+		const refusal = { action: 'save', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true };
+		const { getAllByText, container, rerender } = setup([]);
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		await rerender({ data: { datasources: [], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed }, form: refusal } as never);
+		const inDrawer = container.ownerDocument.querySelector(`#datasource-form a[href="${away}"]`) as HTMLAnchorElement;
+		expect(inDrawer.textContent).toBe('View the add-on');
+		expect(inDrawer.getAttribute('target')).toBe('_blank');
+		expect(inDrawer.getAttribute('rel')).toBe('noopener noreferrer');
+		cleanup();
+		setup([], { ...refusal, action: 'delete' });
+		const onPage = document.body.querySelector(`a[href="${away}"]`) as HTMLAnchorElement;
+		expect(onPage.textContent).toBe('View the add-on');
+		expect(onPage.getAttribute('target')).toBe('_blank');
+		expect(onPage.getAttribute('rel')).toBe('noopener noreferrer');
+	});
+
+	it('keeps a link on this console in the same tab', () => {
+		upgrade.link = { href: '/admin/settings/license', label: 'Manage the license' };
+		setup([], { action: 'delete', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
+		const a = document.body.querySelector('a[href="/admin/settings/license"]') as HTMLAnchorElement;
+		expect(a.textContent).toBe('Manage the license');
+		expect(a.getAttribute('target')).toBeNull();
+	});
+});
+
+describe('a stored header turned secret', () => {
+	// The plugin replaces the stored secrets whole, so a header carried into
+	// the secret half replaces the secret headers nobody touched.
+	it('carries the value and says that turning Secret on replaces the stored secrets', async () => {
+		const { getByLabelText, container } = setup();
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		const row = form.querySelector('fieldset > div.flex.items-end') as HTMLElement;
+		await fireEvent.click(row.querySelector('[role="switch"], input[type="checkbox"]') as HTMLElement);
+		const d = new FormData(form);
+		expect([d.getAll('header_key'), d.getAll('header_value'), d.getAll('header_secret')]).toEqual([['Accept'], ['application/json'], ['true']]);
+		const rule = container.querySelector('[data-testid="secret-rule"]') as HTMLElement;
+		expect(rule.textContent).toContain('Typing a secret, or turning Secret on for a header, replaces all of them');
 	});
 });

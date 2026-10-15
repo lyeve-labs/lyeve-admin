@@ -816,3 +816,29 @@ describe('after a rule is removed', () => {
 	});
 });
 
+
+describe('a refusal shown on the page', () => {
+	const link = 'https://shop.example.com/pricing?plan=basic';
+	const refused = { kind: 'feature', feature: 'feature-b', plugin: 'rbac', upgradeUrl: link };
+	const render_ = (over: Record<string, unknown>) =>
+		render(PermissionsPage, {
+			props: {
+				data: { permissions: [permission], schemas: [{ name: 'article' }], entitlements, loadError: null, ...over },
+				form: { action: 'delete', error: 'refused', refused },
+			} as never,
+		});
+
+	// The page leads with New role, so the way forward is not a second primary.
+	it('makes the way forward a secondary beside New role', () => {
+		const { getByRole } = render_({ roleCap: 0 });
+		expect(getByRole('button', { name: 'New role' })).toBeTruthy();
+		expect(getByRole('link', { name: 'View the plan' }).classList.contains('bg-brand')).toBe(false);
+	});
+
+	// At the ceiling New role is withdrawn, and the way forward is the one action left.
+	it('makes the way forward the primary at the ceiling, where New role is withdrawn', () => {
+		const { queryByRole, getByRole } = render_({ roleCap: 1, roleCount: 1 });
+		expect(queryByRole('button', { name: 'New role' })).toBeNull();
+		expect(getByRole('link', { name: 'View the plan' }).classList.contains('bg-brand')).toBe(true);
+	});
+});

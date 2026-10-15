@@ -180,9 +180,13 @@ export const load: PageServerLoad = async (event) => {
 		controlFailures: controls ? controls.failures : null,
 	};
 
-	// The tenant's own page, when it chose one, leads the dashboard.
+	// The tenant's own page, when it chose one, leads the dashboard. A read of
+	// it that failed is kept, so the dashboard says the page is missing and why.
 	const homeSlug = customization?.entitled ? customization.settings.home_page : '';
-	const homePage = homeSlug ? await getCustomPage(client, homeSlug).catch(() => null) : null;
+	const homeRead = homeSlug
+		? await section(getCustomPage(client, homeSlug), 'The home page chosen in customization could not be read.')
+		: null;
+	const homePage = homeRead?.ok ? homeRead.value : null;
 	const homeBlocks = homePage ? await resolveBlocks(client, homePage.blocks) : [];
 
 	return {
@@ -196,6 +200,7 @@ export const load: PageServerLoad = async (event) => {
 		now: now.toISOString(),
 		homePage: homePage ? { slug: homePage.slug, title: homePage.title } : null,
 		homeBlocks,
+		home: homeRead && !homeRead.ok ? { slug: homeSlug, gate: homeRead.gate } : null,
 		// Each list is null when its read failed or was not made, so a failure
 		// never draws as a quiet instance.
 		entries: content ? rowsOf(content) : null,

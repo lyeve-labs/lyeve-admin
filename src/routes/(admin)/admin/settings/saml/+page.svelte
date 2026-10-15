@@ -305,10 +305,12 @@
 												{p.enabled ? 'Enabled' : 'Disabled'}
 											</Badge>
 										</div>
+										<!-- Under a finger the separator widens, so the two links' hit
+										     areas sit apart instead of overlapping on a short link. -->
 										<div class="text-xs text-faint">
-											<a class="underline" href={metadataPath(p.name)}>Metadata</a>
-											<span class="mx-1">·</span>
-											<a class="underline" href={signInPath(p.name)}>Test sign-in</a>
+											<a class="relative hit-area underline" href={metadataPath(p.name)}>Metadata</a>
+											<span class="mx-1 coarse:mx-4">·</span>
+											<a class="relative hit-area underline" href={signInPath(p.name)}>Test sign-in</a>
 										</div>
 									</td>
 									<td class="max-w-xs truncate text-xs text-faint" title={p.entity_id}>

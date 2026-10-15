@@ -245,7 +245,7 @@
 						{#each visible as e (e.id)}
 							<tr>
 								<td>
-									<a class="font-medium text-brand hover:underline" href="/admin/experiments/{e.id}">
+									<a class="relative hit-area font-medium text-brand hover:underline" href="/admin/experiments/{e.id}">
 										{e.name}
 									</a>
 									{#if e.description}

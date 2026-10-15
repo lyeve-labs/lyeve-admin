@@ -285,6 +285,28 @@ describe('admin dashboard load', () => {
 		expect(seen.some((p) => p.includes('/apianalytics/'))).toBe(false);
 	});
 
+	// The tenant chose a page to lead the dashboard. A read of it that failed
+	// was dropped, so the dashboard showed without it and said nothing.
+	it('keeps a failed read of the chosen home page as its gate', async () => {
+		const chose = { customization: { ...customized.customization, settings: { ...customized.customization.settings, home_page: 'welcome' } } };
+		const { event, seen } = loadEvent(
+			{ '/api/admin/customization/dashboard': { entitled: true, custom: false, widgets: [], updated_at: null }, '/api/admin/schemas': schemaList },
+			admin,
+			'http://localhost/admin',
+			chose,
+		);
+		const d = (await load(event)) as Loaded;
+		expect(seen).toContain('/api/admin/customization/pages/welcome');
+		expect(d.homePage).toBeNull();
+		expect(d.home).toEqual({ slug: 'welcome', gate: { state: 'absent' } });
+	});
+
+	it('reports no home page failure when the tenant chose none', async () => {
+		const { event } = loadEvent({ '/api/admin/schemas': schemaList }, admin, 'http://localhost/admin', customized);
+		const d = (await load(event)) as Loaded;
+		expect(d.home).toBeNull();
+	});
+
 	it('keeps the stock dashboard when the tenant composed none', async () => {
 		const { event, seen } = loadEvent(
 			{

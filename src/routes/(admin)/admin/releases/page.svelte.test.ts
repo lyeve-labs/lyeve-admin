@@ -100,3 +100,12 @@ describe('creating a release', () => {
 		expect((createForm() as HTMLFormElement).firstElementChild?.textContent).toContain('a release named Autumn exists');
 	});
 });
+
+describe('the release name link', () => {
+	// The name is the only way to open a release, and its link is one line of text tall.
+	it('gives the link that opens a release a touch hit area', () => {
+		render(ReleasesPage, { props: props() });
+		const link = screen.getByRole('link', { name: 'Spring launch' });
+		expect(link.className.split(/\s+/)).toEqual(expect.arrayContaining(['relative', 'hit-area']));
+	});
+});

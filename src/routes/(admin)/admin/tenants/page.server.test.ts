@@ -319,9 +319,14 @@ describe('admin/tenants load provisioning', () => {
 		expect((await run(eventFor(() => json({ error: 'unavailable' }, 503)))).provisioningUrl).toBe('');
 	});
 
-	it('reads a plugin without the route, or a refusal, as not enabled', async () => {
-		expect(await run(eventFor(() => json({ error: 'not found' }, 404)))).toMatchObject({ canProvision: false, provisionGate: null, total: 1 });
+	it('reads a refusal as not enabled', async () => {
 		expect(await run(eventFor(() => json({ error: 'payment_required' }, 402)))).toMatchObject({ canProvision: false, provisionGate: null });
+	});
+
+	// A route that is not served says nothing about the license, so the page
+	// has to tell it apart from a refusal.
+	it('keeps a plugin without the provisioning route as its own gate', async () => {
+		expect(await run(eventFor(() => json({ error: 'not found' }, 404)))).toMatchObject({ canProvision: false, provisionGate: { state: 'absent' }, total: 1 });
 	});
 
 	// An outage says nothing about the license, so it is never drawn as
