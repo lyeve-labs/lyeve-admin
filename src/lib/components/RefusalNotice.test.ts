@@ -36,7 +36,9 @@ describe('RefusalNotice', () => {
 		expect(more.getAttribute('rel')).toBe('noopener noreferrer');
 	});
 
-	it('leads with the plan the engine names, as the primary action, and the license page after it', () => {
+	// The notice sits in a drawer or a page that has its own Create or Save,
+	// and a surface holds one primary.
+	it('leads with the plan the engine names as a secondary, and the license page after it as a ghost', () => {
 		const link = 'https://shop.example.com/pricing?plan=basic&utm_source=admin&utm_medium=product&utm_campaign=admin.seats';
 		const { getAllByRole } = render(RefusalNotice, {
 			props: { refusal: { kind: 'cap', cap: 'admin.seats', limit: 3, current: 3, upgradeUrl: link } },
@@ -44,9 +46,28 @@ describe('RefusalNotice', () => {
 		const [first, second] = getAllByRole('link');
 		expect(first.textContent?.trim()).toBe('View the plan');
 		expect(first.getAttribute('href')).toBe(link);
-		expect(first.classList.contains('bg-brand')).toBe(true);
+		expect(first.classList.contains('bg-brand')).toBe(false);
+		expect(first.classList.contains('bg-surface-2')).toBe(true);
 		expect(second.textContent?.trim()).toBe('View the license');
 		expect(second.classList.contains('bg-brand')).toBe(false);
+		expect(second.classList.contains('bg-surface-2')).toBe(false);
+	});
+
+	it('makes the way forward the primary only where it is the one action on its surface', () => {
+		const link = 'https://shop.example.com/pricing?plan=basic';
+		const { getAllByRole } = render(RefusalNotice, {
+			props: { refusal: { kind: 'cap', cap: 'admin.seats', limit: 3, current: 3, upgradeUrl: link }, lead: true },
+		});
+		const [first, second] = getAllByRole('link');
+		expect(first.classList.contains('bg-brand')).toBe(true);
+		expect(second.classList.contains('bg-surface-2')).toBe(true);
+	});
+
+	it('keeps the license page a secondary when it is the only link', () => {
+		const { getByRole } = render(RefusalNotice, {
+			props: { refusal: { kind: 'cap', cap: 'admin.seats', limit: 3, current: 3, upgradeUrl: '' } },
+		});
+		expect(getByRole('link', { name: 'View the license' }).classList.contains('bg-surface-2')).toBe(true);
 	});
 
 	it('names an add-on link by what it opens', () => {
@@ -82,5 +103,14 @@ describe('FormErrors with a refusal', () => {
 		});
 		expect(container.textContent).toContain('7 of 7 probes are in use');
 		expect(container.textContent).not.toContain('raw');
+	});
+});
+
+describe('FormErrors with a refusal in a form', () => {
+	it('draws no primary beside the form\'s own Create or Save', () => {
+		const { container } = render(FormErrors, {
+			props: { refused: { kind: 'cap', cap: 'gadgets.probes', limit: 7, current: 7, upgradeUrl: 'https://shop.example.com/pricing?plan=basic' } },
+		});
+		expect(container.querySelector('a.bg-brand')).toBeNull();
 	});
 });

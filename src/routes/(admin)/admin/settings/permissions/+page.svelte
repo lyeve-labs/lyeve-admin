@@ -207,7 +207,9 @@
 	{/if}
 
 	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
+		<!-- New role is withdrawn in the same states, so the way forward is then
+		     the one action on the page. -->
+		<RefusalNotice refusal={pageRefusal} lead={loadError || atRoleCap} />
 	{:else if failure?.roleCapReached}
 		<Alert tone="warn" title="That would pass this instance's role ceiling">
 			{#snippet children()}

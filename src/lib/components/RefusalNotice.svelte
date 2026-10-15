@@ -11,7 +11,19 @@
 	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
 	import { LICENSE_PAGE, refusalText, refusalTitle, upgradeLabel, type Refusal } from '$lib/api/refusal';
 
-	let { refusal }: { refusal: Refusal } = $props();
+	let {
+		refusal,
+		lead = false,
+	}: {
+		refusal: Refusal;
+		/**
+		 * True where the way forward is the one action on its surface. A
+		 * surface holds one primary, and the notice usually sits in a drawer or
+		 * a page that has its own Create or Save, so by default its links stay
+		 * below that: the way forward secondary and the license page ghost.
+		 */
+		lead?: boolean;
+	} = $props();
 
 	const instance = useInstance();
 	// The license page is always offered. A link the engine or the license
@@ -33,9 +45,9 @@
 		<p>{refusalText(refusal)}</p>
 		<div class="mt-3 flex flex-wrap gap-2">
 			{#if offered}
-				<UpgradeLink link={offered} variant="primary" size="sm" />
+				<UpgradeLink link={offered} variant={lead ? 'primary' : 'secondary'} size="sm" />
 			{/if}
-			<Button variant="secondary" size="sm" href={LICENSE_PAGE}>View the license</Button>
+			<Button variant={offered && !lead ? 'ghost' : 'secondary'} size="sm" href={LICENSE_PAGE}>View the license</Button>
 		</div>
 	</Alert>
 </div>
