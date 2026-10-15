@@ -58,6 +58,11 @@ describe('locales page', () => {
 		expect(hidden('fallback_chain')).toEqual(['fr', 'de']);
 	});
 
+	it('centers the locale tags in their row, so the default sits level with a removable one', () => {
+		render(LocalesPage, { props: { data: data(), form: null } });
+		expect(screen.getByRole('list', { name: 'Enabled locales' }).classList.contains('items-center')).toBe(true);
+	});
+
 	it('adds a locale, reorders the chain and takes a removed locale out of both', async () => {
 		render(LocalesPage, { props: { data: data(), form: null } });
 

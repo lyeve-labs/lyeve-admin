@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.38.4.
+- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.38.5.
 - The console's docs link and the README point at the documentation's new address, lyeve.com/docs. The old host redirects there.
 - A release candidate image is published under its exact tag only, `X.Y.Z-rc.N`, and never as `latest` or the minor line.
 - The release jobs that read secrets run in a release environment that admits only version tags. Pull requests no longer run the suite with the visual editors, which needs those secrets and failed on every pull request. The release runs it before it builds.
@@ -106,6 +106,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A link to where a feature is turned on is no longer named with the license page's own label when it opens another page.
 - The notes under the telemetry header choice and a JSON field's edit choice are read with their control by a screen reader, and the setup page shows each restart command in a copy field.
 - Under a finger, each option of an open select, multiple select or autocomplete list, each day of a date picker, each choice in a checkbox or radio group, the close button of a dialog and the clear button of an autocomplete take a full touch target, and the date picker fits a 320 pixel screen. Under the keyboard, number fields, multiple selects, file drops and the search box of an open list show the focus ring. The active tab's count and the sidebar badges read at 4.5:1 or better in both themes, the phone navigation drawer slides out as it slides in, and a dismissed banner fades away. These come with ui-kit 0.38.4.
+- Under a finger, the remove cross on each chip of a multiple select and on a removable tag keeps its touch target off its neighbors, so a tap meant for the field or the next chip no longer removes a value. A multiple select is read in the order Tab reaches it, the field first, and a list or a date picker wider than the room it opens in shrinks to fit. These come with ui-kit 0.38.5.
+- Localization: under a finger, the default locale's tag sits level with the removable tags beside it.
 - The browser's toolbar color follows each switch of the theme control. It used to keep the color the page loaded with until the next load.
 - Content: a list column that links to another entry shows the linked entry's title for an entry saved in the console, and for one the console took in from a row written through the API, instead of an empty cell.
 

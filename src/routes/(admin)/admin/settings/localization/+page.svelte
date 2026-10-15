@@ -140,7 +140,7 @@
 						Each one is a tab in every entry's Translations panel. Language tags such as
 						<span class="font-mono">fr</span> or <span class="font-mono">pt-BR</span>.
 					</p>
-					<div class="flex flex-wrap gap-2" role="list" aria-label="Enabled locales">
+					<div class="flex flex-wrap items-center gap-2" role="list" aria-label="Enabled locales">
 						{#each enabled as code (code)}
 							<div role="listitem">
 								{#if code === defaultLocale}
