@@ -6,6 +6,8 @@ import { fixtureCatalog, fixtureEventTypes, fixtureGroupedEventTypes, fixtureSch
 import type { ValidationError } from '$lib/api/flows';
 import type { Selection } from '$lib/flow/types';
 
+vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/f1') } }));
+
 afterEach(cleanup);
 
 function setup(selected: Selection, errors: ValidationError[]) {
@@ -359,5 +361,48 @@ describe('FlowInspector on error', () => {
 		const radios = getAllByRole('radio').filter((r) => (r as HTMLInputElement).name === 'settings-on-error');
 		expect(radios).toHaveLength(2);
 		expect(container.textContent).toContain('The run ends at the first node that fails');
+	});
+});
+
+describe('FlowInspector names that could not be read', () => {
+	const flowView = (over: Record<string, unknown>) =>
+		render(FlowInspector, {
+			props: { definition: joinFlow, catalog: fixtureCatalog, selected: null, errors: [], onchange: vi.fn(), onselect: vi.fn(), ...over },
+		});
+
+	it('says the datasources could not be read, with Try again, instead of hiding them', () => {
+		const { container, getByRole } = flowView({ variables: ['region'], datasourcesGate: { state: 'unavailable' } });
+		expect(container.textContent).toContain('so datasources could not be read');
+		expect(getByRole('link', { name: /Try again/ })).toBeTruthy();
+		expect(container.textContent).toContain('vars.region');
+	});
+
+	it('draws the section for a failed read even when nothing else was read', () => {
+		const { container } = flowView({ variablesGate: { state: 'error', message: 'The variables could not be read.' } });
+		expect(container.textContent).toContain('Available names');
+		expect(container.textContent).toContain('The variables could not be read.');
+	});
+
+	// The names are admin routes, so a role refused them sees no section, as
+	// it sees no shortcut to them.
+	it('stays quiet for a role the names are refused to', () => {
+		const { container } = flowView({ datasourcesGate: { state: 'forbidden' }, variablesGate: { state: 'forbidden' } });
+		expect(container.textContent).not.toContain('Available names');
+	});
+
+	// A refused or unlicensed read listed nothing, which is not the same as none.
+	it('draws no datasources row beside the variables when the datasources were refused or not enabled', () => {
+		for (const state of ['forbidden', 'locked', 'absent'] as const) {
+			const { container, unmount } = flowView({ variables: ['region'], datasourcesGate: { state } });
+			const terms = Array.from(container.querySelectorAll('dt')).map((dt) => dt.textContent);
+			expect(terms).toEqual(['Variables']);
+			expect(container.textContent).toContain('vars.region');
+			unmount();
+		}
+	});
+
+	it('draws no variables row beside the datasources when the variables were refused', () => {
+		const { container } = flowView({ datasources: [{ id: 'd1', name: 'warehouse', kind: 'postgres' }], variablesGate: { state: 'forbidden' } });
+		expect(Array.from(container.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual(['Datasources']);
 	});
 });

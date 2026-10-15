@@ -210,6 +210,41 @@ describe('media library upload', () => {
 	});
 });
 
+describe('an upload whose session ended', () => {
+	function pick() {
+		const picker = screen.getByLabelText('Choose files to upload') as HTMLInputElement;
+		Object.defineProperty(picker, 'files', { value: [new File(['x'], 'new.png', { type: 'image/png' })], configurable: true });
+		return fireEvent.change(picker);
+	}
+
+	// The console renews the engine's short token only on a request its own
+	// server handles, so an upload sent straight to the engine can carry one
+	// that lapsed on a live session. Rerunning the loads renews it.
+	it('renews the session and sends the file again', async () => {
+		const answers = [new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }), new Response('{}', { status: 201 })];
+		const fetch = vi.fn(async () => answers.shift() as Response);
+		vi.stubGlobal('fetch', fetch);
+		setup();
+		await pick();
+		await waitFor(() => expect(kit.success).toHaveBeenCalledWith('Uploaded 1 file'));
+		expect(fetch).toHaveBeenCalledTimes(2);
+		expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
+		expect(nav.goto).toHaveBeenCalledTimes(1);
+		expect(nav.goto).toHaveBeenCalledWith('/admin/media', { invalidateAll: true });
+		vi.unstubAllGlobals();
+	});
+
+	it('says to sign in again when the renewed upload is refused too', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('Your session ended. Sign in again in another tab, then try again here.'));
+		expect(nav.goto).not.toHaveBeenCalled();
+		expect(document.body.textContent).not.toContain('unauthorized');
+		vi.unstubAllGlobals();
+	});
+});
+
 describe('media library controls carry a name', () => {
 	it('names the file picker the upload button opens', () => {
 		// sr-only hides the picker from the eye and not from a screen reader, so

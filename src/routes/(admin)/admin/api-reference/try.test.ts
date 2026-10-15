@@ -67,6 +67,15 @@ describe('trying an endpoint', () => {
 		}) as unknown as typeof globalThis.fetch;
 		const out = (await actions.try(tryEvent({ method: 'GET', path: '/api/admin/tenants' }, fetch))) as Failure;
 		expect(out.status).toBe(502);
-		expect(out.data.tryError).toContain('did not reach the engine');
+		expect(out.data.tryError).toBe('The request did not reach the engine. Try again in a moment.');
+	});
+
+	// The runtime's words for a failed connection can name an internal address.
+	it('prints none of the transport error', async () => {
+		const fetch = vi.fn(async () => {
+			throw new TypeError('fetch failed: connect ECONNREFUSED 10.0.0.5:8080');
+		}) as unknown as typeof globalThis.fetch;
+		const out = (await actions.try(tryEvent({ method: 'GET', path: '/api/admin/tenants' }, fetch))) as Failure;
+		expect(out.data.tryError).not.toContain('ECONNREFUSED');
 	});
 });

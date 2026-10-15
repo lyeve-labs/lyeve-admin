@@ -40,7 +40,7 @@ describe('admin/ai/transcripts load', () => {
 		[404, 'off'],
 		[503, 'no_provider'],
 	])('sorts a %i into the %s state', async (status, state) => {
-		const { event } = loadEvent({ '/api/admin/ai/transcripts': () => refused(status, 'refused') }, { path: '/admin/ai/transcripts' });
+		const { event } = loadEvent({ '/api/admin/ai/transcripts': () => refused(status, status === 503 ? 'no enabled AI provider configured' : 'refused') }, { path: '/admin/ai/transcripts' });
 		const out = (await load(event)) as Loaded;
 		expect(out.gate.state).toBe(state);
 		expect(out.transcripts).toEqual([]);

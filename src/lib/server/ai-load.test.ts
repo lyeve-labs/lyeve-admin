@@ -20,7 +20,13 @@ describe('aiGate', () => {
 		expect(aiGate(new ApiError(402, 'payment required'), { cookies: cookies() }, 'providers')).toEqual({ state: 'locked' });
 		expect(aiGate(new ApiError(403, 'forbidden'), { cookies: cookies() }, 'providers')).toEqual({ state: 'forbidden' });
 		expect(aiGate(new ApiError(404, 'AI is switched off for this tenant'), { cookies: cookies() }, 'providers')).toEqual({ state: 'off' });
-		expect(aiGate(new ApiError(503, 'ai unavailable'), { cookies: cookies() }, 'providers')).toEqual({ state: 'no_provider' });
+		expect(aiGate(new ApiError(503, 'no enabled AI provider configured', { error: 'no enabled AI provider configured', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toEqual({ state: 'no_provider' });
+		// The plugin answers its own store failures with a JSON 503 too, and
+		// that is an outage behind the engine, not a missing provider.
+		expect(aiGate(new ApiError(503, 'failed to list providers', { error: 'failed to list providers', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toMatchObject({ state: 'error' });
+		// A 503 page from a proxy in front of the engine is an outage, not a
+		// plugin without a provider.
+		expect(aiGate(new ApiError(503, '<html>Service Unavailable</html>'), { cookies: cookies() }, 'providers')).toMatchObject({ state: 'error' });
 	});
 
 	it('keeps the engine banner for a 5xx, a network failure and a status it does not expect', () => {
@@ -53,7 +59,9 @@ describe('aiActionError', () => {
 	it('names each refusal and relays a 4xx reason', () => {
 		expect(aiActionError(new ApiError(402, 'x'), 'f')).toContain('not enabled');
 		expect(aiActionError(new ApiError(404, 'x'), 'f')).toContain('switched off');
-		expect(aiActionError(new ApiError(503, 'x'), 'f')).toContain('provider');
+		expect(aiActionError(new ApiError(503, 'no enabled AI provider configured', { error: 'no enabled AI provider configured' }), 'f')).toContain('provider');
+		expect(aiActionError(new ApiError(503, 'failed to list models', { error: 'failed to list models' }), 'f')).toBe('f');
+		expect(aiActionError(new ApiError(503, '<html>Service Unavailable</html>'), 'f')).toBe('f');
 		expect(aiActionError(new ApiError(409, 'x'), 'f')).toContain('supports');
 		expect(aiActionError(new ApiError(400, 'base_url is required for the openai_compatible kind'), 'f')).toBe(
 			'base_url is required for the openai_compatible kind'

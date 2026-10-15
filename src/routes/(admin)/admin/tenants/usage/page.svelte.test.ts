@@ -103,12 +103,17 @@ describe('the quota drawer and the failures of other actions', () => {
 	});
 
 	// The two warning switches sat 16px apart, so the second one's touch hit
-	// area took the bottom of the first one's.
+	// area took the bottom of the first one's. They are spaced the way the SAML
+	// form spaces its switches, by the group that holds them.
 	it('spaces the two warning switches so each keeps its touch hit area', async () => {
 		const { getAllByRole } = render(UsagePage, { props: props() });
 		await fireEvent.click(getAllByRole('button', { name: /new quota/i })[0]);
+		const warn80 = document.body.querySelector('#quota-warn80')?.closest('label') as HTMLElement;
 		const warn90 = document.body.querySelector('#quota-warn90')?.closest('label') as HTMLElement;
-		expect(warn90.className).toContain('coarse:mt-2');
+		const group = warn90.parentElement as HTMLElement;
+		expect(warn80.parentElement).toBe(group);
+		expect(group.className.split(/\s+/)).toEqual(expect.arrayContaining(['gap-4', 'coarse:gap-6']));
+		expect(warn90.className).not.toContain('coarse:mt-2');
 	});
 
 	it('shows a failed save inside the open drawer', async () => {

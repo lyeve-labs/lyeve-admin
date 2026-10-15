@@ -231,8 +231,30 @@ describe('admin/jobs/+page.server.ts load opens the drawer from the address', ()
 		expect(result.openJob?.id).toBe('j9');
 	});
 
-	it('opens nothing for a job that does not exist', async () => {
+	it('opens nothing for a job that does not exist, and says so', async () => {
 		const result = (await load(routed('?edit=nope', { error: 'not found' }))) as Loaded;
 		expect(result.openJob).toBeNull();
+		expect(result.openGate).toEqual({ state: 'absent' });
+	});
+
+	// A link that opened nothing said nothing, so a failed read of the job
+	// looked like a link that does nothing.
+	it('keeps a failed read of the linked job as its gate', async () => {
+		const fetch = vi.fn(async (url: string) =>
+			/\/api\/admin\/jobs\/[^?]+$/.test(String(url)) ? json({ error: 'down' }, 503) : json(jobs(2))
+		) as unknown as typeof globalThis.fetch;
+		const result = (await load({
+			fetch,
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/jobs?edit=j9'),
+			parent: async () => ({ user: { roles: ['super_admin'] } }),
+		} as never)) as Loaded;
+		expect(result.openJob).toBeNull();
+		expect(result.openGate).toEqual({ state: 'unavailable' });
+	});
+
+	it('reports no failure for a job it opened', async () => {
+		const result = (await load(routed('?edit=j9', jobs(1, 9)[0]))) as Loaded;
+		expect(result.openGate).toBeNull();
 	});
 });

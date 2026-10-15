@@ -171,3 +171,26 @@ describe('heading outline', () => {
 		expect(outlineSkips(container)).toEqual([]);
 	});
 });
+
+describe('the release page links under a finger', () => {
+	const hasHitArea = (el: Element | null) => !!el && ['relative', 'hit-area'].every((c) => el.classList.contains(c));
+
+	// Both are one line of small text, and the only way to the other release or the entry.
+	it('gives the other release and the entry title a touch hit area', () => {
+		const { getByRole } = setup({ conflicts: [{ entry_id: 'e1', kind: 'other_release', detail: '', release_id: 'r2' }] });
+		expect(hasHitArea(getByRole('link', { name: 'Open the other release' }))).toBe(true);
+		expect(hasHitArea(getByRole('link', { name: 'Hello' }))).toBe(true);
+	});
+
+	// A row is about 22px tall and each link's box is 44px, so rows 8px apart
+	// let one conflict's link take the taps meant for the next one's.
+	it('spaces the conflict rows so their links do not overlap', () => {
+		const { getByTestId } = setup({
+			conflicts: [
+				{ entry_id: 'e1', kind: 'other_release', detail: '', release_id: 'r2' },
+				{ entry_id: 'e2', kind: 'other_release', detail: '', release_id: 'r3' },
+			],
+		});
+		expect(getByTestId('release-conflicts').classList.contains('coarse:gap-6')).toBe(true);
+	});
+});

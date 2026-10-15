@@ -265,7 +265,7 @@
 								builds, on a subject under the run's tenant, so a flow can call another service the same way
 								a content event does.
 							</p>
-							<a href="/admin/flows" class="text-sm text-brand hover:underline">Open flows</a>
+							<a href="/admin/flows" class="relative hit-area self-start text-sm text-brand hover:underline">Open flows</a>
 						</div>
 					</Card>
 				</div>

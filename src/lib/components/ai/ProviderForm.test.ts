@@ -106,3 +106,12 @@ describe('ProviderForm', () => {
 		expect(screen.getByText(/The stored key could not be read after a key rotation/)).toBeTruthy();
 	});
 });
+
+describe('the modalities under a finger', () => {
+	// The boxes wrapped 16px apart, so each 44px hit area took part of the next.
+	it('spaces the modality checkboxes so their hit areas do not overlap', () => {
+		setup();
+		const group = screen.getByRole('group', { name: 'Modalities' });
+		expect(group.querySelector('[class*="coarse:gap-y-"]')).toBeTruthy();
+	});
+});

@@ -255,3 +255,14 @@ describe('the destination form across reloads', () => {
 		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).value).toBe('https://collector.example.net/v1/metrics');
 	});
 });
+
+describe('the stored headers note', () => {
+	// Written after the choice, the note was not read with it.
+	it('belongs to the header choice, so a screen reader reads it with the control', () => {
+		render(TelemetryPage, props({ destination: STORED, licensed: true }));
+		const group = screen.getByRole('radiogroup', { name: 'Headers' });
+		const ids = (group.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+		const described = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+		expect(described).toContain('Stored: Authorization, X-Scope. Their values are never shown.');
+	});
+});

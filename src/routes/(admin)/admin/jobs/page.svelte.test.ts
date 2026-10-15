@@ -243,3 +243,16 @@ describe('a job with a payload', () => {
 		expect((form.querySelector('input[name="had_payload"]') as HTMLInputElement).value).toBe('true');
 	});
 });
+
+describe('a job link that opened nothing', () => {
+	it('says the linked job was not found', () => {
+		const { container } = setup({ openGate: { state: 'absent' } });
+		expect(container.textContent).toContain('The job this link opens was not found. It may have been deleted.');
+	});
+
+	it('says the linked job could not be read, with a way to try again', () => {
+		const { container, getByRole } = setup({ openGate: { state: 'unavailable' } });
+		expect(container.textContent).toContain('so the linked job could not be read');
+		expect(getByRole('link', { name: /Try again/ })).toBeTruthy();
+	});
+});

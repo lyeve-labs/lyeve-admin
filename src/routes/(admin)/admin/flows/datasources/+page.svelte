@@ -424,7 +424,7 @@
 		>
 			<FormErrors message={saveFailure?.error} />
 			{#if saveFailure?.refused && enableLink}
-				<a class="text-sm underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{enableLabel}</a>
+				<a class="relative hit-area self-start text-sm underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{enableLabel}</a>
 			{/if}
 			{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 			<Input

@@ -45,7 +45,10 @@ describe('FlowImportDrawer', () => {
 
 	it('names the way to raise the limit for a refused import', () => {
 		setup({ error: '7 of 7 flows are in use.', refusal: { nodeIds: [], limit: 7, current: 7, upgradeUrl: '' }, refused: true }, { href: '/admin/settings/license' });
-		expect(importForm().querySelector('a[href="/admin/settings/license"]')?.textContent).toBe('How to raise the limit');
+		const link = importForm().querySelector('a[href="/admin/settings/license"]') as HTMLElement;
+		expect(link.textContent).toBe('How to raise the limit');
+		// One line of small text, so it takes the touch hit area.
+		expect(link.classList.contains('hit-area') && link.classList.contains('relative')).toBe(true);
 	});
 
 	it('closes on success and stays open on a failure', async () => {

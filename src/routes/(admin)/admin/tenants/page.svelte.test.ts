@@ -324,3 +324,29 @@ describe('Tenants refusals', () => {
 		expect(notice.textContent).not.toContain('View the plan');
 	});
 });
+
+describe('Tenants with none listed and no create offered', () => {
+	// The notice spoke of tenants below that were not there, and the empty
+	// state asked for a create the page does not offer.
+	it('names no tenants below and asks for no create when provisioning is not served', () => {
+		const { container } = render(TenantsPage, {
+			props: props({ tenants: [], total: 0, canProvision: false, provisionGate: { state: 'absent' } }),
+		});
+		expect(container.textContent).toContain('This instance does not serve tenant provisioning');
+		expect(container.textContent).not.toContain('The tenants below');
+		expect(container.textContent).toContain('No tenants yet');
+		expect(container.textContent).not.toContain('Create a tenant');
+	});
+
+	it('names no tenants below when the license does not include creating them', () => {
+		const { container } = render(TenantsPage, { props: props({ tenants: [], total: 0, canProvision: false }) });
+		expect(container.textContent).toContain('does not include creating tenants');
+		expect(container.textContent).not.toContain('The tenants below');
+		expect(container.textContent).not.toContain('Create a tenant');
+	});
+
+	it('keeps the sentence about the tenants below when some are listed', () => {
+		const { container } = render(TenantsPage, { props: props({ canProvision: false, provisionGate: { state: 'absent' } }) });
+		expect(container.textContent).toContain('The tenants below can still be edited, disabled and deleted.');
+	});
+});

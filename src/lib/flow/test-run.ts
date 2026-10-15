@@ -4,7 +4,10 @@
  * touches the network.
  */
 
+import { ApiError } from '@lyeve-labs/client';
 import { FlowRefusal, validationErrors, type ValidationError } from '$lib/api/flows';
+import { isOutage } from '$lib/api/gate';
+import { SIGN_IN_AGAIN } from '$lib/session';
 import { isBlockedMessage, notEnabledText } from './blocked';
 import type { FlowDefinition } from './types';
 
@@ -55,9 +58,18 @@ export type TestFailure =
  */
 export function testFailure(err: unknown): TestFailure {
 	if (err instanceof FlowRefusal) return { kind: 'refused', errors: err.errors, text: notEnabledText(err.nodeIds) };
+	// The run was sent again after a renewal, so a 401 here is a session that ended.
+	if (err instanceof ApiError && err.status === 401) return { kind: 'refused', errors: [], text: SIGN_IN_AGAIN };
+	if (isOutage(err)) return { kind: 'refused', errors: [], text: TEST_OUTAGE };
 	const message = err instanceof Error ? err.message : '';
 	if (isBlockedMessage(message)) return { kind: 'blocked' };
 	const errors = validationErrors(message);
 	if (errors.length > 0) return { kind: 'refused', errors, text: 'The definition did not validate.' };
-	return { kind: 'refused', errors: [], text: message || 'The test run failed.' };
+	// The client puts the raw body of an answer that was not JSON in the
+	// message, which may be a proxy's error page. Only a refusal the engine
+	// worded is relayed.
+	const worded = err instanceof ApiError && err.status >= 400 && err.status < 500 && err.body !== undefined;
+	return { kind: 'refused', errors: [], text: (worded && message) || 'The test run failed.' };
 }
+
+const TEST_OUTAGE = 'The engine did not answer, so the test run did not finish. Try again in a moment.';

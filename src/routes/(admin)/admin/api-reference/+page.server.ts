@@ -118,12 +118,12 @@ export const actions: Actions = {
 				truncated,
 			};
 			return { tried: result };
-		} catch (err) {
+		} catch {
 			// A transport failure is not a response. Reporting it as one would
-			// have the reader debugging an endpoint that was never reached.
-			return fail(502, {
-				tryError: `The request did not reach the engine: ${err instanceof Error ? err.message : 'unknown error'}`,
-			});
+			// have the reader debugging an endpoint that was never reached. The
+			// runtime's own words can name an internal address, so none of them
+			// are shown.
+			return fail(502, { tryError: 'The request did not reach the engine. Try again in a moment.' });
 		}
 	},
 };

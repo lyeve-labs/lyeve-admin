@@ -318,6 +318,8 @@ describe('flows list page ceiling', () => {
 		expect(a.textContent).toBe('View the add-on');
 		expect(a.getAttribute('target')).toBe('_blank');
 		expect(a.getAttribute('rel')).toBe('noopener noreferrer');
+		// One line of small text, so it takes the touch hit area.
+		expect(a.classList.contains('hit-area') && a.classList.contains('relative')).toBe(true);
 	});
 });
 

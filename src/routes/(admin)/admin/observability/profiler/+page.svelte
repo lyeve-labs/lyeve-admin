@@ -233,7 +233,7 @@
 				{#if detail}
 					<span class="text-xs text-faint">{detail.total_count} entries in the ring</span>
 				{/if}
-				<a href="/admin/observability/profiler" class="ms-auto text-xs text-muted underline-offset-2 transition-colors hover:text-fg hover:underline">Clear selection</a>
+				<a href="/admin/observability/profiler" class="relative hit-area ms-auto text-xs text-muted underline-offset-2 transition-colors hover:text-fg hover:underline">Clear selection</a>
 			</div>
 			{#if data.detail && !data.detail.ok}
 				<GateNotice gate={data.detail.gate} title="this endpoint" absent={ABSENT} />

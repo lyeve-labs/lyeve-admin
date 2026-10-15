@@ -20,7 +20,7 @@ import {
 	type Summary,
 } from '@lyeve-labs/client-rest';
 import { applyMigrations } from '$lib/api/migrate';
-import { section, type Section } from '$lib/api/gate';
+import { section, type Gate, type Section } from '$lib/api/gate';
 import { rowsOf, statedTotal, type ListEnvelope } from '$lib/api/list';
 import { actionError } from '$lib/server/action-error';
 import { localPath } from '$lib/server/local-path';
@@ -44,6 +44,9 @@ export interface RecentEntry {
 
 /** How many rows each "what changed" list shows. */
 const RECENT = 5;
+
+/** The failed reads a second try may answer. */
+const RETRYABLE: ReadonlySet<Gate['state']> = new Set(['unavailable', 'busy', 'error']);
 
 export const load: PageServerLoad = async (event) => {
 	const { parent, url } = event;
@@ -69,9 +72,13 @@ export const load: PageServerLoad = async (event) => {
 	 * A tenant that composed its own dashboard sees that instead of the
 	 * stock panels, so the stock reads are skipped rather than made and
 	 * thrown away. A layout that cannot be read falls back to the stock
-	 * dashboard: an unreadable customization is not an empty page.
+	 * dashboard: an unreadable customization is not an empty page. A read
+	 * that may answer on a second try says so, so its readers can tell the
+	 * stock dashboard standing in from the one the tenant chose.
 	 */
-	const layout = customization?.entitled ? await getDashboardLayout(client).catch(() => null) : null;
+	const layoutRead = customization?.entitled ? await section(getDashboardLayout(client), 'The dashboard layout could not be read.') : null;
+	const layout = layoutRead?.ok ? layoutRead.value : null;
+	const layoutUnread = layoutRead !== null && !layoutRead.ok && RETRYABLE.has(layoutRead.gate.state);
 	const stock = !layout?.custom;
 	const composed = layout?.custom
 		? await resolveWidgets(client, layout.widgets, user.roles, plugins, now)
@@ -197,6 +204,7 @@ export const load: PageServerLoad = async (event) => {
 		window,
 		welcome: customization?.entitled ? customization.settings.brand.welcome : '',
 		composed,
+		layoutUnread,
 		now: now.toISOString(),
 		homePage: homePage ? { slug: homePage.slug, title: homePage.title } : null,
 		homeBlocks,

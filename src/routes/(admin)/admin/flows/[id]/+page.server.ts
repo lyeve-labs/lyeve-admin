@@ -55,7 +55,9 @@ const LOCKED = {
 	catalog: [],
 	catalogGate: GATE_OK,
 	datasources: [],
+	datasourcesGate: GATE_OK,
 	variables: [],
+	variablesGate: GATE_OK,
 	schemas: [],
 	flows: [],
 	eventTypes: null,
@@ -100,8 +102,10 @@ export const load: PageServerLoad = async (event) => {
 					gate: gateOf(err, 'The node types could not be read, so the palette has nothing to offer.'),
 				}),
 			),
-			listDatasources(client).then((list) => list.rows).catch(() => []),
-			listVariables(client, 500, 0).catch(() => []),
+			// A failed read of the names is kept, so the node form and the
+			// inspector never say a tenant has none when they were not read.
+			section(listDatasources(client).then((list) => list.rows), 'The datasources could not be read.'),
+			section(listVariables(client, 500, 0), 'The variables could not be read.'),
 			// The pickers read the content schemas, the published flows and the
 			// event types. A failed read leaves each picker as free text, which
 			// is the escape it carries anyway. An engine without the event-types
@@ -156,8 +160,10 @@ export const load: PageServerLoad = async (event) => {
 		flow: { ...flow, draft: normalizeDefinition(flow.draft ?? emptyDefinition(flow.name, flow.slug)) },
 		catalog: read.catalog,
 		catalogGate: read.gate,
-		datasources: datasources.map((d) => ({ id: d.id, name: d.name, kind: d.kind })),
-		variables: rowsOf(variables).map((v) => v.key),
+		datasources: datasources.ok ? datasources.value.map((d) => ({ id: d.id, name: d.name, kind: d.kind })) : [],
+		datasourcesGate: datasources.ok ? GATE_OK : datasources.gate,
+		variables: variables.ok ? rowsOf(variables.value).map((v) => v.key) : [],
+		variablesGate: variables.ok ? GATE_OK : variables.gate,
 		schemas: schemaOptions,
 		flows,
 		eventTypes,

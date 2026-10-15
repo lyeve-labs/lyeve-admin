@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Checkbox, Collapsible, Input, SearchInput, SegmentedControl, Table } from '@lyeve-labs/ui-kit';
+	import { Alert, Checkbox, CheckboxGroup, Collapsible, Input, SearchInput, SegmentedControl, Table } from '@lyeve-labs/ui-kit';
 	import { Database, BookOpen, Plug } from '@lucide/svelte';
 	import {
 		KEY_ACTIONS,
@@ -56,10 +56,6 @@
 
 	function toggle(list: readonly string[], action: string, on: boolean): string[] {
 		return on ? [...new Set([...list, action])] : list.filter((a) => a !== action);
-	}
-
-	function setContentAction(action: string, on: boolean) {
-		access = { ...access, contentActions: toggle(access.contentActions, action, on) };
 	}
 
 	function setSchemaAction(schema: string, action: string, on: boolean) {
@@ -130,15 +126,14 @@
 					bind:value={() => access.contentMode, (v) => (access = { ...access, contentMode: v })}
 				/>
 				{#if access.contentMode === 'all'}
-					<div class="flex flex-wrap gap-x-4 gap-y-2" role="group" aria-label="Actions on every schema">
-						{#each KEY_ACTIONS as a (a.value)}
-							<Checkbox
-								label={a.label}
-								checked={access.contentActions.includes(a.value)}
-								onchange={(on) => setContentAction(a.value, on)}
-							/>
-						{/each}
-					</div>
+					<CheckboxGroup
+						label="Actions on every schema"
+						labelHidden
+						orientation="horizontal"
+						options={KEY_ACTIONS}
+						value={access.contentActions}
+						onchange={(v) => (access = { ...access, contentActions: v as typeof access.contentActions })}
+					/>
 				{:else if schemasFailed}
 					<Alert tone="warn">The schemas could not be read, so none can be chosen now. Reload the page to try again.</Alert>
 				{:else if schemas.length === 0}
@@ -216,15 +211,14 @@
 							{g.label} reads every schema, whichever schemas are chosen above. Leave it off for a key held to some schemas.
 						</Alert>
 					{/if}
-					<div class="flex flex-wrap gap-x-4 gap-y-2" role="group" aria-label="Actions on {g.label}">
-						{#each g.actions as action (action)}
-							<Checkbox
-								label={actionLabel(action)}
-								checked={st.actions.includes(action)}
-								onchange={(on) => setResource(g.resource, { actions: toggle(st.actions, action, on) })}
-							/>
-						{/each}
-					</div>
+					<CheckboxGroup
+						label="Actions on {g.label}"
+						labelHidden
+						orientation="horizontal"
+						options={g.actions.map((action) => ({ value: action, label: actionLabel(action) }))}
+						value={st.actions}
+						onchange={(v) => setResource(g.resource, { actions: v })}
+					/>
 					{#if g.nameParam}
 						<Input
 							id="key-names-{g.resource}"

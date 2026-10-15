@@ -13,6 +13,8 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { csrfHeaders } from '$lib/api/csrf';
+	import { SIGN_IN_AGAIN } from '$lib/session';
+	import { renewingOnce } from '$lib/renew';
 	import type { MediaItem } from '$lib/api/media';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import type { PageData, ActionData } from './$types';
@@ -112,7 +114,13 @@
 			const body = new FormData();
 			body.append('file', file);
 			try {
-				const res = await fetch('/api/admin/media', { method: 'POST', headers: csrfHeaders(), body });
+				const res = await renewingOnce(() => fetch('/api/admin/media', { method: 'POST', headers: csrfHeaders(), body }));
+				// A 401 after a renewal is a session that ended. The files stay
+				// picked, so the reader can sign in and send them again.
+				if (res.status === 401) {
+					uploadError = SIGN_IN_AGAIN;
+					break;
+				}
 				if (!res.ok) {
 					const j = (await res.json().catch(() => ({ error: 'Upload failed' }))) as {
 						error?: string;

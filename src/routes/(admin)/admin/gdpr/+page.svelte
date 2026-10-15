@@ -119,7 +119,7 @@
 						<a
 							href={exportHref}
 							download={exportFilename}
-							class="inline-flex items-center gap-2 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-brand-light"
+							class="inline-flex items-center gap-2 rounded-md bg-brand px-3 py-1.5 coarse:min-h-control text-xs font-medium text-ink transition-colors hover:bg-brand-light"
 						>
 							<FileJson size={ICON.sm} /> Download JSON
 						</a>

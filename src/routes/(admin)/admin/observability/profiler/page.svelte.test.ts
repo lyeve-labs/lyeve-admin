@@ -138,3 +138,12 @@ describe('the endpoint links on a touch screen', () => {
 		expect(link.className).toContain('relative');
 	});
 });
+
+describe('the profiler links under a finger', () => {
+	const hasHitArea = (el: Element | null) => !!el && ['relative', 'hit-area'].every((c) => el.classList.contains(c));
+
+	it('gives Clear selection a touch hit area', () => {
+		const { getByRole } = render(ProfilerPage, props(page({ selected: '/nothing', detail: ok(null) })));
+		expect(hasHitArea(getByRole('link', { name: 'Clear selection' }))).toBe(true);
+	});
+});

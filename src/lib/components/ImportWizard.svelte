@@ -25,6 +25,9 @@
 	import TransformField from '$lib/components/imports/TransformField.svelte';
 	import { refusalOf, type Refusal } from '$lib/api/refusal';
 	import { errorCodeOf } from '$lib/api/limits';
+	import { ApiError } from '@lyeve-labs/client';
+	import { renewingOnce } from '$lib/renew';
+	import { SIGN_IN_AGAIN } from '$lib/session';
 	import {
 		IMPORT_FORMATS,
 		IMPORT_FORMAT_LABELS,
@@ -236,11 +239,23 @@
 		hint = '';
 		refusal = null;
 		try {
-			return await fn();
+			return await renewingOnce(fn);
 		} catch (e) {
+			// A 401 after a renewal is a session that ended, and the chosen file
+			// and mapping stay here for after the reader signs in. A request that
+			// never reached the engine carries the browser's words, which are not
+			// the console's.
+			if (e instanceof ApiError && e.status === 401) {
+				error = SIGN_IN_AGAIN;
+				return null;
+			}
+			if (!(e instanceof ApiError)) {
+				error = 'The request did not reach the engine. Nothing was imported. Try again in a moment.';
+				return null;
+			}
 			refusal = refusalOf(e);
 			if (!refusal) {
-				error = e instanceof Error ? e.message : 'The request failed.';
+				error = e.message || 'The request failed.';
 				hint = parseRefusalHint(error, errorCodeOf(e));
 			}
 			return null;

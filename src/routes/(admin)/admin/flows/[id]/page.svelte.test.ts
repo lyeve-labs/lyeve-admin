@@ -12,12 +12,13 @@ import { outlineSkips } from '$lib/test-outline';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/f1') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
-const nav = vi.hoisted(() => ({ guard: null as null | ((n: unknown) => void) }));
+const nav = vi.hoisted(() => ({ guard: null as null | ((n: unknown) => void), invalidateAll: vi.fn(async () => {}) }));
 vi.mock('$app/navigation', () => ({
 	beforeNavigate: vi.fn((fn: (n: unknown) => void) => {
 		nav.guard = fn;
 	}),
 	goto: vi.fn(async () => {}),
+	invalidateAll: nav.invalidateAll,
 }));
 
 // The instance the layout provides, so a refusal has a way to enable to name.
@@ -768,6 +769,44 @@ describe('flow editor page', () => {
 		expect(container.textContent).toContain('One element uses what this instance does not enable: orders.');
 		expect(container.querySelector('[data-node-id="orders"]')?.className).toContain('border-danger');
 		expect(queryByText('payment_required')).toBeNull();
+	});
+
+	// The console renews the engine's short token only on a request its own
+	// server handles, so a test run sent straight to the engine can carry one
+	// that lapsed on a live session. Rerunning the loads renews it.
+	describe('a test run the engine answers with 401', () => {
+		function answeringTest(statuses: number[]) {
+			return vi.fn(async (url: string) => {
+				if (!String(url).endsWith('/test')) {
+					return new Response(JSON.stringify({ ok: true, errors: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+				}
+				const status = statuses.shift() ?? 200;
+				const body = status === 401 ? { error: 'unauthorized' } : fixtureRun;
+				return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+			});
+		}
+
+		it('renews the session and runs the test again, keeping the draft in place', async () => {
+			nav.invalidateAll.mockClear();
+			fetchMock = answeringTest([401]);
+			vi.stubGlobal('fetch', fetchMock);
+			const { getByRole, queryByText } = setup();
+			await fireEvent.click(getByRole('button', { name: 'Test' }));
+			await vi.waitFor(() => expect(fetchMock.mock.calls.filter((c) => String(c[0]).endsWith('/test'))).toHaveLength(2));
+			expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
+			await vi.waitFor(() => expect(queryByText('unauthorized')).toBeNull());
+			vi.unstubAllGlobals();
+		});
+
+		it('says to sign in again when the renewed run is refused too', async () => {
+			fetchMock = answeringTest([401, 401]);
+			vi.stubGlobal('fetch', fetchMock);
+			const { getByRole, container } = setup();
+			await fireEvent.click(getByRole('button', { name: 'Test' }));
+			await vi.waitFor(() => expect(container.textContent).toContain('Your session ended. Sign in again in another tab, then try again here.'));
+			expect(container.textContent).not.toContain('unauthorized');
+			vi.unstubAllGlobals();
+		});
 	});
 
 	it('says the versions could not be read, offers no rollback and never calls the draft unpublished', () => {

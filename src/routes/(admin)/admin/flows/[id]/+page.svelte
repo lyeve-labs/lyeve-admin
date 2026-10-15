@@ -56,6 +56,7 @@
 	import { formatDateTime, relativeTime } from '$lib/format';
 	import { focusMode } from '$lib/flow/focus.svelte';
 	import { parseTrigger, sampleKey, testFailure, untilOptions } from '$lib/flow/test-run';
+	import { renewingOnce } from '$lib/renew';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -299,12 +300,8 @@
 		testing = true;
 		testError = '';
 		try {
-			lastRun = await testFlow(browserClient(), flowId, {
-				trigger: trigger.value,
-				definition: cloneDefinition(definition),
-				live,
-				until_node: untilNode || undefined,
-			});
+			const request = { trigger: trigger.value, definition: cloneDefinition(definition), live, until_node: untilNode || undefined };
+			lastRun = await renewingOnce(() => testFlow(browserClient(), flowId, request));
 			focusStep = null;
 			tab = 'test';
 			drawerOpen = true;
@@ -774,7 +771,9 @@
 						{errors}
 						schemas={data.schemas}
 						datasources={data.datasources}
+						datasourcesGate={data.datasourcesGate}
 						variables={data.variables}
+						variablesGate={data.variablesGate}
 						flows={data.flows}
 						flowId={data.flow.id}
 						{savedSlug}

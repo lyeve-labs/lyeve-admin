@@ -391,7 +391,7 @@
 			{@const link = instance.upgradeLink(f.refusal.upgradeUrl || null)}
 			{#if link}
 				{@const away = isExternalHref(link.href)}
-				<a class="text-sm underline" href={link.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{upgradeLabel(link.href) ?? link.label ?? (f.refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+				<a class="relative hit-area self-start text-sm underline" href={link.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{upgradeLabel(link.href) ?? link.label ?? (f.refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
 			{/if}
 		{/if}
 		{#if f && f.errors.length > 0}

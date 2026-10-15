@@ -92,6 +92,27 @@ function actionEvent(form: FormData, routes: Record<string, Route> = everything)
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
 describe('admin/flows/[id] load', () => {
+	// A failed read of the names is not a tenant with none, so the node form
+	// and the inspector have to tell the two apart.
+	it('keeps a failed datasource or variable read as its gate', async () => {
+		const { event } = loadEvent({
+			...everything,
+			'/api/admin/flows/datasources': () => json({ error: 'unavailable' }, 503),
+			'/api/admin/flows/variables': () => json({ error: 'boom' }, 500),
+		});
+		const result = (await load(event)) as Loaded;
+		expect(result.datasources).toEqual([]);
+		expect(result.datasourcesGate).toEqual({ state: 'unavailable' });
+		expect(result.variablesGate).toMatchObject({ state: 'error' });
+	});
+
+	it('reports both name reads as read when they answered', async () => {
+		const { event } = loadEvent();
+		const result = (await load(event)) as Loaded;
+		expect(result.datasourcesGate).toEqual({ state: 'ok' });
+		expect(result.variablesGate).toEqual({ state: 'ok' });
+	});
+
 	it('loads the flow with its draft, the catalog, names and recent runs', async () => {
 		const { event, calls } = loadEvent();
 		const result = (await load(event)) as Loaded;

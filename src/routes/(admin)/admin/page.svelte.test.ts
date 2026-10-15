@@ -380,10 +380,32 @@ describe('the missing home page for each role', () => {
 		expect(document.body.textContent).toContain('Choose another one there.');
 	});
 
-	// Only an admin can open customization, so a reader is not sent there.
-	it('says the page was not found to a reader who cannot choose another', () => {
+	// The plugin answers 404 for a page hidden from the reader's role as well
+	// as for a missing one, so a reader outside its roles sees the dashboard
+	// without it and is told nothing, not even its slug.
+	it('says nothing to a reader for whom the page was not found', () => {
 		render(DashboardPage, { props: { data: data({ ...missing, isAdmin: false, superAdmin: false }), form: null } });
-		expect(document.body.textContent).toContain('The home page chosen in customization, welcome, was not found.');
-		expect(document.body.textContent).not.toContain('Choose another');
+		expect(document.body.textContent).not.toContain('home page');
+		expect(document.body.textContent).not.toContain('welcome');
+	});
+
+	it('keeps Try again for a reader when the page could not be read', () => {
+		const down = { ...missing, home: { slug: 'welcome', gate: { state: 'unavailable' } } };
+		render(DashboardPage, { props: { data: data({ ...down, isAdmin: false, superAdmin: false }), form: null } });
+		expect(document.body.textContent).toContain('so the home page could not be read');
+		expect(screen.getByRole('link', { name: /Try again/ })).toBeTruthy();
+	});
+});
+
+describe('a composed dashboard that could not be read', () => {
+	it('says the stock dashboard stands in for it, with a way to try again', () => {
+		render(DashboardPage, { props: { data: data({ layoutUnread: true }), form: null } });
+		expect(document.body.textContent).toContain("This tenant's own dashboard could not be read, so the standard one is shown.");
+		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin');
+	});
+
+	it('says nothing when the layout was read', () => {
+		render(DashboardPage, { props: { data: data({ layoutUnread: false }), form: null } });
+		expect(document.body.textContent).not.toContain('own dashboard could not be read');
 	});
 });

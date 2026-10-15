@@ -28,7 +28,7 @@ describe('admin/ai/providers/[id] load', () => {
 		[403, 'forbidden'],
 		[503, 'no_provider'],
 	])('sorts a %i into the %s state', async (status, state) => {
-		const { event } = loadEvent({ [`/api/admin/ai/providers/${id}`]: () => refused(status, 'refused') }, { path, params: { id } });
+		const { event } = loadEvent({ [`/api/admin/ai/providers/${id}`]: () => refused(status, status === 503 ? 'no enabled AI provider configured' : 'refused') }, { path, params: { id } });
 		expect(((await load(event)) as Loaded).gate.state).toBe(state);
 	});
 });
@@ -51,9 +51,11 @@ describe('admin/ai/providers/[id] actions', () => {
 		expect(await actions.models(event)).toEqual({ scope: 'models', models: ['gpt-4o', 'gpt-4o-mini'] });
 	});
 
-	it('names the missing provider when the model list answers 503', async () => {
+	// The plugin answers a vendor that did not list its models with a 503, which
+	// is not the tenant missing a provider.
+	it('says the provider did not answer when the model list answers 503', async () => {
 		const { event } = actionEvent({ [`/providers/${id}/models`]: () => refused(503, 'failed to list models') }, new FormData(), { path, params: { id } });
-		expect(await actions.models(event)).toMatchObject({ status: 400, data: { scope: 'models', error: expect.stringContaining('provider') } });
+		expect(await actions.models(event)).toMatchObject({ status: 400, data: { scope: 'models', error: 'The provider did not answer with its models' } });
 	});
 
 	it('asks capabilities for the model named in the form', async () => {

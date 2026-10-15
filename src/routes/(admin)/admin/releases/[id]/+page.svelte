@@ -243,7 +243,7 @@
 							? `${blocking.length} ${blocking.length === 1 ? 'conflict stops' : 'conflicts stop'} this release from going out. Resolve each one or remove the entry.`
 							: 'Nothing here stops the release. Deleted entries are skipped when it goes out.'}
 					</p>
-					<ul class="flex flex-col gap-2" data-testid="release-conflicts">
+					<ul class="flex flex-col gap-2 coarse:gap-6" data-testid="release-conflicts">
 						{#each conflicts as c, i (`${c.entry_id}-${c.kind}-${i}`)}
 							<li class="flex flex-wrap items-center gap-2 text-sm">
 								<Badge tone={blocks(c) ? 'danger' : 'neutral'}>{blocks(c) ? 'Blocks' : 'Skipped'}</Badge>
@@ -251,7 +251,7 @@
 								<span class="text-muted">{CONFLICT_LABELS[c.kind] ?? c.detail}</span>
 								{#if c.at}<span class="text-xs text-faint">{formatDateTime(c.at)}</span>{/if}
 								{#if c.release_id}
-									<a class="text-xs text-brand" href="/admin/releases/{c.release_id}">Open the other release</a>
+									<a class="relative hit-area text-xs text-brand" href="/admin/releases/{c.release_id}">Open the other release</a>
 								{/if}
 							</li>
 						{/each}
@@ -293,7 +293,7 @@
 								<tr>
 									<td>
 										{#if href}
-											<a {href} class="text-fg transition-colors hover:text-brand">{label?.title || shortId(it.entry_id)}</a>
+											<a {href} class="relative hit-area text-fg transition-colors hover:text-brand">{label?.title || shortId(it.entry_id)}</a>
 										{:else}
 											<span class="font-mono text-xs text-muted">{it.entry_id}</span>
 										{/if}

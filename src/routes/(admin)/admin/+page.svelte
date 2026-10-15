@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import CustomBlocks from '$lib/components/custom/CustomBlocks.svelte';
 	import DashboardWidgets from '$lib/components/custom/DashboardWidgets.svelte';
 	import {
@@ -98,15 +99,25 @@
 	     with the refusal, so this is where it is announced. -->
 	<FormErrors message={form?.error} />
 
+	{#if data.layoutUnread}
+		<p class="flex flex-wrap items-center gap-2 text-sm text-muted">
+			<TriangleAlert size={ICON.md} class="shrink-0 text-warn" aria-hidden="true" />
+			This tenant's own dashboard could not be read, so the standard one is shown.
+			<a class="relative hit-area underline hover:text-fg" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>Try again</a>
+		</p>
+	{/if}
 	{#if data.welcome}
 		<p class="text-base text-fg" data-testid="tenant-welcome">{data.welcome}</p>
 	{/if}
-	{#if data.home}
+	<!-- The plugin answers 404 for a page hidden from the reader's role as well
+	     as for a missing one. Only an admin, who sees every page, reads a 404
+	     as missing, and a reader outside the page's roles is told nothing. -->
+	{#if data.home && (data.home.gate.state !== 'absent' || data.isAdmin)}
 		<GateNotice
 			level={2}
 			gate={data.home.gate}
 			title="The home page"
-			absent="The home page chosen in customization, {data.home.slug}, was not found.{data.isAdmin ? ' Choose another one there.' : ''}"
+			absent="The home page chosen in customization, {data.home.slug}, was not found. Choose another one there."
 		/>
 	{:else if data.homePage}
 		<section class="flex flex-col gap-4" aria-label={data.homePage.title}>
