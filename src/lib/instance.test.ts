@@ -38,12 +38,18 @@ describe('instanceFrom', () => {
 		expect(instanceFrom(() => null).licenseModule()).toBe(false);
 	});
 
-	it('points a feature it does not serve at the link the engine sent, in the module\'s words', () => {
+	// The module's words name the module's own page. Paired with another
+	// address they would name a page the link does not open.
+	it('points a feature it does not serve at the link the engine sent, without the module\'s words', () => {
 		const instance = instanceFrom(() => ({ licensing }));
-		expect(instance.upgradeLink('/admin/settings/license?plugin=search')).toEqual({
-			href: '/admin/settings/license?plugin=search',
-			label: 'Turn it on',
+		expect(instance.upgradeLink('https://shop.example.com/pricing?plan=basic')).toEqual({
+			href: 'https://shop.example.com/pricing?plan=basic',
 		});
+	});
+
+	it('keeps the module\'s words when the engine sent the module\'s own link', () => {
+		const instance = instanceFrom(() => ({ licensing }));
+		expect(instance.upgradeLink('/admin/settings/license')).toEqual({ href: '/admin/settings/license', label: 'Turn it on' });
 	});
 
 	it('falls back to the module\'s upgrade link when the engine sent none, or an unsafe one', () => {

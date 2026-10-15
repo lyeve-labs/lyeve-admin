@@ -60,9 +60,10 @@ describe('NotEnabled', () => {
 		expect(getByRole('link', { name: 'Turn it on' }).getAttribute('href')).toBe('/admin/settings/license');
 	});
 
-	it('puts the module\'s words on the link the engine sent', () => {
+	// The module's words name its own page, and the engine's link may open another.
+	it('keeps the module\'s words off a link the engine sent', () => {
 		const { getByRole } = render(Host, { props: { licensing, url: '/admin/settings/license?plugin=audit' } });
-		const link = getByRole('link', { name: 'Turn it on' });
+		const link = getByRole('link', { name: 'How to enable it' });
 		expect(link.getAttribute('href')).toBe('/admin/settings/license?plugin=audit');
 		expect(link.getAttribute('target')).toBeNull();
 	});
