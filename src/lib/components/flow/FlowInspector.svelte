@@ -160,6 +160,10 @@
 	const RETRYABLE: ReadonlySet<Gate['state']> = new Set(['unavailable', 'busy', 'error']);
 	const datasourcesUnread = $derived(RETRYABLE.has(datasourcesGate.state));
 	const variablesUnread = $derived(RETRYABLE.has(variablesGate.state));
+	// A refused or unlicensed read listed nothing, so its row would say none
+	// where the answer is unknown. Only a read that ran or can run again shows.
+	const datasourcesRow = $derived(datasourcesGate.state === 'ok' || datasourcesUnread);
+	const variablesRow = $derived(variablesGate.state === 'ok' || variablesUnread);
 </script>
 
 <div class="flex flex-col gap-4 p-4" data-testid="flow-inspector">
@@ -386,26 +390,30 @@
 		{#if datasources.length > 0 || variables.length > 0 || datasourcesUnread || variablesUnread}
 			<SectionHeading level={2} variant="eyebrow">Available names</SectionHeading>
 			<dl class="grid gap-3 text-xs">
-				<div>
-					<dt class="text-faint">Datasources</dt>
-					{#if datasourcesUnread}
-						<dd><GateNotice gate={datasourcesGate} title="Datasources" absent="" /></dd>
-					{:else}
-						<dd class="font-mono text-fg">
-							{#each datasources as d (d.id)}<span class="block">{d.name} <span class="text-faint">{d.kind}</span></span>{:else}<span class="text-faint">none</span>{/each}
-						</dd>
-					{/if}
-				</div>
-				<div>
-					<dt class="text-faint">Variables</dt>
-					{#if variablesUnread}
-						<dd><GateNotice gate={variablesGate} title="Variables" absent="" /></dd>
-					{:else}
-						<dd class="font-mono text-fg">
-							{#each variables as v (v)}<span class="block">vars.{v}</span>{:else}<span class="text-faint">none</span>{/each}
-						</dd>
-					{/if}
-				</div>
+				{#if datasourcesRow}
+					<div>
+						<dt class="text-faint">Datasources</dt>
+						{#if datasourcesUnread}
+							<dd><GateNotice gate={datasourcesGate} title="Datasources" absent="" /></dd>
+						{:else}
+							<dd class="font-mono text-fg">
+								{#each datasources as d (d.id)}<span class="block">{d.name} <span class="text-faint">{d.kind}</span></span>{:else}<span class="text-faint">none</span>{/each}
+							</dd>
+						{/if}
+					</div>
+				{/if}
+				{#if variablesRow}
+					<div>
+						<dt class="text-faint">Variables</dt>
+						{#if variablesUnread}
+							<dd><GateNotice gate={variablesGate} title="Variables" absent="" /></dd>
+						{:else}
+							<dd class="font-mono text-fg">
+								{#each variables as v (v)}<span class="block">vars.{v}</span>{:else}<span class="text-faint">none</span>{/each}
+							</dd>
+						{/if}
+					</div>
+				{/if}
 			</dl>
 		{/if}
 		{@render orphans(orphanFlowErrors)}

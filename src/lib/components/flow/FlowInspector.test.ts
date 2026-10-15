@@ -389,4 +389,20 @@ describe('FlowInspector names that could not be read', () => {
 		const { container } = flowView({ datasourcesGate: { state: 'forbidden' }, variablesGate: { state: 'forbidden' } });
 		expect(container.textContent).not.toContain('Available names');
 	});
+
+	// A refused or unlicensed read listed nothing, which is not the same as none.
+	it('draws no datasources row beside the variables when the datasources were refused or not enabled', () => {
+		for (const state of ['forbidden', 'locked', 'absent'] as const) {
+			const { container, unmount } = flowView({ variables: ['region'], datasourcesGate: { state } });
+			const terms = Array.from(container.querySelectorAll('dt')).map((dt) => dt.textContent);
+			expect(terms).toEqual(['Variables']);
+			expect(container.textContent).toContain('vars.region');
+			unmount();
+		}
+	});
+
+	it('draws no variables row beside the datasources when the variables were refused', () => {
+		const { container } = flowView({ datasources: [{ id: 'd1', name: 'warehouse', kind: 'postgres' }], variablesGate: { state: 'forbidden' } });
+		expect(Array.from(container.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual(['Datasources']);
+	});
 });
