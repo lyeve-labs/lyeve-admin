@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The permission matrix draws each state with its own shape, so a grant, an inherited grant, a refusal and an exempt role read without color and keep their shape in high contrast mode.
 - The plugin page colors HTTP methods the way the schema builder and the API reference do. An HTTP status takes one badge color on every page that shows one.
 - The UI check refuses a style block in a component, a date or time written with no locale, and a native disclosure or dialog.
+- A refusal at a license limit says what happened, then that a license allowing more lifts the limit, and only then that removing one also makes room. When the engine names a page where more can be bought, that link leads the notice, opens in a new tab and is named by what it opens, a plan or an add-on. The admin seat refusal on the users page and on a tenant's members, and the flow limit refusal, read this way.
 
 ### Fixed
 
@@ -81,6 +82,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - On a phone the GraphQL endpoint notes keep a readable width and the table scrolls in its box, and below 1280 pixels the GraphQL schema tables stack instead of sitting three across with a description column a few letters wide. A review stage stays on one line in the definitions table, and an AI price's update time stays on one line. On a phone the stage name in the New review definition form keeps a readable width beside its number and its placeholder shows whole, with the stage buttons on the line below.
 - Under a finger the flow name, the only way to open a flow, takes a full touch target, as do the content sort headers and every switch in the SAML provider form, new or edited.
 - Under a finger the hour and minute of a time picker, such as the one in the event replay form, each take a full-size target, and a tap anywhere in the picker lands on a field. This comes with ui-kit 0.38.3.
+- Search: result snippets show their matches highlighted and the rest as plain text, instead of printing the highlight tags and escaped characters. Only the standard character names are decoded, so an unknown one stays as written.
+- Tenants: where the license does not include creating tenants, the page says so and offers the link the engine names, instead of a card with no way forward. A create refused at the tenant ceiling reads as a limit reached and shows its link. A not-enabled card names its link by what it opens, a plan or an add-on.
 
 ### Upgrade notes
 
