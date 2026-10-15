@@ -4,11 +4,20 @@ import { CatalogError } from '$lib/api/assist';
 import { assistRefusal, catalogFor, refusalStatus } from './flow-assist';
 
 describe('assistRefusal', () => {
+	// The client puts the raw body of an answer that was not JSON in the
+	// message, so a proxy's 503 page would be relayed as the engine's sentence.
+	it('relays a 503 only when the engine sent it', () => {
+		expect(assistRefusal(new ApiError(503, '<html><h1>503 Service Unavailable</h1></html>'))).toEqual({
+			state: 'error',
+			message: 'The assistant did not answer. Try again.',
+		});
+	});
+
 	it('maps the two gates, the validator and the rest', () => {
 		expect(assistRefusal(new ApiError(402, 'ai is not enabled'))).toEqual({ state: 'locked' });
 		expect(assistRefusal(new ApiError(404, 'not found'))).toEqual({ state: 'off' });
-		expect(assistRefusal(new ApiError(503, 'flow validator is not registered'))).toEqual({ state: 'unavailable', message: 'flow validator is not registered' });
-		expect(assistRefusal(new ApiError(503, ''))).toEqual({ state: 'unavailable', message: 'The flow validator is not available on this engine.' });
+		expect(assistRefusal(new ApiError(503, 'flow validator is not registered', { error: 'flow validator is not registered' }))).toEqual({ state: 'unavailable', message: 'flow validator is not registered' });
+		expect(assistRefusal(new ApiError(503, '', {}))).toEqual({ state: 'unavailable', message: 'The flow validator is not available on this engine.' });
 		expect(assistRefusal(new ApiError(422, 'prompt is too long'))).toEqual({ state: 'error', message: 'prompt is too long' });
 		expect(assistRefusal(new ApiError(500, 'pq: connection refused'))).toEqual({ state: 'error', message: 'The assistant did not answer. Try again.' });
 		expect(assistRefusal(new Error('boom'))).toEqual({ state: 'error', message: 'The assistant did not answer. Try again.' });

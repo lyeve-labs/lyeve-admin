@@ -46,7 +46,9 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 		if (err.status === 402) return { state: 'locked' };
 		if (err.status === 403) return { state: 'forbidden' };
 		if (err.status === 404) return { state: notFound };
-		if (err.status === 503) return { state: 'no_provider' };
+		// The plugin's 503 is JSON. A proxy's 503 page is an outage, which the
+		// banner below reports.
+		if (err.status === 503 && err.body !== undefined) return { state: 'no_provider' };
 	}
 	return { state: 'error', message: aiBanner(plural) };
 }
@@ -92,7 +94,7 @@ export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRol
 			return msg;
 		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';
-		if (err.status === 503) return 'No enabled AI provider can answer this. Add or enable a provider first.';
+		if (err.status === 503 && err.body !== undefined) return 'No enabled AI provider can answer this. Add or enable a provider first.';
 		if (err.status === 409) return 'No configured provider supports this operation.';
 		if (err.status >= 400 && err.status < 500) {
 			const msg = err.message?.trim();

@@ -47,7 +47,9 @@ export function assistRefusal(err: unknown): AssistRefusal {
 		if (aiBudgetSpent(err)) return { state: 'error', message: AI_BUDGET_TEXT };
 		if (err.status === 402) return { state: 'locked' };
 		if (err.status === 404) return { state: 'off' };
-		if (err.status === 503) {
+		// A 503 the engine sent is JSON. Any other is a proxy's page, whose body
+		// is not a sentence for the operator.
+		if (err.status === 503 && err.body !== undefined) {
 			const msg = err.message?.trim();
 			return { state: 'unavailable', message: msg && msg !== '503' ? msg : UNAVAILABLE_FALLBACK };
 		}
