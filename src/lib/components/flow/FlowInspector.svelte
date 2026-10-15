@@ -14,6 +14,8 @@
 	import { isEventTriggerSchema } from '$lib/flow/events';
 	import { flowEndpoints, slugError, type FlowEndpoint } from '$lib/flow/endpoints';
 	import { ICON } from '$lib/icon';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { GATE_OK, type Gate } from '$lib/api/gate';
 
 	interface Props {
 		definition: FlowDefinition;
@@ -24,7 +26,10 @@
 		schemas?: SchemaOption[];
 		/** The tenant's datasources, for the pickers and the names list. */
 		datasources?: DatasourceOption[];
+		/** How each names read went, so a failed read is not drawn as none. */
+		datasourcesGate?: Gate;
 		variables?: string[];
+		variablesGate?: Gate;
 		/** The published flows, for the flow picker. */
 		flows?: FlowOption[];
 		/** The id of the flow on the canvas, which its own flow picker leaves out. */
@@ -53,7 +58,9 @@
 		errors = [],
 		schemas = [],
 		datasources = [],
+		datasourcesGate = GATE_OK,
 		variables = [],
+		variablesGate = GATE_OK,
 		flows = [],
 		flowId,
 		eventTypes = null,
@@ -145,6 +152,14 @@
 		{ value: 'stop', label: 'Stop', description: 'The run ends at the first node that fails, and nothing after it runs.' },
 		{ value: 'continue', label: 'Continue', description: 'The node is marked failed and the run goes on to the nodes after it.' },
 	];
+
+	// A read that may answer on a second try is drawn as failed, with Try
+	// again. A role refused the names, a license without them and a plugin
+	// that does not serve them are not, because the toolbar draws no way to
+	// them either.
+	const RETRYABLE: ReadonlySet<Gate['state']> = new Set(['unavailable', 'busy', 'error']);
+	const datasourcesUnread = $derived(RETRYABLE.has(datasourcesGate.state));
+	const variablesUnread = $derived(RETRYABLE.has(variablesGate.state));
 </script>
 
 <div class="flex flex-col gap-4 p-4" data-testid="flow-inspector">
@@ -192,6 +207,7 @@
 				idPrefix="node-{node.id}"
 				{schemas}
 				{datasources}
+				{datasourcesGate}
 				{flows}
 				selfId={flowId}
 				{events}
@@ -289,6 +305,7 @@
 				idPrefix="trigger"
 				{schemas}
 				{datasources}
+				{datasourcesGate}
 				{flows}
 				selfId={flowId}
 				{events}
@@ -366,20 +383,28 @@
 				/>
 			</div>
 		</Collapsible>
-		{#if datasources.length > 0 || variables.length > 0}
+		{#if datasources.length > 0 || variables.length > 0 || datasourcesUnread || variablesUnread}
 			<SectionHeading level={2} variant="eyebrow">Available names</SectionHeading>
 			<dl class="grid gap-3 text-xs">
 				<div>
 					<dt class="text-faint">Datasources</dt>
-					<dd class="font-mono text-fg">
-						{#each datasources as d (d.id)}<span class="block">{d.name} <span class="text-faint">{d.kind}</span></span>{:else}<span class="text-faint">none</span>{/each}
-					</dd>
+					{#if datasourcesUnread}
+						<dd><GateNotice gate={datasourcesGate} title="Datasources" absent="" /></dd>
+					{:else}
+						<dd class="font-mono text-fg">
+							{#each datasources as d (d.id)}<span class="block">{d.name} <span class="text-faint">{d.kind}</span></span>{:else}<span class="text-faint">none</span>{/each}
+						</dd>
+					{/if}
 				</div>
 				<div>
 					<dt class="text-faint">Variables</dt>
-					<dd class="font-mono text-fg">
-						{#each variables as v (v)}<span class="block">vars.{v}</span>{:else}<span class="text-faint">none</span>{/each}
-					</dd>
+					{#if variablesUnread}
+						<dd><GateNotice gate={variablesGate} title="Variables" absent="" /></dd>
+					{:else}
+						<dd class="font-mono text-fg">
+							{#each variables as v (v)}<span class="block">vars.{v}</span>{:else}<span class="text-faint">none</span>{/each}
+						</dd>
+					{/if}
 				</div>
 			</dl>
 		{/if}

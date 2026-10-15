@@ -774,7 +774,9 @@
 						{errors}
 						schemas={data.schemas}
 						datasources={data.datasources}
+						datasourcesGate={data.datasourcesGate}
 						variables={data.variables}
+						variablesGate={data.variablesGate}
 						flows={data.flows}
 						flowId={data.flow.id}
 						{savedSlug}
