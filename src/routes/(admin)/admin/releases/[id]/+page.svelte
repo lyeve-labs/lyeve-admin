@@ -243,7 +243,7 @@
 							? `${blocking.length} ${blocking.length === 1 ? 'conflict stops' : 'conflicts stop'} this release from going out. Resolve each one or remove the entry.`
 							: 'Nothing here stops the release. Deleted entries are skipped when it goes out.'}
 					</p>
-					<ul class="flex flex-col gap-2" data-testid="release-conflicts">
+					<ul class="flex flex-col gap-2 coarse:gap-6" data-testid="release-conflicts">
 						{#each conflicts as c, i (`${c.entry_id}-${c.kind}-${i}`)}
 							<li class="flex flex-wrap items-center gap-2 text-sm">
 								<Badge tone={blocks(c) ? 'danger' : 'neutral'}>{blocks(c) ? 'Blocks' : 'Skipped'}</Badge>
