@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { afterNavigate } from '$app/navigation';
 	import {
 		AccountMenu,
 		AppShell,
@@ -87,6 +88,11 @@
 	const here = $derived(page.url.pathname + page.url.search);
 
 	let navOpen = $state(false);
+	// On a phone the drawer is a modal over the page. A link in it opens its
+	// page underneath, so the drawer closes once that navigation completes.
+	afterNavigate(() => {
+		navOpen = false;
+	});
 
 	// What the page under the shell asks of it. The flow editor's focus mode
 	// puts the sidebar and the header away while it is open, and a page has

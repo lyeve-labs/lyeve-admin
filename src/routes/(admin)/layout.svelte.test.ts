@@ -16,7 +16,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/state', () => state);
-vi.mock('$app/navigation', () => ({ onNavigate: () => {} }));
+const navigation = vi.hoisted(() => ({ after: [] as (() => void)[] }));
+vi.mock('$app/navigation', () => ({
+	onNavigate: () => {},
+	afterNavigate: (fn: () => void) => navigation.after.push(fn),
+}));
 vi.mock('$app/paths', () => ({ asset: (path: string) => path }));
 vi.mock('$lib/api/csrf', () => ({ csrfHeaders: () => ({}) }));
 // Additive, not a replacement. A factory returning one export makes every other
@@ -78,6 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	navigation.after.length = 0;
 	vi.unstubAllGlobals();
 	// The kit persists which sections a reader opened. Left behind, one case's
 	// disclosure decides the next case's tree.
@@ -117,6 +122,23 @@ describe('admin shell navigation', () => {
 		expect(open.inert, 'an open drawer is reachable').toBe(false);
 		expect(open.getAttribute('aria-hidden')).toBeNull();
 		expect(document.querySelectorAll('aside'), 'still one aside').toHaveLength(1);
+	});
+});
+
+describe('admin shell drawer after a navigation', () => {
+	// On a phone a sidebar link opens its page under the drawer, which stayed
+	// open over the new page until the scrim was tapped.
+	it('closes the drawer once a navigation completes', async () => {
+		setViewport(true);
+		render(AdminLayout, { props: { data, children: EmptyChildren } as never });
+		await tick();
+		await fireEvent.click(screen.getByRole('button', { name: /open navigation/i }));
+		expect((document.querySelector('aside') as HTMLElement).inert).toBe(false);
+
+		for (const fn of navigation.after) fn();
+		await tick();
+
+		expect((document.querySelector('aside') as HTMLElement).inert, 'the drawer closed').toBe(true);
 	});
 });
 
