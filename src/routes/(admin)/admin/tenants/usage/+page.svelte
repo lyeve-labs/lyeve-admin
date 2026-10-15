@@ -493,9 +493,13 @@
 		/>
 		<NumberInput id="quota-grace" name="grace_period_hours" label="Grace period (hours)" min={0} bind:value={graceHours} hint="How long a tenant may stay over before the block." />
 		<input type="hidden" name="warn_at_pct_80" value={warn80 ? 'true' : 'false'} />
-		<Toggle id="quota-warn80" label="Warn at 80%" bind:checked={warn80} />
 		<input type="hidden" name="warn_at_pct_90" value={warn90 ? 'true' : 'false'} />
-		<Toggle id="quota-warn90" label="Warn at 90%" class="coarse:mt-2" bind:checked={warn90} />
+		<!-- Under a finger each switch takes a 44px hit area around its 20px
+		     track, so two switches 24px apart share none of it. -->
+		<div class="flex flex-col gap-4 coarse:gap-6">
+			<Toggle id="quota-warn80" label="Warn at 80%" bind:checked={warn80} />
+			<Toggle id="quota-warn90" label="Warn at 90%" bind:checked={warn90} />
+		</div>
 	</form>
 	{#snippet footer()}
 		{#if editing}
