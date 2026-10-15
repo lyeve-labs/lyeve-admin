@@ -84,6 +84,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Under a finger the hour and minute of a time picker, such as the one in the event replay form, each take a full-size target, and a tap anywhere in the picker lands on a field. This comes with ui-kit 0.38.3.
 - Search: result snippets show their matches highlighted and the rest as plain text, instead of printing the highlight tags and escaped characters. Only the standard character names are decoded, so an unknown one stays as written.
 - Tenants: where the license does not include creating tenants, the page says so and offers the link the engine names, instead of a card with no way forward. A create refused at the tenant ceiling reads as a limit reached and shows its link. A not-enabled card names its link by what it opens, a plan or an add-on.
+- Flows: removing a datasource header no longer posts its secret under the header below it, and turning a header's Secret switch on or off keeps the value already typed.
+- Flows: the link beside a refused datasource write is named by what it opens, a plan or an add-on, and a link outside the console opens in a new tab.
+- Under a finger the release name, the experiment name and the media filename, each the only way to open its row, take a full touch target.
+- SAML: under a finger the Metadata and Test sign-in links of a provider row each take a full touch target, and the two no longer overlap.
+- Dashboard: when the page the tenant chose to lead the dashboard cannot be read, the dashboard says so where that page would be, with Try again where trying again can help, instead of leaving it out.
+- A license refusal in a drawer or on a page that has its own Create or Save no longer adds a second primary button. Its link stays first as a secondary button, and stays primary only where it is the one action left, as on the permissions page at the role ceiling.
+- Tenants: when the instance does not serve tenant provisioning, the page says so instead of saying the license does not include creating tenants.
 
 ### Upgrade notes
 
