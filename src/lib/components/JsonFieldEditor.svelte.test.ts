@@ -89,3 +89,14 @@ describe('JsonFieldEditor', () => {
 		expect(container.textContent).toContain('Not valid JSON');
 	});
 });
+
+describe('the note on a value that stays JSON', () => {
+	// Written after the choice, the note was not read with it.
+	it('belongs to the edit choice, so a screen reader reads it with the control', () => {
+		const { container } = render(JsonFieldEditor, { props: { value: '{"a":{"b":1}}' } });
+		const group = container.querySelector('[role="radiogroup"]') as HTMLElement;
+		const ids = (group.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+		const described = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+		expect(described).toContain('stays as JSON');
+	});
+});

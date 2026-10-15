@@ -389,13 +389,10 @@
 									{ value: 'keep', label: 'Keep the stored headers' },
 									{ value: 'replace', label: 'Replace them' },
 								]}
+								hint={headersMode === 'keep'
+									? `Stored: ${destination.header_names.join(', ')}. Their values are never shown.`
+									: undefined}
 							/>
-							{#if headersMode === 'keep'}
-								<p class="text-xs text-muted">
-									Stored: <span class="font-mono">{destination.header_names.join(', ')}</span>. Their values are
-									never shown.
-								</p>
-							{/if}
 						{:else}
 							<input type="hidden" name="headers_mode" value="replace" />
 						{/if}

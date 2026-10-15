@@ -135,11 +135,10 @@
 			{ value: 'json', label: 'JSON' },
 		]}
 		onchange={setMode}
+		hint={mode === 'json' && !pairable && value.trim() !== ''
+			? 'Keys and values edits a flat object. This value nests or is not an object, so it stays as JSON.'
+			: undefined}
 	/>
-
-	{#if mode === 'json' && !pairable && value.trim() !== ''}
-		<p class="text-xs text-faint">Keys and values edits a flat object. This value nests or is not an object, so it stays as JSON.</p>
-	{/if}
 
 	{#if mode === 'pairs'}
 		<div class="flex flex-col gap-2" role="group" aria-label="Keys and values">
