@@ -128,6 +128,43 @@ describe('pre-paint palette', () => {
 	});
 });
 
+describe('browser chrome', () => {
+	function chrome(): string | null {
+		return document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? null;
+	}
+
+	beforeEach(() => {
+		document.head.querySelector('meta[name="theme-color"]')?.remove();
+		const meta = document.createElement('meta');
+		meta.setAttribute('name', 'theme-color');
+		meta.setAttribute('content', '#0b1422');
+		document.head.append(meta);
+	});
+
+	it('takes the light ink on a light page', () => {
+		localStorage.setItem(CURRENT_KEY, 'light');
+		paint();
+		expect(chrome()).toBe('#f6f7f9');
+	});
+
+	// The theme control switches the palette after the load by writing
+	// data-theme. The toolbar used to keep the color of the load until the
+	// next page.
+	it('follows a switch of the theme control without a reload', async () => {
+		localStorage.setItem(CURRENT_KEY, 'dark');
+		paint();
+		expect(chrome()).toBe('#0b1422');
+
+		document.documentElement.setAttribute('data-theme', 'light');
+		await Promise.resolve();
+		expect(chrome()).toBe('#f6f7f9');
+
+		document.documentElement.setAttribute('data-theme', 'dark');
+		await Promise.resolve();
+		expect(chrome()).toBe('#0b1422');
+	});
+});
+
 describe('the script itself', () => {
 	// script-src is locked to 'self', and an inline script without the nonce is
 	// refused: the page then paints dark and repaints on hydration.
