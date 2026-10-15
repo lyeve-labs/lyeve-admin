@@ -210,6 +210,22 @@ describe('media library upload', () => {
 	});
 });
 
+describe('an upload whose session ended', () => {
+	// Only a 401 ends a session, and signing in again is the way back, not the engine's word for it.
+	it('sends the reader to sign in', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })));
+		nav.goto.mockClear();
+		setup();
+		const picker = screen.getByLabelText('Choose files to upload') as HTMLInputElement;
+		Object.defineProperty(picker, 'files', { value: [new File(['x'], 'new.png', { type: 'image/png' })], configurable: true });
+		await fireEvent.change(picker);
+		await waitFor(() => expect(nav.goto).toHaveBeenCalledTimes(1));
+		expect(String((nav.goto.mock.calls[0] as unknown[])[0])).toMatch(/^\/login\?ended=1&next=/);
+		expect(document.body.textContent).not.toContain('unauthorized');
+		vi.unstubAllGlobals();
+	});
+});
+
 describe('media library controls carry a name', () => {
 	it('names the file picker the upload button opens', () => {
 		// sr-only hides the picker from the eye and not from a screen reader, so

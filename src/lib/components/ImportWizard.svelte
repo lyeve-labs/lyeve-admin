@@ -25,6 +25,9 @@
 	import TransformField from '$lib/components/imports/TransformField.svelte';
 	import { refusalOf, type Refusal } from '$lib/api/refusal';
 	import { errorCodeOf } from '$lib/api/limits';
+	import { ApiError } from '@lyeve-labs/client';
+	import { goto } from '$app/navigation';
+	import { signInAgainHref } from '$lib/session';
 	import {
 		IMPORT_FORMATS,
 		IMPORT_FORMAT_LABELS,
@@ -238,9 +241,19 @@
 		try {
 			return await fn();
 		} catch (e) {
+			// Only a 401 ends a session. A request that never reached the engine
+			// carries the browser's words, which are not the console's.
+			if (e instanceof ApiError && e.status === 401) {
+				void goto(signInAgainHref(window.location));
+				return null;
+			}
+			if (!(e instanceof ApiError)) {
+				error = 'The request did not reach the engine. Nothing was imported. Try again in a moment.';
+				return null;
+			}
 			refusal = refusalOf(e);
 			if (!refusal) {
-				error = e instanceof Error ? e.message : 'The request failed.';
+				error = e.message || 'The request failed.';
 				hint = parseRefusalHint(error, errorCodeOf(e));
 			}
 			return null;
