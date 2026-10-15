@@ -28,6 +28,8 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { useInstance } from '$lib/instance.svelte';
+	import { isExternalHref } from '$lib/links';
+	import { upgradeLabel } from '$lib/api/refusal';
 	import { submitter } from '$lib/forms.svelte';
 	import { formatDuration } from '$lib/flow/time';
 	import { AUTH_TYPES, EMPTY_AUTH, SSL_MODES, authFieldsOf, isAuthType, isSqlKind, secretKept, sslModeFor, type AuthFields } from '$lib/flow/datasources';
@@ -56,6 +58,8 @@
 
 	const instance = useInstance();
 	const enableLink = $derived(instance.upgradeLink());
+	const enableAway = $derived(enableLink !== null && isExternalHref(enableLink.href));
+	const enableLabel = $derived(enableLink ? (upgradeLabel(enableLink.href) ?? enableLink.label ?? 'How to enable it') : '');
 
 	const KIND_OPTIONS = [
 		{ value: 'postgres', label: 'Postgres' },
@@ -312,7 +316,7 @@
 				{#snippet children()}
 					{pageFailure.error}
 					{#if enableLink}
-						<a class="ml-1 underline" href={enableLink.href}>{enableLink.label ?? 'How to enable it'}</a>
+						<a class="ml-1 underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{enableLabel}</a>
 					{/if}
 				{/snippet}
 			</Alert>
@@ -420,7 +424,7 @@
 		>
 			<FormErrors message={saveFailure?.error} />
 			{#if saveFailure?.refused && enableLink}
-				<a class="text-sm underline" href={enableLink.href}>{enableLink.label ?? 'How to enable it'}</a>
+				<a class="text-sm underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{enableLabel}</a>
 			{/if}
 			{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 			<Input

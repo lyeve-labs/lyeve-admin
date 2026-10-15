@@ -8,8 +8,19 @@ import { AUTH_TYPES } from '$lib/flow/datasources';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/datasources') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+const upgrade = vi.hoisted(() => ({ link: null as { href: string; label?: string } | null }));
+vi.mock('$lib/instance.svelte', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/instance.svelte')>();
+	return {
+		...actual,
+		useInstance: () => ({ ...actual.instanceFrom(() => null), upgradeLink: () => upgrade.link }),
+	};
+});
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	upgrade.link = null;
+});
 
 const licensed: Entitlements = { plan: 'example', state: 'active', features: ['flow'], tenant_quota: 1 };
 
@@ -427,5 +438,35 @@ describe('the header rows of an http datasource', () => {
 		expect(posted(form)[1]).toEqual(['X-Key', 'typed-first', 'true']);
 		await fireEvent.click(toggle());
 		expect(posted(form)[1]).toEqual(['X-Key', 'typed-first', 'false']);
+	});
+});
+
+describe('the link that enables datasources', () => {
+	const away = 'https://shop.example.com/pricing?skus=example-pro';
+
+	it('names a link to an add-on by what it opens and opens it in a new tab, on the page and in the drawer', async () => {
+		upgrade.link = { href: away, label: 'Manage the license' };
+		const refusal = { action: 'save', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true };
+		const { getAllByText, container, rerender } = setup([]);
+		await fireEvent.click(getAllByText('New datasource')[0]);
+		await rerender({ data: { datasources: [], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed }, form: refusal } as never);
+		const inDrawer = container.ownerDocument.querySelector(`#datasource-form a[href="${away}"]`) as HTMLAnchorElement;
+		expect(inDrawer.textContent).toBe('View the add-on');
+		expect(inDrawer.getAttribute('target')).toBe('_blank');
+		expect(inDrawer.getAttribute('rel')).toBe('noopener noreferrer');
+		cleanup();
+		setup([], { ...refusal, action: 'delete' });
+		const onPage = document.body.querySelector(`a[href="${away}"]`) as HTMLAnchorElement;
+		expect(onPage.textContent).toBe('View the add-on');
+		expect(onPage.getAttribute('target')).toBe('_blank');
+		expect(onPage.getAttribute('rel')).toBe('noopener noreferrer');
+	});
+
+	it('keeps a link on this console in the same tab', () => {
+		upgrade.link = { href: '/admin/settings/license', label: 'Manage the license' };
+		setup([], { action: 'delete', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
+		const a = document.body.querySelector('a[href="/admin/settings/license"]') as HTMLAnchorElement;
+		expect(a.textContent).toBe('Manage the license');
+		expect(a.getAttribute('target')).toBeNull();
 	});
 });
