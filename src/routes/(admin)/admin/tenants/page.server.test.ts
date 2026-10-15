@@ -238,6 +238,48 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 		expect(sentBody(event)).not.toHaveProperty('plan');
 	});
 
+	/** A create event whose POST answers the refusal body with a 402. */
+	function refusedEvent(body: unknown) {
+		const form = new FormData();
+		form.append('slug', 'acme');
+		form.append('name', 'ACME Corp');
+		const fetch = vi.fn(async (_url: string, init?: RequestInit) =>
+			init?.method === 'POST' ? json(body, 402) : json({ id: 'u1', email: 'admin@b.co', roles: ['super_admin'] })
+		) as unknown as typeof globalThis.fetch;
+		return {
+			request: { formData: async () => form },
+			fetch,
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/tenants'),
+		} as never;
+	}
+
+	it('returns a missing capability as a refusal with the link the plugin sent', async () => {
+		const link = 'https://shop.example.com/pricing?skus=example-pro&utm_campaign=example';
+		const result = await actions.create(
+			refusedEvent({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature', upgrade_url: link })
+		);
+
+		expect(result).toMatchObject({
+			status: 402,
+			data: { refused: { kind: 'feature', feature: 'example-feature', upgradeUrl: link } },
+		});
+		expect((result as { data: { error: string } }).data.error).toContain('does not include example-feature');
+	});
+
+	it('returns the tenant ceiling as a limit reached with the link the plugin sent', async () => {
+		const link = 'https://shop.example.com/pricing?plan=larger&utm_campaign=tenants';
+		const result = await actions.create(
+			refusedEvent({ error: 'tenant quota reached (1); upgrade your plan to add more tenants', upgrade_url: link })
+		);
+
+		expect(result).toMatchObject({
+			status: 402,
+			data: { refused: { kind: 'cap', cap: 'tenants', limit: null, current: null, upgradeUrl: link } },
+		});
+		expect((result as { data: { error: string } }).data.error).toContain('This instance allows no more tenants.');
+	});
+
 	it('sends the plan as typed', async () => {
 		const event = createEvent({ slug: 'acme', name: 'ACME Corp', plan: 'standard' });
 		await actions.create(event);
@@ -262,6 +304,19 @@ describe('admin/tenants load provisioning', () => {
 	it('takes from the plugin whether a tenant may be created', async () => {
 		expect((await run(eventFor(() => json({ enabled: true })))).canProvision).toBe(true);
 		expect((await run(eventFor(() => json({ enabled: false })))).canProvision).toBe(false);
+	});
+
+	it('carries the link a read that says no names, and none when it says yes', async () => {
+		const link = 'https://shop.example.com/pricing?skus=example-pro&utm_campaign=example';
+		expect(await run(eventFor(() => json({ enabled: false, upgrade_url: link })))).toMatchObject({
+			canProvision: false,
+			provisioningUrl: link,
+		});
+		expect(await run(eventFor(() => json({ enabled: true, upgrade_url: link })))).toMatchObject({
+			canProvision: true,
+			provisioningUrl: '',
+		});
+		expect((await run(eventFor(() => json({ error: 'unavailable' }, 503)))).provisioningUrl).toBe('');
 	});
 
 	it('reads a plugin without the route, or a refusal, as not enabled', async () => {
@@ -347,14 +402,6 @@ describe('admin/tenants create refusals', () => {
 			data: { action: 'create', refused: { kind: 'feature', feature: 'example-feature' } },
 		});
 		expect(JSON.stringify(result)).not.toContain('payment_required');
-	});
-
-	it('relays a 402 that carries its own sentence', async () => {
-		const sentence = 'tenant quota reached (3); upgrade your plan to add more tenants';
-		const result = await actions.create(
-			writeEvent({ slug: 'acme', name: 'ACME' }, () => json({ error: sentence }, 402))
-		);
-		expect(result).toEqual({ status: 400, data: { action: 'create', error: sentence } });
 	});
 });
 

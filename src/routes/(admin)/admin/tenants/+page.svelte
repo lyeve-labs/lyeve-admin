@@ -162,7 +162,8 @@
 		<NotEnabled
 			level={2}
 			title="Tenant provisioning"
-			description="Creating a tenant from this page. The tenants below can still be edited, disabled and deleted."
+			description="The license on this instance does not include creating tenants. The tenants below can still be edited, disabled and deleted."
+			url={data.provisioningUrl || null}
 		/>
 	{/if}
 
