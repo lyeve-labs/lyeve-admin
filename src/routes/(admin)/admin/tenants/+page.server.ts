@@ -60,10 +60,11 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	// The plugin says whether a create would pass, so the page offers one only
-	// then, and where it would not, the link to what lifts it. A refusal, or a
-	// plugin without the route, says creating is not enabled. Any other failure
-	// is unread: the page offers no create and says it could not tell, rather
-	// than calling the instance unlicensed.
+	// then, and where it would not, the link to what lifts it. Only a refusal
+	// says creating is not enabled. A plugin without the route says nothing
+	// about the license, and any other failure is unread: each keeps its gate,
+	// so the page says what happened rather than calling the instance
+	// unlicensed.
 	const [read, provisioning] = await Promise.all([
 		section(listTenants(client, limit, offset), LIST_FAILED),
 		section(getProvisioning(client), PROVISIONING_FAILED),
@@ -71,7 +72,7 @@ export const load: PageServerLoad = async (event) => {
 	const canProvision = provisioning.ok && provisioning.value.enabled;
 	const provisioningUrl = provisioning.ok ? provisioning.value.upgradeUrl : '';
 	const provisionGate: Gate | null =
-		!provisioning.ok && provisioning.gate.state !== 'absent' && provisioning.gate.state !== 'locked'
+		!provisioning.ok && provisioning.gate.state !== 'locked'
 			? provisioning.gate
 			: null;
 	// The page draws the gate in place of the list and offers no create.

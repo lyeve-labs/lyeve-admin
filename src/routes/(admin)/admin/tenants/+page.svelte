@@ -156,7 +156,7 @@
 			level={2}
 			gate={data.provisionGate}
 			title="Tenant provisioning"
-			absent="This instance does not say whether it may create tenants."
+			absent="This instance does not serve tenant provisioning, so a tenant cannot be created here. The tenants below can still be edited, disabled and deleted."
 		/>
 	{:else if data.tenants.ok && !canProvision}
 		<NotEnabled

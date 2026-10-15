@@ -273,6 +273,16 @@ describe('Tenants refusals', () => {
 		expect(link.getAttribute('rel')).toBe('noopener noreferrer');
 	});
 
+	it('says the provisioning route is not served, and never that the license lacks it', () => {
+		const { container, queryByTestId } = render(TenantsPage, {
+			props: props({ canProvision: false, provisionGate: { state: 'absent' } }),
+		});
+
+		expect(container.textContent).toContain('This instance does not serve tenant provisioning, so a tenant cannot be created here.');
+		expect(container.textContent).not.toContain('license');
+		expect(queryByTestId('not-enabled')).toBeNull();
+	});
+
 	it('offers no link where the read named none', () => {
 		const { getByTestId } = render(TenantsPage, { props: props({ canProvision: false }) });
 
