@@ -4,7 +4,7 @@ import type { HttpClient } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
-import { section, type Section } from '$lib/api/gate';
+import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 export interface Job {
@@ -68,7 +68,7 @@ export const load: PageServerLoad = async (event) => {
 	const read = await section(listJobs(client, limit + 1, offset), LIST_FAILED);
 	// The page draws the gate in place of the list. Nothing was read, so the
 	// drawer stays shut whatever the address asks for.
-	if (!read.ok) return { jobs: read, limit, offset, hasMore: false, openNew: false, openJob: null };
+	if (!read.ok) return { jobs: read, limit, offset, hasMore: false, openNew: false, openJob: null, openGate: null };
 	const page = pageOf<Job>(read.value, limit, offset);
 	const back = pastEndOffset(page.rows.length, limit, offset, null);
 	if (back !== null) redirect(307, withOffset(url, back));
@@ -79,26 +79,28 @@ export const load: PageServerLoad = async (event) => {
 	const openNew = url.searchParams.get('new') === '1';
 	const editId = url.searchParams.get('edit');
 	let openJob: Job | null = null;
+	let openGate: Gate | null = null;
 	if (editId) {
-		openJob = page.rows.find((j) => j.id === editId) ?? (await readJob(client, editId));
+		const onPage = page.rows.find((j) => j.id === editId);
+		const linked = onPage ? { ok: true as const, value: onPage } : await readJob(client, editId);
+		if (linked.ok) openJob = linked.value;
+		else openGate = linked.gate;
 	}
 	// Typed, because a bare literal widens `ok` to boolean and the page could
 	// no longer tell the two cases apart.
 	const jobs: Section<Job[]> = { ok: true, value: page.rows };
-	return { jobs, limit, offset, hasMore: page.hasMore, openNew, openJob };
+	return { jobs, limit, offset, hasMore: page.hasMore, openNew, openJob, openGate };
 };
 
-async function readJob(client: HttpClient, id: string): Promise<Job | null> {
-	try {
-		// GET /api/admin/jobs/{id} returns the job itself. Reading a `job`
-		// wrapper that is not there yields undefined, and the edit form would
-		// render every field blank for a job that exists.
-		const res = await client.get<Job | { job: Job }>(`/api/admin/jobs/${encodeURIComponent(id)}`);
-		const job = 'job' in res ? res.job : res;
-		return job?.id ? job : null;
-	} catch {
-		return null;
-	}
+/** The job a link names, or why the drawer cannot open on it. An answer without a job is one that was not found. */
+async function readJob(client: HttpClient, id: string): Promise<Section<Job>> {
+	// GET /api/admin/jobs/{id} returns the job itself. Reading a `job`
+	// wrapper that is not there yields undefined, and the edit form would
+	// render every field blank for a job that exists.
+	const read = await section(client.get<Job | { job: Job }>(`/api/admin/jobs/${encodeURIComponent(id)}`), 'The linked job could not be read.');
+	if (!read.ok) return read;
+	const job = 'job' in read.value ? read.value.job : read.value;
+	return job?.id ? { ok: true, value: job } : { ok: false, gate: { state: 'absent' } };
 }
 
 /** Which write a failure came from, so the drawer shows only its own. */

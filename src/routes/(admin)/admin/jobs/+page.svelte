@@ -155,6 +155,16 @@
 		<FormErrors message={formError} {refused} />
 	{/if}
 
+	{#if data.openGate}
+		<!-- The address named a job the drawer could not open on. -->
+		<GateNotice
+			level={2}
+			gate={data.openGate}
+			title="The linked job"
+			absent="The job this link opens was not found. It may have been deleted."
+		/>
+	{/if}
+
 	{#if !data.jobs.ok}
 		<GateNotice
 			level={2}
