@@ -36,7 +36,7 @@ describe('admin/ai/providers load', () => {
 		[404, 'off'],
 		[503, 'no_provider'],
 	])('sorts a %i into the %s state and reads nothing else', async (status, state) => {
-		const { event, calls } = loadEvent({ '/api/admin/ai/providers': () => refused(status, 'refused') });
+		const { event, calls } = loadEvent({ '/api/admin/ai/providers': () => refused(status, status === 503 ? 'no enabled AI provider configured' : 'refused') });
 		const out = (await load(event)) as Loaded;
 		expect(out.gate.state).toBe(state);
 		expect(out.providers).toEqual([]);

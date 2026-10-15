@@ -6,8 +6,8 @@
  * spent monthly budget, which only a write can meet. A 403
  * is a role that may not read the resource. A 404 is the tenant's own switch:
  * every route but the settings pair answers it while the switch is off, and the
- * way back is that switch. A 503 is the plugin with nothing to answer through:
- * no enabled provider, or a store that did not answer. A 401 is an expired
+ * way back is that switch. A 503 that says no provider is enabled is the
+ * plugin with nothing to answer through. A 401 is an expired
  * session and goes where the shell sends one. Everything else keeps the engine
  * banner, which is not a report that there is nothing.
  */
@@ -46,11 +46,20 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 		if (err.status === 402) return { state: 'locked' };
 		if (err.status === 403) return { state: 'forbidden' };
 		if (err.status === 404) return { state: notFound };
-		// The plugin's 503 is JSON. A proxy's 503 page is an outage, which the
-		// banner below reports.
-		if (err.status === 503 && err.body !== undefined) return { state: 'no_provider' };
+		if (noProvider(err)) return { state: 'no_provider' };
 	}
 	return { state: 'error', message: aiBanner(plural) };
+}
+
+/**
+ * Whether a refusal is the plugin having no enabled provider. The plugin
+ * answers that with a 503 and one sentence, under the generic code every 503
+ * carries. Its store failures and a proxy's error page are 503s too, and both
+ * are an outage, so the sentence decides.
+ */
+function noProvider(err: ApiError): boolean {
+	const said = (err.body as { error?: unknown } | null | undefined)?.error;
+	return err.status === 503 && typeof said === 'string' && said.trim().toLowerCase() === 'no enabled ai provider configured';
 }
 
 /** What the reader sees when a provider's monthly budget is spent. */
@@ -94,7 +103,7 @@ export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRol
 			return msg;
 		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';
-		if (err.status === 503 && err.body !== undefined) return 'No enabled AI provider can answer this. Add or enable a provider first.';
+		if (noProvider(err)) return 'No enabled AI provider can answer this. Add or enable a provider first.';
 		if (err.status === 409) return 'No configured provider supports this operation.';
 		if (err.status >= 400 && err.status < 500) {
 			const msg = err.message?.trim();
