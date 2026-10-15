@@ -290,8 +290,10 @@ describe('content listing names linked entries', () => {
 				{ ...rows(1)[0], body: { author_id: 'a1', edited_by: 'a1' } },
 				{ ...rows(1, 1)[0], body: { author: 'a1' } },
 				{ ...rows(1, 2)[0], body: { author_id: 'missing' } },
+				{ ...rows(1, 3)[0], body: { author_id: '', author: 'a1' } },
+				{ ...rows(1, 4)[0], body: { author_id: 'missing', author: { id: 'b2', title: 'Bo Lee' } } },
 			],
-			total_count: 3,
+			total_count: 5,
 		};
 		const authors = { data: [{ id: 'a1', title: 'Ada Park', created_at: '', updated_at: '' }], total_count: 1 };
 		const fetch = vi.fn(async (input: string | URL | Request) => {
@@ -307,11 +309,13 @@ describe('content listing names linked entries', () => {
 		} as never)) as unknown as Loaded;
 
 		if (!result.items.ok) throw new Error('the listing failed');
-		const [byKey, byName, unknown] = result.items.value;
+		const [byKey, byName, unknown, blankKey, carried] = result.items.value;
 		expect(byKey.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
 		expect(byKey.data.editor).toEqual({ id: 'a1', title: 'Ada Park' });
 		expect(byName.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
 		expect(unknown.data.author).toBe('missing');
+		expect(blankKey.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(carried.data.author).toEqual({ id: 'b2', title: 'Bo Lee' });
 	});
 
 	it('reads nothing more when no row links anywhere', async () => {

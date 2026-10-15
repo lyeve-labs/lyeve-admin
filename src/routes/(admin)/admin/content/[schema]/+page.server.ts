@@ -122,7 +122,11 @@ async function nameRelatedEntries(
 	const links = fields.filter(
 		(f) => f.field_type === 'relation' && f.relation_to && (f.relation_type ?? 'belongs_to') === 'belongs_to',
 	);
-	const linkOf = (it: ListedItem, f: SchemaField) => it.data[fieldKey(f)] ?? it.data[f.name];
+	// An empty key column is a form left blank, so the field name decides.
+	const linkOf = (it: ListedItem, f: SchemaField) => {
+		const key = it.data[fieldKey(f)];
+		return key === undefined || key === null || key === '' ? it.data[f.name] : key;
+	};
 	const wanted = new Set<string>();
 	for (const f of links) {
 		if (items.some((it) => typeof linkOf(it, f) === 'string' && linkOf(it, f) !== '')) {
@@ -151,7 +155,8 @@ async function nameRelatedEntries(
 			const id = linkOf(it, f);
 			if (typeof id === 'string' && titles.has(id)) {
 				it.data[f.name] = { id, title: titles.get(id) };
-			} else if (id !== undefined) {
+			} else if (id !== undefined && (typeof it.data[f.name] !== 'object' || it.data[f.name] === null)) {
+				// A linked entry the body already carries stays as it is.
 				it.data[f.name] = id;
 			}
 		}
