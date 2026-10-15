@@ -396,3 +396,16 @@ describe('the missing home page for each role', () => {
 		expect(screen.getByRole('link', { name: /Try again/ })).toBeTruthy();
 	});
 });
+
+describe('a composed dashboard that could not be read', () => {
+	it('says the stock dashboard stands in for it, with a way to try again', () => {
+		render(DashboardPage, { props: { data: data({ layoutUnread: true }), form: null } });
+		expect(document.body.textContent).toContain("This tenant's own dashboard could not be read, so the standard one is shown.");
+		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin');
+	});
+
+	it('says nothing when the layout was read', () => {
+		render(DashboardPage, { props: { data: data({ layoutUnread: false }), form: null } });
+		expect(document.body.textContent).not.toContain('own dashboard could not be read');
+	});
+});

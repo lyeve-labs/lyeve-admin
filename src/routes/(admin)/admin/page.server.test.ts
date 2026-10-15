@@ -307,6 +307,29 @@ describe('admin dashboard load', () => {
 		expect(d.home).toBeNull();
 	});
 
+	// A composed dashboard that could not be read fell back to the stock one
+	// in silence, so its readers could not tell the two apart.
+	it('says when the composed dashboard could not be read', async () => {
+		const { event } = loadEvent({ '/api/admin/schemas': schemaList }, admin, 'http://localhost/admin', customized);
+		const failing = event as unknown as { fetch: typeof globalThis.fetch };
+		const inner = failing.fetch;
+		failing.fetch = (async (url: string, init?: RequestInit) =>
+			String(url).includes('/api/admin/customization/dashboard') ? json({ error: 'unavailable' }, 503) : inner(url, init)) as typeof globalThis.fetch;
+		const d = (await load(event)) as Loaded;
+		expect(d.composed).toBeNull();
+		expect(d.layoutUnread).toBe(true);
+	});
+
+	it('reports a readable layout as read', async () => {
+		const { event } = loadEvent(
+			{ '/api/admin/customization/dashboard': { entitled: true, custom: false, widgets: [], updated_at: null }, '/api/admin/schemas': schemaList },
+			admin,
+			'http://localhost/admin',
+			customized,
+		);
+		expect(((await load(event)) as Loaded).layoutUnread).toBe(false);
+	});
+
 	it('keeps the stock dashboard when the tenant composed none', async () => {
 		const { event, seen } = loadEvent(
 			{

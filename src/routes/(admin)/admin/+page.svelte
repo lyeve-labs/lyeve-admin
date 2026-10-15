@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import CustomBlocks from '$lib/components/custom/CustomBlocks.svelte';
 	import DashboardWidgets from '$lib/components/custom/DashboardWidgets.svelte';
 	import {
@@ -98,6 +99,13 @@
 	     with the refusal, so this is where it is announced. -->
 	<FormErrors message={form?.error} />
 
+	{#if data.layoutUnread}
+		<p class="flex flex-wrap items-center gap-2 text-sm text-muted">
+			<TriangleAlert size={ICON.md} class="shrink-0 text-warn" aria-hidden="true" />
+			This tenant's own dashboard could not be read, so the standard one is shown.
+			<a class="relative hit-area underline hover:text-fg" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>Try again</a>
+		</p>
+	{/if}
 	{#if data.welcome}
 		<p class="text-base text-fg" data-testid="tenant-welcome">{data.welcome}</p>
 	{/if}
