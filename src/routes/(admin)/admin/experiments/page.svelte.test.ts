@@ -193,3 +193,12 @@ describe('where a failure shows', () => {
 		expect(said(drawer)).toContain('Name the experiment');
 	});
 });
+
+describe('the experiment name link', () => {
+	// A finished experiment has no edit button, so the name is the only way in.
+	it('gives the link that opens an experiment a touch hit area', () => {
+		const { container } = render(ExperimentsPage, { props: props({ experiments: [experiment({ status: 'completed' })] }) });
+		const link = container.querySelector('tbody a[href="/admin/experiments/e1"]') as HTMLElement;
+		expect(link.className.split(/\s+/)).toEqual(expect.arrayContaining(['relative', 'hit-area']));
+	});
+});

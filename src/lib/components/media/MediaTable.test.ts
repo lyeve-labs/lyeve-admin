@@ -53,3 +53,17 @@ describe('MediaTable', () => {
 		expect(onselect).toHaveBeenLastCalledWith(IMAGE);
 	});
 });
+
+describe('the filename control', () => {
+	// The filename is the only way to open a file from the table. The box that
+	// grows it under a finger is drawn outside the button, so the button
+	// itself must not clip it.
+	it('gives the filename a touch hit area that its truncation does not clip', () => {
+		setup([IMAGE]);
+		const button = screen.getByRole('button', { name: 'photo.png' });
+		const cls = button.className.split(/\s+/);
+		expect(cls).toEqual(expect.arrayContaining(['relative', 'hit-area']));
+		expect(cls).not.toContain('truncate');
+		expect(button.querySelector('.truncate')?.textContent?.trim()).toBe('photo.png');
+	});
+});

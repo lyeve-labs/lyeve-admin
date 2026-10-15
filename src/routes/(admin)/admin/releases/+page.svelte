@@ -101,7 +101,7 @@
 					{#each data.releases as r (r.id)}
 						<tr>
 							<td>
-								<a href="/admin/releases/{r.id}" class="font-medium text-fg transition-colors hover:text-brand">{r.name}</a>
+								<a href="/admin/releases/{r.id}" class="relative hit-area font-medium text-fg transition-colors hover:text-brand">{r.name}</a>
 								{#if r.failure_reason}
 									<span class="block text-xs text-danger">{r.failure_reason}</span>
 								{/if}
