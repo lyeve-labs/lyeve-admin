@@ -13,6 +13,7 @@
 	import { useInstance } from '$lib/instance.svelte';
 	import { isExternalHref } from '$lib/links';
 	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
+	import { upgradeLabel } from '$lib/api/refusal';
 
 	let {
 		title,
@@ -45,6 +46,11 @@
 	// Another origin opens in a tab of its own, so it cannot reach back into
 	// the admin session through window.opener.
 	const away = $derived(target !== null && isExternalHref(target.href));
+	// A link that opens a plan or an add-on is named by what it opens, as a
+	// refusal names it.
+	const targetLabel = $derived(
+		target === null ? '' : (upgradeLabel(target.href) ?? target.label ?? 'How to enable it'),
+	);
 </script>
 
 {#snippet lock()}
@@ -57,7 +63,7 @@
 
 {#snippet enable()}
 	{#if target}
-		<UpgradeLink link={target} />
+		<UpgradeLink link={{ href: target.href, label: targetLabel }} />
 	{/if}
 {/snippet}
 
