@@ -45,6 +45,9 @@ export function tenantRefusal(err: unknown): Refusal | null {
 	const refused = refusalOf(err);
 	if (!refused || refused.kind === 'cap') return refused;
 	const body = (err as ApiError).body as { error?: unknown } | null | undefined;
+	// Any other 402 that carries a sentence reads as the ceiling too. The
+	// create answers 402 only these two ways and a store failure answers 503,
+	// so a third refusal there needs its own branch here.
 	const sentence = typeof body?.error === 'string' && body.error !== 'payment_required';
 	if (!sentence) return refused;
 	return { kind: 'cap', cap: TENANTS_CAP, limit: null, current: null, upgradeUrl: refused.upgradeUrl };
