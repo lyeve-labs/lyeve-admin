@@ -319,6 +319,16 @@ describe('admin/tenants load provisioning', () => {
 		expect((await run(eventFor(() => json({ error: 'unavailable' }, 503)))).provisioningUrl).toBe('');
 	});
 
+	// The refusal carries the link that lifts it, as a read that says no does.
+	it('carries the link a refused provisioning read names', async () => {
+		const link = 'https://shop.example.com/pricing?skus=example-pro';
+		expect(await run(eventFor(() => json({ error: 'payment_required', upgrade_url: link }, 402)))).toMatchObject({
+			canProvision: false,
+			provisionGate: null,
+			provisioningUrl: link,
+		});
+	});
+
 	it('reads a refusal as not enabled', async () => {
 		expect(await run(eventFor(() => json({ error: 'payment_required' }, 402)))).toMatchObject({ canProvision: false, provisionGate: null });
 	});

@@ -70,7 +70,12 @@ export const load: PageServerLoad = async (event) => {
 		section(getProvisioning(client), PROVISIONING_FAILED),
 	]);
 	const canProvision = provisioning.ok && provisioning.value.enabled;
-	const provisioningUrl = provisioning.ok ? provisioning.value.upgradeUrl : '';
+	// A read that says no and a refusal both name where creating is turned on.
+	const provisioningUrl = provisioning.ok
+		? provisioning.value.upgradeUrl
+		: provisioning.gate.state === 'locked'
+			? provisioning.gate.upgradeUrl
+			: '';
 	const provisionGate: Gate | null =
 		!provisioning.ok && provisioning.gate.state !== 'locked'
 			? provisioning.gate
