@@ -487,10 +487,13 @@
 				/>
 				{#if editing?.has_secret}
 					<!-- The plugin stores the token, password, client secret and
-					     secret headers as one sealed value and replaces it whole. -->
+					     secret headers as one sealed value and replaces it whole. A
+					     plain header turned secret carries its value into that half,
+					     so the switch replaces them as typing does. -->
 					<p class="text-xs text-muted" data-testid="secret-rule">
 						The stored secrets are never shown, the secret headers included. Leave every secret field empty to keep
-						all of them. Typing any one replaces all of them, so type every secret this datasource needs.
+						all of them. Typing a secret, or turning Secret on for a header, replaces all of them, so type every secret this
+						datasource needs.
 					</p>
 				{/if}
 				<div class="flex flex-col gap-3 rounded-md border border-line p-3" data-testid="auth-section">
