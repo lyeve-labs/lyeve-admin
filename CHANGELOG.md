@@ -110,6 +110,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Localization: under a finger, the default locale's tag sits level with the removable tags beside it.
 - The browser's toolbar color follows each switch of the theme control. It used to keep the color the page loaded with until the next load.
 - Content: a list column that links to another entry shows the linked entry's title for an entry saved in the console, and for one the console took in from a row written through the API, instead of an empty cell.
+- A screen reader names every row of a JSON field's key and value editor. Every row used to share one Key id and one Value id, so only the first row's fields had a name. This comes with ui-kit 0.39.0.
+- A list or calendar opened in a dialog too short for it opens whole below its field, and the dialog grows or scrolls to show it. Under a finger, a tap just inside a number no longer steps it, the Show and Copy buttons beside a secret no longer overlap, and a multi-select's remove crosses stay inside the field. The show, hide and copy icons in password and copy fields are 14 pixels, matching their text, and the sidebar toggle is 20 pixels. These come with ui-kit 0.39.0.
 
 ### Upgrade notes
 
