@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
 import { resetRateLimitStore } from '$lib/server/rate-limit';
 
 function json(body: unknown, status = 200): Response {
@@ -63,5 +63,48 @@ describe('login/magic-link action', () => {
 		const fetch = vi.fn(async () => json({ error: 'too many' }, 429)) as unknown as typeof globalThis.fetch;
 		const result = (await submit({ email: 'a@b.co' }, fetch)) as { status: number };
 		expect(result.status).toBe(429);
+	});
+});
+
+describe('organization on the request', () => {
+	beforeEach(() => resetRateLimitStore());
+
+	function sentBody(fetch: typeof globalThis.fetch): unknown {
+		const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+		expect(String(url)).toContain('/api/admin/auth/magic-link/request');
+		return JSON.parse(String(init.body));
+	}
+
+	it('sends the organization as tenant, folded to the case the engine reads', async () => {
+		const fetch = vi.fn(async () => json({ message: 'sent' })) as unknown as typeof globalThis.fetch;
+		const result = await submit({ email: 'a@b.co', tenant: ' Acme ' }, fetch);
+		expect(result).toEqual({ sent: true, email: 'a@b.co' });
+		expect(sentBody(fetch)).toEqual({ email: 'a@b.co', tenant: 'acme' });
+	});
+
+	it('answers an organization the same way whatever the engine holds', async () => {
+		// The engine's answer is the same for a known and an unknown
+		// organization, and so is what the page returns for either.
+		const fetch = vi.fn(async () => json({ message: 'sent' })) as unknown as typeof globalThis.fetch;
+		const known = await submit({ email: 'a@b.co', tenant: 'acme' }, fetch);
+		const unknown = await submit({ email: 'a@b.co', tenant: 'nobody_here' }, fetch);
+		expect(unknown).toEqual(known);
+	});
+
+	it('refuses a name the engine would not read, without calling it', async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+		const result = (await submit({ email: 'a@b.co', tenant: 'acme corp' }, fetch)) as {
+			status: number;
+			data: { error: string; email: string; tenant: string };
+		};
+		expect(result.status).toBe(400);
+		expect(result.data.error).toMatch(/short name your admin gave you/);
+		expect(result.data.tenant).toBe('acme corp');
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	it('follows a link that names the organization', () => {
+		expect(load({ url: new URL('http://admin.test/x?tenant=acme') } as never)).toEqual({ carried: 'acme' });
+		expect(load({ url: new URL('http://admin.test/x') } as never)).toEqual({ carried: '' });
 	});
 });

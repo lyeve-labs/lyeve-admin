@@ -9,6 +9,8 @@
 	import type { CaptchaChallenge } from '$lib/captcha';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
+	import OrganizationField from '$lib/components/OrganizationField.svelte';
+	import { withOrganization } from '$lib/organization';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 
@@ -22,6 +24,7 @@
 		form && 'captcha' in form && form.captcha ? (form.captcha as CaptchaChallenge) : null
 	);
 	const email = $derived(form && 'email' in form && typeof form.email === 'string' ? form.email : '');
+	const typedOrganization = $derived(form && 'tenant' in form && typeof form.tenant === 'string' ? form.tenant : null);
 </script>
 
 <PageTitle title="Sign in" />
@@ -82,9 +85,11 @@
 				required
 			/>
 
+			<OrganizationField carried={data.carried} typed={typedOrganization} />
+
 			{#if data.passwordReset}
 				<div class="flex justify-end">
-					<a href="/forgot-password" class="text-sm text-brand transition-colors hover:underline">Forgot password?</a>
+					<a href={withOrganization('/forgot-password', data.carried)} class="text-sm text-brand transition-colors hover:underline">Forgot password?</a>
 				</div>
 			{/if}
 
@@ -108,7 +113,7 @@
 		</form>
 
 		{#if data.magicLink}
-			<Button href="/login/magic-link" variant="ghost" size="sm" full class="mt-3">Email me a sign-in link</Button>
+			<Button href={withOrganization('/login/magic-link', data.carried)} variant="ghost" size="sm" full class="mt-3">Email me a sign-in link</Button>
 		{/if}
 
 		{#if data.oauthProviders.length > 0 || data.samlProviders.length > 0}

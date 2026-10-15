@@ -214,7 +214,7 @@ describe('signing in', () => {
 			fetch: vi.fn() as never,
 			cookies: mockCookies(),
 		}) as never);
-		expect(result).toEqual({ error: 'Email and password are required.' });
+		expect(result).toEqual({ error: 'Email and password are required.', tenant: '' });
 	});
 
 	// An adapter behind a proxy it was not told about cannot name the
@@ -400,7 +400,7 @@ describe('signing in', () => {
 			cookies: mockCookies(),
 		}) as never);
 
-		expect(result).toEqual({ error: 'Invalid email or password.' });
+		expect(result).toEqual({ error: 'Invalid email or password.', tenant: '' });
 	});
 
 	// MFA lockout and challenge exhaustion both return 429. Calling either an
@@ -637,6 +637,57 @@ describe('a sign-in the engine challenges', () => {
 
 		const result = await submit({ email: 'a@b.co', password: 'wrong' }, fetch);
 
-		expect(result).toEqual({ error: 'Invalid email or password.' });
+		expect(result).toEqual({ error: 'Invalid email or password.', tenant: '' });
+	});
+});
+
+describe('naming the organization at sign-in', () => {
+	beforeEach(() => resetRateLimitStore());
+
+	function submit(fields: Record<string, string>, fetch: typeof globalThis.fetch) {
+		const formData = new FormData();
+		for (const [k, v] of Object.entries(fields)) formData.set(k, v);
+		return actions.default(
+			mockEvent({ request: { formData: () => Promise.resolve(formData) } as never, fetch, cookies: mockCookies() }) as never
+		);
+	}
+
+	it('sends the organization as tenant beside the credentials', async () => {
+		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
+			json({ user: { id: 'u1' }, token: 'session' })
+		) as unknown as typeof globalThis.fetch;
+
+		await catchRedirect(() => submit({ email: 'a@b.co', password: 'right', tenant: 'Acme' }, fetch));
+
+		const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body))).toEqual({ email: 'a@b.co', password: 'right', tenant: 'acme' });
+	});
+
+	it('reads a refusal with an organization named as a wrong password, and keeps the name', async () => {
+		const fetch = vi.fn(async () => json({ error: 'invalid credentials' }, 401)) as unknown as typeof globalThis.fetch;
+
+		const result = await submit({ email: 'a@b.co', password: 'wrong', tenant: 'acme' }, fetch);
+
+		expect(result).toEqual({ error: 'Invalid email or password.', tenant: 'acme' });
+	});
+
+	it('refuses a name the engine would not read, without calling it', async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+
+		const result = (await submit({ email: 'a@b.co', password: 'pw', tenant: 'acme corp' }, fetch)) as {
+			status: number;
+			data: { error: string; tenant: string };
+		};
+
+		expect(result.status).toBe(400);
+		expect(result.data.error).toMatch(/short name your admin gave you/);
+		expect(result.data.tenant).toBe('acme corp');
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	it('follows a link that names the organization', async () => {
+		const fetch = vi.fn(async () => json([])) as unknown as typeof globalThis.fetch;
+		const result = await load({ fetch, cookies: mockCookies(), url: new URL('http://admin.test/login?tenant=acme') } as never);
+		expect(result).toMatchObject({ carried: 'acme' });
 	});
 });
