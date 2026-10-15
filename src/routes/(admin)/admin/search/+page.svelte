@@ -27,6 +27,7 @@
 	import { ICON } from '$lib/icon';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { formatCount } from '$lib/format';
+	import { snippetParts } from '$lib/highlight';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -131,7 +132,9 @@
 										{#each Object.entries(hit.snippets) as [field, snippet]}
 											<p class="mt-2 text-xs text-muted">
 												<span class="text-faint">{field}</span>
-												{snippet}
+												{#each snippetParts(snippet) as part, i (i)}
+													{#if part.mark}<mark class="rounded-sm bg-warn/15 text-fg">{part.text}</mark>{:else}{part.text}{/if}
+												{/each}
 											</p>
 										{/each}
 									{/if}

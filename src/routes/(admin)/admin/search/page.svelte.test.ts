@@ -144,6 +144,21 @@ describe('Search page counts', () => {
 		expect(container.querySelector('a[href="/admin/search?q=cats&limit=20&offset=20"]')).toBeTruthy();
 	});
 
+	// A snippet is escaped HTML with live mark tags. Printed as text it showed
+	// the tags and the entities, and rendered as HTML it would run the markup.
+	it('renders a snippet match in a mark and escaped markup as text', () => {
+		const snippets = { title: '&lt;img src=x onerror=alert(1)&gt; <mark>Lamp</mark> &amp; desk' };
+		const results = ok({ results: [{ ...hit(1), snippets }], total: 1 });
+		const { container } = render(SearchPage, { props: { data: data({ results }) as never, form: null } });
+		const marks = container.querySelectorAll('mark');
+		expect(marks).toHaveLength(1);
+		expect(marks[0].textContent).toBe('Lamp');
+		expect(container.querySelector('img')).toBeNull();
+		const line = marks[0].parentElement;
+		expect(line?.textContent).toContain('<img src=x onerror=alert(1)> Lamp & desk');
+		expect(line?.textContent).not.toContain('&lt;');
+	});
+
 	it('says when more synonym groups exist than were listed', () => {
 		const groups = [{ id: 's1', base_term: 'tv', synonyms: ['telly'] }];
 		const { getByText } = render(SearchPage, {
