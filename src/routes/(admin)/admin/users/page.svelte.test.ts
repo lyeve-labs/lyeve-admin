@@ -400,3 +400,26 @@ describe('Users admin seat refusal', () => {
 		expect(more.getAttribute('target')).toBe('_blank');
 	});
 });
+
+describe('accounts a tenant identity provider created', () => {
+	it('marks them in words a tenant admin reads, and only them', () => {
+		const [local, password] = accounts(2);
+		const { getAllByRole } = render(UsersPage, {
+			props: props({ users: [{ ...local, tenant_local: true }, { ...password, tenant_local: false }] }),
+		});
+
+		const rows = getAllByRole('row').slice(1);
+		expect(within(rows[0]).queryByText('Signs in through your identity provider')).not.toBeNull();
+		expect(within(rows[1]).queryByText('Signs in through your identity provider')).toBeNull();
+	});
+
+	it('shows the address the account signs in with', () => {
+		const [local] = accounts(1);
+		const { getAllByRole } = render(UsersPage, {
+			props: props({ users: [{ ...local, email: 'pat@acme.example', tenant_local: true }] }),
+		});
+
+		expect(within(getAllByRole('row')[1]).queryByText('pat@acme.example')).not.toBeNull();
+	});
+});
+

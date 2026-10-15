@@ -1,12 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
-import { ApiError, type User } from '@lyeve-labs/client';
+import { ApiError } from '@lyeve-labs/client';
 import { createUser, updateUserRoles, deleteUser, listTenants, type Tenant } from '@lyeve-labs/client-rest';
 import { fail, error, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError } from '$lib/server/action-error';
-import { passwordTooLong, setUserPassword } from '$lib/api/users';
+import { passwordTooLong, setUserPassword, type ListedUser } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { refusalText } from '$lib/api/refusal';
 import { section, type Section } from '$lib/api/gate';
@@ -44,7 +44,7 @@ export const load: PageServerLoad = async (event) => {
 	 */
 	const [rows, tenants] = await Promise.all([
 		section(
-			client.get<User[]>(`/api/admin/users?limit=${limit + 1}&offset=${offset}`),
+			client.get<ListedUser[]>(`/api/admin/users?limit=${limit + 1}&offset=${offset}`),
 			'The accounts could not be read. This is not a report that there are none.'
 		),
 		// An account belongs to one tenant. With several, the engine cannot
@@ -63,7 +63,7 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(url, back));
 	}
 
-	const users: Section<User[]> = rows.ok ? { ok: true, value: page.slice(0, limit) } : rows;
+	const users: Section<ListedUser[]> = rows.ok ? { ok: true, value: page.slice(0, limit) } : rows;
 	const choices: Section<{ slug: string; name: string }[]> = tenants.ok
 		? { ok: true, value: tenants.value.filter((t) => !t.archived).map((t) => ({ slug: t.slug, name: t.name })) }
 		: tenants;
