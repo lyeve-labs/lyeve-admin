@@ -26,8 +26,8 @@
 	import { refusalOf, type Refusal } from '$lib/api/refusal';
 	import { errorCodeOf } from '$lib/api/limits';
 	import { ApiError } from '@lyeve-labs/client';
-	import { goto } from '$app/navigation';
-	import { signInAgainHref } from '$lib/session';
+	import { renewingOnce } from '$lib/renew';
+	import { SIGN_IN_AGAIN } from '$lib/session';
 	import {
 		IMPORT_FORMATS,
 		IMPORT_FORMAT_LABELS,
@@ -239,12 +239,14 @@
 		hint = '';
 		refusal = null;
 		try {
-			return await fn();
+			return await renewingOnce(fn);
 		} catch (e) {
-			// Only a 401 ends a session. A request that never reached the engine
-			// carries the browser's words, which are not the console's.
+			// A 401 after a renewal is a session that ended, and the chosen file
+			// and mapping stay here for after the reader signs in. A request that
+			// never reached the engine carries the browser's words, which are not
+			// the console's.
 			if (e instanceof ApiError && e.status === 401) {
-				void goto(signInAgainHref(window.location));
+				error = SIGN_IN_AGAIN;
 				return null;
 			}
 			if (!(e instanceof ApiError)) {

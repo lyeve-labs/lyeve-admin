@@ -7,6 +7,7 @@
 import { ApiError } from '@lyeve-labs/client';
 import { FlowRefusal, validationErrors, type ValidationError } from '$lib/api/flows';
 import { isOutage } from '$lib/api/gate';
+import { SIGN_IN_AGAIN } from '$lib/session';
 import { isBlockedMessage, notEnabledText } from './blocked';
 import type { FlowDefinition } from './types';
 
@@ -39,8 +40,6 @@ export function parseTrigger(text: string): { ok: true; value: unknown } | { ok:
 /** What a refused test run means for the editor. */
 export type TestFailure =
 	| { kind: 'blocked' }
-	/** The engine ended the session, so the reader signs in again. */
-	| { kind: 'signed-out' }
 	| {
 			kind: 'refused';
 			/** The problems to mark on the canvas, empty when the refusal names none. */
@@ -59,7 +58,8 @@ export type TestFailure =
  */
 export function testFailure(err: unknown): TestFailure {
 	if (err instanceof FlowRefusal) return { kind: 'refused', errors: err.errors, text: notEnabledText(err.nodeIds) };
-	if (err instanceof ApiError && err.status === 401) return { kind: 'signed-out' };
+	// The run was sent again after a renewal, so a 401 here is a session that ended.
+	if (err instanceof ApiError && err.status === 401) return { kind: 'refused', errors: [], text: SIGN_IN_AGAIN };
 	if (isOutage(err)) return { kind: 'refused', errors: [], text: TEST_OUTAGE };
 	const message = err instanceof Error ? err.message : '';
 	if (isBlockedMessage(message)) return { kind: 'blocked' };

@@ -71,8 +71,8 @@ describe('testFailure for an answer that is not the engine speaking', () => {
 		});
 	});
 
-	it('sends a reader whose session ended to sign in', () => {
-		expect(testFailure(new ApiError(401, 'unauthorized', { error: 'unauthorized' }))).toEqual({ kind: 'signed-out' });
+	it('says to sign in again on a 401, which the run was already renewed for', () => {
+		expect(testFailure(new ApiError(401, 'unauthorized', { error: 'unauthorized' }))).toEqual({ kind: 'refused', errors: [], text: 'Your session ended. Sign in again in another tab, then try again here.' });
 	});
 
 	it('relays a refusal the engine worded', () => {

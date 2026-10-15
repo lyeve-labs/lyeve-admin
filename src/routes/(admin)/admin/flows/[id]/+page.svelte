@@ -56,7 +56,7 @@
 	import { formatDateTime, relativeTime } from '$lib/format';
 	import { focusMode } from '$lib/flow/focus.svelte';
 	import { parseTrigger, sampleKey, testFailure, untilOptions } from '$lib/flow/test-run';
-	import { signInAgainHref } from '$lib/session';
+	import { renewingOnce } from '$lib/renew';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -300,21 +300,13 @@
 		testing = true;
 		testError = '';
 		try {
-			lastRun = await testFlow(browserClient(), flowId, {
-				trigger: trigger.value,
-				definition: cloneDefinition(definition),
-				live,
-				until_node: untilNode || undefined,
-			});
+			const request = { trigger: trigger.value, definition: cloneDefinition(definition), live, until_node: untilNode || undefined };
+			lastRun = await renewingOnce(() => testFlow(browserClient(), flowId, request));
 			focusStep = null;
 			tab = 'test';
 			drawerOpen = true;
 		} catch (err) {
 			const failure = testFailure(err);
-			if (failure.kind === 'signed-out') {
-				window.location.assign(signInAgainHref(page.url));
-				return;
-			}
 			if (failure.kind === 'blocked') {
 				runBlocked = true;
 				drawerOpen = false;

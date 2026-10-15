@@ -1,10 +1,6 @@
-/** Where the sign-in page says the session ended. */
-export const SESSION_ENDED = '/login?ended=1';
-
 /**
- * The sign-in page for a reader whose session the engine ended during a
- * request the browser made itself, with the way back to the page they were on.
+ * What a page says when a request it sent to the engine is refused for the
+ * session after a renewal. Signing in from another tab keeps the work on this
+ * one, which a sign-in here would throw away.
  */
-export function signInAgainHref(here: { pathname: string; search: string }): string {
-	return `${SESSION_ENDED}&next=${encodeURIComponent(here.pathname + here.search)}`;
-}
+export const SIGN_IN_AGAIN = 'Your session ended. Sign in again in another tab, then try again here.';

@@ -211,16 +211,35 @@ describe('media library upload', () => {
 });
 
 describe('an upload whose session ended', () => {
-	// Only a 401 ends a session, and signing in again is the way back, not the engine's word for it.
-	it('sends the reader to sign in', async () => {
-		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })));
-		nav.goto.mockClear();
-		setup();
+	function pick() {
 		const picker = screen.getByLabelText('Choose files to upload') as HTMLInputElement;
 		Object.defineProperty(picker, 'files', { value: [new File(['x'], 'new.png', { type: 'image/png' })], configurable: true });
-		await fireEvent.change(picker);
-		await waitFor(() => expect(nav.goto).toHaveBeenCalledTimes(1));
-		expect(String((nav.goto.mock.calls[0] as unknown[])[0])).toMatch(/^\/login\?ended=1&next=/);
+		return fireEvent.change(picker);
+	}
+
+	// The console renews the engine's short token only on a request its own
+	// server handles, so an upload sent straight to the engine can carry one
+	// that lapsed on a live session. Rerunning the loads renews it.
+	it('renews the session and sends the file again', async () => {
+		const answers = [new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }), new Response('{}', { status: 201 })];
+		const fetch = vi.fn(async () => answers.shift() as Response);
+		vi.stubGlobal('fetch', fetch);
+		setup();
+		await pick();
+		await waitFor(() => expect(kit.success).toHaveBeenCalledWith('Uploaded 1 file'));
+		expect(fetch).toHaveBeenCalledTimes(2);
+		expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
+		expect(nav.goto).toHaveBeenCalledTimes(1);
+		expect(nav.goto).toHaveBeenCalledWith('/admin/media', { invalidateAll: true });
+		vi.unstubAllGlobals();
+	});
+
+	it('says to sign in again when the renewed upload is refused too', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('Your session ended. Sign in again in another tab, then try again here.'));
+		expect(nav.goto).not.toHaveBeenCalled();
 		expect(document.body.textContent).not.toContain('unauthorized');
 		vi.unstubAllGlobals();
 	});

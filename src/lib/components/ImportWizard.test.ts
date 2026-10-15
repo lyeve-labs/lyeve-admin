@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import ImportWizard from './ImportWizard.svelte';
 
-const nav = vi.hoisted(() => ({ goto: vi.fn(async () => {}) }));
+const nav = vi.hoisted(() => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 vi.mock('$app/navigation', () => nav);
 
 afterEach(() => {
@@ -180,12 +180,31 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		expect(document.body.textContent).not.toContain('Failed to fetch');
 	});
 
-	// Only a 401 ends a session, and signing in again is the way back.
-	it('sends a reader whose session ended to sign in', async () => {
+	// The console renews the engine's short token only on a request its own
+	// server handles, so a request sent straight to the engine can carry one
+	// that lapsed on a live session. Rerunning the loads renews it, and the
+	// chosen file and mapping stay where they are.
+	it('renews the session and reads the file again after a 401', async () => {
+		nav.goto.mockClear();
+		nav.invalidateAll.mockClear();
+		const statuses = [401];
+		const answer = vi.fn(async () => {
+			const status = statuses.shift() ?? 400;
+			return new Response(JSON.stringify({ error: status === 401 ? 'unauthorized' : 'The file has no header row.' }), { status, headers: { 'content-type': 'application/json' } });
+		});
+		await readWith(answer);
+		await waitFor(() => expect(document.body.textContent).toContain('The file has no header row.'));
+		expect(answer).toHaveBeenCalledTimes(2);
+		expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
+		expect(nav.goto).not.toHaveBeenCalled();
+	});
+
+	it('says to sign in again when the renewed request is refused too, and keeps the wizard open', async () => {
 		nav.goto.mockClear();
 		await readWith(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'content-type': 'application/json' } }));
-		await waitFor(() => expect(nav.goto).toHaveBeenCalledTimes(1));
-		expect(String((nav.goto.mock.calls[0] as unknown[])[0])).toMatch(/^\/login\?ended=1&next=/);
+		await waitFor(() => expect(document.body.textContent).toContain('Your session ended. Sign in again in another tab, then try again here.'));
+		expect(nav.goto).not.toHaveBeenCalled();
 		expect(document.body.textContent).not.toContain('unauthorized');
+		expect((document.getElementById('import-url') as HTMLInputElement).value).toBe('https://example.com/orders.csv');
 	});
 });
