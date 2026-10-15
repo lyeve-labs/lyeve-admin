@@ -92,6 +92,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A license refusal in a drawer or on a page that has its own Create or Save no longer adds a second primary button. Its link stays first as a secondary button, and stays primary only where it is the one action left, as on the permissions page at the role ceiling.
 - Tenants: when the instance does not serve tenant provisioning, the page says so instead of saying the license does not include creating tenants.
 - Under a finger, each option of an open select, multiple select or autocomplete list, each day of a date picker, each choice in a checkbox or radio group, the close button of a dialog and the clear button of an autocomplete take a full touch target, and the date picker fits a 320 pixel screen. Under the keyboard, number fields, multiple selects, file drops and the search box of an open list show the focus ring. The active tab's count and the sidebar badges read at 4.5:1 or better in both themes, the phone navigation drawer slides out as it slides in, and a dismissed banner fades away. These come with ui-kit 0.38.4.
+- The browser's toolbar color follows each switch of the theme control. It used to keep the color the page loaded with until the next load.
 
 ### Upgrade notes
 
