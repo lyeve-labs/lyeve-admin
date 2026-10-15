@@ -260,3 +260,17 @@ describe('API keys failures stay with their own action', () => {
 		expect(dialog()?.textContent).toContain('The request limits could not be saved.');
 	});
 });
+
+describe('the action checkboxes of a new key under a finger', () => {
+	// The rows wrapped 8px apart, so each checkbox's 44px hit area took part
+	// of the one below it.
+	const spaced = (group: HTMLElement) => !!group.querySelector('[class*="coarse:gap-y-"]');
+
+	it('spaces the actions on every schema and on a route group so their hit areas do not overlap', async () => {
+		const { getAllByRole, getByRole } = setup([key({})]);
+		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		expect(spaced(getByRole('group', { name: 'Actions on every schema' }))).toBe(true);
+		await fireEvent.click(getByRole('button', { name: /Flows/ }));
+		expect(spaced(getByRole('group', { name: 'Actions on Flows' }))).toBe(true);
+	});
+});

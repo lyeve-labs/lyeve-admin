@@ -7,7 +7,7 @@
 	 * only the fields, so the owner decides where the buttons go: a drawer
 	 * footer on create, a card on the detail page.
 	 */
-	import { Checkbox, Input, NumberInput, PasswordInput, RadioGroup, Select, Toggle } from '@lyeve-labs/ui-kit';
+	import { CheckboxGroup, Input, NumberInput, PasswordInput, RadioGroup, Select, Toggle } from '@lyeve-labs/ui-kit';
 	import { MODALITIES, PRESETS, PROVIDER_KINDS, isCompatibleKind, providerKindDescription, providerKindLabel, type AiProvider, type Modality, type ProviderKind } from '$lib/api/ai';
 
 	let {
@@ -152,15 +152,16 @@
 		hint="Lower is tried first when a call names no provider."
 	/>
 
-	<fieldset class="md:col-span-2 flex flex-col gap-2">
-		<legend class="text-sm font-medium text-fg">Modalities</legend>
-		<div class="flex flex-wrap gap-4">
-			{#each MODALITIES as m (m)}
-				<Checkbox id="{id}-mod-{m}" name="modalities" value={m} label={m} bind:checked={modalities[m]} />
-			{/each}
-		</div>
-		<p class="text-xs text-faint">What this row may serve. The model's own table decides the rest. A call needs both.</p>
-	</fieldset>
+	<CheckboxGroup
+		class="md:col-span-2"
+		name="modalities"
+		label="Modalities"
+		orientation="horizontal"
+		options={MODALITIES.map((m) => ({ value: m, label: m }))}
+		value={MODALITIES.filter((m) => modalities[m])}
+		onchange={(v) => (modalities = { text: v.includes('text'), embed: v.includes('embed'), image: v.includes('image') })}
+		hint="What this row may serve. The model's own table decides the rest. A call needs both."
+	/>
 
 	<NumberInput
 		id="{id}-rpm"
