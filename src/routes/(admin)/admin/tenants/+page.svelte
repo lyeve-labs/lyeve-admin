@@ -131,6 +131,12 @@
 	);
 
 	const saveTenantSubmit = tracked(saveTenant);
+
+	// A notice that withholds creating speaks of the tenants below only when
+	// the list holds some.
+	const stillEditable = $derived(
+		data.tenants.ok && data.tenants.value.length > 0 ? ' The tenants below can still be edited, disabled and deleted.' : '',
+	);
 </script>
 
 <PageShell
@@ -156,13 +162,13 @@
 			level={2}
 			gate={data.provisionGate}
 			title="Tenant provisioning"
-			absent="This instance does not serve tenant provisioning, so a tenant cannot be created here. The tenants below can still be edited, disabled and deleted."
+			absent="This instance does not serve tenant provisioning, so a tenant cannot be created here.{stillEditable}"
 		/>
 	{:else if data.tenants.ok && !canProvision}
 		<NotEnabled
 			level={2}
 			title="Tenant provisioning"
-			description="The license on this instance does not include creating tenants. The tenants below can still be edited, disabled and deleted."
+			description="The license on this instance does not include creating tenants.{stillEditable}"
 			url={data.provisioningUrl || null}
 		/>
 	{/if}
@@ -178,7 +184,7 @@
 		<EmptyState
 			level={2}
 			title="No tenants yet"
-			description="Create a tenant to start serving content on this instance."
+			description={canProvision ? 'Create a tenant to start serving content on this instance.' : 'This instance lists no tenant.'}
 		>
 			{#snippet iconSnippet()}
 				<Building2 size={ICON.lg} />
