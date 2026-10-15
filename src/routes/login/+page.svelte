@@ -89,7 +89,7 @@
 
 			{#if data.passwordReset}
 				<div class="flex justify-end">
-					<a href={withOrganization('/forgot-password', data.carried)} class="text-sm text-brand transition-colors hover:underline">Forgot password?</a>
+					<a href={withOrganization('/forgot-password', data.carried)} class="relative hit-area text-sm text-brand transition-colors hover:underline">Forgot password?</a>
 				</div>
 			{/if}
 

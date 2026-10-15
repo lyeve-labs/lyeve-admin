@@ -251,7 +251,7 @@
 								<span class="text-muted">{CONFLICT_LABELS[c.kind] ?? c.detail}</span>
 								{#if c.at}<span class="text-xs text-faint">{formatDateTime(c.at)}</span>{/if}
 								{#if c.release_id}
-									<a class="text-xs text-brand" href="/admin/releases/{c.release_id}">Open the other release</a>
+									<a class="relative hit-area text-xs text-brand" href="/admin/releases/{c.release_id}">Open the other release</a>
 								{/if}
 							</li>
 						{/each}
@@ -293,7 +293,7 @@
 								<tr>
 									<td>
 										{#if href}
-											<a {href} class="text-fg transition-colors hover:text-brand">{label?.title || shortId(it.entry_id)}</a>
+											<a {href} class="relative hit-area text-fg transition-colors hover:text-brand">{label?.title || shortId(it.entry_id)}</a>
 										{:else}
 											<span class="font-mono text-xs text-muted">{it.entry_id}</span>
 										{/if}

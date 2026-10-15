@@ -73,3 +73,14 @@ describe('Privacy request erasure outcome', () => {
 		expect(said(container)).toContain('Erased 12 rows');
 	});
 });
+
+describe('the export download under a finger', () => {
+	// The link is drawn as a small button, so it grows to the control size
+	// under a finger as a Button does.
+	it('grows the Download JSON link to the control size', () => {
+		const { getByRole } = render(GdprPage, {
+			props: { form: { action: 'export', ok: true, subject: 'jane@example.com', result: { identifier: 'jane@example.com', plugins: {}, errors: [], summary: { total_records: 0, plugins_with_data: 0, plugins_queried: 1 } } } as never },
+		});
+		expect(getByRole('link', { name: /Download JSON/ }).classList.contains('coarse:min-h-control')).toBe(true);
+	});
+});

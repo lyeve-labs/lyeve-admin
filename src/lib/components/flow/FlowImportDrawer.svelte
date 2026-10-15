@@ -45,7 +45,7 @@
 			<!-- The notice above the canvas leaves an import's refusal to this
 			     drawer, so the way to raise the limit or enable the feature is
 			     here too. -->
-			<a class="text-sm underline" href={enableLink.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{upgradeLabel(enableLink.href) ?? enableLink.label ?? (failure.refusal?.limit != null ? 'How to raise the limit' : 'How to enable it')}</a>
+			<a class="relative hit-area self-start text-sm underline" href={enableLink.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{upgradeLabel(enableLink.href) ?? enableLink.label ?? (failure.refusal?.limit != null ? 'How to raise the limit' : 'How to enable it')}</a>
 		{/if}
 		<input type="hidden" name="slug" value={slug} />
 		<p class="text-sm text-muted">The imported definition replaces the draft of this flow. The published version is not touched until you publish again.</p>

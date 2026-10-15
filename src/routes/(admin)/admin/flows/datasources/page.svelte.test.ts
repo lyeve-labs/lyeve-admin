@@ -454,6 +454,7 @@ describe('the link that enables datasources', () => {
 		expect(inDrawer.textContent).toBe('View the add-on');
 		expect(inDrawer.getAttribute('target')).toBe('_blank');
 		expect(inDrawer.getAttribute('rel')).toBe('noopener noreferrer');
+		expect(inDrawer.classList.contains('hit-area') && inDrawer.classList.contains('relative')).toBe(true);
 		cleanup();
 		setup([], { ...refusal, action: 'delete' });
 		const onPage = document.body.querySelector(`a[href="${away}"]`) as HTMLAnchorElement;

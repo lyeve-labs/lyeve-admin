@@ -193,3 +193,12 @@ describe('the outbox', () => {
 		expect(said(container)).not.toContain('The broker is refusing events');
 	});
 });
+
+describe('the broker page links under a finger', () => {
+	const hasHitArea = (el: Element | null) => !!el && ['relative', 'hit-area'].every((c) => el.classList.contains(c));
+
+	it('gives Open flows a touch hit area', () => {
+		const { getByRole } = render(BrokerPage, props());
+		expect(hasHitArea(getByRole('link', { name: 'Open flows' }))).toBe(true);
+	});
+});

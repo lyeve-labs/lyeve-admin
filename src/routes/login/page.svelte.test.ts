@@ -259,3 +259,12 @@ describe('Login page after a session ended', () => {
 		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('');
 	});
 });
+
+describe('the sign-in links under a finger', () => {
+	const hasHitArea = (el: Element | null) => !!el && ['relative', 'hit-area'].every((c) => el.classList.contains(c));
+
+	it('gives Forgot password a touch hit area', () => {
+		const { getByRole } = render(LoginPage, props());
+		expect(hasHitArea(getByRole('link', { name: 'Forgot password?' }))).toBe(true);
+	});
+});
