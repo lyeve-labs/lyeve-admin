@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { render, cleanup, screen } from '@testing-library/svelte';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import DashboardPage from './+page.svelte';
+
+vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin') } }));
 
 afterEach(cleanup);
 
@@ -349,5 +351,23 @@ describe('traffic', () => {
 		const { container } = render(DashboardPage, { props: { data: data(), form: null } });
 
 		expect(container.textContent).not.toContain('Requests per hour');
+	});
+});
+
+describe('the chosen home page', () => {
+	it('says the chosen home page could not be read, with a way to try again', () => {
+		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'unavailable' } } }), form: null } });
+		expect(document.body.textContent).toContain('so the home page could not be read');
+		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin');
+	});
+
+	it('says the chosen home page no longer exists when the engine has none by that name', () => {
+		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'absent' } } }), form: null } });
+		expect(document.body.textContent).toContain('The home page chosen in customization, welcome, was not found.');
+	});
+
+	it('says nothing when the tenant chose no home page', () => {
+		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: null }), form: null } });
+		expect(document.body.textContent).not.toContain('home page');
 	});
 });

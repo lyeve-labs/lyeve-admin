@@ -14,6 +14,7 @@
 	import type { ActionData, PageData } from './$types';
 	import { ArrowRight, CircleCheck, OctagonAlert, Pencil, Plus, TriangleAlert } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import TrafficBars from '$lib/components/TrafficBars.svelte';
 	import { NO_VALUE, formatCount, formatDateTime, formatPercent, logLevelTone } from '$lib/format';
 	import { entryTone } from '$lib/tones';
@@ -100,7 +101,14 @@
 	{#if data.welcome}
 		<p class="text-base text-fg" data-testid="tenant-welcome">{data.welcome}</p>
 	{/if}
-	{#if data.homePage}
+	{#if data.home}
+		<GateNotice
+			level={2}
+			gate={data.home.gate}
+			title="The home page"
+			absent="The home page chosen in customization, {data.home.slug}, was not found. Choose another one there."
+		/>
+	{:else if data.homePage}
 		<section class="flex flex-col gap-4" aria-label={data.homePage.title}>
 			<CustomBlocks blocks={data.homeBlocks} roles={data.user.roles} />
 		</section>
