@@ -375,3 +375,57 @@ describe('the target of a granted datasource', () => {
 		expect((container.querySelector('input[type="hidden"][name="base_url"]') as HTMLInputElement).value).toBe('https://inventory.example.test');
 	});
 });
+
+describe('the header rows of an http datasource', () => {
+	function posted(form: HTMLFormElement): [string, string, string][] {
+		const d = new FormData(form);
+		const keys = d.getAll('header_key').map(String);
+		const values = d.getAll('header_value').map(String);
+		const secrets = d.getAll('header_secret').map(String);
+		return keys.map((k, i) => [k, values[i], secrets[i]]);
+	}
+
+	async function addHeader(container: HTMLElement, getByText: (t: string) => HTMLElement, key: string, value: string, secret: boolean) {
+		await fireEvent.click(getByText('Add header'));
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		const rows = form.querySelectorAll('fieldset > div.flex.items-end');
+		const row = rows[rows.length - 1] as HTMLElement;
+		await fireEvent.input(row.querySelector('[name="header_key"]') as HTMLInputElement, { target: { value: key } });
+		if (secret) await fireEvent.click(row.querySelector('[role="switch"], input[type="checkbox"]') as HTMLElement);
+		await fireEvent.input(row.querySelector('[name="header_value"]') as HTMLInputElement, { target: { value } });
+	}
+
+	// A row's secret lived in the field and not in the row, and rows were
+	// keyed by position, so removing one handed its secret to the next.
+	it('keeps each secret with its own header when a row above is removed', async () => {
+		const { getByLabelText, getByText, container } = setup();
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		await addHeader(container, getByText, 'X-One', 'secret-one', true);
+		await addHeader(container, getByText, 'X-Two', 'secret-two', true);
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		expect(posted(form)).toEqual([
+			['Accept', 'application/json', 'false'],
+			['X-One', 'secret-one', 'true'],
+			['X-Two', 'secret-two', 'true'],
+		]);
+		await fireEvent.click(getByLabelText('Remove header X-One'));
+		expect(posted(form)).toEqual([
+			['Accept', 'application/json', 'false'],
+			['X-Two', 'secret-two', 'true'],
+		]);
+	});
+
+	it('keeps the typed value when Secret is turned on, and when it is turned off again', async () => {
+		const { getByLabelText, getByText, container } = setup();
+		await fireEvent.click(getByLabelText('Edit inventory'));
+		await addHeader(container, getByText, 'X-Key', 'typed-first', false);
+		const form = container.querySelector('#datasource-form') as HTMLFormElement;
+		const rows = form.querySelectorAll('fieldset > div.flex.items-end');
+		const row = rows[rows.length - 1] as HTMLElement;
+		const toggle = () => row.querySelector('[role="switch"], input[type="checkbox"]') as HTMLElement;
+		await fireEvent.click(toggle());
+		expect(posted(form)[1]).toEqual(['X-Key', 'typed-first', 'true']);
+		await fireEvent.click(toggle());
+		expect(posted(form)[1]).toEqual(['X-Key', 'typed-first', 'false']);
+	});
+});

@@ -67,7 +67,14 @@
 
 	const DEFAULT_PORT: Record<string, string> = { postgres: '5432', mysql: '3306', mssql: '1433' };
 
-	type HeaderRow = { key: string; value: string; secret: boolean };
+	// A row keeps its own id so a removal never hands one row's fields, and
+	// the secret typed into them, to the row that moves up into its place.
+	type HeaderRow = { id: number; key: string; value: string; secret: boolean };
+	let headerSeq = 0;
+	function headerRow(key = '', value = '', secret = false): HeaderRow {
+		headerSeq += 1;
+		return { id: headerSeq, key, value, secret };
+	}
 
 	let open = $state(false);
 	let editing = $state<Datasource | null>(null);
@@ -144,7 +151,7 @@
 		const h = ds.config.headers;
 		headers =
 			h && typeof h === 'object'
-				? Object.entries(h as Record<string, unknown>).map(([key, value]) => ({ key, value: str(value), secret: false }))
+				? Object.entries(h as Record<string, unknown>).map(([key, value]) => headerRow(key, str(value)))
 				: [];
 		apiBase = str(ds.config.api_base);
 		auth = authFieldsOf(ds.config);
@@ -519,23 +526,23 @@
 				</div>
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-xs font-semibold uppercase tracking-wide text-faint">Headers</legend>
-					{#each headers as h, i (i)}
+					{#each headers as h, i (h.id)}
 						<div class="flex items-end gap-2">
-							<Input id="ds-header-key-{i}" name="header_key" label="Header" bind:value={h.key} class="min-w-0 flex-1" />
+							<Input id="ds-header-key-{h.id}" name="header_key" label="Header" bind:value={h.key} class="min-w-0 flex-1" />
 							{#if h.secret}
-								<PasswordInput id="ds-header-value-{i}" name="header_value" label="Value" class="min-w-0 flex-1" />
+								<PasswordInput id="ds-header-value-{h.id}" name="header_value" label="Value" bind:value={h.value} class="min-w-0 flex-1" />
 							{:else}
-								<Input id="ds-header-value-{i}" name="header_value" label="Value" bind:value={h.value} class="min-w-0 flex-1" />
+								<Input id="ds-header-value-{h.id}" name="header_value" label="Value" bind:value={h.value} class="min-w-0 flex-1" />
 							{/if}
 							<input type="hidden" name="header_secret" value={h.secret ? 'true' : 'false'} />
-							<Toggle id="ds-header-secret-{i}" label="Secret" size="sm" bind:checked={h.secret} />
-							<Button variant="ghost" size="sm" aria-label="Remove header {h.key || i + 1}" onclick={() => (headers = headers.filter((_, j) => j !== i))}>
+							<Toggle id="ds-header-secret-{h.id}" label="Secret" size="sm" bind:checked={h.secret} />
+							<Button variant="ghost" size="sm" aria-label="Remove header {h.key || i + 1}" onclick={() => (headers = headers.filter((row) => row.id !== h.id))}>
 								<Trash2 size={ICON.sm} class="text-danger" />
 							</Button>
 						</div>
 					{/each}
 					<div>
-						<Button variant="secondary" size="sm" onclick={() => (headers = [...headers, { key: '', value: '', secret: false }])}>
+						<Button variant="secondary" size="sm" onclick={() => (headers = [...headers, headerRow()])}>
 							<Plus size={ICON.sm} />
 							Add header
 						</Button>
