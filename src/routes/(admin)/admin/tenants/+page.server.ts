@@ -9,8 +9,9 @@ import {
 	type Tenant
 } from '@lyeve-labs/client-rest';
 import { ApiError } from '@lyeve-labs/client';
-import { actionError, actionFailure } from '$lib/server/action-error';
-import { getProvisioning } from '$lib/api/tenants';
+import { actionError } from '$lib/server/action-error';
+import { getProvisioning, tenantRefusal } from '$lib/api/tenants';
+import { refusalText } from '$lib/api/refusal';
 import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
@@ -36,19 +37,17 @@ const DEFAULT_PLAN = 'free';
 
 /**
  * The failure of a create the plugin refused. A slug the engine does not
- * accept lands on the Slug field. A 402 that names a capability is the
- * license refusal, and any other 402 carries its own sentence, such as the
- * tenant quota, which the refusal notice would misname.
+ * accept lands on the Slug field. A refusal for the license renders with the
+ * link the plugin sent, so the operator sees what lifts it rather than a bare
+ * sentence. The tenant ceiling, which the plugin answers with a sentence and
+ * no cap, reads as a limit reached.
  */
 function createFailure(err: unknown) {
 	if (err instanceof ApiError && err.status === 400 && err.message?.startsWith('invalid slug')) {
 		return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: { slug: err.message } });
 	}
-	const body = err instanceof ApiError ? ((err.body ?? {}) as { error?: unknown }) : {};
-	if (err instanceof ApiError && err.status === 402 && (body.error === 'payment_required' || body.error === 'cap_exceeded')) {
-		const refused = actionFailure(err, 'Failed to create tenant');
-		return fail(402, { ...refused.data, action: 'create' });
-	}
+	const refused = tenantRefusal(err);
+	if (refused) return fail(402, { action: 'create', error: refusalText(refused), refused });
 	return fail(400, { action: 'create', error: actionError(err, 'Failed to create tenant') });
 }
 
@@ -61,20 +60,22 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	// The plugin says whether a create would pass, so the page offers one only
-	// then. A refusal, or a plugin without the route, says creating is not
-	// enabled. Any other failure is unread: the page offers no create and says
-	// it could not tell, rather than calling the instance unlicensed.
+	// then, and where it would not, the link to what lifts it. A refusal, or a
+	// plugin without the route, says creating is not enabled. Any other failure
+	// is unread: the page offers no create and says it could not tell, rather
+	// than calling the instance unlicensed.
 	const [read, provisioning] = await Promise.all([
 		section(listTenants(client, limit, offset), LIST_FAILED),
 		section(getProvisioning(client), PROVISIONING_FAILED),
 	]);
-	const canProvision = provisioning.ok && provisioning.value;
+	const canProvision = provisioning.ok && provisioning.value.enabled;
+	const provisioningUrl = provisioning.ok ? provisioning.value.upgradeUrl : '';
 	const provisionGate: Gate | null =
 		!provisioning.ok && provisioning.gate.state !== 'absent' && provisioning.gate.state !== 'locked'
 			? provisioning.gate
 			: null;
 	// The page draws the gate in place of the list and offers no create.
-	if (!read.ok) return { tenants: read, limit, offset, total: 0, canProvision: false, provisionGate: null };
+	if (!read.ok) return { tenants: read, limit, offset, total: 0, canProvision: false, provisionGate: null, provisioningUrl };
 	const result = read.value;
 	// A page past the end is not an instance with no tenants, so the request
 	// goes back to the last page that holds rows.
@@ -89,7 +90,7 @@ export const load: PageServerLoad = async (event) => {
 	// Typed, because a bare literal widens `ok` to boolean and the page could
 	// no longer tell the two cases apart.
 	const tenants: Section<Tenant[]> = { ok: true, value: result.items };
-	return { tenants, limit, offset, total, canProvision, provisionGate };
+	return { tenants, limit, offset, total, canProvision, provisionGate, provisioningUrl };
 };
 
 export const actions: Actions = {

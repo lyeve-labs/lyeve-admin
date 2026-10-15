@@ -32,12 +32,16 @@ function data(overrides: Record<string, unknown> = {}) {
 		total: 731,
 		// Creating is enabled, so a pagination test is not also a gate test.
 		canProvision: true,
+		provisioningUrl: '',
 		...rest,
 	};
 }
 
-const props = (over: Record<string, unknown> = {}) =>
-	({ data: data(over) as never, form: null as never });
+const props = (over: Record<string, unknown> = {}, form: unknown = null) =>
+	({ data: data(over) as never, form: form as never });
+
+const ADD_ON = 'https://shop.example.com/pricing?skus=example-pro&utm_campaign=example';
+const PLAN = 'https://shop.example.com/pricing?plan=larger&utm_campaign=tenants';
 
 describe('Tenants provisioning gate', () => {
 	// The list is always drawn. Only a create is refused where the plugin does
@@ -254,5 +258,59 @@ describe('the tenant name link on a touch screen', () => {
 		const link = container.querySelector('a[href="/admin/tenants/t0"]');
 		expect(link?.classList.contains('hit-area')).toBe(true);
 		expect(link?.classList.contains('relative')).toBe(true);
+	});
+});
+
+describe('Tenants refusals', () => {
+	it('links where creating is bought when the license does not include it', () => {
+		const { getByTestId, getByRole } = render(TenantsPage, {
+			props: props({ canProvision: false, provisioningUrl: ADD_ON }),
+		});
+
+		expect(getByTestId('not-enabled').textContent).toContain('The license on this instance does not include creating tenants.');
+		const link = getByRole('link', { name: 'View the add-on' });
+		expect(link.getAttribute('href')).toBe(ADD_ON);
+		expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+	});
+
+	it('offers no link where the read named none', () => {
+		const { getByTestId } = render(TenantsPage, { props: props({ canProvision: false }) });
+
+		expect(getByTestId('not-enabled').querySelector('a')).toBeNull();
+	});
+
+	// A refused create comes back while the drawer is open, as a submit's does.
+	async function refusedCreate(refused: unknown) {
+		const { getAllByRole, rerender } = render(TenantsPage, { props: props() });
+		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
+		await rerender({ data: data() as never, form: { action: 'create', error: 'refused', refused } as never });
+		return document.body.querySelector('form#tenant-form') as HTMLElement;
+	}
+
+	it('shows a create refused for a missing capability with its add-on link', async () => {
+		const drawer = await refusedCreate({ kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: ADD_ON });
+
+		const notice = drawer.querySelector('[data-testid="refusal-notice"]') as HTMLElement;
+		expect(notice.textContent).toContain('This needs example-feature');
+		expect(notice.textContent).toContain('The license on this instance does not include example-feature.');
+		expect(notice.querySelector(`a[href="${ADD_ON}"]`)?.textContent?.trim()).toBe('View the add-on');
+	});
+
+	it('shows a create refused at the tenant ceiling as a limit reached with its plan link', async () => {
+		const drawer = await refusedCreate({ kind: 'cap', cap: 'tenants', limit: null, current: null, upgradeUrl: PLAN });
+
+		const notice = drawer.querySelector('[data-testid="refusal-notice"]') as HTMLElement;
+		expect(notice.textContent).toContain('No more tenants on this instance');
+		expect(notice.textContent).toContain('This instance allows no more tenants. A license that allows more lifts the limit.');
+		expect(notice.textContent).not.toContain('This is not enabled on this instance');
+		expect(notice.querySelector(`a[href="${PLAN}"]`)?.textContent?.trim()).toBe('View the plan');
+	});
+
+	it('shows a ceiling refusal with no link without a plan button', async () => {
+		const drawer = await refusedCreate({ kind: 'cap', cap: 'tenants', limit: null, current: null, upgradeUrl: '' });
+
+		const notice = drawer.querySelector('[data-testid="refusal-notice"]') as HTMLElement;
+		expect(notice.textContent).toContain('No more tenants on this instance');
+		expect(notice.textContent).not.toContain('View the plan');
 	});
 });
