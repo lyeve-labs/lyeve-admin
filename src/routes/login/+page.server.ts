@@ -10,6 +10,7 @@ import { clearSessionCookie, setRefreshCookie, setSessionCookie, sessionToken } 
 import { adminReturnPath } from '$lib/server/local-path';
 import { LANDING } from '$lib/landing';
 import { challengeFrom } from '$lib/captcha';
+import { organizationFromForm, organizationFromUrl } from '$lib/organization';
 
 const SIGN_IN_UNAVAILABLE = 'Sign-in is unavailable right now. Please try again shortly.';
 
@@ -88,7 +89,15 @@ export const load: PageServerLoad = async (event) => {
 		routeMounted(fetch, '/api/admin/auth/magic-link/request'),
 	]);
 
-	return { oauthProviders, samlProviders, passwordReset, magicLink, ended: event.url?.searchParams.has('ended') === true };
+	return {
+		oauthProviders,
+		samlProviders,
+		passwordReset,
+		magicLink,
+		ended: event.url?.searchParams.has('ended') === true,
+		// A link that names the organization fills the field in, and the reader can change or clear it.
+		carried: organizationFromUrl(event.url),
+	};
 };
 
 export const actions: Actions = {
@@ -125,9 +134,15 @@ export const actions: Actions = {
 		const email = form.get('email') as string;
 		const password = form.get('password') as string;
 
+		const typed = String(form.get('tenant') ?? '').trim();
 		if (!email || !password) {
-			return { error: 'Email and password are required.' };
+			return { error: 'Email and password are required.', tenant: typed };
 		}
+		// Only the shape is checked. Whether the organization exists is never
+		// asked, and a wrong one is refused by the engine exactly as a wrong
+		// password is.
+		const organization = organizationFromForm(form);
+		if (!organization.ok) return fail(400, { error: organization.error, tenant: typed });
 
 		// The captcha plugin reads the token from the login body itself, so it
 		// travels beside the credentials rather than in a header. Absent until
@@ -135,6 +150,7 @@ export const actions: Actions = {
 		const captchaToken = String(form.get('captcha_token') ?? '').trim();
 		const body: Record<string, string> = { email, password };
 		if (captchaToken) body.captcha_token = captchaToken;
+		if (organization.value) body.tenant = organization.value;
 
 		const client = createClient(fetch);
 		try {
@@ -166,6 +182,7 @@ export const actions: Actions = {
 								: 'Complete the security check to sign in.',
 						captcha,
 						email,
+						tenant: typed,
 					});
 				}
 				if (e.status === 429) {
@@ -177,7 +194,7 @@ export const actions: Actions = {
 			} else {
 				return fail(503, { error: SIGN_IN_UNAVAILABLE });
 			}
-			return { error: 'Invalid email or password.' };
+			return { error: 'Invalid email or password.', tenant: typed };
 		}
 
 		redirect(302, returnTo(event.url));

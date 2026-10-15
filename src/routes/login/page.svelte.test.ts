@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import LoginPage from './+page.svelte';
 
@@ -13,7 +13,7 @@ const providerLinks = (links: HTMLElement[]) =>
 const props = (extra: Record<string, unknown> = {}) =>
 	({
 		form: null,
-		data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true },
+		data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: '' },
 		...extra,
 	}) as never;
 
@@ -208,5 +208,54 @@ describe('Login page after a session ended', () => {
 	it('says nothing of it on an ordinary visit', () => {
 		const { container } = render(LoginPage, { props: props() });
 		expect(container.textContent).not.toContain('Your session ended');
+	});
+
+	it('offers an optional organization field that says when to fill it in', () => {
+		const { container } = render(LoginPage, { props: props() });
+
+		const field = container.querySelector('#tenant') as HTMLInputElement;
+		expect(field.name).toBe('tenant');
+		expect(field.required).toBe(false);
+		expect(container.textContent).toContain('Organization (optional)');
+		expect(container.textContent).toContain("Leave this empty unless your organization's identity provider created your account.");
+	});
+
+	it('keeps the organization a refused sign-in named', () => {
+		const { container } = render(LoginPage, {
+			props: props({ form: { error: 'Invalid email or password.', tenant: 'acme' } }),
+		});
+
+		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('acme');
+	});
+
+	it('shows the organization its link named, in a field the reader sees', () => {
+		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+
+		const field = container.querySelector('#tenant') as HTMLInputElement;
+		expect(field.type).toBe('text');
+		expect(field.value).toBe('acme');
+		expect(container.querySelectorAll('[name="tenant"]')).toHaveLength(1);
+		expect(container.querySelector('input[type="hidden"][name="tenant"]')).toBeNull();
+		expect(container.textContent).toContain('The link you followed filled this in. Change or clear it if it is not your organization.');
+		expect(container.querySelector('a[href="/forgot-password?tenant=acme"]')).not.toBeNull();
+		expect(container.querySelector('a[href="/login/magic-link?tenant=acme"]')).not.toBeNull();
+	});
+
+	it('submits what the field shows after the reader changes or clears it', async () => {
+		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+		const field = container.querySelector('#tenant') as HTMLInputElement;
+		const posted = () => new FormData(field.form as HTMLFormElement).get('tenant');
+
+		expect(posted()).toBe('acme');
+		await fireEvent.input(field, { target: { value: 'globex' } });
+		expect(posted()).toBe('globex');
+		await fireEvent.input(field, { target: { value: '' } });
+		expect(posted()).toBe('');
+	});
+
+	it('keeps an organization the reader cleared when the form comes back refused', () => {
+		const { container } = render(LoginPage, { props: { form: { error: 'x', tenant: '' }, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+
+		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('');
 	});
 });

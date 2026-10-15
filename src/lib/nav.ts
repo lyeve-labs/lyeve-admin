@@ -120,6 +120,7 @@ import {
 	Wrench,
 	History,
 	ShieldQuestion,
+	LockKeyhole,
 } from '@lucide/svelte';
 import { PLUGIN, type PluginName } from '$lib/plugin-names';
 import { runs, UNNAMED, type PluginSet } from '$lib/plugins';
@@ -534,6 +535,14 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		href: '/admin/settings/captcha',
 		icon: ShieldQuestion,
 	};
+	// How the accounts this tenant's identity provider created may sign in
+	// without it. The engine answers the tenant's admin and a super admin.
+	const signIn: NavNode = {
+		id: 'sign-in',
+		label: 'Sign-in',
+		href: '/admin/settings/sign-in',
+		icon: LockKeyhole,
+	};
 	// A tenant admin's own limit and address lists. A super admin reaches the
 	// same page from the instance rate limits.
 	const tenantRateLimits: NavNode = {
@@ -613,9 +622,10 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 				{ id: 'pii', label: 'PII masking', href: '/admin/settings/pii', icon: EyeOff },
 				customization,
 				captcha,
+				signIn,
 		  ]
 		: operator
-			? [customization, captcha, tenantRateLimits]
+			? [customization, captcha, signIn, tenantRateLimits]
 			: [];
 
 	const tree: NavTree = [

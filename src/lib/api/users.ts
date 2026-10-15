@@ -1,6 +1,14 @@
 import type { HttpClient, User } from '@lyeve-labs/client';
 
 /**
+ * An account as the users list reads it. `tenant_local` marks an account that
+ * a tenant's identity provider created: it belongs to that tenant alone, its
+ * address can repeat in another tenant, and `email` is the address it signs in
+ * with. An engine that predates the marker sends none, which reads as false.
+ */
+export type ListedUser = User & { tenant_local?: boolean };
+
+/**
  * Replaces an account's password. Only a super admin may call it, and the
  * engine ends every session the account held, so the operator has to be told
  * the user is signed out everywhere and not only that the write landed.

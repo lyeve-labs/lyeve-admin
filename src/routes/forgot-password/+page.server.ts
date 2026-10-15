@@ -3,28 +3,35 @@ import { createClient } from '@lyeve-labs/client';
 import { requestPasswordReset } from '$lib/api/password-reset';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
-import type { Actions } from './$types';
+import { organizationFromForm, organizationFromUrl } from '$lib/organization';
+import type { Actions, PageServerLoad } from './$types';
+
+// A link that names the organization fills the field in, and the reader can change or clear it.
+export const load: PageServerLoad = ({ url }) => ({ carried: organizationFromUrl(url) });
 
 export const actions: Actions = {
 	default: async (event) => {
 		const limit = checkRateLimit(event.getClientAddress());
 		if (!limit.allowed) {
-			return fail(429, { error: 'Too many attempts. Please try again later.', email: '' });
+			return fail(429, { error: 'Too many attempts. Please try again later.', email: '', tenant: '' });
 		}
 
 		const form = await event.request.formData();
 		const email = String(form.get('email') ?? '').trim();
-		if (!email) return fail(400, { error: 'Enter the email address you sign in with.', email });
+		const typed = String(form.get('tenant') ?? '').trim();
+		if (!email) return fail(400, { error: 'Enter the email address you sign in with.', email, tenant: typed });
+		const organization = organizationFromForm(form);
+		if (!organization.ok) return fail(400, { error: organization.error, email, tenant: typed });
 
 		try {
-			await requestPasswordReset(createClient(event.fetch), email);
+			await requestPasswordReset(createClient(event.fetch), email, organization.value);
 		} catch (e) {
 			const refused = recoveryRefusal(e, 'Password reset');
-			if (refused) return fail(refused.status, { error: refused.error, email });
-			return fail(400, { error: 'Enter a valid email address.', email });
+			if (refused) return fail(refused.status, { error: refused.error, email, tenant: typed });
+			return fail(400, { error: 'Enter a valid email address.', email, tenant: typed });
 		}
 		// The engine answers the same whether or not the address has an
-		// account, and so does this page.
+		// account or the organization exists, and so does this page.
 		return { sent: true, email };
 	},
 };

@@ -23,7 +23,17 @@ describe('reset-password load', () => {
 		expect(load({ url: new URL('http://admin.test/reset-password?token=t1') } as never)).toEqual({
 			token: 't1',
 			minLength: 12,
+			carried: '',
 		});
+	});
+
+	it('carries the organization its link names, and drops one the engine would not read', () => {
+		const named = load({ url: new URL('http://admin.test/reset-password?token=t1&tenant=acme') } as never) as { carried: string };
+		expect(named.carried).toBe('acme');
+		const malformed = load({ url: new URL('http://admin.test/reset-password?token=t1&tenant=Acme%20Co') } as never) as {
+			carried: string;
+		};
+		expect(malformed.carried).toBe('');
 	});
 });
 

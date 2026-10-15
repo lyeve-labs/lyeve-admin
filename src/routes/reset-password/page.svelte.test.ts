@@ -5,7 +5,8 @@ import ResetPage from './+page.svelte';
 
 afterEach(cleanup);
 
-const props = (token: string, form: unknown = null) => ({ form, data: { token, minLength: 12 } }) as never;
+const props = (token: string, form: unknown = null, carried = '') =>
+	({ form, data: { token, minLength: 12, carried } }) as never;
 
 describe('Reset password page', () => {
 	it('asks for the new password twice and posts the token with it', () => {
@@ -33,6 +34,16 @@ describe('Reset password page', () => {
 
 		expect(container.querySelector('#password')).toBeNull();
 		expect(getByRole('link', { name: /request a new link/i }).getAttribute('href')).toBe('/forgot-password');
+	});
+
+	it('never asks for an organization and carries the one its link named', () => {
+		const { getByRole, container } = render(ResetPage, {
+			props: props('t1', { error: 'This reset link is invalid or has expired. Request a new one.', expired: true }, 'acme'),
+		});
+
+		expect(container.querySelector('input[name="tenant"]')).toBeNull();
+		expect(getByRole('link', { name: /request a new link/i }).getAttribute('href')).toBe('/forgot-password?tenant=acme');
+		expect(getByRole('link', { name: /back to sign in/i }).getAttribute('href')).toBe('/login?tenant=acme');
 	});
 
 	it('offers a new link when the email link carried no token', () => {

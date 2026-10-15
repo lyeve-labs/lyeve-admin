@@ -99,17 +99,18 @@ describe('adminNav role gate', () => {
 		// tenant's own, and the quota reads and the cost ledger read the
 		// caller's tenant.
 		expect(ids(find(tree, 'operations').children ?? [])).toEqual(['plugins', 'ai', 'tenant-usage', 'tenant-costs']);
-		// Customizing the tenant's admin, its captcha and its own rate limits
-		// are the tenant admin's, so they are the settings entries an admin
-		// reaches.
+		// Customizing the tenant's admin, its captcha, how its provider
+		// accounts sign in and its own rate limits are the tenant admin's, so
+		// they are the settings entries an admin reaches.
 		expect(ids(find(tree, 'settings').children ?? [])).toEqual([
 			'customization',
 			'captcha',
+			'sign-in',
 			'tenant-rate-limits',
 		]);
 	});
 
-	it('gives a super admin every section and all sixty seven destinations', () => {
+	it('gives a super admin every section and all sixty eight destinations', () => {
 		const tree = adminNav(SUPER);
 		expect(ids(tree)).toEqual([
 			'dashboard',
@@ -125,7 +126,7 @@ describe('adminNav role gate', () => {
 			'insight',
 			'settings',
 		]);
-		expect(labels(tree)).toHaveLength(67);
+		expect(labels(tree)).toHaveLength(68);
 		expect(ids(find(tree, 'settings').children ?? [])).toEqual([
 			'email',
 			'recommendations',
@@ -142,6 +143,7 @@ describe('adminNav role gate', () => {
 			'pii',
 			'customization',
 			'captcha',
+			'sign-in',
 		]);
 		expect(ids(find(tree, 'access').children ?? [])).toEqual([
 			'users',
@@ -244,6 +246,7 @@ describe('adminNav plugin gate', () => {
 		'security',
 		'gdpr',
 		'settings',
+		'sign-in',
 	];
 	const present = (tree: NavTree) => flatten(tree).map((node) => node.id);
 
@@ -266,6 +269,7 @@ describe('adminNav plugin gate', () => {
 			'insight',
 			'observability',
 			'settings',
+			'sign-in',
 		]);
 		expect(present(adminNav(EDITOR, { plugins: kernel }))).toEqual(['dashboard', 'delivery', 'api-access', 'settings']);
 	});

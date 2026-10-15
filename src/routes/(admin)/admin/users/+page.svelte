@@ -248,7 +248,16 @@
 				<tbody>
 					{#each visible as user (user.id)}
 						<tr>
-							<td data-cell="nowrap">{user.email}</td>
+							<td data-cell="nowrap">
+								<div class="flex flex-wrap items-center gap-2">
+									<span>{user.email}</span>
+									<!-- Such an account belongs to one tenant, and its address can
+									     repeat in another, so two rows may show the same address. -->
+									{#if user.tenant_local}
+										<Badge tone="neutral">Signs in through your identity provider</Badge>
+									{/if}
+								</div>
+							</td>
 							<td data-cell="nowrap">
 								<div class="flex flex-wrap gap-1">
 									{#each user.roles as held (held)}
