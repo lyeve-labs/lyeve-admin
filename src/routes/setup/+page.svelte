@@ -8,6 +8,7 @@
 		Button,
 		Card,
 		CopyButton,
+		CopyField,
 		Input,
 		PageShell,
 		PasswordInput,
@@ -211,13 +212,7 @@
 						<p class="text-sm text-muted">The engine cannot restart itself. Use the command for how you run it:</p>
 						<ul class="space-y-2">
 							{#each modeStatus.restart as step (step.label)}
-								<li class="flex items-center justify-between gap-3 text-sm">
-									<span class="min-w-0">
-										<span class="font-medium text-fg">{step.label}:</span>
-										<code class="break-all text-muted">{step.command}</code>
-									</span>
-									<CopyButton value={step.command} label="Copy" />
-								</li>
+								<li><CopyField label={step.label} value={step.command} wrap /></li>
 							{/each}
 						</ul>
 					</div>

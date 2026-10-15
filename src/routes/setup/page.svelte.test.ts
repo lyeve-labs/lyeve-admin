@@ -278,3 +278,15 @@ describe('Setup page: create the first admin', () => {
 		expect(container.textContent).toContain('did not accept that setup token');
 	});
 });
+
+describe('the restart commands', () => {
+	// Each command is a value the reader copies, so it is the kit's copy
+	// field: the whole command readable, and focusing it selects all of it.
+	it('shows each restart command as a copy field named by how the engine runs', () => {
+		const { getByLabelText } = render(SetupPage, { props: { data: data('setup_mode'), form: { status: fullStatus } as never } });
+		const compose = getByLabelText('Docker Compose') as HTMLTextAreaElement;
+		expect(compose.readOnly).toBe(true);
+		expect(compose.value).toBe('docker compose up -d');
+		expect((getByLabelText('Kubernetes') as HTMLTextAreaElement).value).toBe('kubectl rollout restart deployment/<engine deployment>');
+	});
+});
