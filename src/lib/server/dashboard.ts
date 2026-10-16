@@ -17,7 +17,8 @@ export interface TrafficHour {
 
 /** One thing an operator should act on, and where to do it. */
 export interface Attention {
-	tone: StatusTone;
+	// The dashboard draws every tone but danger with the warning icon.
+	tone: Extract<StatusTone, 'warn' | 'danger'>;
 	text: string;
 	href: string;
 	action: string;

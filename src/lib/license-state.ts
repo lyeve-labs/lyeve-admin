@@ -30,7 +30,7 @@ export function licenseStateLabel(state: string | null | undefined): string {
 }
 
 /** How loudly a state is shown: a grace period warns and an expired license alarms. */
-export function licenseTone(state: string | null | undefined): StatusTone {
+export function licenseTone(state: string | null | undefined): Extract<StatusTone, 'success' | 'warn' | 'danger' | 'neutral'> {
 	switch (state) {
 		case 'active':
 			return 'success';
