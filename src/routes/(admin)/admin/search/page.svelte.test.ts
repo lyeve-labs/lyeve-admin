@@ -133,6 +133,18 @@ describe('Search page settings', () => {
 	});
 });
 
+describe('Search page public request', () => {
+	// The field shows the request it copies, so what lands on the clipboard
+	// is what the reader read.
+	it('shows the example request in a field that copies exactly that', () => {
+		render(SearchPage, { props: { data: data({ publicSchemas: ok(['blog']) }) as never, form: null } });
+		const field = screen.getByLabelText('Example GET request') as HTMLTextAreaElement;
+		expect(field.value).toBe('/api/v1/search/blog?q=kettle');
+		expect(field.readOnly).toBe(true);
+		expect(screen.getByRole('button', { name: 'Copy the request' })).toBeTruthy();
+	});
+});
+
 describe('Search page counts', () => {
 	const hit = (n: number) => ({ entry_id: `e${n}`, title: `Entry ${n}`, schema: 'blog', status: 'published', rank: 1 });
 
