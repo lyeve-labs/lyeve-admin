@@ -7,7 +7,7 @@ describe('parseCost', () => {
 		expect(parseCost('0')).toBe(0);
 	});
 
-	it('answers null for a cost that does not parse, so it never reads as free', () => {
+	it('answers null for a cost that does not parse, so it never reads as a cost of zero', () => {
 		for (const cost of ['', ' ', 'n/a', '-1', '1e3', 'NaN', null, undefined, 0.0031, Number.NaN, -1]) {
 			expect(parseCost(cost)).toBeNull();
 		}

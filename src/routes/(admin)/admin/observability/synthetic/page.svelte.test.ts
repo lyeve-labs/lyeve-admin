@@ -167,7 +167,7 @@ describe('the form', () => {
 	});
 
 	// The floor depends on the install's license, so the hint is the one the
-	// plugin answers. A fixed "at least 30" was wrong both ways: free installs
+	// plugin answers. A fixed "at least 30" was wrong both ways: unlicensed installs
 	// refuse anything under 300, licensed ones accept 15.
 	it('gives the interval floor the plugin answers', async () => {
 		render(SyntheticPage, {

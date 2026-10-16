@@ -70,7 +70,7 @@ describe('NotEnabled', () => {
 
 	it('names a link to a plan or an add-on by what it opens', () => {
 		const plan = render(NotEnabled, {
-			props: { title: 'Tenants', url: 'https://shop.example.com/pricing?plan=growth&utm_campaign=tenants' },
+			props: { title: 'Tenants', url: 'https://shop.example.com/pricing?plan=example&utm_campaign=tenants' },
 		});
 		expect(plan.getByRole('link', { name: 'View the plan' })).toBeTruthy();
 		cleanup();
@@ -82,7 +82,7 @@ describe('NotEnabled', () => {
 
 	it('prefers what the link opens to the module\'s words', () => {
 		const { getByRole, queryByRole } = render(Host, {
-			props: { licensing, url: 'https://shop.example.com/pricing?plan=growth' },
+			props: { licensing, url: 'https://shop.example.com/pricing?plan=example' },
 		});
 		expect(getByRole('link', { name: 'View the plan' })).toBeTruthy();
 		expect(queryByRole('link', { name: 'Turn it on' })).toBeNull();

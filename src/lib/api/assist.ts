@@ -32,7 +32,7 @@ export interface AssistUsage {
 /**
  * The cost as a number, or null when it does not parse. An empty or
  * malformed string is null rather than zero, so a missing cost never reads
- * as free. A number is null too, because the plugin never sends one.
+ * as a cost of zero. A number is null too, because the plugin never sends one.
  */
 export function parseCost(cost: unknown): number | null {
 	if (typeof cost !== 'string' || !/^\d+(\.\d+)?$/.test(cost.trim())) return null;

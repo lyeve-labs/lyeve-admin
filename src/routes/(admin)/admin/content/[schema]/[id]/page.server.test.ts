@@ -559,7 +559,7 @@ describe('content editor translations', () => {
 		expect(out?.data?.error).toBeTruthy();
 	});
 
-	// The plugin refuses a new locale past the free ceiling with the bare code
+	// The plugin refuses a new locale past its unlicensed ceiling with the bare code
 	// cap_exceeded and the numbers beside it.
 	it('reads the locale ceiling into its numbers instead of the bare code', async () => {
 		const fn = vi.fn(async () =>
