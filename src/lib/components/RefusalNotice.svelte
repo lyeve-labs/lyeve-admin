@@ -9,7 +9,7 @@
 	import { Alert, Button } from '@lyeve-labs/ui-kit';
 	import { useInstance } from '$lib/instance.svelte';
 	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
-	import { LICENSE_PAGE, refusalText, refusalTitle, upgradeLabel, type Refusal } from '$lib/api/refusal';
+	import { LICENSE_PAGE, refusalText, refusalTitle, upgradeWords, type Refusal } from '$lib/api/refusal';
 
 	let {
 		refusal,
@@ -34,7 +34,7 @@
 		upgrade !== null && upgrade.href !== LICENSE_PAGE
 			? {
 					href: upgrade.href,
-					label: upgradeLabel(upgrade.href) ?? upgrade.label ?? (refusal.kind === 'cap' ? 'How to raise the limit' : 'How to enable it'),
+					label: upgradeWords(upgrade, refusal.kind === 'cap'),
 				}
 			: null,
 	);

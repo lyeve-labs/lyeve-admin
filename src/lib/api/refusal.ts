@@ -156,6 +156,15 @@ export function upgradeLabel(href: string): string | null {
 }
 
 /**
+ * The words for a link out of a refusal: what the address opens, then the
+ * label it was served with, then the step the refusal asks for. `raises` is
+ * a refusal at a ceiling, where more is bought rather than turned on.
+ */
+export function upgradeWords(link: { href: string; label?: string }, raises = false): string {
+	return upgradeLabel(link.href) ?? link.label ?? (raises ? 'How to raise the limit' : 'How to enable it');
+}
+
+/**
  * The refusal a form action returned, read from the page's `form` prop. The
  * key is `refused`, because the flow editor already returns a `refusal` of
  * its own shape.

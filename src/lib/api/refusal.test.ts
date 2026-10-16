@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 
-import { capNoun, featureName, formRefusal, refusalOf, refusalText, refusalTitle, upgradeLabel } from './refusal';
+import { capNoun, featureName, formRefusal, refusalOf, refusalText, refusalTitle, upgradeLabel, upgradeWords } from './refusal';
 
 function refused(body: Record<string, unknown>, status = 402): ApiError {
 	return new ApiError(status, String(body.error ?? 'refused'), body);
@@ -112,5 +112,20 @@ describe('helpers', () => {
 		expect(formRefusal({ error: 'x', refused: cap })).toEqual(cap);
 		expect(formRefusal({ error: 'x', refusal: { nodeIds: [] } })).toBeNull();
 		expect(formRefusal(null)).toBeNull();
+	});
+});
+
+describe('upgradeWords', () => {
+	it('names a link by what it opens before the label it was served with', () => {
+		expect(upgradeWords({ href: 'https://shop.example.com/pricing?skus=a,b', label: 'License' })).toBe('View the add-ons');
+	});
+
+	it('keeps the served label for a link whose address says nothing', () => {
+		expect(upgradeWords({ href: '/admin/settings/license', label: 'Open the license' })).toBe('Open the license');
+	});
+
+	it('falls back to the step the refusal asks for', () => {
+		expect(upgradeWords({ href: '/admin/settings/license' })).toBe('How to enable it');
+		expect(upgradeWords({ href: '/admin/settings/license' }, true)).toBe('How to raise the limit');
 	});
 });
