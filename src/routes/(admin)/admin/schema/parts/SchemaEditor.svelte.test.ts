@@ -151,4 +151,15 @@ describe('SchemaEditor', () => {
 		setup({ isSuperAdmin: true });
 		expect(screen.getByRole('button', { name: /History/ })).toBeTruthy();
 	});
+
+	// The row shows a route and the button copies a curl command built from
+	// it, so the button's own words say what it copies, and its description
+	// names the route that sets it apart from the other rows.
+	it('says on each route row that its copy button copies a curl command', () => {
+		setup();
+		const copies = screen.getAllByRole('button', { name: 'curl' });
+		expect(copies.length).toBeGreaterThan(1);
+		for (const b of copies) expect(b.textContent).toContain('curl');
+		expect(screen.getByRole('button', { name: 'curl', description: /^Copy a curl request for POST / })).toBeTruthy();
+	});
 });

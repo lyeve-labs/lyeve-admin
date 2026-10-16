@@ -740,9 +740,11 @@
 							<Badge tone={methodTone(route.method)} class="font-mono">{route.method}</Badge>
 							<code class="min-w-0 flex-1 truncate font-mono text-xs text-fg">{route.path}</code>
 							<span class="text-xs text-faint">{route.summary}</span>
+							<!-- The words say what is copied. Every row's button reads the same,
+							     so the tooltip names the route and becomes its description. -->
 							<CopyButton
 								value={preview}
-								label="Copy a curl request for {route.method} {route.path}"
+								text="curl"
 								title="Copy a curl request for {route.method} {route.path}"
 								size={ICON.xs}
 								class="shrink-0"

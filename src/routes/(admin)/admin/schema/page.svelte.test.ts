@@ -222,7 +222,7 @@ describe('schema builder relation panel', () => {
 		const paths = screen.getAllByText(/^\/api\/v1\/content\/posts/);
 		expect(paths.length).toBeGreaterThanOrEqual(6);
 		expect(screen.queryByText(/\{schema\}/)).toBeNull();
-		expect(screen.getByRole('button', { name: 'Copy a curl request for POST /api/v1/content/posts' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'curl', description: 'Copy a curl request for POST /api/v1/content/posts' })).toBeTruthy();
 	});
 
 	it('copies a collection request and confirms for a second and a half', async () => {
@@ -231,7 +231,7 @@ describe('schema builder relation panel', () => {
 		await openPosts();
 		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
 		vi.useFakeTimers();
-		const copy = screen.getByRole('button', { name: 'Copy a curl request for POST /api/v1/content/posts' });
+		const copy = screen.getByRole('button', { name: 'curl', description: 'Copy a curl request for POST /api/v1/content/posts' });
 		const status = copyFrame(copy).querySelector('[role="status"]')!;
 
 		await fireEvent.click(copy);
@@ -247,11 +247,12 @@ describe('schema builder relation panel', () => {
 	it('shows a tooltip on a collection request copy control', async () => {
 		await openPosts();
 		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
-		const name = 'Copy a curl request for POST /api/v1/content/posts';
-		const button = screen.getByRole('button', { name });
-		expect(copyFrame(button).textContent).toContain(name);
-		// The tooltip says what the name says, so it is not read a second time.
-		expect(button.hasAttribute('aria-describedby')).toBe(false);
+		const description = 'Copy a curl request for POST /api/v1/content/posts';
+		const button = screen.getByRole('button', { name: 'curl', description });
+		expect(copyFrame(button).textContent).toContain(description);
+		// The name is the word on the button, so the tooltip, which names the
+		// route, is read as its description.
+		expect(button.hasAttribute('aria-describedby')).toBe(true);
 	});
 
 	it('turns off the boxes that do nothing for a relation', async () => {
