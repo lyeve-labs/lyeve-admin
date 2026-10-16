@@ -12,7 +12,9 @@
 		Stat,
 		Table,
 		toast,
-		Pagination, type StatusTone} from '@lyeve-labs/ui-kit';
+		Pagination,
+		type StatusTone,
+	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';

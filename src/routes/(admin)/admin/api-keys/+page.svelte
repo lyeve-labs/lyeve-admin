@@ -15,7 +15,9 @@
 		SearchInput,
 		SegmentedControl,
 		Pagination,
-		Table, type StatusTone} from '@lyeve-labs/ui-kit';
+		Table,
+		type StatusTone,
+	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';

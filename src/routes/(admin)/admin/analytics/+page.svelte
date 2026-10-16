@@ -8,7 +8,9 @@
 		Progress,
 		SectionHeading,
 		Stat,
-		Table, type StatusTone} from '@lyeve-labs/ui-kit';
+		Table,
+		type StatusTone,
+	} from '@lyeve-labs/ui-kit';
 	import { TrendingUp, Gauge, Globe, Server } from '@lucide/svelte';
 	import { NO_VALUE, formatBytes, formatCount, formatDateTime } from '$lib/format';
 	import type { PageData } from './$types';
