@@ -125,7 +125,12 @@
 					const j = (await res.json().catch(() => ({ error: 'Upload failed' }))) as {
 						error?: string;
 					};
-					uploadError = j.error ?? 'Upload failed';
+					// A refusal's sentence is written for the operator. A 5xx body
+					// can carry driver or proxy text, so it never reaches the page.
+					uploadError =
+						res.status < 500
+							? (j.error ?? 'Upload failed')
+							: 'The engine could not store the file. Nothing was uploaded. Try again in a moment.';
 					break;
 				}
 				uploaded += 1;

@@ -245,6 +245,33 @@ describe('an upload whose session ended', () => {
 	});
 });
 
+describe('a refused or failed upload', () => {
+	function pick() {
+		const picker = screen.getByLabelText('Choose files to upload') as HTMLInputElement;
+		Object.defineProperty(picker, 'files', { value: [new File(['x'], 'new.png', { type: 'image/png' })], configurable: true });
+		return fireEvent.change(picker);
+	}
+
+	it('relays the reason the engine gave for refusing the file', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'The file type image/x-icon is not allowed.' }), { status: 415 })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('The file type image/x-icon is not allowed.'));
+		vi.unstubAllGlobals();
+	});
+
+	// A 5xx body can carry driver or proxy text, so the console says it in
+	// its own words, as every other write does.
+	it('keeps the body of a 5xx answer off the page', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'dial tcp 10.0.0.4:5432: connect: connection refused' }), { status: 503 })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('The engine could not store the file. Nothing was uploaded. Try again in a moment.'));
+		expect(document.body.textContent).not.toContain('dial tcp');
+		vi.unstubAllGlobals();
+	});
+});
+
 describe('media library controls carry a name', () => {
 	it('names the file picker the upload button opens', () => {
 		// sr-only hides the picker from the eye and not from a screen reader, so
