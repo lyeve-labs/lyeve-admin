@@ -1,3 +1,6 @@
+import { globSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OnNavigate } from '@sveltejs/kit';
 import { FADING, fadeRouteChange } from './page-transition';
@@ -68,10 +71,18 @@ describe('fadeRouteChange', () => {
 		expect(b.startViewTransition).not.toHaveBeenCalled();
 	});
 
-	it('swaps without a fade under reduced motion', () => {
+	// The kit's stylesheet finishes the view-transition pseudo-elements in 1ms
+	// under reduced motion, so the admin starts the transition either way and
+	// never asks the media query itself.
+	it('starts the transition under reduced motion too, without reading the preference', async () => {
 		const b = browser({ reducedMotion: true });
-		expect(fadeRouteChange(navigation('/dashboard', '/billing'))).toBeUndefined();
-		expect(b.startViewTransition).not.toHaveBeenCalled();
+		const matchMedia = vi.fn(() => ({ matches: true }));
+		vi.stubGlobal('window', { matchMedia });
+		await fadeRouteChange(navigation('/dashboard', '/billing'));
+		expect(b.startViewTransition).toHaveBeenCalledOnce();
+		expect(matchMedia).not.toHaveBeenCalled();
+		b.finish(0);
+		await vi.waitFor(() => expect(b.attrs.has(FADING)).toBe(false));
 	});
 
 	it('swaps without a fade in a browser that has no view transitions', () => {
@@ -88,5 +99,16 @@ describe('fadeRouteChange', () => {
 		// An unhandled rejection from the transition fails the run on this tick.
 		await new Promise((r) => setTimeout(r, 0));
 		await vi.waitFor(() => expect(b.attrs.has(FADING)).toBe(false));
+	});
+});
+
+// Reduced motion is honored once, in the kit's stylesheet. A second check in
+// the admin is a second rule that can disagree with the first.
+describe('reduced motion', () => {
+	it('is decided nowhere in the admin', () => {
+		const src = fileURLToPath(new URL('..', import.meta.url));
+		const files = globSync('**/*.{ts,svelte,css}', { cwd: src }).filter((f) => !f.endsWith('.test.ts'));
+		expect(files.length).toBeGreaterThan(0);
+		expect(files.filter((f) => /prefers-reduced-motion/.test(readFileSync(join(src, f), 'utf8')))).toEqual([]);
 	});
 });

@@ -15,13 +15,13 @@ let running = 0;
  * how anything inside it layers.
  *
  * A change of query alone, such as a filter or a page of results, keeps the
- * reader in place and does not fade. Under reduced motion, or in a browser
+ * reader in place and does not fade. Under reduced motion the kit's stylesheet
+ * finishes the transition in 1ms, so it is not checked here. In a browser
  * without view transitions, the page swaps as it always did.
  */
 export function fadeRouteChange(navigation: OnNavigate): Promise<void> | undefined {
 	if (typeof document === 'undefined' || !document.startViewTransition) return;
 	if (navigation.from?.url.pathname === navigation.to?.url.pathname) return;
-	if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
 	const root = document.documentElement;
 	running += 1;
