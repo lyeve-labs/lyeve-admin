@@ -12,6 +12,7 @@
  * on it is the one that reads as zero when it is wrong: a tenant with no
  * region assigned is not in a compliant default, it is unaccounted for.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -127,7 +128,7 @@ export function slugIsSound(slug: string): boolean {
 
 export function replicationTone(
 	status: string | null | undefined
-): 'success' | 'danger' | 'warn' | 'neutral' {
+): StatusTone {
 	if (status === 'synced') return 'success';
 	if (status === 'failed') return 'danger';
 	if (status === 'syncing' || status === 'paused') return 'warn';
@@ -197,7 +198,7 @@ export const REGION_STATE_LABELS: Readonly<Record<string, string>> = {
 	closed: 'Closed to new tenants',
 };
 
-export function regionTone(state: string): 'brand' | 'success' | 'neutral' {
+export function regionTone(state: string): StatusTone {
 	if (state === 'default') return 'brand';
 	if (state === 'open') return 'success';
 	return 'neutral';

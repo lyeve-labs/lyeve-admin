@@ -11,6 +11,7 @@
  * like any other. Reading a dry run's counts as content that now exists is
  * the second mistake available here, so the list marks them.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -550,7 +551,7 @@ export const OUTCOME_LABELS: Readonly<Record<ImportOutcome, string>> = {
 	failed: 'Failed',
 };
 
-export function outcomeTone(o: ImportOutcome): 'success' | 'danger' | 'warn' | 'neutral' {
+export function outcomeTone(o: ImportOutcome): StatusTone {
 	if (o === 'clean') return 'success';
 	if (o === 'failed' || o === 'nothing') return 'danger';
 	if (o === 'partial') return 'warn';

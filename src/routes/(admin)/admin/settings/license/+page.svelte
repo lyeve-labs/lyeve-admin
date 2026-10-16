@@ -8,7 +8,7 @@
 	 * here come from the module's own route, so the page holds no address and
 	 * no account of how a license is issued or checked.
 	 */
-	import { Alert, Button, Card, DescriptionList, PageShell, SectionHeading, Textarea } from '@lyeve-labs/ui-kit';
+	import { Alert, Button, Card, DescriptionList, PageShell, SectionHeading, Textarea, type StatusTone } from '@lyeve-labs/ui-kit';
 	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import { Check, Clock, ExternalLink, Shield, TriangleAlert } from '@lucide/svelte';
@@ -47,12 +47,13 @@
 		return '';
 	});
 
-	const MEDALLION = {
+	const MEDALLION: Record<StatusTone, string> = {
 		success: 'bg-success/15 text-success',
 		warn: 'bg-warn/15 text-warn',
 		danger: 'bg-danger/15 text-danger',
 		neutral: 'bg-surface-2 text-muted',
-	} as const;
+		brand: 'bg-brand/15 text-brand',
+	};
 	const tone = $derived(licenseTone(status));
 
 	// The source is the module's word for what renews the license, shown as it

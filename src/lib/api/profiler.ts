@@ -6,6 +6,7 @@
  * arrive in nanoseconds as the sampler records them. The page formats them
  * and never sends one back.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
 export const PROFILER_ROOT = '/api/admin/debug/profiler';
@@ -175,7 +176,7 @@ export function formatSignedBinaryBytes(b: number): string {
 }
 
 /** The badge a p95 earns: a second is red, a tenth amber, ten milliseconds green. */
-export function latencyTone(ns: number): 'danger' | 'warn' | 'success' | 'neutral' {
+export function latencyTone(ns: number): StatusTone {
 	if (ns >= 1e9) return 'danger';
 	if (ns >= 1e8) return 'warn';
 	if (ns <= 1e7) return 'success';

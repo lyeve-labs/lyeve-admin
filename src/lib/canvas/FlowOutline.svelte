@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Badge, Button, Select } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Select, type StatusTone } from '@lyeve-labs/ui-kit';
 	import { StickyNote, X } from '@lucide/svelte';
 	import type { FlowCanvasProps } from './contract';
 	import type { RunStep } from '$lib/api/flows';
@@ -107,7 +107,7 @@
 	});
 
 	/** The run outcome in the words a positioned editor uses on its cards. */
-	function pill(step: RunStep): { label: string; tone: 'success' | 'danger' | 'neutral' | 'warn' } {
+	function pill(step: RunStep): { label: string; tone: StatusTone } {
 		const took = formatDuration(step.duration_ms);
 		if (step.dry_run) return { label: `dry-run ${took}`, tone: 'warn' };
 		if (step.status === 'succeeded') return { label: `ok ${took}`, tone: 'success' };

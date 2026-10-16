@@ -5,20 +5,16 @@
  * two pages sees the same color for the same severity.
  */
 
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { levelName } from '$lib/api/helpers';
-
-/**
- * The tone a log level carries. A subset of the kit's accent tones: a log
- * level is a severity, so the decorative tones are not reachable from here.
- */
-export type LogLevelTone = 'neutral' | 'brand' | 'warn' | 'danger';
 
 /** The levels the engine emits, least severe first. */
 export const LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
 
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
-const LEVEL_TONES: Record<LogLevel, LogLevelTone> = {
+// A log level is a severity, so it never takes the violet accent.
+const LEVEL_TONES: Record<LogLevel, StatusTone> = {
 	DEBUG: 'neutral',
 	INFO: 'brand',
 	WARN: 'warn',
@@ -54,7 +50,7 @@ export function logLevelLabel(level: WireLogLevel): string {
  * The level is folded before it is looked up, so a spelling the engine sends
  * in another case keeps its severity instead of falling through to gray.
  */
-export function logLevelTone(level: WireLogLevel): LogLevelTone {
+export function logLevelTone(level: WireLogLevel): StatusTone {
 	return LEVEL_TONES[logLevelLabel(level) as LogLevel] ?? 'neutral';
 }
 

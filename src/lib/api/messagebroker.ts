@@ -15,6 +15,7 @@
  * outbox, a refused event is retried, so Failed counts attempts and the
  * outbox's dead count is the number of events lost.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 
@@ -147,7 +148,7 @@ export const HEALTH_LABELS: Readonly<Record<BrokerHealth, string>> = {
 	idle: 'Nothing published yet',
 };
 
-export function healthTone(h: BrokerHealth): 'success' | 'danger' | 'warn' | 'neutral' {
+export function healthTone(h: BrokerHealth): StatusTone {
 	if (h === 'publishing') return 'success';
 	if (h === 'refusing' || h === 'lost') return 'danger';
 	if (h === 'retrying' || h === 'undelivered' || h === 'disabled' || h === 'discarding') return 'warn';

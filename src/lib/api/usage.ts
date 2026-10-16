@@ -15,6 +15,7 @@
  * A limit of zero leaves that dimension unchecked entirely. It reads like the
  * strictest possible setting and it is the loosest.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -227,7 +228,7 @@ export function enforcementLabel(q: Quota): string {
 	return 'Reported only, never blocks';
 }
 
-export function enforcementTone(q: Quota): 'success' | 'warn' | 'neutral' {
+export function enforcementTone(q: Quota): StatusTone {
 	if (!hasAnyLimit(q)) return 'neutral';
 	return enforces(q) ? 'success' : 'warn';
 }
@@ -268,7 +269,7 @@ export function usedPct(used: number, limit: number): number | null {
 	return Math.round((used / limit) * 1000) / 10;
 }
 
-export function usageTone(pct: number | null): 'danger' | 'warn' | 'success' | 'neutral' {
+export function usageTone(pct: number | null): StatusTone {
 	if (pct === null) return 'neutral';
 	if (pct >= 100) return 'danger';
 	if (pct >= 80) return 'warn';

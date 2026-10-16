@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Collapsible, Skeleton } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Collapsible, Skeleton, type StatusTone } from '@lyeve-labs/ui-kit';
 	import { History } from '@lucide/svelte';
 	import { formatDateTime } from '$lib/format';
 	import type { HistoryEntry } from '../+page.server';
@@ -7,7 +7,7 @@
 
 	let { ddl }: { ddl: DdlHistory } = $props();
 
-	const HISTORY_TONE: Record<HistoryEntry['state'], 'success' | 'warn' | 'danger' | 'neutral'> = {
+	const HISTORY_TONE: Record<HistoryEntry['state'], StatusTone> = {
 		applied: 'success',
 		pending: 'warn',
 		failed: 'danger',

@@ -15,6 +15,7 @@
  * Enforcement is the destructive control. It deletes, it is not a dry run, and
  * nothing undoes it.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -260,6 +261,6 @@ export function archivalLabel(p: RetentionPolicy): string {
 	return p.archival_storage ? `Archived to ${p.archival_storage}` : 'Archived';
 }
 
-export function archivalTone(p: RetentionPolicy): 'success' | 'warn' {
+export function archivalTone(p: RetentionPolicy): StatusTone {
 	return p.archival_enabled ? 'success' : 'warn';
 }

@@ -12,6 +12,7 @@
  * decides whether somebody ships a change. The helpers below refuse to call a
  * winner the engine did not declare.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import { rowsOf, type ListEnvelope } from './list';
@@ -264,7 +265,7 @@ export function isFinished(status: ExperimentStatus): boolean {
 
 export function statusTone(
 	status: ExperimentStatus
-): 'success' | 'danger' | 'warn' | 'brand' | 'neutral' {
+): StatusTone {
 	if (status === 'running') return 'success';
 	if (status === 'paused') return 'warn';
 	if (status === 'completed') return 'brand';

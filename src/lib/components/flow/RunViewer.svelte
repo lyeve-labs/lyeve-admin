@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, CopyButton, SectionHeading, SegmentedControl } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, CopyButton, SectionHeading, SegmentedControl, type StatusTone } from '@lyeve-labs/ui-kit';
 	import { RotateCw } from '@lucide/svelte';
 	import JsonTree from './JsonTree.svelte';
 	import type { FlowRun, RunStep } from '$lib/api/flows';
@@ -36,7 +36,7 @@
 		return steps.find((s) => s.node_id === want) ?? failed ?? steps.find((s) => s.status === 'failed') ?? steps[0] ?? null;
 	});
 
-	function stepTone(step: RunStep): 'success' | 'danger' | 'neutral' | 'warn' {
+	function stepTone(step: RunStep): StatusTone {
 		if (step.dry_run) return 'warn';
 		if (step.status === 'succeeded') return 'success';
 		if (step.status === 'failed') return 'danger';

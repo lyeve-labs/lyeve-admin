@@ -11,6 +11,7 @@
  * has an alert outstanding. A screen that merged them would show a disabled
  * probe as healthy, which is the reading that lets an outage go unnoticed.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { toChannels, type AlertChannels } from './alert-channels';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
@@ -320,7 +321,7 @@ export function probeHealth(p: Probe): ProbeHealth {
 	return p.last_status === 'pass' ? 'passing' : 'failing';
 }
 
-export function probeTone(h: ProbeHealth): 'success' | 'danger' | 'warn' | 'neutral' {
+export function probeTone(h: ProbeHealth): StatusTone {
 	if (h === 'passing') return 'success';
 	if (h === 'failing') return 'danger';
 	if (h === 'unrun') return 'warn';

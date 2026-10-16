@@ -10,6 +10,7 @@
  * grammar per dialect, and an instance runs one. The page asks for the one
  * the engine reports and never guesses.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
 export const QUERY_LOG_URL = '/api/admin/query-log';
@@ -193,7 +194,7 @@ export function noSuggestionText(dialect: Dialect, read: AnalysisRead): string {
 }
 
 /** A duration worth coloring. The engine samples what is already slow. */
-export function durationTone(ms: number): 'danger' | 'warn' | 'neutral' {
+export function durationTone(ms: number): StatusTone {
 	if (ms >= 1000) return 'danger';
 	if (ms >= 250) return 'warn';
 	return 'neutral';

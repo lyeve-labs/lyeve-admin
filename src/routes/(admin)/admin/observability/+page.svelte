@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Card, EmptyState, PageShell, SectionHeading, SegmentedControl, Stat, Table } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Card, EmptyState, PageShell, SectionHeading, SegmentedControl, Stat, Table, type StatusTone } from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { Database, Gauge, AlertTriangle, CheckCircle, RefreshCw } from '@lucide/svelte';
@@ -42,7 +42,7 @@
 		return `${us}µs`;
 	}
 
-	function latencyVariant(us: number): 'danger' | 'warn' | 'success' | 'neutral' {
+	function latencyVariant(us: number): StatusTone {
 		if (us >= 1_000_000) return 'danger';
 		if (us >= 100_000) return 'warn';
 		if (us <= 10_000) return 'success';

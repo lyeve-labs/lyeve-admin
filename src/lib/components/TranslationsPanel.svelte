@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Card, Label, SectionHeading, Tabs } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Card, Label, SectionHeading, Tabs, type StatusTone } from '@lyeve-labs/ui-kit';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { enhance } from '$app/forms';
 	import { CircleCheck } from '@lucide/svelte';
@@ -88,7 +88,7 @@
 		translated: 'Translated',
 		outdated: 'Outdated',
 	};
-	const STATUS_TONE: Record<TranslationStatus | 'missing', 'neutral' | 'success' | 'warn'> = {
+	const STATUS_TONE: Record<TranslationStatus | 'missing', StatusTone> = {
 		missing: 'neutral',
 		draft: 'neutral',
 		translated: 'success',

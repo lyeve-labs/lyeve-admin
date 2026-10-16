@@ -19,6 +19,7 @@
  * are close to their limit and when each window resets. It is a snapshot from
  * one process, which matters on more than one node.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -182,7 +183,7 @@ export function scopeLabel(rule: RateRule): string {
 	return rule.tenant_id ? rule.tenant_id : 'Every tenant';
 }
 
-export function scopeTone(rule: RateRule): 'warn' | 'neutral' {
+export function scopeTone(rule: RateRule): StatusTone {
 	return rule.tenant_id ? 'neutral' : 'warn';
 }
 

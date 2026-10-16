@@ -12,8 +12,7 @@
 		Stat,
 		Table,
 		toast,
-		Pagination,
-	} from '@lyeve-labs/ui-kit';
+		Pagination, type StatusTone} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -62,7 +61,7 @@
 	);
 
 	const STATUS_LABEL: Record<AlertStatus, string> = { open: 'Open', resolved: 'Resolved', ignored: 'Ignored' };
-	const STATUS_TONE: Record<AlertStatus, 'danger' | 'success' | 'neutral'> = {
+	const STATUS_TONE: Record<AlertStatus, StatusTone> = {
 		open: 'danger',
 		resolved: 'success',
 		ignored: 'neutral',

@@ -11,6 +11,7 @@
  * minutes rather than seconds. It answers 409 while one is already running,
  * which the screen has to report as "already running" and not as a failure.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 
@@ -104,7 +105,7 @@ export function sourceLabel(source: string): string {
  * Random picks are the control arm, so a feed made of them is not a broken
  * feed. It is the measurement, and marking it apart stops that reading.
  */
-export function sourceTone(source: string): 'brand' | 'neutral' {
+export function sourceTone(source: string): StatusTone {
 	return source === 'random' ? 'neutral' : 'brand';
 }
 

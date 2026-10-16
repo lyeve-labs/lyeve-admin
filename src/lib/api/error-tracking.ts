@@ -11,6 +11,7 @@
  * fingerprint is one problem, and ten fingerprints with one event each is ten.
  * A list ordered by event count says the opposite.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { toChannels, type AlertChannels } from './alert-channels';
 import { GATE_OK, gateOf, type Gate } from './gate';
@@ -287,7 +288,7 @@ export function stillFiring(
 
 export function severityTone(
 	severity: string
-): 'danger' | 'warn' | 'brand' | 'neutral' {
+): StatusTone {
 	const s = severity.toUpperCase();
 	if (s === 'CRITICAL') return 'danger';
 	if (s === 'ERROR') return 'danger';

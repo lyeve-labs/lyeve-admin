@@ -1,3 +1,4 @@
+import { globSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { entryTone, httpStatusTone, methodTone } from './tones';
 
@@ -43,5 +44,22 @@ describe('httpStatusTone', () => {
 		expect(httpStatusTone(0)).toBe('neutral');
 		expect(httpStatusTone(101)).toBe('neutral');
 		expect(httpStatusTone(600)).toBe('neutral');
+	});
+});
+
+// A tone union written out by hand drifts from the kit's when the kit adds
+// or renames a tone, so a tone is typed as the kit's StatusTone, or
+// AccentTone where a label may be violet.
+describe('tone types', () => {
+	it('writes no tone union by hand', () => {
+		const union = /'(neutral|brand|success|warn|danger|violet)'(\s*\|\s*'(neutral|brand|success|warn|danger|violet)')+/;
+		const offenders = globSync('src/**/*.{ts,svelte}')
+			.filter((file) => !file.endsWith('.test.ts'))
+			.flatMap((file) =>
+				readFileSync(file, 'utf8')
+					.split('\n')
+					.flatMap((line, i) => (union.test(line) ? [`${file}:${i + 1}`] : [])),
+			);
+		expect(offenders).toEqual([]);
 	});
 });
