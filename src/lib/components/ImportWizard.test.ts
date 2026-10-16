@@ -190,7 +190,7 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		const statuses = [401];
 		const answer = vi.fn(async () => {
 			const status = statuses.shift() ?? 400;
-			return new Response(JSON.stringify({ error: status === 401 ? 'unauthorized' : 'The file has no header row.' }), { status, headers: { 'content-type': 'application/json' } });
+			return new Response(JSON.stringify(status === 401 ? { error: 'unauthorized', code: 'unauthorized' } : { error: 'The file has no header row.', code: 'bad_request' }), { status, headers: { 'content-type': 'application/json' } });
 		});
 		await readWith(answer);
 		await waitFor(() => expect(document.body.textContent).toContain('The file has no header row.'));

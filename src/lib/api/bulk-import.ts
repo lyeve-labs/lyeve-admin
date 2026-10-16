@@ -391,13 +391,14 @@ async function postImport<T>(fetchFn: typeof fetch, path: string, body: unknown)
 		body: JSON.stringify(body),
 	});
 	if (!res.ok) {
-		const j = (await res.json().catch(() => ({}))) as { error?: string };
-		// A refusal's sentence is written for the operator and is shown as
-		// sent. A 5xx body can carry driver detail, so it never reaches the
-		// page, and the status picks the sentence instead. An ApiError keeps
+		const j = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+		// The engine's refusals carry a code, and their sentence is written for
+		// the operator and shown as sent. A 5xx body can carry driver detail,
+		// and an uncoded 4xx is not the engine's, so the status picks the
+		// sentence for both. An ApiError keeps
 		// the body, so a license refusal renders through RefusalNotice with
 		// what the plugin sent.
-		const said = res.status < 500 && j.error ? j.error : importFailure(res.status);
+		const said = res.status < 500 && j.code && j.error ? j.error : importFailure(res.status);
 		throw new ApiError(res.status, said, j);
 	}
 	return (await res.json()) as T;

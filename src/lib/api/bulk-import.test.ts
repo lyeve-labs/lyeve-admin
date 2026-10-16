@@ -194,7 +194,15 @@ describe('a refused import call', () => {
 	}
 
 	it('shows a refusal written for the operator as it was sent', async () => {
-		expect((await refusal(400, { error: 'source_url must be http or https' })).message).toBe('source_url must be http or https');
+		expect((await refusal(400, { error: 'source_url must be http or https', code: 'bad_request' })).message).toBe('source_url must be http or https');
+	});
+
+	// The engine's refusals carry a code. A 4xx body without one, such as a
+	// proxy's, is not a sentence written for the operator.
+	it('says it in its own words when a refusal carries no code', async () => {
+		const err = await refusal(413, { error: 'client intended to send too large body' });
+		expect(err.message).toBe('The file is larger than the 50 MB an import takes. Split it and import the parts.');
+		expect((await refusal(400, { error: 'bad request from upstream' })).message).toBe('The engine refused the request.');
 	});
 
 	// A 5xx body can carry driver detail, and the outage sentence is the one
