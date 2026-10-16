@@ -61,7 +61,7 @@
 	 * The plugin says nothing about its license until a write is refused, so
 	 * the first refusal of a quota or an approval is what this page learns it
 	 * from. From then on it holds the paid fields and Approve, with the
-	 * reason beside them, and keeps the free writes live.
+	 * reason beside them, and keeps live the writes that need no license.
 	 */
 	let paidRefusal = $state.raw<Refusal | null>(null);
 	$effect(() => {

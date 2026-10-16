@@ -56,7 +56,7 @@ describe('email triggers load', () => {
 	});
 
 	it('carries the license refusal a trigger write would meet', async () => {
-		const refused = { kind: 'feature', feature: 'Email Pro', plugin: 'email', upgradeUrl: '' };
+		const refused = { kind: 'feature', feature: 'Trigger Studio', plugin: 'email', upgradeUrl: '' };
 		api.triggerWriteRefusal.mockResolvedValue(refused);
 		const out = (await load({} as never)) as Loaded;
 		expect(out.writeRefusal).toEqual(refused);

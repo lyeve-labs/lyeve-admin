@@ -61,7 +61,7 @@ function props(over: Record<string, unknown> = {}, form: unknown = null) {
 }
 
 describe('email triggers without the license for writes', () => {
-	const refused = { kind: 'feature', feature: 'Email Pro', plugin: 'email', upgradeUrl: '' };
+	const refused = { kind: 'feature', feature: 'Trigger Studio', plugin: 'email', upgradeUrl: '' };
 
 	it('disables New and Edit with the reason, and keeps Delete', () => {
 		render(TriggersPage, { props: props({ writeRefusal: refused }) });
@@ -69,7 +69,7 @@ describe('email triggers without the license for writes', () => {
 		expect(create.disabled).toBe(true);
 		expect((screen.getByRole('button', { name: 'Edit Order confirmation' }) as HTMLButtonElement).disabled).toBe(true);
 		expect((screen.getByRole('button', { name: 'Delete Order confirmation' }) as HTMLButtonElement).disabled).toBe(false);
-		expect(document.body.textContent).toContain('Creating or editing a trigger needs Email Pro');
+		expect(document.body.textContent).toContain('Creating or editing a trigger needs Trigger Studio');
 	});
 
 	it('leaves New and Edit live when the license allows them', () => {
@@ -150,10 +150,10 @@ describe('email trigger drawer', () => {
 	it('shows the license a refused save needs inside the open drawer', async () => {
 		const { rerender } = render(TriggersPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
-		const refused = { kind: 'feature', feature: 'Email Pro', plugin: 'email', upgradeUrl: '' };
-		await rerender(props({}, { action: 'save', error: 'This needs Email Pro.', refused }));
-		expect(drawerText()).toContain('Email Pro');
-		expect(drawerText()).not.toContain('This needs Email Pro.');
+		const refused = { kind: 'feature', feature: 'Trigger Studio', plugin: 'email', upgradeUrl: '' };
+		await rerender(props({}, { action: 'save', error: 'This needs Trigger Studio.', refused }));
+		expect(drawerText()).toContain('Trigger Studio');
+		expect(drawerText()).not.toContain('This needs Trigger Studio.');
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {

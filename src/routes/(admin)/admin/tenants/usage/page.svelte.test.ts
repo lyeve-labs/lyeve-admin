@@ -211,7 +211,7 @@ describe('a license without paid quotas', () => {
 		const field = (id: string) => document.body.querySelector<HTMLInputElement>(`#${id}`);
 		expect(field('quota-requests')?.disabled).toBe(true);
 		expect(field('quota-storage')?.disabled).toBe(true);
-		// Turning enforcement off stays free, turning it on does not.
+		// Turning enforcement off needs no license, turning it on does.
 		expect(field('quota-block')?.disabled).toBe(false);
 		expect(field('quota-hard')?.disabled).toBe(true);
 	});
