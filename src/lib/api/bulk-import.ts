@@ -398,14 +398,24 @@ async function postImport<T>(fetchFn: typeof fetch, path: string, body: unknown)
 		// sentence for both. An ApiError keeps
 		// the body, so a license refusal renders through RefusalNotice with
 		// what the plugin sent.
-		const said = res.status < 500 && j.code && j.error ? j.error : importFailure(res.status);
+		const engineSaid = typeof j.code === 'string' && j.code !== '';
+		const said = res.status < 500 && engineSaid && j.error ? j.error : importFailure(res.status, path === '', engineSaid);
 		throw new ApiError(res.status, said, j);
 	}
 	return (await res.json()) as T;
 }
 
-function importFailure(status: number): string {
+/**
+ * The sentence for a failed import call. The engine answers a start once it
+ * has stored the job and imports the rows after that, so its own 5xx means
+ * no job was made. A 5xx it did not write, such as a proxy's 502 or 504, can
+ * arrive after the job was made, so a start claims only what is known.
+ */
+function importFailure(status: number, starts: boolean, engineSaid: boolean): string {
 	if (status === 413) return 'The file is larger than the 50 MB an import takes. Split it and import the parts.';
+	if (status >= 500 && starts && !engineSaid) {
+		return 'The engine did not confirm the import. Check the entries before trying again.';
+	}
 	if (status === 502 || status === 503 || status === 504) {
 		return 'The engine or its database did not answer. Nothing was imported. Try again in a moment.';
 	}
