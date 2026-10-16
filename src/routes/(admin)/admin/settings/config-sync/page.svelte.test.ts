@@ -48,6 +48,14 @@ describe('config sync page', () => {
 		expect(link.getAttribute('href')).toBe('blob:bundle');
 	});
 
+	it('keeps the secrets caveat beside the download, outside the outcome that clears itself', () => {
+		vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:bundle'), revokeObjectURL: vi.fn() }));
+		const { getByRole, getByText } = setup({ scope: 'export', bundle: '{}', filename: 'b.json', sections: [] });
+		const caveat = getByText('Anyone holding the bundle and the passphrase can read every secret in it.');
+		expect(caveat.closest('[role="status"], [role="alert"]')).toBeNull();
+		expect(getByRole('link', { name: /Download b.json/ }).parentElement?.contains(caveat)).toBe(true);
+	});
+
 	it('lists the plan per section, content types first, with the count of each change', () => {
 		const { getByTestId } = setup({ scope: 'sync', mode: 'diff', plan });
 		const sections = getByTestId('sync-plan').querySelectorAll('[data-testid^="plan-section-"]');

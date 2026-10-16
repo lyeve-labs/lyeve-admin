@@ -1,6 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -11,6 +10,7 @@
 		EmptyState,
 		Input,
 		PageShell,
+		Pagination,
 		PasswordInput,
 		SearchInput,
 		SegmentedControl,
@@ -21,19 +21,44 @@
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { IncomingWebhook } from '@lyeve-labs/client';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { submitter } from '$lib/forms.svelte';
+	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import { Plus, Pencil, Trash2, ArrowDownToLine } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { narrows } from '$lib/narrow';
+	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * Each failure names the action that caused it. The drawer shows only its
+	 * own writes' failures, and only one that came back after it was opened, so
+	 * a failed delete never reads as a failure of the form opened next. The
+	 * rest show above the list.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	const pageForm = $derived(inDrawer ? null : form);
 
 	const submit = submitter(() => (open = false));
 
-	const schemaOptions = $derived(data.schemas.map((s) => ({ value: s.name, label: s.name })));
+	// The webhook plugin serves create, update and delete to a super admin
+	// only. An admin reads the endpoints and is told the rest.
+	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
+
+	// The plugin reports whether its license opens create and update. Only a
+	// stated false holds them, so an older plugin that says nothing keeps both
+	// live and lets the write answer.
+	const held = $derived(data.licensed === false);
+
+	const rows = $derived(data.incomingWebhooks.ok ? data.incomingWebhooks.value : []);
+	const schemaNames = $derived(data.schemas.ok ? data.schemas.value.map((s) => s.name) : []);
 
 	// One drawer for both writes: a null target is a new endpoint.
 	let open = $state(false);
@@ -45,10 +70,17 @@
 	let enabled = $state(true);
 	let allowedIPs = $state('');
 
+	// The endpoint's own schema stays among the options even when the schema
+	// list could not be read, so saving an edit never moves it.
+	const schemaOptions = $derived(
+		[...new Set([...schemaNames, ...(schema ? [schema] : [])])].map((name) => ({ value: name, label: name }))
+	);
+
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		name = '';
-		schema = data.schemas[0]?.name ?? '';
+		schema = schemaNames[0] ?? '';
 		secret = '';
 		fieldMap = '{\n  "external_field": "schema_field"\n}';
 		enabled = true;
@@ -57,6 +89,7 @@
 	}
 
 	function openEdit(wh: IncomingWebhook) {
+		openedOver = form;
 		editing = wh;
 		name = wh.name;
 		schema = wh.schema_name;
@@ -74,13 +107,14 @@
 
 	async function askDelete(wh: IncomingWebhook) {
 		const ok = await confirmDialog(
-			`Delete ${wh.name}?`,
+			`Delete incoming webhook ${wh.name}`,
 			'External services can no longer send payloads to this endpoint.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
 		deleteId = wh.id;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the value has reached the DOM.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -93,7 +127,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.incomingWebhooks.filter(
+		rows.filter(
 			(wh) =>
 				narrows(query, wh.name, wh.schema_name, wh.id) &&
 				(status === '' || (status === 'enabled') === wh.enabled)
@@ -101,39 +135,54 @@
 	);
 </script>
 
-<PageTitle title="Incoming webhooks" />
-
 <PageShell
 	title="Incoming webhooks"
 	description="Public HTTP endpoints that accept payloads from external services and create content records."
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} />
-			New incoming webhook
-		</Button>
+		<!-- A list that could not be read offers no write against it. -->
+		{#if data.incomingWebhooks.ok && isSuperAdmin}
+			<Button variant="primary" size="sm" onclick={openCreate} disabled={held}>
+				<Plus size={ICON.sm} />
+				New incoming webhook
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if form && 'error' in form && form.error}
-		<Alert tone="danger">
-			{#snippet children()}{form.error}{/snippet}
+	<FormErrors message={(pageForm as Failure)?.error || undefined} refused={formRefusal(pageForm)} />
+
+	{#if data.incomingWebhooks.ok && !isSuperAdmin}
+		<Alert tone="brand">Your role reads incoming webhooks. Creating, changing or deleting one takes a super admin.</Alert>
+	{/if}
+
+	{#if data.incomingWebhooks.ok && isSuperAdmin && held}
+		<Alert tone="warn">
+			The license on this instance does not include creating or changing incoming webhooks. Deleting one stays open.
 		</Alert>
 	{/if}
 
-	{#if data.incomingWebhooks.length === 0}
+	{#if !data.incomingWebhooks.ok}
+		<GateNotice
+			level={2}
+			gate={data.incomingWebhooks.gate}
+			title="Incoming webhooks"
+			absent="The webhook plugin is not part of this build, so no external service can send payloads here."
+		/>
+	{:else if data.incomingWebhooks.value.length === 0}
 		<EmptyState
+			level={2}
 			title="No incoming webhooks"
 			description="Create one to receive payloads from external services."
 		>
 			{#snippet iconSnippet()}<ArrowDownToLine size={ICON.lg} />{/snippet}
 			{#snippet action()}
-				<Button variant="secondary" onclick={openCreate}>
-					<Plus size={ICON.sm} />
-					New incoming webhook
-				</Button>
+				{#if isSuperAdmin}
+					<Button variant="secondary" onclick={openCreate} disabled={held}>
+						<Plus size={ICON.sm} />
+						New incoming webhook
+					</Button>
+				{/if}
 			{/snippet}
 		</EmptyState>
 	{:else}
@@ -148,7 +197,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState title="No incoming webhook matches" description="Clear the search or widen the status to see every endpoint." />
+			<EmptyState level={2} title="No incoming webhook matches" description="Clear the search or widen the status to see every endpoint." />
 		{:else}
 		<div class="flex flex-col gap-3">
 			{#each visible as wh (wh.id)}
@@ -177,11 +226,13 @@
 								</div>
 							{/if}
 						</div>
+						{#if isSuperAdmin}
 						<div class="flex shrink-0 items-center gap-2">
 							<Button
 								variant="ghost"
 								size="sm"
 								onclick={() => openEdit(wh)}
+								disabled={held}
 								title="Edit"
 								aria-label="Edit {wh.name}"
 							>
@@ -197,18 +248,25 @@
 								<Trash2 size={ICON.sm} class="text-danger" />
 							</Button>
 						</div>
+						{/if}
 					</div>
 				</Card>
 			{/each}
 		</div>
 		{/if}
+		<Pagination
+			page={pageNumber(data.offset, data.limit)}
+			perPage={data.limit}
+			count={data.incomingWebhooks.value.length}
+			total={data.total ?? undefined}
+			hasNext={data.hasMore}
+			noun="incoming webhooks"
+			href={pageHref('/admin/webhooks/incoming', data.limit)}
+		/>
 	{/if}
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New incoming webhook'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
@@ -216,13 +274,22 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors
+			message={(drawerForm as Failure)?.error || undefined}
+			fields={fieldErrors(drawerForm)}
+			refused={formRefusal(drawerForm)}
+		/>
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input id="incoming-name" name="name" label="Name" required bind:value={name} placeholder="Stripe events" />
+		{#if !data.schemas.ok}
+			<p class="text-xs text-muted">The schemas could not be read, so only the one this endpoint already names is listed.</p>
+		{/if}
 		<Select
 			id="incoming-schema"
 			name="schema_name"
 			label="Target schema"
 			required
+			searchable
 			options={schemaOptions}
 			value={schema}
 			onvaluechange={(v) => (schema = v)}

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -170,8 +169,6 @@
 	}
 </script>
 
-<PageTitle title="Config sync" />
-
 <PageShell
 	title="Config sync"
 	description="Move content types, flows, permission rules, webhooks and settings from one instance to another in one bundle. Content is never included."
@@ -202,14 +199,17 @@
 			{/if}
 			{#if exported}
 				<div class="flex flex-col gap-3" data-testid="export-ready">
-					<Alert tone="success" autoDismiss>The bundle is ready. Anyone holding it and the passphrase can read every secret in it.</Alert>
+					<Alert tone="success" autoDismiss>The bundle is ready.</Alert>
 					<p class="text-sm text-muted">
 						Sections: {namesOrNone(exported.sections, sectionLabel)}.
 					</p>
-					<div>
+					<div class="flex flex-col items-start gap-1">
 						<Button variant="secondary" href={downloadHref || undefined} disabled={!downloadHref} download={exported.filename}>
 							<Download size={ICON.sm} /> Download {exported.filename}
 						</Button>
+						<!-- A standing caveat, so it stays beside the download rather
+						     than clearing itself with the outcome above. -->
+						<p class="text-xs text-muted">Anyone holding the bundle and the passphrase can read every secret in it.</p>
 					</div>
 				</div>
 			{/if}

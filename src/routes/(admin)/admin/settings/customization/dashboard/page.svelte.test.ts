@@ -11,6 +11,7 @@ function mount(widgets: unknown[] = [], custom = false, running: string[] = ['co
 			data: {
 				layout: { entitled: true, custom, widgets, updated_at: custom ? '2026-09-26T10:00:00Z' : null },
 				schemas: ['posts', 'authors'],
+				schemasGate: { state: 'ok' },
 				plugins: { state: 'named', running, withheld: [] },
 				user: { roles: ['admin'] },
 			},
@@ -66,5 +67,46 @@ describe('dashboard editor page', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /Start from the stock layout/ }));
 		expect(screen.getByText('1. Entry counts')).toBeTruthy();
 		expect(screen.getAllByRole('button', { name: /^Remove widget/ }).length).toBeGreaterThan(3);
+	});
+});
+
+describe('dashboard widget controls', () => {
+	function mountWith(widgets: unknown[], schemasRead: boolean | 'forbidden' = true, schemas = ['posts', 'authors']) {
+		return render(EditorPage, {
+			props: {
+				data: {
+					layout: { entitled: true, custom: true, widgets, updated_at: null },
+					schemas,
+					schemasGate: schemasRead === 'forbidden' ? { state: 'forbidden' } : schemasRead ? { state: 'ok' } : { state: 'error', message: 'The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.' },
+					plugins: { state: 'named', running: ['content', 'media', 'audit'], withheld: [] },
+					user: { roles: ['admin'] },
+				},
+				form: null,
+			} as never,
+		});
+	}
+
+	it('picks the status from a segmented control and the counted schemas from a searchable list', () => {
+		const { container } = mountWith([
+			{ id: 'a', type: 'latest_entries', limit: 5, status: 'draft' },
+			{ id: 'b', type: 'entry_counts', schemas: ['posts'] },
+		]);
+		expect(screen.getByRole('radiogroup', { name: 'Status' })).toBeTruthy();
+		expect(screen.getByRole('radio', { name: 'Draft' }).getAttribute('aria-checked')).toBe('true');
+		expect(container.querySelector('#widget-a-status')).toBeNull();
+		expect(container.querySelector('#widget-b-schemas')).toBeTruthy();
+		expect(container.querySelectorAll('input[type="checkbox"]').length).toBe(6);
+	});
+
+	it('names the schema list in lower case inside the role refusal', () => {
+		const { container } = mountWith([], 'forbidden', []);
+		expect(container.textContent).toContain('Your role cannot open the schema list.');
+	});
+
+	it('keeps the schemas a widget names on screen when the schema list was not read', () => {
+		const { container } = mountWith([{ id: 'b', type: 'entry_counts', schemas: ['orders'] }], false, []);
+		expect(container.textContent).toContain('The schemas could not be read');
+		expect(container.textContent).not.toContain('no schemas to count yet');
+		expect(container.querySelector('#widget-b-schemas')?.closest('div')?.parentElement?.textContent).toContain('orders');
 	});
 });

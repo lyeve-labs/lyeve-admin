@@ -5,9 +5,11 @@ vi.mock('@lyeve-labs/client', () => ({
 	createClient: vi.fn(() => ({})),
 	ApiError: class ApiError extends Error {
 		status: number;
-		constructor(status: number, message: string) {
+		body?: unknown;
+		constructor(status: number, message: string, body?: unknown) {
 			super(message);
 			this.status = status;
+			this.body = body;
 		}
 	},
 }));
@@ -32,6 +34,7 @@ vi.mock('$lib/server/authz', () => ({
 
 import { load, actions } from './+page.server';
 import { listPermissions, getSchemas, upsertPermission } from '@lyeve-labs/client-rest';
+import { ApiError } from '@lyeve-labs/client';
 
 const mockedListPermissions = vi.mocked(listPermissions);
 const mockedGetSchemas = vi.mocked(getSchemas);
@@ -52,7 +55,7 @@ function loadEvent() {
 interface LoadResult {
 	permissions: unknown[];
 	schemas: unknown[];
-	loadError: string | null;
+	loadGate: { state: string; message?: string } | null;
 }
 
 const permission = {
@@ -68,7 +71,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('permissions +page.server.ts load', () => {
+describe('reading the rules', () => {
 	it('returns the rules and schemas when both reads succeed', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([{ name: 'article' }] as never);
@@ -77,7 +80,7 @@ describe('permissions +page.server.ts load', () => {
 
 		expect(result.permissions).toEqual([permission]);
 		expect(result.schemas).toEqual([{ name: 'article' }]);
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 	});
 
 	it('reports a failed read rather than an empty matrix', async () => {
@@ -88,7 +91,7 @@ describe('permissions +page.server.ts load', () => {
 
 		const result = (await load(loadEvent())) as unknown as LoadResult;
 
-		expect(result.loadError).toBeTruthy();
+		expect(result.loadGate).toBeTruthy();
 		expect(result.permissions).toEqual([]);
 	});
 
@@ -98,7 +101,7 @@ describe('permissions +page.server.ts load', () => {
 
 		const result = (await load(loadEvent())) as unknown as LoadResult;
 
-		expect(result.loadError).toBeTruthy();
+		expect(result.loadGate).toBeTruthy();
 		expect(result.schemas).toEqual([]);
 	});
 
@@ -108,8 +111,8 @@ describe('permissions +page.server.ts load', () => {
 
 		const result = (await load(loadEvent())) as unknown as LoadResult;
 
-		expect(result.loadError).not.toContain('pq:');
-		expect(result.loadError).not.toContain('SSL');
+		expect(JSON.stringify(result.loadGate)).not.toContain('pq:');
+		expect(JSON.stringify(result.loadGate)).not.toContain('SSL');
 	});
 
 	it('refuses a session without super_admin', async () => {
@@ -139,7 +142,7 @@ function upsertEvent(fields: Record<string, string | string[]>) {
 	} as never;
 }
 
-describe('permissions +page.server.ts role ceiling', () => {
+describe('the role ceiling', () => {
 	it('takes the ceiling and the count from the plugin', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([] as never);
@@ -156,7 +159,7 @@ describe('permissions +page.server.ts role ceiling', () => {
 		const result = (await load(loadEvent())) as LoadResult & { roleCap: number; roleCount: number | null };
 		expect(result.roleCap).toBe(0);
 		expect(result.roleCount).toBeNull();
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 		expect(result.permissions).toHaveLength(1);
 	});
 
@@ -165,27 +168,38 @@ describe('permissions +page.server.ts role ceiling', () => {
 		limits.getRoleLimits.mockResolvedValueOnce({ roles: { limit: 7, current: 7 } });
 		const result = (await load(loadEvent())) as LoadResult & { roleCap: number };
 		expect(result.roleCap).toBe(7);
-		expect(result.loadError).toBeTruthy();
+		expect(result.loadGate).toBeTruthy();
 	});
 });
 
-describe('permissions +page.server.ts flows as resources', () => {
+describe('flows as resources', () => {
 	it('lists the flows beside the schemas', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([{ name: 'article' }] as never);
 		flows.listAllFlows.mockResolvedValueOnce([{ id: 'f1', slug: 'send-receipt', name: 'Send receipt' }]);
 		const result = (await load(loadEvent())) as LoadResult & { flows: { slug: string }[] };
 		expect(result.flows.map((f) => f.slug)).toEqual(['send-receipt']);
-		expect(result.loadError).toBeNull();
+		expect(result.loadGate).toBeNull();
 	});
 
 	it('reads an instance without the flow plugin as no flows, not a failed read', async () => {
 		mockedListPermissions.mockResolvedValue([permission] as never);
 		mockedGetSchemas.mockResolvedValue([] as never);
-		flows.listAllFlows.mockRejectedValueOnce(new Error('404'));
-		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[] };
+		flows.listAllFlows.mockRejectedValueOnce(new ApiError(404, 'not found'));
+		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
 		expect(result.flows).toEqual([]);
-		expect(result.loadError).toBeNull();
+		expect(result.flowsFailed).toBe(false);
+		expect(result.loadGate).toBeNull();
+	});
+
+	it('says the flows could not be read when the list fails for another reason', async () => {
+		mockedListPermissions.mockResolvedValue([permission] as never);
+		mockedGetSchemas.mockResolvedValue([] as never);
+		flows.listAllFlows.mockRejectedValueOnce(new ApiError(500, 'boom'));
+		const result = (await load(loadEvent())) as LoadResult & { flows: unknown[]; flowsFailed: boolean };
+		expect(result.flows).toEqual([]);
+		expect(result.flowsFailed).toBe(true);
+		expect(result.loadGate).toBeNull();
 	});
 
 	it('refuses activate on a schema before calling the engine', async () => {
@@ -207,7 +221,7 @@ describe('permissions +page.server.ts flows as resources', () => {
 	});
 });
 
-describe('permissions +page.server.ts actions.upsert', () => {
+describe('saving a rule', () => {
 	it('writes a wildcard rule with no actions for a new role', async () => {
 		mockedUpsertPermission.mockResolvedValue(permission as never);
 
@@ -238,5 +252,44 @@ describe('permissions +page.server.ts actions.upsert', () => {
 
 		expect(result).toMatchObject({ status: 422 });
 		expect(mockedUpsertPermission).not.toHaveBeenCalled();
+	});
+});
+
+describe('refused writes', () => {
+	type Failed = { status: number; data: Record<string, unknown> };
+
+	// The plugin's ceiling refusal, as its handler writes it: a 402 whose body
+	// names the cap and carries the ceiling and the count.
+	it('reads the role ceiling refusal with the numbers the plugin sent', async () => {
+		const body = { error: 'cap_exceeded', cap: 'rbac.roles', limit: 3, current: 3, upgrade_url: '' };
+		mockedUpsertPermission.mockRejectedValueOnce(new ApiError(402, 'cap_exceeded', body));
+		const result = (await actions.upsert(upsertEvent({ role: 'auditor', schema_name: '*', drawer: 'role' }))) as Failed;
+		expect(result).toEqual({
+			status: 402,
+			data: {
+				action: 'role',
+				roleCapReached: true,
+				refused: { kind: 'cap', cap: 'rbac.roles', limit: 3, current: 3, upgradeUrl: '' },
+			},
+		});
+	});
+
+	it('renders a license refusal that is not the role ceiling as a refusal, not as engine text', async () => {
+		const refusal = Object.assign(new ApiError(402, 'payment_required'), {
+			body: { error: 'payment_required', feature: 'feature:rbac', plugin: 'permissions' },
+		});
+		mockedUpsertPermission.mockRejectedValueOnce(refusal);
+		const result = (await actions.upsert(upsertEvent({ role: 'editor', schema_name: 'article', drawer: 'rule' }))) as Failed;
+		expect(result.status).toBe(402);
+		expect(result.data.refused).toMatchObject({ kind: 'feature' });
+		expect(result.data.roleCapReached).toBeUndefined();
+		expect(result.data.action).toBe('rule');
+	});
+
+	it('names the drawer that posted, so the failure shows in that drawer only', async () => {
+		mockedUpsertPermission.mockRejectedValueOnce(new ApiError(500, 'pq: boom'));
+		const result = (await actions.upsert(upsertEvent({ role: 'reviewer', schema_name: '*', drawer: 'role' }))) as Failed;
+		expect(result.data.action).toBe('role');
+		expect(result.data.error).toBe('The rule could not be saved.');
 	});
 });

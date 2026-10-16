@@ -5,10 +5,14 @@
 	import { ArrowLeft } from '@lucide/svelte';
 	import AuthShell from '$lib/components/AuthShell.svelte';
 	import { submitter } from '$lib/forms.svelte';
+	import OrganizationField from '$lib/components/OrganizationField.svelte';
 	import { ICON } from '$lib/icon';
-	import type { ActionData } from './$types';
+	import { withOrganization } from '$lib/organization';
+	import type { ActionData, PageData } from './$types';
 
-	let { form }: { form: ActionData } = $props();
+	let { form, data }: { form: ActionData; data: PageData } = $props();
+
+	const typed = $derived(form && 'tenant' in form && typeof form.tenant === 'string' ? form.tenant : null);
 
 	const send = submitter();
 </script>
@@ -22,7 +26,7 @@
 				If an account exists for {form.email}, a reset link is on its way. It works once and expires in
 				an hour.
 			</Alert>
-			<Button href="/login" variant="ghost" size="sm" full>
+			<Button href={withOrganization('/login', data.carried)} variant="ghost" size="sm" full>
 				<ArrowLeft size={ICON.sm} aria-hidden="true" />
 				Back to sign in
 			</Button>
@@ -45,9 +49,11 @@
 				autofocus
 			/>
 
+			<OrganizationField carried={data.carried} {typed} />
+
 			<Button type="submit" variant="primary" full loading={send.pending}>Email me a reset link</Button>
 
-			<Button href="/login" variant="ghost" size="sm" full>
+			<Button href={withOrganization('/login', data.carried)} variant="ghost" size="sm" full>
 				<ArrowLeft size={ICON.sm} aria-hidden="true" />
 				Back to sign in
 			</Button>

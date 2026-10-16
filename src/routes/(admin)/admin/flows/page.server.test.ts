@@ -118,8 +118,7 @@ describe('admin/flows load', () => {
 		});
 		const result = (await load(event)) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBeTruthy();
-		expect(result.loadError).not.toContain('pq:');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 		expect(result.flows).toEqual([]);
 		expect(calls.some((c) => c.url.includes('/templates'))).toBe(false);
 	});
@@ -134,7 +133,7 @@ describe('admin/flows load', () => {
 		const { event } = loadEvent({ '/api/admin/flows?': () => json({ error: 'forbidden' }, 403) });
 		const result = (await load(event)) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBe('Your role cannot read flows.');
+		expect(result.gate).toEqual({ state: 'forbidden' });
 	});
 
 	it('keeps the engine banner for a network failure', async () => {
@@ -144,7 +143,15 @@ describe('admin/flows load', () => {
 			},
 		});
 		const result = (await load(event)) as Loaded;
-		expect(result.loadError).toContain('could not be read from the engine');
+		expect(result.gate).toEqual({ state: 'unavailable' });
+	});
+
+	// A status no chip carries would filter the list with no chip selected.
+	it('reads a status it does not know as no filter', async () => {
+		const { event, calls } = loadEvent({ '/api/admin/flows?': () => json({ data: [], total: 0 }) }, '?status=archived');
+		const result = (await load(event)) as Loaded;
+		expect(result.status).toBe('');
+		expect(calls.find((c) => c.url.includes('/api/admin/flows?'))?.url).not.toContain('status=archived');
 	});
 
 	it('passes the status and search filters to the engine and back to the page', async () => {
@@ -231,17 +238,41 @@ describe('admin/flows create action', () => {
 		const result = (await actions.create(event)) as { status: number; data: { error: string; locked?: boolean; refusal: unknown } };
 		expect(result.status).toBe(402);
 		expect(result.data.locked).toBeUndefined();
-		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7 });
+		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: '' });
 		expect(result.data.error).toContain('7 of 7 flows');
 		expect(result.data.error).not.toContain('example-capability');
+	});
+
+	it('says the slug is taken when the plugin answers 409', async () => {
+		const form = new FormData();
+		form.set('name', 'Orders');
+		form.set('slug', 'orders');
+		const { event } = actionEvent({ '/api/admin/flows': () => json({ error: 'failed to create flow', code: 'conflict' }, 409) }, form);
+		const result = (await actions.create(event)) as { status: number; data: { action: string; error: string; field: string } };
+		expect(result.status).toBe(409);
+		expect(result.data).toEqual({ action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' });
+	});
+
+	it('carries the link the plugin names for more flows to the page', async () => {
+		const form = new FormData();
+		form.set('name', 'x');
+		form.set('slug', 'x');
+		const link = 'https://shop.example.com/pricing?utm_campaign=flow.flows';
+		const body = { error: 'cap_exceeded', cap: 'flow.flows', limit: 7, current: 7, upgrade_url: link };
+		const { event } = actionEvent({ '/api/admin/flows': () => json(body, 402) }, form);
+		const result = (await actions.create(event)) as { status: number; data: { error: string; refusal: unknown } };
+		expect(result.status).toBe(402);
+		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: link });
+		expect(result.data.error).toContain('A license that allows more lifts the limit.');
 	});
 
 	it('refuses a blank name before calling the engine', async () => {
 		const form = new FormData();
 		form.set('slug', 'x');
 		const { event, calls } = actionEvent({}, form);
-		const result = (await actions.create(event)) as { status: number };
+		const result = (await actions.create(event)) as { status: number; data: { action: string } };
 		expect(result.status).toBe(400);
+		expect(result.data.action).toBe('create');
 		expect(calls.filter((c) => !c.url.includes('/auth/me'))).toHaveLength(0);
 	});
 });
@@ -260,9 +291,10 @@ describe('admin/flows delete action', () => {
 		const form = new FormData();
 		form.set('id', 'f9');
 		const { event } = actionEvent({ '/api/admin/flows/f9': () => json({ error: 'super_admin required' }, 403) }, form);
-		const result = (await actions.delete(event)) as { status: number; data: { error: string; forbidden: boolean } };
+		const result = (await actions.delete(event)) as { status: number; data: { error: string; forbidden: boolean; action: string } };
 		expect(result.status).toBe(403);
 		expect(result.data.forbidden).toBe(true);
+		expect(result.data.action).toBe('delete');
 		expect(result.data.error).toBe('super_admin required');
 	});
 });
@@ -338,7 +370,9 @@ describe('admin/flows import action', () => {
 
 	it('refuses an empty import and a replace with no slug before calling the engine', async () => {
 		const empty = actionEvent({}, new FormData());
-		expect(((await actions.import(empty.event)) as { status: number }).status).toBe(400);
+		const refused = (await actions.import(empty.event)) as { status: number; data: { action: string } };
+		expect(refused.status).toBe(400);
+		expect(refused.data.action).toBe('import');
 
 		const form = new FormData();
 		form.set('text', '{}');

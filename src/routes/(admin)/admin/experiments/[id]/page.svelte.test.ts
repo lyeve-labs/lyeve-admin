@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -70,17 +70,27 @@ function results(over: Partial<ExperimentResults> = {}): ExperimentResults {
 	};
 }
 
-const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
-	data: {
-		experiment: experiment(),
-		variants: [variant(), variant({ id: 'v2', name: 'bright', is_control: false })],
-		metrics: [metric()],
-		results: results(),
-		gate: { state: 'ok' },
-		...over,
-	} as never,
-	form: form as never,
-});
+const ok = <T>(value: T) => ({ ok: true, value });
+const down = { ok: false, gate: { state: 'unavailable' } };
+
+/** Each panel answered, unless `over` says otherwise. A bare value is an answered read. */
+const props = (over: Record<string, unknown> = {}, form: unknown = null) => {
+	const panel = (key: string, fallback: unknown) => {
+		const v = key in over ? over[key] : fallback;
+		return v && typeof v === 'object' && 'ok' in v ? v : ok(v);
+	};
+	return {
+		data: {
+			experiment: experiment(),
+			gate: { state: 'ok' },
+			...over,
+			variants: panel('variants', [variant(), variant({ id: 'v2', name: 'bright', is_control: false })]),
+			metrics: panel('metrics', [metric()]),
+			results: panel('results', results()),
+		} as never,
+		form: form as never,
+	};
+};
 
 describe('the verdict', () => {
 	it('names the leader when the engine called it significant', () => {
@@ -101,15 +111,40 @@ describe('the verdict', () => {
 		expect(text).not.toContain('Ahead');
 	});
 
-	it('warns when a variant is below the minimum the experiment set itself', () => {
+	it('warns while the exposures across all variants are below the minimum', () => {
 		const thin = results({
+			variants: [
+				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 40, conversions: 4, conversion_rate: 0.1 },
+				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 9, conversions: 4, conversion_rate: 0.44 },
+			],
+		});
+		const { container } = render(DetailPage, { props: props({ results: thin }) });
+		const text = said(container);
+		expect(text).toContain('So far the experiment has 49 exposures across all variants, fewer than the 100 it needs.');
+		expect(text).toContain('no result counts as significant');
+	});
+
+	it('counts a single exposure in the singular', () => {
+		const one = results({
+			variants: [
+				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 0, conversions: 0, conversion_rate: 0 },
+				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 1, conversions: 1, conversion_rate: 1 },
+			],
+		});
+		const { container } = render(DetailPage, { props: props({ results: one }) });
+		expect(said(container)).toContain('So far the experiment has 1 exposure across all variants');
+	});
+
+	// The minimum is a total, so a lopsided split past it is not short of it.
+	it('does not warn once the total reaches the minimum, however it is split', () => {
+		const lopsided = results({
 			variants: [
 				{ variant_id: 'v1', variant_name: 'control', is_control: true, sample_size: 500, conversions: 50, conversion_rate: 0.1 },
 				{ variant_id: 'v2', variant_name: 'bright', is_control: false, sample_size: 9, conversions: 4, conversion_rate: 0.44 },
 			],
 		});
-		const { container } = render(DetailPage, { props: props({ results: thin }) });
-		expect(said(container)).toContain('not yet worth acting on');
+		const { container } = render(DetailPage, { props: props({ results: lopsided }) });
+		expect(said(container)).not.toContain('fewer than');
 	});
 });
 
@@ -142,8 +177,80 @@ describe('the empty states', () => {
 		expect(said(container)).toContain('can never produce a result');
 	});
 
-	it('says there is no result yet rather than reporting one', () => {
-		const { container } = render(DetailPage, { props: props({ results: null }) });
-		expect(said(container)).toContain('No results yet');
+	it('says nobody has been exposed yet when the results answer with no exposure', () => {
+		const { container } = render(DetailPage, { props: props({ results: results({ variants: [], significant: false, winner: null }) }) });
+		expect(said(container)).toContain('Nobody has been exposed to this experiment yet');
+	});
+});
+
+/*
+ * A panel whose read failed is not an empty panel. Offering to add the first
+ * variant over a list that may already have two would duplicate them on the
+ * next try.
+ */
+describe('a panel that could not be read', () => {
+	it('says the variants could not be read and offers no new variant', () => {
+		const { container } = render(DetailPage, { props: props({ variants: down }) });
+		const text = said(container);
+		expect(text).toContain('the variants could not be read');
+		expect(text).not.toContain('splits nothing');
+		expect(text).not.toContain('New variant');
+	});
+
+	it('says the metrics could not be read and offers no new metric', () => {
+		const { container } = render(DetailPage, { props: props({ metrics: down }) });
+		const text = said(container);
+		expect(text).toContain('the metrics could not be read');
+		expect(text).not.toContain('can never produce a result');
+		expect(text).not.toContain('New metric');
+	});
+
+	it('says the results could not be read and counts no exposure', () => {
+		const { container } = render(DetailPage, { props: props({ results: down }) });
+		const text = said(container);
+		expect(text).toContain('the results could not be read');
+		expect(text).not.toContain('Nobody has been exposed');
+		expect(text).toContain('Exposures unknown');
+	});
+});
+
+/*
+ * The page's forms share one result. A failed remove belongs on the page, and
+ * a failed add in its own drawer.
+ */
+describe('where a failure shows', () => {
+	it('shows a failed remove on the page and not in a drawer opened after it', async () => {
+		const { container, getAllByText } = render(DetailPage, {
+			props: props({}, { action: 'removeVariant', error: 'The variant could not be removed.' }),
+		});
+		expect(said(container)).toContain('The variant could not be removed.');
+
+		await fireEvent.click(getAllByText('New variant')[0]);
+		const drawer = container.ownerDocument.querySelector('#variant-form') as HTMLElement;
+		expect(said(drawer)).not.toContain('could not be removed');
+	});
+
+	it('shows a failed add inside its drawer and not in the other', async () => {
+		const { container, getAllByText } = render(DetailPage, {
+			props: props({}, { action: 'addMetric', error: 'Choose a metric type.' }),
+		});
+		expect(said(container)).not.toContain('Choose a metric type.');
+
+		await fireEvent.click(getAllByText('New variant')[0]);
+		expect(said(container.ownerDocument.querySelector('#variant-form') as HTMLElement)).not.toContain('Choose a metric type.');
+	});
+
+});
+
+describe('the new metric drawer', () => {
+	// Four short types fit in sight, so they are segments rather than a list
+	// that hides three of them.
+	it('offers the four metric types as segments and submits the chosen one', async () => {
+		const { container, getAllByText } = render(DetailPage, { props: props() });
+		await fireEvent.click(getAllByText('New metric')[0]);
+
+		const drawer = container.ownerDocument.querySelector('#metric-form') as HTMLElement;
+		expect(drawer.querySelectorAll('[role="radio"]').length).toBe(4);
+		expect((drawer.querySelector('input[name="metric_type"]') as HTMLInputElement).value).toBe('conversion');
 	});
 });

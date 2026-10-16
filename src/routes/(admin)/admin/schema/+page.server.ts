@@ -1,21 +1,26 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { ApiError, createClient, type Schema } from '@lyeve-labs/client';
+import { ApiError, type Schema, type HttpClient } from '@lyeve-labs/client';
 import { getSchemas, getSchemaStats } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole, requireUser } from '$lib/server/authz';
+import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { retryBusy } from '$lib/server/retry-busy';
-import { bundleContentType, flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
+import { bundleContentType, readImportForm } from '$lib/server/flow-import';
 import { IMPORT_SOURCES } from './import-sources';
 import { applySchemaPreset, deleteSchemaPreset, readSchemaPresets, saveSchemaPreset, type SchemaPreset } from '$lib/api/schema-preset-catalog';
 import { NO_CANVAS, parsePositions, readCanvasLayout, saveCanvasLayout, type CanvasLayout } from '$lib/api/schema-canvas-layout';
 import { refusalOf, refusalText } from '$lib/api/refusal';
-import { sessionToken } from '$lib/server/session-cookie';
+import { section, type Gate } from '$lib/api/gate';
 
 /** Every schema write the engine serves takes one of these. */
 const WRITERS = ['admin', 'super_admin'];
 
-export type DryRunStatement = { description: string; sql: string; down_sql?: string };
+/**
+ * One statement a save would run. `destructive` marks one the save queues
+ * instead of running, because it drops data: it waits in History until a
+ * super admin applies it.
+ */
+export type DryRunStatement = { description: string; sql: string; down_sql?: string; destructive?: boolean };
 
 /** One statement the engine recorded for a table, as GET .../history answers it. */
 export type HistoryEntry = {
@@ -45,7 +50,7 @@ export type ImportPlan = {
  */
 const STATS_CONCURRENCY = 8;
 
-async function countRows(schemas: Schema[], client: ReturnType<typeof createClient>): Promise<Record<string, number>> {
+async function countRows(schemas: Schema[], client: HttpClient): Promise<Record<string, number>> {
 	const out: Record<string, number> = {};
 	let next = 0;
 	async function worker() {
@@ -62,43 +67,49 @@ async function countRows(schemas: Schema[], client: ReturnType<typeof createClie
 	return out;
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent } = event;
 	const { user } = await parent();
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	const canWrite = (user?.roles ?? []).some((r: string) => WRITERS.includes(r));
 	const isSuperAdmin = (user?.roles ?? []).includes('super_admin');
 
 	// A failed read is said as one, not drawn as an instance with no schemas:
 	// the empty state offers to create the first one, and a table the engine
 	// could not list is not a table that is not there.
-	let schemas: Schema[];
-	try {
-		schemas = await getSchemas(client);
-	} catch {
+	const read = await section(getSchemas(client), 'The schemas could not be read. This is not a report that there are none.');
+	if (!read.ok) {
 		return {
 			schemas: [] as Schema[],
 			rowCounts: Promise.resolve({} as Record<string, number>),
 			presets: [] as SchemaPreset[],
-			presetsError: null,
+			presetsGate: null as Gate | null,
 			canSavePresets: false,
 			canvas: NO_CANVAS as CanvasLayout,
+			// The canvas draws the schemas, so it says the same failure rather
+			// than a license that leaves it out.
+			canvasGate: read.gate as Gate | null,
 			canWrite,
 			isSuperAdmin,
-			loadError: true,
+			loadGate: read.gate as Gate | null,
 		};
 	}
+	const schemas = read.value;
 
+	// The presets and the canvas layout are served to an admin only, and the
+	// page offers neither to another role. Reading them for an editor would
+	// only collect a refusal.
+	//
 	// The presets are an offer, not the page: an install that has none, or
 	// cannot list them, still edits the schemas it has. The refusal is kept so
 	// the picker can say why it is empty rather than claim there are none.
 	let presets: SchemaPreset[] = [];
-	let presetsError: string | null = null;
+	let presetsGate: Gate | null = null;
 	let canSavePresets = false;
-	try {
-		({ presets, canSave: canSavePresets } = await readSchemaPresets(client));
-	} catch (err) {
-		presetsError = err instanceof ApiError && err.status === 404 ? null : 'The presets could not be loaded.';
+	if (canWrite) {
+		const offered = await section(readSchemaPresets(client), 'The presets could not be read. This is not a report that there are none.');
+		if (offered.ok) ({ presets, canSave: canSavePresets } = offered.value);
+		else presetsGate = offered.gate;
 	}
 
 	// Streamed: the list paints with the definitions, and the counts arrive
@@ -106,11 +117,33 @@ export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
 	const rowCounts = countRows(schemas, client);
 
 	// The plugin says whether this install draws the canvas, with the layout
-	// it saved. A read that fails draws none, which is what an install without
-	// the capability sees, and the list editor still does everything.
-	const canvas = await readCanvasLayout(client).catch(() => NO_CANVAS);
+	// it saved. A read that fails keeps its gate, so an outage or a refusal is
+	// never drawn as a license that leaves the canvas out. The layout route
+	// admits an admin only, so another role is told so without asking.
+	let canvas: CanvasLayout = NO_CANVAS;
+	let canvasGate: Gate | null = { state: 'forbidden' };
+	if (canWrite) {
+		const layout = await section(readCanvasLayout(client), 'The canvas layout could not be read, so the canvas is not drawn.');
+		if (layout.ok) {
+			canvas = layout.value;
+			canvasGate = null;
+		} else {
+			canvasGate = layout.gate;
+		}
+	}
 
-	return { schemas, rowCounts, presets, presetsError, canSavePresets, canvas, canWrite, isSuperAdmin, loadError: false };
+	return {
+		schemas,
+		rowCounts,
+		presets,
+		presetsGate,
+		canSavePresets,
+		canvas,
+		canvasGate,
+		canWrite,
+		isSuperAdmin,
+		loadGate: null as Gate | null,
+	};
 };
 
 function parseSchema(raw: FormDataEntryValue | null): Schema | null {
@@ -302,7 +335,7 @@ export const actions: Actions = {
 		try {
 			res = await event.fetch(`/api/admin/schemas/import?${query}`, {
 				method: 'POST',
-				headers: { ...flowAuthHeaders(event), 'Content-Type': type },
+				headers: { ...authedHeaders(event), 'Content-Type': type },
 				body: payload,
 			});
 		} catch {
@@ -335,11 +368,11 @@ export const actions: Actions = {
 	},
 
 	preset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '').trim();
-		if (!id) return fail(400, { error: 'Choose a preset.', preset: '' });
+		if (!id) return fail(400, { action: 'preset' as const, error: 'Choose a preset.', preset: '' });
 
 		try {
 			const result = await applySchemaPreset(client, id);
@@ -349,17 +382,17 @@ export const actions: Actions = {
 			// on: a schema of that name is already here. The plugin's sentence
 			// says which, so it is relayed beside the preset it belongs to.
 			if (err instanceof ApiError && err.status === 409) {
-				return fail(409, { error: actionError(err, 'A schema this preset creates already exists.'), preset: id });
+				return fail(409, { action: 'preset' as const, error: actionError(err, 'A schema this preset creates already exists.'), preset: id });
 			}
 			if (err instanceof ApiError && err.status === 404) {
-				return fail(404, { error: 'This install does not ship this preset.', preset: id });
+				return fail(404, { action: 'preset' as const, error: 'This install does not ship this preset.', preset: id });
 			}
-			return fail(400, { error: actionError(err, 'The preset could not be created.'), preset: id });
+			return fail(400, { action: 'preset' as const, error: actionError(err, 'The preset could not be created.'), preset: id });
 		}
 	},
 
 	savePreset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const url = String(data.get('url') ?? '').trim();
@@ -387,7 +420,7 @@ export const actions: Actions = {
 	// The canvas saves after every gesture that moves a node. The page sends
 	// the whole map, and the plugin replaces what it holds with it.
 	saveLayout: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		let positions;
 		try {
@@ -406,15 +439,15 @@ export const actions: Actions = {
 	},
 
 	deletePreset: async (event) => {
-		await requireUser(event);
+		await requireRole(event, WRITERS);
 		const client = authedClient(event);
 		const id = String((await event.request.formData()).get('id') ?? '').trim();
-		if (!id) return fail(400, { error: 'Choose a preset.', preset: '' });
+		if (!id) return fail(400, { action: 'deletePreset' as const, error: 'Choose a preset.', preset: '' });
 		try {
 			await deleteSchemaPreset(client, id);
 			return { deletedPreset: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The preset could not be deleted.'), preset: id });
+			return fail(400, { action: 'deletePreset' as const, error: actionError(err, 'The preset could not be deleted.'), preset: id });
 		}
 	},
 };

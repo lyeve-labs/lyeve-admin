@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({
@@ -7,10 +7,16 @@ vi.mock('$app/navigation', () => ({
 	invalidateAll: vi.fn(async () => {}),
 }));
 
+vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/observability/queries?offset=50') } }));
+
 import QueriesPage from './+page.svelte';
-import type { QueryLogEntry } from '$lib/api/query-monitor';
+import type { AnalysisRead, NoPlansReason, QueryLogEntry } from '$lib/api/query-monitor';
 
 afterEach(cleanup);
+
+function read(entries: QueryLogEntry[], plansRead: number | null = null, noPlansReason: NoPlansReason | null = null): AnalysisRead {
+	return { entries, missingIndexes: [], plansRead, noPlansReason };
+}
 
 function entry(over: Partial<QueryLogEntry> = {}): QueryLogEntry {
 	return {
@@ -33,7 +39,7 @@ const props = (over: Record<string, unknown> = {}) => ({
 		offset: 0,
 		gate: { state: 'ok' },
 		dialect: null,
-		analyzed: [],
+		analysis: null,
 		analyzeFailed: false,
 		licensed: true,
 		...over,
@@ -58,10 +64,34 @@ describe('Slow queries gate', () => {
 
 	it('names the store when the capture table did not answer', () => {
 		const { container } = render(QueriesPage, {
-			props: props({ gate: { state: 'unavailable' }, entries: [] }),
+			props: props({ gate: { state: 'capture_store' }, entries: [] }),
 		});
 
 		expect(container.textContent).toContain('capture store did not answer');
+	});
+
+	// A pending migration is applied while the page is open, so the notice
+	// offers the same retry as every other read that did not answer.
+	it('offers to try the capture store again', () => {
+		const { getByRole } = render(QueriesPage, {
+			props: props({ gate: { state: 'capture_store' }, entries: [] }),
+		});
+
+		const retry = getByRole('link', { name: /Try again/ });
+		expect(retry.getAttribute('href')).toBe('/admin/observability/queries?offset=50');
+		expect(retry.hasAttribute('data-sveltekit-reload')).toBe(true);
+	});
+
+	// The shared outage state once landed in the capture store warning, which
+	// sent the reader to look for a pending migration while the engine was down.
+	it('reads an outage as an outage rather than as the capture store', () => {
+		const { container } = render(QueriesPage, {
+			props: props({ gate: { state: 'unavailable' }, entries: [] }),
+		});
+
+		expect(container.textContent).toContain('did not answer');
+		expect(container.textContent).not.toContain('capture store');
+		expect(container.textContent).toContain('Try again');
 	});
 });
 
@@ -116,7 +146,7 @@ describe('Slow queries analysis', () => {
 		const { container } = render(QueriesPage, {
 			props: props({
 				dialect: 'postgres',
-				analyzed: [
+				analysis: read([
 					entry({
 						analysis: {
 							index_suggestions: [
@@ -129,12 +159,47 @@ describe('Slow queries analysis', () => {
 							],
 						},
 					}),
-				],
+				]),
 			}),
 		});
 
 		expect(container.textContent).toContain('sys_content');
 		expect(container.textContent).toContain('CREATE INDEX ON sys_content (tenant_id, status)');
+	});
+
+	it('says no plan was read and why, rather than that every plan uses an index', () => {
+		const { container } = render(QueriesPage, {
+			props: props({ dialect: 'postgres', analysis: read([entry()], 0, 'source_missing') }),
+		});
+
+		expect(container.textContent).toContain('No plans were read');
+		expect(container.textContent).toContain('pg_stat_statements');
+		expect(container.textContent).not.toContain('already');
+	});
+
+	it('says how many plans it read when none needs an index', () => {
+		const { container } = render(QueriesPage, {
+			props: props({ dialect: 'postgres', analysis: read([entry({ plan_text: '[]' })], 1) }),
+		});
+
+		expect(container.textContent).toContain('Nothing to suggest in the plan the analyzer read');
+	});
+
+	it("lists SQL Server's own missing-index suggestions", () => {
+		const { container } = render(QueriesPage, {
+			props: props({
+				dialect: 'mssql',
+				analysis: {
+					entries: [],
+					missingIndexes: [{ table: 'sys_users', columns: ['email'], reason: 'equality on email' }],
+					plansRead: null,
+					noPlansReason: null,
+				},
+			}),
+		});
+
+		expect(container.textContent).toContain('sys_users');
+		expect(container.textContent).toContain('equality on email');
 	});
 
 	it('says the dialect is wrong rather than that there is nothing to suggest', () => {
@@ -146,5 +211,26 @@ describe('Slow queries analysis', () => {
 
 		expect(container.textContent).toContain('could not explain these statements as mssql');
 		expect(container.textContent).not.toContain('Nothing to suggest');
+	});
+});
+
+describe('Slow queries filter', () => {
+	// The table head and the pager stood above the empty state, so an empty
+	// table read as a page of rows that failed to draw.
+	it('draws no table or pager when nothing on the page matches', async () => {
+		const { container } = render(QueriesPage, { props: props() });
+		const input = container.querySelector('#query-narrow') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'no such statement' } });
+
+		expect(container.textContent).toContain('Nothing on this page matches');
+		expect(container.querySelector('table')).toBeNull();
+		expect(container.querySelector('nav[aria-label*="agination" i]')).toBeNull();
+	});
+});
+
+describe('the search box', () => {
+	it('is named for a screen reader', () => {
+		const { container } = render(QueriesPage, { props: props() });
+		expect(container.querySelector('label[for="query-narrow"]')?.textContent).toBe('Narrow this page');
 	});
 });

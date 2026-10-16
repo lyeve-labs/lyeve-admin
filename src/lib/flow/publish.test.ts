@@ -44,6 +44,12 @@ describe('writeButtons', () => {
 		expect(writeButtons({ ...base, live: true, dirty: true }).publish.disabled).toBe(false);
 	});
 
+	it('keeps Publish open but not primary when the versions could not be read, and says why', () => {
+		const out = writeButtons({ ...base, liveUnknown: true }).publish;
+		expect(out).toMatchObject({ disabled: false, variant: 'secondary' });
+		expect(out.hint).toContain('versions could not be read');
+	});
+
 	it('disables Publish with the reason when the draft cannot be published', () => {
 		expect(writeButtons({ ...base, publishable: false }).publish).toMatchObject({ disabled: true, hint: base.refusal });
 	});

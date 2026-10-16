@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ApiError } from '@lyeve-labs/client';
+import { listMediaChoices } from '$lib/api/media';
 
 const api = vi.hoisted(() => ({
 	getCustomization: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock('$lib/api/customization', async (orig) => ({
 }));
 
 import { actions, load } from './+page.server';
+import { requireRole } from '$lib/server/authz';
 
 const settings = () => ({
 	brand: { name: 'Old', logo_url: '', accent: '', welcome: '' },
@@ -67,7 +70,24 @@ describe('customization settings', () => {
 		const data = (await load(event({}))) as { entitled: boolean; navChoices: unknown[]; mediaChoices: unknown[] };
 		expect(data.entitled).toBe(false);
 		expect(data.navChoices).toEqual([]);
-		expect(data.mediaChoices).toEqual([]);
+		expect(data.mediaChoices).toBeNull();
+	});
+
+	// A failed read is said as its gate, never as a tenant that may not shape
+	// its admin and never as a page the shell replaces with an outage.
+	it('keeps a failed customization read as its gate', async () => {
+		api.getCustomization.mockRejectedValue(new ApiError(503, 'unavailable'));
+		const down = (await load(event({}))) as { gate: { state: string }; entitled: boolean };
+		expect(down.gate).toEqual({ state: 'unavailable' });
+		api.getCustomization.mockRejectedValue(new ApiError(403, 'forbidden'));
+		expect(((await load(event({}))) as { gate: unknown }).gate).toEqual({ state: 'forbidden' });
+	});
+
+	it('says the media library was not read rather than that it is empty', async () => {
+		vi.mocked(listMediaChoices).mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		const data = (await load(event({}))) as { mediaChoices: unknown; gate: { state: string } };
+		expect(data.gate).toEqual({ state: 'ok' });
+		expect(data.mediaChoices).toBeNull();
 	});
 
 	it('offers the menu entries of the plugins that run', async () => {
@@ -258,5 +278,58 @@ describe('tab icon', () => {
 		const res = (await actions.uploadFavicon(svg.ev)) as { status: number; data: { faviconError: string } };
 		expect(res.status).toBe(400);
 		expect(res.data.faviconError).toBe('A tab icon is a PNG, JPEG or WebP image.');
+	});
+});
+
+describe('menu link, dashboard page and page delete', () => {
+	const refusal = new ApiError(422, 'home_page names no page');
+	const outage = new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused');
+
+	it('removes the named link and keeps the rest of the menu', async () => {
+		expect(await actions.removeLink(event({ index: '0' }))).toEqual({ linkRemoved: true });
+		const saved = api.saveCustomization.mock.calls[0][1] as ReturnType<typeof settings>;
+		expect(saved.menu.links).toEqual([]);
+		expect(saved.menu.hidden).toEqual(['search']);
+	});
+
+	it('sets the page the dashboard leads with', async () => {
+		expect(await actions.home(event({ home_page: 'welcome' }))).toEqual({ homeSaved: true });
+		expect((api.saveCustomization.mock.calls[0][1] as { home_page: string }).home_page).toBe('welcome');
+	});
+
+	it('deletes the named page', async () => {
+		api.deleteCustomPage.mockResolvedValue(undefined);
+		expect(await actions.deletePage(event({ slug: 'welcome' }))).toEqual({ pageDeleted: true });
+		expect(api.deleteCustomPage).toHaveBeenCalledWith(client, 'welcome');
+	});
+
+	it('relays a refusal under the key of the card it was made in', async () => {
+		api.saveCustomization.mockRejectedValue(refusal);
+		expect(await actions.removeLink(event({ index: '0' }))).toMatchObject({ status: 400, data: { menuError: 'home_page names no page' } });
+		expect(await actions.home(event({ home_page: 'x' }))).toMatchObject({ status: 400, data: { pagesError: 'home_page names no page' } });
+	});
+
+	it('keeps an outage body off the page', async () => {
+		api.getCustomization.mockRejectedValue(outage);
+		expect(await actions.removeLink(event({ index: '0' }))).toMatchObject({ data: { menuError: 'The link could not be removed.' } });
+		expect(await actions.home(event({ home_page: 'x' }))).toMatchObject({ data: { pagesError: 'The dashboard page could not be saved.' } });
+	});
+
+	it.each(['removeLink', 'home', 'deletePage'] as const)('holds %s to an admin', async (name) => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		const e = event({ index: '0', home_page: 'x', slug: 'x' });
+		await expect(actions[name](e)).rejects.toMatchObject({ status: 403 });
+		expect(requireRole).toHaveBeenCalledWith(e, ['admin', 'super_admin']);
+		expect(api.saveCustomization).not.toHaveBeenCalled();
+		expect(api.deleteCustomPage).not.toHaveBeenCalled();
+	});
+});
+
+describe('a failed page delete', () => {
+	it('reports under its own key, which the Pages card draws', async () => {
+		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found'));
+		expect(await actions.deletePage(event({ slug: 'gone' }))).toMatchObject({ status: 400, data: { pageDeleteError: 'page not found' } });
+		api.deleteCustomPage.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
+		expect(await actions.deletePage(event({ slug: 'x' }))).toMatchObject({ data: { pageDeleteError: 'The page could not be deleted.' } });
 	});
 });

@@ -7,7 +7,6 @@ import {
 	roleIsSound,
 	windowLabel,
 	exhausted,
-	headroom,
 	rateLabel,
 	rateLimitGate,
 	resetsIn,
@@ -96,14 +95,6 @@ describe('the live counters', () => {
 		expect(exhausted(rows)).toHaveLength(1);
 	});
 
-	// Against the burst, because the burst is the size of the bucket and the
-	// rate is how fast it refills. Two of fifty left is nearly out.
-	it('measures headroom against the burst, not the rate', () => {
-		expect(headroom(state({ remaining: 10, burst: 20 }))).toBe(0.5);
-		expect(headroom(state({ remaining: 0, burst: 20 }))).toBe(0);
-		expect(headroom(state({ remaining: 5, burst: 0 }))).toBe(0);
-	});
-
 	it('counts a reset down rather than printing a timestamp', () => {
 		const now = new Date('2026-09-23T12:00:00Z');
 		expect(resetsIn('2026-09-23T12:00:30Z', now)).toBe('30s');
@@ -138,7 +129,8 @@ describe('the gate', () => {
 	it('calls a 404 absent, a 402 not enabled and anything else a failure', () => {
 		expect(rateLimitGate(new ApiError(404, 'not found')).state).toBe('absent');
 		expect(rateLimitGate(new ApiError(402, 'payment required')).state).toBe('locked');
-		expect(rateLimitGate(new ApiError(503, 'database error')).state).toBe('error');
+		expect(rateLimitGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(rateLimitGate(new ApiError(503, 'database error')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as nothing being limited', () => {

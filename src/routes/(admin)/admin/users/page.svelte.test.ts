@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { render, cleanup, fireEvent, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({
@@ -23,8 +23,11 @@ function accounts(count: number, from = 0) {
 	}));
 }
 
+/** Load data as the load returns it. A bare array stands for a read that answered. */
 function data(overrides: Record<string, unknown> = {}) {
-	return { users: accounts(25), limit: 25, offset: 0, hasMore: false, tenants: [], ...overrides };
+	const answered = (value: unknown) => (Array.isArray(value) ? { ok: true, value } : value);
+	const merged: Record<string, unknown> = { users: accounts(25), limit: 25, offset: 0, hasMore: false, tenants: [], ...overrides };
+	return { ...merged, users: answered(merged.users), tenants: answered(merged.tenants) };
 }
 
 const props = (over: Record<string, unknown> = {}) =>
@@ -87,6 +90,19 @@ describe('Users create', () => {
 		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
 
 		expect(getByRole('button', { name: /close/i })).toBeTruthy();
+	});
+
+	// An install may set its own minimum and drop the complexity rule, and the
+	// console cannot read either, so the hint gives the default as a default.
+	it('names the engine\'s policy and gives its rules only as the default', async () => {
+		const { container, getAllByRole } = render(UsersPage, { props: props() });
+
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+
+		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+		expect(dialog.textContent).toContain(
+			"The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
+		);
 	});
 
 	// The roles offered here and on the API key page are the same list.
@@ -160,15 +176,18 @@ describe('Users pagination', () => {
  */
 describe('Users form errors', () => {
 	const rejected = {
+		action: 'create',
 		error: 'Check the highlighted fields.',
-		fields: { email: 'Email is required', password: 'Password must be at least 8 characters' },
+		fields: { email: 'Email is required', password: 'Password must be at least 12 characters' },
 	};
 
+	// The failure comes back while the drawer is open, as a submit's does.
 	async function openCreate(form: unknown) {
 		const rendered = render(UsersPage, {
-			props: { data: data() as never, form: form as never },
+			props: { data: data() as never, form: null as never },
 		});
 		await fireEvent.click(rendered.getAllByRole('button', { name: /new user/i })[0]);
+		await rendered.rerender({ data: data() as never, form: form as never });
 		return rendered;
 	}
 
@@ -193,7 +212,7 @@ describe('Users form errors', () => {
 
 		expect(container.querySelector('#new-pw')?.getAttribute('aria-invalid')).toBe('true');
 		expect(container.querySelector('#new-pw-error')?.textContent).toBe(
-			'Password must be at least 8 characters'
+			'Password must be at least 12 characters'
 		);
 	});
 
@@ -203,7 +222,7 @@ describe('Users form errors', () => {
 	it('announces the rejection through a live region', async () => {
 		const { container } = await openCreate(rejected);
 
-		const region = container.querySelector('[aria-live="assertive"]');
+		const region = container.querySelector('[role="dialog"] [aria-live="assertive"]');
 		expect(region).toBeTruthy();
 		expect(region?.textContent).toContain('2 fields need attention.');
 	});
@@ -222,15 +241,17 @@ describe('Users form errors', () => {
  */
 describe('Users set password', () => {
 	const refused = {
+		action: 'setPassword',
 		error: 'Check the highlighted field.',
 		fields: { new_password: 'password must be at least 12 characters' },
 	};
 
 	async function openSetPassword(form: unknown) {
 		const rendered = render(UsersPage, {
-			props: { data: data({ users: accounts(1) }) as never, form: form as never },
+			props: { data: data({ users: accounts(1) }) as never, form: null as never },
 		});
 		await fireEvent.click(rendered.getByRole('button', { name: /set password for user0@b\.co/i }));
+		await rendered.rerender({ data: data({ users: accounts(1) }) as never, form: form as never });
 		return rendered;
 	}
 
@@ -280,6 +301,42 @@ describe('Users set password', () => {
 	});
 });
 
+// Every action answers into one `form`. A failure from one action must not
+// read as another form's failure.
+describe('Users failures stay with their own action', () => {
+	const deleteFailed = { action: 'delete', error: 'Failed to delete user' };
+
+	it('shows a failed delete on the page and never inside the next New user drawer', async () => {
+		const { getAllByRole, container } = render(UsersPage, {
+			props: { data: data({ users: accounts(1) }) as never, form: deleteFailed as never },
+		});
+		expect(container.textContent).toContain('Failed to delete user');
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).not.toContain('Failed to delete user');
+	});
+
+	it('keeps a failed password set out of the roles drawer', async () => {
+		const failed = { action: 'setPassword', error: 'Failed to set password' };
+		const { getByRole, container } = render(UsersPage, {
+			props: { data: data({ users: accounts(1) }) as never, form: failed as never },
+		});
+		await fireEvent.click(getByRole('button', { name: /edit roles for user0@b\.co/i }));
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).not.toContain('Failed to set password');
+	});
+
+	it('drops a create failure from an earlier opening of the drawer', async () => {
+		const failed = { action: 'create', error: 'Failed to create user' };
+		const { getAllByRole, container } = render(UsersPage, {
+			props: { data: data() as never, form: failed as never },
+		});
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).not.toContain('Failed to create user');
+	});
+});
+
 describe('Users create, several tenants', () => {
 	it('asks which tenant the account belongs to only when there are several', async () => {
 		const one = render(UsersPage, { props: props({ tenants: [{ slug: 'acme', name: 'Acme' }] }) });
@@ -291,6 +348,78 @@ describe('Users create, several tenants', () => {
 		await fireEvent.click(two.getAllByRole('button', { name: /new user/i })[0]);
 		expect(two.container.ownerDocument.querySelector('#new-tenant')).toBeTruthy();
 		expect(two.container.ownerDocument.querySelector('input[name="tenant_required"]')).toBeTruthy();
+	});
+});
+
+
+describe('Users read failures', () => {
+	it('says the accounts could not be read instead of inviting a first account', () => {
+		const failed = { ok: false, gate: { state: 'error', message: 'The accounts could not be read.' } };
+		const { container, queryByRole } = render(UsersPage, { props: props({ users: failed }) });
+
+		expect(container.textContent).toContain('The accounts could not be read.');
+		expect(container.textContent).not.toContain('No users yet');
+		expect(queryByRole('button', { name: /new user/i })).toBeNull();
+	});
+
+	it('says in the create form that the tenants could not be read', async () => {
+		const failed = { ok: false, gate: { state: 'unavailable' } };
+		const { getAllByRole, container } = render(UsersPage, { props: props({ tenants: failed }) });
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+
+		expect(container.ownerDocument.body.textContent).toContain('Tenants could not be read');
+	});
+});
+
+describe('Users role filter', () => {
+	it('offers the roles as chips', () => {
+		const { getByRole } = render(UsersPage, { props: props() });
+
+		expect(getByRole('group', { name: 'Role' })).toBeTruthy();
+		expect(getByRole('button', { name: 'super_admin' })).toBeTruthy();
+	});
+});
+
+describe('Users admin seat refusal', () => {
+	// The refusal comes back while the drawer is open, as a submit's does.
+	it('shows the seat count and a button to where more seats are bought', async () => {
+		const link = 'https://shop.example.com/pricing?plan=basic&utm_source=admin&utm_medium=product&utm_campaign=admin.seats';
+		const refused = { kind: 'cap', cap: 'admin.seats', limit: 3, current: 3, upgradeUrl: link };
+		const rendered = render(UsersPage, { props: { data: data() as never, form: null as never } });
+		await fireEvent.click(rendered.getAllByRole('button', { name: /new user/i })[0]);
+		await rendered.rerender({
+			data: data() as never,
+			form: { action: 'create', error: 'Every admin seat is taken.', refused } as never,
+		});
+
+		const dialog = within(rendered.container.ownerDocument.body.querySelector('[role="dialog"]') as HTMLElement);
+		expect(dialog.getByText(/3 of 3 are in use/)).toBeTruthy();
+		expect(dialog.getByText(/A license that allows more lifts the limit\./)).toBeTruthy();
+		const more = dialog.getByRole('link', { name: 'View the plan' });
+		expect(more.getAttribute('href')).toBe(link);
+		expect(more.getAttribute('target')).toBe('_blank');
+	});
+});
+
+describe('accounts a tenant identity provider created', () => {
+	it('marks them in words a tenant admin reads, and only them', () => {
+		const [local, password] = accounts(2);
+		const { getAllByRole } = render(UsersPage, {
+			props: props({ users: [{ ...local, tenant_local: true }, { ...password, tenant_local: false }] }),
+		});
+
+		const rows = getAllByRole('row').slice(1);
+		expect(within(rows[0]).queryByText('Signs in through your identity provider')).not.toBeNull();
+		expect(within(rows[1]).queryByText('Signs in through your identity provider')).toBeNull();
+	});
+
+	it('shows the address the account signs in with', () => {
+		const [local] = accounts(1);
+		const { getAllByRole } = render(UsersPage, {
+			props: props({ users: [{ ...local, email: 'pat@acme.example', tenant_local: true }] }),
+		});
+
+		expect(within(getAllByRole('row')[1]).queryByText('pat@acme.example')).not.toBeNull();
 	});
 });
 

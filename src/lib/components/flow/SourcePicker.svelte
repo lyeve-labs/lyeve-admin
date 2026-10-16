@@ -69,7 +69,7 @@
 		<Select
 			{id}
 			{label}
-			searchable={options.length > 8}
+			searchable
 			{required}
 			options={rows}
 			value={selected}

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render } from '@testing-library/svelte';
+import { fireEvent, render, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import JsonFieldEditor, { cellValue, pairsOf, parseError, textOf } from './JsonFieldEditor.svelte';
 
@@ -70,6 +70,12 @@ describe('JsonFieldEditor', () => {
 		expect(JSON.parse(getByTestId('json-preview').textContent ?? '')).toEqual({ a: 'x' });
 	});
 
+	it('opens what is saved by default for keys and values, behind a disclosure button', () => {
+		const { container } = render(JsonFieldEditor, { props: { value: '{"a":"x"}' } });
+		const toggle = within(container).getByRole('button', { name: 'What is saved' });
+		expect(toggle.getAttribute('aria-expanded')).toBe('true');
+	});
+
 	it('opens a nested document as JSON text', () => {
 		const { container } = render(JsonFieldEditor, { props: { value: '{"a":{"b":1}}' } });
 		expect(container.querySelector('textarea')).toBeTruthy();
@@ -81,5 +87,16 @@ describe('JsonFieldEditor', () => {
 		const area = container.querySelector('textarea') as HTMLTextAreaElement;
 		await fireEvent.input(area, { target: { value: '{"a":' } });
 		expect(container.textContent).toContain('Not valid JSON');
+	});
+});
+
+describe('the note on a value that stays JSON', () => {
+	// Written after the choice, the note was not read with it.
+	it('belongs to the edit choice, so a screen reader reads it with the control', () => {
+		const { container } = render(JsonFieldEditor, { props: { value: '{"a":{"b":1}}' } });
+		const group = container.querySelector('[role="radiogroup"]') as HTMLElement;
+		const ids = (group.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+		const described = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+		expect(described).toContain('stays as JSON');
 	});
 });

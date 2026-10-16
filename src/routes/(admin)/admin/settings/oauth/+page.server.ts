@@ -1,20 +1,30 @@
 import type { PageServerLoad, Actions } from './$types';
-import type { OAuthProvider } from '@lyeve-labs/client';
-import { createClient } from '@lyeve-labs/client';
 import { listOAuthProviders, createOAuthProvider, updateOAuthProvider, deleteOAuthProvider } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { fail, error } from '@sveltejs/kit';
+import { fail, error, type ActionFailure } from '@sveltejs/kit';
 import { actionFailure } from '$lib/server/action-error';
-import { sessionToken } from '$lib/server/session-cookie';
+import { section } from '$lib/api/gate';
 
-export const load: PageServerLoad = async ({ fetch, cookies, parent, url }) => {
+export const load: PageServerLoad = async (event) => {
+	const { parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
-	const providers = await listOAuthProviders(client).catch((): OAuthProvider[] => []);
+	const client = authedClient(event);
+	const providers = await section(
+		listOAuthProviders(client),
+		'The OAuth providers could not be read. This is not a report that there are none.'
+	);
 	return { providers };
 };
+
+/**
+ * The failure marked with the action that caused it. The page shows a failed
+ * delete beside the list and a failed save in its drawer, and never one in
+ * the other's place.
+ */
+function tagged<T extends Record<string, unknown>>(action: string, failure: ActionFailure<T>) {
+	return fail(failure.status, { ...failure.data, action });
+}
 
 export const actions: Actions = {
 	create: async (event) => {
@@ -41,7 +51,7 @@ export const actions: Actions = {
 				client,
 			);
 		} catch (e: unknown) {
-			return actionFailure(e, 'The provider could not be created.');
+			return tagged('create', actionFailure(e, 'The provider could not be created.'));
 		}
 		return { success: true };
 	},
@@ -71,7 +81,7 @@ export const actions: Actions = {
 		try {
 			await updateOAuthProvider(id, payload as Parameters<typeof updateOAuthProvider>[1], client);
 		} catch (e: unknown) {
-			return actionFailure(e, 'The provider could not be saved.');
+			return tagged('update', actionFailure(e, 'The provider could not be saved.'));
 		}
 		return { success: true };
 	},
@@ -85,7 +95,7 @@ export const actions: Actions = {
 		try {
 			await deleteOAuthProvider(id, client);
 		} catch (e: unknown) {
-			return actionFailure(e, 'The provider could not be deleted.');
+			return tagged('delete', actionFailure(e, 'The provider could not be deleted.'));
 		}
 		return { success: true };
 	},

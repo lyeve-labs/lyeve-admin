@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Button,
@@ -15,8 +14,6 @@
 		Select,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
-		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -24,7 +21,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import AlertChannelFields from '$lib/components/AlertChannelFields.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { channelSummary } from '$lib/api/alert-channels';
 	import { LOG_ALERT_LEVELS, ruleScope, type LogAlertRule } from '$lib/api/log-alerts';
@@ -73,21 +70,11 @@
 	}
 
 	function deleteRule(rule: LogAlertRule): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(
-				`Delete the rule on ${ruleScope(rule).toLowerCase()}?`,
-				'It stops firing. Its channels go with it.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!ok) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success('Rule deleted');
-			};
-		};
+		return confirmed(
+			`Delete the rule on ${ruleScope(rule).toLowerCase()}?`,
+			'It stops firing. Its channels go with it.',
+			{ confirmLabel: 'Delete', success: 'Rule deleted' },
+		);
 	}
 
 	// A new webhook URL's signing secret arrives once, in the write's answer.
@@ -98,8 +85,6 @@
 		}
 	});
 </script>
-
-<PageTitle title="Volume alerts" />
 
 <PageShell
 	title="Volume alerts"
@@ -117,6 +102,7 @@
 
 	{#if data.gate.state !== 'ok' || !config}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Volume alerts"
 			absent="The logging plugin is not part of this build, so there are no volume rules."
@@ -206,8 +192,11 @@
 						id="log-alert-cooldown"
 						name="cooldown"
 						label="Quiet time after a rule fires"
-						hint="A rule fires again only after this, such as 10m or 1h."
-						value={config.cooldown || '10m'}
+						hint={config.cooldown
+							? 'A rule fires again only after this, such as 10m or 1h.'
+							: 'No cooldown is set, so a rule fires on every check while it is over its count. Enter one such as 10m or 1h.'}
+						placeholder="10m"
+						value={config.cooldown}
 						mono
 					/>
 					<Button variant="secondary" type="submit">Save</Button>

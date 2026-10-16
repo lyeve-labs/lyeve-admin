@@ -8,6 +8,7 @@ vi.mock('$lib/server/authz', async (importOriginal) => ({
 	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
 }));
 
+import { assertRole, requireRole } from '$lib/server/authz';
 import { actions, load } from './+page.server';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
@@ -54,7 +55,7 @@ describe('the destinations load', () => {
 		expect(out.licensed).toBe(false);
 		expect(out.providers[0]).toMatchObject({ id: 'p1', retry_policy: { max_attempts: 3, backoff_seconds: 30 } });
 		expect(out.deliveries?.data[0]).toMatchObject({ id: 'd1', status: 'failed', last_error: 'timeout' });
-		expect(engine.get).toHaveBeenCalledWith('/api/admin/analytics/deliveries?limit=50&status=failed');
+		expect(engine.get).toHaveBeenCalledWith('/api/admin/analytics/deliveries?limit=51&status=failed');
 	});
 
 	it('still reads a plugin that answers the old bare array', async () => {
@@ -71,7 +72,28 @@ describe('the destinations load', () => {
 		});
 		const out = (await load(loadEvent())) as Loaded;
 		expect(out.deliveries).toBeNull();
+		expect(out.deliveriesGate).toEqual({ state: 'unavailable' });
 		expect(out.gate.state).toBe('ok');
+	});
+
+	// The plugin takes no offset and sends no count, so the list stopped at
+	// fifty with nothing saying more were owed.
+	it('says when more deliveries are owed than the list holds', async () => {
+		const rows = Array.from({ length: 51 }, (_, i) => ({ id: `d${i}`, status: 'failed' }));
+		engine.get.mockImplementation(async (url: string) =>
+			url.startsWith('/api/admin/analytics/providers') ? { data: [], licensed: true } : { data: rows, licensed: true },
+		);
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.deliveries?.data).toHaveLength(50);
+		expect(out.moreDeliveries).toBe(true);
+	});
+
+	it('says nothing more when the list holds every delivery', async () => {
+		engine.get.mockImplementation(async (url: string) =>
+			url.startsWith('/api/admin/analytics/providers') ? { data: [], licensed: true } : { data: [{ id: 'd1' }], licensed: true },
+		);
+		const out = (await load(loadEvent())) as Loaded;
+		expect(out.moreDeliveries).toBe(false);
 	});
 
 	it('reads nothing while the plugin does not run', async () => {
@@ -151,5 +173,31 @@ describe('replaying a delivery', () => {
 		const out = (await actions.replay(actionEvent({ id: 'd1' }))) as Failure;
 		expect(out.status).toBe(402);
 		expect(out.data.refused).toMatchObject({ kind: 'feature' });
+	});
+});
+
+describe('deleting a destination', () => {
+	it('deletes the named destination', async () => {
+		engine.delete.mockResolvedValue(undefined);
+		expect(await actions.delete(actionEvent({ id: 'p1' }))).toEqual({ deleted: 'p1' });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/analytics/providers/p1');
+	});
+
+	it('relays the reason the plugin refused with', async () => {
+		engine.delete.mockRejectedValue(new ApiError(404, 'provider not found'));
+		expect(await actions.delete(actionEvent({ id: 'p1' }))).toMatchObject({ status: 400, data: { error: 'provider not found' } });
+	});
+
+	it('keeps driver text out of a delete that meets an outage', async () => {
+		engine.delete.mockRejectedValue(new ApiError(503, 'pq: connection refused'));
+		const out = (await actions.delete(actionEvent({ id: 'p1' }))) as Failure;
+		expect(out.status).toBe(400);
+		expect(String(out.data.error)).not.toContain('pq:');
+	});
+
+	it('refuses an editor before calling the plugin', async () => {
+		vi.mocked(requireRole).mockImplementationOnce(async (_event, roles) => assertRole({ id: 'u2', roles: ['editor'] } as never, roles));
+		await expect(actions.delete(actionEvent({ id: 'p1' }))).rejects.toMatchObject({ status: 403 });
+		expect(engine.delete).not.toHaveBeenCalled();
 	});
 });

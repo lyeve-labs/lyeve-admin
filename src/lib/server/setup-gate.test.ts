@@ -103,6 +103,20 @@ describe('setupGateRedirect', () => {
 	});
 });
 
+describe('setupGateRedirect for a signed-in request', () => {
+	it('lets it through an unreachable engine, and keeps it out of the ready cache', async () => {
+		expect(await setupGateRedirect(new URL('http://a/admin/users'), down, 1_000, true)).toBeNull();
+		expect(await setupGateRedirect(new URL('http://a/admin/users'), down, 1_001)).toBe('/setup?next=%2Fadmin%2Fusers');
+	});
+
+	it.each([
+		['setup mode', engine({ setup_required: true, mode: 'setup' })],
+		['no account yet', engine({ setup_required: true })],
+	])('still sends it to the setup screen in %s', async (_name, fetchFn) => {
+		expect(await setupGateRedirect(new URL('http://a/admin'), fetchFn, 1_000, true)).toBe('/setup?next=%2Fadmin');
+	});
+});
+
 describe('setupGateRedirect when the engine is rate limiting', () => {
 	// A sign-in the engine refused with 429 must reach its own action, which
 	// reports the refusal. Redirecting it to setup would lose the message.

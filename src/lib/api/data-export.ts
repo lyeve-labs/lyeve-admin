@@ -9,6 +9,7 @@
  * only good while the file is still there. The list says when a job finished
  * rather than promising the file is still downloadable.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import { formatCount } from '$lib/format';
@@ -16,6 +17,12 @@ import { formatCount } from '$lib/format';
 export const JOBS_URL = '/api/admin/data-export/jobs';
 export const SCHEDULES_URL = '/api/admin/data-export/schedules';
 export const START_URL = '/api/admin/data-export/start';
+
+/**
+ * The most entries one export holds. The plugin applies it to a request that
+ * names no limit, to keep an export from loading the whole content table.
+ */
+export const EXPORT_ROW_CEILING = 10_000;
 
 export const FORMATS = ['json', 'ndjson', 'yaml', 'csv', 'markdown', 'hugo', 'template'] as const;
 export type ExportFormat = (typeof FORMATS)[number];
@@ -25,7 +32,7 @@ export type ExportFormat = (typeof FORMATS)[number];
  * four are the ones the bulk import reads back.
  */
 export const FORMAT_LABELS: Readonly<Record<ExportFormat, { label: string; hint: string }>> = {
-	json: { label: 'JSON', hint: 'One document with every entry. Imports back as it is.' },
+	json: { label: 'JSON', hint: 'One document holding the entries. Imports back as it is.' },
 	ndjson: { label: 'NDJSON', hint: 'One entry per line, for large exports and streaming tools. Imports back.' },
 	yaml: { label: 'YAML', hint: 'The JSON document written as YAML. Imports back.' },
 	csv: {
@@ -241,7 +248,7 @@ export async function cancelJob(client: HttpClient, id: string): Promise<void> {
 }
 
 /** The tone a status wears, in the kit's own vocabulary. */
-export function jobTone(status: JobStatus): 'success' | 'danger' | 'warn' | 'neutral' {
+export function jobTone(status: JobStatus): StatusTone {
 	if (status === 'completed') return 'success';
 	if (status === 'failed') return 'danger';
 	if (status === 'running') return 'warn';
@@ -269,19 +276,6 @@ export function jobProgress(job: ExportJob): number {
  */
 export function downloadable(job: ExportJob): boolean {
 	return job.status === 'completed' && !!job.file_key;
-}
-
-/** A byte count a person can read. */
-export function fileSize(bytes: number): string {
-	if (bytes <= 0) return '0 B';
-	const units = ['B', 'KB', 'MB', 'GB'];
-	let n = bytes;
-	let i = 0;
-	while (n >= 1024 && i < units.length - 1) {
-		n /= 1024;
-		i += 1;
-	}
-	return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
 }
 
 /**

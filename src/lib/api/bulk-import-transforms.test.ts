@@ -97,7 +97,7 @@ describe('postImport', () => {
 
 	it('keeps the plugin sentence for a file it would not read', async () => {
 		const fetchFn = vi.fn(
-			async () => new Response(JSON.stringify({ error: 'failed to parse file: the sheet has more than 1024 columns' }), { status: 400 }),
+			async () => new Response(JSON.stringify({ error: 'failed to parse file: the sheet has more than 1024 columns', code: 'bulk_import.too_many_columns' }), { status: 400 }),
 		) as unknown as typeof fetch;
 		const err = (await previewImport(fetchFn, { file_data: 'eA==' }).catch((e: unknown) => e)) as Error;
 		expect(err.message).toBe('failed to parse file: the sheet has more than 1024 columns');

@@ -28,7 +28,7 @@ afterEach(cleanup);
 
 const licensed: Entitlements = { plan: 'example', state: 'active', features: ['flow'], tenant_quota: 1 };
 
-function setup(overrides: Record<string, unknown> = {}, entitlements = licensed) {
+function setup(overrides: Record<string, unknown> = {}, entitlements = licensed, form: unknown = null) {
 	return render(FlowsPage, {
 		props: {
 			data: {
@@ -40,11 +40,12 @@ function setup(overrides: Record<string, unknown> = {}, entitlements = licensed)
 				status: '',
 				q: '',
 				locked: false,
-				loadError: null,
+				gate: { state: 'ok' },
+				user: { roles: ['admin'] },
 				entitlements,
 				...overrides,
 			},
-			form: null,
+			form,
 		} as never,
 	});
 }
@@ -81,6 +82,16 @@ describe('flows list page', () => {
 		expect(container.textContent).not.toContain('Nightly sheet export');
 	});
 
+	// Each mode changes what an import does to an existing flow, so each says so.
+	it('offers the import modes as choices that each say what they do', async () => {
+		const { getByText, container } = setup();
+		await fireEvent.click(getByText('Import'));
+		const form = container.ownerDocument.querySelector('#flow-import-form') as HTMLElement;
+		const radios = form.querySelectorAll('input[type="radio"][name="mode"]');
+		expect(radios).toHaveLength(2);
+		expect(form.textContent).toContain('Its published version runs until you publish again.');
+	});
+
 	it('asks for a name and a slug and nothing else', async () => {
 		const { getAllByText, container } = setup();
 		await fireEvent.click(getAllByText('New flow')[0]);
@@ -113,7 +124,7 @@ describe('flows list page', () => {
 		// The title asks the question and names the flow. The body says what the
 		// delete takes with it.
 		expect(kit.confirm).toHaveBeenCalledWith(
-			expect.stringContaining(fixtureFlow.name),
+			`Delete flow ${fixtureFlow.name}?`,
 			expect.stringContaining('run history'),
 			{ confirmLabel: 'Delete' },
 		);
@@ -133,11 +144,33 @@ describe('flows list page', () => {
 		expect(locked.queryByText('New flow')).toBeNull();
 	});
 
-	it('shows a failed load as an alert and not as an empty tenant', () => {
-		const { container, queryByText } = setup({ loadError: 'Flows could not be read from the engine.' });
+	it('shows a failed load as an alert and not as an empty tenant, with nothing to create', () => {
+		const { container, queryByText } = setup({ gate: { state: 'error', message: 'Flows could not be read from the engine.' } });
 		expect(container.textContent).toContain('Flows could not be read from the engine.');
 		expect(queryByText('No flows yet')).toBeNull();
+		expect(queryByText('New flow')).toBeNull();
+		expect(queryByText('Import')).toBeNull();
 		expect(container.querySelector('[data-testid="flow-templates"]')).toBeNull();
+	});
+
+	// A role refusal is not an outage, so it offers no reload and no create.
+	it('says the role cannot read flows, with nothing to create, filter or reload', () => {
+		const { container, queryByText } = setup({ gate: { state: 'forbidden' } });
+		expect(container.textContent).toContain('Your role cannot open flows.');
+		expect(container.textContent).not.toContain('Reload');
+		expect(queryByText('Try again')).toBeNull();
+		expect(queryByText('New flow')).toBeNull();
+		expect(queryByText('Import')).toBeNull();
+		expect(container.querySelector('[data-testid="flow-filters"]')).toBeNull();
+	});
+
+	it('links the datasources and the variables only for an admin, whose routes they are', () => {
+		const editor = setup({ user: { roles: ['editor'] } });
+		expect(editor.container.querySelector('a[href="/admin/flows/datasources"]')).toBeNull();
+		expect(editor.container.querySelector('a[href="/admin/flows/variables"]')).toBeNull();
+		cleanup();
+		const admin = setup();
+		expect(admin.container.querySelector('a[href="/admin/flows/datasources"]')).not.toBeNull();
 	});
 
 	it('filters by status and search through query parameters', () => {
@@ -182,28 +215,66 @@ describe('flows list page', () => {
 		expect(search.getAttribute('placeholder')).toBe('Name or slug');
 		const label = form.querySelector('label[for="flow-search"]') as HTMLElement;
 		expect(label.className).toContain('sr-only');
-		// The status control sits at the control height, the field's own, so
-		// the two share a middle instead of the control centering on a label.
-		expect(getByRole('group', { name: 'Status' }).className).toContain('h-control');
+		// Five statuses are chips that wrap rather than a strip that overflows.
+		expect(getByRole('group', { name: 'Status' }).querySelectorAll('a')).toHaveLength(5);
 		expect(form.querySelector('[role="toolbar"]')?.className).toContain('items-center');
 	});
 
-	it('lists validation errors the create action returned', () => {
-		const { container } = render(FlowsPage, {
-			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, entitlements: licensed },
-				form: {
-					error: 'The definition did not validate.',
-					errors: [
-						{ node_id: 'join', path: '/config/left_key', message: 'required' },
-						{ path: '/settings/timeout', message: 'not a duration' },
-					] satisfies ValidationError[],
-				},
-			} as never,
-		});
-		expect(container.textContent).toContain('join /config/left_key: required');
-		expect(container.textContent).toContain('/settings/timeout: not a duration');
-		expect(container.textContent).not.toContain('undefined');
+	it('puts a level 2 heading between the title and the first-run empty state', () => {
+		const { container } = setup({ flows: [] });
+		const levels = [...container.querySelectorAll('h1, h2, h3')].map((h) => Number(h.tagName.slice(1)));
+		expect(levels.some((level, i) => level > (i === 0 ? 1 : levels[i - 1]) + 1)).toBe(false);
+		expect(levels).toContain(3);
+	});
+
+	it('lists the validation errors a create returned inside the create drawer', async () => {
+		const data = { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed };
+		const { container, getAllByText, rerender } = render(FlowsPage, { props: { data, form: null } as never });
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({
+			data,
+			form: {
+				action: 'create',
+				error: 'The definition did not validate.',
+				errors: [
+					{ node_id: 'join', path: '/config/left_key', message: 'required' },
+					{ path: '/settings/timeout', message: 'not a duration' },
+				] satisfies ValidationError[],
+			},
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
+		expect(drawer.textContent).toContain('The definition did not validate.');
+		expect(drawer.textContent).toContain('join /config/left_key: required');
+		expect(drawer.textContent).toContain('/settings/timeout: not a duration');
+		expect(drawer.textContent).not.toContain('undefined');
+	});
+
+	it('puts a taken slug at the slug field inside the create drawer', async () => {
+		const data = { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed };
+		const { container, getAllByText, rerender } = render(FlowsPage, { props: { data, form: null } as never });
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({ data, form: { action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' } } as never);
+		const slug = container.ownerDocument.querySelector('#create-slug') as HTMLInputElement;
+		expect(slug.getAttribute('aria-invalid')).toBe('true');
+		const described = (slug.getAttribute('aria-describedby') ?? '').split(' ').map((id) => container.ownerDocument.getElementById(id)?.textContent ?? '');
+		expect(described.join(' ')).toContain('Another flow already uses this slug');
+	});
+
+	// The drawers and the row's delete share one form result.
+	it('shows a failed delete on the page and not in a drawer opened after it', async () => {
+		const { container, getAllByText, getByText } = setup({ flows: [fixtureFlow] }, licensed, { action: 'delete', error: 'Failed to delete flow' });
+		expect(container.textContent).toContain('Failed to delete flow');
+
+		await fireEvent.click(getAllByText('New flow')[0]);
+		expect((container.ownerDocument.querySelector('#flow-create-form') as HTMLElement).textContent).not.toContain('Failed to delete flow');
+
+		await fireEvent.click(getByText('Import'));
+		expect((container.ownerDocument.querySelector('#flow-import-form') as HTMLElement).textContent).not.toContain('Failed to delete flow');
+	});
+
+	it('keeps a failed import out of the page behind the drawer', () => {
+		const { container } = setup({}, licensed, { action: 'import', error: 'Paste a definition or choose a file.' });
+		expect(container.textContent).not.toContain('Paste a definition or choose a file.');
 	});
 });
 
@@ -222,15 +293,33 @@ describe('flows list row links', () => {
 });
 
 describe('flows list page ceiling', () => {
-	it('shows the refusal with the limit the plugin sent', () => {
-		const { container } = render(FlowsPage, {
-			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, loadError: null, entitlements: licensed },
-				form: { error: '7 of 7 flows are in use, the most this instance keeps. Delete one to make room for another.', refusal: { nodeIds: [], limit: 7, current: 7 } },
-			} as never,
-		});
-		expect(container.textContent).toContain('Flow limit reached');
-		expect(container.textContent).toContain('7 of 7 flows are in use');
+	// The ceiling refuses a create, so it shows in the drawer that asked.
+	it('shows the refusal with the limit the plugin sent inside the create drawer', async () => {
+		const { container, getAllByText, rerender } = setup();
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({
+			data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
+			form: { action: 'create', error: '7 of 7 flows are in use, the most this instance keeps. A license that allows more lifts the limit. Deleting one also makes room.', refusal: { nodeIds: [], limit: 7, current: 7, upgradeUrl: '' } },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
+		expect(drawer.textContent).toContain('7 of 7 flows are in use');
+	});
+
+	it('links where the plugin says more flows are bought, named by what it opens, in a new tab', async () => {
+		const link = 'https://shop.example.com/pricing?skus=example-pro&utm_campaign=flow.flows';
+		const { container, getAllByText, rerender } = setup();
+		await fireEvent.click(getAllByText('New flow')[0]);
+		await rerender({
+			data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
+			form: { action: 'create', error: '7 of 7 flows are in use, the most this instance keeps. A license that allows more lifts the limit. Deleting one also makes room.', refusal: { nodeIds: [], limit: 7, current: 7, upgradeUrl: link } },
+		} as never);
+		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
+		const a = drawer.querySelector(`a[href="${link}"]`) as HTMLAnchorElement;
+		expect(a.textContent).toBe('View the add-on');
+		expect(a.getAttribute('target')).toBe('_blank');
+		expect(a.getAttribute('rel')).toBe('noopener noreferrer');
+		// One line of small text, so it takes the touch hit area.
+		expect(a.classList.contains('hit-area') && a.classList.contains('relative')).toBe(true);
 	});
 });
 
@@ -257,11 +346,21 @@ describe('flows list page role grants', () => {
 	it('renders a 403 inline as a role refusal', () => {
 		const { container } = render(FlowsPage, {
 			props: {
-				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, loadError: null, entitlements: licensed, canCreate: true },
-				form: { error: 'permission denied: create on flows', forbidden: true },
+				data: { flows: [], limit: 50, offset: 0, total: null, hasMore: false, status: '', q: '', locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed, canCreate: true },
+				form: { action: 'delete', error: 'permission denied: delete on flows', forbidden: true },
 			} as never,
 		});
 		expect(container.textContent).toContain('Your role cannot do that');
-		expect(container.textContent).toContain('create on flows');
+		expect(container.textContent).toContain('delete on flows');
+	});
+});
+
+describe('flow name link', () => {
+	// The name is the only way to open a flow, and its link is 17px tall.
+	it('gives the link that opens a flow a touch hit area', () => {
+		const { getByText } = setup({ flows: [fixtureFlow] });
+		const link = getByText(fixtureFlow.name).closest('a') as HTMLElement;
+		expect(link.className).toContain('relative');
+		expect(link.className).toContain('hit-area');
 	});
 });

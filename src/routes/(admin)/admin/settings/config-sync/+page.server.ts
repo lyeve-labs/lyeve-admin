@@ -12,6 +12,7 @@ import {
 	parseBundle,
 	type SyncRequest,
 } from '$lib/api/config-sync';
+import { forbiddenText } from '$lib/api/gate';
 
 /**
  * Config sync has no read of its own: every route is a POST, and an export
@@ -23,7 +24,7 @@ import {
 export const load: PageServerLoad = async ({ parent }) => {
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) {
-		error(403, 'Requires super_admin role');
+		error(403, forbiddenText('configuration sync'));
 	}
 	return {};
 };

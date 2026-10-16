@@ -2,14 +2,20 @@ import { describe, it, expect } from 'vitest';
 import {
 	LOG_LEVELS,
 	NO_VALUE,
+	formatBytes,
 	formatCount,
 	formatGoDuration,
 	formatDate,
 	formatDateTime,
+	formatMillis,
+	formatPercent,
 	formatTime,
 	hasTrace,
 	logLevelLabel,
-	logLevelTone, relativeTime } from './format';
+	logLevelTone,
+	relativeTime,
+	type ByteUnit,
+} from './format';
 
 describe('logLevelTone', () => {
 	it('gives every level the engine emits a tone of its own', () => {
@@ -191,6 +197,140 @@ describe('formatCount', () => {
 	});
 });
 
+describe('formatBytes', () => {
+	// Each row is what that surface printed before it shared this function,
+	// read from its own formatter at the time.
+	const before: [surface: string, size: number | null, largest: ByteUnit, shown: string][] = [
+		['tenant usage', 0, 'TB', '0 B'],
+		['tenant usage', 1, 'TB', '1 B'],
+		['tenant usage', 512, 'TB', '512 B'],
+		['tenant usage', 1023, 'TB', '1023 B'],
+		['tenant usage', 1024, 'TB', '1.0 KB'],
+		['tenant usage', 1536, 'TB', '1.5 KB'],
+		['tenant usage', 2048, 'TB', '2.0 KB'],
+		['tenant usage', 1048575, 'TB', '1024.0 KB'],
+		['tenant usage', 1048576, 'TB', '1.0 MB'],
+		['tenant usage', 5242880, 'TB', '5.0 MB'],
+		['tenant usage', 1073741823, 'TB', '1024.0 MB'],
+		['tenant usage', 1073741824, 'TB', '1.0 GB'],
+		['tenant usage', 1610612736, 'TB', '1.5 GB'],
+		['tenant usage', 10737418240, 'TB', '10.0 GB'],
+		['tenant usage', 1099511627776, 'TB', '1.0 TB'],
+		['tenant usage', 2199023255552, 'TB', '2.0 TB'],
+		['tenant usage', null, 'TB', '0 B'],
+		['tenant usage', -1, 'TB', '0 B'],
+		['cache entries', 0, 'GB', '0 B'],
+		['cache entries', 1, 'GB', '1 B'],
+		['cache entries', 512, 'GB', '512 B'],
+		['cache entries', 1023, 'GB', '1023 B'],
+		['cache entries', 1024, 'GB', '1.0 KB'],
+		['cache entries', 1536, 'GB', '1.5 KB'],
+		['cache entries', 2048, 'GB', '2.0 KB'],
+		['cache entries', 1048575, 'GB', '1024.0 KB'],
+		['cache entries', 1048576, 'GB', '1.0 MB'],
+		['cache entries', 5242880, 'GB', '5.0 MB'],
+		['cache entries', 1073741823, 'GB', '1024.0 MB'],
+		['cache entries', 1073741824, 'GB', '1.0 GB'],
+		['cache entries', 1610612736, 'GB', '1.5 GB'],
+		['cache entries', 10737418240, 'GB', '10.0 GB'],
+		['cache entries', 1099511627776, 'GB', '1024.0 GB'],
+		['cache entries', 2199023255552, 'GB', '2048.0 GB'],
+		['cache entries', null, 'GB', '0 B'],
+		['cache entries', -1, 'GB', '0 B'],
+		['export files', 0, 'GB', '0 B'],
+		['export files', 1, 'GB', '1 B'],
+		['export files', 512, 'GB', '512 B'],
+		['export files', 1023, 'GB', '1023 B'],
+		['export files', 1024, 'GB', '1.0 KB'],
+		['export files', 1536, 'GB', '1.5 KB'],
+		['export files', 2048, 'GB', '2.0 KB'],
+		['export files', 1048575, 'GB', '1024.0 KB'],
+		['export files', 1048576, 'GB', '1.0 MB'],
+		['export files', 5242880, 'GB', '5.0 MB'],
+		['export files', 1073741823, 'GB', '1024.0 MB'],
+		['export files', 1073741824, 'GB', '1.0 GB'],
+		['export files', 1610612736, 'GB', '1.5 GB'],
+		['export files', 10737418240, 'GB', '10.0 GB'],
+		['export files', 1099511627776, 'GB', '1024.0 GB'],
+		['export files', 2199023255552, 'GB', '2048.0 GB'],
+		['export files', -1, 'GB', '0 B'],
+		['media library', 0, 'MB', '0 B'],
+		['media library', 1, 'MB', '1 B'],
+		['media library', 512, 'MB', '512 B'],
+		['media library', 1023, 'MB', '1023 B'],
+		['media library', 1024, 'MB', '1.0 KB'],
+		['media library', 1536, 'MB', '1.5 KB'],
+		['media library', 2048, 'MB', '2.0 KB'],
+		['media library', 1048575, 'MB', '1024.0 KB'],
+		['media library', 1048576, 'MB', '1.0 MB'],
+		['media library', 5242880, 'MB', '5.0 MB'],
+		['media library', 1073741823, 'MB', '1024.0 MB'],
+		['media library', 1073741824, 'MB', '1024.0 MB'],
+		['media library', 1610612736, 'MB', '1536.0 MB'],
+		['media library', 10737418240, 'MB', '10240.0 MB'],
+		['media library', 1099511627776, 'MB', '1048576.0 MB'],
+		['media library', 2199023255552, 'MB', '2097152.0 MB'],
+		['media library', -1, 'MB', '0 B'],
+		['media library', Number.NaN, 'MB', '0 B'],
+		['analytics request size', 0, 'MB', '0 B'],
+		['analytics request size', 1, 'MB', '1 B'],
+		['analytics request size', 512, 'MB', '512 B'],
+		['analytics request size', 1023, 'MB', '1023 B'],
+		['analytics request size', 1024, 'MB', '1.0 KB'],
+		['analytics request size', 1536, 'MB', '1.5 KB'],
+		['analytics request size', 2048, 'MB', '2.0 KB'],
+		['analytics request size', 1048575, 'MB', '1024.0 KB'],
+		['analytics request size', 1048576, 'MB', '1.0 MB'],
+		['analytics request size', 5242880, 'MB', '5.0 MB'],
+		['analytics request size', 1073741823, 'MB', '1024.0 MB'],
+		['analytics request size', 1073741824, 'MB', '1024.0 MB'],
+		['analytics request size', 1610612736, 'MB', '1536.0 MB'],
+		['analytics request size', 10737418240, 'MB', '10240.0 MB'],
+		['analytics request size', 1099511627776, 'MB', '1048576.0 MB'],
+		['analytics request size', 2199023255552, 'MB', '2097152.0 MB'],
+		['analytics request size', 0.4, 'MB', '0 B'],
+		['analytics request size', 512.6, 'MB', '513 B'],
+		['analytics request size', 1023.5, 'MB', '1024 B'],
+	];
+
+	it.each(before)('prints %s %s capped at %s as %s', (_surface, size, largest, shown) => {
+		expect(formatBytes(size, largest)).toBe(shown);
+	});
+
+	it('steps up to TB unless told to stop sooner', () => {
+		expect(formatBytes(2_199_023_255_552)).toBe('2.0 TB');
+		expect(formatBytes(undefined)).toBe('0 B');
+	});
+});
+
+describe('formatMillis', () => {
+	// What the slow queries page printed before it shared this function.
+	const before: [ms: number, shown: string][] = [
+		[0, '0 ms'],
+		[0.4, '0 ms'],
+		[1, '1 ms'],
+		[342, '342 ms'],
+		[999, '999 ms'],
+		[999.4, '999 ms'],
+		[999.6, '1000 ms'],
+		[1000, '1.00 s'],
+		[1500, '1.50 s'],
+		[1234.5, '1.23 s'],
+		[61234, '61.23 s'],
+		[3600000, '3600.00 s'],
+	];
+
+	it.each(before)('prints %s as %s', (ms, shown) => {
+		expect(formatMillis(ms)).toBe(shown);
+	});
+
+	it('names the gap for a time that was not measured', () => {
+		expect(formatMillis(null)).toBe(NO_VALUE);
+		expect(formatMillis(undefined)).toBe(NO_VALUE);
+		expect(formatMillis(Number.NaN)).toBe(NO_VALUE);
+	});
+});
+
 /** A fixed clock, so "3 minutes ago" is the same sentence on every run. */
 const relNow = new Date('2026-09-14T12:00:00Z');
 const ago = (ms: number) => new Date(relNow.getTime() - ms).toISOString();
@@ -239,5 +379,13 @@ describe('formatGoDuration', () => {
 	it('hands back a string that is not a Go duration, and the fallback for none', () => {
 		expect(formatGoDuration('soon')).toBe('soon');
 		expect(formatGoDuration(null)).toBe(NO_VALUE);
+	});
+});
+
+describe('formatPercent', () => {
+	it('says a fraction as a percentage to one decimal place', () => {
+		expect(formatPercent(0.0123)).toBe('1.2%');
+		expect(formatPercent(0)).toBe('0.0%');
+		expect(formatPercent(1)).toBe('100.0%');
 	});
 });

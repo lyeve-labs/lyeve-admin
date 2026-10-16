@@ -1,16 +1,18 @@
 <script lang="ts">
-	import { Alert } from '@lyeve-labs/ui-kit';
-	import type { SchemaField, Content } from '@lyeve-labs/client';
+	import { untrack } from 'svelte';
+	import type { SchemaField } from '@lyeve-labs/client';
 	import { fieldKey } from '$lib/utils/content-form';
 	import { humanizeFieldName } from '$lib/utils/entry-identity';
 	import FieldInput from './FieldInput.svelte';
+	import FormErrors from './FormErrors.svelte';
 	import type { MediaChoice } from '$lib/api/media';
+	import type { RelationChoices } from './content/relation-choices';
 
 	let {
 		fields,
 		formValues,
 		validationErrors = {},
-		relationItems = {},
+		relations = {},
 		mediaChoices = [],
 		error,
 	}: {
@@ -18,9 +20,10 @@
 		/** Reactive $state proxy from parent - mutated in-place by FieldInput */
 		formValues: Record<string, unknown>;
 		validationErrors?: Record<string, string>;
-		relationItems?: Record<string, Content[]>;
-		/** Published library files a media field may point at. */
-		mediaChoices?: MediaChoice[];
+		/** What each related collection's read gave, by collection name. */
+		relations?: Record<string, RelationChoices>;
+		/** Published library files a media field may point at. Null when the library could not be read. */
+		mediaChoices?: MediaChoice[] | null;
 		/** Server-side error message */
 		error?: string | null;
 	} = $props();
@@ -57,12 +60,43 @@
 		return field.field_type === 'datetime' ? `field-${field.name}-date` : `field-${field.name}`;
 	}
 
+	let root: HTMLDivElement | undefined = $state();
+
+	/*
+	 * A refused submit moves focus to the first field it names. The summary at
+	 * the top says how many need attention, and focus on the field is what lets
+	 * a keyboard reader fix it without hunting down the form. The errors object
+	 * is replaced on every refused submit, so this runs once per refusal. The
+	 * fields are read untracked: a page whose data is read again derives them
+	 * anew, and that is no refusal to move focus for.
+	 */
+	$effect(() => {
+		const named = Object.keys(validationErrors);
+		if (named.length === 0 || !root) return;
+		const first = untrack(() => fields).find((f) => named.includes(f.name));
+		if (!first) return;
+		const box = root.querySelector(`[data-field-name="${first.name}"]`);
+		const control = box?.querySelector<HTMLElement>(
+			'input:not([type="hidden"]), textarea, select, button, [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
+		);
+		control?.focus();
+	});
+
+	function relationOf(field: SchemaField): RelationChoices | undefined {
+		return relations[field.relation_to ?? ''];
+	}
+
 	/** "first_name" reads "First name", the case every other field label uses. */
 	function fieldLabel(name: string): string {
 		const words = humanizeFieldName(name);
 		return words.charAt(0) + words.slice(1).toLowerCase();
 	}
 </script>
+
+<!-- The failure is read before the fields, so a refused save is the first
+     thing in the form rather than something below the last field. -->
+<div bind:this={root} class="flex flex-col gap-5">
+<FormErrors message={error ?? undefined} fields={validationErrors} />
 
 {#if fields.length === 0}
 	<p class="text-faint text-sm py-4 text-center">This schema has no editable fields.</p>
@@ -92,7 +126,9 @@
 						{field}
 						id="field-{field.name}"
 						bind:value={formValues[field.name]}
-						relationItems={relationItems[field.relation_to ?? ''] ?? []}
+						relationItems={relationOf(field)?.items ?? []}
+						relationTotal={relationOf(field)?.total}
+						relationFailed={relationOf(field)?.failed ?? false}
 						{mediaChoices}
 						error={validationErrors[field.name]}
 					/>
@@ -109,7 +145,9 @@
 					{field}
 					id="field-{field.name}"
 					bind:value={formValues[fieldKey(field)]}
-					relationItems={relationItems[field.relation_to ?? ''] ?? []}
+					relationItems={relationOf(field)?.items ?? []}
+					relationTotal={relationOf(field)?.total}
+					relationFailed={relationOf(field)?.failed ?? false}
 					{mediaChoices}
 					error={validationErrors[field.name]}
 				/>
@@ -118,7 +156,4 @@
 	{/each}
 	</div>
 {/if}
-
-{#if error}
-	<Alert tone="danger" class="mt-2">{error}</Alert>
-{/if}
+</div>

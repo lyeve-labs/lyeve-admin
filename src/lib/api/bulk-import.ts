@@ -11,21 +11,13 @@
  * like any other. Reading a dry run's counts as content that now exists is
  * the second mistake available here, so the list marks them.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import { csrfHeaders } from './csrf';
 
 export const IMPORTS_URL = '/api/admin/imports';
-
-export type ImportStatus =
-	| 'pending'
-	| 'running'
-	| 'completed'
-	| 'completed_with_errors'
-	| 'failed'
-	| 'canceled'
-	| 'rolled_back';
 
 export interface ImportJob {
 	id: string;
@@ -127,7 +119,6 @@ export const IMPORT_FORMAT_LABELS: Readonly<Record<ImportFormat, string>> = {
  */
 export const MAX_IMPORT_COLUMNS = 1024;
 export const MAX_IMPORT_CELLS = 5_000_000;
-export const MAX_IMPORT_ROWS = 100_000;
 
 /**
  * The codes the plugin gives the two bounds a file can pass. Every parse
@@ -400,17 +391,35 @@ async function postImport<T>(fetchFn: typeof fetch, path: string, body: unknown)
 		body: JSON.stringify(body),
 	});
 	if (!res.ok) {
-		const j = (await res.json().catch(() => ({}))) as { error?: string };
-		// An ApiError keeps the body, so a license refusal renders through
-		// RefusalNotice with what the plugin sent.
-		throw new ApiError(res.status, j.error || importFailure(res.status), j);
+		const j = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+		// The engine's refusals carry a code, and their sentence is written for
+		// the operator and shown as sent. A 5xx body can carry driver detail,
+		// and an uncoded 4xx is not the engine's, so the status picks the
+		// sentence for both. An ApiError keeps
+		// the body, so a license refusal renders through RefusalNotice with
+		// what the plugin sent.
+		const engineSaid = typeof j.code === 'string' && j.code !== '';
+		const said = res.status < 500 && engineSaid && j.error ? j.error : importFailure(res.status, path === '', engineSaid);
+		throw new ApiError(res.status, said, j);
 	}
 	return (await res.json()) as T;
 }
 
-function importFailure(status: number): string {
+/**
+ * The sentence for a failed import call. The engine answers a start once it
+ * has stored the job and imports the rows after that, so its own 5xx means
+ * no job was made. A 5xx it did not write, such as a proxy's 502 or 504, can
+ * arrive after the job was made, so a start claims only what is known.
+ */
+function importFailure(status: number, starts: boolean, engineSaid: boolean): string {
 	if (status === 413) return 'The file is larger than the 50 MB an import takes. Split it and import the parts.';
-	if (status === 503) return 'The database is unavailable. Try again in a moment.';
+	if (status >= 500 && starts && !engineSaid) {
+		return 'The engine did not confirm the import. Check the entries before trying again.';
+	}
+	if (status === 502 || status === 503 || status === 504) {
+		return 'The engine or its database did not answer. Nothing was imported. Try again in a moment.';
+	}
+	if (status >= 500) return 'The engine could not finish the request. Nothing was imported.';
 	return 'The engine refused the request.';
 }
 
@@ -506,13 +515,6 @@ export function suggestMapping(columns: readonly string[], targets: readonly Map
 	return out;
 }
 
-/** The mappings a choice of columns describes, leaving out unmapped targets. */
-export function mappingsFrom(chosen: Record<string, string>, targets: readonly MappingTarget[]): FieldMapping[] {
-	return targets
-		.filter((t) => chosen[t.value])
-		.map((t) => ({ source_field: chosen[t.value], target_field: t.value, data_type: t.dataType }));
-}
-
 /** Reads a file into the base64 the engine takes. */
 export async function fileToBase64(file: File): Promise<string> {
 	const bytes = new Uint8Array(await file.arrayBuffer());
@@ -560,7 +562,7 @@ export const OUTCOME_LABELS: Readonly<Record<ImportOutcome, string>> = {
 	failed: 'Failed',
 };
 
-export function outcomeTone(o: ImportOutcome): 'success' | 'danger' | 'warn' | 'neutral' {
+export function outcomeTone(o: ImportOutcome): StatusTone {
 	if (o === 'clean') return 'success';
 	if (o === 'failed' || o === 'nothing') return 'danger';
 	if (o === 'partial') return 'warn';

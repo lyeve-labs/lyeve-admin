@@ -6,6 +6,10 @@
 #   - X.Y          (rolling, latest patch in the X.Y minor line)
 #   - latest       (most recent release)
 #
+# A release candidate tag, `vX.Y.Z-rc.N`, runs the same suite and the same
+# build and publishes one tag, X.Y.Z-rc.N. It never moves X.Y or latest.
+# .github/scripts/image-tags.sh holds both rules and refuses any other tag.
+#
 # Image name matches the README and the repository: ghcr.io/lyeve-labs/lyeve-admin:<tag>
 #
 # Multi-arch strategy: each architecture builds on its OWN native runner
@@ -27,7 +31,11 @@
 # publishing the build from source. The ci.yml call still tests this
 # repository alone.
 #
-# Secrets:
+# Secrets. Every stored one belongs to the `release` environment, which admits
+# only a `v*` tag ref, and every job that reads one names it. Keep them out of
+# the repository's own secrets, which a run dispatched from any branch could
+# read. A manual re-publish is dispatched on the tag itself
+# (`--ref vX.Y.Z -f tag=vX.Y.Z`).
 #   GITHUB_TOKEN. Built-in, used to push to GHCR (no setup needed).
 #   GHCR_TOKEN. Optional. When set, it pushes a package not linked to this
 #   repository.
@@ -46,7 +54,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing vX.Y.Z tag to (re)build and publish'
+        description: 'Existing vX.Y.Z or vX.Y.Z-rc.N tag to (re)build and publish'
         required: true
         type: string
 
@@ -79,6 +87,7 @@ jobs:
   suite-with-editors:
     name: suite with editors
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -111,6 +120,7 @@ jobs:
     name: build ${{ matrix.platform }}
     needs: [test, suite-with-editors]
     runs-on: ${{ matrix.runner }}
+    environment: release
     strategy:
       fail-fast: false
       matrix:
@@ -124,6 +134,15 @@ jobs:
         with:
           ref: ${{ env.RELEASE_REF }}
           persist-credentials: false
+
+      # A dispatch input is free-form, and a tag the tag rules cannot classify
+      # must not build at all.
+      - name: Validate release ref
+        run: |
+          if ! bash .github/scripts/image-tags.sh "${RELEASE_REF}" >/dev/null; then
+            echo "::error::RELEASE_REF '${RELEASE_REF}' is not a vX.Y.Z or vX.Y.Z-rc.N tag"
+            exit 1
+          fi
 
       - uses: ./.github/actions/fetch-editors
         with:
@@ -188,8 +207,16 @@ jobs:
   merge:
     name: merge manifest & push tags
     runs-on: ubuntu-24.04
+    environment: release
     needs: [build]
     steps:
+      # The tag rules only, from the tag being released.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.RELEASE_REF }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
       - name: Download digests
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -209,15 +236,19 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       # Derive tags from the git tag in shell. No metadata-action, no REST API.
-      #   refs/tags/v1.2.3 → ${GITHUB_REF_NAME}=v1.2.3 → 1.2.3, 1.2, latest
+      #   v1.2.3 gives 1.2.3, 1.2 and latest. v1.2.3-rc.1 gives 1.2.3-rc.1 alone.
       - name: Compute image tags
         id: tags
         run: |
+          set -euo pipefail
           ver="${RELEASE_REF#v}"
-          minor="${ver%.*}"
           img="${REGISTRY}/${IMAGE_NAME}"
+          args=""
+          while read -r t; do args="${args} -t ${img}:${t}"; done \
+            < <(bash .github/scripts/image-tags.sh "${RELEASE_REF}")
+          echo "Publishing:${args}"
           echo "version=${ver}" >> "$GITHUB_OUTPUT"
-          echo "args=-t ${img}:${ver} -t ${img}:${minor} -t ${img}:latest" >> "$GITHUB_OUTPUT"
+          echo "args=${args# }" >> "$GITHUB_OUTPUT"
 
       - name: Create manifest list & push
         working-directory: ${{ runner.temp }}/digests

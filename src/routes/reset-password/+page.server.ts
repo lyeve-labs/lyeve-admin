@@ -1,16 +1,24 @@
 import { fail } from '@sveltejs/kit';
 import { createClient } from '@lyeve-labs/client';
 import { confirmPasswordReset, RESET_MIN_PASSWORD_LENGTH } from '$lib/api/password-reset';
+import { passwordTooLong } from '$lib/api/users';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { organizationFromUrl } from '$lib/organization';
 import type { Actions, PageServerLoad } from './$types';
 
 const EXPIRED = 'This reset link is invalid or has expired. Request a new one.';
 
 // The token is read here and only spent by the submit, so a mail scanner that
-// opens the link leaves it usable.
+// opens the link leaves it usable. The token already names the account, so
+// this page never asks for an organization. One the link carries goes on to
+// the sign-in and new-link pages, so they do not ask either.
 export const load: PageServerLoad = ({ url }) => {
-	return { token: url.searchParams.get('token') ?? '', minLength: RESET_MIN_PASSWORD_LENGTH };
+	return {
+		token: url.searchParams.get('token') ?? '',
+		minLength: RESET_MIN_PASSWORD_LENGTH,
+		carried: organizationFromUrl(url),
+	};
 };
 
 export const actions: Actions = {
@@ -27,6 +35,10 @@ export const actions: Actions = {
 		if (password.length < RESET_MIN_PASSWORD_LENGTH) {
 			return fail(400, { error: `Use at least ${RESET_MIN_PASSWORD_LENGTH} characters.` });
 		}
+		// Checked here because the engine spends the link before it hashes the
+		// password, so a refusal there would cost the reader the link.
+		const tooLong = passwordTooLong(password);
+		if (tooLong) return fail(400, { error: tooLong });
 		if (password !== confirm) return fail(400, { error: 'The two passwords do not match.' });
 
 		try {

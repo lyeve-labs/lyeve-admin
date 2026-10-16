@@ -18,7 +18,7 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 			fields: [{ name: 'title', field_type: 'text', required: false, unique: false, indexed: false }],
 		},
 		item: { id: 'e1', created_at: '2026-09-19T10:00:00Z', updated_at: '2026-09-19T10:00:00Z', data: { title: 'One' } },
-		relationItems: {},
+		relations: {},
 		revisions: [],
 		localization: null,
 		review: null,
@@ -129,7 +129,7 @@ describe('content entry editor, revision history', () => {
 		expect(older.textContent).toContain('the last 30 days');
 		const open = older.querySelector('input[name="rev_num"]') as HTMLInputElement;
 		expect(open.value).toBe('7');
-		expect(screen.getByRole('button', { name: 'Open revision 7' })).toBeTruthy();
+		expect(open.max).toBe('7');
 	});
 
 	it('shows no such row when the install reads every revision', async () => {
@@ -166,5 +166,53 @@ describe('content entry editor, revision history', () => {
 		const opened = screen.getByTestId('opened-revision');
 		expect(opened.textContent).toContain('Revision 4');
 		expect((opened.querySelector('input[name="rev_num"]') as HTMLInputElement).value).toBe('4');
+		// The button text is text-sm, so its icon takes the text-sm rung.
+		expect(opened.querySelector('button svg')?.getAttribute('width')).toBe('14');
+	});
+});
+
+describe('content entry editor, a schema refusal', () => {
+	it('shows the message the plugin gave beside the field it refused', () => {
+		const { container } = render(EntryPage, {
+			props: {
+				data: data(),
+				form: { error: 'The entry was not saved. Check the highlighted fields.', fieldErrors: { title: 'must be at least 3 characters' } } as never,
+			},
+		});
+		expect(container.querySelector('[data-field-name="title"]')?.textContent).toContain('must be at least 3 characters');
+	});
+});
+
+describe('content entry editor, revision count', () => {
+	it('labels the history with the total and offers the next older revision past the listed ones', async () => {
+		const revisions = [
+			{ id: 'r600', revision_num: 600, created_at: '2026-09-19T10:00:00Z', data: { title: 'One' } },
+			{ id: 'r599', revision_num: 599, created_at: '2026-09-18T10:00:00Z', data: { title: 'One' } },
+		];
+		render(EntryPage, { props: { data: data({ revisions, revisionTotal: 600 }), form: null } });
+		const toggle = screen.getByRole('button', { name: /History \(600\)/ });
+		await fireEvent.click(toggle);
+		expect(screen.getByText(/The newest 2 of 600 revisions are listed/)).toBeTruthy();
+		const open = screen.getByLabelText('Revision number') as HTMLInputElement;
+		expect(open.name).toBe('rev_num');
+		expect(open.closest('form')?.getAttribute('action')).toBe('?/openRevision');
+		expect([open.value, open.min, open.max]).toEqual(['598', '1', '598']);
+	});
+
+	it('takes any older revision by number, and keeps the opener after one is open', async () => {
+		const revisions = [
+			{ id: 'r600', revision_num: 600, created_at: '2026-09-19T10:00:00Z', data: { title: 'One' } },
+			{ id: 'r599', revision_num: 599, created_at: '2026-09-18T10:00:00Z', data: { title: 'One' } },
+		];
+		render(EntryPage, {
+			props: { data: data({ revisions, revisionTotal: 600 }), form: { openedRevision: revision(42) } as never },
+		});
+		expect(screen.getByTestId('opened-revision').textContent).toContain('Revision 42');
+		const open = screen.getByLabelText('Revision number') as HTMLInputElement;
+		await fireEvent.input(open, { target: { value: '1' } });
+		expect(open.value).toBe('1');
+		expect(open.checkValidity()).toBe(true);
+		const sent = new FormData(open.closest('form') as HTMLFormElement);
+		expect(sent.get('rev_num')).toBe('1');
 	});
 });

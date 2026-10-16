@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { page } from '$app/state';
 	import CustomBlocks from '$lib/components/custom/CustomBlocks.svelte';
 	import DashboardWidgets from '$lib/components/custom/DashboardWidgets.svelte';
 	import {
@@ -15,8 +15,10 @@
 	import type { ActionData, PageData } from './$types';
 	import { ArrowRight, CircleCheck, OctagonAlert, Pencil, Plus, TriangleAlert } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import TrafficBars from '$lib/components/TrafficBars.svelte';
-	import { NO_VALUE, formatCount, formatDateTime, logLevelTone } from '$lib/format';
+	import { NO_VALUE, formatCount, formatDateTime, formatPercent, logLevelTone } from '$lib/format';
+	import { entryTone } from '$lib/tones';
 	import { WINDOWS, WINDOW_LABEL, trafficTone, type Window } from '$lib/dashboard';
 	import { ICON } from '$lib/icon';
 	import { licenseStateLabel, licenseTone } from '$lib/license-state';
@@ -31,23 +33,31 @@
 
 	const errorRate = $derived(data.requests ? data.requests.errorRate : 0);
 
-	function entryTone(status: string): 'success' | 'warn' | 'neutral' {
-		if (status === 'published') return 'success';
-		if (status === 'draft') return 'warn';
-		return 'neutral';
-	}
-
-	const pct = (fraction: number) => `${(fraction * 100).toFixed(1)}%`;
 	const ms = (n: number) => `${formatCount(Math.round(n))} ms`;
 	const whenever = (ts: string | null | undefined) => (ts ? formatDateTime(ts, ts) : NO_VALUE);
 
+	const schemas = $derived(data.schemas?.ok ? data.schemas.value : null);
+
 	/** What the collections carry, from the list already in hand. */
 	const collectionsSub = $derived.by(() => {
-		const staged = data.schemas.filter((s) => s.with_draft_publish).length;
+		if (!schemas) return 'schemas unavailable';
+		const staged = schemas.filter((s) => s.with_draft_publish).length;
 		return staged > 0
 			? `${formatCount(staged)} with draft and publish`
 			: 'none with draft and publish';
 	});
+
+	/*
+	 * Whether a tile drawn above could not be read. Nothing needing attention
+	 * then covers only what was read, and the line says so.
+	 */
+	const unread = $derived(
+		(data.offers.analytics && !data.requests) ||
+			(data.superAdmin && data.offers.jobs && !data.jobs) ||
+			(data.offers.logs && data.errorsLogged === null) ||
+			(data.offers.webhooks && !data.webhooks) ||
+			(data.superAdmin && data.controlFailures === null)
+	);
 
 	const entriesSub = $derived(
 		data.entriesByStatus
@@ -55,8 +65,6 @@
 			: undefined
 	);
 </script>
-
-<PageTitle title="Dashboard" />
 
 <PageShell
 	title="Dashboard"
@@ -91,10 +99,27 @@
 	     with the refusal, so this is where it is announced. -->
 	<FormErrors message={form?.error} />
 
+	{#if data.layoutUnread}
+		<p class="flex flex-wrap items-center gap-2 text-sm text-muted">
+			<TriangleAlert size={ICON.md} class="shrink-0 text-warn" aria-hidden="true" />
+			This tenant's own dashboard could not be read, so the standard one is shown.
+			<a class="relative hit-area underline hover:text-fg" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>Try again</a>
+		</p>
+	{/if}
 	{#if data.welcome}
 		<p class="text-base text-fg" data-testid="tenant-welcome">{data.welcome}</p>
 	{/if}
-	{#if data.homePage}
+	<!-- The plugin answers 404 for a page hidden from the reader's role as well
+	     as for a missing one. Only an admin, who sees every page, reads a 404
+	     as missing, and a reader outside the page's roles is told nothing. -->
+	{#if data.home && (data.home.gate.state !== 'absent' || data.isAdmin)}
+		<GateNotice
+			level={2}
+			gate={data.home.gate}
+			title="The home page"
+			absent="The home page chosen in customization, {data.home.slug}, was not found. Choose another one there."
+		/>
+	{:else if data.homePage}
 		<section class="flex flex-col gap-4" aria-label={data.homePage.title}>
 			<CustomBlocks blocks={data.homeBlocks} roles={data.user.roles} />
 		</section>
@@ -106,14 +131,19 @@
 		{:else}
 			<DashboardWidgets widgets={data.composed} now={new Date(data.now)} />
 		{/if}
-	{:else if data.offers.schema && data.schemas.length === 0}
-		<EmptyState title="No schemas yet" description="A content type is the first thing to make.">
-			{#snippet action()}
-				<Button variant="secondary" href="/admin/schema">
-					<Plus size={ICON.sm} /> New schema
-				</Button>
-			{/snippet}
-		</EmptyState>
+	{:else if schemas && schemas.length === 0}
+		{#if data.isAdmin}
+			<EmptyState level={2} title="No schemas yet" description="A content type is the first thing to make.">
+				{#snippet action()}
+					<Button variant="secondary" href="/admin/schema">
+						<Plus size={ICON.sm} /> New schema
+					</Button>
+				{/snippet}
+			</EmptyState>
+		{:else}
+			<!-- The engine admits a new schema only from an admin. -->
+			<EmptyState level={2} title="No schemas yet" description="An admin makes the first content type. Your entries start once one exists." />
+		{/if}
 	{:else}
 		{#if data.isAdmin}
 			<section class="flex flex-col gap-4">
@@ -121,7 +151,12 @@
 
 				<!-- The tiles say how many. This says which, and where to fix it. -->
 				<Card pad="none">
-					{#if data.attention.length === 0}
+					{#if data.attention.length === 0 && unread}
+						<p class="flex items-center gap-2 px-card py-card-sm text-sm text-muted">
+							<TriangleAlert size={ICON.md} class="shrink-0 text-warn" aria-hidden="true" />
+							Nothing needs attention in what could be read. A tile below says unknown where its read failed.
+						</p>
+					{:else if data.attention.length === 0}
 						<p class="flex items-center gap-2 px-card py-card-sm text-sm text-muted">
 							<CircleCheck size={ICON.md} class="shrink-0 text-success" aria-hidden="true" />
 							Nothing needs attention in the last {WINDOW_LABEL[data.window]}.
@@ -163,18 +198,20 @@
 							class="h-full"
 							label="Collections"
 							accent="neutral"
-							value={formatCount(data.schemas.length)}
+							value={schemas ? formatCount(schemas.length) : 'unknown'}
 							sub={collectionsSub}
 						/>
 					</a>
 				{/if}
-				{#if data.offers.content}
+				<!-- The entry counts are read from a route the engine admits only
+				     from an admin, so no other role is shown a count. -->
+				{#if data.isAdmin && data.offers.content}
 					<a href="/admin/content" class="block h-full rounded-xl outline-none transition-shadow hover:ring-1 hover:ring-brand/40 focus-visible:ring-2 focus-visible:ring-brand">
 						<Stat class="h-full"
 							label="Entries"
 							accent="neutral"
 							value={data.entryTotal === null ? 'unknown' : formatCount(data.entryTotal)}
-							sub={entriesSub ?? 'across every collection'}
+							sub={data.entryTotal === null ? 'entries unavailable' : (entriesSub ?? 'across every collection')}
 						/>
 					</a>
 				{/if}
@@ -184,7 +221,7 @@
 							<Stat class="h-full"
 								label="Requests, {data.window}"
 								value={data.requests ? formatCount(data.requests.total) : 'unknown'}
-								sub={data.requests ? `${pct(errorRate)} failed` : 'analytics unavailable'}
+								sub={data.requests ? `${formatPercent(errorRate)} failed` : 'analytics unavailable'}
 								tone={data.requests ? trafficTone(errorRate) : 'neutral'}
 							/>
 						</a>
@@ -197,7 +234,8 @@
 							/>
 						</a>
 					{/if}
-					{#if data.offers.jobs}
+					<!-- The scheduler lists its jobs to a super admin only. -->
+					{#if data.superAdmin && data.offers.jobs}
 						<a href="/admin/jobs" class="block h-full rounded-xl outline-none transition-shadow hover:ring-1 hover:ring-brand/40 focus-visible:ring-2 focus-visible:ring-brand">
 							<Stat class="h-full"
 								label="Failed jobs"
@@ -277,7 +315,7 @@
 										<span class="min-w-0 truncate font-mono text-xs text-fg" title={e.key}>{e.key}</span>
 										<span class="flex shrink-0 items-center gap-2">
 											<span class="text-xs tabular-nums text-muted">{formatCount(e.requests)}</span>
-											<Badge tone={trafficTone(e.errorRate)} size="sm">{pct(e.errorRate)}</Badge>
+											<Badge tone={trafficTone(e.errorRate)} size="sm">{formatPercent(e.errorRate)}</Badge>
 										</span>
 									</li>
 								{/each}
@@ -288,7 +326,7 @@
 			</section>
 		{/if}
 
-		{#if data.offers.content || (data.isAdmin && (data.offers.audit || data.offers.webhooks || data.offers.logs))}
+		{#if data.isAdmin && (data.offers.content || data.offers.audit || data.offers.webhooks || data.offers.logs)}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>What changed</SectionHeading>
 
@@ -301,7 +339,9 @@
 									<a href="/admin/content" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">All collections</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.entries.length === 0}
+							{#if !data.entries}
+								<p class="mt-3 text-sm text-faint">The recent entries could not be read.</p>
+							{:else if data.entries.length === 0}
 								<p class="mt-3 text-sm text-muted">No entries yet.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
@@ -335,8 +375,10 @@
 									<a href="/admin/audit-log" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">Audit log</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.audit.length === 0}
-								<p class="mt-3 text-sm text-muted">Nothing recorded, or the audit log is unavailable.</p>
+							{#if !data.audit}
+								<p class="mt-3 text-sm text-faint">The audit log could not be read.</p>
+							{:else if data.audit.length === 0}
+								<p class="mt-3 text-sm text-muted">Nothing recorded yet.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
 									{#each data.audit as entry (entry.id)}
@@ -363,7 +405,9 @@
 									<a href="/admin/webhooks" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">Webhooks</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.deadLetters.length === 0}
+							{#if !data.deadLetters}
+								<p class="mt-3 text-sm text-faint">The dead letter queue could not be read.</p>
+							{:else if data.deadLetters.length === 0}
 								<p class="mt-3 text-sm text-muted">No delivery is waiting in the dead letter queue.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
@@ -395,8 +439,10 @@
 									<a href="/admin/logs?level=ERROR" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">Logs</a>
 								{/snippet}
 							</SectionHeading>
-							{#if data.errors.length === 0}
-								<p class="mt-3 text-sm text-muted">No error has been logged, or the log is unavailable.</p>
+							{#if !data.errors}
+								<p class="mt-3 text-sm text-faint">The log could not be read.</p>
+							{:else if data.errors.length === 0}
+								<p class="mt-3 text-sm text-muted">No error has been logged in the last {WINDOW_LABEL[data.window]}.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
 									{#each data.errors as entry, i (entry.timestamp + i)}

@@ -9,7 +9,6 @@
  * upload rides a form post, which the server caps at 512 KiB by default.
  */
 export const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
-export const LOGO_ACCEPT = LOGO_TYPES.join(',');
 export const LOGO_MAX_BYTES = 500_000;
 
 /**

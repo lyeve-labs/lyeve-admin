@@ -1,9 +1,7 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Drawer,
@@ -13,6 +11,7 @@
 		PasswordInput,
 		SectionHeading,
 		Card,
+		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
@@ -24,17 +23,36 @@
 	import SettingRow from '$lib/components/SettingRow.svelte';
 	import type { ConfigSetting } from './+page.server';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 	import { API_METHODS, BODY_PLACEHOLDERS, WEBHOOK_EVENTS, webhookPath, type EmailProvider } from '$lib/api/email';
 	import { submitter } from '$lib/forms.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * The provider drawer, the delete and every mail setting report through the
+	 * one `form`. The drawer shows only a failed save, and only one that came
+	 * back after it opened, so a failed delete never reads as a failure of the
+	 * next form opened. A failed delete shows above the list. A setting's
+	 * outcome carries its key, and its own row shows it.
+	 */
+	const failure = $derived(form as { action?: string; error?: string; key?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const saveFailure = $derived(failure?.action === 'provider' && form !== openedOver ? failure : null);
+	// A setting's failure that names no key, such as an ended session, has no
+	// row to show in, so it shows above the list with a failed delete.
+	const deleteFailure = $derived(
+		failure?.action === 'delete' || (failure && !failure.action && !failure.key) ? failure : null,
+	);
+	const pageRefusal = $derived(deleteFailure ? formRefusal(deleteFailure) : null);
 
 	const submit = submitter(() => (open = false));
 
-	const mail = $derived(data.mail ?? []);
+	const providers = $derived(data.providers.ok ? data.providers.value : []);
+	const mail = $derived(data.mail?.ok ? data.mail.value : []);
 
 	// SettingRow matches a save's outcome to a row by key, and the provider
 	// actions on this page report through the same `form`. A provider failure
@@ -72,8 +90,8 @@
 
 	let open = $state(false);
 	let editing = $state<EmailProvider | null>(null);
-	let transport = $state<string | null>('smtp');
-	let status = $state<string | null>('active');
+	let transport = $state('smtp');
+	let status = $state('active');
 	let host = $state('');
 	let port = $state('587');
 	// The name is state rather than read from `editing`: a duplicate has a
@@ -82,7 +100,7 @@
 	let username = $state('');
 	let useTLS = $state(true);
 	let apiBaseUrl = $state('');
-	let apiMethod = $state<string | null>('POST');
+	let apiMethod = $state('POST');
 	let apiPath = $state('');
 	let apiHeaders = $state<Row[]>([]);
 	let apiBody = $state('');
@@ -117,6 +135,7 @@
 		webhookMessageIdPath = '';
 		webhookReasonPath = '';
 		eventMap = [];
+		openedOver = form;
 		open = true;
 	}
 
@@ -140,6 +159,7 @@
 		webhookMessageIdPath = p.api_webhook_message_id_path ?? '';
 		webhookReasonPath = p.api_webhook_reason_path ?? '';
 		eventMap = rows(p.api_webhook_event_map);
+		openedOver = form;
 		open = true;
 	}
 
@@ -154,7 +174,7 @@
 	 */
 	function openDuplicate(source: EmailProvider) {
 		const draft = duplicateRow(source as unknown as Record<string, unknown>, {
-			taken: data.providers.map((x) => x.name),
+			taken: providers.map((x) => x.name),
 		});
 		editing = null;
 		providerName = String(draft.name ?? source.name);
@@ -175,6 +195,7 @@
 		webhookMessageIdPath = source.api_webhook_message_id_path ?? '';
 		webhookReasonPath = source.api_webhook_reason_path ?? '';
 		eventMap = rows(source.api_webhook_event_map);
+		openedOver = form;
 		open = true;
 	}
 
@@ -193,12 +214,12 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(p: EmailProvider) {
-		const ok = await confirm(`Delete ${p.name}?`, 'Sends that rotate onto it will go to the next provider.', {
+		const ok = await confirm(`Delete provider ${p.name}`, 'Sends that rotate onto it will go to the next provider.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		deleteId = p.id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -209,17 +230,16 @@
 	const placeholderHint = `A JSON template. ${BODY_PLACEHOLDERS.map((p) => `{{${p}}}`).join(', ')} are substituted at send time; {{to}} is an array of addresses, {{to_first}} its first address and {{to_objects}} the same list as objects with an email key.`;
 </script>
 
-<PageTitle title="Email providers" />
-
 <PageShell
 	title="Email"
+	documentTitle="Email providers"
 	description="How this instance sends mail. The provider pool is tried first, and the fallback transport below it catches anything the pool cannot send."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
 	{#snippet actions()}
 		<Badge tone="violet" size="sm">Beta</Badge>
-		{#if !data.unavailable}
+		{#if data.providers.ok}
 			<Button variant="secondary" size="sm" href="/admin/settings/email/templates">
 				<FileText size={ICON.sm} />
 				Templates
@@ -242,19 +262,12 @@
 			sends first, and a provider saved here joins the rotation straight away.
 		</p>
 
-	{#if data.unavailable}
-		<Alert tone="warn" title="The email plugin did not answer">
-			The engine lists the plugin, but its routes are not responding. Providers cannot be read or
-			written until it is.
-		</Alert>
+	{#if !data.providers.ok}
+		<GateNotice gate={data.providers.gate} title="Email providers" absent="The email plugin is not part of this build, so no provider sends mail." />
 	{:else}
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if form?.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={deleteFailure?.error} refused={pageRefusal} />
 
-		{#if data.providers.length === 0}
+		{#if providers.length === 0}
 			<EmptyState
 				title="No providers yet"
 				description="Until one exists, mail goes through the fallback transport below, if it is set."
@@ -282,7 +295,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.providers as p (p.id)}
+					{#each providers as p (p.id)}
 						<tr>
 							<td data-cell="nowrap" class="text-sm text-fg">{p.name}</td>
 							<td data-cell="nowrap">
@@ -321,7 +334,12 @@
 	<!-- Not a second way to configure the pool above. The sign-in and reset
 	     mailers dial these settings themselves when no provider can send, so
 	     the section shows whether or not the pool is available. -->
-	{#if mail.length > 0}
+	{#if data.mail && !data.mail.ok}
+		<section class="flex flex-col gap-4">
+			<SectionHeading level={2}>Fallback transport</SectionHeading>
+			<GateNotice gate={data.mail.gate} title="Fallback transport" absent="This engine does not report its configuration." />
+		</section>
+	{:else if mail.length > 0}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Fallback transport</SectionHeading>
 			<p class="text-sm text-muted">
@@ -384,9 +402,6 @@
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${editing.name}` : 'New provider'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
@@ -394,19 +409,18 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors message={saveFailure?.error} refused={saveFailure ? formRefusal(saveFailure) : null} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 			<input type="hidden" name="stored_transport" value={editing.transport} />
 		{/if}
 		<Input id="ep-name" name="name" label="Name" hint="A label for the pool, such as Primary or Marketing." bind:value={providerName} required />
-		<Select
-			id="ep-transport"
-			name="transport"
+		<SegmentedControl
 			label="Transport"
+			name="transport"
 			options={TRANSPORT_OPTIONS}
-			value={transport}
-			hint="SMTP talks to a mail server; a provider API sends over HTTPS with a key."
-			onvaluechange={(v) => (transport = v)}
+			bind:value={transport}
+			hint="SMTP talks to a mail server. A provider API sends over HTTPS with a key."
 		/>
 		<Input id="ep-from" name="from_addr" label="From address" placeholder="noreply@example.com" value={editing?.from_addr ?? ''} required />
 
@@ -423,7 +437,13 @@
 					bind:value={apiBaseUrl}
 					required
 				/>
-				<Select id="ep-api-method" name="api_method" label="Method" options={METHOD_OPTIONS} value={apiMethod} hint="The verb of the send request; POST for nearly every provider." onvaluechange={(v) => (apiMethod = v)} />
+				<SegmentedControl
+					label="Method"
+					name="api_method"
+					options={METHOD_OPTIONS}
+					bind:value={apiMethod}
+					hint="The verb of the send request. POST for nearly every provider."
+				/>
 				<Input id="ep-api-path" name="api_path" label="Path" placeholder="/v3/messages" hint="Appended to the base URL. Starts with / and carries no query string." bind:value={apiPath} />
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-xs font-semibold uppercase tracking-wide text-faint">Headers</legend>
@@ -504,7 +524,7 @@
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 			<Input id="ep-priority" name="priority" label="Priority" inputmode="numeric" hint="0 sends first." value={String(editing?.priority ?? 0)} />
 			<Input id="ep-max-per-hour" name="max_per_hour" label="Max per hour" inputmode="numeric" hint="0 is unlimited." value={String(editing?.max_per_hour ?? 0)} />
-			<Select id="ep-status" name="status" label="Status" options={STATUS_OPTIONS} value={status} onvaluechange={(v) => (status = v)} />
+			<SegmentedControl label="Status" name="status" options={STATUS_OPTIONS} bind:value={status} />
 		</div>
 	</form>
 	{#snippet footer()}

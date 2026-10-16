@@ -5,9 +5,11 @@ const client = vi.hoisted(() => ({
 	post: vi.fn(async (_path: string, _body: unknown) => ({ id: 'e1' })),
 }));
 
+// Reads and writes share one session client, as they do in the load and the
+// action. Writes land in `client` and reads in `reads`.
 vi.mock('$lib/server/authz', () => ({
 	requireUser: vi.fn(async () => ({ id: 'u1' })),
-	authedClient: vi.fn(() => client),
+	authedClient: vi.fn(() => ({ post: client.post, get: reads.get })),
 	stripProtectedFields: (d: Record<string, unknown>) => d,
 }));
 
@@ -22,8 +24,8 @@ const { FakeApiError } = vi.hoisted(() => ({
 		}
 	},
 }));
+const reads = vi.hoisted(() => ({ get: vi.fn(async (_path: string): Promise<unknown> => ({})) }));
 vi.mock('@lyeve-labs/client', () => ({
-	createClient: vi.fn(() => ({})),
 	ApiError: FakeApiError,
 }));
 
@@ -36,20 +38,20 @@ const rest = vi.hoisted(() => ({
 			{ name: 'active', field_type: 'boolean' },
 		],
 	})),
-	listContent: vi.fn(async () => []),
 }));
 vi.mock('@lyeve-labs/client-rest', () => rest);
 
 const relations = vi.hoisted(() => ({
 	// Takes the event, not a fetch and a token: the CSRF header the write needs
 	// is built from the event's cookies in one place.
-	setRelations: vi.fn(
-		async (_event: unknown, _entryID: string, _fieldName: string, _ids: string[]) => {},
+	setEntryRelations: vi.fn(
+		async (_event: unknown, _entryID: string, _byField: Record<string, string[]>): Promise<string | null> => null,
 	),
 }));
 vi.mock('$lib/server/content-relations', () => relations);
 
-import { actions } from './+page.server';
+import { isHttpError } from '@sveltejs/kit';
+import { actions, load } from './+page.server';
 
 function cookies(): Cookies {
 	return { get: vi.fn(() => 'tok') } as unknown as Cookies;
@@ -75,7 +77,7 @@ async function create(data: Record<string, unknown>, m2m?: Record<string, string
 
 beforeEach(() => {
 	client.post.mockClear();
-	relations.setRelations.mockClear();
+	relations.setEntryRelations.mockClear();
 });
 
 describe('creating a content entry', () => {
@@ -114,19 +116,160 @@ describe('creating a content entry', () => {
 
 	it('writes the relations against the id the admin store gave back', async () => {
 		await create({ title: 'Contact' }, { tags: ['t1', 't2'] });
-		expect(relations.setRelations).toHaveBeenCalledOnce();
-		const [event, entryID, fieldName, ids] = relations.setRelations.mock.calls[0];
+		expect(relations.setEntryRelations).toHaveBeenCalledOnce();
+		const [event, entryID, byField] = relations.setEntryRelations.mock.calls[0];
 		// The event carries the session and CSRF cookies. Anything else here
 		// sends Bearer alone, which the engine refuses with 403.
 		expect(event).toHaveProperty('cookies');
 		expect(entryID).toBe('e1');
-		expect(fieldName).toBe('tags');
-		expect(ids).toEqual(['t1', 't2']);
+		expect(byField).toEqual({ tags: ['t1', 't2'] });
+	});
+
+	it('reports links the plugin refused instead of redirecting as a success', async () => {
+		relations.setEntryRelations.mockResolvedValueOnce('In tags, 1 link could not be added.');
+		const { result, threw } = await create({ title: 'Contact' }, { tags: ['t1'] });
+		expect(threw).toBeUndefined();
+		const data = (result as { data: { error: string; created: string } }).data;
+		expect(data.error).toContain('The entry was created');
+		expect(data.error).toContain('In tags, 1 link could not be added.');
+		expect(data.created).toBe('e1');
+	});
+
+	// The plugin answers a value the schema refuses with an errors array and no
+	// error key, so the message the client carries is the raw body.
+	it('reads a schema refusal into a message per field', async () => {
+		const refusal = Object.assign(
+			new FakeApiError('{"errors":[{"field":"title","message":"must be an email"}]}', 422),
+			{ body: { errors: [{ field: 'title', message: 'must be an email', code: 'email', rule: 'email' }] } },
+		);
+		client.post.mockRejectedValueOnce(refusal);
+		const { result } = await create({ title: 'Contact' });
+		const failure = result as { status: number; data: { error: string; fieldErrors: Record<string, string> } };
+		expect(failure.status).toBe(422);
+		expect(failure.data.fieldErrors).toEqual({ title: 'must be an email' });
+		expect(failure.data.error).toBe('The entry was not saved. Check the highlighted fields.');
+		expect(failure.data.error).not.toContain('{');
 	});
 
 	it('relays the reason a create was refused', async () => {
 		client.post.mockRejectedValueOnce(new FakeApiError('slug already in use', 409));
 		const { result } = await create({ title: 'Contact' });
 		expect(JSON.stringify(result)).toContain('slug already in use');
+	});
+});
+
+describe('opening the new entry form', () => {
+	const localizedSchema = { name: 'surveys', display_name: 'Surveys', with_localization: true, fields: [] };
+
+	type Opened = {
+		locales: { ok: boolean; value?: unknown } | null;
+		relations: Record<string, { items: unknown[]; total: number; failed: boolean }>;
+	};
+
+	function open(running: string[], roles: string[] = ['admin']) {
+		return Promise.resolve(
+			load({
+				fetch: vi.fn(),
+				cookies: cookies(),
+				params: { schema: 'surveys' },
+				url: new URL('http://localhost/admin/content/surveys/new'),
+				parent: async () => ({ plugins: { state: 'named', running, withheld: [] }, user: { id: 'u1', roles } }),
+			} as never),
+		) as Promise<Opened>;
+	}
+
+	const relatedSchema = {
+		name: 'surveys',
+		display_name: 'Surveys',
+		fields: [{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' }],
+	};
+
+	beforeEach(() => {
+		reads.get.mockReset();
+		rest.getSchema.mockClear();
+	});
+
+	it('opens a localized schema without the localization plugin, and offers no locale', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+
+		const data = await open([]);
+
+		expect(data.locales).toBeNull();
+		expect(reads.get).not.toHaveBeenCalled();
+	});
+
+	it('keeps the form when the locales cannot be read, and says so', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+		reads.get.mockRejectedValueOnce(new FakeApiError('down', 503));
+
+		const data = await open(['localization']);
+
+		expect(data.locales?.ok).toBe(false);
+	});
+
+	it('offers the enabled locales while the plugin runs', async () => {
+		rest.getSchema.mockResolvedValueOnce(localizedSchema as never);
+		reads.get.mockResolvedValueOnce({ default_locale: 'en', enabled_locales: ['en', 'fr'] });
+
+		const data = await open(['localization']);
+
+		expect(data.locales).toEqual({
+			ok: true,
+			value: [
+				{ code: 'en', name: 'en', is_default: true },
+				{ code: 'fr', name: 'fr', is_default: false },
+			],
+		});
+	});
+
+	it('hands the media picker null when the library could not be read', async () => {
+		const withMedia = { name: 'surveys', display_name: 'Surveys', fields: [{ name: 'cover', field_type: 'media' }] };
+		rest.getSchema.mockResolvedValueOnce(withMedia as never);
+		reads.get.mockRejectedValueOnce(new FakeApiError('down', 503));
+		const failed = (await open([])) as unknown as { mediaChoices: unknown };
+		expect(failed.mediaChoices).toBeNull();
+
+		rest.getSchema.mockResolvedValueOnce(withMedia as never);
+		reads.get.mockResolvedValueOnce({ data: [] });
+		const empty = (await open([])) as unknown as { mediaChoices: unknown };
+		expect(empty.mediaChoices).toEqual([]);
+	});
+
+	it('reports an outage as an outage, not as a schema that is not there', async () => {
+		rest.getSchema.mockRejectedValueOnce(new FakeApiError('down', 503) as never);
+
+		const thrown = await open([]).catch((err: unknown) => err);
+
+		expect(isHttpError(thrown) && thrown.status).toBe(503);
+	});
+
+	it('refuses an editor, whose Create the engine would refuse, before reading anything', async () => {
+		const thrown = await open([], ['editor']).catch((err: unknown) => err);
+
+		expect(isHttpError(thrown) && thrown.status).toBe(403);
+		expect(rest.getSchema).not.toHaveBeenCalled();
+	});
+
+	it('reads each related collection from the admin store, one page of 500', async () => {
+		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
+		reads.get.mockResolvedValueOnce({ data: [{ id: 'a1', title: 'Ada' }], total_count: 900 });
+
+		const data = await open([]);
+
+		const asked = new URL(String(reads.get.mock.calls[0][0]), 'http://localhost');
+		expect(asked.pathname).toBe('/api/admin/content');
+		expect(asked.searchParams.get('schema')).toBe('author');
+		expect(asked.searchParams.get('limit')).toBe('500');
+		expect(data.relations.author).toMatchObject({ total: 900, failed: false });
+		expect(data.relations.author.items).toHaveLength(1);
+	});
+
+	it('marks a related collection whose read failed, rather than calling it empty', async () => {
+		rest.getSchema.mockResolvedValueOnce(relatedSchema as never);
+		reads.get.mockRejectedValueOnce(new FakeApiError('down', 503));
+
+		const data = await open([]);
+
+		expect(data.relations.author).toEqual({ items: [], total: 0, failed: true });
 	});
 });

@@ -1,10 +1,33 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProvidersPage from './+page.svelte';
 import type { EmailProvider } from '$lib/api/email';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/**
+ * Press a row's delete, accept the question, and return its title and what
+ * the hidden form held when it was sent. The value has to be in the form by
+ * then, which is what waiting on the next render before sending is for.
+ */
+async function pressDelete(button: HTMLElement, field: string): Promise<{ title: string; sent: string }> {
+	let sent = '';
+	const spy = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(function (this: HTMLFormElement) {
+		sent = (this.querySelector(`input[name="${field}"]`) as HTMLInputElement | null)?.value ?? '';
+	});
+	kit.confirm.mockClear();
+	await fireEvent.click(button);
+	await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+	spy.mockRestore();
+	return { title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''), sent };
+}
+
 
 afterEach(cleanup);
 
@@ -47,7 +70,7 @@ const api: EmailProvider = {
 
 function setup(providers: EmailProvider[] = [smtp, api], overrides: Record<string, unknown> = {}, form: unknown = null) {
 	return render(ProvidersPage, {
-		props: { data: { unavailable: false, providers, ...overrides }, form } as never,
+		props: { data: { providers: { ok: true, value: providers }, mail: null, ...overrides }, form } as never,
 	});
 }
 
@@ -58,6 +81,8 @@ function formEl(container: HTMLElement): HTMLFormElement {
 function names(form: HTMLFormElement): string[] {
 	return [...form.querySelectorAll('[name]')].map((el) => el.getAttribute('name') ?? '');
 }
+
+const down = { ok: false, gate: { state: 'unavailable' } };
 
 const API_FIELDS = [
 	'api_key',
@@ -73,16 +98,27 @@ const API_FIELDS = [
 	'api_webhook_reason_path',
 ];
 
+function segment(container: HTMLElement, group: string, label: string): HTMLElement {
+	const radios = container.querySelector(`[role="radiogroup"][aria-label="${group}"]`) as HTMLElement;
+	return within(radios).getByRole('radio', { name: label });
+}
+
 async function chooseTransport(container: HTMLElement, label: string) {
-	await fireEvent.click(container.querySelector('#ep-transport') as HTMLElement);
-	await fireEvent.click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent?.trim() === label) as HTMLElement);
+	await fireEvent.click(segment(container, 'Transport', label));
 }
 
 describe('email providers page', () => {
 	it('says the plugin did not answer, and offers nothing to create', () => {
-		const { getByText, queryByText } = setup([], { unavailable: true });
-		expect(getByText('The email plugin did not answer')).toBeTruthy();
+		const { container, queryByText } = setup([], { providers: down });
+		expect(container.textContent).toContain('so email providers could not be read');
+		expect(queryByText('No providers yet')).toBeNull();
 		expect(queryByText('New provider')).toBeNull();
+	});
+
+	it('tells a role the plugin refuses that it cannot open the providers', () => {
+		const { container, queryByText } = setup([], { providers: { ok: false, gate: { state: 'forbidden' } } });
+		expect(container.textContent).toContain('Your role cannot open email providers');
+		expect(queryByText('No providers yet')).toBeNull();
 	});
 
 	it('lists transport, endpoint and the webhook path per row and never a key', () => {
@@ -132,9 +168,10 @@ describe('email providers page', () => {
 		expect(container.textContent).toContain('{{to_first}}');
 		expect(container.textContent).toContain('{{to_objects}}');
 		expect(container.textContent).toContain('{{message_id}}');
-		await fireEvent.click(container.querySelector('#ep-api-method') as HTMLElement);
-		expect([...document.querySelectorAll('[role="option"]')].map((o) => o.textContent?.trim())).toEqual(['POST', 'PUT', 'PATCH']);
-		await fireEvent.click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent?.trim() === 'PUT') as HTMLElement);
+		const methods = container.querySelector('[role="radiogroup"][aria-label="Method"]') as HTMLElement;
+		expect(within(methods).getAllByRole('radio').map((o) => o.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+		expect(within(methods).getByRole('radio', { name: 'PATCH' })).toBeTruthy();
+		await fireEvent.click(segment(container, 'Method', 'PUT'));
 		expect((form.querySelector('input[name="api_method"]') as HTMLInputElement).value).toBe('PUT');
 
 		await chooseTransport(container, 'SMTP');
@@ -178,9 +215,26 @@ describe('email providers page', () => {
 		expect(container.textContent).toContain('transport changed');
 	});
 
-	it('reports a refusal', () => {
-		const { getByText } = setup([smtp], {}, { error: 'An API key is required.' });
-		expect(getByText('An API key is required.')).toBeTruthy();
+	const drawerText = (container: HTMLElement) => formEl(container)?.textContent ?? '';
+
+	it('reports a refused save inside the open drawer', async () => {
+		const { getAllByText, container, rerender } = setup([smtp]);
+		await fireEvent.click(getAllByText('New provider')[0]);
+		await rerender({ data: { providers: { ok: true, value: [smtp] }, mail: null }, form: { action: 'provider', error: 'An API key is required.' } } as never);
+		expect(drawerText(container)).toContain('An API key is required.');
+	});
+
+	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const { getAllByText, container } = setup([smtp], {}, { action: 'delete', error: 'Failed to delete the provider.' });
+		expect(container.textContent).toContain('Failed to delete the provider.');
+		await fireEvent.click(getAllByText('New provider')[0]);
+		expect(drawerText(container)).not.toContain('Failed to delete');
+	});
+
+	it('keeps a mail setting failure out of the provider drawer', async () => {
+		const { getAllByText, container } = setup([smtp], {}, { key: 'SMTP_HOST', error: 'Not a mail setting' });
+		await fireEvent.click(getAllByText('New provider')[0]);
+		expect(drawerText(container)).not.toContain('Not a mail setting');
 	});
 });
 
@@ -194,13 +248,13 @@ describe('email page fallback transport', () => {
 	];
 
 	it('keeps the engine mail settings, editable or pinned', () => {
-		const { container } = setup([smtp], { mail });
+		const { container } = setup([smtp], { mail: { ok: true, value: mail } });
 		expect(container.querySelector('#set-SMTP_HOST')).toBeTruthy();
 		expect(container.textContent).toContain('Stored, not shown.');
 	});
 
 	it('shows it when the provider pool did not answer', () => {
-		const { container } = setup([], { unavailable: true, mail });
+		const { container } = setup([], { providers: down, mail: { ok: true, value: mail } });
 		expect(container.querySelector('#set-SMTP_HOST')).toBeTruthy();
 		expect(container.textContent).toContain('Fallback transport');
 	});
@@ -208,15 +262,63 @@ describe('email page fallback transport', () => {
 	it('says which of the two sends, so neither reads as the other', () => {
 		// Normalized: the copy wraps, and textContent keeps the newline and the
 		// indent, so a phrase that spans two source lines never matches raw.
-		const text = (setup([smtp], { mail }).container.textContent ?? '').replace(/\s+/g, ' ');
+		const text = (setup([smtp], { mail: { ok: true, value: mail } }).container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('Provider pool');
 		expect(text).toContain('tried first');
 		expect(text).toContain('takes effect at the next restart');
+	});
+
+	it('says the transport could not be read rather than leaving it out', () => {
+		const { container } = setup([smtp], { mail: { ok: false, gate: { state: 'error', message: 'The fallback transport could not be read. This is not a report that it is unset.' } } });
+		expect(container.textContent).toContain('Fallback transport');
+		expect(container.textContent).toContain('This is not a report that it is unset.');
+		expect(container.querySelector('#set-SMTP_HOST')).toBeNull();
 	});
 
 	it('leaves the section out for a session that may not read it', () => {
 		const { container } = setup([smtp], { mail: null });
 		expect(container.querySelector('#set-SMTP_HOST')).toBeNull();
 		expect(container.textContent).not.toContain('Fallback transport');
+	});
+});
+
+describe('email provider controls', () => {
+	it('offers the transport, the method and the status as segments, with every option in sight', async () => {
+		const { getAllByText, container } = setup([]);
+		await fireEvent.click(getAllByText('New provider')[0]);
+		await chooseTransport(container, 'Provider API');
+		for (const group of ['Transport', 'Method', 'Status']) {
+			expect(container.querySelector(`[role="radiogroup"][aria-label="${group}"]`), group).toBeTruthy();
+		}
+		expect(container.querySelector('#ep-transport')).toBeNull();
+		expect(container.querySelector('#ep-status')).toBeNull();
+		await fireEvent.click(segment(container, 'Status', 'Paused'));
+		expect((formEl(container).querySelector('input[name="status"]') as HTMLInputElement).value).toBe('paused');
+	});
+
+	it('names the transport and the method hints as the descriptions of their groups', async () => {
+		const { getAllByText, container } = setup([]);
+		await fireEvent.click(getAllByText('New provider')[0]);
+		await chooseTransport(container, 'Provider API');
+		const hints: Record<string, string> = {
+			Transport: 'SMTP talks to a mail server.',
+			Method: 'The verb of the send request.',
+		};
+		for (const [group, hint] of Object.entries(hints)) {
+			const radios = container.querySelector(`[role="radiogroup"][aria-label="${group}"]`) as HTMLElement;
+			const ids = radios.getAttribute('aria-describedby') ?? '';
+			expect(ids, group).not.toBe('');
+			const read = ids.split(' ').map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+			expect(read, group).toContain(hint);
+		}
+	});
+});
+
+describe('email provider delete', () => {
+	it('names the provider and sends its id', async () => {
+		const { getByLabelText } = setup([smtp]);
+		const out = await pressDelete(getByLabelText('Delete Primary'), 'id');
+		expect(out.title).toBe('Delete provider Primary');
+		expect(out.sent).toBe('p1');
 	});
 });

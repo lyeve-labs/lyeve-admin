@@ -56,6 +56,28 @@ describe('the quota editor', () => {
 		expect(out.data.refused).toMatchObject({ feature: 'example-capability' });
 	});
 
+	// The plugin decodes the review strictly, so a key it does not read fails
+	// every approval and denial with 400.
+	it.each([
+		['approve', 'approved'],
+		['deny', 'denied'],
+	])('sends only the status to %s a request', async (decision, status) => {
+		engine.post.mockResolvedValue({});
+		expect(await actions.review(event({ id: 'q1', decision, note: 'ignored' }))).toEqual({ reviewed: 'q1' });
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/quota-requests/q1/review', { status });
+	});
+
+	it('sends a byte limit posted in bytes as it is, without rounding through GiB', async () => {
+		engine.put.mockResolvedValue({});
+		await actions.quota(
+			event({ tenant_id: 'acme', storage_bytes_limit: '1234567', storage_gib: '0', bandwidth_bytes_limit: '5000000' }),
+		);
+		expect(engine.put).toHaveBeenCalledWith(
+			'/api/admin/quotas/acme',
+			expect.objectContaining({ storage_bytes_limit: 1234567, bandwidth_bytes_limit: 5000000 }),
+		);
+	});
+
 	it('removes a quota', async () => {
 		engine.delete.mockResolvedValue(undefined);
 		expect(await actions.clearQuota(event({ tenant_id: 'acme' }))).toEqual({ quotaCleared: 'acme' });

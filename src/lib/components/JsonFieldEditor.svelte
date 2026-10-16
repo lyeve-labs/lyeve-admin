@@ -60,7 +60,7 @@
 </script>
 
 <script lang="ts">
-	import { Button, Input, SegmentedControl, Textarea } from '@lyeve-labs/ui-kit';
+	import { Button, Collapsible, Input, SegmentedControl, Textarea } from '@lyeve-labs/ui-kit';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 
@@ -135,11 +135,10 @@
 			{ value: 'json', label: 'JSON' },
 		]}
 		onchange={setMode}
+		hint={mode === 'json' && !pairable && value.trim() !== ''
+			? 'Keys and values edits a flat object. This value nests or is not an object, so it stays as JSON.'
+			: undefined}
 	/>
-
-	{#if mode === 'json' && !pairable && value.trim() !== ''}
-		<p class="text-xs text-faint">Keys and values edits a flat object. This value nests or is not an object, so it stays as JSON.</p>
-	{/if}
 
 	{#if mode === 'pairs'}
 		<div class="flex flex-col gap-2" role="group" aria-label="Keys and values">
@@ -193,9 +192,8 @@
 	{/if}
 
 	{#if preview}
-		<details class="rounded-lg border border-line bg-surface-2" open={mode === 'pairs'}>
-			<summary class="cursor-pointer px-3 py-2 text-xs font-medium text-muted">What is saved</summary>
-			<pre class="max-h-64 overflow-auto px-3 pb-3 font-mono text-xs text-fg" data-testid="json-preview">{preview}</pre>
-		</details>
+		<Collapsible label="What is saved" open={mode === 'pairs'}>
+			<pre class="max-h-64 overflow-auto rounded-lg border border-line bg-surface-2 p-3 font-mono text-xs text-fg" data-testid="json-preview">{preview}</pre>
+		</Collapsible>
 	{/if}
 </div>

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -8,6 +7,7 @@
 		EmptyState,
 		Input,
 		PageShell,
+		Pagination,
 		SearchInput,
 		SectionHeading,
 		Stat,
@@ -21,6 +21,7 @@
 	import { Copy, Eye, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
 		byType,
@@ -32,6 +33,7 @@
 	import { NO_VALUE, formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
+	import { pageHref, pageNumber } from '$lib/api/list';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -70,12 +72,22 @@
 	let open = $state(false);
 	let sample = $state('');
 
-	const testResult = $derived((form as { test?: unknown } | null)?.test ?? null);
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// Every form on this page reports through one result, so each failure is
+	// tagged with its action and shown only where that action was made: a
+	// save in the rule form, a dry run under it, a delete on the page. A
+	// drawer opened after any result starts clean, so the result is set aside.
+	let setAside = $state<unknown>(null);
+	const current = $derived(form && form !== setAside ? (form as { action?: string; error?: string; test?: unknown }) : null);
+	const testResult = $derived(current?.test ?? null);
+	const failedAs = (actions: string[]) => (current?.action && actions.includes(current.action) ? (current.error ?? '') : '');
+	const saveError = $derived(failedAs(['create', 'update']));
+	const testError = $derived(failedAs(['test']));
+	const rowError = $derived(failedAs(['delete']));
 
 	function newRule() {
 		editing = { ...BLANK };
 		sample = '';
+		setAside = form;
 		open = true;
 	}
 
@@ -90,6 +102,7 @@
 			enabled: rule.enabled,
 		};
 		sample = '';
+		setAside = form;
 		open = true;
 	}
 
@@ -123,6 +136,7 @@
 			enabled: false,
 		};
 		sample = '';
+		setAside = form;
 		open = true;
 	}
 
@@ -132,8 +146,8 @@
 	async function askDelete(rule: CustomRule) {
 		deleteId = rule.id;
 		const ok = await confirm(
-			'Delete rule',
-			`Delete ${rule.name}? Anything it was hiding is served unmasked from the next request.`,
+			`Delete rule ${rule.name}`,
+			'Anything it was hiding is served unmasked from the next request.',
 			{ confirmLabel: 'Delete' },
 		).catch(() => false);
 		if (ok) deleteForm?.requestSubmit();
@@ -149,8 +163,6 @@
 			: data.entries,
 	);
 </script>
-
-<PageTitle title="PII masking" />
 
 <PageShell
 	title="PII masking"
@@ -173,13 +185,14 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="PII masking"
 			absent="The masking plugin is not part of this build, so responses are served as they are stored."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 		{#if form && 'saved' in form && form.saved}
 			<Alert tone="success" autoDismiss>Saved. It applies from the next request.</Alert>
@@ -200,7 +213,8 @@
 			/>
 			<Stat size="sm" mono label="Your own rules" value={`${enabledCount} of ${maxEnabled}`} />
 			<Stat size="sm" mono label="Mask styles" value={tags.length} />
-			<Stat size="sm" mono label="Unmasked reads" value={data.total} />
+			<!-- An unread log has no count, so the tile says so rather than 0. -->
+			<Stat size="sm" mono label="Unmasked reads" value={data.logFailed ? NO_VALUE : data.total} />
 		</div>
 
 		<section class="flex flex-col gap-4">
@@ -369,6 +383,7 @@
 
 				<ListToolbar label="Filter unmasked reads">
 					{#snippet search()}
+						<label for="pii-narrow" class="sr-only">Narrow this page</label>
 						<SearchInput
 							id="pii-narrow"
 							bind:value={narrow}
@@ -376,31 +391,6 @@
 						/>
 					{/snippet}
 				</ListToolbar>
-
-				<Table label="Unmasked reads">
-					<thead>
-						<tr>
-							<th scope="col">Read</th>
-							<th scope="col">Kind</th>
-							<th scope="col">Record</th>
-							<th scope="col">Role</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as entry (entry.id)}
-							<tr>
-								<td data-cell="nowrap" class="text-xs text-faint"
-									>{formatDateTime(entry.accessed_at)}</td
-								>
-								<td data-cell="nowrap">{entry.pii_type}</td>
-								<td data-cell="nowrap" class="font-mono text-xs"
-									>{entry.record_type ?? NO_VALUE}</td
-								>
-								<td data-cell="nowrap" class="text-xs">{entry.viewer_role ?? NO_VALUE}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
 
 				{#if visible.length === 0}
 					<EmptyState
@@ -411,7 +401,40 @@
 							<Search size={ICON.lg} />
 						{/snippet}
 					</EmptyState>
+				{:else}
+					<Table label="Unmasked reads">
+						<thead>
+							<tr>
+								<th scope="col">Read</th>
+								<th scope="col">Kind</th>
+								<th scope="col">Record</th>
+								<th scope="col">Role</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as entry (entry.id)}
+								<tr>
+									<td data-cell="nowrap" class="text-xs text-faint"
+										>{formatDateTime(entry.accessed_at)}</td
+									>
+									<td data-cell="nowrap">{entry.pii_type}</td>
+									<td data-cell="nowrap" class="font-mono text-xs"
+										>{entry.record_type ?? NO_VALUE}</td
+									>
+									<td data-cell="nowrap" class="text-xs">{entry.viewer_role ?? NO_VALUE}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
 				{/if}
+				<Pagination
+					page={pageNumber(data.offset, data.limit)}
+					perPage={data.limit}
+					count={data.entries.length}
+					total={data.total}
+					noun="reads"
+					href={pageHref('/admin/settings/pii', data.limit)}
+				/>
 			{/if}
 		</section>
 	{/if}
@@ -430,12 +453,15 @@
 	<form
 		method="POST"
 		action={editing.id ? '?/update' : '?/create'}
-		use:enhance={() => async ({ update }) => {
+		use:enhance={() => async ({ result, update }) => {
 			await update({ reset: false });
-			open = false;
+			// A refused save keeps the drawer open, with the reason at the top
+			// of the form and the rule as it was typed.
+			if (result.type === 'success' || result.type === 'redirect') open = false;
 		}}
 		class="flex flex-col gap-4"
 	>
+		<FormErrors message={saveError || undefined} />
 		{#if editing.id}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}
@@ -475,7 +501,9 @@
 			name="priority"
 			label="Priority"
 			type="number"
-			hint="Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them."
+			hint={editing.id
+				? 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them, and 0 before them.'
+				: 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them. A new rule starts at 1 or more: set 0 by editing it.'}
 			bind:value={priorityText}
 		/>
 		<!-- The kit's Toggle is a button and serializes nothing, so the value
@@ -516,7 +544,9 @@
 			</div>
 		</form>
 
-		{#if testResult}
+		{#if testError}
+			<Alert tone="danger">{testError}</Alert>
+		{:else if testResult}
 			{@const result = testResult as
 				| { valid: false; error: string }
 				| { valid: true; matches: string[]; count: number; masked: string }}

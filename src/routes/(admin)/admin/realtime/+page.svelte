@@ -1,7 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
-		Alert,
 		Badge,
 		Card,
 		EmptyState,
@@ -34,10 +32,11 @@
 	const streamUsed = $derived(inUse(data.stream));
 	const socketUsed = $derived(inUse(data.socket));
 	const loads = $derived(tenantLoad(data.platform?.connections_by_tenant));
-
-	function num(value: number | undefined | null): string {
-		return formatCount(value);
-	}
+	// The plugin's tenant view hard-codes the idle count to zero, so it is no
+	// measurement and is not shown.
+	const socketStates = $derived(
+		Object.entries(data.socket?.connections_by_state ?? {}).filter(([state]) => state !== 'idle'),
+	);
 
 	function pct(share: number): string {
 		return `${Math.round(share * 100)}%`;
@@ -48,8 +47,6 @@
 		return m ? uptimeSince(m.since) : NO_VALUE;
 	}
 </script>
-
-<PageTitle title="Realtime" />
 
 <PageShell
 	title="Realtime"
@@ -64,6 +61,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Realtime"
 			absent="The realtime plugin is not part of this build, so nothing is holding connections open."
@@ -71,57 +69,66 @@
 	{:else}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Server-sent events</SectionHeading>
-			{#if !streamUsed}
+			{#if data.streamGate}
+				<GateNotice gate={data.streamGate} title="the server-sent events counters" absent="This build does not serve server-sent events." />
+			{:else if !streamUsed}
 				<p class="text-sm text-muted">
 					Nothing has connected over this transport. That is a transport nobody is using, not a
 					fault.
 				</p>
 			{/if}
-			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-				<Stat size="sm" mono label="Open now" value={num(data.stream?.active_connections)} />
-				<Stat
-					size="sm"
-					mono
-					label="Accepted in {window_(data.stream)}"
-					value={num(data.stream?.total_connections)}
-				/>
-				<Stat size="sm" mono label="Events pushed" value={num(data.stream?.events_dispatched)} />
-				<Stat
-					size="sm"
-					mono
-					label="Rejected"
-					value={num(data.stream?.connections_rejected)}
-					tone={(data.stream?.connections_rejected ?? 0) > 0 ? 'warn' : undefined}
-				/>
-			</div>
+			{#if !data.streamGate}
+				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+					<Stat size="sm" mono label="Open now" value={formatCount(data.stream?.active_connections)} />
+					<Stat
+						size="sm"
+						mono
+						label="Accepted in {window_(data.stream)}"
+						value={formatCount(data.stream?.total_connections)}
+					/>
+					<Stat size="sm" mono label="Events pushed, whole instance" value={formatCount(data.stream?.events_dispatched)} />
+					<Stat
+						size="sm"
+						mono
+						label="Rejected, whole instance"
+						value={formatCount(data.stream?.connections_rejected)}
+						tone={(data.stream?.connections_rejected ?? 0) > 0 ? 'warn' : undefined}
+					/>
+				</div>
+				<p class="text-xs text-faint">
+					Open now and accepted count this tenant's connections. The other counters cover every tenant on
+					the instance.
+				</p>
+			{/if}
 		</section>
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>WebSocket</SectionHeading>
-			{#if !socketUsed}
+			{#if data.socketGate}
+				<GateNotice gate={data.socketGate} title="the WebSocket counters" absent="This build does not serve WebSocket connections." />
+			{:else if !socketUsed}
 				<p class="text-sm text-muted">
 					Nothing has connected over this transport. That is a transport nobody is using, not a
 					fault.
 				</p>
 			{/if}
-			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-				<Stat size="sm" mono label="Open now" value={num(data.socket?.active_connections)} />
-				<Stat
-					size="sm"
-					mono
-					label="Idle"
-					value={num(data.socket?.idle_connections)}
-					tone={(data.socket?.idle_connections ?? 0) > 0 ? 'warn' : undefined}
-				/>
-				<Stat size="sm" mono label="Broadcasts" value={num(data.socket?.broadcasts_sent)} />
-				<Stat size="sm" mono label="Reconnections" value={num(data.socket?.reconnections)} />
-			</div>
+			{#if !data.socketGate}
+				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					<Stat size="sm" mono label="Open now" value={formatCount(data.socket?.active_connections)} />
+					<Stat size="sm" mono label="Broadcasts, whole instance" value={formatCount(data.socket?.broadcasts_sent)} />
+					<Stat size="sm" mono label="Reconnections, whole instance" value={formatCount(data.socket?.reconnections)} />
+				</div>
+				<p class="text-xs text-faint">
+					Open now counts this tenant's sockets. Broadcasts and reconnections cover every tenant on the
+					instance.
+				</p>
+			{/if}
 
-			{#if data.socket?.connections_by_state}
+			{#if socketStates.length > 0}
 				<Card>
 					<div class="flex flex-wrap items-center gap-2">
 						<span class="text-xs text-muted">Sockets by state</span>
-						{#each Object.entries(data.socket.connections_by_state) as [state, count] (state)}
+						{#each socketStates as [state, count] (state)}
 							<Badge tone="neutral">{state} {count}</Badge>
 						{/each}
 					</div>
@@ -132,11 +139,12 @@
 		{#if data.superAdmin}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Connections by tenant</SectionHeading>
-				{#if !data.platform}
-					<Alert tone="warn">
-						The per-tenant roster did not answer. The counters above are this tenant's and are
-						unaffected.
-					</Alert>
+				{#if data.platformGate}
+					<GateNotice
+						gate={data.platformGate}
+						title="the per-tenant roster"
+						absent="This version of the realtime plugin keeps no per-tenant roster."
+					/>
 				{:else if loads.length === 0}
 					<EmptyState
 						title="No tenant has a connection open"
@@ -169,7 +177,7 @@
 			</section>
 		{/if}
 
-		{#if !streamUsed && !socketUsed}
+		{#if !data.streamGate && !data.socketGate && !streamUsed && !socketUsed}
 			<EmptyState
 				title="Nothing is connected"
 				description="The plugin is running and neither transport has been used. Open a stream from a client to see it here."

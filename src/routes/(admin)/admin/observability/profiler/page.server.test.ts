@@ -84,10 +84,10 @@ describe('profiler load', () => {
 	it('reads the four views under /api/admin/debug/profiler for a super admin', async () => {
 		const { event, calls } = loadEvent(views, ['super_admin']);
 		const result = (await load(event)) as Loaded;
-		expect(result.endpoints).toEqual([STATS]);
-		expect(result.slowest).toEqual([STATS]);
-		expect(result.plugins?.[0].plugin).toBe('core');
-		expect(result.memory).toEqual(MEMORY);
+		expect(result.endpoints).toEqual({ ok: true, value: [STATS] });
+		expect(result.slowest).toEqual({ ok: true, value: [STATS] });
+		expect(result.plugins.ok && result.plugins.value[0].plugin).toBe('core');
+		expect(result.memory).toEqual({ ok: true, value: MEMORY });
 		expect(result.selected).toBeNull();
 		expect(result.detail).toBeNull();
 		const asked = calls.map((c) => c.url).filter((u) => u.includes('/debug/profiler'));
@@ -99,17 +99,39 @@ describe('profiler load', () => {
 		const { event, calls } = loadEvent(views, ['super_admin'], '?endpoint=api%2Fv1%2Fcontent');
 		const result = (await load(event)) as Loaded;
 		expect(result.selected).toBe('/api/v1/content');
-		expect(result.detail).toEqual(DETAIL);
+		expect(result.detail).toEqual({ ok: true, value: DETAIL });
 		expect(calls.some((c) => c.url.includes('/debug/profiler/endpoint/api/v1/content?limit=100'))).toBe(true);
 	});
 
-	it('reports a view the engine did not answer as absent rather than as zeros', async () => {
+	it('keeps the reason a view did not answer rather than drawing zeros', async () => {
 		const { event } = loadEvent({ ...views, '/debug/profiler/memory': () => json({ error: 'down' }, 503) }, ['super_admin'], '?endpoint=nothing');
 		const result = (await load(event)) as Loaded;
-		expect(result.memory).toBeNull();
-		expect(result.slowest).toEqual([STATS]);
+		expect(result.memory).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(result.slowest).toEqual({ ok: true, value: [STATS] });
 		expect(result.selected).toBe('/nothing');
-		expect(result.detail).toBeNull();
+		expect(result.detail).toEqual({ ok: true, value: null });
+	});
+
+	// The plugin answers 404 for a path its ring holds no sample of. Read as
+	// a missing route, the page said the profiler was not in this build.
+	it('reads a 404 for the selected endpoint as no samples, not as a missing plugin', async () => {
+		const { event } = loadEvent(
+			{ ...views, '/debug/profiler/endpoint/': () => json({ error: 'no data for endpoint: /nothing' }, 404) },
+			['super_admin'],
+			'?endpoint=nothing',
+		);
+		const result = (await load(event)) as Loaded;
+		expect(result.detail).toEqual({ ok: true, value: null });
+	});
+
+	it('keeps any other failure of the selected endpoint as a gate', async () => {
+		const { event } = loadEvent(
+			{ ...views, '/debug/profiler/endpoint/': () => json({ error: 'down' }, 503) },
+			['super_admin'],
+			'?endpoint=nothing',
+		);
+		const result = (await load(event)) as Loaded;
+		expect(result.detail).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 
 	// The ring describes every tenant's traffic and the exports carry process

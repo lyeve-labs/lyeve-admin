@@ -11,10 +11,11 @@
  * has an alert outstanding. A screen that merged them would show a disabled
  * probe as healthy, which is the reading that lets an outage go unnoticed.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { toChannels, type AlertChannels } from './alert-channels';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
-import type { ListEnvelope } from './list';
+import { rowsOf, type ListEnvelope } from './list';
 
 export const PROBES_URL = '/api/admin/synthetic-monitoring/probes';
 export const ALERTS_URL = '/api/admin/synthetic-monitoring/alerts';
@@ -55,6 +56,44 @@ export interface ProbeConfig {
 	expected_redirect?: string;
 	webhook_url?: string;
 	headers?: Record<string, string> | null;
+	/** Masked as "***" on every read. No read returns the stored value. */
+	auth_token?: string;
+	/** Masked as "***" on every read. No read returns the stored value. */
+	password?: string;
+	payload?: Record<string, unknown> | null;
+	expected_response?: Record<string, string> | null;
+}
+
+/** What the plugin answers in place of a stored secret. */
+export const SECRET_MASK = '***';
+
+/**
+ * The headers whose stored values a read masks. A probe save replaces the
+ * stored config whole, so these cannot be sent back and the save drops them.
+ */
+export function maskedHeaders(config: ProbeConfig | null | undefined): string[] {
+	return Object.entries(config?.headers ?? {})
+		.filter(([, v]) => v === SECRET_MASK)
+		.map(([k]) => k)
+		.sort();
+}
+
+/**
+ * The stored config a save sends back beside what the form shows. The plugin
+ * replaces the config whole, so a key the form never shows is lost unless it
+ * travels back. A masked secret cannot travel back: sending the mask would
+ * store the mask, so it is left out and the form asks for it again.
+ */
+export function keptConfig(read: ProbeConfig | null | undefined): ProbeConfig {
+	const kept: ProbeConfig = { ...(read ?? {}) };
+	delete kept.auth_token;
+	delete kept.password;
+	if (kept.headers) {
+		const headers = Object.fromEntries(Object.entries(kept.headers).filter(([, v]) => v !== SECRET_MASK));
+		if (Object.keys(headers).length > 0) kept.headers = headers;
+		else delete kept.headers;
+	}
+	return kept;
 }
 
 export interface Probe {
@@ -100,16 +139,6 @@ export interface ProbeAlert {
 	created_at: string;
 }
 
-export interface TrendBucket {
-	time: string;
-	avg_ms: number;
-	p50_ms: number;
-	p95_ms: number;
-	p99_ms: number;
-	count: number;
-	fail_count: number;
-}
-
 export type SyntheticGate = Gate;
 
 export const SYNTHETIC_OK: SyntheticGate = GATE_OK;
@@ -127,21 +156,16 @@ export async function listProbes(
 	return client.get<ListEnvelope<Probe>>(`${PROBES_URL}?limit=${limit}&offset=${offset}`);
 }
 
-/** Outstanding alerts. Acknowledged ones are history and are not asked for. */
+/**
+ * Outstanding alerts. Acknowledged ones are history and are not asked for.
+ * The plugin answers a bare array.
+ */
 export async function listOpenAlerts(client: HttpClient, limit = 50): Promise<ListEnvelope<ProbeAlert>> {
-	return client.get<ListEnvelope<ProbeAlert>>(
+	const raw = await client.get<ListEnvelope<ProbeAlert> | ProbeAlert[]>(
 		`${ALERTS_URL}?acknowledged=false&limit=${limit}&offset=0`
 	);
-}
-
-export async function listResults(
-	client: HttpClient,
-	probeId: string,
-	limit = 20
-): Promise<ListEnvelope<ProbeResult>> {
-	return client.get<ListEnvelope<ProbeResult>>(
-		`${PROBES_URL}/${encodeURIComponent(probeId)}/results?limit=${limit}&offset=0`
-	);
+	const data = rowsOf(raw);
+	return { data, total_count: Array.isArray(raw) ? data.length : (raw?.total_count ?? data.length) };
 }
 
 export interface SaveProbe {
@@ -152,6 +176,8 @@ export interface SaveProbe {
 	interval_seconds: number;
 	timeout_seconds: number;
 	alert_threshold: number;
+	/** The plugin stores an absent list as none, so an edit sends back what it read. */
+	regions?: string[];
 }
 
 export async function createProbe(client: HttpClient, body: SaveProbe): Promise<Probe> {
@@ -170,8 +196,74 @@ export async function deleteProbe(client: HttpClient, id: string): Promise<void>
 	await client.delete(`${PROBES_URL}/${encodeURIComponent(id)}`);
 }
 
-export async function runProbeNow(client: HttpClient, id: string): Promise<ProbeResult> {
-	return client.post<ProbeResult>(`${PROBES_URL}/${encodeURIComponent(id)}/run`, {});
+/** Runs a probe now. The answer is one result per region it is watched from. */
+export async function runProbeNow(client: HttpClient, id: string): Promise<ProbeResult[]> {
+	const res = await client.post<unknown>(`${PROBES_URL}/${encodeURIComponent(id)}/run`, {});
+	return Array.isArray(res) ? (res as ProbeResult[]) : [];
+}
+
+/** How one run went across its regions. */
+export interface RunOutcome {
+	/** Failed when any region failed. Null when the run recorded no result. */
+	status: ProbeStatus | null;
+	/** The slowest region's response time, in milliseconds. */
+	ms: number;
+	failed: number;
+	regions: number;
+}
+
+/**
+ * One run read as a whole.
+ *
+ * A run is a result per region, and a run fails when any region fails, which
+ * is also what counts toward the alert. Timed by the slowest region, because
+ * that is the time the run took.
+ */
+export function runOutcome(results: readonly ProbeResult[]): RunOutcome {
+	const failed = results.filter((r) => r.status === 'fail').length;
+	return {
+		status: results.length === 0 ? null : failed > 0 ? 'fail' : 'pass',
+		ms: results.reduce((slowest, r) => Math.max(slowest, r.response_time_ms || 0), 0),
+		failed,
+		regions: results.length,
+	};
+}
+
+export const LIMITS_URL = '/api/admin/synthetic-monitoring/limits';
+
+/** What a probe write will accept for this tenant, as the plugin answers it. */
+export interface ProbeLimits {
+	/** The probes the tenant keeps against its ceiling. A limit of 0 is no ceiling. */
+	probes: { limit: number; current: number };
+	/** The shortest interval a new probe may be given, in seconds. */
+	minIntervalSeconds: number;
+}
+
+/**
+ * The limits a probe write is held to, or null when the plugin does not say.
+ *
+ * The floor depends on what the install is licensed for, so the console reads
+ * it rather than guessing one of its own.
+ */
+export async function readProbeLimits(client: HttpClient): Promise<ProbeLimits | null> {
+	const raw = await client.get<unknown>(LIMITS_URL);
+	const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+	const probes = r.probes && typeof r.probes === 'object' ? (r.probes as Record<string, unknown>) : {};
+	const min = r.min_interval_seconds;
+	if (typeof min !== 'number' || !Number.isFinite(min) || min <= 0) return null;
+	return {
+		probes: {
+			limit: typeof probes.limit === 'number' ? probes.limit : 0,
+			current: typeof probes.current === 'number' ? probes.current : 0,
+		},
+		minIntervalSeconds: min,
+	};
+}
+
+/** The interval field's hint, with the floor when the plugin said what it is. */
+export function intervalHint(limits: ProbeLimits | null): string {
+	const why = 'A probe is this instance calling itself.';
+	return limits ? `At least ${limits.minIntervalSeconds}. ${why}` : why;
 }
 
 export async function acknowledgeAlert(client: HttpClient, id: string): Promise<void> {
@@ -229,7 +321,7 @@ export function probeHealth(p: Probe): ProbeHealth {
 	return p.last_status === 'pass' ? 'passing' : 'failing';
 }
 
-export function probeTone(h: ProbeHealth): 'success' | 'danger' | 'warn' | 'neutral' {
+export function probeTone(h: ProbeHealth): StatusTone {
 	if (h === 'passing') return 'success';
 	if (h === 'failing') return 'danger';
 	if (h === 'unrun') return 'warn';
@@ -261,13 +353,6 @@ export function everyLabel(seconds: number): string {
 		return `Every ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 	}
 	return `Every ${seconds} seconds`;
-}
-
-/** A response time, at the precision it was measured. */
-export function millis(ms: number | null | undefined): string {
-	if (ms === null || ms === undefined || !Number.isFinite(ms)) return '-';
-	if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
-	return `${Math.round(ms)} ms`;
 }
 
 /**

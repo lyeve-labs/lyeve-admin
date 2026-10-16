@@ -137,6 +137,15 @@ describe('License page status', () => {
 		expect(queryByText('No license')).toBeNull();
 	});
 
+	it('offers the key in neutral words when the license was not read', () => {
+		const { container } = mount({ ent: null });
+		const text = said(container);
+		expect(text).not.toContain('Add a license key');
+		expect(text).not.toContain('Activate license');
+		expect(text).not.toContain('Only needed for what a license grants');
+		expect(text).toContain('Apply license');
+	});
+
 	it('lists no feature the license carries and counts none', () => {
 		const { container } = mount({ ent: entitlements({ features: ['feature-a', 'feature-b'] }) });
 		expect(said(container)).not.toMatch(/feature-a|feature-b|features? enabled/);
@@ -176,6 +185,16 @@ describe('License page links', () => {
 			expect(link.getAttribute('target'), name).toBe('_blank');
 			expect(link.getAttribute('rel'), name).toBe('noopener noreferrer');
 		}
+	});
+
+	// Each link's hit area is 44px under a finger, and its negative margin lays
+	// each item out 24px tall, so the gap has to be 20px to put the links 44px
+	// apart.
+	it('spaces the stacked links so each keeps its whole touch hit area', () => {
+		const { getByRole } = mount();
+		const link = getByRole('link', { name: 'Get a license' });
+		expect(link.className).toContain('hit-area');
+		expect((link.closest('ul') as HTMLElement).className).toContain('coarse:gap-5');
 	});
 
 	it('leaves the enable and support links to the rest of the console', () => {

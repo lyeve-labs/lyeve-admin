@@ -1,45 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-// Mock requireRole so the action tests don't hit a real API.
-vi.mock('$lib/server/authz', () => ({
-	authedHeaders: vi.fn(() => ({ Authorization: 'Bearer tok' })),
+// Mock requireRole so the action tests don't ask the engine for the session.
+// The session client stays real and runs over the event's own fetch, which the
+// tests stub, so every call carries the headers it would send.
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/authz')>()),
 	requireRole: vi.fn(
 		async () => ({ id: 'u1', email: 'admin@test.invalid', roles: ['super_admin'] }) as never
-	),
-	// The actions build their client here so writes carry the engine's CSRF
-	// token. Return a client backed by the event's own fetch, which the tests
-	// already stub.
-	authedClient: vi.fn(
-		(event: { fetch: typeof fetch }) =>
-			({
-				get: async (path: string) => (await event.fetch(path)).json(),
-				post: async (path: string, body: unknown) =>
-					(
-						await event.fetch(path, {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(body),
-						})
-					).json(),
-				put: async (path: string, body: unknown) =>
-					(
-						await event.fetch(path, {
-							method: 'PUT',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(body),
-						})
-					).json(),
-				patch: async (path: string, body: unknown) =>
-					(
-						await event.fetch(path, {
-							method: 'PATCH',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(body),
-						})
-					).json(),
-				delete: async (path: string) => (await event.fetch(path, { method: 'DELETE' })).json(),
-			}) as never
 	),
 }));
 
@@ -138,18 +106,18 @@ function loadEvent(rows: unknown[], search = '') {
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 const run = async (event: never): Promise<Loaded> => (await load(event)) as Loaded;
 
-describe('admin/users/+page.server.ts load', () => {
-	it('returns users list when super_admin', async () => {
+describe('the accounts list', () => {
+	it('lists the accounts for a super admin', async () => {
 		const { event } = loadEvent([{ id: 'u1', email: 'a@b.co' }]);
 
 		const result = await run(event);
 
 		expect(result).toEqual({
-			users: [{ id: 'u1', email: 'a@b.co' }],
+			users: { ok: true, value: [{ id: 'u1', email: 'a@b.co' }] },
 			limit: 25,
 			offset: 0,
 			hasMore: false,
-			tenants: [],
+			tenants: { ok: true, value: [] },
 		});
 	});
 
@@ -163,7 +131,8 @@ describe('admin/users/+page.server.ts load', () => {
 		expect(seen[0]).toContain('limit=26');
 		expect(seen[0]).toContain('offset=0');
 		expect(result.hasMore).toBe(true);
-		expect(result.users).toHaveLength(25);
+		expect(result.users).toEqual({ ok: true, value: expect.any(Array) });
+		expect(result.users.ok && result.users.value).toHaveLength(25);
 	});
 
 	it('reports no next page when the probe row does not come back', async () => {
@@ -172,7 +141,8 @@ describe('admin/users/+page.server.ts load', () => {
 		const result = await run(event);
 
 		expect(result.hasMore).toBe(false);
-		expect(result.users).toHaveLength(25);
+		expect(result.users).toEqual({ ok: true, value: expect.any(Array) });
+		expect(result.users.ok && result.users.value).toHaveLength(25);
 	});
 
 	it('carries the requested offset and page size through to the engine', async () => {
@@ -197,6 +167,15 @@ describe('admin/users/+page.server.ts load', () => {
 		expect(seen[0]).toContain('limit=200');
 	});
 
+	// The pager numbers pages, so an offset between two boundaries snaps down
+	// to the page that holds it rather than drawing rows the pager misnames.
+	it('snaps an offset between two page boundaries to its page', async () => {
+		const { event, seen } = loadEvent(accounts(10, 50), '?limit=10&offset=55');
+		const result = (await load(event)) as { offset: number };
+		expect(result.offset).toBe(50);
+		expect(seen[0]).toContain('offset=50');
+	});
+
 	it('refuses a negative offset rather than passing it on', async () => {
 		const { event, seen } = loadEvent(accounts(5), '?offset=-40');
 
@@ -206,9 +185,9 @@ describe('admin/users/+page.server.ts load', () => {
 		expect(seen[0]).toContain('offset=0');
 	});
 
-	it('renders an empty page when the engine cannot be reached', async () => {
+	it('reports an unreachable engine rather than an empty list', async () => {
 		const fetch = vi.fn(async () => {
-			throw new Error('engine unreachable');
+			throw new TypeError('fetch failed');
 		}) as unknown as typeof globalThis.fetch;
 
 		const result = await run({
@@ -218,8 +197,29 @@ describe('admin/users/+page.server.ts load', () => {
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never);
 
-		expect(result.users).toEqual([]);
+		expect(result.users).toEqual({ ok: false, gate: { state: 'unavailable' } });
 		expect(result.hasMore).toBe(false);
+	});
+
+	it('keeps a refused read apart from an empty one', async () => {
+		const { event } = loadEvent([]);
+		const failing = {
+			...(event as Record<string, unknown>),
+			fetch: vi.fn(async () => json({ error: 'boom' }, 500)) as unknown as typeof globalThis.fetch,
+		};
+
+		const result = await run(failing as never);
+
+		expect(result.users.ok).toBe(false);
+	});
+
+	it('sends a page past the end back to the first page', async () => {
+		const { event } = loadEvent([], '?offset=50&limit=25');
+
+		const out = await catchRedirect(() => load(event));
+
+		expect(out.status).toBe(307);
+		expect(out.location).toBe('/admin/users?offset=0&limit=25');
 	});
 
 	it('throws 403 when user lacks super_admin role', async () => {
@@ -239,13 +239,13 @@ describe('admin/users/+page.server.ts load', () => {
 
 // actions.create
 
-describe('admin/users/+page.server.ts actions.create', () => {
-	it('returns 400 when email is missing (null → fail, not 500)', async () => {
+describe('creating an account', () => {
+	it('asks for the email on its field before calling the engine', async () => {
 		const fetch = vi.fn() as never;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ password: 'password123' })) } as never,
+			request: { formData: () => Promise.resolve(form({ password: 'password12345' })) } as never,
 			fetch,
 			cookies,
 		}) as never);
@@ -255,13 +255,14 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { email: 'Email is required' },
 			},
 		});
 	});
 
-	it('returns 400 when password is missing (null guarded before .length)', async () => {
+	it('asks for the password on its field before calling the engine', async () => {
 		const fetch = vi.fn() as never;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
@@ -274,14 +275,17 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { password: 'Password is required' },
 			},
 		});
 	});
 
-	it('returns 400 when password is shorter than 8 characters', async () => {
-		const fetch = vi.fn() as never;
+	// The engine's minimum is a setting an install may lower, so a short
+	// password goes to the engine, which judges it and names its own rule.
+	it('leaves the shortest password to the engine', async () => {
+		const fetch = vi.fn(async (_url: string, _init: RequestInit) => json({ id: 'u1' })) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
 		const result = await actions.create(mockEvent({
@@ -290,11 +294,44 @@ describe('admin/users/+page.server.ts actions.create', () => {
 			cookies,
 		}) as never);
 
+		expect(result).toEqual({ ok: true });
+		expect(fetch).toHaveBeenCalled();
+	});
+
+	// The engine's hasher fails a password over 72 bytes with a 500 that names
+	// no rule, so both forms refuse one on the field before sending it.
+	it('refuses a new account password over 72 bytes before sending it', async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+		const long = 'é'.repeat(37);
+		const result = (await actions.create(mockEvent({
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: long })) } as never,
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+		}) as never)) as { status: number; data: { fields: { password: string } } };
+		expect(result.status).toBe(400);
+		expect(result.data.fields.password).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	// The engine's policy can be stricter than the length checked here. Its
+	// 422 names the rule, and that sentence belongs on the password control.
+	it('puts the engine password refusal on the password field', async () => {
+		const fetch = vi.fn(async () =>
+			json({ error: 'password must contain a digit', code: 'password_policy' }, 422)
+		) as unknown as typeof globalThis.fetch;
+
+		const result = await actions.create(mockEvent({
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'longenoughpassword' })) } as never,
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+		}) as never);
+
 		expect(result).toEqual({
-			status: 400,
+			status: 422,
 			data: {
-				error: 'Check the highlighted fields.',
-				fields: { password: 'Password must be at least 8 characters' },
+				action: 'create',
+				error: 'Check the highlighted field.',
+				fields: { password: 'password must contain a digit' },
 			},
 		});
 	});
@@ -306,7 +343,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 		const cookies = mockCookies({ '__Host-sys_session': 'tok' });
 
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345' })) } as never,
 			fetch,
 			cookies,
 		}) as never);
@@ -322,7 +359,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
 
 		const result = await actions.create(mockEvent({
 			request: {
-				formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123', roles: 'admin,editor' })),
+				formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345', roles: 'admin,editor' })),
 			} as never,
 			fetch,
 			cookies,
@@ -339,7 +376,7 @@ describe('admin/users/+page.server.ts actions.create', () => {
  * every session the account held. The action's job is to carry the refusal
  * to the control and nothing else.
  */
-describe('admin/users/+page.server.ts actions.setPassword', () => {
+describe('setting an account password', () => {
 	function submit(fetch: unknown, data: Record<string, string>) {
 		return actions.setPassword(mockEvent({
 			request: { formData: () => Promise.resolve(form(data)) } as never,
@@ -347,6 +384,17 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 	}
+
+	it('refuses a password over 72 bytes on its field before sending it', async () => {
+		const fetch = vi.fn();
+		const result = (await submit(fetch, { id: 'u1', new_password: 'é'.repeat(37) })) as {
+			status: number;
+			data: { fields: { new_password: string } };
+		};
+		expect(result.status).toBe(400);
+		expect(result.data.fields.new_password).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
+	});
 
 	it('puts the password to the account and answers ok', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
@@ -381,6 +429,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 		expect(result).toEqual({
 			status: 422,
 			data: {
+				action: 'setPassword',
 				error: 'Check the highlighted field.',
 				fields: { new_password: 'password must be at least 12 characters' },
 			},
@@ -392,7 +441,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 
 		const result = await submit(fetch, { id: 'nope', new_password: 'correct horse battery' });
 
-		expect(result).toEqual({ status: 400, data: { error: 'user not found' } });
+		expect(result).toEqual({ status: 400, data: { action: 'setPassword', error: 'user not found' } });
 	});
 
 	it('refuses an empty password before asking the engine', async () => {
@@ -402,7 +451,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 
 		expect(result).toEqual({
 			status: 400,
-			data: { error: 'Check the highlighted field.', fields: { new_password: 'Password is required' } },
+			data: { action: 'setPassword', error: 'Check the highlighted field.', fields: { new_password: 'Password is required' } },
 		});
 		expect(fetch).not.toHaveBeenCalled();
 	});
@@ -423,7 +472,7 @@ describe('admin/users/+page.server.ts actions.setPassword', () => {
 	});
 });
 
-describe('admin/users/+page.server.ts admin seat ceiling', () => {
+describe('the admin seat ceiling', () => {
 	const seatsFull = (): typeof globalThis.fetch =>
 		vi.fn(async () => {
 			throw new ApiError(402, 'cap_exceeded', {
@@ -431,22 +480,24 @@ describe('admin/users/+page.server.ts admin seat ceiling', () => {
 				cap: 'admin.seats',
 				limit: 7,
 				current: 7,
-				upgrade_url: '',
+				upgrade_url: 'https://shop.example.com/pricing?utm_campaign=admin.seats',
 			});
 		}) as unknown as typeof globalThis.fetch;
 
-	// The numbers are the refusal's, so the page holds no ceiling of its own.
+	// The numbers and the link are the refusal's, so the page holds no ceiling
+	// and no address of its own.
 	const expected =
-		'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.';
+		'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.';
+	const refused = { kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: 'https://shop.example.com/pricing?utm_campaign=admin.seats' };
 
 	it('says the seats are full when creating an admin is refused', async () => {
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123', roles: 'admin' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345', roles: 'admin' })) } as never,
 			fetch: seatsFull(),
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 402, data: { error: expected } });
+		expect(result).toEqual({ status: 402, data: { action: 'create', error: expected, refused } });
 	});
 
 	it('says the seats are full when a promotion is refused', async () => {
@@ -456,12 +507,12 @@ describe('admin/users/+page.server.ts admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 402, data: { error: expected } });
+		expect(result).toEqual({ status: 402, data: { action: 'updateRoles', error: expected, refused } });
 	});
 
 	it('leaves a refusal at another cap to the usual message', async () => {
 		const result = (await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password123', roles: 'admin' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'a@b.co', password: 'password12345', roles: 'admin' })) } as never,
 			fetch: vi.fn(async () => {
 				throw new ApiError(402, 'cap_exceeded', { error: 'cap_exceeded', cap: 'example.items', limit: 4, current: 4 });
 			}) as unknown as typeof globalThis.fetch,
@@ -481,13 +532,13 @@ describe('admin/users/+page.server.ts admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 
-		expect(result).toEqual({ status: 400, data: { error: 'user not found' } });
+		expect(result).toEqual({ status: 400, data: { action: 'updateRoles', error: 'user not found' } });
 	});
 });
 
 // An account belongs to one tenant. With several, the form names it and the
 // engine is asked in that tenant.
-describe('admin/users/+page.server.ts tenants', () => {
+describe('the tenant a new account belongs to', () => {
 	it('offers the tenants the multitenant plugin lists, leaving out archived ones', async () => {
 		const fetch = vi.fn(async (url: string) =>
 			String(url).startsWith('/api/admin/tenants')
@@ -503,7 +554,7 @@ describe('admin/users/+page.server.ts tenants', () => {
 			url: new URL('http://localhost/admin/users'),
 			parent: async () => ({ user: { roles: ['super_admin'] }, plugins: { state: 'named', running: ['multitenant'], withheld: [] } }),
 		} as never)) as Loaded;
-		expect(out.tenants).toEqual([{ slug: 'acme', name: 'Acme' }]);
+		expect(out.tenants).toEqual({ ok: true, value: [{ slug: 'acme', name: 'Acme' }] });
 	});
 
 	it('asks for no tenants on an engine without the multitenant plugin', async () => {
@@ -518,8 +569,22 @@ describe('admin/users/+page.server.ts tenants', () => {
 			url: new URL('http://localhost/admin/users'),
 			parent: async () => ({ user: { roles: ['super_admin'] }, plugins: { state: 'named', running: [], withheld: [] } }),
 		} as never)) as Loaded;
-		expect(out.tenants).toEqual([]);
+		expect(out.tenants).toEqual({ ok: true, value: [] });
 		expect(seen.some((u) => u.startsWith('/api/admin/tenants'))).toBe(false);
+	});
+
+	it('says the tenants could not be read rather than offering no choice', async () => {
+		const fetch = vi.fn(async (url: string) =>
+			String(url).startsWith('/api/admin/tenants') ? json({ error: 'down' }, 503) : json([]),
+		) as unknown as typeof globalThis.fetch;
+		const out = (await load({
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			url: new URL('http://localhost/admin/users'),
+			parent: async () => ({ user: { roles: ['super_admin'] }, plugins: { state: 'named', running: ['multitenant'], withheld: [] } }),
+		} as never)) as Loaded;
+		expect(out.tenants).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(out.users.ok).toBe(true);
 	});
 
 	it('creates the account in the tenant the form names', async () => {
@@ -529,27 +594,67 @@ describe('admin/users/+page.server.ts tenants', () => {
 			return json({ id: 'n1', email: 'new@b.co', roles: ['editor'] }, 201);
 		});
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password123', tenant_id: 'acme', tenant_required: '1' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password12345', tenant_id: 'acme', tenant_required: '1' })) } as never,
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 		expect(result).toEqual({ ok: true });
 		const post = calls.find((c) => c.url.endsWith('/api/admin/users'));
 		expect(post?.headers['x-tenant-id']).toBe('acme');
+		expect(post?.headers.authorization).toBe('Bearer tok');
 	});
 
 	it('asks for a tenant when the form offered a choice and none was made', async () => {
 		const fetch = vi.fn();
 		const result = await actions.create(mockEvent({
-			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password123', tenant_required: '1' })) } as never,
+			request: { formData: () => Promise.resolve(form({ email: 'new@b.co', password: 'password12345', tenant_required: '1' })) } as never,
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
 		expect(result).toEqual({
 			status: 400,
-			data: { error: 'Check the highlighted fields.', fields: { tenant_id: 'Choose the tenant this account belongs to' } },
+			data: { action: 'create', error: 'Check the highlighted fields.', fields: { tenant_id: 'Choose the tenant this account belongs to' } },
 		});
 		expect(fetch).not.toHaveBeenCalled();
 	});
 });
 
+
+describe('deleting an account', () => {
+	function remove(reply: () => Response | Promise<Response>) {
+		const calls: { method: string; url: string }[] = [];
+		const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+			calls.push({ method: init?.method ?? 'GET', url: String(url) });
+			return reply();
+		}) as unknown as typeof globalThis.fetch;
+		const event = mockEvent({
+			request: { formData: () => Promise.resolve(form({ id: 'u1' })) } as never,
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+		});
+		return { calls, run: () => actions.delete(event as never) };
+	}
+
+	it('deletes the named account', async () => {
+		const { calls, run } = remove(() => new Response(null, { status: 204 }));
+		expect(await run()).toEqual({ ok: true });
+		expect(calls).toEqual([{ method: 'DELETE', url: '/api/admin/users/u1' }]);
+	});
+
+	it('relays the engine refusal on the page', async () => {
+		const { run } = remove(() => json({ error: 'cannot delete the last super admin' }, 409));
+		expect(await run()).toEqual({ status: 400, data: { action: 'delete', error: 'cannot delete the last super admin' } });
+	});
+
+	it('keeps outage detail off the page', async () => {
+		const { run } = remove(() => Promise.reject(new TypeError('fetch failed')));
+		expect(await run()).toEqual({ status: 400, data: { action: 'delete', error: 'Failed to delete user' } });
+	});
+
+	it('holds the delete to a super admin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('Requires one of roles: super_admin'), { status: 403 }));
+		const { calls, run } = remove(() => new Response(null, { status: 204 }));
+		await expect(run()).rejects.toMatchObject({ status: 403 });
+		expect(calls).toEqual([]);
+	});
+});

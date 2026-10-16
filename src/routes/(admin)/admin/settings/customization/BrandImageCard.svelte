@@ -18,7 +18,8 @@
 		kind: 'logo' | 'favicon';
 		/** The address the brand stores now. */
 		current: string;
-		mediaChoices: MediaChoice[];
+		/** Null when the media library could not be read, which is not a library with nothing in it. */
+		mediaChoices: MediaChoice[] | null;
 		error?: string;
 		fieldError?: string;
 		notice?: ImageNotice;
@@ -130,7 +131,7 @@
 
 <Card pad="md">
 	{#snippet header()}
-		<SectionHeading level={3}>{copy.heading}</SectionHeading>
+		<SectionHeading level={2}>{copy.heading}</SectionHeading>
 	{/snippet}
 	<div class="flex flex-col gap-4">
 		{#if error}
@@ -173,6 +174,7 @@
 		</form>
 
 		<div>
+			<!-- The picker says itself when the library could not be read. -->
 			<MediaPicker choices={mediaChoices} onpick={(c) => pickFromLibrary(c.public_url)} label="Choose from the library" />
 		</div>
 

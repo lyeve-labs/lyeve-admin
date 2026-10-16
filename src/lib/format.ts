@@ -5,20 +5,16 @@
  * two pages sees the same color for the same severity.
  */
 
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { levelName } from '$lib/api/helpers';
-
-/**
- * The tone a log level carries. A subset of the kit's accent tones: a log
- * level is a severity, so the decorative tones are not reachable from here.
- */
-export type LogLevelTone = 'neutral' | 'brand' | 'warn' | 'danger';
 
 /** The levels the engine emits, least severe first. */
 export const LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
 
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
-const LEVEL_TONES: Record<LogLevel, LogLevelTone> = {
+// A log level is a severity, so it never takes the violet accent.
+const LEVEL_TONES: Record<LogLevel, StatusTone> = {
 	DEBUG: 'neutral',
 	INFO: 'brand',
 	WARN: 'warn',
@@ -54,7 +50,7 @@ export function logLevelLabel(level: WireLogLevel): string {
  * The level is folded before it is looked up, so a spelling the engine sends
  * in another case keeps its severity instead of falling through to gray.
  */
-export function logLevelTone(level: WireLogLevel): LogLevelTone {
+export function logLevelTone(level: WireLogLevel): StatusTone {
 	return LEVEL_TONES[logLevelLabel(level) as LogLevel] ?? 'neutral';
 }
 
@@ -156,6 +152,37 @@ export function formatCount(value: number | null | undefined, fallback: string =
 	return COUNT_FORMAT.format(Math.round(value));
 }
 
+/** A fraction as a percentage to one decimal place: `0.0123` reads `1.2%`. */
+export function formatPercent(fraction: number): string {
+	return `${(fraction * 100).toFixed(1)}%`;
+}
+
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+
+/** A unit `formatBytes` can step up to. */
+export type ByteUnit = (typeof BYTE_UNITS)[number];
+
+/**
+ * A byte count a person can read: `512 B`, `2.0 KB`, `1.5 GB`. Each unit is
+ * 1024 of the one before, and every unit past bytes carries one decimal.
+ * Nothing, a negative number or a value that is not a number reads `0 B`.
+ *
+ * `largest` is the biggest unit a surface steps up to. The media library and
+ * the analytics page stop at MB, so a 2 GB video reads `2048.0 MB` there as it
+ * always has.
+ */
+export function formatBytes(size: number | null | undefined, largest: ByteUnit = 'TB'): string {
+	if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) return '0 B';
+	const top = BYTE_UNITS.indexOf(largest);
+	let n = size;
+	let i = 0;
+	while (n >= 1024 && i < top) {
+		n /= 1024;
+		i += 1;
+	}
+	return i === 0 ? `${Math.round(n)} B` : `${n.toFixed(1)} ${BYTE_UNITS[i]}`;
+}
+
 /**
  * Two registers, and which one a surface uses is a decision, not a habit.
  *
@@ -189,6 +216,17 @@ export function relativeTime(value: string | null | undefined, now: Date = new D
 	if (days < 30) return plural(Math.floor(days / 7), 'week');
 	if (days < 365) return plural(Math.floor(days / 30), 'month');
 	return plural(Math.floor(days / 365), 'year');
+}
+
+/**
+ * A measured response time at the precision it was measured: `342 ms`, and
+ * `1.50 s` from a second up, with two decimals because a reader compares it
+ * against a threshold.
+ */
+export function formatMillis(ms: number | null | undefined, fallback: string = NO_VALUE): string {
+	if (typeof ms !== 'number' || !Number.isFinite(ms)) return fallback;
+	if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
+	return `${Math.round(ms)} ms`;
 }
 
 const GO_UNIT_MS: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1000, ms: 1, us: 1e-3, 'µs': 1e-3, ns: 1e-6 };

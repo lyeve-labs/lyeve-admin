@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
 	blocked,
-	bytes,
 	enforcementLabel,
 	enforcementTone,
 	enforces,
@@ -15,6 +14,7 @@ import {
 	usedPct,
 	type Quota,
 	type QuotaRequest,
+	requesterName,
 } from './usage';
 
 function quota(over: Partial<Quota> = {}): Quota {
@@ -100,6 +100,10 @@ describe('usage against a limit', () => {
 		expect(limitLabel(1000)).toBe('1,000');
 		expect(limitLabel(2048, true)).toBe('2.0 KB');
 	});
+
+	it('steps a byte limit up to TB', () => {
+		expect(limitLabel(2 * 1024 ** 4, true)).toBe('2.0 TB');
+	});
 });
 
 describe('the queues', () => {
@@ -113,24 +117,34 @@ describe('the queues', () => {
 	});
 });
 
-describe('bytes', () => {
-	it('reads at the largest unit that fits', () => {
-		expect(bytes(512)).toBe('512 B');
-		expect(bytes(10_737_418_240)).toBe('10.0 GB');
-		expect(bytes(0)).toBe('0 B');
-		expect(bytes(null)).toBe('0 B');
-	});
-});
-
 describe('the gate', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(usageGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(usageGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(usageGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(usageGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(usageGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as nobody being over their limit', () => {
 		const gate = usageGate(new Error('network'));
 		expect(gate.state === 'error' && gate.message).toContain('not a report that nobody is over their limit');
+	});
+});
+
+describe('who asked for more', () => {
+	const people = { '5cec39db-bbeb-44a3-bdef-912a4f57a344': 'admin@example.com' };
+
+	// The plugin stores an account id. A raw id names nobody a reader knows.
+	it('names the requester by email', () => {
+		expect(requesterName('5cec39db-bbeb-44a3-bdef-912a4f57a344', people)).toBe('admin@example.com');
+	});
+
+	it('keeps the short id of an account the directory did not answer', () => {
+		expect(requesterName('24d6560b-540e-47b6-8957-59934db4021d', people)).toBe('24d6560b');
+	});
+
+	it('says an erased requester was erased', () => {
+		expect(requesterName('erased', people)).toBe('an erased account');
+		expect(requesterName('', people)).toBe('an unknown account');
 	});
 });

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
 		Button,
 		CheckboxGroup,
+		CopyField,
 		DatePicker,
 		Drawer,
 		EmptyState,
@@ -16,21 +16,20 @@
 		SegmentedControl,
 		Pagination,
 		Table,
-		confirm as confirmDialog,
-		toast,
+		type StatusTone,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
-	import { Key, Plus, Trash2, Ban, Copy, Check, Gauge } from '@lucide/svelte';
+	import { Key, Plus, Trash2, Ban, Gauge } from '@lucide/svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { copyText } from '$lib/clipboard';
-	import { fieldErrors, submitter } from '$lib/forms.svelte';
+	import { confirmed, fieldErrors, submitter } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
-	import { formatCount, formatDate as formatDay } from '$lib/format';
+	import { formatCount, formatDate } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import {
@@ -51,17 +50,32 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const errors = $derived(fieldErrors(form));
-	const formError = $derived(form && 'error' in form ? String(form.error) : undefined);
+	type APIKeyRow = Extract<PageData['keys'], { ok: true }>['value'][number];
+	const keys = $derived(data.keys.ok ? data.keys.value : []);
+
+	/*
+	 * Every action answers into the one `form`, so each failure names its
+	 * action. A drawer shows only its own action's failure, and only one that
+	 * came back after it opened. The page shows revoke and delete.
+	 */
+	type Failure = { action?: string; error?: string; fields?: Record<string, string>; refused?: unknown };
+	const failure = $derived(form && typeof form === 'object' && 'error' in form ? (form as Failure) : null);
+	let createOpenedOver = $state.raw<unknown>(null);
+	let limitOpenedOver = $state.raw<unknown>(null);
+	const createFailure = $derived(form !== createOpenedOver && failure?.action === 'create' ? failure : null);
+	const limitFailure = $derived(form !== limitOpenedOver && failure?.action === 'limit' ? failure : null);
+	const pageFailure = $derived(failure && failure.action !== 'create' && failure.action !== 'limit' ? failure : null);
+	const errors = $derived(fieldErrors(createFailure));
+	const limitErrors = $derived(fieldErrors(limitFailure));
 
 	function usagePct(keyId: string): number {
-		const key = data.keys.find((k) => k.id === keyId);
+		const key = keys.find((k) => k.id === keyId);
 		const usage = data.usageMap?.[keyId];
 		if (!key || !usage || !key.monthly_limit || key.monthly_limit === 0) return -1;
 		return Math.min(100, Math.round((usage.requests / key.monthly_limit) * 100));
 	}
 
-	function usageTone(pct: number): 'danger' | 'warn' | 'brand' {
+	function usageTone(pct: number): StatusTone {
 		if (pct >= 90) return 'danger';
 		if (pct >= 70) return 'warn';
 		return 'brand';
@@ -78,14 +92,15 @@
 	let limitKey = $state<{ id: string; name: string } | null>(null);
 	let limitOpen = $state(false);
 	let limitValues = $state<KeyLimits>({ ...NO_LIMITS });
-	function openLimit(key: PageData['keys'][number]) {
+	function openLimit(key: APIKeyRow) {
+		limitOpenedOver = form;
 		limitKey = { id: key.id, name: key.name };
 		limitValues = limitsOf(key);
 		limitOpen = true;
 	}
 
 	/** The hourly and daily ceilings, for the usage cell under the monthly bar. */
-	function windowNote(key: PageData['keys'][number]): string {
+	function windowNote(key: APIKeyRow): string {
 		const l = limitsOf(key);
 		const parts = LIMIT_FIELDS.filter((f) => f.field !== 'monthly_limit' && l[f.field] > 0).map(
 			(f) => `${formatCount(l[f.field])}/${f.per}`,
@@ -95,7 +110,9 @@
 
 	// Which routes a key can be scoped to, from the engine's catalog.
 	const groups = $derived(groupCatalog(data.catalog ?? null));
-	const refused = $derived(formRefusal(form));
+	const refused = $derived(formRefusal(createFailure));
+	const limitRefused = $derived(formRefusal(limitFailure));
+	const pageRefused = $derived(formRefusal(pageFailure));
 	let createRoles = $state<string[]>(['editor']);
 	let createAccess = $state(defaultAccess());
 	const createScopes = $derived(accessScopes(createAccess));
@@ -108,12 +125,13 @@
 	const scopeProblem = $derived(keyScopeProblem(createRoles, createScopes));
 	// A privileged key with no expiry keeps working. The page counts those so
 	// they get replaced rather than forgotten.
-	const neverExpiring = $derived(data.keys.filter((k) => k.enabled && !k.expires_at && isPrivilegedKey(k.roles)).length);
+	const neverExpiring = $derived(keys.filter((k) => k.enabled && !k.expires_at && isPrivilegedKey(k.roles)).length);
 	// The admin API refuses these and takes admin tokens instead. The page
 	// counts them so automation still sending one is found.
-	const adminRoleKeys = $derived(data.keys.filter((k) => k.enabled && isPrivilegedKey(k.roles)).length);
+	const adminRoleKeys = $derived(keys.filter((k) => k.enabled && isPrivilegedKey(k.roles)).length);
 
 	function openCreate() {
+		createOpenedOver = form;
 		createName = '';
 		createLimits = { ...NO_LIMITS };
 		createRoles = ['editor'];
@@ -127,8 +145,6 @@
 	let showRawKey = $state(false);
 	let rawKey = $state('');
 	let rawKeyName = $state('');
-	let copiedKey = $state(false);
-	let copyError = $state('');
 
 	$effect(() => {
 		if (form && 'created' in form && form.created) {
@@ -139,37 +155,17 @@
 		}
 	});
 
-	async function copyKey() {
-		if (!(await copyText(rawKey))) {
-			copyError = 'Could not reach the clipboard. Select the key and copy it manually.';
-			return;
-		}
-		copyError = '';
-		copiedKey = true;
-		setTimeout(() => (copiedKey = false), 2000);
-	}
-
 	/**
 	 * A key is a live credential and deleting it cannot be undone, so the row
 	 * asks first and names the key. enhance awaits this before it sends anything,
 	 * so canceling here means the request is never made.
 	 */
 	function deleteKey(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Permanently delete key ${name}?`,
-				'Anything signing with it stops working, and the key leaves the list.',
-				{ confirmLabel: 'Delete' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${name}`);
-			};
-		};
+		return confirmed(
+			`Delete API key ${name}`,
+			'Anything signing with it stops working, and the key leaves the list.',
+			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+		);
 	}
 
 	/** Revoking leaves the row in place, so nothing on screen says it worked. */
@@ -180,25 +176,11 @@
 	 * nothing on the caller's side says why. So it asks first, as delete does.
 	 */
 	function revokeKey(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Revoke key ${name}?`,
-				'Anything signing with it stops working at once. The key stays listed and cannot be used again.',
-				{ confirmLabel: 'Revoke' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Revoked ${name}`);
-			};
-		};
-	}
-
-	function formatDate(iso: string | null) {
-		return formatDay(iso, 'Never');
+		return confirmed(
+			`Revoke key ${name}?`,
+			'Anything signing with it stops working at once. The key stays listed and cannot be used again.',
+			{ confirmLabel: 'Revoke', success: `Revoked ${name}` },
+		);
 	}
 
 	// The endpoint takes no search, so the box narrows the page on screen.
@@ -210,7 +192,7 @@
 		{ value: 'revoked', label: 'Revoked' },
 	];
 	const visible = $derived(
-		data.keys.filter(
+		keys.filter(
 			(k) =>
 				narrows(query, k.name, k.roles.join(' '), k.schemas.join(' ')) &&
 				(status === '' || (status === 'active') === k.enabled)
@@ -221,17 +203,17 @@
 	const limit = submitter(() => (limitOpen = false));
 </script>
 
-<PageTitle title="API keys" />
-
 <PageShell
 	title="API keys"
 	description="Machine-to-machine credentials, each held to the schemas, routes and request limits you give it."
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New key
-		</Button>
+		{#if data.keys.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New key
+			</Button>
+		{/if}
 	{/snippet}
 
 	<p class="text-sm text-muted">
@@ -239,9 +221,15 @@
 		<a href="/admin/admin-tokens" class="text-brand hover:underline">admin token</a> instead: scoped grants, an expiry and a request log.
 	</p>
 
-	<FormErrors message={formError} fields={errors} {refused} />
+	<FormErrors message={pageFailure?.error} refused={pageRefused} />
 
-	{#if data.keys.length === 0}
+	<!-- The kit's empty state titles itself as an h3. This names the list
+	     under the page title so a heading list never skips a level. -->
+	<h2 class="sr-only">Keys</h2>
+
+	{#if !data.keys.ok}
+		<GateNotice gate={data.keys.gate} title="API keys" absent="This engine does not serve API keys." />
+	{:else if keys.length === 0}
 		<EmptyState
 			title="No API keys yet"
 			description="Create a key to allow external services to authenticate."
@@ -340,12 +328,12 @@
 								<Badge tone="danger" dot>Revoked</Badge>
 							{/if}
 						</td>
-						<td data-cell="nowrap" class="text-xs text-faint">{formatDate(key.created_at)}</td>
+						<td data-cell="nowrap" class="text-xs text-faint">{formatDate(key.created_at, 'Never')}</td>
 						<td data-cell="nowrap" class="text-xs text-faint">
 							{#if !key.expires_at && isPrivilegedKey(key.roles)}
 								<Badge tone="warn">No expiry</Badge>
 							{:else}
-								{formatDate(key.expires_at)}
+								{formatDate(key.expires_at, 'Never')}
 							{/if}
 						</td>
 						<td>
@@ -360,6 +348,8 @@
 								</div>
 							{:else if u}
 								<span class="text-xs text-faint">{u.requests} req</span>
+							{:else if data.usageUnknown.includes(key.id)}
+								<span class="text-xs text-faint">Unknown, the usage could not be read</span>
 							{:else}
 								<span class="text-xs text-faint">None</span>
 							{/if}
@@ -406,21 +396,23 @@
 				{/each}
 			</tbody>
 		</Table>
-			<Pagination
-				page={pageNumber(data.offset, data.limit)}
-				perPage={data.limit}
-				count={data.keys.length}
-				total={data.total ?? undefined}
-				noun="keys"
-				href={pageHref('/admin/api-keys', data.limit)}
-			/>
 		{/if}
+		<!-- The search narrows this page only, so the pager stays when nothing on
+		     it matches: the next page may hold the key. -->
+		<Pagination
+			page={pageNumber(data.offset, data.limit)}
+			perPage={data.limit}
+			count={keys.length}
+			total={data.total ?? undefined}
+			noun="keys"
+			href={pageHref('/admin/api-keys', data.limit)}
+		/>
 	{/if}
 </PageShell>
 
 <Drawer bind:open={showCreate} title="New key">
 		<form method="POST" action="?/create" id="key-form" use:enhance={create.enhance} class="flex flex-col gap-4">
-			<FormErrors message={formError} fields={errors} {refused} />
+			<FormErrors message={createFailure?.error} fields={errors} {refused} />
 
 			<Input
 				id="key-name"
@@ -437,6 +429,8 @@
 			<KeyAccess
 				bind:access={createAccess}
 				schemas={data.schemaNames ?? []}
+				schemasFailed={data.schemasFailed}
+				catalogFailed={data.catalogFailed}
 				{groups}
 				{privileged}
 				error={errors.scopes ?? (scopeProblem || undefined)}
@@ -473,19 +467,16 @@
 				Your API key <strong class="text-fg">{rawKeyName}</strong> has been created. Copy it now.
 				It will not be shown again.
 			</p>
-			<div class="flex items-center gap-2 rounded-lg border border-line bg-ink px-3 py-2">
-				<code class="flex-1 font-mono text-xs break-all text-success">{rawKey}</code>
-				<Button variant="ghost" size="sm" onclick={copyKey} aria-label="Copy key">
-					{#if copiedKey}
-						<Check size={ICON.sm} class="text-success" />
-					{:else}
-						<Copy size={ICON.sm} />
-					{/if}
-				</Button>
-			</div>
-			{#if copyError}
-				<Alert tone="warn">{copyError}</Alert>
-			{/if}
+			<CopyField
+				id="raw-api-key"
+				label="API key"
+				labelHidden
+				value={rawKey}
+				mono
+				wrap
+				copyLabel="Copy key"
+				hint="If the copy fails, select the key and copy it yourself."
+			/>
 			<p class="text-xs text-faint">
 				Send this key in the <code class="text-muted">X-API-Key</code> header of your requests.
 			</p>
@@ -499,9 +490,9 @@
 <Drawer bind:open={limitOpen} title="Request limits for {limitKey?.name ?? ''}">
 	{#if limitKey}
 		<form method="POST" action="?/limit" id="limit-form" use:enhance={limit.enhance} class="flex flex-col gap-4">
-			<FormErrors message={formError} fields={errors} {refused} />
+			<FormErrors message={limitFailure?.error} fields={limitErrors} refused={limitRefused} />
 			<input type="hidden" name="id" value={limitKey.id} />
-			<RequestLimits bind:limits={limitValues} idPrefix="key-limit" {errors} />
+			<RequestLimits bind:limits={limitValues} idPrefix="key-limit" errors={limitErrors} />
 		</form>
 	{/if}
 	{#snippet footer()}

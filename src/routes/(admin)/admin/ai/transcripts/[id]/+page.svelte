@@ -1,6 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Alert, Badge, Breadcrumb, Button, Card, DescriptionList, PageShell, SectionHeading, Stat } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Breadcrumb, Button, Card, DescriptionList, PageShell, SectionHeading, Stat, type AccentTone } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { FileJson, FileText, Sparkles } from '@lucide/svelte';
@@ -34,15 +33,13 @@
 			: []
 	);
 
-	function roleTone(role: string): 'brand' | 'violet' | 'neutral' | 'warn' {
+	function roleTone(role: string): AccentTone {
 		if (role === 'user') return 'brand';
 		if (role === 'assistant') return 'violet';
 		if (role === 'system') return 'warn';
 		return 'neutral';
 	}
 </script>
-
-<PageTitle title="Transcript" />
 
 <PageShell title="Transcript" description={t ? formatDateTime(t.created_at) : ''} width="wide" {back}>
 	{#snippet breadcrumb()}
@@ -59,7 +56,7 @@
 		{/if}
 	{/snippet}
 
-	<AiSection tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
+	<AiSection level={2} tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
 		{#if t}
 			<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
 				<Stat size="sm" mono label="Messages" value={t.messages?.length ?? t.message_count} />

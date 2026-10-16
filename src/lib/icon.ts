@@ -20,5 +20,3 @@ export const ICON = {
 	/** Standing in for a file that cannot be previewed. */
 	placeholder: 40,
 } as const;
-
-export type IconSize = (typeof ICON)[keyof typeof ICON];

@@ -41,6 +41,12 @@ function loadEvent(body: unknown, search = '') {
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
+/** The rows a load answered with. A test that reads them expects the read to have succeeded. */
+function loadedRows(result: Loaded) {
+	if (!result.schemas.ok) throw new Error('the collections read failed');
+	return result.schemas.value;
+}
+
 /*
  * The index renders one slice of the collections. The schemas endpoint
  * answers with a bare array and no row count, so the total is knowable here
@@ -51,7 +57,7 @@ describe('admin/content/+page.server.ts load', () => {
 	it('bounds the list and states the measured total', async () => {
 		const result = (await load(loadEvent(schemas(400), '?limit=50'))) as Loaded;
 
-		expect(result.schemas).toHaveLength(50);
+		expect(loadedRows(result)).toHaveLength(50);
 		expect(result.total).toBe(400);
 		expect(result.hasMore).toBe(true);
 	});
@@ -59,7 +65,7 @@ describe('admin/content/+page.server.ts load', () => {
 	it('reports the end of the list on the last page', async () => {
 		const result = (await load(loadEvent(schemas(120), '?limit=50&offset=100'))) as Loaded;
 
-		expect(result.schemas).toHaveLength(20);
+		expect(loadedRows(result)).toHaveLength(20);
 		expect(result.hasMore).toBe(false);
 		expect(result.offset).toBe(100);
 	});
@@ -73,7 +79,7 @@ describe('admin/content/+page.server.ts load', () => {
 		const result = (await load(loadEvent(rows, '?q=zebra'))) as Loaded;
 
 		expect(result.total).toBe(2);
-		expect(result.schemas.map((schema: { name: string }) => schema.name)).toEqual([
+		expect(loadedRows(result).map((schema: { name: string }) => schema.name)).toEqual([
 			'zebra_one',
 			'zebra_two',
 		]);
@@ -125,8 +131,12 @@ describe('admin/content/+page.server.ts load', () => {
 		});
 	});
 
-	it('renders an empty index rather than failing when the endpoint errors', async () => {
-		const fetch = vi.fn(async () => json({ error: 'nope' }, 500)) as unknown as typeof globalThis.fetch;
+	it.each([
+		[500, 'error'],
+		[503, 'unavailable'],
+		[403, 'forbidden'],
+	])('draws a gate, never an empty index, when the read answers %i', async (status, state) => {
+		const fetch = vi.fn(async () => json({ error: 'nope' }, status)) as unknown as typeof globalThis.fetch;
 		const event = {
 			fetch,
 			cookies: mockCookies(),
@@ -136,7 +146,8 @@ describe('admin/content/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.schemas).toEqual([]);
+		expect(result.schemas.ok).toBe(false);
+		if (!result.schemas.ok) expect(result.schemas.gate.state).toBe(state);
 		expect(result.total).toBe(0);
 	});
 
@@ -169,7 +180,7 @@ describe('admin/content/+page.server.ts load', () => {
 		const data = (await load(event)) as Loaded;
 
 		expect(calls.filter((u) => u.endsWith('/stats'))).toHaveLength(9);
-		expect(data.schemas.map((s: { name: string }) => s.name)).toEqual(['collection_7', 'collection_8', 'collection_6']);
+		expect(loadedRows(data).map((s: { name: string }) => s.name)).toEqual(['collection_7', 'collection_8', 'collection_6']);
 		expect(data.sort).toBe('rows');
 		expect(data.dir).toBe('desc');
 	});
@@ -193,7 +204,7 @@ describe('admin/content/+page.server.ts load', () => {
 
 		const data = (await load(event)) as Loaded;
 
-		expect(data.schemas.map((s: { name: string }) => s.name)).toEqual([
+		expect(loadedRows(data).map((s: { name: string }) => s.name)).toEqual([
 			'collection_0',
 			'collection_2',
 			'collection_3',
@@ -223,7 +234,7 @@ describe('admin/content/+page.server.ts load', () => {
 
 		const data = (await load(event)) as Loaded;
 
-		expect(data.schemas.map((s: { name: string }) => s.name)).toEqual(['collection_2', 'collection_4']);
+		expect(loadedRows(data).map((s: { name: string }) => s.name)).toEqual(['collection_2', 'collection_4']);
 		expect(calls.filter((u) => u.endsWith('/stats'))).toHaveLength(2);
 	});
 
@@ -270,7 +281,7 @@ describe('admin/content/+page.server.ts load', () => {
 		const data = (await load(event)) as Loaded;
 
 		expect(calls.filter((u) => u.endsWith('/stats'))).toHaveLength(5);
-		expect(data.schemas.map((s: { name: string }) => s.name)).toEqual([
+		expect(loadedRows(data).map((s: { name: string }) => s.name)).toEqual([
 			'collection_2',
 			'collection_4',
 			'collection_0',
@@ -308,7 +319,7 @@ describe('admin/content/+page.server.ts load', () => {
 		const data = (await load(event)) as Loaded;
 
 		expect(data.filter).toBe('draft-publish');
-		expect(data.schemas.map((s: { name: string }) => s.name)).toEqual(['collection_0', 'collection_2']);
+		expect(loadedRows(data).map((s: { name: string }) => s.name)).toEqual(['collection_0', 'collection_2']);
 		expect(data.total).toBe(3);
 		expect(data.hasMore).toBe(true);
 		expect(calls.filter((u) => u.endsWith('/stats'))).toHaveLength(2);
@@ -336,7 +347,7 @@ describe('admin/content/+page.server.ts load', () => {
 		const data = (await load(event)) as Loaded;
 
 		expect(calls.filter((u) => u.endsWith('/stats'))).toHaveLength(5);
-		expect(data.schemas.map((s: { name: string }) => s.name)).toEqual(['collection_0', 'collection_2', 'collection_4']);
+		expect(loadedRows(data).map((s: { name: string }) => s.name)).toEqual(['collection_0', 'collection_2', 'collection_4']);
 		expect(data.total).toBe(3);
 	});
 
@@ -344,6 +355,23 @@ describe('admin/content/+page.server.ts load', () => {
 		const data = (await load(loadEvent(schemas(3), '?filter=famous'))) as Loaded;
 
 		expect(data.filter).toBe('all');
-		expect(data.schemas).toHaveLength(3);
+		expect(loadedRows(data)).toHaveLength(3);
+	});
+
+	// Every content route refuses a reader below admin, so the index says so
+	// instead of listing collections whose New entry buttons all end in a refusal.
+	it.each(['editor', 'viewer'])('answers the forbidden gate for the %s role without reading', async (role) => {
+		const fetch = vi.fn(async () => json(schemas(3))) as unknown as typeof globalThis.fetch;
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/content'),
+			parent: async () => ({ user: { roles: [role] } }),
+		} as never;
+
+		const data = (await load(event)) as Loaded;
+
+		expect(data.schemas).toEqual({ ok: false, gate: { state: 'forbidden' } });
+		expect(fetch).not.toHaveBeenCalled();
 	});
 });

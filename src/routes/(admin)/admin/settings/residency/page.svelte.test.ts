@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -60,7 +60,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		regions: [region()],
 		report: report(),
-		reportRead: true,
+		reportGate: { state: 'ok' },
 		gate: { state: 'ok' },
 		licensed: true,
 		permitted: true,
@@ -90,10 +90,26 @@ describe('the report', () => {
 	// give: zero unplaced tenants because nobody could ask.
 	it('never draws an unread report as a clean one', () => {
 		const { container } = render(ResidencyPage, {
-			props: props({ report: null, reportRead: false }),
+			props: props({
+				report: null,
+				reportGate: {
+					state: 'error',
+					message: 'The residency report could not be read. This is not a report that every tenant is placed.',
+				},
+			}),
 		});
 		const text = said(container);
 		expect(text).toContain('not a report that every tenant is placed');
+		expect(text).not.toContain('Nothing to report yet');
+	});
+
+	it('says a refused report is a role refusal, not an outage', () => {
+		const { container } = render(ResidencyPage, {
+			props: props({ report: null, reportGate: { state: 'forbidden' } }),
+		});
+		const text = said(container);
+		expect(text).toContain('Your role cannot open the residency report.');
+		expect(text).not.toContain('did not answer');
 		expect(text).not.toContain('Nothing to report yet');
 	});
 
@@ -161,5 +177,40 @@ describe('regions', () => {
 	it('says a region has to exist before a tenant can be placed', () => {
 		const { container } = render(ResidencyPage, { props: props({ regions: [] }) });
 		expect(said(container)).toContain('before a tenant can be placed');
+	});
+});
+
+describe('Data residency region drawer', () => {
+	it('shows a failed save inside the open drawer', async () => {
+		const { getByRole } = render(ResidencyPage, {
+			props: props({}, { action: 'create', error: 'A region with that slug already exists.' }),
+		});
+		await fireEvent.click(getByRole('button', { name: /new region/i }));
+		const form = document.getElementById('region-form') as HTMLFormElement;
+		expect(form.textContent).toContain('A region with that slug already exists.');
+	});
+});
+
+describe('Data residency failures stay where they were made', () => {
+	it('shows a failed delete on the page and opens the region drawer clean', async () => {
+		const { getByRole, container } = render(ResidencyPage, {
+			props: props({}, { action: 'delete', error: 'The region could not be removed.' }),
+		});
+		expect(said(container)).toContain('The region could not be removed.');
+		await fireEvent.click(getByRole('button', { name: /new region/i }));
+		const form = document.getElementById('region-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('could not be removed');
+	});
+});
+
+describe('a region list past the cap', () => {
+	it('says the list stops at 100 regions', () => {
+		const { container } = render(ResidencyPage, { props: props({ more: true }) });
+		expect(said(container)).toContain('Showing the first 100 regions');
+	});
+
+	it('says nothing when every region is listed', () => {
+		const { container } = render(ResidencyPage, { props: props({ more: false }) });
+		expect(said(container)).not.toContain('Showing the first');
 	});
 });

@@ -4,14 +4,34 @@ import { CatalogError } from '$lib/api/assist';
 import { assistRefusal, catalogFor, refusalStatus } from './flow-assist';
 
 describe('assistRefusal', () => {
+	// The client puts the raw body of an answer that was not JSON in the
+	// message, so a proxy's 503 page would be relayed as the engine's sentence.
+	it('relays a 503 only when the engine sent it', () => {
+		expect(assistRefusal(new ApiError(503, '<html><h1>503 Service Unavailable</h1></html>'))).toEqual({
+			state: 'error',
+			message: 'The assistant did not answer. Try again.',
+		});
+	});
+
 	it('maps the two gates, the validator and the rest', () => {
 		expect(assistRefusal(new ApiError(402, 'ai is not enabled'))).toEqual({ state: 'locked' });
 		expect(assistRefusal(new ApiError(404, 'not found'))).toEqual({ state: 'off' });
-		expect(assistRefusal(new ApiError(503, 'flow validator is not registered'))).toEqual({ state: 'unavailable', message: 'flow validator is not registered' });
-		expect(assistRefusal(new ApiError(503, ''))).toEqual({ state: 'unavailable', message: 'The flow validator is not available on this engine.' });
+		expect(assistRefusal(new ApiError(503, 'flow validator is not registered', { error: 'flow validator is not registered' }))).toEqual({ state: 'unavailable', message: 'flow validator is not registered' });
+		expect(assistRefusal(new ApiError(503, '', {}))).toEqual({ state: 'unavailable', message: 'The flow validator is not available on this engine.' });
 		expect(assistRefusal(new ApiError(422, 'prompt is too long'))).toEqual({ state: 'error', message: 'prompt is too long' });
 		expect(assistRefusal(new ApiError(500, 'pq: connection refused'))).toEqual({ state: 'error', message: 'The assistant did not answer. Try again.' });
 		expect(assistRefusal(new Error('boom'))).toEqual({ state: 'error', message: 'The assistant did not answer. Try again.' });
+	});
+
+	it('reads a spent budget as an error that keeps the prompt live, not as the license', () => {
+		const budget = new ApiError(402, 'ai budget exhausted for this billing period', { error: 'ai budget exhausted for this billing period', code: 'http_402' });
+		const refusal = assistRefusal(budget);
+		expect(refusal.state).toBe('error');
+		expect((refusal as { message: string }).message).toContain('budget for this billing period is spent');
+		const license = new ApiError(402, 'payment_required', { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' });
+		expect(assistRefusal(license)).toEqual({ state: 'locked' });
+		const other = new ApiError(402, 'this request needs a paid plan', { error: 'this request needs a paid plan', code: 'http_402' });
+		expect(assistRefusal(other)).toEqual({ state: 'locked' });
 	});
 
 	it('reads a missing catalog route as unavailable and a 402 on it as locked', () => {

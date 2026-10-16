@@ -1,7 +1,6 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -13,12 +12,10 @@
 		PasswordInput,
 		SectionHeading,
 		SegmentedControl,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
-	import type { SubmitFunction } from '@sveltejs/kit';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import { CAPTCHA_PROVIDERS, providerLabel, type CaptchaProvider } from '$lib/api/captcha-settings';
 	import type { ActionData, PageData } from './$types';
 
@@ -47,24 +44,12 @@
 		if (result.type === 'success') toast.success('Saved the captcha settings');
 	});
 
-	const clear: SubmitFunction = async ({ cancel }) => {
-		const confirmed = await confirmDialog(
-			'Clear the tenant captcha settings?',
-			"This tenant's pages and flows go back to the install's captcha, and the stored secret is deleted.",
-			{ confirmLabel: 'Clear' },
-		);
-		if (!confirmed) {
-			cancel();
-			return;
-		}
-		return async ({ result, update }) => {
-			await update();
-			if (result.type === 'success') toast.success('Cleared the captcha settings');
-		};
-	};
+	const clear = confirmed(
+		'Clear the tenant captcha settings?',
+		"This tenant's pages and flows go back to the install's captcha, and the stored secret is deleted.",
+		{ confirmLabel: 'Clear', success: 'Cleared the captcha settings' },
+	);
 </script>
-
-<PageTitle title="Captcha" />
 
 <PageShell
 	title="Captcha"
@@ -74,6 +59,7 @@
 >
 	{#if data.gate.state !== 'ok' || !settings}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Captcha"
 			absent="The captcha plugin is not part of this build, so no form is challenged."
@@ -84,11 +70,7 @@
 			install's settings whatever is saved here, so a wrong key here cannot lock an admin out.
 		</Alert>
 
-		{#if refusal}
-			<RefusalNotice {refusal} />
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={formError} refused={refusal} />
 
 		<section class="flex flex-col gap-4" aria-label="What is checked now">
 			<SectionHeading level={2}>What is checked now</SectionHeading>
@@ -117,13 +99,14 @@
 		<section class="flex flex-col gap-4" aria-label="Tenant settings">
 			<SectionHeading level={2}>Tenant settings</SectionHeading>
 			{#if !settings.licensed}
-				<p class="text-sm text-muted">
+				<p class="text-sm text-muted" id="captcha-license-note">
 					Saving or changing tenant captcha settings needs a license this install does not hold. Settings already
 					saved keep applying, and clearing them is always allowed.
 				</p>
 			{/if}
 			<Card pad="md">
 				<form id="captcha-form" method="POST" action="?/save" use:enhance={save.enhance} class="flex flex-col gap-4">
+					<input type="hidden" name="failure_threshold" value={data.settings?.tenant?.failure_threshold ?? ''} />
 					<SegmentedControl
 						label="Provider"
 						name="provider"
@@ -160,7 +143,17 @@
 						/>
 					{/if}
 					<div class="flex flex-wrap items-center gap-2">
-						<Button variant="primary" type="submit" loading={save.pending}>Save</Button>
+						<!-- The plugin refuses an unlicensed save, so the button is off and
+						     points at the note above that says why. -->
+						<Button
+							variant="primary"
+							type="submit"
+							loading={save.pending}
+							disabled={!settings.licensed}
+							aria-describedby={settings.licensed ? undefined : 'captcha-license-note'}
+						>
+							Save
+						</Button>
 					</div>
 				</form>
 				{#if tenant}

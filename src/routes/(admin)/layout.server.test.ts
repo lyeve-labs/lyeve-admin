@@ -4,6 +4,7 @@ import type { Cookies } from '@sveltejs/kit';
 // The load function under test. SvelteKit's redirect() throws a Redirect object.
 // We catch it and inspect status/location.
 import { load } from './+layout.server';
+import { BUSY, OUTAGE } from '$lib/outage';
 
 // helpers
 
@@ -52,7 +53,7 @@ function catchRedirect(fn: () => unknown): Promise<{ status: number; location: s
 
 // tests
 
-describe('(admin)/+layout.server.ts load', () => {
+describe('the console frame', () => {
 	it('redirects to /login when there is no session cookie', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
 			json({ setup_required: false })
@@ -64,7 +65,7 @@ describe('(admin)/+layout.server.ts load', () => {
 		expect(r.location).toBe('/login');
 	});
 
-	it('deletes the session cookie and redirects to /login when getMe fails', async () => {
+	it('deletes the session cookie and tells the sign-in page the session ended when the engine answers 401', async () => {
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			if (String(url).includes('/api/admin/setup')) return json({ setup_required: false });
 			// /me endpoint: return 401 (invalid/expired token)
@@ -72,8 +73,9 @@ describe('(admin)/+layout.server.ts load', () => {
 			return json({});
 		}) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies({ '__Host-sys_session': 'expired-token' });
+		const url = new URL('https://admin.example.com/admin/content/posts?offset=40');
 
-		const r = await catchRedirect(() => load({ fetch, cookies } as never));
+		const r = await catchRedirect(() => load({ fetch, cookies, url, request: new Request(url) } as never));
 
 		// The delete has to repeat the attributes the cookie was set with. A
 		// __Host- cookie cleared without Secure is discarded by the browser, the
@@ -85,10 +87,107 @@ describe('(admin)/+layout.server.ts load', () => {
 			sameSite: 'strict',
 		});
 		expect(r.status).toBe(302);
-		expect(r.location).toBe('/login');
+		// The reader returns to the page they were on once they sign in again.
+		expect(r.location).toBe('/login?ended=1&next=%2Fadmin%2Fcontent%2Fposts%3Foffset%3D40');
 	});
 
-	it('returns user and fail-closed NO_ENTITLEMENTS when entitlements endpoint errors', async () => {
+	// A form posted without script lands here with the action in its address.
+	// Sending the reader back there would name the action, not the page.
+	it('returns a reader whose form post found the session ended to the page alone', async () => {
+		const fetch = vi.fn(async (url: string, _init: RequestInit) =>
+			String(url).includes('/api/admin/auth/me') ? json({ error: 'unauthorized' }, 401) : json({})
+		) as unknown as typeof globalThis.fetch;
+		const url = new URL('https://admin.example.com/admin/users?/delete');
+		const request = new Request(url, { method: 'POST' });
+
+		const r = await catchRedirect(() =>
+			load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'expired-token' }), url, request } as never)
+		);
+
+		expect(r.location).toBe('/login?ended=1&next=%2Fadmin%2Fusers');
+	});
+
+	// SvelteKit re-runs a load that read the address on every navigation, and
+	// the shell's reads would then repeat on every page. A standing session
+	// must not touch it.
+	it('does not read the address while the session stands', async () => {
+		const user = { id: 'u1', email: 'a@b.co', roles: ['editor'], tenant_id: 't', disabled: false, created_at: '' };
+		const fetch = vi.fn(async (url: string, _init: RequestInit) =>
+			String(url).includes('/api/admin/auth/me') ? json(user) : json({})
+		) as unknown as typeof globalThis.fetch;
+		let read = false;
+		const url = new URL('https://admin.example.com/admin/users');
+		for (const property of ['href', 'pathname', 'search', 'searchParams']) {
+			const value = url[property as keyof URL];
+			Object.defineProperty(url, property, {
+				get: () => {
+					read = true;
+					return value;
+				},
+			});
+		}
+
+		await load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'valid-token' }), url } as never);
+
+		expect(read).toBe(false);
+	});
+
+	/*
+	 * The engine answers 503 when its database cannot check a session, so that
+	 * an outage signs nobody out. The shell has to keep that promise: the cookie
+	 * stays, and the reader sees the outage page instead of the sign-in form.
+	 */
+	describe('when the engine cannot check the session', () => {
+		async function outage(me: () => Response | Promise<Response>) {
+			const fetch = vi.fn(async (url: string, _init: RequestInit) => {
+				if (String(url).includes('/api/admin/auth/me')) return me();
+				return json({});
+			}) as unknown as typeof globalThis.fetch;
+			const cookies = mockCookies({ '__Host-sys_session': 'valid-token' });
+			const thrown = (await Promise.resolve(load({ fetch, cookies } as never)).then(
+				() => {
+					throw new Error('expected the outage page');
+				},
+				(e: unknown) => e
+			)) as { status?: number; location?: string; body?: { message?: string } };
+			return { thrown, cookies };
+		}
+
+		it('keeps the cookie and shows the outage page on a 503', async () => {
+			const { thrown, cookies } = await outage(() => json({ error: 'session check unavailable' }, 503));
+			expect(cookies.delete).not.toHaveBeenCalled();
+			expect(thrown.location).toBeUndefined();
+			expect(thrown.status).toBe(503);
+			expect(thrown.body?.message).toBe(OUTAGE.body);
+		});
+
+		it('keeps the cookie and shows the outage page when the engine does not answer', async () => {
+			const { thrown, cookies } = await outage(() => Promise.reject(new TypeError('fetch failed')));
+			expect(cookies.delete).not.toHaveBeenCalled();
+			expect(thrown.location).toBeUndefined();
+			expect(thrown.status).toBe(503);
+		});
+
+		// A refusal is an answer, so it gets its own page and never the outage
+		// wording. The session is intact, so the cookie stays for each.
+		it.each([
+			[
+				402,
+				{ error: 'cap_exceeded', cap: 'admin.seats', limit: 3, current: 3, upgrade_url: '' },
+				'Every admin seat is taken. 3 of 3 are in use, which is the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.',
+			],
+			[403, { error: 'forbidden' }, 'This account or network cannot reach the admin right now.'],
+			[429, { error: 'rate limit exceeded' }, BUSY.body],
+		])('keeps the cookie and shows its own page for a %i', async (status, body, message) => {
+			const { thrown, cookies } = await outage(() => json(body, status));
+			expect(cookies.delete).not.toHaveBeenCalled();
+			expect(thrown.location).toBeUndefined();
+			expect(thrown.status).toBe(status);
+			expect(thrown.body?.message).toBe(message);
+		});
+	});
+
+	it('treats an unreadable license as granting nothing, and keeps the reader signed in', async () => {
 		const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {
 			if (String(url).includes('/api/admin/setup')) return json({ setup_required: false });
@@ -242,6 +341,74 @@ describe('(admin)/+layout.server.ts load', () => {
 			expect(result!.plugins).toEqual({ state: 'named', running: ['media'], withheld: ['audit'] });
 		});
 
+		describe('for an operator', () => {
+			// Every phase a plugin can be in, and one the build left out. The
+			// running list below is what the engine derives from the same report.
+			const report = {
+				compiled: ['media', 'search', 'audit', 'forms', 'cache'],
+				entitled: ['media', 'search', 'audit', 'forms', 'cache'],
+				plugins: [
+					{ name: 'media', compiled: true, entitled: true, requested: true, active: true, phase: 'running' },
+					{ name: 'search', compiled: true, entitled: true, requested: true, active: false, phase: 'lazy' },
+					{ name: 'audit', compiled: true, entitled: true, requested: true, active: true, phase: 'running' },
+					{ name: 'forms', compiled: true, entitled: true, requested: true, active: false, phase: 'failed' },
+					{ name: 'cache', compiled: false, entitled: true, requested: true, active: false, phase: 'registered' },
+				],
+			};
+			const entitlements = { plan: '', state: '', features: [], withheld: ['search'] };
+			const routes = {
+				'/api/admin/plugins/running': () => json({ plugins: ['audit', 'media'], withheld: ['search'] }),
+				'/api/admin/plugins/status': () => json(report),
+				'/api/admin/entitlements': () => json(entitlements),
+			};
+			const listRead = (seen: string[]) => seen.some((u) => u.includes('/api/admin/plugins/running'));
+
+			it('builds the same plugin set from the status report as the running list gives', async () => {
+				const editor = engine(['editor'], routes);
+				const operator = engine(['super_admin'], routes);
+				const fromList = (await editor.run())!.plugins;
+				const fromStatus = (await operator.run())!.plugins;
+				expect(fromList).toEqual({ state: 'named', running: ['audit', 'media'], withheld: ['search'] });
+				expect(fromStatus).toEqual(fromList);
+				expect(listRead(editor.seen)).toBe(true);
+				expect(listRead(operator.seen)).toBe(false);
+			});
+
+			it('reads the running list when the status report could not be read', async () => {
+				const { seen, run } = engine(['admin'], { ...routes, '/api/admin/plugins/status': () => json({ error: 'down' }, 503) });
+				expect((await run())!.plugins).toEqual({ state: 'named', running: ['audit', 'media'], withheld: ['search'] });
+				expect(listRead(seen)).toBe(true);
+			});
+
+			it('reads the running list when the entitlements could not be read', async () => {
+				// Without them nothing says what is withheld, and a set derived
+				// without that would offer a withheld plugin's pages.
+				const { seen, run } = engine(['admin'], { ...routes, '/api/admin/entitlements': () => json({ error: 'down' }, 503) });
+				expect((await run())!.plugins).toEqual({ state: 'named', running: ['audit', 'media'], withheld: ['search'] });
+				expect(listRead(seen)).toBe(true);
+			});
+		});
+
+		it.each([['editor'], ['viewer']])('never asks the engine for the entitlements on behalf of the %s role', async (role) => {
+			const { seen, run } = engine([role], {
+				'/api/admin/plugins/running': () => json({ plugins: ['media'], withheld: [] }),
+				'/api/admin/entitlements': () => json({ plan: 'example', state: 'active', features: ['example'] }),
+			});
+			const result = await run();
+			expect(seen.some((u) => u.includes('/api/admin/entitlements'))).toBe(false);
+			expect(result!.entitlements.features).toEqual([]);
+		});
+
+		it.each([['admin'], ['super_admin']])('reads the entitlements for the %s role', async (role) => {
+			const { seen, run } = engine([role], {
+				'/api/admin/plugins/running': () => json({ plugins: ['media'], withheld: [] }),
+				'/api/admin/entitlements': () => json({ plan: 'example', state: 'active', features: ['example'] }),
+			});
+			const result = await run();
+			expect(seen.some((u) => u.includes('/api/admin/entitlements'))).toBe(true);
+			expect(result!.entitlements.features).toEqual(['example']);
+		});
+
 		it('shows every page to an editor on an engine without the list', async () => {
 			const { run } = engine(['editor'], {
 				'/api/admin/plugins/running': () => json({ error: 'not found' }, 404),
@@ -356,7 +523,7 @@ describe('(admin)/+layout.server.ts load', () => {
 		});
 	});
 
-	it('returns user + entitlements on full happy path', async () => {
+	it('gives the console the reader and what the license grants', async () => {
 		const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
 		const entitlements = { plan: 'example', state: 'active', features: ['example'], caps: {} };
 		const fetch = vi.fn(async (url: string, _init: RequestInit) => {

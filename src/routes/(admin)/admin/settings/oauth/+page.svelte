@@ -1,9 +1,6 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Drawer,
@@ -16,22 +13,34 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { OAuthProvider } from '@lyeve-labs/client';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import { KeyRound, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+	const refusal = $derived(formRefusal(form));
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Each failure names the action that caused it. The drawer shows only a
+	 * failed save, and only one that came back after it was opened, so a failed
+	 * delete never reads as a failure of the form opened next. A failed delete
+	 * shows above the list.
+	 */
+	const failure = $derived(form as { error?: string; action?: string } | null);
+	const savedInDrawer = $derived(failure?.action === 'create' || failure?.action === 'update');
+	let openedOver = $state.raw<unknown>(null);
+	const drawerFresh = $derived(savedInDrawer && form !== openedOver);
+	const pageRefusal = $derived(savedInDrawer ? null : refusal);
+	const formError = $derived(savedInDrawer ? '' : (failure?.error ?? ''));
 
 	// One drawer for both writes: a null target is a new provider.
 	let open = $state(false);
@@ -40,14 +49,15 @@
 	/** The provider name as the list shows it, rather than its stored form. */
 	const providerLabel = (name: string) => name.replace(/_/g, ' ');
 
-	const enabledCount = $derived(data.providers.filter((p) => p.enabled).length);
+	const providers = $derived(data.providers.ok ? data.providers.value : []);
+	const enabledCount = $derived(providers.filter((p) => p.enabled).length);
 	let narrow = $state('');
 	const visible = $derived(
 		narrow.trim()
-			? data.providers.filter((p) =>
+			? providers.filter((p) =>
 					[p.name, p.issuer_url, p.client_id].some((v) => v.toLowerCase().includes(narrow.trim().toLowerCase())),
 				)
-			: data.providers,
+			: providers,
 	);
 
 	/**
@@ -56,21 +66,11 @@
 	 * anything, so canceling here means the request is never made.
 	 */
 	function deleteProvider(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete provider ${providerLabel(name)}?`,
-				'Everyone who signs in through it loses that way in.',
-				{ confirmLabel: 'Delete provider' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${providerLabel(name)}`);
-			};
-		};
+		return confirmed(
+			`Delete provider ${providerLabel(name)}?`,
+			'Everyone who signs in through it loses that way in.',
+			{ confirmLabel: 'Delete provider', success: `Deleted ${providerLabel(name)}` },
+		);
 	}
 
 	let name = $state('');
@@ -92,6 +92,7 @@
 		rolesClaim = 'roles';
 		defaultRoles = 'editor';
 		enabled = true;
+		openedOver = form;
 		open = true;
 	}
 
@@ -105,6 +106,7 @@
 		rolesClaim = p.roles_claim;
 		defaultRoles = p.default_roles.join(', ');
 		enabled = p.enabled;
+		openedOver = form;
 		open = true;
 	}
 
@@ -122,33 +124,33 @@
 	const saveProviderSubmit = tracked(saveProvider);
 </script>
 
-<PageTitle title="OAuth providers" />
-
 <PageShell
 	title="OAuth providers"
 	description="External OpenID Connect and OAuth 2.0 providers people can sign in with."
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New provider
-		</Button>
+		{#if data.providers.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New provider
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if formError}
-		<Alert tone="danger">{formError}</Alert>
-	{/if}
+	<FormErrors message={formError} refused={pageRefusal} />
 
-	<div class="grid gap-4 sm:grid-cols-3">
-		<Stat size="sm" mono label="Providers" value={data.providers.length} />
-		<Stat size="sm" mono label="Enabled" value={enabledCount} />
-	</div>
+	{#if data.providers.ok}
+		<div class="grid gap-4 sm:grid-cols-3">
+			<Stat size="sm" mono label="Providers" value={providers.length} />
+			<Stat size="sm" mono label="Enabled" value={enabledCount} />
+		</div>
+	{/if}
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Providers</SectionHeading>
-		{#if data.providers.length === 0}
+		{#if !data.providers.ok}
+			<GateNotice gate={data.providers.gate} title="OAuth providers" absent="This engine does not serve OAuth sign-in." />
+		{:else if providers.length === 0}
 			<EmptyState
 				title="No OAuth providers configured"
 				description="Add an OpenID Connect provider to offer single sign-on on the login page."
@@ -165,7 +167,8 @@
 		{:else}
 			<ListToolbar label="Filter providers">
 				{#snippet search()}
-					<SearchInput bind:value={narrow} placeholder="Search providers" />
+					<label for="oauth-search" class="sr-only">Search providers</label>
+					<SearchInput id="oauth-search" bind:value={narrow} placeholder="Search providers" />
 				{/snippet}
 			</ListToolbar>
 
@@ -195,7 +198,7 @@
 											{provider.enabled ? 'Enabled' : 'Disabled'}
 										</Badge>
 									</div>
-									<div class="font-mono text-xs text-faint">/auth/oauth/{provider.name}</div>
+									<div class="font-mono text-xs text-faint">/api/admin/auth/oauth/{provider.name}</div>
 								</td>
 								<td class="max-w-xs truncate text-xs text-muted" title={provider.issuer_url}>
 									{provider.issuer_url}
@@ -233,9 +236,6 @@
 </PageShell>
 
 <Drawer bind:open title={editing ? `Edit ${providerLabel(editing.name)}` : 'New provider'}>
-	{#if pageRefusal}
-		<div class="mb-4"><RefusalNotice refusal={pageRefusal} /></div>
-	{/if}
 	<form
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
@@ -243,6 +243,9 @@
 		use:enhance={saveProviderSubmit.enhance}
 		class="flex flex-col gap-4"
 	>
+		<!-- A refused save keeps the drawer open, so the reason has to be in it
+		     and not behind the panel on the page. -->
+		<FormErrors message={drawerFresh ? failure?.error : undefined} refused={drawerFresh ? refusal : null} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input
 			id="provider-name"
@@ -251,7 +254,7 @@
 			required
 			bind:value={name}
 			placeholder="google"
-			hint="Lowercase slug used in the login URL. google gives /auth/oauth/google."
+			hint="Lowercase slug used in the sign-in URL. google gives /api/admin/auth/oauth/google."
 		/>
 		<Input
 			id="provider-issuer"

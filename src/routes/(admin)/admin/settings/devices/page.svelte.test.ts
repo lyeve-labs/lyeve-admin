@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -23,9 +23,7 @@ function device(over: Partial<Device> = {}): Device {
 		id: 'd1',
 		user_id: 'u1',
 		label: 'Work laptop',
-		trusted: true,
 		user_agent: CHROME_MAC,
-		ip: '203.0.113.4',
 		last_seen_at: '2026-09-22T10:00:00Z',
 		created_at: '2026-09-01T10:00:00Z',
 		...over,
@@ -82,6 +80,19 @@ describe('this browser', () => {
 		expect(said(container)).not.toContain('remembers the browser you are reading this in');
 	});
 
+	// It states a standing condition, so it stays. A confirmation that clears
+	// itself would leave the section a heading over nothing.
+	it('keeps saying this browser is trusted after a while', async () => {
+		vi.useFakeTimers();
+		try {
+			const { container } = render(DevicesPage, { props: props({ userAgent: CHROME_MAC }) });
+			await vi.advanceTimersByTimeAsync(30_000);
+			expect(said(container)).toContain('already trusted, as Work laptop');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('marks the row that looks like this browser', () => {
 		const { container } = render(DevicesPage, { props: props({ userAgent: CHROME_MAC }) });
 		expect(said(container)).toContain('Looks like this one');
@@ -93,9 +104,48 @@ describe('this browser', () => {
 	});
 });
 
+describe('the rows', () => {
+	it('names the browser each device was trusted from', () => {
+		const { container } = render(DevicesPage, {
+			props: props({ devices: [device(), device({ id: 'd2', label: 'Edge box', user_agent: EDGE_WIN })] }),
+		});
+		expect(said(container)).toContain('Chrome on macOS');
+		expect(said(container)).toContain('Edge on Windows');
+		expect(said(container)).not.toContain('Unrecognized device');
+	});
+
+	// An engine whose device plugin predates the field sends no user agent.
+	// That says nothing about the device, so the row shows its name alone.
+	it('shows the name alone when the engine sends no user agent', () => {
+		const { user_agent: _omitted, ...withoutAgent } = device();
+		const { container } = render(DevicesPage, { props: props({ devices: [withoutAgent] }) });
+		expect(said(container)).toContain('Work laptop');
+		expect(said(container)).not.toContain('Unrecognized device');
+	});
+});
+
 describe('the empty state', () => {
 	it('says what having no remembered device means', () => {
 		const { container } = render(DevicesPage, { props: props({ devices: [] }) });
 		expect(said(container)).toContain('treated as coming from somewhere new');
+	});
+});
+
+describe('the search', () => {
+	it('narrows the page to the devices that match and keeps the pager', async () => {
+		const { container, getByPlaceholderText } = render(DevicesPage, {
+			props: props({
+				devices: [device(), device({ id: 'd2', label: 'Edge box', user_agent: EDGE_WIN })],
+				total: 40,
+				hasMore: true,
+			}),
+		});
+		await fireEvent.input(getByPlaceholderText('Name or browser on this page'), { target: { value: 'edge' } });
+		expect(said(container)).toContain('Edge box');
+		expect(said(container)).not.toContain('Work laptop');
+
+		await fireEvent.input(getByPlaceholderText('Name or browser on this page'), { target: { value: 'nothing like it' } });
+		expect(said(container)).toContain('No device on this page matches');
+		expect(container.querySelector('a[href="/admin/settings/devices?limit=25&offset=25"]')).toBeTruthy();
 	});
 });

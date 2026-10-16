@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const engine = vi.hoisted(() => ({ get: vi.fn() }));
-const gate = vi.hoisted(() => ({ requireRole: vi.fn() }));
 
-vi.mock('$lib/server/authz', () => ({
-	requireRole: gate.requireRole,
+// The role check is the real one, so the load's own refusal is what is tested.
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/authz')>()),
 	authedClient: vi.fn(() => engine),
 }));
 vi.mock('@lyeve-labs/client', () => ({
@@ -21,7 +21,10 @@ vi.mock('@lyeve-labs/client', () => ({
 import { load } from './+page.server';
 import { ApiError } from '@lyeve-labs/client';
 
-const event = {} as never;
+/** The page's event, with the session user the layout already read. */
+function event(roles: string[] = ['super_admin']) {
+	return { parent: async () => ({ user: { id: 'u1', roles } }) } as never;
+}
 const report = {
 	checked_at: '2026-09-13T22:00:00Z',
 	failures: 1,
@@ -30,30 +33,29 @@ const report = {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	gate.requireRole.mockResolvedValue({ id: 'u1', roles: ['super_admin'] });
 });
 
 describe('security load', () => {
 	it('asks the engine for the report as super_admin', async () => {
 		engine.get.mockResolvedValue(report);
-		const data = await load(event);
-		expect(gate.requireRole).toHaveBeenCalledWith(event, ['super_admin']);
+		const data = await load(event());
 		expect(engine.get).toHaveBeenCalledWith('/api/admin/security/controls');
-		expect(data).toEqual({ report, unavailable: null });
+		expect(data).toEqual({ report: { ok: true, value: report } });
 	});
 
 	it('refuses a lower role before reading anything', async () => {
-		gate.requireRole.mockRejectedValue(new Error('403'));
-		await expect(load(event)).rejects.toThrow('403');
+		await expect(load(event(['admin']))).rejects.toMatchObject({ status: 403 });
 		expect(engine.get).not.toHaveBeenCalled();
 	});
 
-	it('tells an engine without the report apart from a dead one', async () => {
-		// A 404 is an engine without the endpoint, which the page says one way.
-		// Anything else is an engine that did not answer.
+	it('tells an engine without the report apart from a dead one and a busy one', async () => {
+		// A 404 is an engine without the endpoint, a 429 an engine that is up
+		// and refusing for the rate, and a 503 one that did not answer.
 		engine.get.mockRejectedValue(new ApiError(404, 'not found'));
-		expect(await load(event)).toEqual({ report: null, unavailable: 'missing' });
+		expect(await load(event())).toEqual({ report: { ok: false, gate: { state: 'absent' } } });
+		engine.get.mockRejectedValue(new ApiError(429, 'slow down'));
+		expect(await load(event())).toMatchObject({ report: { ok: false, gate: { state: 'busy' } } });
 		engine.get.mockRejectedValue(new ApiError(503, 'db down'));
-		expect(await load(event)).toEqual({ report: null, unavailable: 'down' });
+		expect(await load(event())).toMatchObject({ report: { ok: false, gate: { state: 'unavailable' } } });
 	});
 });

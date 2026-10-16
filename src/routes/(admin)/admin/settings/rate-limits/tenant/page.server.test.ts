@@ -22,6 +22,7 @@ vi.mock('$lib/server/authz', () => ({
 }));
 
 import { load, actions } from './+page.server';
+import { requireRole } from '$lib/server/authz';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
@@ -59,8 +60,8 @@ describe('tenant rate limits load', () => {
 		const result = (await load(loadEvent())) as Loaded;
 		expect(result.hours).toBe(24);
 		expect(api.readRefusalHistory).toHaveBeenCalledWith(expect.anything(), 24);
-		expect(result.limit.value?.licensed).toBe(false);
-		expect(result.addresses.value?.limits?.entries).toEqual({ limit: 500, current: 0 });
+		expect(result.limit).toMatchObject({ ok: true, value: { licensed: false } });
+		expect(result.addresses).toMatchObject({ ok: true, value: { limits: { entries: { limit: 500, current: 0 } } } });
 	});
 
 	it('takes the history window from the address and ignores one the plugin would refuse', async () => {
@@ -75,9 +76,9 @@ describe('tenant rate limits load', () => {
 	it('locks the history alone when the plugin refuses it for the license', async () => {
 		api.readRefusalHistory.mockRejectedValue(paymentRequired());
 		const result = (await load(loadEvent())) as Loaded;
-		expect(result.history.gate.state).toBe('locked');
-		expect(result.addresses.gate.state).toBe('ok');
-		expect(result.limit.gate.state).toBe('ok');
+		expect(result.history).toMatchObject({ ok: false, gate: { state: 'locked' } });
+		expect(result.addresses.ok).toBe(true);
+		expect(result.limit.ok).toBe(true);
 	});
 });
 
@@ -158,5 +159,36 @@ describe('address list actions', () => {
 	it('clears the tenant limit', async () => {
 		api.clearTenantGlobal.mockResolvedValue(undefined);
 		expect(await actions.clearLimit(formEvent({}))).toEqual({ clearedLimit: true });
+	});
+});
+
+describe('removing an address entry', () => {
+	it('removes the named entry', async () => {
+		api.deleteAddressEntry.mockResolvedValue(undefined);
+		expect(await actions.deleteAddress(formEvent({ id: 'a1' }))).toEqual({ removedAddress: 'a1' });
+		expect(api.deleteAddressEntry).toHaveBeenCalledWith(expect.anything(), 'a1');
+	});
+
+	it('relays the plugin refusal under its action', async () => {
+		api.deleteAddressEntry.mockRejectedValue(new ApiError(404, 'entry not found'));
+		expect(await actions.deleteAddress(formEvent({ id: 'a1' }))).toMatchObject({
+			status: 400,
+			data: { action: 'deleteAddress', error: 'entry not found' },
+		});
+	});
+
+	it('keeps an outage body off the page', async () => {
+		api.deleteAddressEntry.mockRejectedValue(new ApiError(503, 'dial tcp: connection refused'));
+		expect(await actions.deleteAddress(formEvent({ id: 'a1' }))).toMatchObject({
+			data: { action: 'deleteAddress', error: 'The entry could not be removed.' },
+		});
+	});
+
+	it('holds the delete to an admin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		const e = formEvent({ id: 'a1' });
+		await expect(actions.deleteAddress(e)).rejects.toMatchObject({ status: 403 });
+		expect(requireRole).toHaveBeenCalledWith(e, ['admin', 'super_admin']);
+		expect(api.deleteAddressEntry).not.toHaveBeenCalled();
 	});
 });

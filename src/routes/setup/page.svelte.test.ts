@@ -195,6 +195,48 @@ describe('Setup page: create the first admin', () => {
 		}
 	});
 
+	// The engine's hasher fails a password over 72 bytes without naming a rule,
+	// so the page says the limit on the field and sends nothing.
+	it('refuses a password over 72 bytes on its field', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}));
+		try {
+			const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
+			const long = 'é'.repeat(37);
+			(container.querySelector('#setup_token') as HTMLInputElement).value = 'from-the-log';
+			(container.querySelector('#email') as HTMLInputElement).value = 'a@b.test';
+			(container.querySelector('#password') as HTMLInputElement).value = long;
+			(container.querySelector('#confirm') as HTMLInputElement).value = long;
+			await fireEvent.submit(container.querySelector('form')!);
+			expect(container.querySelector('#password-error')?.textContent).toMatch(/at most 72 bytes/);
+			expect(fetchSpy).not.toHaveBeenCalled();
+		} finally {
+			fetchSpy.mockRestore();
+		}
+	});
+
+	// An install can change the engine's password policy, so the page states
+	// no length of its own. The engine names the rule it refuses a password for.
+	it('leaves the password rules to the engine', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}));
+		try {
+			const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
+			const password = container.querySelector('#password') as HTMLInputElement;
+			expect(container.querySelector('#password-hint')?.textContent).toContain('password policy');
+			expect(password.getAttribute('placeholder') ?? '').not.toMatch(/\d/);
+
+			(container.querySelector('#setup_token') as HTMLInputElement).value = 'from-the-log';
+			(container.querySelector('#email') as HTMLInputElement).value = 'a@b.test';
+			password.value = 'short';
+			(container.querySelector('#confirm') as HTMLInputElement).value = 'short';
+			await fireEvent.submit(container.querySelector('form')!);
+
+			expect(container.querySelector('#password-error')).toBeNull();
+			expect(fetchSpy).toHaveBeenCalledTimes(1);
+		} finally {
+			fetchSpy.mockRestore();
+		}
+	});
+
 	it('refuses a confirmation that does not match', async () => {
 		const { container } = render(SetupPage, { props: { data: data('needs_admin'), form: null } });
 
@@ -234,5 +276,17 @@ describe('Setup page: create the first admin', () => {
 			props: { data: data('needs_admin'), form: { error: 'The engine did not accept that setup token.' } as never },
 		});
 		expect(container.textContent).toContain('did not accept that setup token');
+	});
+});
+
+describe('the restart commands', () => {
+	// Each command is a value the reader copies, so it is the kit's copy
+	// field: the whole command readable, and focusing it selects all of it.
+	it('shows each restart command as a copy field named by how the engine runs', () => {
+		const { getByLabelText } = render(SetupPage, { props: { data: data('setup_mode'), form: { status: fullStatus } as never } });
+		const compose = getByLabelText('Docker Compose') as HTMLTextAreaElement;
+		expect(compose.readOnly).toBe(true);
+		expect(compose.value).toBe('docker compose up -d');
+		expect((getByLabelText('Kubernetes') as HTMLTextAreaElement).value).toBe('kubectl rollout restart deployment/<engine deployment>');
 	});
 });

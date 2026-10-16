@@ -3,6 +3,7 @@
  * for and the bands a failure rate is judged against. Shared here because the
  * page cannot import a server module and both sides read them.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 
 /** The windows the page can be asked for, and the hours each one spans. */
 export const WINDOWS = { '6h': 6, '24h': 24, '7d': 168 } as const;
@@ -23,7 +24,7 @@ export const WINDOW_LABEL: Record<Window, string> = {
 };
 
 /** The same bands the analytics page draws its own line at. */
-export function trafficTone(rate: number): 'danger' | 'warn' | 'neutral' {
+export function trafficTone(rate: number): StatusTone {
 	if (rate >= 0.05) return 'danger';
 	if (rate >= 0.01) return 'warn';
 	return 'neutral';

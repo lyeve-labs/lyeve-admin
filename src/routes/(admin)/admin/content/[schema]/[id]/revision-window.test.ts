@@ -3,11 +3,16 @@ import type { Cookies } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
-vi.mock('$lib/server/authz', async (importOriginal) => ({
-	...((await importOriginal()) as object),
-	requireUser: vi.fn(async () => ({ id: 'u1', roles: ['admin'] }) as never),
-	authedClient: vi.fn(() => engine),
-}));
+vi.mock('$lib/server/authz', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/server/authz')>();
+	return {
+		...real,
+		requireUser: vi.fn(async () => ({ id: 'u1', roles: ['admin'] }) as never),
+		// The load reads through the real client over its event's fetch. An
+		// action's event carries no fetch and gets the fake.
+		authedClient: vi.fn((event: { fetch?: unknown }) => (event.fetch ? real.authedClient(event as never) : engine)),
+	};
+});
 vi.mock('@lyeve-labs/client-rest', () => ({
 	getSchema: vi.fn(async () => ({ name: 'article', fields: [] })),
 }));
@@ -15,7 +20,11 @@ vi.mock('@lyeve-labs/client-rest', () => ({
 import { actions, load } from './+page.server';
 
 type Failure = { status: number; data: Record<string, unknown> };
-type Loaded = { revisions: { revision_num: number }[]; revisionWindow: { hiddenOlder: number; windowDays: number | null } };
+type Loaded = {
+	revisions: { revision_num: number }[];
+	revisionTotal: number;
+	revisionWindow: { hiddenOlder: number; windowDays: number | null };
+};
 
 const REFUSED = new ApiError(402, 'payment_required', {
 	error: 'payment_required',
@@ -27,9 +36,15 @@ function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+let revisionPaths: string[] = [];
+
 async function loadWith(revisions: unknown): Promise<Loaded> {
+	revisionPaths = [];
 	const fetch = vi.fn(async (path: string) => {
-		if (String(path).includes('/revisions')) return json(revisions);
+		if (String(path).includes('/revisions')) {
+			revisionPaths.push(String(path));
+			return json(revisions);
+		}
 		return json({ id: 'e1', created_at: '', updated_at: '', title: 'One', body: {}, status: 'draft' });
 	}) as unknown as typeof globalThis.fetch;
 	return (await load({
@@ -69,6 +84,22 @@ describe('the revision window', () => {
 	it('reads a plugin that sends neither field as one with nothing hidden', async () => {
 		const out = await loadWith({ data: [], total_count: 0 });
 		expect(out.revisionWindow).toEqual({ hiddenOlder: 0, windowDays: null });
+	});
+});
+
+describe('the revision count', () => {
+	// Left unnamed, the plugin answers its default page of 50, newest first.
+	it('asks for the engine page ceiling and keeps the total the plugin counted', async () => {
+		const rows = Array.from({ length: 3 }, (_, i) => ({ id: `r${i}`, revision_num: 700 - i, created_at: '', title: 'One' }));
+		const out = await loadWith({ data: rows, total_count: 700, hidden_older: 0 });
+		expect(revisionPaths).toHaveLength(1);
+		expect(new URL(revisionPaths[0], 'http://x').searchParams.get('limit')).toBe('500');
+		expect(out.revisionTotal).toBe(700);
+	});
+
+	it('counts the rows when the plugin sends no total', async () => {
+		const out = await loadWith([{ id: 'r1', revision_num: 1, created_at: '', title: 'One' }]);
+		expect(out.revisionTotal).toBe(1);
 	});
 });
 

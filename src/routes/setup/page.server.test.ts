@@ -30,6 +30,8 @@ function catchRedirect(fn: () => unknown): Promise<{ status: number; location: s
 	);
 }
 
+const ENGINE_SILENT = 'The engine did not answer. It may be restarting. Try again in a moment.';
+
 function fetchReturning(body: unknown, status = 200) {
 	return vi.fn(async (_url: string, _init?: RequestInit) => json(body, status)) as unknown as typeof globalThis.fetch;
 }
@@ -126,6 +128,18 @@ describe('setup actions.status', () => {
 		const result = await actions.status(actionEvent({ setup_token: 'tok' }, fetchReturning({}, 404)));
 		expect(result).toEqual({ status: null });
 	});
+
+	it('tells the operator to try again when the engine is down', async () => {
+		const fetch = vi.fn(async () => {
+			throw new TypeError('fetch failed');
+		});
+		const result = (await actions.status(actionEvent({ setup_token: 'tok' }, fetch))) as {
+			status: number;
+			data: { error: string };
+		};
+		expect(result.status).toBe(503);
+		expect(result.data.error).toBe(ENGINE_SILENT);
+	});
 });
 
 describe('setup actions.create', () => {
@@ -149,6 +163,20 @@ describe('setup actions.create', () => {
 	it('returns error when passwords do not match', async () => {
 		const result = await actions.create(actionEvent({ ...valid, confirm: 'other-password' }, vi.fn()));
 		expect(result).toEqual({ error: 'Passwords do not match.' });
+	});
+
+	// The engine's hasher fails a password over 72 bytes with a 500 that names
+	// no rule, so the action refuses one first and puts the limit on the field.
+	it('refuses a password over 72 bytes before asking the engine', async () => {
+		const fetch = vi.fn();
+		const long = 'é'.repeat(37);
+		const result = (await actions.create(actionEvent({ ...valid, password: long, confirm: long }, fetch))) as {
+			status: number;
+			data: { error: string; fields: { password: string } };
+		};
+		expect(result.status).toBe(400);
+		expect(result.data.fields.password).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
 	});
 
 	it('names the rule the engine refused the password for', async () => {
@@ -188,11 +216,41 @@ describe('setup actions.create', () => {
 		expect(r.location).toBe('/login');
 	});
 
-	it('returns a generic error when the engine fails otherwise (no backend detail leaked)', async () => {
-		const fetch = vi.fn(async () => {
-			throw new Error('driver: connection reset');
-		});
-		const result = await actions.create(actionEvent(valid, fetch));
+	// An engine that did not answer judged nothing about the form, so the
+	// operator is told to wait and try again rather than that setup failed.
+	it.each([
+		['a 503', async () => json({ code: 'DATABASE_ERROR' }, 503)],
+		[
+			'no answer at all',
+			async (): Promise<Response> => {
+				throw new Error('driver: connection reset');
+			},
+		],
+	])('tells the operator to try again after %s, without the detail', async (_case, answer) => {
+		const cookies = mockCookies();
+		const result = (await actions.create(actionEvent(valid, vi.fn(answer), cookies))) as {
+			status: number;
+			data: { error: string };
+		};
+		expect(result.status).toBe(503);
+		expect(result.data.error).toBe(ENGINE_SILENT);
+		expect(cookies.set).not.toHaveBeenCalled();
+	});
+
+	it('keeps the plain failure for a refusal it has no words for', async () => {
+		const result = await actions.create(actionEvent(valid, fetchReturning({ error: 'forbidden' }, 403)));
 		expect(result).toEqual({ error: 'Setup failed.' });
+	});
+});
+
+describe('setup and the refresh cookie', () => {
+	beforeEach(() => resetRateLimitStore());
+
+	it('drops a refresh token left from an earlier session, since setup answers none', async () => {
+		const fetch = fetchReturning({ user: { id: 'u1' }, token: 'setup-session-token' });
+		const cookies = mockCookies();
+		const valid = { setup_token: 'tok', email: 'a@b.co', password: 'password123', confirm: 'password123' };
+		await catchRedirect(() => actions.create(actionEvent(valid, fetch, cookies)));
+		expect(cookies.delete).toHaveBeenCalledWith('__Host-console_refresh', expect.objectContaining({ path: '/', secure: true }));
 	});
 });

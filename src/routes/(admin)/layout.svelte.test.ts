@@ -16,6 +16,12 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/state', () => state);
+const navigation = vi.hoisted(() => ({ after: [] as (() => void)[] }));
+vi.mock('$app/navigation', () => ({
+	onNavigate: () => {},
+	afterNavigate: (fn: () => void) => navigation.after.push(fn),
+}));
+vi.mock('$app/paths', () => ({ asset: (path: string) => path }));
 vi.mock('$lib/api/csrf', () => ({ csrfHeaders: () => ({}) }));
 // Additive, not a replacement. A factory returning one export makes every other
 // kit import in the layout undefined, and the shell then fails to render before
@@ -29,6 +35,7 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
 import AdminLayout from './+layout.svelte';
 import { licensingOf, NO_LICENSING } from '$lib/api/license';
 import EmptyChildren from './layout-empty-children.test.svelte';
+import UnderRoot from './layout-under-root.test.svelte';
 import FocusChild from './layout-focus-child.test.svelte';
 
 const EDITOR = ['editor'];
@@ -75,6 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	navigation.after.length = 0;
 	vi.unstubAllGlobals();
 	// The kit persists which sections a reader opened. Left behind, one case's
 	// disclosure decides the next case's tree.
@@ -117,6 +125,23 @@ describe('admin shell navigation', () => {
 	});
 });
 
+describe('admin shell drawer after a navigation', () => {
+	// On a phone a sidebar link opens its page under the drawer, which stayed
+	// open over the new page until the scrim was tapped.
+	it('closes the drawer once a navigation completes', async () => {
+		setViewport(true);
+		render(AdminLayout, { props: { data, children: EmptyChildren } as never });
+		await tick();
+		await fireEvent.click(screen.getByRole('button', { name: /open navigation/i }));
+		expect((document.querySelector('aside') as HTMLElement).inert).toBe(false);
+
+		for (const fn of navigation.after) fn();
+		await tick();
+
+		expect((document.querySelector('aside') as HTMLElement).inert, 'the drawer closed').toBe(true);
+	});
+});
+
 describe('admin shell landmarks', () => {
 	it('leaves one aside in the page, named, so the drawer has one landmark', async () => {
 		await mount(SUPER);
@@ -139,12 +164,15 @@ describe('admin shell landmarks', () => {
 });
 
 describe('admin shell role gate', () => {
-	it('gives an editor the daily destinations and nothing privileged', async () => {
+	it('gives an editor the daily destinations the engine answers it and nothing privileged', async () => {
 		await mount(EDITOR);
 
 		const names = linkNames();
-		expect(names).toContain('Content');
-		expect(names).toContain('Media library');
+		expect(names).toContain('Schema builder');
+		expect(names).toContain('Reviews');
+		// Both open on admin routes, which the engine refuses an editor.
+		expect(names).not.toContain('Content');
+		expect(names).not.toContain('Media library');
 		expect(names).not.toContain('Users');
 		expect(names).not.toContain('Audit log');
 		expect(names).not.toContain('Tenants');
@@ -342,6 +370,29 @@ describe('admin shell plugin gate', () => {
 		expect(screen.queryByTestId('page')).toBeNull();
 		expect(screen.getByTestId('not-running').dataset.state).toBe('unexplained');
 		expect(screen.getByRole('heading', { name: 'Search', level: 1 })).toBeTruthy();
+	});
+
+	it('heads the reason one level under the page title', async () => {
+		await mountWith('/admin/search', { plugins: kernel }, EDITOR);
+		expect(screen.getByRole('heading', { name: 'Not running', level: 2 })).toBeTruthy();
+	});
+
+	// The tab names the plugin's page and the tenant, as any other page's does.
+	it('titles the tab after the page whose plugin does not run', async () => {
+		setViewport(false);
+		state.page.url = new URL('http://localhost/admin/search');
+		const brand = { name: 'Acme Studio', logo_url: '', accent: '', favicon_url: '' };
+		(state.page as { data?: unknown }).data = { brand };
+		try {
+			render(UnderRoot, {
+				props: { data: { user: { email: 'a@b.c', roles: EDITOR }, plugins: kernel, brand } } as never,
+			});
+			await tick();
+			expect(screen.getByTestId('not-running')).toBeTruthy();
+			expect(document.title).toBe('Search - Acme Studio');
+		} finally {
+			delete (state.page as { data?: unknown }).data;
+		}
 	});
 
 	it('gives an operator the reason the status report carries', async () => {

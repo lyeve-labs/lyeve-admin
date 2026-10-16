@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup, screen } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -32,6 +32,9 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		inactive: [],
 		rules: { gate: { state: 'ok' }, rows: [rule], licensed: false, limit: { limit: 10, current: 1 } },
 		entries: [],
+		entriesGate: null,
+		unlisted: false,
+		flushScoped: true,
 		total: 0,
 		limit: 50,
 		offset: 0,
@@ -123,8 +126,106 @@ describe('response cache rules', () => {
 		expect(screen.getByRole('button', { name: 'Purge tag' })).toBeTruthy();
 	});
 
-	it('keeps the instance flush off a tenant admin page', () => {
+	it('waits on New rule at the ceiling, with the warning as its reason', () => {
+		render(CachePage, {
+			props: props({
+				rules: { gate: { state: 'ok' }, rows: [rule], licensed: false, limit: { limit: 10, current: 10 } },
+			}),
+		});
+		const button = screen.getByRole('button', { name: /New rule/ }) as HTMLButtonElement;
+		expect(button.disabled).toBe(true);
+		expect(button.getAttribute('aria-describedby')).toBe('rules-full');
+		expect(document.getElementById('rules-full')?.textContent).toContain('Every rule this install allows is in use');
+	});
+
+	it('leaves New rule live below the ceiling', () => {
+		render(CachePage, { props: props() });
+		expect((screen.getByRole('button', { name: /New rule/ }) as HTMLButtonElement).disabled).toBe(false);
+	});
+});
+
+describe('flush', () => {
+	// The plugin scopes the flush to the tenant the request names, and it
+	// admits a tenant admin. The button says what goes.
+	it("offers a tenant admin the flush of this tenant's responses", () => {
 		const { container } = render(CachePage, { props: props() });
-		expect(said(container)).not.toContain('Flush everything');
+		expect(screen.getByRole('button', { name: "Flush this tenant's responses" })).toBeTruthy();
+		expect(said(container)).not.toContain('Flush the cache');
+		expect(said(container)).toContain('listed for super admins only');
+	});
+
+	it('names the whole cache only where the session names no tenant', () => {
+		render(CachePage, { props: props({ superAdmin: true, flushScoped: false }) });
+		expect(screen.getByRole('button', { name: 'Flush the cache' })).toBeTruthy();
+	});
+
+	it("says the stored list is this tenant's while the counters are every tenant's", () => {
+		const entry = { key: 'resp:acme:1', size: 10, expires_at: '2026-09-23T12:00:00Z', created_at: '2026-09-23T11:00:00Z', ttl_mode: 'fixed', tags: null };
+		const { container } = render(CachePage, { props: props({ superAdmin: true, entries: [entry], total: 1 }) });
+		expect(said(container)).toContain("Only this tenant's keys are listed. The counters above count every tenant.");
+	});
+});
+
+describe('stored entries', () => {
+	it('stops an entry size at GB', () => {
+		const entry = { key: 'page:/', size: 2 * 1024 ** 4, expires_at: '2026-09-23T12:00:00Z', created_at: '2026-09-23T11:00:00Z', ttl_mode: 'fixed', tags: null };
+		const { container } = render(CachePage, { props: props({ superAdmin: true, entries: [entry], total: 1 }) });
+		expect(said(container)).toContain('2048.0 GB');
+	});
+
+	// The counter above read thousands while the list said nothing was cached.
+	it('says the entries could not be read rather than that nothing is cached', () => {
+		const { container } = render(CachePage, {
+			props: props({
+				superAdmin: true,
+				stats: { hits: 1, misses: 1, sets: 0, deletes: 0, flushes: 0, evictions: 0, entries: 4200, max_size: 0 },
+				entriesGate: { state: 'error', message: 'The stored entries could not be read. This is not a report that nothing is cached.' },
+			}),
+		});
+		expect(said(container)).toContain('The stored entries could not be read.');
+		expect(said(container)).not.toContain('Nothing is cached');
+	});
+
+	// A networked provider cannot list what it holds. The plugin answers an
+	// empty page and a note, and the counter above still counts thousands.
+	it('says the provider does not list its entries rather than that nothing is cached', () => {
+		const { container } = render(CachePage, {
+			props: props({
+				superAdmin: true,
+				stats: { hits: 1, misses: 1, sets: 0, deletes: 0, flushes: 0, evictions: 0, entries: 4200, max_size: 0 },
+				unlisted: true,
+			}),
+		});
+		expect(said(container)).toContain('This cache provider does not list its entries');
+		expect(said(container)).not.toContain('Nothing is cached');
+	});
+
+	it('says a refused providers read with its gate', () => {
+		const { container } = render(CachePage, {
+			props: props({ providers: [], providersRead: false, providersGate: { state: 'forbidden' } }),
+		});
+		expect(said(container)).toContain('Your role cannot open the providers');
+		expect(said(container)).not.toContain('No provider is configured');
+	});
+});
+
+describe('a failed rule save', () => {
+	// The message went to the page behind the drawer, so the open panel said
+	// nothing about why the save did not happen.
+	it('is said at the top of the open form', async () => {
+		render(CachePage, { props: props({}, { error: 'A rule needs a route pattern.', drawer: 'rule' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#cache-rule-form') as HTMLFormElement;
+		expect(form.textContent).toContain('A rule needs a route pattern.');
+	});
+
+	// A failed delete, purge, flush or circuit reset belongs to the page. Read
+	// by the drawer, it greeted the next New rule as that rule's failure.
+	it('keeps a failure from a row out of the drawer', async () => {
+		const { container } = render(CachePage, { props: props({}, { error: 'The rule could not be deleted.' }) });
+		expect(said(container)).toContain('The rule could not be deleted.');
+		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
+		const form = document.querySelector('#cache-rule-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('The rule could not be deleted.');
 	});
 });

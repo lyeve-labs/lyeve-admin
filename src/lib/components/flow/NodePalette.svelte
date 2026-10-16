@@ -7,6 +7,8 @@
 
 	interface Props {
 		catalog: NodeSpec[];
+		/** The node types could not be read, so an empty palette is not a search that matched nothing. */
+		unread?: boolean;
 		/** Click, or Enter on a card: add the type at the viewport center. */
 		onadd: (type: string) => void;
 	}
@@ -14,7 +16,7 @@
 	// A type the plugin says this instance may not use wears a lock and stays
 	// draggable: the refusal on save names the node, which is a better
 	// explanation than a row that will not move.
-	let { catalog, onadd }: Props = $props();
+	let { catalog, unread = false, onadd }: Props = $props();
 
 	const LOCKED = 'Not enabled on this instance';
 
@@ -123,7 +125,9 @@
 				</Collapsible>
 			</section>
 		{/each}
-		{#if groups.length === 0}
+		{#if unread}
+			<p class="p-2 text-sm text-muted">The node types could not be read, so there is nothing to add.</p>
+		{:else if groups.length === 0}
 			<p class="p-2 text-sm text-muted">No node type matches.</p>
 		{/if}
 	</div>

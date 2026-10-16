@@ -1,7 +1,6 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -16,12 +15,10 @@
 		SegmentedControl,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Gauge, Plus, ShieldBan, Trash2 } from '@lucide/svelte';
 	import {
@@ -40,19 +37,36 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const refusal = $derived(formRefusal(form));
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const lockout = $derived((form as { lockout?: string } | null)?.lockout ?? '');
+	/*
+	 * Every form here reports through the one `form`, so each failure names the
+	 * action that caused it. A drawer shows only its own action's failure, and
+	 * only one that came back after it opened, so a failed delete never reads
+	 * as a failure of the next form opened. The page shows the row actions'.
+	 */
+	const failure = $derived(form as { action?: string; error?: string; lockout?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const fresh = $derived(form !== openedOver);
+	const inDrawer = $derived(failure?.action === 'limit' || failure?.action === 'address');
+	const refusal = $derived(inDrawer ? null : formRefusal(form));
+	const formError = $derived(inDrawer ? '' : (failure?.error ?? ''));
+	const limitFailure = $derived(fresh && failure?.action === 'limit' ? failure : null);
+	const addressFailure = $derived(fresh && failure?.action === 'address' ? failure : null);
+	const lockout = $derived(addressFailure?.lockout ?? '');
 
-	const limitRead = $derived(data.limit.value);
+	const limitRead = $derived(data.limit.ok ? data.limit.value : null);
 	const own = $derived(limitRead?.tenant_global ?? null);
 	const install = $derived(limitRead?.install_global ?? null);
-	const addresses = $derived(data.addresses.value);
+	const addresses = $derived(data.addresses.ok ? data.addresses.value : null);
 	const entries = $derived(addresses?.rules ?? []);
+	// The plugin refuses a new limit or a new address without the license, so
+	// both stay disabled beside the sentence that says why. Clearing a limit
+	// and removing an entry are always allowed and stay live.
+	const limitLicensed = $derived(limitRead?.licensed !== false);
+	const addressesLicensed = $derived(addresses?.licensed !== false);
 	const entryLimit = $derived(addresses ? addressLimit(addresses) : null);
 	const allow = $derived(entries.filter((e) => e.list === 'allow'));
 	const deny = $derived(entries.filter((e) => e.list === 'deny'));
-	const history = $derived(data.history.value);
+	const history = $derived(data.history.ok ? data.history.value : null);
 	const totals = $derived(refusalTotals(history?.minutes ?? []));
 	const entryCidr = $derived(new Map(entries.map((e) => [e.id, e.cidr])));
 
@@ -62,6 +76,7 @@
 	let limitEnabled = $state(true);
 
 	function openLimit() {
+		openedOver = form;
 		rate = String(own?.rate ?? install?.rate ?? 10);
 		burst = String(own?.burst ?? install?.burst ?? 20);
 		limitEnabled = own?.enabled ?? true;
@@ -80,6 +95,7 @@
 	let note = $state('');
 
 	function openAddress(which: AddressList) {
+		openedOver = form;
 		cidr = '';
 		list = which;
 		note = '';
@@ -97,59 +113,39 @@
 	});
 
 	function removeAddress(e: AddressEntry): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Remove ${e.cidr} from the ${e.list} list?`,
-				e.list === 'allow'
-					? 'Requests from it are counted against the tenant rules again.'
-					: 'Requests from it are served again from the next request.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Removed ${e.cidr}`);
-			};
-		};
-	}
-
-	const clearLimit: SubmitFunction = async ({ cancel }) => {
-		const confirmed = await confirmDialog(
-			'Clear the tenant limit?',
-			'This tenant goes back to the install-wide limit alone.',
-			{ confirmLabel: 'Clear' },
+		return confirmed(
+			`Remove ${e.cidr} from the ${e.list} list?`,
+			e.list === 'allow'
+				? 'Requests from it are counted against the tenant rules again.'
+				: 'Requests from it are served again from the next request.',
+			{ confirmLabel: 'Delete', success: `Removed ${e.cidr}` },
 		);
-		if (!confirmed) {
-			cancel();
-			return;
-		}
-		return async ({ result, update }) => {
-			await update();
-			if (result.type === 'success') toast.success('Cleared the tenant limit');
-		};
-	};
-
-	// The window follows the address, so going back shows the window it named.
-	let hours = $state('24');
-	$effect(() => {
-		hours = String(data.hours);
-	});
-	function showWindow(value: string) {
-		void goto(`?hours=${value}`, { keepFocus: true, noScroll: true });
 	}
-</script>
 
-<PageTitle title="Tenant rate limits" />
+	const clearLimit = confirmed(
+		'Clear the tenant limit?',
+		'This tenant goes back to the install-wide limit alone.',
+		{ confirmLabel: 'Clear', success: 'Cleared the tenant limit' },
+	);
+
+	// The window is the address, so the server render already marks the one
+	// it read, the links work before the page hydrates, and going back shows
+	// the window that address named.
+	const windows = HISTORY_WINDOWS.map((w) => ({ value: w.value, label: w.label, href: `?hours=${w.value}` }));
+</script>
 
 {#snippet addressCard(which: AddressList, rows: AddressEntry[], title: string)}
 	<Card pad="md">
 		<div class="flex flex-col gap-3">
 			<div class="flex items-center justify-between gap-2">
 				<SectionHeading level={3}>{title}</SectionHeading>
-				<Button variant="secondary" size="sm" onclick={() => openAddress(which)}>
+				<Button
+					variant="secondary"
+					size="sm"
+					onclick={() => openAddress(which)}
+					disabled={!addressesLicensed}
+					aria-describedby={addressesLicensed ? undefined : 'address-license'}
+				>
 					<Plus size={ICON.sm} /> New address
 				</Button>
 			</div>
@@ -198,31 +194,17 @@
 >
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Rate limits"
 			absent="The rate limit plugin is not part of this build, so no request is limited."
 		/>
 	{:else}
-		{#if refusal}
-			<RefusalNotice {refusal} />
-		{:else if lockout}
-			<Alert tone="danger" title="That entry would lock you out">
-				<p>
-					{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it
-					would refuse this console to you, and only an operator of the install could undo that.
-				</p>
-				<p class="mt-2">
-					Add your own address to the allow list first, then deny the range. An allowed address is served
-					whatever the deny list says.
-				</p>
-			</Alert>
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={formError} refused={refusal} />
 
 		<section class="flex flex-col gap-4" aria-label="Tenant limit">
 			<SectionHeading level={2}>Tenant limit</SectionHeading>
-			{#if data.limit.gate.state !== 'ok'}
+			{#if !data.limit.ok}
 				<GateNotice gate={data.limit.gate} title="Tenant limit" absent="This version of the plugin has no tenant limit." />
 			{:else}
 				<Card pad="md">
@@ -251,14 +233,20 @@
 									<Button variant="secondary" size="sm" type="submit">Clear</Button>
 								</form>
 							{/if}
-							<Button variant="secondary" size="sm" onclick={openLimit}>
+							<Button
+								variant="secondary"
+								size="sm"
+								onclick={openLimit}
+								disabled={!limitLicensed}
+								aria-describedby={limitLicensed ? undefined : 'limit-license'}
+							>
 								<Gauge size={ICON.sm} />
 								{own ? 'Edit' : 'Set a limit'}
 							</Button>
 						</div>
 					</div>
-					{#if limitRead && !limitRead.licensed}
-						<p class="mt-3 text-xs text-faint">
+					{#if !limitLicensed}
+						<p id="limit-license" class="mt-3 text-xs text-faint">
 							Setting or changing this limit needs a license this install does not hold. Clearing it is always
 							allowed.
 						</p>
@@ -284,18 +272,20 @@
 				An allowed address skips this tenant's rules. A denied one is refused with 403 before any rule is counted.
 				An address on both lists is allowed.
 			</p>
-			{#if data.addresses.gate.state !== 'ok'}
+			{#if !data.addresses.ok}
 				<GateNotice
 					gate={data.addresses.gate}
 					title="Address lists"
 					absent="This version of the plugin keeps no address lists."
 				/>
 			{:else}
-				{#if addresses && !addresses.licensed}
-					<Alert tone="brand">
-						Adding an address needs a license this install does not hold. Entries already saved keep applying, and
-						removing one is always allowed.
-					</Alert>
+				{#if !addressesLicensed}
+					<div id="address-license">
+						<Alert tone="brand">
+							Adding an address needs a license this install does not hold. Entries already saved keep applying, and
+							removing one is always allowed.
+						</Alert>
+					</div>
 				{/if}
 				<div class="grid gap-4 lg:grid-cols-2">
 					{@render addressCard('allow', allow, 'Allow list')}
@@ -307,15 +297,9 @@
 		<section class="flex flex-col gap-4" aria-label="Refusal history">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<SectionHeading level={2}>Refusal history</SectionHeading>
-				<SegmentedControl
-					label="Window"
-					labelHidden
-					bind:value={hours}
-					options={HISTORY_WINDOWS.map((w) => ({ value: w.value, label: w.label }))}
-					onchange={showWindow}
-				/>
+				<SegmentedControl label="Window" labelHidden value={String(data.hours)} options={windows} />
 			</div>
-			{#if data.history.gate.state !== 'ok'}
+			{#if !data.history.ok}
 				<GateNotice
 					gate={data.history.gate}
 					title="Refusal history"
@@ -359,13 +343,9 @@
 </PageShell>
 
 <Drawer bind:open={limitOpen} title="Tenant limit">
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="tenant-limit-form" method="POST" action="?/setLimit" use:enhance={saveLimit.enhance}>
 		<div class="flex flex-col gap-4">
+			<FormErrors message={limitFailure?.error} refused={limitFailure ? formRefusal(limitFailure) : null} />
 			<Input
 				id="tenant-rate"
 				name="rate"
@@ -393,13 +373,24 @@
 </Drawer>
 
 <Drawer bind:open={addressOpen} title="New address">
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="address-form" method="POST" action="?/addAddress" use:enhance={saveAddress.enhance}>
 		<div class="flex flex-col gap-4">
+			{#if lockout}
+				<!-- The plugin's sentence says only that it was refused. This says why,
+				     and how to proceed, beside the entry that caused it. -->
+				<Alert tone="danger" title="That entry would lock you out">
+					<p>
+						{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it
+						would refuse this console to you, and only an operator of the install could undo that.
+					</p>
+					<p class="mt-2">
+						Add your own address to the allow list first, then deny the range. An allowed address is served
+						whatever the deny list says.
+					</p>
+				</Alert>
+			{:else}
+				<FormErrors message={addressFailure?.error} refused={addressFailure ? formRefusal(addressFailure) : null} />
+			{/if}
 			<SegmentedControl
 				label="List"
 				name="list"

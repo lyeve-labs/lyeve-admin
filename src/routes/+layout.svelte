@@ -1,12 +1,23 @@
 <script lang="ts">
 	import '../app.css';
-	import { getThemePreference, setThemePreference, watchSystemTheme } from '@lyeve-labs/ui-kit';
+	import { getThemePreference, setDocumentTitleFormat, setThemePreference, watchSystemTheme } from '@lyeve-labs/ui-kit';
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import { asset } from '$app/paths';
-	import { pageBrand } from '$lib/brand';
+	import { onNavigate } from '$app/navigation';
+	import { fadeRouteChange } from '$lib/page-transition';
+	import { documentTitle, pageBrand } from '$lib/brand';
 
 	let { children }: { children: Snippet } = $props();
+
+	onNavigate(fadeRouteChange);
+
+	// Every PageShell below titles the browser tab from its own title, ended
+	// with the name the admin goes by. It reads the nearest layout's brand, so
+	// a signed-in tab carries the tenant's name and a signed-out one the
+	// public brand. A page with no PageShell renders PageTitle, which writes
+	// the same format.
+	setDocumentTitleFormat((title) => documentTitle(pageBrand(page.data), title));
 
 	// The nearest layout's brand decides the tab icon: the session tenant's
 	// inside the admin, the public one outside it. Without one the product's

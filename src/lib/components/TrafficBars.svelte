@@ -8,7 +8,7 @@
 	 * hour, so a quiet hour can still be asked what it held. The table beside
 	 * the bars is the same series for a reader who cannot see them.
 	 */
-	import { formatCount, formatDateTime } from '$lib/format';
+	import { formatCount, formatDateTime, formatPercent } from '$lib/format';
 
 	interface Hour {
 		hour: string;
@@ -26,12 +26,6 @@
 	const peakHour = $derived(hours.find((h) => h.requests === peak));
 	const total = $derived(hours.reduce((n, h) => n + h.requests, 0));
 
-	/**
-	 * Every window here crosses midnight, so an hour without its date reads the
-	 * same at both ends of the axis.
-	 */
-	const stamp = (iso: string) => formatDateTime(iso, iso);
-
 	/** The bands the analytics page draws its own line at. */
 	function fill(h: Hour): string {
 		if (h.requests === 0) return 'bg-line';
@@ -47,15 +41,15 @@
 	}
 
 	function describe(h: Hour): string {
-		const failed = `${(h.errorRate * 100).toFixed(1)}% failed`;
-		return `${stamp(h.hour)}: ${formatCount(h.requests)} requests, ${failed}`;
+		const failed = `${formatPercent(h.errorRate)} failed`;
+		return `${formatDateTime(h.hour, h.hour)}: ${formatCount(h.requests)} requests, ${failed}`;
 	}
 </script>
 
 <div class="flex flex-col gap-2">
 	<div class="flex items-baseline justify-between gap-3 text-xs text-faint">
 		<span>
-			{formatCount(total)} requests{#if peakHour && peak > 0}, peak {formatCount(peak)} at {stamp(peakHour.hour)}{/if}
+			{formatCount(total)} requests{#if peakHour && peak > 0}, peak {formatCount(peak)} at {formatDateTime(peakHour.hour, peakHour.hour)}{/if}
 		</span>
 		<span class="flex items-center gap-3">
 			<span class="flex items-center gap-1">
@@ -83,9 +77,13 @@
 	</div>
 
 	{#if hours.length > 0}
+		<!-- Every window here crosses midnight, so each end of the axis carries
+		     its date, and an hour without one would read the same at both. -->
+		{@const first = hours[0].hour}
+		{@const last = hours[hours.length - 1].hour}
 		<div class="flex justify-between text-xs tabular-nums text-faint" aria-hidden="true">
-			<span>{stamp(hours[0].hour)}</span>
-			<span>{stamp(hours[hours.length - 1].hour)}</span>
+			<span>{formatDateTime(first, first)}</span>
+			<span>{formatDateTime(last, last)}</span>
 		</div>
 	{/if}
 
@@ -100,9 +98,9 @@
 			<tbody>
 				{#each hours as h (h.hour)}
 					<tr>
-						<td>{stamp(h.hour)}</td>
+						<td>{formatDateTime(h.hour, h.hour)}</td>
 						<td>{h.requests}</td>
-						<td>{(h.errorRate * 100).toFixed(1)}%</td>
+						<td>{formatPercent(h.errorRate)}</td>
 					</tr>
 				{/each}
 			</tbody>

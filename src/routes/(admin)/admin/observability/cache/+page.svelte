@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -12,15 +11,14 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Database, Eraser, Pencil, Plus, RotateCcw, Route, Trash2 } from '@lucide/svelte';
 	import {
@@ -30,7 +28,6 @@
 		ruleCount,
 		ttlLabel,
 		type CacheRule,
-		bytes,
 		circuitState,
 		circuitTone,
 		fullness,
@@ -40,7 +37,7 @@
 		underPressure,
 		type CacheProvider,
 	} from '$lib/api/cache';
-	import { formatDateTime } from '$lib/format';
+	import { formatBytes, formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -53,6 +50,11 @@
 	const tripped = $derived(trippedProviders(data.providers));
 	const tags = $derived(tagsOf(data.entries));
 	const refusal = $derived(formRefusal(form));
+	// A failed save names the drawer it came from, so it is said inside that
+	// drawer and nowhere else. Every other failure is the page's.
+	const fromDrawer = $derived(
+		form && 'drawer' in form && typeof form.drawer === 'string' ? form.drawer : null,
+	);
 	const rules = $derived(data.rules);
 	const ruleTags = $derived([...new Set(rules.rows.flatMap((r) => r.tags))].sort());
 	const rulesFull = $derived(rules.licensed !== true && atCeiling(rules.limit));
@@ -94,21 +96,11 @@
 	});
 
 	function removeRule(r: CacheRule): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete the rule for ${r.pattern}?`,
-				'What it cached is evicted with it, and the route is served uncached from the next request.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted the rule for ${r.pattern}`);
-			};
-		};
+		return confirmed(
+			`Delete the rule for ${r.pattern}?`,
+			'What it cached is evicted with it, and the route is served uncached from the next request.',
+			{ confirmLabel: 'Delete', success: `Deleted the rule for ${r.pattern}` },
+		);
 	}
 
 	/**
@@ -116,47 +108,49 @@
 	 * its next request, so the confirm says what it puts on the database.
 	 */
 	function purge(what: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Purge ${what}?`,
-				'Each purged response is computed again the next time it is asked for.',
-				{ confirmLabel: 'Purge' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') {
-					const n = (result.data as { purged?: number } | undefined)?.purged ?? 0;
-					toast.success(`Purged ${n} ${n === 1 ? 'response' : 'responses'}`);
-				}
-			};
-		};
+		return confirmed(
+			`Purge ${what}?`,
+			'Each purged response is computed again the next time it is asked for.',
+			{
+				confirmLabel: 'Purge',
+				success: (data) => {
+					const n = (data as { purged?: number } | undefined)?.purged ?? 0;
+					return `Purged ${n} ${n === 1 ? 'response' : 'responses'}`;
+				},
+			},
+		);
 	}
+
+	const RECOMPUTED =
+		'Every flushed key is recomputed the next time it is asked for, so this puts that load on the database at once.';
 
 	/**
 	 * Every flushed key is recomputed on its next request, so this is a
-	 * deliberate load against the database rather than a tidy-up.
+	 * deliberate load against the database rather than a tidy-up. The plugin
+	 * flushes only the request's tenant when the request names one, so the
+	 * confirm says which of the two this flush is.
 	 */
-	function flush(tag: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const what = tag ? `everything tagged ${tag}` : 'the whole cache';
-			const confirmed = await confirmDialog(
-				`Flush ${what}?`,
-				'Every flushed key is recomputed the next time it is asked for, so this puts that load on the database at once.',
-				{ confirmLabel: 'Flush' },
+	function flushAll(): SubmitFunction {
+		if (data.flushScoped) {
+			return confirmed(
+				"Flush this tenant's cached responses?",
+				`Other tenants' entries and keys outside the response cache stay. ${RECOMPUTED}`,
+				{ confirmLabel: 'Flush', success: "Flushed this tenant's cached responses" },
 			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Flushed ${what}`);
-			};
-		};
+		}
+		return confirmed(
+			'Flush the cache?',
+			`Your session names no tenant, so on an install with many tenants this removes every key of every tenant. On an install with one tenant it removes that tenant's cached responses. ${RECOMPUTED}`,
+			{ confirmLabel: 'Flush', success: 'Flushed the cache' },
+		);
+	}
+
+	function flushTag(tag: string): SubmitFunction {
+		return confirmed(
+			`Flush everything tagged ${tag}?`,
+			`Every entry carrying the tag goes, whichever tenant it belongs to. ${RECOMPUTED}`,
+			{ confirmLabel: 'Flush', success: `Flushed everything tagged ${tag}` },
+		);
 	}
 
 	function reset(p: CacheProvider): SubmitFunction {
@@ -168,8 +162,6 @@
 	}
 </script>
 
-<PageTitle title="Cache" />
-
 <PageShell
 	title="Cache"
 	description="What is being served from cache, which backends are behind it, and what is stored."
@@ -178,7 +170,15 @@
 >
 	{#snippet actions()}
 		{#if data.gate.state === 'ok' && rules.gate.state === 'ok'}
-			<Button variant="primary" size="sm" onclick={openCreate}>
+			<!-- At the ceiling a create can only be refused, so the button waits
+			     and the warning beside the rules says why. -->
+			<Button
+				variant="primary"
+				size="sm"
+				onclick={openCreate}
+				disabled={rulesFull}
+				aria-describedby={rulesFull ? 'rules-full' : undefined}
+			>
 				<Plus size={ICON.sm} /> New rule
 			</Button>
 		{/if}
@@ -186,16 +186,13 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Cache"
 			absent="The cache plugin is not part of this build, so nothing is cached."
 		/>
 	{:else}
-		{#if refusal}
-			<RefusalNotice {refusal} />
-		{:else if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={fromDrawer ? undefined : formError} refused={fromDrawer ? null : refusal} />
 
 		{#if tripped.length > 0}
 			<!-- The reading the stats hide. A lower-priority provider picks up
@@ -256,9 +253,13 @@
 				</p>
 			{/if}
 			{#if !data.providersRead}
-				<Alert tone="danger">
-					The providers could not be read. This is not a report that all of them are healthy.
-				</Alert>
+				{#if data.providersGate}
+					<GateNotice gate={data.providersGate} title="the providers" absent="This version of the cache plugin does not list its providers." />
+				{:else}
+					<Alert tone="danger">
+						The providers could not be read. This is not a report that all of them are healthy.
+					</Alert>
+				{/if}
 			{:else if data.providers.length === 0}
 				<EmptyState
 					title="No provider is configured"
@@ -359,10 +360,12 @@
 				/>
 			{:else}
 				{#if rulesFull}
-					<Alert tone="warn" title="Every rule this install allows is in use">
-						{rules.limit?.current} of {rules.limit?.limit} rules are in use. Delete one to add another, or
-						change the license to allow more. Existing rules keep serving either way.
-					</Alert>
+					<div id="rules-full">
+						<Alert tone="warn" title="Every rule this install allows is in use">
+							{rules.limit?.current} of {rules.limit?.limit} rules are in use. Delete one to add another, or
+							change the license to allow more. Existing rules keep serving either way.
+						</Alert>
+					</div>
 				{/if}
 
 				<div class="flex flex-wrap items-end gap-2">
@@ -446,24 +449,41 @@
 			{/if}
 		</section>
 
-		{#if data.superAdmin}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Stored</SectionHeading>
 			<div class="flex flex-wrap items-center gap-2">
-				<form method="POST" action="?/flush" use:enhance={flush('')}>
+				<form method="POST" action="?/flush" use:enhance={flushAll()}>
 					<Button variant="secondary" size="sm" type="submit">
-						<Trash2 size={ICON.sm} /> Flush everything
+						<Trash2 size={ICON.sm} />
+						{data.flushScoped ? "Flush this tenant's responses" : 'Flush the cache'}
 					</Button>
 				</form>
-				{#each tags as tag (tag)}
-					<form method="POST" action="?/flush" use:enhance={flush(tag)}>
-						<input type="hidden" name="tag" value={tag} />
-						<Button variant="ghost" size="sm" type="submit">Flush {tag}</Button>
-					</form>
-				{/each}
+				{#if data.superAdmin}
+					{#each tags as tag (tag)}
+						<form method="POST" action="?/flush" use:enhance={flushTag(tag)}>
+							<input type="hidden" name="tag" value={tag} />
+							<Button variant="ghost" size="sm" type="submit">Flush {tag}</Button>
+						</form>
+					{/each}
+				{/if}
 			</div>
 
-			{#if data.entries.length === 0}
+			{#if !data.superAdmin}
+				<p class="text-sm text-muted">
+					The stored keys are listed for super admins only, because the store holds every tenant's keys.
+				</p>
+			{:else if data.entriesGate}
+				<GateNotice
+					gate={data.entriesGate}
+					title="the stored entries"
+					absent="This version of the cache plugin does not list its stored entries."
+				/>
+			{:else if data.unlisted}
+				<Alert tone="brand">
+					This cache provider does not list its entries, so none are shown here. The counters above still
+					count them.
+				</Alert>
+			{:else if data.entries.length === 0}
 				<EmptyState
 					title="Nothing is cached"
 					description="Either nothing has been asked for yet, or every entry has expired."
@@ -473,6 +493,9 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.flushScoped}
+					<p class="text-xs text-faint">Only this tenant's keys are listed. The counters above count every tenant.</p>
+				{/if}
 				<Table label="Stored">
 					<thead>
 						<tr>
@@ -486,7 +509,7 @@
 						{#each data.entries as e (e.key)}
 							<tr>
 								<td class="max-w-md truncate font-mono text-xs" title={e.key}>{e.key}</td>
-								<td data-cell="nowrap" class="font-mono text-xs">{bytes(e.size)}</td>
+								<td data-cell="nowrap" class="font-mono text-xs">{formatBytes(e.size, 'GB')}</td>
 								<td data-cell="nowrap" class="text-xs text-faint">
 									{(e.tags ?? []).join(', ') || '-'}
 								</td>
@@ -508,17 +531,15 @@
 				/>
 			{/if}
 		</section>
-		{/if}
 	{/if}
 </PageShell>
 
 <Drawer bind:open={ruleOpen} title={editing ? 'Edit rule' : 'New rule'}>
-	{#if refusal}
-		<div class="mb-4"><RefusalNotice {refusal} /></div>
-	{:else if formError}
-		<div class="mb-4"><Alert tone="danger">{formError}</Alert></div>
-	{/if}
 	<form id="cache-rule-form" method="POST" action={editing ? '?/updateRule' : '?/createRule'} use:enhance={saveRule.enhance}>
+		<FormErrors
+			message={fromDrawer === 'rule' ? formError || undefined : undefined}
+			refused={fromDrawer === 'rule' ? refusal : null}
+		/>
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{/if}

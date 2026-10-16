@@ -27,7 +27,7 @@ describe('admin/ai/transcripts/[id] load', () => {
 		[403, 'forbidden'],
 		[503, 'no_provider'],
 	])('sorts a %i into the %s state', async (status, state) => {
-		const { event } = loadEvent({ [`/api/admin/ai/transcripts/${id}`]: () => refused(status, 'refused') }, { path, params });
+		const { event } = loadEvent({ [`/api/admin/ai/transcripts/${id}`]: () => refused(status, status === 503 ? 'no enabled AI provider configured' : 'refused') }, { path, params });
 		expect(((await load(event)) as Loaded).gate.state).toBe(state);
 	});
 });

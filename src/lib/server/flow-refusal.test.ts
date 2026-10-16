@@ -8,13 +8,19 @@ describe('refusalFailure', () => {
 	it('quotes the limit and the count of a ceiling refusal as the plugin sent them', () => {
 		const result = refusalFailure(new FlowRefusal([], 7, 7)) as unknown as Failure;
 		expect(result.status).toBe(402);
-		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7 });
-		expect(result.data.error).toBe('7 of 7 flows are in use, the most this instance keeps. Delete one to make room for another.');
+		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: '' });
+		expect(result.data.error).toBe('7 of 7 flows are in use, the most this instance keeps. A license that allows more lifts the limit. Deleting one also makes room.');
+	});
+
+	it('carries the link a ceiling refusal names for more flows', () => {
+		const link = 'https://shop.example.com/pricing?utm_campaign=flow.flows';
+		const result = refusalFailure(new FlowRefusal([], 7, 7, link)) as unknown as Failure;
+		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: link });
 	});
 
 	it('quotes the limit alone when the refusal carries no count', () => {
 		const result = refusalFailure(new FlowRefusal([], 12)) as unknown as Failure;
-		expect(result.data.error).toBe('This instance keeps at most 12 flows. Delete one to make room for another.');
+		expect(result.data.error).toBe('This instance keeps at most 12 flows. A license that allows more lifts the limit. Deleting one also makes room.');
 	});
 
 	it('lists the nodes a definition refusal names and keeps their problems', () => {
@@ -23,7 +29,7 @@ describe('refusalFailure', () => {
 			{ node_id: 'rows', path: '/type', message: 'not enabled here' },
 		];
 		const result = refusalFailure(new FlowRefusal(errors)) as unknown as Failure;
-		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'rows'], limit: null, current: null });
+		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'rows'], limit: null, current: null, upgradeUrl: '' });
 		expect(result.data.error).toBe('2 elements use what this instance does not enable: the trigger, rows.');
 		expect(result.data.errors).toEqual(errors);
 	});

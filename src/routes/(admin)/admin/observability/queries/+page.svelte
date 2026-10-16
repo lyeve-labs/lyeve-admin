@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -16,21 +15,26 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { Lightbulb, RefreshCw, Search, Timer } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { page } from '$app/state';
+	import { OUTAGE } from '$lib/outage';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
 		ANALYZABLE,
 		callerOf,
 		durationTone,
+		noSuggestionText,
 		oneLine,
 		type Dialect,
 		type QueryLogEntry,
 	} from '$lib/api/query-monitor';
-	import { NO_VALUE, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatDateTime, formatMillis } from '$lib/format';
 	import type { PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
 	let { data }: { data: PageData } = $props();
+
+	const here = $derived(`${page.url.pathname}${page.url.search}`);
 
 	let refreshing = $state(false);
 	async function refresh() {
@@ -68,22 +72,22 @@
 		return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 	}
 
-	/** Every suggestion the analyzer made, flattened with the query it came from. */
-	const suggestions = $derived(
-		data.analyzed.flatMap((entry) =>
-			(entry.analysis?.index_suggestions ?? []).map((s) => ({ entry, suggestion: s })),
+	/**
+	 * Every suggestion the analyzer made, flattened with the query it came
+	 * from. SQL Server's come from its own views and name no captured query.
+	 */
+	const suggestions = $derived([
+		...(data.analysis?.entries ?? []).flatMap((entry) =>
+			(entry.analysis?.index_suggestions ?? []).map((s) => ({ key: entry.id, suggestion: s })),
 		),
-	);
+		...(data.analysis?.missingIndexes ?? []).map((s) => ({ key: 'mssql', suggestion: s })),
+	]);
 
 	function analyze(dialect: Dialect | null) {
 		const url = new URL(window.location.href);
 		if (dialect) url.searchParams.set('dialect', dialect);
 		else url.searchParams.delete('dialect');
 		void goto(`${url.pathname}${url.search}`, { keepFocus: true, noScroll: true });
-	}
-
-	function ms(value: number): string {
-		return value >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${Math.round(value)} ms`;
 	}
 
 	function planFlags(entry: QueryLogEntry): string[] {
@@ -97,8 +101,6 @@
 	}
 </script>
 
-<PageTitle title="Slow queries" />
-
 <PageShell
 	title="Slow queries"
 	description="Statements the engine sampled because they took too long, with the plan behind them."
@@ -111,13 +113,23 @@
 		</Button>
 	{/snippet}
 
-	{#if data.gate.state === 'unavailable'}
+	{#if data.gate.state === 'capture_store'}
 		<Alert tone="warn">
-			The capture store did not answer. Sampling writes to its own table, which a pending
-			migration can leave absent.
+			<p>
+				The capture store did not answer. Sampling writes to its own table, which a pending
+				migration can leave absent.
+			</p>
+			<!-- A plain link to this address asks for a fresh document, as the
+			     shared notice's retry does, so it works before hydration. -->
+			<div class="mt-3">
+				<Button variant="secondary" size="sm" href={here} data-sveltekit-reload>
+					<RefreshCw size={ICON.sm} aria-hidden="true" /> {OUTAGE.action}
+				</Button>
+			</div>
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Slow queries"
 			absent="The query monitor is not part of this build, so nothing is sampling statements."
@@ -129,10 +141,10 @@
 				size="sm"
 				mono
 				label="Slowest on this page"
-				value={slowest ? ms(slowest) : NO_VALUE}
+				value={slowest ? formatMillis(slowest) : NO_VALUE}
 				tone={slowest >= 1000 ? 'danger' : undefined}
 			/>
-			<Stat size="sm" mono label="Median on this page" value={median ? ms(median) : NO_VALUE} />
+			<Stat size="sm" mono label="Median on this page" value={median ? formatMillis(median) : NO_VALUE} />
 		</div>
 
 		<section class="flex flex-col gap-4">
@@ -161,10 +173,8 @@
 						The analyzer could not explain these statements as {data.dialect}. An instance runs
 						one dialect, and EXPLAIN is a different grammar in each.
 					</Alert>
-				{:else if data.dialect && suggestions.length === 0}
-					<p class="text-sm text-muted">
-						Nothing to suggest. The plans the analyzer read are already using an index.
-					</p>
+				{:else if data.dialect && data.analysis && suggestions.length === 0}
+					<p class="text-sm text-muted">{noSuggestionText(data.dialect, data.analysis)}</p>
 				{:else if suggestions.length > 0}
 					<Table label="Index suggestions">
 						<thead>
@@ -176,7 +186,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each suggestions as { entry, suggestion }, i (`${entry.id}-${i}`)}
+							{#each suggestions as { key, suggestion }, i (`${key}-${i}`)}
 								<tr>
 									<td data-cell="nowrap" class="font-mono text-xs">{suggestion.table}</td>
 									<td data-cell="nowrap" class="font-mono text-xs"
@@ -212,6 +222,7 @@
 			{:else}
 				<ListToolbar label="Filter captured statements">
 					{#snippet search()}
+						<label for="query-narrow" class="sr-only">Narrow this page</label>
 						<SearchInput
 							id="query-narrow"
 							bind:value={narrow}
@@ -219,52 +230,6 @@
 						/>
 					{/snippet}
 				</ListToolbar>
-
-				<Table label="Captured statements">
-					<thead>
-						<tr>
-							<th scope="col">Statement</th>
-							<th scope="col">Took</th>
-							<th scope="col">Rows</th>
-							<th scope="col">Caller</th>
-							<th scope="col">Captured</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each visible as entry (entry.id)}
-							<tr>
-								<td>
-									<code class="text-xs">{oneLine(entry.query_text)}</code>
-									{#if planFlags(entry).length > 0}
-										<div class="mt-1 flex flex-wrap gap-1">
-											{#each planFlags(entry) as flag (flag)}
-												<Badge tone="warn">{flag}</Badge>
-											{/each}
-										</div>
-									{/if}
-								</td>
-								<td data-cell="nowrap">
-									<Badge tone={durationTone(entry.duration_ms)}>{ms(entry.duration_ms)}</Badge>
-								</td>
-								<td data-cell="nowrap" class="text-xs">{entry.rows_returned ?? NO_VALUE}</td>
-								<td data-cell="nowrap" class="font-mono text-xs text-faint"
-									>{callerOf(entry) ?? NO_VALUE}</td
-								>
-								<td data-cell="nowrap" class="text-xs text-faint"
-									>{formatDateTime(entry.captured_at)}</td
-								>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-				<Pagination
-					page={pageNumber(data.offset, data.limit)}
-					perPage={data.limit}
-					count={data.entries.length}
-					total={data.total ?? undefined}
-					noun="queries"
-					href={pageHref('/admin/observability/queries', data.limit)}
-				/>
 
 				{#if visible.length === 0}
 					<EmptyState
@@ -274,7 +239,56 @@
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}
+						{#snippet action()}
+							<Button variant="secondary" onclick={() => (narrow = '')}>Clear the filter</Button>
+						{/snippet}
 					</EmptyState>
+				{:else}
+					<Table label="Captured statements">
+						<thead>
+							<tr>
+								<th scope="col">Statement</th>
+								<th scope="col">Took</th>
+								<th scope="col">Rows</th>
+								<th scope="col">Caller</th>
+								<th scope="col">Captured</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each visible as entry (entry.id)}
+								<tr>
+									<td>
+										<code class="text-xs">{oneLine(entry.query_text)}</code>
+										{#if planFlags(entry).length > 0}
+											<div class="mt-1 flex flex-wrap gap-1">
+												{#each planFlags(entry) as flag (flag)}
+													<Badge tone="warn">{flag}</Badge>
+												{/each}
+											</div>
+										{/if}
+									</td>
+									<td data-cell="nowrap">
+										<Badge tone={durationTone(entry.duration_ms)}>{formatMillis(entry.duration_ms)}</Badge>
+									</td>
+									<td data-cell="nowrap" class="text-xs">{entry.rows_returned ?? NO_VALUE}</td>
+									<td data-cell="nowrap" class="font-mono text-xs text-faint"
+										>{callerOf(entry) ?? NO_VALUE}</td
+									>
+									<td data-cell="nowrap" class="text-xs text-faint"
+										>{formatDateTime(entry.captured_at)}</td
+									>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+					<Pagination
+						page={pageNumber(data.offset, data.limit)}
+						perPage={data.limit}
+						count={data.entries.length}
+						total={data.total ?? undefined}
+						noun="queries"
+						href={pageHref('/admin/observability/queries', data.limit)}
+					/>
 				{/if}
 			{/if}
 		</section>

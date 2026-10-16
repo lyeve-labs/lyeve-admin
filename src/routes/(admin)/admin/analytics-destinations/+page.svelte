@@ -1,7 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Checkbox,
@@ -18,7 +16,6 @@
 		Select,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
@@ -28,7 +25,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		CONFIG_FIELDS,
@@ -100,19 +97,11 @@
 	}
 
 	function deleteDestination(p: Provider): SubmitFunction {
-		return async ({ cancel }) => {
-			const ok = await confirmDialog(`Delete ${p.name}?`, 'Events stop going to it, and its queued deliveries go with it.', {
-				confirmLabel: 'Delete',
-			});
-			if (!ok) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete ${p.name}?`,
+			'Events stop going to it, and its queued deliveries go with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 
 	const replaySubmit: SubmitFunction = () => async ({ result, update }) => {
@@ -133,8 +122,6 @@
 	});
 </script>
 
-<PageTitle title="Analytics destinations" />
-
 <PageShell
 	title="Analytics destinations"
 	description="Where this tenant's tracked events are sent, and the deliveries a destination has not accepted yet."
@@ -150,6 +137,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Analytics destinations"
 			absent="The analytics plugin is not part of this build, so events are not sent anywhere."
@@ -230,7 +218,11 @@
 				</div>
 			{/if}
 			{#if data.deliveries === null}
-				<Alert tone="warn">The deliveries could not be read. This is not a report that every event arrived.</Alert>
+				<GateNotice
+					gate={data.deliveriesGate ?? { state: 'error', message: 'The deliveries could not be read. This is not a report that every event arrived.' }}
+					title="the deliveries"
+					absent="This version of the analytics plugin does not list the deliveries it owes."
+				/>
 			{:else if data.deliveries.data.length === 0}
 				<EmptyState
 					title="Nothing is owed"
@@ -287,6 +279,12 @@
 						{/each}
 					</tbody>
 				</Table>
+				{#if data.moreDeliveries}
+					<p class="text-xs text-muted" data-testid="more-deliveries">
+						The {data.deliveryLimit} newest are listed and more are owed. The plugin lists no older ones, so
+						filter by status to see a different set.
+					</p>
+				{/if}
 			{/if}
 		</section>
 	{/if}
@@ -315,7 +313,8 @@
 			{#if editing}
 				<p class="text-xs text-muted">
 					The stored settings are never shown. Leave every field empty to keep them, or fill them in to replace
-					all of them.
+					all of them. A replacement also returns any setting this form does not show, such as a timeout set
+					through the API, to its default.
 				</p>
 			{/if}
 			{#each fields as f (f.key)}

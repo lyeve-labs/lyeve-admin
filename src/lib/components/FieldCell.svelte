@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Badge } from '@lyeve-labs/ui-kit';
 	import type { SchemaField } from '@lyeve-labs/client';
-	import { formatDate as formatDay, formatDateTime } from '$lib/format';
+	import { formatDate, formatDateTime } from '$lib/format';
 
 	let { field, value }: { field: SchemaField; value: unknown } = $props();
 
@@ -37,12 +37,12 @@
 	 * place the reader can see what is actually in the column, and "Invalid
 	 * Date" hides it.
 	 */
-	function formatDate(v: unknown): string {
+	function cellDateTime(v: unknown): string {
 		return formatDateTime(v as string, String(v));
 	}
 
-	function formatDateOnly(v: unknown): string {
-		return formatDay(v as string, String(v));
+	function cellDate(v: unknown): string {
+		return formatDate(v as string, String(v));
 	}
 
 	// Emptiness is decided once, above every field_type branch, so no branch can
@@ -63,9 +63,9 @@
 			case 'rich_text':
 				return stripHtml(String(value)).slice(0, 120);
 			case 'date':
-				return formatDateOnly(value);
+				return cellDate(value);
 			case 'datetime':
-				return formatDate(value);
+				return cellDateTime(value);
 			case 'json':
 				return typeof value === 'object' ? '{...}' : String(value).slice(0, 40);
 			case 'relation': {

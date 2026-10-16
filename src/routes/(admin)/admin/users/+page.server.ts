@@ -1,14 +1,16 @@
 import type { PageServerLoad, Actions } from './$types';
-import { ApiError, createClient, type User } from '@lyeve-labs/client';
+import { ApiError } from '@lyeve-labs/client';
 import { createUser, updateUserRoles, deleteUser, listTenants, type Tenant } from '@lyeve-labs/client-rest';
-import { fail, error } from '@sveltejs/kit';
-import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
+import { fail, error, redirect } from '@sveltejs/kit';
+import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError } from '$lib/server/action-error';
-import { setUserPassword } from '$lib/api/users';
-import { sessionToken } from '$lib/server/session-cookie';
+import { passwordTooLong, setUserPassword, type ListedUser } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
+import { refusalText } from '$lib/api/refusal';
+import { section, type Section } from '$lib/api/gate';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 /** The engine's own page size when a request names none. */
 const DEFAULT_LIMIT = 25;
@@ -21,20 +23,17 @@ const DEFAULT_LIMIT = 25;
  */
 const MAX_LIMIT = 199;
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user, plugins } = await parent();
 	if (!user.roles.includes('super_admin')) {
 		error(403, 'Requires super_admin role');
 	}
 
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
-	const limit = Math.max(
-		1,
-		Math.min(MAX_LIMIT, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT)
-	);
-	const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+	// Snapped to a page boundary, so the pager numbers the rows on screen.
+	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	/*
 	 * The users endpoint answers with a bare array and no row count, so there is
@@ -44,35 +43,32 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	 * more. Without it, a page that ends at the engine's default looks complete.
 	 */
 	const [rows, tenants] = await Promise.all([
-		client.get<User[]>(`/api/admin/users?limit=${limit + 1}&offset=${offset}`).catch(() => [] as User[]),
+		section(
+			client.get<ListedUser[]>(`/api/admin/users?limit=${limit + 1}&offset=${offset}`),
+			'The accounts could not be read. This is not a report that there are none.'
+		),
 		// An account belongs to one tenant. With several, the engine cannot
 		// tell which one a new account is for unless the form names it.
 		notRunning(plugins, PLUGIN.multitenant)
-			? Promise.resolve<Tenant[]>([])
-			: listTenants(client, 500, 0)
-					.then((r) => (Array.isArray(r?.items) ? r.items : []))
-					.catch((): Tenant[] => []),
+			? Promise.resolve<Section<Tenant[]>>({ ok: true, value: [] })
+			: section(
+					listTenants(client, 500, 0).then((r) => (Array.isArray(r?.items) ? r.items : [])),
+					'The tenants could not be read, so this form cannot name the tenant a new account belongs to.'
+				),
 	]);
-	const page = Array.isArray(rows) ? rows : [];
+	const page = rows.ok && Array.isArray(rows.value) ? rows.value : [];
 	const hasMore = page.length > limit;
+	if (rows.ok) {
+		const back = pastEndOffset(page.length, limit, offset, null);
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
 
-	return {
-		users: page.slice(0, limit),
-		limit,
-		offset,
-		hasMore,
-		tenants: tenants.filter((t) => !t.archived).map((t) => ({ slug: t.slug, name: t.name })),
-	};
+	const users: Section<ListedUser[]> = rows.ok ? { ok: true, value: page.slice(0, limit) } : rows;
+	const choices: Section<{ slug: string; name: string }[]> = tenants.ok
+		? { ok: true, value: tenants.value.filter((t) => !t.archived).map((t) => ({ slug: t.slug, name: t.name })) }
+		: tenants;
+	return { users, limit, offset, hasMore, tenants: choices };
 };
-
-/**
- * A client whose requests act in tenant. The engine honors X-Tenant-ID from a
- * super admin only, and checks the slug against its roster.
- */
-function inTenant(event: Parameters<Actions[string]>[0], tenant: string) {
-	const headers = { ...authedHeaders(event), 'X-Tenant-ID': tenant };
-	return createClient((url, init) => event.fetch(url, { ...init, headers: { ...init?.headers, ...headers } }));
-}
 
 export const actions: Actions = {
 	create: async (event) => {
@@ -98,22 +94,36 @@ export const actions: Actions = {
 		 */
 		const fields: Record<string, string> = {};
 		if (!email) fields.email = 'Email is required';
+		// The engine judges the password, its minimum included, since an install
+		// may set that, and its refusal lands on this field below. Past the
+		// hasher's limit it fails without naming a rule, so that one is caught here.
 		if (!password) fields.password = 'Password is required';
-		else if (password.length < 8) fields.password = 'Password must be at least 8 characters';
+		else if (passwordTooLong(password)) fields.password = passwordTooLong(password) ?? '';
 		// The form offers the choice only where there is one to make, and then
 		// it is required: the engine refuses an account that names no tenant.
 		const tenant = String(form.get('tenant_id') ?? '').trim();
 		if (form.get('tenant_required') === '1' && !tenant) fields.tenant_id = 'Choose the tenant this account belongs to';
 		if (Object.keys(fields).length > 0) {
-			return fail(400, { error: 'Check the highlighted fields.', fields });
+			return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields });
 		}
+		// The engine honors X-Tenant-ID from a super admin only, and checks the
+		// slug against its roster.
+		const target = tenant ? authedClient(event, { 'X-Tenant-ID': tenant }) : client;
 		try {
-			await createUser(email, password, roles.length ? roles : ['editor'], tenant ? inTenant(event, tenant) : client);
+			await createUser(email, password, roles.length ? roles : ['editor'], target);
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { error: full });
-			return fail(400, { error: actionError(err, 'Failed to create user') });
+			if (full) return fail(402, { action: 'create', error: refusalText(full), refused: full });
+			// The email is checked above, so a 422 is the password policy.
+			if (err instanceof ApiError && err.status === 422) {
+				return fail(422, {
+					action: 'create',
+					error: 'Check the highlighted field.',
+					fields: { password: actionError(err, 'The password does not meet the policy') },
+				});
+			}
+			return fail(400, { action: 'create', error: actionError(err, 'Failed to create user') });
 		}
 	},
 
@@ -135,8 +145,8 @@ export const actions: Actions = {
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { error: full });
-			return fail(400, { error: actionError(err, 'Failed to update roles') });
+			if (full) return fail(402, { action: 'updateRoles', error: refusalText(full), refused: full });
+			return fail(400, { action: 'updateRoles', error: actionError(err, 'Failed to update roles') });
 		}
 	},
 
@@ -150,7 +160,7 @@ export const actions: Actions = {
 			await deleteUser(id, client);
 			return { ok: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete user') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete user') });
 		}
 	},
 
@@ -163,10 +173,12 @@ export const actions: Actions = {
 		const password = String(form.get('new_password') ?? '');
 		// The field is named apart from the create form's so a refusal lands
 		// on the control that was submitted and never on the other drawer's.
-		if (!password) {
+		const problem = password ? passwordTooLong(password) : 'Password is required';
+		if (problem) {
 			return fail(400, {
+				action: 'setPassword',
 				error: 'Check the highlighted field.',
-				fields: { new_password: 'Password is required' },
+				fields: { new_password: problem },
 			});
 		}
 		try {
@@ -182,11 +194,12 @@ export const actions: Actions = {
 			 */
 			if (err instanceof ApiError && err.status === 422) {
 				return fail(422, {
+					action: 'setPassword',
 					error: 'Check the highlighted field.',
 					fields: { new_password: actionError(err, 'The password does not meet the policy') },
 				});
 			}
-			return fail(400, { error: actionError(err, 'Failed to set password') });
+			return fail(400, { action: 'setPassword', error: actionError(err, 'Failed to set password') });
 		}
 	},
 };

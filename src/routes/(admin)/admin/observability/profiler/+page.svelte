@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -30,14 +29,16 @@
 	import {
 		PROFILE_SECONDS,
 		PROFILE_TYPES,
-		formatBytes,
+		formatSignedBinaryBytes,
 		formatNs,
 		latencyTone,
 		type EndpointStats,
 	} from '$lib/api/profiler';
 	import { NO_VALUE, formatDateTime, formatTime } from '$lib/format';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
+	import { httpStatusTone } from '$lib/tones';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -57,8 +58,10 @@
 	let flameSeconds = $state<number>(PROFILE_SECONDS.default);
 	let cpuSeconds = $state<number>(PROFILE_SECONDS.default);
 
-	const memory = $derived(data.memory);
+	const memory = $derived(data.memory.ok ? data.memory.value : null);
+	const ABSENT = 'The profiler plugin is not part of this build, so nothing is sampled.';
 	const latest = $derived(memory?.snapshots.at(-1) ?? null);
+	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 
 	// The flamegraph is the last action's answer while the page holds it. It
 	// is drawn as an image from a data URL rather than inlined as markup: the
@@ -78,8 +81,6 @@
 		allocs: 'Allocations',
 	};
 </script>
-
-<PageTitle title="Profiler" />
 
 {#snippet noEndpoints()}
 	<Gauge size={ICON.lg} />
@@ -113,7 +114,7 @@
 				<tr>
 					<td><Badge tone="neutral">{row.method}</Badge></td>
 					<td data-cell="nowrap" class="font-mono text-xs">
-						<a href={detailHref(row.endpoint)} class="text-fg underline-offset-2 transition-colors hover:text-brand hover:underline">{row.endpoint}</a>
+						<a href={detailHref(row.endpoint)} class="relative hit-area text-fg underline-offset-2 transition-colors hover:text-brand hover:underline">{row.endpoint}</a>
 					</td>
 					<td data-cell="nowrap" class="text-right text-xs"><span class="text-faint">{row.count}</span></td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.avg_duration_ns)}</td>
@@ -121,7 +122,7 @@
 					<td class="text-right"><Badge tone={latencyTone(row.p95_duration_ns)}>{formatNs(row.p95_duration_ns)}</Badge></td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.p99_duration_ns)}</td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.max_duration_ns)}</td>
-					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(row.avg_alloc_bytes)}</td>
+					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(row.avg_alloc_bytes)}</td>
 				</tr>
 			{/each}
 		</tbody>
@@ -184,19 +185,21 @@
 				<span class="ms-auto text-xs text-faint">{memory.snapshots.length} snapshots</span>
 			{/if}
 		</div>
-		{#if !memory}
-			<EmptyState iconSnippet={noMemory} title="Memory trend unavailable" description="The engine did not answer with its memory snapshots." />
+		{#if !data.memory.ok}
+			<GateNotice gate={data.memory.gate} title="the memory trend" absent={ABSENT} />
+		{:else if !memory}
+			<EmptyState iconSnippet={noMemory} title="No memory trend" description="The engine answered with no memory snapshots." />
 		{:else if !latest}
 			<EmptyState iconSnippet={noMemory} title="No snapshot yet" description="The sampler takes a snapshot on a schedule. The first one has not been taken." />
 		{:else}
 			<Card>
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="memory-stats">
-					<Stat size="sm" label="Heap in use" mono value={formatBytes(latest.heap_alloc)} />
+					<Stat size="sm" label="Heap in use" mono value={formatSignedBinaryBytes(latest.heap_alloc)} />
 					<Stat size="sm" label="Heap objects" mono value={latest.heap_objects} />
-					<Stat size="sm" label="Allocated total" mono value={formatBytes(latest.total_alloc)} />
+					<Stat size="sm" label="Allocated total" mono value={formatSignedBinaryBytes(latest.total_alloc)} />
 					<Stat size="sm" label="GC cycles" mono value={latest.num_gc} />
 					<Stat size="sm" label="Goroutines" mono value={latest.num_goroutine} />
-					<Stat size="sm" label="Heap slope" mono value="{formatBytes(memory.slope_bytes_per_sec)}/s" tone={memory.leak_likely ? 'danger' : undefined} />
+					<Stat size="sm" label="Heap slope" mono value="{formatSignedBinaryBytes(memory.slope_bytes_per_sec)}/s" tone={memory.leak_likely ? 'danger' : undefined} />
 				</div>
 				<p class="mt-3 text-xs text-muted">
 					Last snapshot {formatDateTime(latest.timestamp, NO_VALUE)}.
@@ -209,14 +212,17 @@
 	<section class="flex flex-col gap-4" data-testid="profiler-slowest">
 		<div class="flex flex-wrap items-center gap-2">
 			<SectionHeading level={2}>Slowest endpoints</SectionHeading>
-			<span class="text-xs text-faint">By p95, the twenty slowest. {data.endpoints?.length ?? 0} endpoints sampled.</span>
+			<span class="text-xs text-faint">
+				By p95, the twenty slowest.{#if data.endpoints.ok}
+					{data.endpoints.value.length} endpoints sampled.{/if}
+			</span>
 		</div>
-		{#if !data.slowest}
-			<EmptyState iconSnippet={noEndpoints} title="Profiler unavailable" description="The engine did not answer with its endpoint statistics." />
-		{:else if data.slowest.length === 0}
+		{#if !data.slowest.ok}
+			<GateNotice gate={data.slowest.gate} title="the endpoint statistics" absent={ABSENT} />
+		{:else if data.slowest.value.length === 0}
 			<EmptyState iconSnippet={noEndpoints} title="Nothing sampled yet" description="Endpoints appear here once the sampler has timed some requests." />
 		{:else}
-			{@render endpointRows(data.slowest, 'Slowest endpoints')}
+			{@render endpointRows(data.slowest.value, 'Slowest endpoints')}
 		{/if}
 	</section>
 
@@ -224,16 +230,18 @@
 		<section class="flex flex-col gap-4" data-testid="profiler-detail">
 			<div class="flex flex-wrap items-center gap-2">
 				<SectionHeading level={2}><span class="font-mono">{data.selected}</span></SectionHeading>
-				{#if data.detail}
-					<span class="text-xs text-faint">{data.detail.total_count} entries in the ring</span>
+				{#if detail}
+					<span class="text-xs text-faint">{detail.total_count} entries in the ring</span>
 				{/if}
-				<a href="/admin/observability/profiler" class="ms-auto text-xs text-muted underline-offset-2 transition-colors hover:text-fg hover:underline">Clear selection</a>
+				<a href="/admin/observability/profiler" class="relative hit-area ms-auto text-xs text-muted underline-offset-2 transition-colors hover:text-fg hover:underline">Clear selection</a>
 			</div>
-			{#if !data.detail}
+			{#if data.detail && !data.detail.ok}
+				<GateNotice gate={data.detail.gate} title="this endpoint" absent={ABSENT} />
+			{:else if !detail || !detail.methods?.length}
 				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="The ring holds no sample for it. It may have been reset, or the path is not one the engine served." />
 			{:else}
-				{@render endpointRows(data.detail.methods.map((m) => m.stats), `Methods for ${data.selected}`)}
-				{#each data.detail.methods as method (method.method)}
+				{@render endpointRows(detail.methods.map((m) => m.stats), `Methods for ${data.selected}`)}
+				{#each detail.methods as method (method.method)}
 					<Card>
 						{#snippet header()}
 							<div class="flex flex-wrap items-center gap-2">
@@ -256,9 +264,9 @@
 								{#each method.recent_entries as e, i (i)}
 									<tr>
 										<td data-cell="nowrap" class="font-mono text-xs"><span class="text-faint">{formatTime(e.captured_at, e.captured_at)}</span></td>
-										<td class="text-right"><Badge tone={e.status_code >= 500 ? 'danger' : e.status_code >= 400 ? 'warn' : 'neutral'}>{e.status_code}</Badge></td>
+										<td class="text-right"><Badge tone={httpStatusTone(e.status_code)}>{e.status_code}</Badge></td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(e.duration_ns)}</td>
-										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(e.alloc_bytes)}</td>
+										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(e.alloc_bytes)}</td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{e.num_goroutine}</td>
 										<td data-cell="nowrap" class="text-xs">{e.plugin || NO_VALUE}</td>
 									</tr>
@@ -275,9 +283,9 @@
 		<div class="flex flex-wrap items-center gap-2">
 			<SectionHeading level={2}>By plugin</SectionHeading>
 		</div>
-		{#if !data.plugins}
-			<EmptyState iconSnippet={noPlugins} title="Plugin breakdown unavailable" description="The engine did not answer with its per-plugin statistics." />
-		{:else if data.plugins.length === 0}
+		{#if !data.plugins.ok}
+			<GateNotice gate={data.plugins.gate} title="the plugin breakdown" absent={ABSENT} />
+		{:else if data.plugins.value.length === 0}
 			<EmptyState iconSnippet={noPlugins} title="Nothing sampled yet" description="Plugins appear here once a request has been served through one." />
 		{:else}
 			<Table label="By plugin">
@@ -291,13 +299,13 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.plugins as p (p.plugin)}
+					{#each data.plugins.value as p (p.plugin)}
 						<tr>
 							<td data-cell="nowrap" class="font-mono text-xs">{p.plugin}</td>
 							<td data-cell="nowrap" class="text-right text-xs"><span class="text-faint">{p.count}</span></td>
 							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(p.avg_duration_ns)}</td>
 							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(p.max_duration_ns)}</td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(p.total_alloc_bytes)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(p.total_alloc_bytes)}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -330,6 +338,7 @@
 				/>
 				<div class="flex flex-wrap gap-2">
 					{#each PROFILE_TYPES as type (type)}
+						<!-- A download, so it posts to an endpoint and stays a plain form. -->
 						<form method="POST" action="/api/admin/debug/profiler/profile/{type}">
 							{#if type === 'cpu'}
 								<input type="hidden" name="duration_sec" value={cpuSeconds} />

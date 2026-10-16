@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Card, Input, SectionHeading, Select, Textarea } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Card, Input, MultiSelect, SectionHeading, Select, Textarea, type StatusTone } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { Check, Eye, EyeOff, RotateCcw, X } from '@lucide/svelte';
 	import {
@@ -21,8 +21,10 @@
 		definitions = [],
 		approvalsNeeded = 1,
 		userId = '',
+		people = [],
 		unavailable = false,
 		forbidden = false,
+		definitionsFailed = false,
 		error = null,
 		errorStatus = 0,
 	}: {
@@ -37,10 +39,17 @@
 		approvalsNeeded?: number;
 		/** The signed-in user, so the assignee reads as "you" when it is. */
 		userId?: string;
+		/**
+		 * The accounts a review can be handed to, by email. Empty for a caller
+		 * who may not list them, who types the ids instead.
+		 */
+		people?: { id: string; email: string }[];
 		/** The plugin is compiled in and did not answer. */
 		unavailable?: boolean;
 		/** The engine refused to show this entry's review to the caller. */
 		forbidden?: boolean;
+		/** The definitions could not be read, so no review can be started from here. */
+		definitionsFailed?: boolean;
 		/** The last review action's refusal, as the engine worded it. */
 		error?: string | null;
 		/** The status the refusal came with. A 403 is named as a permission. */
@@ -56,7 +65,7 @@
 		rejected: 'Rejected',
 		published: 'Published',
 	};
-	const STATUS_TONE: Record<ReviewStatus, 'neutral' | 'brand' | 'success' | 'warn' | 'danger'> = {
+	const STATUS_TONE: Record<ReviewStatus, StatusTone> = {
 		draft: 'neutral',
 		pending_review: 'brand',
 		in_review: 'brand',
@@ -92,9 +101,11 @@
 		return status === 'approved' || status === 'published';
 	}
 
+	let emails = $derived(new Map(people.map((p) => [p.id, p.email])));
+
 	function assignee(id: string): string {
 		if (!id || /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(id)) return 'Nobody';
-		return id === userId ? 'You' : shortId(id);
+		return id === userId ? 'You' : (emails.get(id) ?? shortId(id));
 	}
 
 	let definitionOptions = $derived(
@@ -106,8 +117,16 @@
 	let definitionId = $state<string | null>(null);
 	let assigneeId = $state('');
 	$effect(() => {
-		if (!assigneeId && userId) assigneeId = userId;
+		if (!assigneeId && userId && (people.length === 0 || emails.has(userId))) assigneeId = userId;
 	});
+
+	// The picker offers the accounts the page could read. The signed-in user
+	// reads as themselves, so the default needs no lookup.
+	let personOptions = $derived(
+		people.map((p) => ({ value: p.id, label: p.id === userId ? `${p.email} (you)` : p.email })),
+	);
+	let otherIds = $state<string[]>([]);
+	let otherOptions = $derived(personOptions.filter((o) => o.value !== assigneeId));
 
 	// Every assignee, the primary first. A plugin that answers no list has one.
 	let assignees = $derived(
@@ -166,36 +185,68 @@
 							label="Definition"
 							placeholder="Pick a definition"
 							options={definitionOptions}
+							searchable
 							bind:value={definitionId}
 							required
 						/>
-						<Input
-							id="review-assignee"
-							name="assignee_id"
-							label="Assignee"
-							hint="The user id of the first reviewer."
-							bind:value={assigneeId}
-							autocomplete="off"
-							required
-							mono
-						/>
+						{#if people.length > 0}
+							<Select
+								id="review-assignee"
+								name="assignee_id"
+								label="Assignee"
+								hint="The first reviewer."
+								placeholder="Pick a user"
+								options={personOptions}
+								searchable
+								bind:value={assigneeId}
+								required
+							/>
+						{:else}
+							<Input
+								id="review-assignee"
+								name="assignee_id"
+								label="Assignee"
+								hint="The user id of the first reviewer."
+								bind:value={assigneeId}
+								autocomplete="off"
+								required
+								mono
+							/>
+						{/if}
 					</div>
-					<Textarea
-						id="review-other-assignees"
-						name="other_assignees"
-						label="More assignees"
-						hint="One user id per line. A stage that needs several approvals takes them from the assignees, so name at least as many as it needs."
-						rows={2}
-					/>
+					{#if people.length > 0}
+						{#each otherIds.filter((id) => id !== assigneeId) as id (id)}
+							<input type="hidden" name="other_assignees" value={id} />
+						{/each}
+						<MultiSelect
+							id="review-other-assignees"
+							label="More assignees"
+							hint="A stage that needs several approvals takes them from the assignees, so name at least as many as it needs."
+							placeholder="Pick users"
+							options={otherOptions}
+							searchable
+							bind:value={otherIds}
+						/>
+					{:else}
+						<Textarea
+							id="review-other-assignees"
+							name="other_assignees"
+							label="More assignees"
+							hint="One user id per line. A stage that needs several approvals takes them from the assignees, so name at least as many as it needs."
+							rows={2}
+						/>
+					{/if}
 					{#if error}
 						<Alert tone="danger">{error}</Alert>
 					{/if}
 					<div>
-						<Button type="submit" size="sm" loading={submitting === 'start'} disabled={!definitionId}>
+						<Button type="submit" size="sm" loading={submitting === 'start'} disabled={!definitionId || !assigneeId}>
 							Start review
 						</Button>
 					</div>
 				</form>
+			{:else if definitionsFailed}
+				<p class="text-sm text-muted">The review definitions could not be read, so a review cannot be started here. Reload the page to try again.</p>
 			{:else if error}
 				<Alert tone="danger">{error}</Alert>
 			{/if}

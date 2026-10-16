@@ -1,52 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-// authedHeaders is left real: the relationship writes build their headers
-// through it, and a stub would hide a call that sends Bearer alone.
+// The session client is left real and runs over the event's fetch, so every
+// read and write lands in one call log with the headers it would send. It
+// throws on a non-2xx: a fake that resolved whatever the engine answered would
+// turn a refused write into a passing test.
 vi.mock('$lib/server/authz', async (importOriginal) => ({
 	...((await importOriginal()) as object),
 	requireUser: vi.fn(async () => ({ id: 'u1', email: 'admin@test.invalid' }) as never),
-	// Backed by the event's own fetch, so the action's writes land in the same
-	// call log the relationship calls do. It throws on a non-2xx the way the
-	// real client does: a mock that resolves whatever the engine answered turns
-	// a refused write into a passing test.
-	authedClient: vi.fn((event: { fetch: typeof fetch }) => {
-		const send = async (method: string, path: string, body: unknown) => {
-			const res = await event.fetch(path, {
-				method,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!res.ok) throw new Error(`${method} ${path} answered ${res.status}`);
-			return res.json();
-		};
-		return {
-			put: (path: string, body: unknown) => send('PUT', path, body),
-			post: (path: string, body: unknown) => send('POST', path, body)
-		} as never;
-	}),
 	stripProtectedFields: vi.fn((v: unknown) => v)
-}));
-
-vi.mock('@lyeve-labs/client', () => ({
-	// Backed by the fetch it is handed, so the localization reads land in the
-	// same call log the entry and revision reads do.
-	createClient: vi.fn((fetchFn: typeof fetch) => ({
-		get: async (path: string) => {
-			const res = await fetchFn(path);
-			if (!res.ok) throw new Error(`GET ${path} answered ${res.status}`);
-			return res.json();
-		}
-	}) as never),
-	ApiError: class ApiError extends Error {
-		status = 500;
-	}
 }));
 
 vi.mock('@lyeve-labs/client-rest', () => ({
 	getSchema: vi.fn(async () => ({ name: 'article', with_draft_publish: true, fields: [] }))
 }));
 
+import { isHttpError } from '@sveltejs/kit';
 import { load, actions } from './+page.server';
 import type { PluginSet } from '$lib/plugins';
 
@@ -156,14 +125,99 @@ describe('content editor load, revisions', () => {
 		expect(result.revisions).toHaveLength(1);
 	});
 
-	it('reports no revisions rather than failing the page when the call errors', async () => {
-		const result = await loadWith({ error: 'nope' }, 503);
+	it('says the history could not be read rather than failing the page when the call errors', async () => {
+		const result = (await loadWith({ error: 'nope' }, 503)) as unknown as { revisions: unknown[]; revisionsFailed: boolean };
 		expect(result.revisions).toEqual([]);
+		expect(result.revisionsFailed).toBe(true);
 	});
 
 	it('reports no revisions when the envelope carries none', async () => {
-		const result = await loadWith({ data: [], total: 0 });
+		const result = (await loadWith({ data: [], total: 0 })) as unknown as { revisions: unknown[]; revisionsFailed: boolean };
 		expect(result.revisions).toEqual([]);
+		expect(result.revisionsFailed).toBe(false);
+	});
+});
+
+describe('content editor load, the entry read', () => {
+	async function entryAnswering(status: number) {
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('/revisions')) return json({ data: [] });
+			if (path.includes('/api/admin/content?')) return json({ data: [] });
+			return json({ error: 'x' }, status);
+		}) as unknown as typeof globalThis.fetch;
+		return Promise.resolve(
+			load({
+				fetch: fetchFn,
+				cookies: mockCookies(),
+				params: { schema: 'article', id: 'e1' },
+				parent: async () => ({ plugins: none })
+			} as never),
+		).catch((err: unknown) => err);
+	}
+
+	it('answers 404 when the engine says the entry does not exist', async () => {
+		const thrown = await entryAnswering(404);
+		expect(isHttpError(thrown) && thrown.status).toBe(404);
+	});
+
+	it('reports an outage as an outage, never as an entry that is not there', async () => {
+		const thrown = await entryAnswering(503);
+		expect(isHttpError(thrown) && thrown.status).toBe(503);
+	});
+
+	it('reports a refused role as a refusal', async () => {
+		const thrown = await entryAnswering(403);
+		expect(isHttpError(thrown) && thrown.status).toBe(403);
+	});
+});
+
+describe('content editor load, relation pickers', () => {
+	it('says when a related collection is larger than the picker, and when its read failed', async () => {
+		const { getSchema } = await import('@lyeve-labs/client-rest');
+		vi.mocked(getSchema).mockResolvedValueOnce({
+			name: 'article',
+			fields: [
+				{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' },
+				{ name: 'tags', field_type: 'relation', relation_type: 'many_to_many', relation_to: 'tag' },
+			],
+		} as never);
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('schema=author')) return json({ data: [{ id: 'a1', title: 'Ada' }], total_count: 900 });
+			if (path.includes('schema=tag')) return json({ error: 'x' }, 503);
+			if (path.includes('/revisions')) return json({ data: [] });
+			return json(entry);
+		}) as unknown as typeof globalThis.fetch;
+		const result = (await load({
+			fetch: fetchFn,
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none })
+		} as never)) as unknown as { relations: Record<string, { items: unknown[]; total: number; failed: boolean }> };
+
+		expect(result.relations.author.total).toBe(900);
+		expect(result.relations.author.items).toHaveLength(1);
+		expect(result.relations.tag.failed).toBe(true);
+	});
+
+	it('hands the media picker null when the library could not be read', async () => {
+		const { getSchema } = await import('@lyeve-labs/client-rest');
+		vi.mocked(getSchema).mockResolvedValueOnce({
+			name: 'article',
+			fields: [{ name: 'cover', field_type: 'media' }],
+		} as never);
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('/api/admin/media')) return json({ error: 'x' }, 503);
+			if (path.includes('/revisions')) return json({ data: [] });
+			return json(entry);
+		}) as unknown as typeof globalThis.fetch;
+		const result = (await load({
+			fetch: fetchFn,
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none })
+		} as never)) as unknown as { mediaChoices: unknown };
+
+		expect(result.mediaChoices).toBeNull();
 	});
 
 	it('flattens the row columns into the one data object the panel reads', async () => {
@@ -299,6 +353,18 @@ describe('content editor save, many_to_many fields', () => {
 		expect(calls.some((c) => c.method === 'PUT' && c.path.includes('/relationships'))).toBe(false);
 	});
 
+	it('reports a link the plugin refused instead of redirecting as a success', async () => {
+		const fn = vi.fn(async (path: string, init?: RequestInit) => {
+			if (path.includes('/relationships?')) return json({ data: [], total: 0 });
+			if (init?.method === 'POST') return json({ error: 'failed to create relationship' }, 503);
+			return json({ ok: true });
+		}) as unknown as typeof globalThis.fetch;
+
+		const failure = await runSave(saveEvent(fn, { tags: ['t1'] }));
+
+		expect(failure?.data?.error).toBe('The entry was saved, but not every link was. In tags, 1 link could not be added.');
+	});
+
 	it('leaves a set that has not changed alone', async () => {
 		const { fn, calls } = relationFetch([{ id: 'rel-1', target_id: 't1' }]);
 		await runSave(saveEvent(fn, { tags: ['t1'] }));
@@ -331,6 +397,29 @@ async function runRestore(event: never) {
 		throw e;
 	}
 }
+
+describe('content editor save, a schema refusal', () => {
+	// The plugin answers a value the schema refuses with an errors array and no
+	// error key. Relayed as the client's message, the banner showed the JSON.
+	it('marks each refused field and keeps the body out of the banner', async () => {
+		const { getSchema } = await import('@lyeve-labs/client-rest');
+		vi.mocked(getSchema).mockResolvedValueOnce({
+			name: 'article',
+			fields: [{ name: 'email', field_type: 'email' }],
+		} as never);
+		const errors = [{ field: 'email', message: 'must be a valid email', code: 'email', rule: 'email' }];
+		const fn = vi.fn(async () => json({ errors }, 422)) as unknown as typeof globalThis.fetch;
+
+		const failure = (await runSave(saveEvent(fn, {}))) as {
+			status: number;
+			data: { error: string; fieldErrors: Record<string, string> };
+		};
+
+		expect(failure.status).toBe(422);
+		expect(failure.data.fieldErrors).toEqual({ email: 'must be a valid email' });
+		expect(failure.data.error).toBe('The entry was not saved. Check the highlighted fields.');
+	});
+});
 
 describe('content editor restore', () => {
 	it('names the revision by its number under the key the route reads', async () => {
@@ -465,8 +554,75 @@ describe('content editor translations', () => {
 	it('returns the refusal against the locale it was about', async () => {
 		const fn = vi.fn(async () => json({ error: 'nope' }, 402)) as unknown as typeof globalThis.fetch;
 		const out = await runAction('saveTranslation', translationEvent(fn, { locale: 'fr', exists: 'true', data: '{}' }));
-		expect(out?.status).toBe(400);
+		expect(out?.status).toBe(402);
 		expect(out?.data).toMatchObject({ translationLocale: 'fr' });
 		expect(out?.data?.error).toBeTruthy();
+	});
+
+	// The plugin refuses a new locale past its unlicensed ceiling with the bare code
+	// cap_exceeded and the numbers beside it.
+	it('reads the locale ceiling into its numbers instead of the bare code', async () => {
+		const fn = vi.fn(async () =>
+			json({ error: 'cap_exceeded', cap: 'locales', limit: 2, current: 2 }, 402)
+		) as unknown as typeof globalThis.fetch;
+		const out = await runAction('saveTranslation', translationEvent(fn, { locale: 'de', exists: 'false', data: JSON.stringify({ title: 'Eins' }) }));
+		expect(out?.status).toBe(402);
+		expect(out?.data?.error).toContain('2 of 2');
+		expect(out?.data?.error).not.toContain('cap_exceeded');
+		expect(out?.data).toMatchObject({ translationLocale: 'de' });
+	});
+
+	// The plugin refuses a new translation with no title. Left empty, the
+	// locale's reader gets the source, so the first save sends the source title.
+	it('sends the source title on the first save when the title was left empty', async () => {
+		const calls: Call[] = [];
+		const fn = vi.fn(async (path: string, init?: RequestInit) => {
+			calls.push({ method: init?.method ?? 'GET', path, body: typeof init?.body === 'string' ? init.body : undefined });
+			return path === '/api/admin/content/e1' ? json(entry) : json({ ok: true }, 201);
+		}) as unknown as typeof globalThis.fetch;
+		const out = await runAction(
+			'saveTranslation',
+			translationEvent(fn, { locale: 'fr', exists: 'false', data: JSON.stringify({ title: '', body: '<p>Salut</p>' }) })
+		);
+		expect(out).toMatchObject({ status: 303 });
+		const post = calls.find((c) => c.method === 'POST');
+		const sent = JSON.parse(post?.body ?? '{}');
+		expect(sent).toMatchObject({ title: 'One', body: { body: '<p>Salut</p>' } });
+		// An empty title in the body would be laid over the title column.
+		expect(sent.body).not.toHaveProperty('title');
+	});
+});
+
+describe('content editor load, releases', () => {
+	function releasesFetch(membership: () => Response) {
+		return vi.fn(async (path: string) => {
+			if (path.includes('/api/admin/content/releases/r1')) return membership();
+			if (path.includes('/api/admin/content/releases')) return json({ data: [{ id: 'r1', name: 'Spring', status: 'draft' }] });
+			if (path.includes('/revisions')) return json([]);
+			if (path.includes('/api/admin/content?')) return json({ data: [] });
+			return json(entry);
+		}) as unknown as typeof globalThis.fetch;
+	}
+
+	async function releasesWith(membership: () => Response) {
+		const out = (await load({
+			fetch: releasesFetch(membership),
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none }),
+		} as never)) as { releases: { open: unknown[]; holding: string[]; failed: boolean } | null };
+		return out.releases;
+	}
+
+	// A release whose items could not be read was counted as one that does not
+	// hold the entry, so Add to release offered a release that already held it.
+	it('says the releases could not be read when one of them could not', async () => {
+		const releases = await releasesWith(() => json({ error: 'unavailable' }, 503));
+		expect(releases).toMatchObject({ failed: true, holding: [] });
+	});
+
+	it('reads a release that holds the entry as holding it', async () => {
+		const releases = await releasesWith(() => json({ id: 'r1', name: 'Spring', status: 'draft', items: [{ entry_id: 'e1' }] }));
+		expect(releases).toMatchObject({ failed: false, holding: ['r1'] });
 	});
 });

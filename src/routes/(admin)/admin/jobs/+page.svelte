@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Button,
@@ -16,19 +15,19 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
-		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Plus, Trash2, Pencil, Clock, CheckCircle, XCircle, Inbox } from '@lucide/svelte';
 	import type { Job } from './+page.server';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import { ALERT_PREFIX, hasChannels } from '$lib/api/cron-alerts';
 	import AlertChannelFields from '$lib/components/AlertChannelFields.svelte';
@@ -66,12 +65,23 @@
 		}
 	});
 	const formError = $derived(form && 'error' in form && form.error ? String(form.error) : undefined);
+	// A failed create or update belongs to the drawer that sent it, and only
+	// when it came back after that drawer opened. A failed delete belongs to
+	// the page. Read by the wrong drawer, a failure greets the next job as that
+	// job's own.
+	let openedOver = $state.raw<unknown>(null);
+	const drawerFailed = $derived(
+		form !== openedOver && !!form && 'action' in form && form.action === (editing ? 'update' : 'create'),
+	);
 
+	// The address effect below calls both openers. Reading `form` untracked
+	// keeps every answer from reopening the drawer.
 	function openCreate() {
 		editing = null;
 		enabled = true;
 		payload = '';
 		threshold = 1;
+		openedOver = untrack(() => form);
 		open = true;
 	}
 
@@ -80,6 +90,7 @@
 		enabled = job.enabled;
 		payload = job.payload ? JSON.stringify(job.payload, null, 2) : '';
 		threshold = job.alerts?.failure_threshold ?? 1;
+		openedOver = untrack(() => form);
 		open = true;
 	}
 
@@ -105,25 +116,11 @@
 	 * canceling here means the request is never made.
 	 */
 	function deleteJob(name: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${name}?`,
-				'Its schedule stops and its run history goes with it.',
-				{ confirmLabel: 'Delete' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${name}`);
-			};
-		};
-	}
-
-	function formatDate(iso: string | null) {
-		return formatDateTime(iso, 'Never');
+		return confirmed(
+			`Delete ${name}?`,
+			'Its schedule stops and its run history goes with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+		);
 	}
 
 	// The endpoint takes no search, so the box narrows the page on screen and
@@ -136,7 +133,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.jobs.filter(
+		(data.jobs.ok ? data.jobs.value : []).filter(
 			(j) =>
 				narrows(query, j.name, j.description, j.schedule, j.endpoint) &&
 				(status === '' || (status === 'enabled') === j.enabled)
@@ -144,21 +141,39 @@
 	);
 </script>
 
-<PageTitle title="Scheduled jobs" />
-
 <PageShell title="Scheduled jobs" {description} width="wide">
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New job
-		</Button>
+		<!-- A list that could not be read offers no write against it. -->
+		{#if data.jobs.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New job
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if !open}
+	{#if !(form && 'action' in form && (form.action === 'create' || form.action === 'update'))}
 		<FormErrors message={formError} {refused} />
 	{/if}
 
-	{#if data.jobs.length === 0}
-		<EmptyState title="No jobs yet" description="Schedule HTTP jobs to run on a cron expression.">
+	{#if data.openGate}
+		<!-- The address named a job the drawer could not open on. -->
+		<GateNotice
+			level={2}
+			gate={data.openGate}
+			title="The linked job"
+			absent="The job this link opens was not found. It may have been deleted."
+		/>
+	{/if}
+
+	{#if !data.jobs.ok}
+		<GateNotice
+			level={2}
+			gate={data.jobs.gate}
+			title="Scheduled jobs"
+			absent="The cron plugin is not part of this build, so no job runs on a schedule."
+		/>
+	{:else if data.jobs.value.length === 0}
+		<EmptyState level={2} title="No jobs yet" description="Schedule HTTP jobs to run on a cron expression.">
 			{#snippet iconSnippet()}
 				<Inbox size={ICON.lg} />
 			{/snippet}
@@ -180,7 +195,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState title="No job on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
+			<EmptyState level={2} title="No job on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
 		{:else}
 		<Table label="Scheduled jobs">
 			<thead>
@@ -220,7 +235,7 @@
 								{:else}
 									<Clock size={ICON.xs} class="shrink-0" />
 								{/if}
-								{formatDate(job.last_run_at)}
+								{formatDateTime(job.last_run_at, 'Never')}
 							</div>
 						</td>
 						<td>
@@ -261,7 +276,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.jobs.length}
+			count={data.jobs.value.length}
 			hasNext={data.hasMore}
 			noun="jobs"
 			href={pageHref('/admin/jobs', data.limit)}
@@ -291,8 +306,9 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={formError} {refused} />
+		<FormErrors message={drawerFailed ? formError : undefined} refused={drawerFailed ? refused : null} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
+		{#if editing?.payload}<input type="hidden" name="had_payload" value="true" />{/if}
 
 		<Input id="job-name" label="Name" name="name" required placeholder="send-daily-digest" value={editing?.name ?? ''} />
 		<Input
@@ -326,6 +342,9 @@
 			name="payload"
 			rows={4}
 			placeholder={'{\n  "key": "value"\n}'}
+			hint={editing?.payload
+				? 'Clearing it sends an empty JSON object on each run. Once a job has a payload, it cannot go back to sending none.'
+				: undefined}
 			bind:value={payload}
 		/>
 		<!-- Toggle is a switch button rather than a form control, so the value

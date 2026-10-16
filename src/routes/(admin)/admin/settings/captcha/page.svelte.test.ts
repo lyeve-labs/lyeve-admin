@@ -42,6 +42,19 @@ describe('captcha settings', () => {
 		expect((screen.getByLabelText('Secret key') as HTMLInputElement).value).toBe('');
 	});
 
+	it('carries the stored failure threshold into the save, so a save keeps it', () => {
+		const { container } = render(CaptchaPage, {
+			props: props({
+				source: 'tenant',
+				tenant: { provider: 'hcaptcha', site_key: 's', has_secret: true, score_floor: null, failure_threshold: 9 },
+				instance,
+				licensed: true,
+			}),
+		});
+		const form = container.querySelector('form#captcha-form') as HTMLFormElement;
+		expect(new FormData(form).get('failure_threshold')).toBe('9');
+	});
+
 	it('asks for the score floor only for reCAPTCHA', () => {
 		render(CaptchaPage, {
 			props: props({
@@ -64,6 +77,15 @@ describe('captcha settings', () => {
 		expect(said(container)).toContain('needs a license this install does not hold');
 	});
 
+	it('turns the save off on an unlicensed install and points it at the reason', () => {
+		const { container } = render(CaptchaPage, {
+			props: props({ source: 'instance', tenant: null, instance, licensed: false }),
+		});
+		const save = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Save');
+		expect(save?.hasAttribute('disabled')).toBe(true);
+		expect(save?.getAttribute('aria-describedby')).toBe('captcha-license-note');
+	});
+
 	it('renders a refused save through the refusal notice', () => {
 		render(CaptchaPage, {
 			props: props(
@@ -81,5 +103,18 @@ describe('captcha settings', () => {
 		});
 		expect(said(container)).toContain('could not be read');
 		expect(screen.queryByLabelText('Site key')).toBeNull();
+	});
+});
+
+describe('a refused captcha write', () => {
+	// The banner arrives inside a region that was mounted before the failure,
+	// which is what a screen reader reliably announces.
+	it('says the failure inside a live region that was there before it', () => {
+		const settings = { source: 'instance', tenant: null, instance, licensed: true };
+		const { rerender } = render(CaptchaPage, { props: props(settings) });
+		const region = document.querySelector('[aria-live="assertive"][aria-atomic="true"].contents');
+		expect(region).not.toBeNull();
+		rerender(props(settings, {}, { error: 'The captcha settings could not be saved.' }));
+		expect(region?.textContent).toContain('The captcha settings could not be saved.');
 	});
 });

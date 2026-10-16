@@ -11,8 +11,11 @@
  * Three outcomes are counted apart because they have different fixes.
  * Published is the broker accepting an event. Failed is the broker refusing
  * one, which is a broker problem. Dropped is this instance having nowhere to
- * send one, which is a configuration problem here.
+ * send one, which is a configuration problem here. Where the plugin keeps an
+ * outbox, a refused event is retried, so Failed counts attempts and the
+ * outbox's dead count is the number of events lost.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 
@@ -39,6 +42,23 @@ export interface BrokerStatus {
 	dropped: number;
 	last_publish_at?: string | null;
 	last_error?: PublishFailure | null;
+	/** The outbox events wait in until the broker takes them, where the plugin has one. */
+	outbox?: OutboxStatus;
+}
+
+/**
+ * The outbox's depth. With an outbox a refused publish is retried, so Failed
+ * counts attempts, and only Dead counts events that never reached the broker.
+ */
+export interface OutboxStatus {
+	/** False where the plugin has no database, and events publish once, inline. */
+	enabled: boolean;
+	/** False when the counts could not be read. */
+	available: boolean;
+	pending: number;
+	dead: number;
+	oldest_pending_at?: string | null;
+	oldest_pending_age_seconds?: number;
 }
 
 export type BrokerGate = Gate;
@@ -60,26 +80,58 @@ export const BACKEND_LABELS: Readonly<Record<string, string>> = {
 	rabbitmq: 'RabbitMQ',
 };
 
-export function backendLabel(backend: string): string {
-	return BACKEND_LABELS[backend] ?? (backend || 'No broker configured');
+/**
+ * The backends that publish nowhere. With either one the plugin hands each
+ * event to a publisher that discards it, counts it as published, and reports
+ * itself connected, so neither figure says anything reached a broker.
+ */
+const NO_BROKER: readonly string[] = ['', 'noop'];
+
+/** Whether the instance is set to publish to a broker at all. */
+export function hasBroker(s: BrokerStatus | null): boolean {
+	return !!s && !NO_BROKER.includes(s.backend);
 }
 
-export type BrokerHealth = 'publishing' | 'refusing' | 'undelivered' | 'disabled' | 'idle';
+export function backendLabel(backend: string): string {
+	if (NO_BROKER.includes(backend)) return 'No broker configured';
+	return BACKEND_LABELS[backend] ?? backend;
+}
+
+export type BrokerHealth =
+	| 'publishing'
+	| 'refusing'
+	| 'retrying'
+	| 'lost'
+	| 'undelivered'
+	| 'disabled'
+	| 'discarding'
+	| 'idle';
 
 /**
  * The one sentence the page leads with.
  *
  * Disabled comes first: a plugin the instance does not enable drops every
  * event on purpose, and reporting it as a broker failure sends somebody to
- * look at infrastructure that is working. A connection with failures outranks one with drops, because
- * a broker that is refusing is the more urgent of the two. Idle is last and
+ * look at infrastructure that is working. An instance with no broker comes
+ * next, because whatever its counters say, every event was discarded. A
+ * connection with failures outranks one with drops, because
+ * a broker that is refusing is the more urgent of the two. With an outbox, a
+ * refused attempt is retried, so only dead events are lost, and refused
+ * attempts with nothing left waiting were delivered after all. Idle is last and
  * means nothing has been published yet, which on a fresh install is correct
  * and must not read as a fault.
  */
 export function brokerHealth(s: BrokerStatus | null): BrokerHealth {
 	if (!s) return 'idle';
 	if (s.degraded) return 'disabled';
-	if (s.failed > 0) return 'refusing';
+	if (!hasBroker(s)) return 'discarding';
+	const outbox = s.outbox;
+	if (outbox?.enabled) {
+		if (outbox.available && outbox.dead > 0) return 'lost';
+		if (s.failed > 0 && !(outbox.available && outbox.pending === 0)) return 'retrying';
+	} else if (s.failed > 0) {
+		return 'refusing';
+	}
 	if (s.dropped > 0) return 'undelivered';
 	if (s.published > 0) return 'publishing';
 	return 'idle';
@@ -88,28 +140,32 @@ export function brokerHealth(s: BrokerStatus | null): BrokerHealth {
 export const HEALTH_LABELS: Readonly<Record<BrokerHealth, string>> = {
 	publishing: 'Publishing',
 	refusing: 'The broker is refusing events',
+	retrying: 'The broker refused attempts, the outbox retries them',
+	lost: 'Events ran out of attempts',
 	undelivered: 'Events had nowhere to go',
 	disabled: 'Dropping events, not enabled on this instance',
+	discarding: 'No broker, events are discarded',
 	idle: 'Nothing published yet',
 };
 
-export function healthTone(h: BrokerHealth): 'success' | 'danger' | 'warn' | 'neutral' {
+export function healthTone(h: BrokerHealth): StatusTone {
 	if (h === 'publishing') return 'success';
-	if (h === 'refusing') return 'danger';
-	if (h === 'undelivered' || h === 'disabled') return 'warn';
+	if (h === 'refusing' || h === 'lost') return 'danger';
+	if (h === 'retrying' || h === 'undelivered' || h === 'disabled' || h === 'discarding') return 'warn';
 	return 'neutral';
 }
 
 /**
  * Share of events that reached the broker, as a percentage, or null when
- * nothing has been attempted.
+ * nothing has been attempted or there is no broker to reach.
  *
  * Null rather than 100, because a fresh install has delivered none of nothing
  * and stating that as perfect delivery is the reading this page exists to
- * prevent.
+ * prevent. The same holds with no broker: the plugin counts every discarded
+ * event as published.
  */
 export function deliveryRate(s: BrokerStatus | null): number | null {
-	if (!s) return null;
+	if (!s || !hasBroker(s)) return null;
 	const attempted = s.published + s.failed + s.dropped;
 	if (attempted === 0) return null;
 	return Math.round((s.published / attempted) * 1000) / 10;

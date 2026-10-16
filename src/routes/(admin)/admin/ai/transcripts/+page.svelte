@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, EmptyState, Input, PageShell, Pagination, Select, Table } from '@lyeve-labs/ui-kit';
 	import { ChevronRight, MessagesSquare, Search } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -22,14 +21,12 @@
 	});
 </script>
 
-<PageTitle title="AI transcripts" />
-
 <PageShell
 	title="AI transcripts"
 	description="Every call from a route, a flow node, the editor assistant or another plugin, with what was asked and answered."
 	width="wide"
 >
-	<AiSection tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
+	<AiSection level={2} tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
 		{#if !data.aiSettings?.transcripts_enabled}
 			<p class="text-xs text-warn" role="status">
 				Transcript storage is off for this tenant, so nothing new is written here.
@@ -64,6 +61,7 @@
 
 		{#if data.transcripts.length === 0}
 			<EmptyState
+				level={2}
 				title={filtered ? 'No transcripts match' : 'No transcripts yet'}
 				description={filtered
 					? 'Nothing recorded matches these filters.'

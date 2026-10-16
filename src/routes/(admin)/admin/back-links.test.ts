@@ -93,7 +93,7 @@ const cases: Case[] = [
 	{
 		route: 'content/[schema]',
 		component: ContentCollection,
-		data: { schemas: [], schemaDef: posts, items: [], activeSchema: 'posts', limit: 100, offset: 0, total: 0 },
+		data: { schemas: { ok: true, value: [] }, schemaDef: posts, items: { ok: true, value: [] }, activeSchema: 'posts', status: null, limit: 100, offset: 0, total: 0 },
 		href: '/admin/content',
 		label: 'Content',
 	},
@@ -103,7 +103,7 @@ const cases: Case[] = [
 		data: {
 			schemaDef: posts,
 			item: { id: 'e1', data: {}, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-			relationItems: {},
+			relations: {},
 			revisions: [],
 		},
 		href: '/admin/content/posts',
@@ -115,7 +115,7 @@ const cases: Case[] = [
 		data: {
 			schemaDef: posts,
 			item: { id: 'e1', data: {}, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-			relationItems: {},
+			relations: {},
 			revisions: [],
 		},
 		url: 'http://localhost/admin/content/posts/e1?limit=100&offset=200',
@@ -125,7 +125,7 @@ const cases: Case[] = [
 	{
 		route: 'content/[schema]/new',
 		component: ContentNew,
-		data: { schemaDef: posts, locales: [], relationItems: {} },
+		data: { schemaDef: posts, locales: null, relations: {} },
 		href: '/admin/content/posts',
 		label: 'Posts',
 	},
@@ -139,10 +139,12 @@ const cases: Case[] = [
 			datasources: [],
 			variables: [],
 			schemas: [],
-			runs: [fixtureRun],
+			catalogGate: { state: 'ok' },
+			runs: { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 0, total: 1, hasMore: false } },
 			versions: [],
 			templates: fixtureTemplates,
 			entitlements: licensed,
+			user: { roles: ['admin'] },
 		},
 		href: '/admin/flows',
 		label: 'Flows',
@@ -157,10 +159,12 @@ const cases: Case[] = [
 			datasources: [],
 			variables: [],
 			schemas: [],
-			runs: [],
+			catalogGate: { state: 'ok' },
+			runs: { ok: true, value: { rows: [], limit: 20, offset: 0, total: 0, hasMore: false } },
 			versions: [],
 			templates: fixtureTemplates,
 			entitlements: licensed,
+			user: { roles: ['admin'] },
 		},
 		url: 'http://localhost/admin/flows/f1?status=active&q=sync',
 		href: '/admin/flows?status=active&q=sync',
@@ -169,14 +173,14 @@ const cases: Case[] = [
 	{
 		route: 'flows/datasources',
 		component: FlowDatasources,
-		data: { datasources: [], locked: false, loadError: null, entitlements: licensed },
+		data: { datasources: [], locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
 		href: '/admin/flows',
 		label: 'Flows',
 	},
 	{
 		route: 'flows/variables',
 		component: FlowVariables,
-		data: { variables: [], locked: false, loadError: null, entitlements: licensed },
+		data: { variables: [], total: 0, q: '', limit: 50, offset: 0, locked: false, gate: { state: 'ok' }, user: { roles: ['admin'] }, entitlements: licensed },
 		href: '/admin/flows',
 		label: 'Flows',
 	},
@@ -231,14 +235,14 @@ const cases: Case[] = [
 	{
 		route: 'settings/configuration',
 		component: SettingsConfiguration,
-		data: { provenance: null },
+		data: { provenance: { ok: false, gate: { state: 'forbidden' } } },
 		href: '/admin/settings',
 		label: 'Settings',
 	},
 	{
 		route: 'settings/email',
 		component: SettingsEmail,
-		data: { entitled: true, unavailable: false, providers: [] },
+		data: { providers: { ok: true, value: [] }, mail: null },
 		href: '/admin/settings',
 		label: 'Settings',
 	},
@@ -252,7 +256,7 @@ const cases: Case[] = [
 	{
 		route: 'settings/mfa',
 		component: SettingsMfa,
-		data: { mfaEnabled: false, entitlements: licensed },
+		data: { mfa: { ok: true, value: false }, entitlements: licensed },
 		href: '/admin/settings',
 		label: 'Settings',
 	},
@@ -266,7 +270,7 @@ const cases: Case[] = [
 	{
 		route: 'settings/security',
 		component: SettingsSecurity,
-		data: { report: null, unavailable: 'down' },
+		data: { report: { ok: false, gate: { state: 'unavailable' } } },
 		href: '/admin/settings',
 		label: 'Settings',
 	},
@@ -286,7 +290,7 @@ describe('every nested page names the way back', () => {
 
 	it('puts the back link ahead of a breadcrumb on the same row', () => {
 		const { container } = render(ContentNew, {
-			props: { data: { schemaDef: posts, locales: [], relationItems: {} }, form: null } as never,
+			props: { data: { schemaDef: posts, locales: null, relations: {} }, form: null } as never,
 		});
 		const back = container.querySelector('[data-testid="page-back"]');
 		const crumb = container.querySelector('nav[aria-label]');
@@ -320,8 +324,8 @@ describe('every nested page names the way back', () => {
 				props: {
 					data: {
 						schemaDef: posts,
-						locales: [],
-						relationItems: {},
+						locales: null,
+						relations: {},
 						revisions: [],
 						item: { id: 'e1', data: {}, created_at: '', updated_at: '' },
 					},
@@ -343,9 +347,9 @@ describe('every nested page names the way back', () => {
  * section instead.
  */
 const destinations: { route: string; component: Page; data: Record<string, unknown> }[] = [
-	{ route: 'settings/oauth', component: SettingsOauth, data: { providers: [], entitlements: licensed } },
+	{ route: 'settings/oauth', component: SettingsOauth, data: { providers: { ok: true, value: [] }, entitlements: licensed } },
 	{ route: 'settings/permissions', component: SettingsPermissions, data: { permissions: [], schemas: [], entitlements: licensed, loadError: null } },
-	{ route: 'webhooks/incoming', component: WebhooksIncoming, data: { schemas: [], incomingWebhooks: [], entitlements: licensed } },
+	{ route: 'webhooks/incoming', component: WebhooksIncoming, data: { schemas: { ok: true, value: [] }, incomingWebhooks: { ok: true, value: [] }, entitlements: licensed } },
 ];
 
 describe('a sidebar destination under a heading', () => {

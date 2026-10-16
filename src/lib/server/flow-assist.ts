@@ -5,7 +5,8 @@
 
 import { ApiError } from '@lyeve-labs/client';
 import { CatalogError, getLLMCatalog } from '$lib/api/assist';
-import { flowAuthHeaders } from '$lib/server/flow-import';
+import { authedHeaders } from '$lib/server/authz';
+import { AI_BUDGET_TEXT, aiBudgetSpent } from '$lib/server/ai-load';
 import type { AssistRefusal } from '$lib/flow/assistant';
 
 const NO_CATALOG_TEXT = 'This engine does not publish the node catalog the assistant reads. Update the flow plugin.';
@@ -28,7 +29,8 @@ export function refusalStatus(r: AssistRefusal): number {
 
 /**
  * Reads a thrown request error into a refusal: `locked` is the license
- * without the AI feature, `off` the tenant's switch, `unavailable` an engine
+ * without the AI feature, a spent monthly budget an error that leaves the
+ * prompt live, `off` the tenant's switch, `unavailable` an engine
  * that cannot validate a draft, and `error` the rest. The 503 is the one 5xx whose
  * body is a static sentence written for the operator, so it is relayed with
  * a fallback for an empty one. Every other 5xx collapses to a static line so
@@ -42,9 +44,12 @@ export function assistRefusal(err: unknown): AssistRefusal {
 		return { state: 'error', message: 'The node catalog could not be read.' };
 	}
 	if (err instanceof ApiError) {
+		if (aiBudgetSpent(err)) return { state: 'error', message: AI_BUDGET_TEXT };
 		if (err.status === 402) return { state: 'locked' };
 		if (err.status === 404) return { state: 'off' };
-		if (err.status === 503) {
+		// A 503 the engine sent is JSON. Any other is a proxy's page, whose body
+		// is not a sentence for the operator.
+		if (err.status === 503 && err.body !== undefined) {
 			const msg = err.message?.trim();
 			return { state: 'unavailable', message: msg && msg !== '503' ? msg : UNAVAILABLE_FALLBACK };
 		}
@@ -68,10 +73,10 @@ const cache = new WeakMap<Request, Promise<string>>();
  * as long as the action does, so nothing outlives the request and two
  * tenants never share a read.
  */
-export function catalogFor(event: { request: Request; fetch: typeof fetch } & Parameters<typeof flowAuthHeaders>[0]): Promise<string> {
+export function catalogFor(event: { request: Request; fetch: typeof fetch } & Parameters<typeof authedHeaders>[0]): Promise<string> {
 	let pending = cache.get(event.request);
 	if (!pending) {
-		pending = getLLMCatalog(event.fetch, flowAuthHeaders(event));
+		pending = getLLMCatalog(event.fetch, authedHeaders(event));
 		cache.set(event.request, pending);
 	}
 	return pending;

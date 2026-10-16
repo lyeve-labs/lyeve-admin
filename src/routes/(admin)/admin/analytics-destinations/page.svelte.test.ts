@@ -83,6 +83,12 @@ describe('analytics destinations', () => {
 		expect((document.querySelector('#destination-attempts') as HTMLInputElement).disabled).toBe(true);
 	});
 
+	it('says a replaced config returns the settings the form does not show to their defaults', async () => {
+		setup();
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit Product' }));
+		expect(screen.getByText(/such as a timeout set through the API, to its default/)).toBeTruthy();
+	});
+
 	it('keeps a stored retry policy editable after a lapse, so it can go back to one attempt', async () => {
 		setup({ licensed: false, providers: [provider({ retry_policy: { max_attempts: 3, backoff_seconds: 30 } })] });
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit Product' }));
@@ -92,6 +98,16 @@ describe('analytics destinations', () => {
 	it('says a failed delivery read failed', () => {
 		setup({ deliveries: null });
 		expect(document.body.textContent).toContain('could not be read');
+	});
+
+	it('says more deliveries are owed than the list holds', () => {
+		setup({ moreDeliveries: true, deliveryLimit: 50 });
+		expect(screen.getByTestId('more-deliveries').textContent).toContain('The 50 newest are listed and more are owed');
+	});
+
+	it('names an outage of the delivery read as an outage', () => {
+		setup({ deliveries: null, deliveriesGate: { state: 'unavailable' } });
+		expect(document.body.textContent).toContain('did not answer');
 	});
 
 	it('says nothing is owed when the queue is empty', () => {

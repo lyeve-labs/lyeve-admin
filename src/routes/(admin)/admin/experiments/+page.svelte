@@ -1,7 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
-		Alert,
 		Badge,
 		Button,
 		Drawer,
@@ -17,10 +15,11 @@
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, FlaskConical, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
@@ -38,7 +37,20 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * The drawer and the row actions share one `form` result. Each failure
+	 * names its action: a save shows in the drawer, a delete or a move on the
+	 * page, so a failed delete never reads as a failed save in the next drawer.
+	 * Opening the drawer clears what an earlier attempt left.
+	 */
+	let cleared = $state<unknown>(null);
+	const failure = $derived.by(() => {
+		const f = form as { action?: unknown; error?: unknown } | null;
+		if (!f || f === cleared || typeof f.error !== 'string') return null;
+		return { action: String(f.action ?? ''), error: f.error };
+	});
+	const saveFailure = $derived(failure?.action === 'save' ? failure.error : undefined);
+	const pageFailure = $derived(failure && failure.action !== 'save' ? failure.error : undefined);
 
 	let narrow = $state('');
 	const visible = $derived(
@@ -60,6 +72,7 @@
 	let autoStop = $state(false);
 
 	function openCreate() {
+		cleared = form;
 		editing = null;
 		name = '';
 		description = '';
@@ -70,6 +83,7 @@
 	}
 
 	function openEdit(e: Experiment) {
+		cleared = form;
 		editing = e;
 		name = e.name;
 		description = e.description ?? '';
@@ -88,6 +102,7 @@
 	 * itself on the original's numbers.
 	 */
 	function openDuplicate(source: Experiment) {
+		cleared = form;
 		const draft = duplicateRow(source as unknown as Record<string, unknown>, {
 			taken: data.experiments.map((x) => x.name),
 		});
@@ -126,12 +141,12 @@
 	function moveExperiment(e: Experiment, move: string): SubmitFunction {
 		return async ({ cancel }) => {
 			if (move === 'stop') {
-				const confirmed = await confirmDialog(
+				const ok = await confirmDialog(
 					`Stop ${e.name}?`,
 					'A stopped experiment cannot be started again. Pause it instead if you mean to come back to it.',
 					{ confirmLabel: 'Stop' },
 				);
-				if (!confirmed) {
+				if (!ok) {
 					cancel();
 					return;
 				}
@@ -144,27 +159,15 @@
 	}
 
 	function removeExperiment(e: Experiment): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${e.name}?`,
-				'Its variants, its metrics and every exposure recorded against it go with it.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${e.name}`);
-			};
-		};
+		return confirmed(
+			`Delete experiment ${e.name}?`,
+			'Its variants, its metrics and every exposure recorded against it go with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${e.name}` },
+		);
 	}
 
 	const saveExperimentSubmit = tracked(saveExperiment);
 </script>
-
-<PageTitle title="Experiments" />
 
 <PageShell
 	title="Experiments"
@@ -181,17 +184,17 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="A/B testing"
 			absent="The A/B testing plugin is not part of this build, so no traffic is being split."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
-		{/if}
+		<FormErrors message={pageFailure} />
 
 		{#if data.experiments.length === 0}
 			<EmptyState
+				level={2}
 				title="No experiment is set up"
 				description="Create one to split traffic between variants and measure the difference."
 			>
@@ -207,7 +210,8 @@
 		{:else}
 			<ListToolbar label="Filter experiments">
 				{#snippet search()}
-					<SearchInput bind:value={narrow} placeholder="Search experiments" />
+					<label for="experiment-search" class="sr-only">Search experiments</label>
+					<SearchInput id="experiment-search" bind:value={narrow} placeholder="Search experiments" />
 				{/snippet}
 			</ListToolbar>
 
@@ -218,6 +222,7 @@
 
 			{#if visible.length === 0}
 				<EmptyState
+					level={2}
 					title="No experiment matches"
 					description="Nothing here is named or described that way."
 				>
@@ -231,7 +236,7 @@
 						<tr>
 							<th scope="col">Experiment</th>
 							<th scope="col">Status</th>
-							<th scope="col">Needs per variant</th>
+							<th scope="col">Exposures needed</th>
 							<th scope="col">Created</th>
 							<th scope="col"><span class="sr-only">Actions</span></th>
 						</tr>
@@ -240,7 +245,7 @@
 						{#each visible as e (e.id)}
 							<tr>
 								<td>
-									<a class="font-medium text-brand hover:underline" href="/admin/experiments/{e.id}">
+									<a class="relative hit-area font-medium text-brand hover:underline" href="/admin/experiments/{e.id}">
 										{e.name}
 									</a>
 									{#if e.description}
@@ -251,7 +256,7 @@
 									<Badge tone={statusTone(e.status)} dot>{STATUS_LABELS[e.status]}</Badge>
 								</td>
 								<td data-cell="nowrap" class="text-xs text-faint">
-									{e.min_sample_size} exposures
+									{e.min_sample_size} across all variants
 								</td>
 								<td data-cell="nowrap" class="text-xs text-faint">
 									{formatDateTime(e.created_at)}
@@ -331,6 +336,7 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<FormErrors message={saveFailure} />
 			<Input id="exp-name" name="name" label="Name" bind:value={name} required />
 			<Textarea
 				id="exp-description"
@@ -350,8 +356,8 @@
 			<Input
 				id="exp-min-sample"
 				name="min_sample_size"
-				label="Minimum exposures per variant"
-				hint="Below this the result is not believable, whatever the p-value says."
+				label="Minimum exposures"
+				hint="Counted across all variants together. Below this no result counts as significant, whatever the p-value says."
 				bind:value={minSample}
 			/>
 			<!-- Toggle renders a button, which submits nothing, and the action

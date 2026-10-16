@@ -4,10 +4,10 @@ import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
+import { section, type Section } from '$lib/api/gate';
 import {
 	GRAPHQL_OK,
 	deletePersisted,
-	graphqlGate,
 	introspect,
 	listPersisted,
 	registerPersisted,
@@ -17,32 +17,40 @@ import {
 	type SchemaRoots,
 } from '$lib/api/graphql';
 
+type Schema = { roots: SchemaRoots | null; refused: string | null };
+
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.graphql)) {
+		const absent: GraphqlGate = { state: 'absent' };
 		return {
-			gate: { state: 'absent' } as GraphqlGate,
-			roots: null as SchemaRoots | null,
-			refused: null as string | null,
-			persisted: [] as PersistedQuery[],
-			persistedError: null as string | null,
+			gate: absent,
+			schema: { ok: false, gate: absent } as Section<Schema>,
+			persisted: { ok: false, gate: absent } as Section<PersistedQuery[]>,
+			persistedTotal: 0,
 		};
 	}
 
 	const client = authedClient(event);
 	// The schema and the allowlist are read apart: an instance that refuses
 	// introspection still keeps an allowlist, and the reverse.
-	const [schema, persisted] = await Promise.allSettled([introspect(client), listPersisted(client)]);
-	let gate: GraphqlGate = GRAPHQL_OK;
-	if (schema.status === 'rejected' && persisted.status === 'rejected') gate = graphqlGate(schema.reason);
-	return {
-		gate,
-		roots: schema.status === 'fulfilled' ? schema.value.roots : null,
-		refused: schema.status === 'fulfilled' ? schema.value.refused : null,
-		persisted: persisted.status === 'fulfilled' ? persisted.value.data : [],
-		persistedError: persisted.status === 'rejected' ? 'The persisted queries could not be loaded.' : null,
-	};
+	// The plugin answers at most 200 a page and says how many it holds, so the
+	// total is kept to say what the list leaves out.
+	let persistedTotal = 0;
+	const [schema, persisted] = await Promise.all([
+		section(introspect(client), 'The schema could not be read. This is not a report that it is empty.'),
+		section(
+			listPersisted(client).then((r) => {
+				persistedTotal = r.total;
+				return r.data;
+			}),
+			'The persisted queries could not be read. This is not a report that there are none.',
+		),
+	]);
+	// Both refused is the plugin's answer as a whole, so the page says it once.
+	const gate: GraphqlGate = !schema.ok && !persisted.ok ? schema.gate : GRAPHQL_OK;
+	return { gate, schema, persisted, persistedTotal };
 };
 
 const hashOf = async (event: Parameters<Actions[string]>[0]) => String((await event.request.formData()).get('hash') ?? '').trim();
@@ -52,7 +60,7 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const query = String(data.get('query') ?? '').trim();
-		if (!query) return fail(400, { error: 'Paste the query to allow.' });
+		if (!query) return fail(400, { action: 'register', error: 'Paste the query to allow.' });
 		try {
 			await registerPersisted(authedClient(event), {
 				query,
@@ -61,31 +69,31 @@ export const actions: Actions = {
 			});
 			return { registered: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The query could not be registered.') });
+			return fail(400, { action: 'register', error: actionError(err, 'The query could not be registered.') });
 		}
 	},
 
 	toggle: async (event) => {
 		await requireUser(event);
 		const hash = await hashOf(event);
-		if (!hash) return fail(400, { error: 'Choose a query.' });
+		if (!hash) return fail(400, { action: 'toggle', error: 'Choose a query.' });
 		try {
 			await togglePersisted(authedClient(event), hash);
 			return { toggled: hash };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The query could not be switched.') });
+			return fail(400, { action: 'toggle', error: actionError(err, 'The query could not be switched.') });
 		}
 	},
 
 	delete: async (event) => {
 		await requireUser(event);
 		const hash = await hashOf(event);
-		if (!hash) return fail(400, { error: 'Choose a query.' });
+		if (!hash) return fail(400, { action: 'delete', error: 'Choose a query.' });
 		try {
 			await deletePersisted(authedClient(event), hash);
 			return { deleted: hash };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The query could not be deleted.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The query could not be deleted.') });
 		}
 	},
 };

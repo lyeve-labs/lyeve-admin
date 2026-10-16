@@ -27,22 +27,9 @@ export interface AlertChannels {
 export const CHANNEL_KEYS = ['slack_url', 'discord_url', 'webhook_url', 'pagerduty_routing_key'] as const;
 export type ChannelKey = (typeof CHANNEL_KEYS)[number];
 
-/** How a masked value is marked. A real URL or routing key never holds it. */
-const MASK_MARKER = '...';
-
-/** Whether a value is a masked one read from the plugin. */
-export function isMasked(value: string | null | undefined): boolean {
-	return !!value && value.includes(MASK_MARKER);
-}
-
 /** Whether a setting names anywhere to send. */
 export function hasChannels(c: AlertChannels | null | undefined): boolean {
 	return !!c && ((c.email?.length ?? 0) > 0 || CHANNEL_KEYS.some((k) => !!c[k]));
-}
-
-/** Whether a setting names a chat, webhook or PagerDuty channel. */
-export function hasPaidChannels(c: AlertChannels | null | undefined): boolean {
-	return !!c && CHANNEL_KEYS.some((k) => !!c[k]);
 }
 
 /** The emails a form field holds, one per comma or line. */

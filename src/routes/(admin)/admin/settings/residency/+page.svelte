@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -12,13 +11,13 @@
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Globe, MapPin, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		REGION_STATE_LABELS,
@@ -37,7 +36,17 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// The region form and the row deletes report through one result, so each
+	// failure is tagged with its action and shown only where it was made. The
+	// drawer opened after a failure starts clean: the result is set aside.
+	let setAside = $state<unknown>(null);
+	const failure = $derived(form && form !== setAside ? (form as { action?: string; error?: string }) : null);
+	const saveError = $derived(failure?.action === 'create' || failure?.action === 'update' ? (failure.error ?? '') : '');
+	// A region created but not closed is no longer a failure of the form, so
+	// it shows above the list with the region it names.
+	const rowError = $derived(
+		failure?.action === 'delete' || failure?.action === 'close' ? (failure.error ?? '') : '',
+	);
 	const summary = $derived(data.report?.summary ?? null);
 	const stranded = $derived(unassigned(data.report));
 	const partial = $derived(reportIsPartial(data.report));
@@ -63,6 +72,7 @@
 		long = '';
 		enabled = true;
 		isDefault = false;
+		setAside = form;
 		open = true;
 	}
 
@@ -75,6 +85,7 @@
 		long = r.coordinates ? String(r.coordinates.long) : '';
 		enabled = r.enabled;
 		isDefault = r.is_default;
+		setAside = form;
 		open = true;
 	}
 
@@ -82,7 +93,8 @@
 		const subject = displayName;
 		const verb = editing ? 'Saved' : 'Created';
 		return async ({ result, update }) => {
-			if (result.type !== 'failure') open = false;
+			const closeFailed = result.type === 'failure' && result.data?.action === 'close';
+			if (result.type !== 'failure' || closeFailed) open = false;
 			await update();
 			if (result.type === 'success') toast.success(`${verb} ${subject}`);
 		};
@@ -93,27 +105,15 @@
 	 * the point at which a residency record can silently stop being true.
 	 */
 	function removeRegion(r: Region): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${r.display_name}?`,
-				'Tenants assigned to it are not moved. Move them first, or the report stops accounting for where their data is.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${r.display_name}`);
-			};
-		};
+		return confirmed(
+			`Delete region ${r.display_name}`,
+			'Tenants assigned to it are not moved. Move them first, or the report stops accounting for where their data is.',
+			{ confirmLabel: 'Delete', success: `Deleted ${r.display_name}` },
+		);
 	}
 
 	const saveRegionSubmit = tracked(saveRegion);
 </script>
-
-<PageTitle title="Data residency" />
 
 <PageShell
 	title="Data residency"
@@ -136,25 +136,27 @@
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Data residency"
 			absent="The data residency plugin is not part of this build, so no region is recorded."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Where tenants are</SectionHeading>
 
-			{#if !data.reportRead}
+			{#if data.reportGate.state !== 'ok'}
 				<!-- An unread report is never drawn as a clean one. Zero unassigned
 				     tenants because nobody could ask is the worst answer here. -->
-				<Alert tone="danger">
-					The residency report could not be read. This is not a report that every tenant is
-					placed.
-				</Alert>
+				<GateNotice
+					gate={data.reportGate}
+					title="The residency report"
+					absent="This instance serves no residency report, so it cannot say where tenants are."
+				/>
 			{:else if summary}
 				<div class="grid gap-4 sm:grid-cols-4">
 					<Stat size="sm" mono label="Regions" value={summary.total_regions} />
@@ -273,6 +275,11 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
+				{#if data.more}
+					<p class="text-xs text-muted">
+						Showing the first 100 regions. Regions past the hundredth are not listed here.
+					</p>
+				{/if}
 				<Table label="Regions">
 					<thead>
 						<tr>
@@ -339,6 +346,7 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<FormErrors message={saveError || undefined} />
 			{#if editing}
 				<!-- The slug is copied onto every tenant assignment and onto the
 				     report, so changing it would leave those rows naming a region
@@ -381,7 +389,9 @@
 					id="region-lat"
 					name="lat"
 					label="Latitude"
-					hint="Optional. Used to route a client to its nearest region."
+					hint={editing?.coordinates
+						? 'Used to route a client to its nearest region. A save cannot remove stored coordinates: emptied fields keep them. Type new ones to move the region.'
+						: 'Optional. Used to route a client to its nearest region.'}
 					bind:value={lat}
 				/>
 				<Input id="region-long" name="long" label="Longitude" bind:value={long} />

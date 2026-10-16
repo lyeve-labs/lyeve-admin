@@ -1,25 +1,40 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { Alert, Badge, Button, Drawer, EmptyState, Input, Modal, PageShell, SegmentedControl, Select, Table, Textarea, confirm } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Drawer, EmptyState, Input, Modal, PageShell, SegmentedControl, Select, Table, Textarea, confirm, toast } from '@lyeve-labs/ui-kit';
 	import { Eye, Lock, Mail, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { ActionData, PageData } from './$types';
 	import { REQUIRED_PURPOSE, type EmailTemplate, type TemplateStatus } from '$lib/api/email-templates';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
-	const formError = $derived(form && 'error' in form && typeof form.error === 'string' ? form.error : '');
+
+	/*
+	 * The drawer, the delete and the preview report through the one `form`, so
+	 * each failure names the action that caused it. The drawer shows only a
+	 * failed save, and only one that came back after it opened, so a failed
+	 * delete never reads as a failure of the next form opened. A failed delete
+	 * or preview shows above the list.
+	 */
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	const saveFailure = $derived(failure?.action === 'save' && form !== openedOver ? failure : null);
+	const pageFailure = $derived(failure?.action === 'delete' || failure?.action === 'preview' ? failure : null);
+	const pageRefusal = $derived(pageFailure ? formRefusal(pageFailure) : null);
+	const formError = $derived(pageFailure?.error ?? '');
 
 	// The plugin states the ceiling and the count. A limit of 0 is none, and
 	// a read that failed states nothing: the create still answers the ceiling.
 	const limit = $derived(data.limits?.limit ?? 0);
 	const atCeiling = $derived(limit > 0 && (data.limits?.current ?? 0) >= limit);
-	const optionalStarters = $derived(data.starters.filter((s) => !s.required));
+	const templates = $derived(data.templates.ok ? data.templates.value : []);
+	const starters = $derived(data.starters.ok ? data.starters.value : []);
+	const optionalStarters = $derived(starters.filter((s) => !s.required));
 	const starterOptions = $derived([{ value: '', label: 'A blank template' }, ...optionalStarters.map((s) => ({ value: s.key, label: s.key }))]);
 	const STATUS_OPTIONS = [
 		{ value: 'active', label: 'Active' },
@@ -52,6 +67,7 @@
 		subject = '';
 		body = BLANK;
 		status = 'active';
+		openedOver = form;
 		open = true;
 	}
 
@@ -61,6 +77,7 @@
 		subject = t.subject;
 		body = t.mjml_source;
 		status = t.status;
+		openedOver = form;
 		open = true;
 	}
 
@@ -78,16 +95,16 @@
 		if (!key) key = s.key;
 	}
 
-	const linkVariable = $derived(editing?.required ? data.starters.find((s) => s.key === editing?.key)?.link_variable : undefined);
+	const linkVariable = $derived(editing?.required ? starters.find((s) => s.key === editing?.key)?.link_variable : undefined);
 
 	let deleteId = $state('');
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(t: EmailTemplate) {
-		const ok = await confirm('Delete template', `Delete ${t.key}? A trigger or a flow that sends it stops sending.`, { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete template ${t.key}`, 'A trigger or a flow that sends it stops sending.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteId = t.id;
-		await Promise.resolve();
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -95,26 +112,32 @@
 	let previewForm = $state<HTMLFormElement>();
 	let previewOpen = $state(false);
 	const preview = $derived(form && 'preview' in form ? form.preview : null);
+	// The preview opens only on a rendered answer. A failed render shows above
+	// the list, where a modal with nothing in it would hide it, and as a toast,
+	// because the reader pressed Preview on a row that may be far below it.
 	const showPreview: SubmitFunction = () => {
-		return async ({ update }) => {
+		return async ({ result, update }) => {
 			await update({ reset: false });
-			previewOpen = true;
+			if (result.type === 'success') previewOpen = true;
+			else if (result.type === 'failure') {
+				const said = (result.data as { error?: unknown } | undefined)?.error;
+				toast.error(typeof said === 'string' && said ? said : 'The template could not be rendered.');
+			}
 		};
 	};
 
 	async function askPreview(t: EmailTemplate) {
 		previewKey = t.key;
-		await Promise.resolve();
+		await tick();
 		previewForm?.requestSubmit();
 	}
 
 	const save = submitter(() => (open = false));
 </script>
 
-<PageTitle title="Email templates - Settings" />
-
 <PageShell
 	title="Email templates"
+	documentTitle="Email templates - Settings"
 	description="The subject and body each mail is sent with. Edit every word, start from a ready-made template, and preview it with sample values before it goes out."
 	width="wide"
 	back={{ href: '/admin/settings/email', label: 'Email' }}
@@ -125,33 +148,32 @@
 				{limit > 0 ? `${data.limits.current} of ${limit} templates` : `${data.limits.current} templates, no limit`}
 			</span>
 		{/if}
-		<Button variant="primary" size="sm" onclick={openCreate} disabled={atCeiling || Boolean(data.loadError)}>
-			<Plus size={ICON.sm} />
-			New template
-		</Button>
+		{#if data.templates.ok}
+			<Button variant="primary" size="sm" onclick={openCreate} disabled={atCeiling}>
+				<Plus size={ICON.sm} />
+				New template
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if data.loadError}
-		<Alert tone="danger" title="Templates could not be loaded">
-			{#snippet children()}{data.loadError} Reload once the engine answers again.{/snippet}
-		</Alert>
-	{/if}
-	{#if pageRefusal && !open}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if formError && !open}
-		<Alert tone="danger">{#snippet children()}{formError}{/snippet}</Alert>
-	{/if}
+	<FormErrors message={formError} refused={pageRefusal} />
 	{#if atCeiling}
 		<Alert tone="info" title="Every template slot is in use">
 			{#snippet children()}This instance holds {limit} templates. Edit one, delete one you no longer send, or change the license to hold more.{/snippet}
 		</Alert>
 	{/if}
 
-	{#if data.loadError}
-		<!-- Nothing: the empty state would say there are none. -->
-	{:else if data.templates.length === 0}
-		<EmptyState title="No templates yet" description="A template is the subject and body a mail is sent with.">
+	{#if !data.templates.ok}
+		<GateNotice level={2} gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
+	{:else if templates.length === 0}
+		<EmptyState level={2} title="No templates yet" description="A template is the subject and body a mail is sent with.">
 			{#snippet iconSnippet()}<Mail size={ICON.lg} />{/snippet}
+			{#snippet action()}
+				<Button variant="secondary" onclick={openCreate} disabled={atCeiling}>
+					<Plus size={ICON.sm} />
+					New template
+				</Button>
+			{/snippet}
 		</EmptyState>
 	{:else}
 		<Table label="Email templates">
@@ -164,7 +186,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each data.templates as t (t.id)}
+				{#each templates as t (t.id)}
 					<tr>
 						<td data-cell="nowrap">
 							<span class="flex items-center gap-2">
@@ -205,11 +227,7 @@
 
 <Drawer bind:open title={editing ? `Edit ${editing.key}` : 'New template'}>
 	<form method="POST" action="?/save" id="template-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if formError}
-			<Alert tone="danger">{#snippet children()}{formError}{/snippet}</Alert>
-		{/if}
+		<FormErrors message={saveFailure?.error} refused={saveFailure ? formRefusal(saveFailure) : null} />
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
 		{:else}
@@ -217,9 +235,12 @@
 				id="template-starter"
 				label="Start from"
 				options={starterOptions}
+				searchable
 				value={starter}
 				onvaluechange={pickStarter}
-				hint="A ready-made template to copy. Everything it copies stays yours to change."
+				hint={data.starters.ok
+					? 'A ready-made template to copy. Everything it copies stays yours to change.'
+					: 'The ready-made templates could not be read, so only a blank one is offered.'}
 			/>
 			<Input id="template-key" name="key" label="Name" required mono placeholder="order-shipped" hint="How a trigger or a flow names it. Lower case letters, digits and dashes." bind:value={key} />
 		{/if}

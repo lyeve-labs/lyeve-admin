@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -13,6 +12,7 @@
 	import type { PageData, ActionData } from './$types';
 	import type { ConfigSetting } from './+page.server';
 	import SettingRow from '$lib/components/SettingRow.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { Lock, FileCode, Terminal, PencilLine } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ICON } from '$lib/icon';
@@ -31,9 +31,10 @@
 	}
 	const result = $derived((form ?? null) as SaveResult | null);
 
-	const settings = $derived(data.provenance?.settings ?? []);
-	const counts = $derived(data.provenance?.counts ?? {});
-	const suppressed = $derived(data.provenance?.suppressed ?? []);
+	const provenance = $derived(data.provenance.ok ? data.provenance.value : null);
+	const settings = $derived(provenance?.settings ?? []);
+	const counts = $derived(provenance?.counts ?? {});
+	const suppressed = $derived(provenance?.suppressed ?? []);
 
 	// Opened for one plugin, only its settings are listed.
 	const scope = $derived(data.plugin ? new Set(data.plugin.keys) : null);
@@ -52,18 +53,19 @@
 	}
 </script>
 
-<PageTitle title="Configuration" />
-
 <PageShell
 	title="Configuration"
 	description="Every setting the engine reads and the layer it came from. An environment variable beats the configuration file, which beats anything saved here."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
-	{#if !data.provenance}
-		<Alert tone="warn" title="Configuration is unavailable">
-			Reading it needs a super admin session.
-		</Alert>
+	{#if !data.provenance.ok}
+		<GateNotice
+			level={2}
+			gate={data.provenance.gate}
+			title="Configuration"
+			absent="This engine does not report where its settings come from."
+		/>
 	{:else}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Where the values come from</SectionHeading>
@@ -129,6 +131,9 @@
 				<Alert tone={data.plugin.found ? 'brand' : 'warn'}>
 					{#if data.plugin.found}
 						Showing the settings of the <span class="font-mono">{data.plugin.name}</span> plugin.
+					{:else if data.plugin.failed}
+						The settings the <span class="font-mono">{data.plugin.name}</span> plugin declares could not be
+						read, so the list below may miss some. Try again in a moment.
 					{:else}
 						The <span class="font-mono">{data.plugin.name}</span> plugin declares no settings, or is not running.
 					{/if}

@@ -7,6 +7,7 @@
  * whole layout to edit it. Writing and resetting are an admin's.
  */
 import type { HttpClient } from '@lyeve-labs/client';
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { CustomLink } from '$lib/api/customization';
 import type { MediaKind } from '$lib/api/media';
 import { PLUGIN, type PluginName } from '$lib/plugin-names';
@@ -24,7 +25,8 @@ export type WidgetType =
 
 export type WidgetWidth = 'third' | 'half' | 'full';
 export type WidgetWindow = '6h' | '24h' | '7d';
-export type WidgetTone = '' | 'neutral' | 'brand' | 'success' | 'warn' | 'danger';
+/** A text widget's Alert tone. The empty string draws the text with no Alert. */
+export type WidgetTone = '' | StatusTone;
 export type WidgetStatus = '' | 'draft' | 'published' | 'archived';
 
 export interface Widget {
@@ -51,12 +53,9 @@ export interface DashboardLayout {
 	updated_at: string | null;
 }
 
-export const STOCK_LAYOUT: DashboardLayout = { entitled: false, custom: false, widgets: [], updated_at: null };
-
 /** The most widgets one dashboard holds. The engine refuses more. */
 export const MAX_WIDGETS = 24;
 export const MAX_WIDGET_ROWS = 20;
-export const MAX_WIDGET_SCHEMAS = 12;
 
 export interface WidgetKind {
 	type: WidgetType;

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
 	import {
 		Alert,
@@ -16,14 +15,22 @@
 	import { enhance } from '$app/forms';
 	import { ArrowDown, ArrowUp, Plus, X } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const pageRefusal = $derived(formRefusal(form));
 
 	// The saved answer wins over the loaded one: the action returns without a
-	// redirect, so `data` still carries what the page opened with.
-	let loaded = $derived(form && 'locales' in form && form.locales ? form.locales : data.locales);
+	// redirect, so `data` still carries what the page opened with. A read that
+	// failed shows no form, so the empty value below is never drawn.
+	let loaded = $derived(
+		form && 'locales' in form && form.locales
+			? form.locales
+			: data.locales.ok
+				? data.locales.value
+				: { default_locale: '', enabled_locales: [], fallback_chain: [] },
+	);
 
 	// svelte-ignore state_referenced_locally
 	let defaultLocale = $state(loaded.default_locale);
@@ -72,8 +79,6 @@
 	let chainJSON = $derived(JSON.stringify(chain));
 </script>
 
-<PageTitle title="Locales" />
-
 <PageShell
 	title="Locales"
 	description="The languages this tenant keeps content in, and the order a missing translation falls back through."
@@ -84,17 +89,16 @@
 		<Badge tone="violet" size="sm">Beta</Badge>
 	{/snippet}
 
-	{#if data.unavailable}
-		<Alert tone="warn" title="The localization plugin did not answer">
-			The engine lists the plugin, but its routes are not responding. Locales cannot be read or
-			written until it is.
-		</Alert>
+	{#if !data.locales.ok}
+		<GateNotice
+			level={2}
+			gate={data.locales.gate}
+			title="Locales"
+			absent="The localization plugin is not part of this build, so content is kept in one language."
+		/>
 	{:else}
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if form?.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{:else if form?.saved}
+		<FormErrors message={form?.error ?? undefined} refused={pageRefusal} />
+		{#if form?.saved}
 			<Alert tone="success" autoDismiss>Locales saved.</Alert>
 		{/if}
 
@@ -115,7 +119,7 @@
 
 			<Card>
 				<div class="flex flex-col gap-4">
-					<SectionHeading level={3}>Default locale</SectionHeading>
+					<SectionHeading level={2}>Default locale</SectionHeading>
 					<Input
 						id="default-locale"
 						name="default_locale"
@@ -131,12 +135,12 @@
 
 			<Card>
 				<div class="flex flex-col gap-4">
-					<SectionHeading level={3}>Enabled locales</SectionHeading>
+					<SectionHeading level={2}>Enabled locales</SectionHeading>
 					<p class="text-sm text-muted">
 						Each one is a tab in every entry's Translations panel. Language tags such as
 						<span class="font-mono">fr</span> or <span class="font-mono">pt-BR</span>.
 					</p>
-					<div class="flex flex-wrap gap-2" role="list" aria-label="Enabled locales">
+					<div class="flex flex-wrap items-center gap-2" role="list" aria-label="Enabled locales">
 						{#each enabled as code (code)}
 							<div role="listitem">
 								{#if code === defaultLocale}
@@ -173,7 +177,7 @@
 
 			<Card>
 				<div class="flex flex-col gap-4">
-					<SectionHeading level={3}>Fallback chain</SectionHeading>
+					<SectionHeading level={2}>Fallback chain</SectionHeading>
 					<p class="text-sm text-muted">
 						When a translation is missing, the reader gets the first locale in this order that has
 						one, and the source fields after that.
@@ -226,6 +230,7 @@
 								label="Append a locale"
 								placeholder="Pick a locale"
 								options={addable}
+								searchable
 								bind:value={chainPick}
 								disabled={addable.length === 0}
 							/>

@@ -39,6 +39,12 @@ describe('AI prices page', () => {
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
 		expect(dialog.querySelector('input[name="model"]')).toBeTruthy();
 		expect(dialog.querySelector('button[type="submit"]')?.textContent?.trim()).toBe('Create');
+		// The four kinds are a list of radios with a sentence each, so the long
+		// labels stay inside a phone-width drawer.
+		const radios = dialog.querySelectorAll<HTMLInputElement>('input[type="radio"][name="kind"]');
+		expect(radios).toHaveLength(4);
+		expect([...radios].find((r) => r.checked)?.value).toBe('openai');
+		expect(dialog.textContent).toContain('Any server that speaks the OpenAI API');
 	});
 
 	it('asks before it deletes, then posts the row key', async () => {
@@ -61,9 +67,25 @@ describe('AI prices page', () => {
 		expect(saved.getByRole('status').textContent).toContain('Saved.');
 	});
 
-	it('shows a write error on the page once the drawer is shut', () => {
-		const { getByText } = setup({}, { key: 'openai/', error: 'Model is required.' });
-		expect(getByText('Model is required.')).toBeTruthy();
+	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
+		const { container, getByText, getAllByRole } = setup({}, { action: 'delete', key: 'openai/gpt-4o', error: 'Failed to delete the price' });
+		expect(getByText('Failed to delete the price')).toBeTruthy();
+		await fireEvent.click(getAllByRole('button', { name: /new price/i })[0]);
+		const form = container.querySelector('#price-form') as HTMLElement;
+		expect(form.textContent).not.toContain('Failed to delete the price');
+	});
+
+	it('shows a failed save inside the open drawer and not on the page behind it', async () => {
+		const { container, getAllByRole, rerender } = setup();
+		await fireEvent.click(getAllByRole('button', { name: /new price/i })[0]);
+		await rerender({ form: { action: 'save', key: 'openai/', error: 'Model is required.' } } as never);
+		expect((container.querySelector('#price-form') as HTMLElement).textContent).toContain('Model is required.');
+		expect(document.body.textContent?.split('Model is required.').length).toBe(2);
+	});
+
+	it('offers no new price while the layout says AI is off, even with a list answered', () => {
+		const { queryByRole } = setup({ aiLayoutGate: { state: 'off' } });
+		expect(queryByRole('button', { name: /new price/i })).toBeNull();
 	});
 
 	it('paints the empty state and the off state', () => {
@@ -73,5 +95,15 @@ describe('AI prices page', () => {
 		const off = setup({ gate: { state: 'off' }, prices: [] });
 		expect(off.getByText('AI is switched off for this tenant')).toBeTruthy();
 		expect(off.queryByRole('button', { name: /new price/i })).toBeNull();
+	});
+});
+
+describe('AI prices table', () => {
+	// The timestamp wrapped to four lines in a 42px column.
+	it('keeps the updated time on one line', () => {
+		const { container } = setup();
+		const row = container.querySelector('tbody tr') as HTMLElement;
+		const updated = [...row.querySelectorAll('td')][5];
+		expect(updated.getAttribute('data-cell')).toBe('nowrap');
 	});
 });

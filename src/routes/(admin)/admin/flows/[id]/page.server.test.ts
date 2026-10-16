@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { actions, load } from './+page.server';
+import { forbiddenText } from '$lib/api/gate';
+import { BUSY, OUTAGE } from '$lib/outage';
 import { blockedFlow, fixtureCatalog, fixtureEventTypes, fixtureFlow, fixtureRun, fixtureTemplates, joinFlow, missingTypeErrors, withLocked } from '$lib/flow/fixtures';
 import type { FlowRun, FlowVersion } from '$lib/api/flows';
 import type { FlowOption, NodeSpec } from '$lib/flow/types';
@@ -38,9 +40,9 @@ function fetchFor(routes: Record<string, Route>) {
 const everything: Record<string, Route> = {
 	'/api/admin/flows/catalog/llm': () => new Response('# Nodes\n\ncontent.query', { status: 200, headers: { 'content-type': 'text/markdown' } }),
 	'/api/admin/flows/catalog': () => json({ data: fixtureCatalog }),
-	'/api/admin/ai/assist/flow/explain': () => json({ answer: 'It **joins** two lists.', conversation_id: 'c1', model: 'm', tokens: 40, cost: 0.0002 }),
+	'/api/admin/ai/assist/flow/explain': () => json({ answer: 'It **joins** two lists.', conversation_id: 'c1', model: 'm', tokens: 40, cost: '0.000200' }),
 	'/api/admin/ai/assist/flow': () =>
-		json({ definition: joinFlow, yaml: 'name: x\n', problems: [{ node_id: 'join', path: '/config/left_key', message: 'required' }], conversation_id: 'c1', model: 'm', tokens: 120, cost: 0.001 }),
+		json({ definition: joinFlow, yaml: 'name: x\n', problems: [{ node_id: 'join', path: '/config/left_key', message: 'required' }], conversation_id: 'c1', model: 'm', tokens: 120, cost: '0.001000' }),
 	'/api/admin/flows/event-types': () => json(fixtureEventTypes),
 	'/api/admin/flows?': () => json({ data: [fixtureFlow, { ...fixtureFlow, id: 'f2', slug: 'send-receipt', name: 'Send receipt' }], total: 2 }),
 	'/api/admin/flows/templates': () => json({ data: fixtureTemplates }),
@@ -90,6 +92,27 @@ function actionEvent(form: FormData, routes: Record<string, Route> = everything)
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
 describe('admin/flows/[id] load', () => {
+	// A failed read of the names is not a tenant with none, so the node form
+	// and the inspector have to tell the two apart.
+	it('keeps a failed datasource or variable read as its gate', async () => {
+		const { event } = loadEvent({
+			...everything,
+			'/api/admin/flows/datasources': () => json({ error: 'unavailable' }, 503),
+			'/api/admin/flows/variables': () => json({ error: 'boom' }, 500),
+		});
+		const result = (await load(event)) as Loaded;
+		expect(result.datasources).toEqual([]);
+		expect(result.datasourcesGate).toEqual({ state: 'unavailable' });
+		expect(result.variablesGate).toMatchObject({ state: 'error' });
+	});
+
+	it('reports both name reads as read when they answered', async () => {
+		const { event } = loadEvent();
+		const result = (await load(event)) as Loaded;
+		expect(result.datasourcesGate).toEqual({ state: 'ok' });
+		expect(result.variablesGate).toEqual({ state: 'ok' });
+	});
+
 	it('loads the flow with its draft, the catalog, names and recent runs', async () => {
 		const { event, calls } = loadEvent();
 		const result = (await load(event)) as Loaded;
@@ -102,9 +125,11 @@ describe('admin/flows/[id] load', () => {
 		expect(result.flows.map((f: FlowOption) => f.slug)).toEqual([fixtureFlow.slug, 'send-receipt']);
 		expect(calls.find((c) => c.url.includes('/api/admin/flows?'))?.url).toContain('status=active');
 		expect(result.eventTypes).toEqual(fixtureEventTypes);
-		expect(result.runs.map((r: FlowRun) => r.id)).toEqual(['r1']);
-		expect(result.versions.map((v: FlowVersion) => v.version)).toEqual([1]);
-		expect(calls.find((c) => c.url.includes('/runs'))?.url).toContain('limit=20');
+		expect(result.runs.ok && result.runs.value.rows.map((r: FlowRun) => r.id)).toEqual(['r1']);
+		expect(result.catalogGate).toEqual({ state: 'ok' });
+		expect(result.versions.ok && result.versions.value.map((v: FlowVersion) => v.version)).toEqual([1]);
+		// One row past the page says whether another follows.
+		expect(calls.find((c) => c.url.includes('/runs'))?.url).toContain('limit=21');
 	});
 
 	it('loads the editor on an engine without the event-types route, with the pickers as free text', async () => {
@@ -153,6 +178,23 @@ describe('admin/flows/[id] load', () => {
 		expect(err.body.message).not.toContain('not found');
 	});
 
+	it('sends an outage to the outage page and a refused rate to the busy sentence', async () => {
+		const gateway = (await Promise.resolve(load(loadEvent({ '/api/admin/flows/f1': () => json({ error: 'bad gateway' }, 504) }).event)).catch(
+			(e: unknown) => e,
+		)) as { status: number; body: { message: string } };
+		expect(gateway).toMatchObject({ status: 503, body: { message: OUTAGE.title } });
+		const busy = (await Promise.resolve(load(loadEvent({ '/api/admin/flows/f1': () => json({ error: 'slow down' }, 429) }).event)).catch(
+			(e: unknown) => e,
+		)) as { status: number; body: { message: string } };
+		expect(busy).toMatchObject({ status: 429, body: { message: BUSY.body } });
+	});
+
+	it('says in the load when the versions could not be read, never an empty history', async () => {
+		const { event } = loadEvent({ ...everything, '/api/admin/flows/f1/versions': () => json({ error: 'down' }, 503) });
+		const result = (await load(event)) as Loaded;
+		expect(result.versions).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
 	it('sends an expired session to the login page with the cookie cleared', async () => {
 		const { event } = loadEvent({ '/api/admin/flows/f1': () => json({ error: 'unauthorized' }, 401) });
 		await expect(load(event)).rejects.toMatchObject({ status: 302, location: '/login' });
@@ -161,7 +203,7 @@ describe('admin/flows/[id] load', () => {
 
 	it('answers a refused role with 403 and names the role as the reason', async () => {
 		const { event } = loadEvent({ '/api/admin/flows/f1': () => json({ error: 'forbidden' }, 403) });
-		await expect(load(event)).rejects.toMatchObject({ status: 403, body: { message: 'Your role cannot read flows' } });
+		await expect(load(event)).rejects.toMatchObject({ status: 403, body: { message: forbiddenText('this page') } });
 	});
 
 	it('offers the Assistant tab when the catalog for a model can be read, and hides it on a 402', async () => {
@@ -179,7 +221,38 @@ describe('admin/flows/[id] load', () => {
 		const { event } = loadEvent({ '/api/admin/flows/f1': () => json(fixtureFlow) });
 		const result = (await load(event)) as Loaded;
 		expect(result.catalog).toEqual([]);
-		expect(result.runs).toEqual([]);
+		expect(result.catalogGate.state).toBe('absent');
+	});
+
+	// Neither draws as a palette or a history with nothing in it.
+	it('keeps an outage on the catalog or the runs apart from an empty answer', async () => {
+		const { event } = loadEvent({
+			...everything,
+			'/api/admin/flows/catalog': () => json({ error: 'down' }, 503),
+			'/api/admin/flows/f1/runs': () => json({ error: 'down' }, 503),
+		});
+		const result = (await load(event)) as Loaded;
+		expect(result.catalog).toEqual([]);
+		expect(result.catalogGate).toEqual({ state: 'unavailable' });
+		expect(result.runs).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('pages the runs by the address and states whether another page follows', async () => {
+		const { fetch, calls } = fetchFor({
+			...everything,
+			'/api/admin/flows/f1/runs': () => json({ data: Array.from({ length: 21 }, (_, i) => ({ ...fixtureRun, id: `r${i}` })) }),
+		});
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			params: { id: 'f1' },
+			url: new URL('http://localhost/admin/flows/f1?offset=20'),
+			parent: async () => ({ user: { roles: ['super_admin'] } }),
+		} as never;
+		const result = (await load(event)) as Loaded;
+		expect(calls.find((c) => c.url.includes('/runs'))?.url).toContain('offset=20');
+		expect(result.runs.ok && result.runs.value.rows).toHaveLength(20);
+		expect(result.runs.ok && result.runs.value.hasMore).toBe(true);
 	});
 });
 
@@ -256,6 +329,40 @@ describe('admin/flows/[id] actions', () => {
 		expect(result.data.errors[0].node_id).toBe('render');
 	});
 
+	it('save reads a slug another flow holds out of the 409 list', async () => {
+		const form = new FormData();
+		form.set('definition', JSON.stringify(fixtureFlow.draft));
+		form.set('name', 'Orders');
+		form.set('slug', 'taken');
+		const body = { ok: false, errors: [{ path: '/slug', message: 'another flow in this tenant already uses this slug' }] };
+		const { event } = actionEvent(form, { '/api/admin/flows/f1': () => json(body, 409) });
+		const result = (await actions.save(event)) as { status: number; data: { error: string; errors: unknown[] } };
+		expect(result.status).toBe(409);
+		expect(result.data.error).toBe('Another flow already uses this slug. Choose another.');
+		expect(result.data.errors).toEqual(body.errors);
+	});
+
+	it('publish marks the trigger when another flow answers its HTTP path', async () => {
+		const body = { ok: false, errors: [{ node_id: 'trigger', path: '/config/path', message: 'another flow already answers this path' }] };
+		const { event } = actionEvent(new FormData(), { '/api/admin/flows/f1/publish': () => json(body, 409) });
+		const result = (await actions.publish(event)) as { status: number; data: { error: string; errors: { node_id?: string }[] } };
+		expect(result.status).toBe(409);
+		expect(result.data.error).toContain('Another flow already answers this HTTP path');
+		expect(result.data.errors[0].node_id).toBe('trigger');
+		expect(result.data.error).not.toContain('{');
+	});
+
+	it('rollback reads the same 409 list as a publish', async () => {
+		const form = new FormData();
+		form.set('version', '1');
+		const body = { ok: false, errors: [{ node_id: 'trigger', path: '/config/path', message: 'another flow already answers this path' }] };
+		const { event } = actionEvent(form, { '/api/admin/flows/f1/rollback': () => json(body, 409) });
+		const result = (await actions.rollback(event)) as { status: number; data: { error: string; errors: unknown[] } };
+		expect(result.status).toBe(409);
+		expect(result.data.errors).toHaveLength(1);
+		expect(result.data.error).not.toContain('{');
+	});
+
 	it('publish maps a 402 to the locked state', async () => {
 		const { event } = actionEvent(new FormData(), { '/api/admin/flows/f1/publish': () => json({ error: 'nope' }, 402) });
 		const result = (await actions.publish(event)) as { status: number; data: { locked: boolean } };
@@ -278,7 +385,7 @@ describe('admin/flows/[id] actions', () => {
 		const result = (await actions.save(event)) as { status: number; data: { error: string; locked?: boolean; refusal: unknown; errors: unknown[] } };
 		expect(result.status).toBe(402);
 		expect(result.data.locked).toBeUndefined();
-		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'orders'], limit: null, current: null });
+		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'orders'], limit: null, current: null, upgradeUrl: '' });
 		expect(result.data.error).toContain('the trigger, orders');
 		expect(result.data.error).not.toContain('example-capability');
 		expect(result.data.errors).toHaveLength(2);
@@ -431,7 +538,7 @@ describe('admin/flows/[id] actions', () => {
 
 	it('assist maps 402, 404 and 503 to locked, off and unavailable with the static text', async () => {
 		const refused = (status: number, body: unknown) => actionEvent(assistForm(), { ...everything, '/api/admin/ai/assist/flow': () => json(body, status) }).event;
-		expect(await actions.assist(refused(402, { error: 'ai is not enabled' }))).toMatchObject({ status: 402, data: { assistRefused: { state: 'locked' } } });
+		expect(await actions.assist(refused(402, { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' }))).toMatchObject({ status: 402, data: { assistRefused: { state: 'locked' } } });
 		expect(await actions.assist(refused(404, { error: 'not found' }))).toMatchObject({ status: 404, data: { assistRefused: { state: 'off' } } });
 		expect(await actions.assist(refused(503, { error: 'flow validator is not registered' }))).toMatchObject({
 			status: 503,

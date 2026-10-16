@@ -18,21 +18,34 @@ vi.mock('$lib/api/request-capture', async (importOriginal) => ({
 	...api,
 }));
 
+const authz = vi.hoisted(() => ({ roles: ['admin'] as string[] }));
+
 vi.mock('$lib/server/authz', () => ({
 	authedClient: vi.fn(() => ({})),
-	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
+	requireRole: vi.fn(async (_event: unknown, allowed: string[]) => {
+		if (!allowed.some((r) => authz.roles.includes(r))) throw new Error('403');
+		return { id: 'u1', roles: authz.roles };
+	}),
 }));
 
 import { load, actions } from './+page.server';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
-function loadEvent(plugins?: unknown) {
+// The session cookie as the engine signs it. The engine's me answer carries no
+// tenant, so the page takes it from the token.
+function sessionCookies(tenant: string) {
+	const part = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
+	const token = `${part({ alg: 'HS256' })}.${part({ sub: 'u', roles: ['super_admin'], ...(tenant ? { tenant_id: tenant } : {}) })}.s`;
+	return { get: (name: string) => (name === 'sys_session' ? token : undefined) };
+}
+
+function loadEvent(plugins?: unknown, roles = ['admin'], tenant = '') {
 	return {
 		url: new URL('http://admin/admin/observability/captures'),
 		fetch: vi.fn(),
-		cookies: {},
-		parent: async () => ({ user: { roles: ['admin'] }, plugins }),
+		cookies: sessionCookies(tenant),
+		parent: async () => ({ user: { roles }, plugins }),
 	} as never;
 }
 
@@ -60,6 +73,7 @@ const capture = {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	authz.roles = ['admin'];
 	api.listCaptures.mockResolvedValue({ data: [capture], total_count: 1, licensed: false });
 	api.listCaptureRules.mockResolvedValue({ data: [], licensed: false });
 	api.listReplaySets.mockResolvedValue({ data: [], licensed: false });
@@ -87,6 +101,38 @@ describe('captures load', () => {
 		const result = (await load(loadEvent())) as Loaded;
 		expect(result.rulesRead).toBe(false);
 		expect(result.captures).toHaveLength(1);
+	});
+
+	// A role refusal, a lapsed license and an outage each read differently,
+	// so a failed rules or sets read keeps its gate.
+	it('keeps the gate of a failed rules or sets read', async () => {
+		api.listCaptureRules.mockRejectedValue(new ApiError(403, 'forbidden', {}));
+		api.listReplaySets.mockRejectedValue(new ApiError(503, 'down', {}));
+		const result = (await load(loadEvent())) as Loaded;
+		expect(result.rulesGate).toEqual({ state: 'forbidden' });
+		expect(result.setsGate).toEqual({ state: 'unavailable' });
+	});
+
+	// The plugin applies no tenant filter to a super admin's read, so the page
+	// has to know whose requests it lists.
+	it('says whether the list is every tenant\'s', async () => {
+		expect(((await load(loadEvent())) as Loaded).superAdmin).toBe(false);
+		expect(((await load(loadEvent(undefined, ['super_admin']))) as Loaded).superAdmin).toBe(true);
+	});
+
+	// A replay set takes only the session tenant's captures.
+	it("hands the page the session's own tenant", async () => {
+		expect(((await load(loadEvent(undefined, ['super_admin'], 'acme'))) as Loaded).ownTenant).toBe('acme');
+		expect(((await load(loadEvent(undefined, ['super_admin']))) as Loaded).ownTenant).toBeNull();
+	});
+});
+
+describe('the captures pager', () => {
+	it('sends an offset past the end back to the last page', async () => {
+		api.listCaptures.mockResolvedValue({ data: [], total_count: 60, licensed: true });
+		const event = loadEvent() as unknown as { url: URL };
+		event.url = new URL('http://admin/admin/observability/captures?limit=50&offset=500');
+		await expect(load(event as never)).rejects.toMatchObject({ status: 307, location: expect.stringContaining('offset=50') });
 	});
 });
 
@@ -181,5 +227,96 @@ describe('replay sets', () => {
 		api.replaySet.mockResolvedValue({ set_id: 's1', results: [] });
 		await actions.replaySet(formEvent({ id: 's1', confirm_mutating: 'true' }));
 		expect(api.replaySet).toHaveBeenCalledWith(expect.anything(), 's1', true);
+	});
+});
+
+describe('which surface a failure belongs to', () => {
+	const fields = { route_pattern: '/api/v1/orders', method: '*', sample_percent: '100', retention_seconds: '3600', enabled: 'true' };
+
+	it('tags a failed rule save for the rule drawer', async () => {
+		api.createCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.createRule(formEvent(fields))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('rule');
+	});
+
+	it('tags a failed set save for the set drawer', async () => {
+		const out = (await actions.createSet(formEvent({ name: '' }))) as { data: Record<string, unknown> };
+		expect(out.data.drawer).toBe('set');
+	});
+
+	it('leaves a failed switch-off from the row for the page', async () => {
+		api.updateCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.updateRule(formEvent({ ...fields, id: 'r1', enabled: 'false', from: 'row' }))) as {
+			data: Record<string, unknown>;
+		};
+		expect(out.data.drawer).toBeNull();
+	});
+});
+
+describe('deleting a rule', () => {
+	it('deletes the rule it names', async () => {
+		api.deleteCaptureRule.mockResolvedValue(undefined);
+		expect(await actions.deleteRule(formEvent({ id: 'r1' }))).toEqual({ removedRule: 'r1' });
+		expect(api.deleteCaptureRule).toHaveBeenCalledWith(expect.anything(), 'r1');
+	});
+
+	it('refuses a delete that names no rule', async () => {
+		const out = (await actions.deleteRule(formEvent({}))) as { status: number };
+		expect(out.status).toBe(400);
+		expect(api.deleteCaptureRule).not.toHaveBeenCalled();
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
+		await expect(actions.deleteRule(formEvent({ id: 'r1' }))).rejects.toThrow('403');
+		expect(api.deleteCaptureRule).not.toHaveBeenCalled();
+	});
+
+	it("relays the plugin's refusal", async () => {
+		api.deleteCaptureRule.mockRejectedValue(new ApiError(404, 'rule not found', {}));
+		const out = (await actions.deleteRule(formEvent({ id: 'r1' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('rule not found');
+	});
+
+	it('says an outage failed the delete', async () => {
+		api.deleteCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.deleteRule(formEvent({ id: 'r1' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('The rule could not be deleted.');
+	});
+});
+
+describe('deleting a replay set', () => {
+	it('deletes the set it names', async () => {
+		api.deleteReplaySet.mockResolvedValue(undefined);
+		expect(await actions.deleteSet(formEvent({ id: 's1' }))).toEqual({ removedSet: 's1' });
+		expect(api.deleteReplaySet).toHaveBeenCalledWith(expect.anything(), 's1');
+	});
+
+	it('refuses a delete that names no set', async () => {
+		const out = (await actions.deleteSet(formEvent({}))) as { status: number };
+		expect(out.status).toBe(400);
+		expect(api.deleteReplaySet).not.toHaveBeenCalled();
+	});
+
+	it('refuses a role the plugin does not admit', async () => {
+		authz.roles = ['editor'];
+		await expect(actions.deleteSet(formEvent({ id: 's1' }))).rejects.toThrow('403');
+		expect(api.deleteReplaySet).not.toHaveBeenCalled();
+	});
+
+	it("relays the plugin's refusal", async () => {
+		api.deleteReplaySet.mockRejectedValue(new ApiError(404, 'replay set not found', {}));
+		const out = (await actions.deleteSet(formEvent({ id: 's1' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('replay set not found');
+	});
+
+	it('says an outage failed the delete', async () => {
+		api.deleteReplaySet.mockRejectedValue(new TypeError('fetch failed'));
+		const out = (await actions.deleteSet(formEvent({ id: 's1' }))) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('The replay set could not be deleted.');
 	});
 });

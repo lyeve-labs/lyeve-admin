@@ -20,12 +20,38 @@ export function readFilter(url: URL): AuditFilter {
 		const v = url.searchParams.get(key) ?? '';
 		return DAY.test(v) ? v : '';
 	};
+	// A From day after the To day is a reversed range, which the engine
+	// refuses outright. The two days are swapped, so the reader sees the
+	// window they meant instead of a failed read.
+	let from = day('from');
+	let to = day('to');
+	if (from && to && from > to) [from, to] = [to, from];
 	return {
 		q: (url.searchParams.get('q') ?? '').trim(),
 		action: (url.searchParams.get('action') ?? '').trim(),
-		from: day('from'),
-		to: day('to'),
+		from,
+		to,
 	};
+}
+
+/** The most entries an audit export holds when the request names no limit. */
+export const AUDIT_EXPORT_CEILING = 100_000;
+
+/**
+ * The body of an audit export for the filter on screen.
+ *
+ * The export takes the dates, the action and the resource type, but no user
+ * or record id, so a search for an id is not applied to the file. It names no
+ * limit, so the plugin stops at its ceiling.
+ */
+export function exportBody(filter: AuditFilter): Record<string, string> {
+	const params = endpointQuery(filter, 1, 0);
+	const body: Record<string, string> = { format: 'json' };
+	for (const key of ['from', 'to', 'action', 'resource_type']) {
+		const value = params.get(key);
+		if (value) body[key] = value;
+	}
+	return body;
 }
 
 /**

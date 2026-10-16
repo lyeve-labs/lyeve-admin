@@ -30,6 +30,14 @@
  * that plugin running for the signed-in tenant. The engine's own entries are
  * always listed, so an engine that runs no plugin still has a sidebar.
  *
+ * An entry is listed only to the roles the engine answers on the read its page
+ * opens with. An admin route answers admin and super_admin, a super admin
+ * route answers super_admin alone, and a route for any signed-in caller
+ * answers every role, a custom one included. A page that mixes them is listed
+ * by its read and gates its own writes. Listed to a role the engine refuses,
+ * an entry opens on a page with nothing in it and buttons that fail. Like the
+ * plugin gate, this is a courtesy and never a control.
+ *
  * Access ships expanded. The mobile drawer is the only way to reach anything on
  * a phone, and Users has to be on screen the moment it opens rather than behind
  * a disclosure a reader has to find first.
@@ -112,6 +120,7 @@ import {
 	Wrench,
 	History,
 	ShieldQuestion,
+	LockKeyhole,
 } from '@lucide/svelte';
 import { PLUGIN, type PluginName } from '$lib/plugin-names';
 import { runs, UNNAMED, type PluginSet } from '$lib/plugins';
@@ -232,24 +241,41 @@ export interface NavInputs {
 
 export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavTree {
 	const superAdmin = roles.includes('super_admin');
-	// The tier that may read what the instance did, without the tier that may
-	// change what it is.
+	// The roles an admin route answers: the tier that may read what the
+	// instance did, without the tier that may change what it is.
 	const operator = superAdmin || roles.includes('admin');
+	// Wrap an entry whose page opens on an admin route, or on a super admin
+	// route, so a role the engine refuses there is never offered it.
+	const operatorOnly = (...nodes: NavNode[]): NavNode[] => (operator ? nodes : []);
+	const superAdminOnly = (...nodes: NavNode[]): NavNode[] => (superAdmin ? nodes : []);
 
 	const dailyWork: NavNode[] = [
 		{ id: 'dashboard', label: 'Dashboard', href: '/admin', icon: Home, match: 'exact' },
 		// Content, the Schema builder and Flows, in the order a reader builds
 		// them: a schema, the content in it, the flows that act on it.
-		{ id: 'content', label: 'Content', href: '/admin/content', icon: Database, match: 'prefix' },
+		//
+		// Content is an admin's although its index lists the schemas first,
+		// which any reader may read. Every collection opens on its entries, and
+		// the content plugin serves those to an admin only.
+		...operatorOnly({ id: 'content', label: 'Content', href: '/admin/content', icon: Database, match: 'prefix' }),
+		// Any signed-in reader may read the definitions. A change takes an
+		// admin, and the page offers one only to an admin.
 		{ id: 'schema', label: 'Schema builder', href: '/admin/schema', icon: Layout, match: 'prefix' },
+		// The flow list answers any signed-in reader with the flows the
+		// permission rules let that reader see.
 		{ id: 'flows', label: 'Flows', href: '/admin/flows', icon: Workflow, match: 'prefix' },
 		// Reviews sit beside Content rather than under it: the content prefix
 		// is a schema name, so the page lives on its own path. They follow the
 		// three rather than splitting them: the queue serves Content and is
 		// opened by a narrower group than the three are.
+		//
+		// A reviewer of any role reads their own assignments. The definitions
+		// are an admin's, and the page reads them only for an admin.
 		{ id: 'reviews', label: 'Reviews', href: '/admin/reviews', icon: ClipboardCheck, match: 'prefix' },
-		{ id: 'media', label: 'Media library', href: '/admin/media', icon: Images, match: 'prefix' },
-		{ id: 'search', label: 'Search', href: '/admin/search', icon: Search, match: 'prefix' },
+		...operatorOnly(
+			{ id: 'media', label: 'Media library', href: '/admin/media', icon: Images, match: 'prefix' },
+			{ id: 'search', label: 'Search', href: '/admin/search', icon: Search, match: 'prefix' },
+		),
 	];
 
 	const delivery: NavNode[] = [
@@ -257,36 +283,53 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		// carries, and a token to try it with. It leads the section because
 		// it is the first thing a reader integrating needs, before the
 		// reference that lists what they can then call.
+		//
+		// Every role keeps it. The page reads nothing the engine guards, and
+		// the token exchange it tries is open to every account.
 		{ id: 'api-access', label: 'API access', href: '/admin/api-access', icon: KeyRound },
-		{ id: 'api-reference', label: 'API reference', href: '/admin/api-reference', icon: BookOpen },
-		// The executing half of the reference. It sits beside it because a
-		// reader who wants to know what an endpoint answers is one row away
-		// from the page that documents it.
-		{ id: 'api-labs', label: 'API labs', href: '/admin/api-labs', icon: FlaskConical },
+		// The engine serves its API document to an admin only, and both pages
+		// open on it. Anybody else would get the built-in catalog under a
+		// warning that the engine did not answer.
+		...operatorOnly(
+			{ id: 'api-reference', label: 'API reference', href: '/admin/api-reference', icon: BookOpen },
+			// The executing half of the reference. It sits beside it because a
+			// reader who wants to know what an endpoint answers is one row away
+			// from the page that documents it.
+			{ id: 'api-labs', label: 'API labs', href: '/admin/api-labs', icon: FlaskConical },
+		),
 		// The other protocol the instance answers on. It files with delivery
 		// because that is the question it answers: how content gets out.
-		{ id: 'grpc', label: 'gRPC', href: '/admin/settings/grpc', icon: Network },
-		{ id: 'graphql', label: 'GraphQL', href: '/admin/settings/graphql', icon: Braces },
-		// Releases decide when a set of entries goes out, so they file with
-		// how content leaves rather than with the daily editing above.
-		// 'prefix', so a release's own page marks this row.
-		{ id: 'releases', label: 'Releases', href: '/admin/releases', icon: CalendarClock, match: 'prefix' },
-		// Experiments split the traffic that leaves through the read API, so
-		// they file with delivery rather than with the instance's settings.
-		{
-			id: 'experiments',
-			label: 'Experiments',
-			href: '/admin/experiments',
-			icon: FlaskConical,
-			match: 'prefix',
-		},
-		{ id: 'webhooks', label: 'Webhooks', href: '/admin/webhooks', icon: Webhook, match: 'exact' },
-		{
-			id: 'webhooks-incoming',
-			label: 'Incoming webhooks',
-			href: '/admin/webhooks/incoming',
-			icon: ArrowDownToLine,
-		},
+		//
+		// The listener's status says how this process is reachable on its
+		// host, so the engine serves it to a super admin only.
+		...superAdminOnly({ id: 'grpc', label: 'gRPC', href: '/admin/settings/grpc', icon: Network }),
+		...operatorOnly(
+			// The endpoint takes any signed-in caller, but the page reads the
+			// schema by introspection, which the GraphQL plugin answers for an
+			// admin unless the instance opens it to everyone. The persisted
+			// queries beside it are an admin route.
+			{ id: 'graphql', label: 'GraphQL', href: '/admin/settings/graphql', icon: Braces },
+			// Releases decide when a set of entries goes out, so they file with
+			// how content leaves rather than with the daily editing above.
+			// 'prefix', so a release's own page marks this row.
+			{ id: 'releases', label: 'Releases', href: '/admin/releases', icon: CalendarClock, match: 'prefix' },
+			// Experiments split the traffic that leaves through the read API, so
+			// they file with delivery rather than with the instance's settings.
+			{
+				id: 'experiments',
+				label: 'Experiments',
+				href: '/admin/experiments',
+				icon: FlaskConical,
+				match: 'prefix',
+			},
+			{ id: 'webhooks', label: 'Webhooks', href: '/admin/webhooks', icon: Webhook, match: 'exact' },
+			{
+				id: 'webhooks-incoming',
+				label: 'Incoming webhooks',
+				href: '/admin/webhooks/incoming',
+				icon: ArrowDownToLine,
+			},
+		),
 	];
 
 	// Admin tokens sit beside API keys, the other machine credential. An admin
@@ -385,28 +428,24 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 						icon: Building2,
 						match: 'exact' as const,
 					},
-					// Quotas cover every tenant, so the page refuses anybody but a
-					// super admin. The row follows the page rather than sitting
-					// beside tenant costs, which an admin may read.
+			  ]
+			: []),
+		// The quota reads and the cost ledger both answer an admin with the
+		// caller's own tenant, and a super admin with every tenant.
+		...(operator
+			? [
 					{
 						id: 'tenant-usage',
 						label: 'Quotas and usage',
 						href: '/admin/tenants/usage',
 						icon: Gauge,
 					},
-			  ]
-			: []),
-		// The cost ledger reads the caller's own tenant, and its routes take an
-		// admin as well as a super admin.
-		...(operator
-			? [
 					{
 						id: 'tenant-costs',
 						label: 'Tenant costs',
 						href: '/admin/tenants/costs',
 						icon: Coins,
 					},
-
 			  ]
 			: []),
 	];
@@ -496,6 +535,14 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		href: '/admin/settings/captcha',
 		icon: ShieldQuestion,
 	};
+	// How the accounts this tenant's identity provider created may sign in
+	// without it. The engine answers the tenant's admin and a super admin.
+	const signIn: NavNode = {
+		id: 'sign-in',
+		label: 'Sign-in',
+		href: '/admin/settings/sign-in',
+		icon: LockKeyhole,
+	};
 	// A tenant admin's own limit and address lists. A super admin reaches the
 	// same page from the instance rate limits.
 	const tenantRateLimits: NavNode = {
@@ -575,9 +622,10 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 				{ id: 'pii', label: 'PII masking', href: '/admin/settings/pii', icon: EyeOff },
 				customization,
 				captcha,
+				signIn,
 		  ]
 		: operator
-			? [customization, captcha, tenantRateLimits]
+			? [customization, captcha, signIn, tenantRateLimits]
 			: [];
 
 	const tree: NavTree = [

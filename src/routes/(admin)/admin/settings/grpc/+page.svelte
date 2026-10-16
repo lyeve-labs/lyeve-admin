@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -44,8 +43,6 @@
 	const note = $derived(reflectionNote(data.status));
 </script>
 
-<PageTitle title="gRPC" />
-
 <PageShell
 	title="gRPC"
 	description="The listener this plugin serves on, and what answers there."
@@ -66,6 +63,7 @@
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="gRPC"
 			absent="The gRPC plugin is not part of this build, so nothing is listening."

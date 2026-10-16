@@ -1,12 +1,14 @@
 <script lang="ts">
 	/*
 	 * What to export and how, shared by the start and schedule drawers so the
-	 * two can never offer different choices. The multi-selects and the
+	 * two can never offer different choices. The schema picker and the
 	 * switches submit nothing on their own, so each value rides in a hidden
-	 * input the action reads.
+	 * input the action reads. The format and status groups are native inputs
+	 * and submit under their names.
 	 */
-	import { MultiSelect, Select, Textarea, Toggle } from '@lyeve-labs/ui-kit';
-	import { FORMATS, FORMAT_LABELS, type ExportFormat } from '$lib/api/data-export';
+	import { CheckboxGroup, MultiSelect, RadioGroup, Textarea, Toggle } from '@lyeve-labs/ui-kit';
+	import { EXPORT_ROW_CEILING, FORMATS, FORMAT_LABELS } from '$lib/api/data-export';
+	import { formatCount } from '$lib/format';
 
 	let {
 		idPrefix,
@@ -19,7 +21,8 @@
 		template = $bindable(''),
 	}: {
 		idPrefix: string;
-		schemaNames: string[];
+		/** The tenant's schemas, or null when the list could not be read. */
+		schemaNames: string[] | null;
 		format?: string;
 		schemas?: string[];
 		statuses?: string[];
@@ -28,19 +31,33 @@
 		template?: string;
 	} = $props();
 
-	const formatOptions = FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f].label }));
-	const schemaOptions = $derived(schemaNames.map((s) => ({ value: s, label: s })));
+	// Each format carries a sentence the reader compares across formats before
+	// picking, so every one shows, not only the chosen one's.
+	const formatOptions = FORMATS.map((f) => ({
+		value: f,
+		label: FORMAT_LABELS[f].label,
+		description: FORMAT_LABELS[f].hint,
+	}));
+	const schemaOptions = $derived((schemaNames ?? []).map((s) => ({ value: s, label: s })));
 	const statusOptions = [
 		{ value: 'published', label: 'Published' },
 		{ value: 'draft', label: 'Draft' },
 		{ value: 'archived', label: 'Archived' },
 	];
-	const formatHint = $derived(FORMAT_LABELS[format as ExportFormat]?.hint ?? '');
-	const schemasHint = $derived(
-		schemas.length === 0
-			? `Every schema${schemaNames.length > 0 ? `, ${schemaNames.length} in this tenant` : ''}.`
-			: `${schemas.length} of ${schemaNames.length} schemas.`,
-	);
+	// The plugin stops an export at its row ceiling when the request names no
+	// limit, and lifting it risks the memory the ceiling protects.
+	const ceilingHint = `An export holds at most ${formatCount(EXPORT_ROW_CEILING)} entries. Pick fewer schemas or statuses to export more in parts.`;
+	// An unread list offers nothing to pick, and the hint says why rather than
+	// leaving an empty choice that reads as a tenant with no schemas.
+	const schemasHint = $derived.by(() => {
+		if (schemaNames === null) {
+			return 'The schema list could not be read, so none can be picked. Leave this empty to export every schema.';
+		}
+		if (schemas.length === 0) {
+			return `Every schema${schemaNames.length > 0 ? `, ${schemaNames.length} in this tenant` : ''}.`;
+		}
+		return `${schemas.length} of ${schemaNames.length} schemas.`;
+	});
 </script>
 
 <div class="flex flex-col gap-4">
@@ -57,14 +74,7 @@
 		<input type="hidden" name="schemas" value={s} />
 	{/each}
 
-	<Select
-		id="{idPrefix}-format"
-		name="format"
-		label="Format"
-		hint={formatHint}
-		bind:value={format}
-		options={formatOptions}
-	/>
+	<RadioGroup name="format" label="Format" hint={ceilingHint} bind:value={format} options={formatOptions} />
 
 	{#if format === 'template'}
 		<Textarea
@@ -78,16 +88,14 @@
 		/>
 	{/if}
 
-	<MultiSelect
-		id="{idPrefix}-statuses"
+	<CheckboxGroup
+		name="statuses"
 		label="Statuses"
-		placeholder="Every status"
+		hint={statuses.length === 0 ? 'None ticked exports every status.' : undefined}
+		orientation="horizontal"
 		options={statusOptions}
 		bind:value={statuses}
 	/>
-	{#each statuses as s (s)}
-		<input type="hidden" name="statuses" value={s} />
-	{/each}
 
 	<input type="hidden" name="include_schemas" value={includeSchemas ? 'true' : 'false'} />
 	<Toggle

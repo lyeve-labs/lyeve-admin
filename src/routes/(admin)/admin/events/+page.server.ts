@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -14,7 +14,8 @@ import {
 	type EventsGate,
 	type ReplayRun,
 } from '$lib/api/events';
-import { pageWindow } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { instantFromWallClock } from '$lib/utils/wall-clock';
 
 const DEFAULT_LIMIT = 50;
@@ -22,6 +23,14 @@ const MAX_LIMIT = 199;
 
 /** How many runs the panel beside the log shows. */
 const REPLAY_LIMIT = 10;
+
+/** The latest runs and how many there are in all. */
+export interface Runs {
+	rows: ReplayRun[];
+	total: number;
+}
+
+const NO_RUNS: Section<Runs> = { ok: true, value: { rows: [], total: 0 } };
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -31,7 +40,7 @@ export const load: PageServerLoad = async (event) => {
 	if (notRunning(plugins, PLUGIN.events)) {
 		return {
 			events: [] as EventRow[],
-			runs: [] as ReplayRun[],
+			runs: NO_RUNS,
 			total: 0,
 			limit,
 			offset,
@@ -46,19 +55,26 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		const page = await listEvents(client, limit, offset);
 		events = page.data ?? [];
+		const back = pastEndOffset(events.length, limit, offset, page.total_count ?? null);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 		total = Math.max(page.total_count ?? 0, offset + events.length);
 	} catch (err) {
+		if (isRedirect(err)) throw err;
 		gate = eventsGate(err);
 	}
 
 	// The run list is a panel beside the log. Losing it should not lose the
-	// log, which is the page's subject.
-	const runs =
+	// log, which is the page's subject, and it is never drawn as no runs.
+	const runs: Section<Runs> =
 		gate.state === 'ok'
-			? await listReplays(client, REPLAY_LIMIT, 0)
-					.then((p) => p.data ?? [])
-					.catch(() => [])
-			: [];
+			? await section(
+					listReplays(client, REPLAY_LIMIT, 0).then((p) => {
+						const rows = p.data ?? [];
+						return { rows, total: Math.max(p.total_count ?? 0, rows.length) };
+					}),
+					'The replay runs could not be read. This is not a report that none were run.'
+				)
+			: NO_RUNS;
 
 	return { events, runs, total, limit, offset, gate };
 };

@@ -1,10 +1,14 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error, fail, redirect } from '@sveltejs/kit';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { fail, redirect } from '@sveltejs/kit';
+import { ApiError, type Schema, type HttpClient } from '@lyeve-labs/client';
 import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
-import { setRelations } from '$lib/server/content-relations';
+import { readError } from '$lib/server/read-error';
+import { refusalOf, refusalText } from '$lib/api/refusal';
+import { readRelationChoices } from '$lib/server/relation-choices';
+import { setEntryRelations } from '$lib/server/content-relations';
+import { fieldRefusalOf } from '$lib/server/content-validation';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
@@ -32,7 +36,7 @@ import {
 	type ReviewDefinition,
 	type StageSLA,
 } from '$lib/api/review';
-import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
+import { listPeople, type Person } from '$lib/server/people';
 
 /**
  * Entries live in the admin store (sys_content_entries) and are served by the
@@ -41,13 +45,24 @@ import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
  * admin endpoints and normalizes the rows into the shape the editor expects.
  */
 
-/** Fetch the entry from the admin store and normalize it to the editor shape. */
-async function getEntry(fetch: typeof globalThis.fetch, token: string, id: string) {
-	const res = await fetch(`/api/admin/content/${encodeURIComponent(id)}`, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	if (!res.ok) return null;
-	const e = await res.json();
+/** An entry as the admin store answers it. */
+type StoredEntry = {
+	id: string;
+	created_at: string;
+	updated_at: string;
+	title?: unknown;
+	body?: unknown;
+	meta?: unknown;
+	status?: string;
+};
+
+/**
+ * Fetch the entry from the admin store and normalize it to the editor shape.
+ * A refusal throws the client's error, so the load can tell an entry that is
+ * not there from an engine that did not answer.
+ */
+async function getEntry(client: HttpClient, id: string) {
+	const e = await client.get<StoredEntry>(`/api/admin/content/${encodeURIComponent(id)}`);
 	return {
 		id: e.id,
 		created_at: e.created_at,
@@ -102,9 +117,17 @@ function toEditorRevision(rev: Record<string, unknown>): EditorRevision {
  * install reads, and `windowDays` is that window, null when the install reads
  * every revision.
  */
-type RevisionList = { revisions: EditorRevision[]; hiddenOlder: number; windowDays: number | null };
+type RevisionList = {
+	revisions: EditorRevision[];
+	hiddenOlder: number;
+	windowDays: number | null;
+	/** How many revisions the plugin says the entry has in the window, which can exceed the rows read. */
+	total: number;
+	/** The read failed, so the empty list says nothing about the entry's history. */
+	failed: boolean;
+};
 
-const NO_REVISIONS: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: null };
+const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: null, total: 0, failed: true };
 
 /**
  * Fetch the entry's revisions.
@@ -115,23 +138,37 @@ const NO_REVISIONS: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: 
  * undefined, and the History control is rendered only when that is above
  * zero. Beside the page it says how many older revisions it left out.
  */
-async function listRevisions(fetch: typeof globalThis.fetch, token: string, id: string): Promise<RevisionList> {
+/** The revisions as the endpoint answers them: the envelope, or a bare array from an older engine. */
+type RevisionBody =
+	| Record<string, unknown>[]
+	| { data?: Record<string, unknown>[]; total_count?: unknown; hidden_older?: unknown; window_days?: unknown }
+	| null;
+
+/**
+ * The most rows one read asks for, which is the engine's page ceiling. Left
+ * unnamed, the plugin answers its default of 50, newest first, and the older
+ * ones could not be listed or restored from the panel.
+ */
+const REVISION_LIMIT = 500;
+
+async function listRevisions(client: HttpClient, id: string): Promise<RevisionList> {
 	try {
-		const res = await fetch(`/api/admin/content/${encodeURIComponent(id)}/revisions`, {
-			headers: { Authorization: `Bearer ${token}` },
-		});
-		if (!res.ok) return NO_REVISIONS;
-		const body = await res.json();
+		const body = await client.get<RevisionBody>(
+			`/api/admin/content/${encodeURIComponent(id)}/revisions?limit=${REVISION_LIMIT}&offset=0`,
+		);
 		const rows = (Array.isArray(body) ? body : (body?.data ?? [])) as Record<string, unknown>[];
 		const hidden = Array.isArray(body) ? 0 : Number(body?.hidden_older ?? 0);
 		const days = Array.isArray(body) ? null : body?.window_days;
+		const counted = Array.isArray(body) ? NaN : Number(body?.total_count);
 		return {
 			revisions: rows.map(toEditorRevision),
+			total: Number.isInteger(counted) && counted > rows.length ? counted : rows.length,
 			hiddenOlder: Number.isInteger(hidden) && hidden > 0 ? hidden : 0,
 			windowDays: typeof days === 'number' && days > 0 ? days : null,
+			failed: false,
 		};
 	} catch {
-		return NO_REVISIONS;
+		return REVISIONS_FAILED;
 	}
 }
 
@@ -150,7 +187,7 @@ export type EntryLocalization = {
 };
 
 async function loadLocalization(
-	client: ReturnType<typeof createClient>,
+	client: HttpClient,
 	entryId: string,
 	running: boolean,
 ): Promise<EntryLocalization | null> {
@@ -185,8 +222,12 @@ export type EntryReview = {
 	/** Approvals the current stage needs before it moves, 1 for a single approval. */
 	approvalsNeeded: number;
 	userId: string;
+	/** The accounts a review can be handed to. Empty for a caller who may not list them. */
+	people: Person[];
 	unavailable: boolean;
 	forbidden: boolean;
+	/** The definitions read failed, so the bar cannot offer to start a review. */
+	definitionsFailed: boolean;
 };
 
 const REVIEW_NONE = (userId: string): EntryReview => ({
@@ -195,12 +236,14 @@ const REVIEW_NONE = (userId: string): EntryReview => ({
 	definitions: [],
 	approvalsNeeded: 1,
 	userId,
+	people: [],
 	unavailable: false,
 	forbidden: false,
+	definitionsFailed: false,
 });
 
 async function loadReview(
-	client: ReturnType<typeof createClient>,
+	client: HttpClient,
 	entryId: string,
 	running: boolean,
 	user: { id: string; roles: string[] },
@@ -212,8 +255,11 @@ async function loadReview(
 	// rest, whose bar shows the review and its actions alone.
 	const canStart = user.roles.includes('admin') || user.roles.includes('super_admin');
 	const definitions = canStart
-		? listDefinitions(client).then((r) => r.items).catch((): ReviewDefinition[] => [])
-		: Promise.resolve<ReviewDefinition[]>([]);
+		? listDefinitions(client).then(
+				(r) => ({ items: r.items, failed: false }),
+				() => ({ items: [] as ReviewDefinition[], failed: true }),
+			)
+		: Promise.resolve({ items: [] as ReviewDefinition[], failed: false });
 	try {
 		// The entry's read carries the assignees, the approvals and the quorum
 		// of the current stage, so the bar's counts come from one read.
@@ -224,11 +270,12 @@ async function loadReview(
 			assignment,
 			approvalsNeeded: assignment.required_approvals,
 			stages,
-			definitions: await definitions,
+			definitions: (await definitions).items,
 		};
 	} catch (err) {
 		if (err instanceof ApiError && err.status === 404) {
-			return { ...base, definitions: await definitions };
+			const read = await definitions;
+			return { ...base, definitions: read.items, definitionsFailed: read.failed };
 		}
 		if (err instanceof ApiError && err.status === 403) {
 			return { ...base, forbidden: true };
@@ -247,12 +294,12 @@ export type EntryComments = {
 	unavailable: boolean;
 };
 
-async function loadComments(client: ReturnType<typeof createClient>, entryId: string): Promise<EntryComments | null> {
+async function loadComments(
+	client: HttpClient,
+	entryId: string,
+	people: Promise<Person[]>,
+): Promise<EntryComments | null> {
 	// Accounts to mention. A caller who may not list them comments without mentions.
-	const people = client
-		.get<{ id: string; email: string }[] | { data?: { id: string; email: string }[] }>('/api/admin/users?limit=200&offset=0')
-		.then((r) => (Array.isArray(r) ? r : (r?.data ?? [])).map((u) => ({ id: u.id, email: u.email })))
-		.catch(() => [] as { id: string; email: string }[]);
 	try {
 		const threads = await listComments(client, entryId, 'all');
 		return { threads, people: await people, unavailable: false };
@@ -269,90 +316,70 @@ async function loadComments(client: ReturnType<typeof createClient>, entryId: st
 export type EntryReleases = {
 	open: Pick<Release, 'id' | 'name' | 'status'>[];
 	holding: string[];
+	/** The releases could not be read, so the card offers none. */
+	failed: boolean;
 };
 
-async function loadReleases(client: ReturnType<typeof createClient>, entryId: string): Promise<EntryReleases | null> {
+async function loadReleases(client: HttpClient, entryId: string): Promise<EntryReleases | null> {
 	try {
 		const res = await listReleases(client, '', 100, 0);
 		const open = rowsOf(res).filter(editable);
-		// The list carries no items, so membership is read from each open release.
-		const holding = (
-			await Promise.all(
-				open.map((r) =>
-					client
-						.get<Release>(`/api/admin/content/releases/${encodeURIComponent(r.id)}`)
-						.then((full) => ((full.items ?? []).some((it) => it.entry_id === entryId) ? r.id : null))
-						.catch(() => null),
-				),
-			)
-		).filter((id): id is string => id !== null);
-		return { open: open.map((r) => ({ id: r.id, name: r.name, status: r.status })), holding };
-	} catch {
-		return null;
+		// The list carries no items, so membership is read from each open
+		// release. A release whose items could not be read is not one that
+		// leaves the entry out, so one failed read leaves the card unread.
+		const reads = await Promise.all(
+			open.map((r) =>
+				client
+					.get<Release>(`/api/admin/content/releases/${encodeURIComponent(r.id)}`)
+					.then((full) => ((full.items ?? []).some((it) => it.entry_id === entryId) ? r.id : null))
+					.catch(() => undefined),
+			),
+		);
+		if (reads.includes(undefined)) return { open: [], holding: [], failed: true };
+		const holding = reads.filter((id): id is string => typeof id === 'string');
+		return { open: open.map((r) => ({ id: r.id, name: r.name, status: r.status })), holding, failed: false };
+	} catch (err) {
+		if (err instanceof ApiError && err.status === 404) return null;
+		return { open: [], holding: [], failed: true };
 	}
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, params, parent, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+export const load: PageServerLoad = async (event) => {
+	const { params, parent } = event;
+	const client = authedClient(event);
 	const { plugins, user } = await parent();
+	// One read of the directory serves the mention list and the review picker.
+	const people = listPeople(client);
 
 	const [schemaDef, item, revisionList, localization, review, comments, releases] = await Promise.all([
-		getSchema(params.schema, client).catch(() => null),
-		getEntry(fetch, token, params.id),
-		listRevisions(fetch, token, params.id),
+		getSchema(params.schema, client).catch((err: unknown): Schema => readError(err, `Schema "${params.schema}" not found`)),
+		getEntry(client, params.id).catch((err: unknown) => readError(err, 'Entry not found')),
+		listRevisions(client, params.id),
 		loadLocalization(client, params.id, runs(plugins, PLUGIN.localization)),
-		loadReview(client, params.id, runs(plugins, PLUGIN.review), user),
-		loadComments(client, params.id).catch(() => null),
+		loadReview(client, params.id, runs(plugins, PLUGIN.review), user).then(async (r) =>
+			r ? { ...r, people: await people } : null,
+		),
+		loadComments(client, params.id, people).catch(() => null),
 		loadReleases(client, params.id).catch(() => null),
 	]);
 
-	if (!schemaDef) {
-		error(404, `Schema "${params.schema}" not found`);
-	}
-	if (!item) {
-		error(404, 'Entry not found');
-	}
-
-	// Load relation picker items from the admin list endpoint, normalized to
-	// the Content shape the picker expects.
-	const relationItems: Record<string, import('@lyeve-labs/client').Content[]> = {};
-	const relSchemas = [
-		...new Set(
-			schemaDef.fields
-				.filter((f) => f.field_type === 'relation' && f.relation_to)
-				.map((f) => f.relation_to as string),
-		),
-	];
-	await Promise.all(
-		relSchemas.map(async (name) => {
-			const res = await fetch(
-				`/api/admin/content?schema=${encodeURIComponent(name)}&limit=500&offset=0`,
-				{ headers: { Authorization: `Bearer ${token}` } },
-			).catch(() => null);
-			const body = res && res.ok ? await res.json().catch(() => ({ data: [] })) : { data: [] };
-			relationItems[name] = (body.data ?? []).map((e: { id: string; title?: string }) => ({
-				id: e.id,
-				schema_name: name,
-				created_at: '',
-				updated_at: '',
-				data: { title: e.title ?? '' },
-			}));
-		}),
-	);
+	const relations = await readRelationChoices(client, schemaDef.fields ?? []);
 
 	// Published library files, for a media field's picker. Read only when
-	// the schema has one.
-	const mediaChoices = schemaDef.fields.some((f) => f.field_type === 'media')
-		? await Promise.resolve().then(() => listMediaChoices(client)).catch((): MediaChoice[] => [])
+	// the schema has one. A read that fails is null, so the picker says the
+	// library could not be read instead of claiming nothing is published.
+	const mediaChoices: MediaChoice[] | null = schemaDef.fields.some((f) => f.field_type === 'media')
+		? await Promise.resolve().then(() => listMediaChoices(client)).catch(() => null)
 		: [];
 
-	const { revisions, hiddenOlder, windowDays } = revisionList;
+	const { revisions, hiddenOlder, windowDays, total: revisionTotal, failed: revisionsFailed } = revisionList;
 	return {
 		schemaDef,
 		item,
-		relationItems,
+		relations,
 		revisions,
+		revisionTotal,
+		revisionsFailed,
 		revisionWindow: { hiddenOlder, windowDays },
 		localization,
 		review,
@@ -361,11 +388,6 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, parent, url
 		releases,
 	};
 };
-
-/** The session cookie, which the relationship calls carry themselves. */
-function token(event: SessionRead) {
-	return sessionToken(event) ?? '';
-}
 
 export const actions: Actions = {
 	// Named, not default: SvelteKit rejects a default action on a page that also
@@ -378,8 +400,10 @@ export const actions: Actions = {
 		const raw = form.get('data') as string;
 		const m2mRaw = form.get('m2m_relations') as string | null;
 
+		let links: Record<string, string[]> | null = null;
 		try {
 			const data = stripProtectedFields(JSON.parse(raw) as Record<string, unknown>);
+			links = m2mRaw ? (JSON.parse(m2mRaw) as Record<string, string[]>) : null;
 			// title is written twice on purpose. It is a column on the entry, and
 			// the load overlays that column on top of body, so a title only in
 			// body never reads back. It is also a field of the schema, and the
@@ -390,17 +414,23 @@ export const actions: Actions = {
 				...(typeof title === 'string' ? { title } : {}),
 				body: data,
 			});
-
-			if (m2mRaw) {
-				const m2m = JSON.parse(m2mRaw) as Record<string, string[]>;
-				await Promise.all(
-					Object.entries(m2m).map(([fieldName, ids]) =>
-						setRelations(event, params.id, fieldName, ids),
-					),
-				);
-			}
 		} catch (err) {
+			// The fields the form shows are the schema's own, so a refusal names
+			// them against the schema rather than against what the form sent.
+			if (err instanceof ApiError && err.status === 422) {
+				const schemaDef = await getSchema(params.schema, client).catch(() => null);
+				const shown = (schemaDef?.fields ?? []).filter((f) => !f.system).map((f) => f.name);
+				const refused = fieldRefusalOf(err, shown);
+				if (refused) return fail(422, refused);
+			}
 			return fail(400, { error: actionError(err, 'Failed to save entry. Check all fields and try again.') });
+		}
+
+		// The entry is saved by now, so a refused link is reported as such
+		// rather than as a failed save or a finished one.
+		if (links) {
+			const failed = await setEntryRelations(event, params.id, links);
+			if (failed) return fail(400, { error: `The entry was saved, but not every link was. ${failed}` });
 		}
 		redirect(303, `/admin/content/${params.schema}`);
 	},
@@ -458,9 +488,20 @@ export const actions: Actions = {
 			if (exists) {
 				await updateTranslation(client, params.id, locale, input);
 			} else {
+				// The localization plugin refuses a new translation with no title,
+				// so a title left empty saves the source title as it is now. The
+				// panel says so beside the empty box.
+				if (!input.title?.trim()) {
+					const source = await client.get<{ title?: string }>(`/api/admin/content/${encodeURIComponent(params.id)}`);
+					if (source?.title) input.title = source.title;
+				}
 				await createTranslation(client, params.id, locale, input);
 			}
 		} catch (err) {
+			// A 402 is the locale ceiling or a license refusal, which carries
+			// numbers and a link a bare relayed code would drop.
+			const refused = refusalOf(err);
+			if (refused) return fail(402, { error: refusalText(refused), refused, translationLocale: locale });
 			return fail(400, {
 				error: actionError(err, 'Failed to save the translation.'),
 				translationLocale: locale,
@@ -536,8 +577,11 @@ export const actions: Actions = {
 		if (!definitionId || !assigneeId) {
 			return fail(400, { error: 'Pick a definition and an assignee.', review: true, reviewStatus: 400 });
 		}
-		const others = String(form.get('other_assignees') ?? '')
-			.split(/[\n,]/)
+		// The picker posts one field per account and the typed fallback one
+		// field of ids, by line or by comma. Both read the same way.
+		const others = form
+			.getAll('other_assignees')
+			.flatMap((v) => String(v).split(/[\n,]/))
 			.map((s) => s.trim())
 			.filter((s) => s && s !== assigneeId);
 		const assigneeIds = [assigneeId, ...new Set(others)];

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -37,6 +36,7 @@
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import StreamLab from '$lib/components/labs/StreamLab.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -173,8 +173,6 @@
 	};
 </script>
 
-<PageTitle title="API labs" />
-
 {#snippet answer(result: LabResult)}
 	<SectionHeading level={3}>The answer</SectionHeading>
 	<div class="flex flex-wrap items-center gap-2">
@@ -259,7 +257,8 @@
 	{#if tab === 'rest'}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Pick an endpoint</SectionHeading>
-			<SearchInput bind:value={narrow} placeholder="Search {data.endpoints.length} endpoints" />
+			<label for="endpoint-narrow" class="sr-only">Search endpoints</label>
+			<SearchInput id="endpoint-narrow" bind:value={narrow} placeholder="Search {data.endpoints.length} endpoints" />
 
 			{#if visible.length === 0}
 				<EmptyState title="No endpoint matches" description="Nothing here is named or pathed that way.">
@@ -276,9 +275,19 @@
 									<td data-cell="nowrap">
 										<Badge tone={riskTone(riskOf(e.method))}>{e.method}</Badge>
 									</td>
-									<td class="font-mono text-xs">{e.path}</td>
-									<td class="max-w-sm truncate text-xs text-faint">{e.summary}</td>
-									<td data-cell="nowrap">
+									<!-- The path keeps its width and the box scrolls sideways. Squeezed
+									     by the summary, it stacked one character per line. -->
+									<td class="min-w-56 font-mono text-xs [overflow-wrap:anywhere]">{e.path}</td>
+									<td class="hidden max-w-sm truncate text-xs text-faint sm:table-cell">{e.summary}</td>
+									<!-- On a narrow screen the row is wider than its scroll box, and the
+									     Select button sat past the edge. The cell sticks to the box's end
+									     so the button is always in view. Its background is the page's,
+									     and on hover the row's tint laid over it, so text scrolling
+									     under the cell never shows through. -->
+									<td
+										data-cell="nowrap"
+										class="sticky end-0 z-1 bg-ink transition-colors [tr:hover>&]:bg-[color-mix(in_srgb,var(--color-surface-2)_60%,var(--color-ink))]"
+									>
 										<Button
 											variant={selectedId === e.id ? 'primary' : 'ghost'}
 											size="sm"
@@ -424,11 +433,14 @@
 	{:else if tab === 'grpc'}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>gRPC</SectionHeading>
-			{#if !data.grpc.reachable}
-				<Alert tone="brand">
-					The gRPC plugin is not part of this build, or the instance does not enable it, so there
-					is no listener to call.
-				</Alert>
+			{#if data.grpc.gate.state !== 'ok'}
+				<!-- Only a 404 says the plugin is not here. A role refusal says the
+				     role, and an outage offers a retry. -->
+				<GateNotice
+					gate={data.grpc.gate}
+					title="the gRPC listener"
+					absent="The gRPC plugin is not part of this build, or the instance does not enable it, so there is no listener to call."
+				/>
 			{:else if !data.grpc.listening}
 				<Alert tone="danger">
 					The plugin is present and nothing is listening. The gRPC screen says why.
@@ -451,6 +463,7 @@
 							bind:value={grpcRoute}
 							options={data.grpc.routes.map((r) => ({ value: r, label: r }))}
 							placeholder="Pick a route"
+							searchable
 						/>
 						{#if grpcParams.length > 0}
 							<div class="grid gap-4 sm:grid-cols-2">

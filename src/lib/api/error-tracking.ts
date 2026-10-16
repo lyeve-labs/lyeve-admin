@@ -11,16 +11,15 @@
  * fingerprint is one problem, and ten fingerprints with one event each is ten.
  * A list ordered by event count says the opposite.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { toChannels, type AlertChannels } from './alert-channels';
 import { GATE_OK, gateOf, type Gate } from './gate';
-import type { ListEnvelope } from './list';
+import { rowsOf, statedTotal, type ListEnvelope } from './list';
 
 export const BASE_URL = '/api/admin/error-tracking';
 export const ALERTS_URL = `${BASE_URL}/alerts`;
 export const CODES_URL = `${BASE_URL}/codes`;
-export const TOP_URL = `${BASE_URL}/top`;
-export const TREND_URL = `${BASE_URL}/trend`;
 export const EVENTS_URL = `${BASE_URL}/events`;
 export const SETTINGS_URL = `${BASE_URL}/alert-settings`;
 
@@ -138,11 +137,10 @@ export interface AlertSettingsInput {
 	spike_z_score: number | null;
 }
 
+/** One page of alerts. `total` is null when the plugin states no count. */
 export interface AlertPage {
-	alerts?: ErrorAlert[] | null;
-	total?: number;
-	limit?: number;
-	offset?: number;
+	alerts: ErrorAlert[];
+	total: number | null;
 }
 
 export type ErrorGate = Gate;
@@ -162,7 +160,8 @@ export async function listAlerts(
 ): Promise<AlertPage> {
 	const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
 	if (status) q.set('status', status);
-	return client.get<AlertPage>(`${ALERTS_URL}?${q}`);
+	const res = await client.get<ListEnvelope<ErrorAlert>>(`${ALERTS_URL}?${q}`);
+	return { alerts: rowsOf(res), total: statedTotal(res) };
 }
 
 export async function triage(client: HttpClient, id: string, action: TriageAction): Promise<void> {
@@ -216,8 +215,24 @@ export async function putAlertSettings(client: HttpClient, body: AlertSettingsIn
 	return toAlertSettings(await client.put<unknown>(SETTINGS_URL, body));
 }
 
+/** The largest page the plugin serves. */
+const CODES_PAGE = 500;
+
+/**
+ * Every registered code. The plugin pages the catalog, 50 to a page unless
+ * asked for more, so a lookup that read one page labeled every alert past it
+ * as an unclassified failure.
+ */
 export async function listCodes(client: HttpClient): Promise<ListEnvelope<ErrorCode>> {
-	return client.get<ListEnvelope<ErrorCode>>(CODES_URL);
+	const all: ErrorCode[] = [];
+	for (let offset = 0; ; offset += CODES_PAGE) {
+		const page = await client.get<ListEnvelope<ErrorCode>>(`${CODES_URL}?limit=${CODES_PAGE}&offset=${offset}`);
+		const rows = rowsOf(page);
+		all.push(...rows);
+		const total = statedTotal(page);
+		if (rows.length < CODES_PAGE || (total !== null && all.length >= total)) break;
+	}
+	return { data: all, total_count: all.length };
 }
 
 export async function acknowledge(client: HttpClient, id: string): Promise<void> {
@@ -273,7 +288,7 @@ export function stillFiring(
 
 export function severityTone(
 	severity: string
-): 'danger' | 'warn' | 'brand' | 'neutral' {
+): StatusTone {
 	const s = severity.toUpperCase();
 	if (s === 'CRITICAL') return 'danger';
 	if (s === 'ERROR') return 'danger';

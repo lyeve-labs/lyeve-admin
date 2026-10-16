@@ -1,11 +1,11 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
+import type { HttpClient } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
+import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { sessionToken } from '$lib/server/session-cookie';
 
 export interface Job {
 	id: string;
@@ -35,28 +35,27 @@ const DEFAULT_LIMIT = 50;
  */
 const MAX_LIMIT = 199;
 
+/** What the page says for a list read that failed for no reason it can name. */
+const LIST_FAILED = 'The jobs could not be read. This is not a report that there are none.';
+
 async function listJobs(
-	client: ReturnType<typeof createClient>,
+	client: HttpClient,
 	limit: number,
 	offset: number
 ): Promise<Job[]> {
-	try {
-		// GET /api/admin/jobs returns a bare array. Reading a `jobs` wrapper that
-		// is not there resolves to undefined and renders an empty list.
-		const res = await client.get<Job[] | { jobs: Job[] }>(
-			`/api/admin/jobs?limit=${limit}&offset=${offset}`
-		);
-		return Array.isArray(res) ? res : (res?.jobs ?? []);
-	} catch {
-		return [];
-	}
+	// GET /api/admin/jobs returns a bare array. Reading a `jobs` wrapper that
+	// is not there resolves to undefined and renders an empty list.
+	const res = await client.get<Job[] | { jobs: Job[] }>(
+		`/api/admin/jobs?limit=${limit}&offset=${offset}`
+	);
+	return Array.isArray(res) ? res : (res?.jobs ?? []);
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
 	const { user } = await parent();
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	/*
@@ -66,8 +65,11 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	 * next page exists and nothing more, and it is dropped before the page sees
 	 * it.
 	 */
-	const rows = await listJobs(client, limit + 1, offset);
-	const page = pageOf<Job>(rows, limit, offset);
+	const read = await section(listJobs(client, limit + 1, offset), LIST_FAILED);
+	// The page draws the gate in place of the list. Nothing was read, so the
+	// drawer stays shut whatever the address asks for.
+	if (!read.ok) return { jobs: read, limit, offset, hasMore: false, openNew: false, openJob: null, openGate: null };
+	const page = pageOf<Job>(read.value, limit, offset);
 	const back = pastEndOffset(page.rows.length, limit, offset, null);
 	if (back !== null) redirect(307, withOffset(url, back));
 
@@ -77,23 +79,37 @@ export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
 	const openNew = url.searchParams.get('new') === '1';
 	const editId = url.searchParams.get('edit');
 	let openJob: Job | null = null;
+	let openGate: Gate | null = null;
 	if (editId) {
-		openJob = page.rows.find((j) => j.id === editId) ?? (await readJob(client, editId));
+		const onPage = page.rows.find((j) => j.id === editId);
+		const linked = onPage ? { ok: true as const, value: onPage } : await readJob(client, editId);
+		if (linked.ok) openJob = linked.value;
+		else openGate = linked.gate;
 	}
-	return { jobs: page.rows, limit, offset, hasMore: page.hasMore, openNew, openJob };
+	// Typed, because a bare literal widens `ok` to boolean and the page could
+	// no longer tell the two cases apart.
+	const jobs: Section<Job[]> = { ok: true, value: page.rows };
+	return { jobs, limit, offset, hasMore: page.hasMore, openNew, openJob, openGate };
 };
 
-async function readJob(client: ReturnType<typeof createClient>, id: string): Promise<Job | null> {
-	try {
-		// GET /api/admin/jobs/{id} returns the job itself. Reading a `job`
-		// wrapper that is not there yields undefined, and the edit form would
-		// render every field blank for a job that exists.
-		const res = await client.get<Job | { job: Job }>(`/api/admin/jobs/${encodeURIComponent(id)}`);
-		const job = 'job' in res ? res.job : res;
-		return job?.id ? job : null;
-	} catch {
-		return null;
-	}
+/** The job a link names, or why the drawer cannot open on it. An answer without a job is one that was not found. */
+async function readJob(client: HttpClient, id: string): Promise<Section<Job>> {
+	// GET /api/admin/jobs/{id} returns the job itself. Reading a `job`
+	// wrapper that is not there yields undefined, and the edit form would
+	// render every field blank for a job that exists.
+	const read = await section(client.get<Job | { job: Job }>(`/api/admin/jobs/${encodeURIComponent(id)}`), 'The linked job could not be read.');
+	if (!read.ok) return read;
+	const job = 'job' in read.value ? read.value.job : read.value;
+	return job?.id ? { ok: true, value: job } : { ok: false, gate: { state: 'absent' } };
+}
+
+/** Which write a failure came from, so the drawer shows only its own. */
+type JobAction = 'create' | 'update' | 'delete';
+
+/** A failed write, tagged with the action that failed. */
+function failed(action: JobAction, err: unknown, fallback: string) {
+	const out = actionFailure(err, fallback);
+	return fail(out.status, { ...out.data, action });
 }
 
 /** The body both writes send, or the one sentence that stops them. */
@@ -113,6 +129,11 @@ function jobBody(form: FormData): { body: Record<string, unknown> } | { error: s
 		} catch {
 			return { error: 'Payload must be valid JSON.' };
 		}
+	} else if (form.get('had_payload') === 'true') {
+		// The cron plugin reads a null payload as "leave it", so a cleared
+		// field would keep the old payload. An empty object is the nearest
+		// clear it accepts, and the form says so.
+		body.payload = {};
 	}
 	if (!body.name || !body.schedule || !body.endpoint) {
 		return { error: 'Name, schedule, and endpoint are required' };
@@ -138,12 +159,12 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const client = authedClient(event);
 		const parsed = jobBody(await event.request.formData());
-		if ('error' in parsed) return fail(400, { error: parsed.error });
+		if ('error' in parsed) return fail(400, { error: parsed.error, action: 'create' as const });
 		let saved: SavedJob;
 		try {
 			saved = await client.post<SavedJob>('/api/admin/jobs', parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to create job.');
+			return failed('create', err, 'Failed to create job.');
 		}
 		if (saved?.alert_signing_secret) return signingReveal(saved);
 		redirect(303, '/admin/jobs');
@@ -154,14 +175,14 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Missing job id' });
+		if (!id) return fail(400, { error: 'Missing job id', action: 'update' as const });
 		const parsed = jobBody(form);
-		if ('error' in parsed) return fail(400, { error: parsed.error });
+		if ('error' in parsed) return fail(400, { error: parsed.error, action: 'update' as const });
 		let saved: SavedJob;
 		try {
 			saved = await client.put<SavedJob>(`/api/admin/jobs/${encodeURIComponent(id)}`, parsed.body);
 		} catch (err) {
-			return actionFailure(err, 'Failed to update job.');
+			return failed('update', err, 'Failed to update job.');
 		}
 		if (saved?.alert_signing_secret) return signingReveal(saved);
 		redirect(303, '/admin/jobs');
@@ -173,11 +194,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await request.formData();
 		const id = form.get('id') as string;
-		if (!id) return fail(400, { error: 'Missing job id' });
+		if (!id) return fail(400, { error: 'Missing job id', action: 'delete' as const });
 		try {
 			await client.delete(`/api/admin/jobs/${encodeURIComponent(id)}`);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete job.') });
+			return fail(400, { error: actionError(err, 'Failed to delete job.'), action: 'delete' as const });
 		}
 		redirect(303, '/admin/jobs');
 	},

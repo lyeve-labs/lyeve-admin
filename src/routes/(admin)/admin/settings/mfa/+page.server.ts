@@ -1,15 +1,27 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
+import { ApiError } from '@lyeve-labs/client';
 import { authedClient } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
+import { section } from '$lib/api/gate';
 
 type Setup = { provisioning_uri: string; secret: string };
 
 export const load: PageServerLoad = async (event) => {
-	const status = await authedClient(event)
-		.get<{ enabled: boolean }>('/api/admin/mfa/status')
-		.catch(() => ({ enabled: false }));
-	return { mfaEnabled: status.enabled };
+	// An unread status is unknown, never off: drawn as off it offers to turn on
+	// a second factor the account may already have.
+	//
+	// The plugin reports enabled for a passkey as well as for an authenticator
+	// app, and says nothing about the app while a passkey is registered. The
+	// page keeps the two apart so it never offers to turn off an app that may
+	// not be set up.
+	const mfa = await section(
+		authedClient(event)
+			.get<{ enabled: boolean; has_passkeys?: boolean }>('/api/admin/mfa/status')
+			.then((s) => ({ enabled: s.enabled === true, hasPasskeys: s.has_passkeys === true })),
+		'The two-factor state of this account could not be read. This is not a report that it is off.'
+	);
+	return { mfa };
 };
 
 /**
@@ -54,6 +66,11 @@ export const actions: Actions = {
 			await authedClient(event).post('/api/admin/mfa/totp/disable', { code });
 			return { step: 'idle' as const, disabled: true };
 		} catch (err) {
+			// The plugin answers 400 when no authenticator app is set up, which
+			// on an account with a passkey the status could not say.
+			if (err instanceof ApiError && err.status === 400 && /not enabled/i.test(err.message)) {
+				return fail(400, { step: 'idle' as const, error: 'No authenticator app is set up on this account, so there is nothing to turn off.' });
+			}
 			const failed = actionFailure(err, 'Two-factor authentication could not be turned off.');
 			return fail(failed.status, { step: 'idle' as const, ...failed.data });
 		}

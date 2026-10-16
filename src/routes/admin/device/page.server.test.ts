@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { actions, load } from './+page.server';
+import { OUTAGE } from '$lib/outage';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -78,6 +79,30 @@ describe('admin/device load', () => {
 		expect(jar.delete).toHaveBeenCalled();
 	});
 
+	// The engine answers 503 when its database cannot check a session, so that
+	// an outage signs nobody out. The approval page keeps that promise too.
+	it.each([
+		['answers 503', async () => json({ error: 'session check unavailable' }, 503)],
+		[
+			'does not answer',
+			async (): Promise<Response> => {
+				throw new TypeError('fetch failed');
+			},
+		],
+	])('keeps the cookie and shows the outage page when the engine %s', async (_case, answer) => {
+		const jar = signedIn();
+		const thrown = (await Promise.resolve(load(loadEvent('?code=WDJB-MJHT', vi.fn(answer) as never, jar))).then(
+			() => {
+				throw new Error('expected the outage page');
+			},
+			(e: unknown) => e,
+		)) as { status?: number; location?: string; body?: { message?: string } };
+		expect(jar.delete).not.toHaveBeenCalled();
+		expect(thrown.location).toBeUndefined();
+		expect(thrown.status).toBe(503);
+		expect(thrown.body?.message).toBe(OUTAGE.body);
+	});
+
 	it('asks for the code when none came with the link', async () => {
 		const data = await load(loadEvent('', engine(['admin'])));
 		expect(data).toMatchObject({ view: 'enter', code: '', request: null, email: 'admin@example.com' });
@@ -123,6 +148,21 @@ describe('admin/device load', () => {
 		const fetch = engine(['admin'], { '/api/admin/auth/device/WDJB-MJHT': () => json({ error: 'Could not read the sign-in.' }, 503) });
 		const data = await load(loadEvent('?code=WDJB-MJHT', fetch));
 		expect(data).toMatchObject({ view: 'error' });
+	});
+
+	it('reads a rate refusal as busy, not as an outage', async () => {
+		const fetch = engine(['admin'], { '/api/admin/auth/device/WDJB-MJHT': () => json({ error: 'rate limit exceeded' }, 429) });
+		const data = await load(loadEvent('?code=WDJB-MJHT', fetch));
+		expect(data).toMatchObject({ view: 'busy' });
+	});
+
+	it('reads a 402 as a refusal with its own sentence, not as an outage', async () => {
+		const fetch = engine(['admin'], {
+			'/api/admin/auth/device/WDJB-MJHT': () => json({ error: 'not licensed', code: 'feature_not_licensed', feature: 'device-login' }, 402),
+		});
+		const data = await load(loadEvent('?code=WDJB-MJHT', fetch));
+		expect(data).toMatchObject({ view: 'refused' });
+		expect((data as { refusal: string }).refusal).not.toBe('');
 	});
 });
 

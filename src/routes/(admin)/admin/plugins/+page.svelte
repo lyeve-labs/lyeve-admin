@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	/**
 	 * Every plugin the engine reports, with the state it reports.
 	 *
@@ -62,7 +62,7 @@
 	const failed = $derived(failedCount(rows));
 
 	const summary = $derived.by(() => {
-		if (data.error) return 'The plugins this engine carries, and whether each one runs.';
+		if (data.gate.state !== 'ok') return 'The plugins this engine carries, and whether each one runs.';
 		if (counts.compiled === 0) return 'This engine carries no plugins.';
 		const noun = counts.compiled === 1 ? 'plugin' : 'plugins';
 		return `${counts.running} of ${counts.compiled} ${noun} running`;
@@ -105,8 +105,6 @@
 	}
 </script>
 
-<PageTitle title="Plugins" />
-
 {#snippet manageLicense()}
 	<Button variant="secondary" size="sm" href="/admin/settings/license">
 		<KeyRound size={ICON.sm} />
@@ -121,12 +119,10 @@
 	actions={licensePage ? manageLicense : undefined}
 >
 
-	{#if data.error}
-		<Alert tone="danger" title="Could not read the plugin status">
-			{#snippet children()}
-				{data.error} Every row comes from it, so no plugin is listed until the engine answers.
-			{/snippet}
-		</Alert>
+	{#if data.gate.state !== 'ok'}
+		<!-- Every row comes from the status report, so no plugin is listed
+		     until the engine answers. -->
+		<GateNotice level={2} gate={data.gate} title="the plugin status" absent="This engine does not report its plugins." />
 	{/if}
 
 	{#if failed > 0}
@@ -140,8 +136,9 @@
 	{/if}
 
 	{#if rows.length === 0}
-		{#if !data.error}
+		{#if data.gate.state === 'ok'}
 			<EmptyState
+				level={2}
 				title="No plugins in this build"
 				description="This engine was built without plugins, so it serves only its own pages."
 			>
@@ -161,6 +158,7 @@
 					options={categoryOptions}
 					value={category}
 					onvaluechange={(v) => (category = v)}
+					searchable
 					class="w-44"
 				/>
 				<CheckboxGroup
@@ -175,6 +173,7 @@
 
 		{#if filtered.length === 0}
 			<EmptyState
+				level={2}
 				title="No plugins match your filters"
 				description="Widen the search, choose a different category, or clear the state filter."
 			>
@@ -246,12 +245,12 @@
 			</div>
 		</a>
 		{#if plugin.upgradeUrl}
-			<div class="px-4 pb-3 ps-14">
+			<div class="px-4 pb-3 ps-14 coarse:pb-3.5">
 				<a
 					href={plugin.upgradeUrl}
 					target={isExternalHref(plugin.upgradeUrl) ? '_blank' : undefined}
 					rel={isExternalHref(plugin.upgradeUrl) ? 'noopener noreferrer' : undefined}
-					class="inline-flex items-center gap-1 text-xs text-brand transition-colors hover:text-brand-light"
+					class="relative hit-area inline-flex items-center gap-1 text-xs text-brand transition-colors hover:text-brand-light"
 				>
 					How to enable it
 					{#if isExternalHref(plugin.upgradeUrl)}

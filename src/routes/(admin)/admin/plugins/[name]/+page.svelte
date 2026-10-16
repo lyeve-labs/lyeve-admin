@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Badge,
 		Breadcrumb,
@@ -12,12 +11,14 @@
 		Table
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { Activity, ExternalLink, Route, Settings } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
+	import { methodTone } from '$lib/tones';
 	import { isExternalHref } from '$lib/links';
 	import { formatCount, formatDateTime, relativeTime } from '$lib/format';
-	import { formatBytes, formatNs } from '$lib/api/profiler';
+	import { formatSignedBinaryBytes, formatNs } from '$lib/api/profiler';
 	import { CATEGORY_LABEL } from '$lib/plugin-categories';
 	import { ROUTE_GROUP_LABEL, STATE_LABEL, STATE_TONE, groupRoutes } from '$lib/plugin-rows';
 
@@ -32,17 +33,8 @@
 	let routeCount = $derived(plugin?.routes.length ?? 0);
 	let routeGroups = $derived(groupRoutes(plugin?.routes ?? []));
 
-	// A write stands out from a read, and a delete from both.
-	function methodTone(method: string): 'neutral' | 'brand' | 'danger' {
-		if (method === 'GET' || method === 'HEAD') return 'neutral';
-		if (method === 'DELETE') return 'danger';
-		return 'brand';
-	}
-
 	const back = { href: '/admin/plugins', label: 'Plugins' };
 </script>
-
-<PageTitle title={`${title} - Plugins`} />
 
 {#snippet stateDetail()}
 	{#if plugin}
@@ -88,6 +80,7 @@
 
 <PageShell
 	{title}
+	documentTitle={`${title} - Plugins`}
 	description={plugin?.description || 'What this plugin is and what it serves on this instance.'}
 	width="wide"
 	{back}
@@ -102,11 +95,18 @@
 		{#if plugin?.beta}
 			<Badge tone="violet" size="sm">Beta</Badge>
 		{/if}
-		<Button variant="secondary" size="sm" href="/admin/settings/configuration?plugin={encodeURIComponent(pluginName)}">
-			<Settings size={ICON.sm} />
-			Settings
-		</Button>
+		<!-- The settings page is a super admin's alone. -->
+		{#if isSuperAdmin}
+			<Button variant="secondary" size="sm" href="/admin/settings/configuration?plugin={encodeURIComponent(pluginName)}">
+				<Settings size={ICON.sm} />
+				Settings
+			</Button>
+		{/if}
 	{/snippet}
+
+	{#if data.statusGate}
+		<GateNotice level={2} gate={data.statusGate} {title} absent="" />
+	{/if}
 
 	{#if plugin}
 		<DescriptionList
@@ -157,7 +157,7 @@
 							{#each routes as route (route.method + ' ' + route.pattern)}
 								<tr>
 									<td data-cell="nowrap"><Badge tone={methodTone(route.method)} size="sm">{route.method}</Badge></td>
-									<td class="font-mono text-xs">{route.pattern}</td>
+									<td data-cell="nowrap" class="font-mono text-xs">{route.pattern}</td>
 									<td data-cell="nowrap" class="text-sm text-muted">{ROUTE_GROUP_LABEL[group]}</td>
 								</tr>
 							{/each}
@@ -194,7 +194,7 @@
 					<Stat size="sm" label="Requests sampled" mono value={formatCount(data.traffic.count)} />
 					<Stat size="sm" label="Average" mono value={formatNs(data.traffic.avg_duration_ns)} />
 					<Stat size="sm" label="Slowest" mono value={formatNs(data.traffic.max_duration_ns)} />
-					<Stat size="sm" label="Allocated" mono value={formatBytes(data.traffic.total_alloc_bytes)} />
+					<Stat size="sm" label="Allocated" mono value={formatSignedBinaryBytes(data.traffic.total_alloc_bytes)} />
 				</div>
 				<p class="text-xs text-faint">
 					Across every tenant, from the profiler's recent sample. Resetting the profiler starts the count again.

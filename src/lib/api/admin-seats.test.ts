@@ -8,11 +8,9 @@ function refusal(body: Record<string, unknown>, status = 402): ApiError {
 }
 
 describe('seatRefusal', () => {
-	it('states the refusal numbers for the seat cap', () => {
-		const err = refusal({ error: 'cap_exceeded', cap: 'admin.seats', limit: 7, current: 7, upgrade_url: '' });
-		expect(seatRefusal(err)).toBe(
-			'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. Editors and viewers take no seat, so remove the admin role from an account to add another.',
-		);
+	it('answers the refusal at the seat cap with its numbers and its link', () => {
+		const err = refusal({ error: 'cap_exceeded', cap: 'admin.seats', limit: 7, current: 7, upgrade_url: 'https://shop.example.com/pricing?utm_campaign=admin.seats' });
+		expect(seatRefusal(err)).toEqual({ kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: 'https://shop.example.com/pricing?utm_campaign=admin.seats' });
 	});
 
 	it('leaves a refusal at another cap to its own handling', () => {

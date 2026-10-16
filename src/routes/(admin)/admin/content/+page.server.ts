@@ -1,9 +1,9 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
 import { getSchemaStats, getSchemas } from '@lyeve-labs/client-rest';
 import type { Schema } from '@lyeve-labs/client';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 import {
 	COLLECTION_FILTERS,
 	filterCountsRows,
@@ -13,7 +13,7 @@ import {
 	type CollectionSort,
 	type SortDir
 } from '$lib/api/collections';
-import { sessionToken } from '$lib/server/session-cookie';
+import { authedClient } from '$lib/server/authz';
 
 /**
  * Resolve typed text to exactly one collection.
@@ -78,6 +78,16 @@ const DEFAULT_LIMIT = 50;
  * probe row is never the row the engine clamped away.
  */
 const MAX_LIMIT = 199;
+
+/** What the index says when the collections could not be read. */
+const LIST_FAILED = 'The collections could not be read. This is not a report that there are none.';
+
+/**
+ * The roles the content plugin serves. Every one of its routes refuses the
+ * rest, so a reader below admin who opens the page by URL is told so instead
+ * of being offered collections whose entries no button can open.
+ */
+const CONTENT_ROLES = ['admin', 'super_admin'];
 
 /** What the stats endpoint says about one collection, as far as the index reads it. */
 export interface CollectionStats {
@@ -161,10 +171,35 @@ function ordered(
 	});
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
-	const all = await getSchemas(client).catch(() => []);
+export const load: PageServerLoad = async (event) => {
+	const { url, parent } = event;
+	const { user } = await parent();
+	const client = authedClient(event);
+	const read: Section<Schema[]> = user.roles.some((r) => CONTENT_ROLES.includes(r))
+		? await section(getSchemas(client), LIST_FAILED)
+		: { ok: false, gate: { state: 'forbidden' } };
+	const typed = (url.searchParams.get('schema') ?? url.searchParams.get('q') ?? '').trim();
+	const { sort, dir } = sortFromParams(url.searchParams);
+	const filter = filterFromParams(url.searchParams);
+	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
+
+	// Nothing was read, so there is nothing to resolve, count or page. The
+	// page draws the gate in place of the list and keeps the controls' state.
+	if (!read.ok) {
+		return {
+			schemas: read as Section<Schema[]>,
+			stats: {} as Record<string, CollectionStats>,
+			query: typed,
+			sort,
+			dir,
+			filter,
+			limit,
+			offset,
+			total: 0,
+			hasMore: false
+		};
+	}
+	const all = read.value;
 
 	/*
 	 * Resolution and the single-collection redirect both read the whole set,
@@ -172,7 +207,6 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	 * and "this tenant has exactly one collection" is a fact about the set and
 	 * not about the page on screen. Only the list that renders is bounded.
 	 */
-	const typed = (url.searchParams.get('schema') ?? url.searchParams.get('q') ?? '').trim();
 	const target = resolveSchema(all, typed);
 	if (target) {
 		redirect(302, `/admin/content/${encodeURIComponent(target.name)}`);
@@ -198,14 +232,11 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	 * A collection that cannot be read is left out, and the row says so rather
 	 * than showing zero.
 	 */
-	const { sort, dir } = sortFromParams(url.searchParams);
-	const filter = filterFromParams(url.searchParams);
 	const countsTheSet = sort === 'rows' || sort === 'updated' || filterCountsRows(filter);
 	const setStats = countsTheSet ? await statsFor(searched, client) : {};
 	const matching = searched.filter((s) => passes(s, filter, setStats));
 	const sorted = ordered(matching, sort, dir, setStats);
 
-	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);
 	/*
 	 * The schemas endpoint answers with a bare array and no row count, so the
 	 * total is not something the response states. It is knowable here anyway,
@@ -217,9 +248,10 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
 	if (back !== null) redirect(307, withOffset(url, back));
 
 	const stats = countsTheSet ? setStats : await statsFor(page.rows, client);
+	const schemas: Section<Schema[]> = { ok: true, value: page.rows };
 
 	return {
-		schemas: page.rows,
+		schemas,
 		stats,
 		query: typed,
 		sort,

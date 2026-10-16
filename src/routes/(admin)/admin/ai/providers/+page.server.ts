@@ -46,7 +46,7 @@ export const actions: Actions = {
 		try {
 			created = await createProvider(client, read.input);
 		} catch (err) {
-			return fail(400, { error: aiActionError(err, 'Failed to create the provider') });
+			return fail(400, { error: aiActionError(err, 'Failed to create the provider', 'super_admin') });
 		}
 		redirect(303, `/admin/ai/providers/${encodeURIComponent(created.id)}`);
 	},

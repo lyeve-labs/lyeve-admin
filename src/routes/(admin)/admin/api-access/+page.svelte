@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Alert, Button, Card, CopyField, Input, PageShell, PasswordInput, SectionHeading, Table } from '@lyeve-labs/ui-kit';
 	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
@@ -26,8 +25,6 @@
 		{ role: 'admin', read: true, write: true, schemas: true },
 	];
 </script>
-
-<PageTitle title="API access" />
 
 <!-- The icon carries no name of its own, so the cell states the answer in text.
      A screen reader reads the cell, not the glyph inside it. -->
@@ -116,7 +113,7 @@
 					An account's email and password exchange for a Bearer token, the way an external app gets one. Give service accounts the
 					<span class="font-mono text-xs">viewer</span> or
 					<span class="font-mono text-xs">editor</span> role on the
-					<a href="/admin/users" class="text-brand hover:underline">Users</a> page.
+					{#if superAdmin}<a href="/admin/users" class="text-brand hover:underline">Users</a>{:else}Users{/if} page, which a super admin opens.
 				</p>
 				<form method="POST" action="?/token" use:enhance={issue.enhance} class="flex flex-col gap-4">
 					<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">

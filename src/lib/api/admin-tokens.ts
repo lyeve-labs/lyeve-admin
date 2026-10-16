@@ -1,5 +1,7 @@
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
+import { httpStatusTone } from '../tones';
 
 const TOKENS_URL = '/api/admin/admin-tokens';
 
@@ -282,7 +284,7 @@ export const STATUS_LABEL: Readonly<Record<TokenStatus, string>> = {
 	replaced: 'Replaced',
 };
 
-export const STATUS_TONE: Readonly<Record<TokenStatus, 'success' | 'neutral' | 'danger' | 'warn'>> = {
+export const STATUS_TONE: Readonly<Record<TokenStatus, StatusTone>> = {
 	active: 'success',
 	expired: 'neutral',
 	revoked: 'danger',
@@ -290,7 +292,7 @@ export const STATUS_TONE: Readonly<Record<TokenStatus, 'success' | 'neutral' | '
 };
 
 /** Danger once a token has expired, warn in its last seven days. */
-export function expiryTone(expiresAt: string, now: Date = new Date()): 'danger' | 'warn' | 'neutral' {
+export function expiryTone(expiresAt: string, now: Date = new Date()): StatusTone {
 	const left = new Date(expiresAt).getTime() - now.getTime();
 	if (left <= 0) return 'danger';
 	if (left <= 7 * DAY_MS) return 'warn';
@@ -317,11 +319,8 @@ export function droppedCount(row: Pick<AdminTokenRequest, 'route_pattern' | 'sta
 	return m && !row.status ? Number(m[1]) : null;
 }
 
-export function requestStatusTone(status: number): 'success' | 'neutral' | 'warn' | 'danger' {
-	if (status >= 500) return 'danger';
-	if (status >= 400) return 'warn';
-	if (status >= 200 && status < 300) return 'success';
-	return 'neutral';
+export function requestStatusTone(status: number): StatusTone {
+	return httpStatusTone(status);
 }
 
 /** The example a new token is shown with: one read its grants may open. */

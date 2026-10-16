@@ -18,13 +18,13 @@
  * else. Names are display names, so they hold spaces and have to be encoded
  * into a URL rather than concatenated into one.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const PROVIDERS_URL = '/api/admin/saml-providers';
 export const TEMPLATES_URL = '/api/admin/saml-templates';
-export const PUBLIC_PROVIDERS_URL = '/api/admin/auth/saml-providers';
 
 /**
  * One configured identity provider.
@@ -182,7 +182,7 @@ export function certHealth(
 }
 
 /** The tone a certificate's health wears, in the kit's own vocabulary. */
-export function certTone(health: CertHealth): 'success' | 'danger' | 'warn' | 'neutral' {
+export function certTone(health: CertHealth): StatusTone {
 	if (health === 'expired') return 'danger';
 	if (health === 'expiring') return 'warn';
 	if (health === 'ok') return 'success';

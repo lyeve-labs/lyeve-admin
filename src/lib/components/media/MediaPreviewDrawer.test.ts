@@ -129,8 +129,7 @@ describe('MediaPreviewDrawer', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 		await waitFor(() => expect(kit.confirm).toHaveBeenCalled());
 		expect(native).not.toHaveBeenCalled();
-		expect(kit.confirm.mock.calls[0]?.[0]).toBe('Delete file');
-		expect(kit.confirm.mock.calls[0]?.[1]).toContain('clip.webm');
+		expect(kit.confirm.mock.calls[0]?.[0]).toBe('Delete clip.webm');
 		expect(kit.confirm.mock.calls[0]?.[2]).toEqual({ confirmLabel: 'Delete' });
 		expect(ondelete).not.toHaveBeenCalled();
 

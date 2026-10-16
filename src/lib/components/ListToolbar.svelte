@@ -33,10 +33,11 @@
 	{/if}
 </Toolbar>
 
-<!-- A segmented control with six chips is wider than a phone. Its segments
-     keep their words on one line and that control alone scrolls sideways under
-     a finger, which is how a wrapped chip row stops looking like six broken
-     buttons.
+<!-- A segmented control keeps each segment's words on one line, so four long
+     options can be wider than a phone. That control alone scrolls sideways
+     under a finger rather than breaking its segments across lines. A filter
+     with more options is FilterChips, whose chips wrap onto a second row and
+     only keep each chip's words together.
 
      The scroll is on the control and never on the row. A scroll container
      clips anything absolutely positioned inside it, and every panel the kit

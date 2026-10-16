@@ -447,6 +447,30 @@ export const rules = [
       ),
   },
   {
+    id: 'style-block',
+    files: ALL,
+    /**
+     * A stylesheet inside a component, where no other rule here can see it.
+     *
+     * Every rule in this file reads class names and markup, so a `<style>`
+     * block takes a literal color, duration or size past all of them. The
+     * admin's rule was no `<style>` blocks. Nothing enforced it, and the rich
+     * text editor shipped one with its heading sizes in rem and its padding in
+     * pixels. Markup the component renders takes utilities. Markup a library
+     * renders, which no class reaches, gets a rule in src/app.css, scoped under
+     * the component's own class and written in the theme's variables.
+     */
+    test: (src) =>
+      // A script may build a document for a preview, and a comment may name
+      // the element. Neither is a stylesheet this page loads.
+      [
+        ...src
+          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .matchAll(/<style\b/g),
+      ].map(() => '<style> block; style with utilities, or with theme variables in src/app.css for markup a library renders'),
+  },
+  {
     id: 'raw-button',
     files: ALL,
     /**
@@ -547,7 +571,9 @@ export const rules = [
      * bright highlight, in the middle of a dark page. A native date field is
      * the browser's own calendar behind a box sized against nothing in the
      * theme. A bare checkbox ignores the theme. A native password field has
-     * no way to reveal what was pasted into it.
+     * no way to reveal what was pasted into it. A native details draws the
+     * browser's own marker and snaps open in one frame. A native dialog
+     * brings none of the kit's focus return, scroll lock or overlay sizes.
      *
      * `hidden` carries form state and renders nothing, and `file` is the only
      * way to open a file picker, including the common shape of a hidden picker
@@ -563,6 +589,10 @@ export const rules = [
           if (el.name === 'select' || el.name === 'textarea') {
             return `native <${el.name}>; use ${KIT_CONTROL[el.name]}`;
           }
+          if (el.name === 'details' || el.name === 'summary') {
+            return `native <${el.name}>; use Collapsible, or Accordion for a set`;
+          }
+          if (el.name === 'dialog') return 'native <dialog>; use Modal or Drawer';
           // An option list written by hand is a native select's list, whoever
           // renders it. The kit's Select takes its rows as data.
           if (el.name === 'option' || el.name === 'optgroup' || el.name === 'datalist') {
@@ -589,19 +619,26 @@ export const rules = [
     id: 'page-title',
     files: PAGES,
     /**
-     * A page that names no tab title.
+     * A page that names no tab title, or names it twice.
      *
      * The layouts carry no fallback title. During server rendering Svelte keeps
      * one title per document and a layout's could outrank the page's, so a
      * page would render titled with the bare product name until the script
-     * runs. Each page says what it is through
-     * PageTitle instead, which also ends the title in the tenant's name. A page
-     * that only redirects renders no markup and is left alone.
+     * runs. The root layout states the format once, and a PageShell titles the
+     * tab from its `title`, or from `documentTitle` when the tab reads
+     * differently. A page with no PageShell, such as a signed-out card,
+     * renders PageTitle instead. Both end the title in the tenant's name. A
+     * page that renders both writes two title elements, and the tab shows
+     * whichever the browser reads first. A page that only redirects renders
+     * no markup and is left alone.
      */
     test: (src) => {
       const body = markup(src).replace(/<!--[\s\S]*?-->/g, '').trim();
       if (!body) return [];
-      return /<PageTitle\b/.test(body) ? [] : ['page sets no tab title; render <PageTitle title="..." />'];
+      const shell = /<PageShell\b/.test(body);
+      const title = /<PageTitle\b/.test(body);
+      if (shell && title) return ['page renders a PageShell and a PageTitle; pass documentTitle to the PageShell instead'];
+      return shell || title ? [] : ['page sets no tab title; render a PageShell, or <PageTitle title="..." /> on a page without one'];
     },
   },
   {
@@ -708,6 +745,26 @@ export const rules = [
       // grouped at the call site, with a locale or without one.
       [...src.matchAll(/\.toLocaleString\(\s*(?:'[^']*'|"[^"]*")?\s*\)/g)].map(
         () => 'toLocaleString groups a number by hand; use formatCount from $lib/format',
+      ),
+  },
+  {
+    id: 'raw-date',
+    // Dates are formatted in the API wrappers too, and ALL is Svelte only.
+    files: globSync('src/{routes,lib}/**/*.{ts,svelte}'),
+    /**
+     * A date or a time written out with no locale.
+     *
+     * With no locale the browser picks the format, so the same moment reads
+     * 14:32:07 in one browser and 2:32:07 PM in another, in the reader's own
+     * zone and unlabeled. The stream lab stamped each event that way beside a
+     * console that prints UTC everywhere else. `undefined` in the locale's
+     * place is the same call, and so is a formatter built with no locale.
+     * `$lib/format.ts` holds the one presentation: formatDate, formatDateTime
+     * and formatTime.
+     */
+    test: (src) =>
+      [...src.matchAll(/\.(toLocaleDateString|toLocaleTimeString)\(\s*(?:\)|undefined\b)|\b(Intl\.DateTimeFormat)\(\s*(?:\)|undefined\b)/g)].map(
+        (m) => `${m[1] ?? m[2]} with no locale renders per browser; use formatDate, formatDateTime or formatTime from $lib/format`,
       ),
   },
   {
@@ -1010,7 +1067,9 @@ export const rules = [
      *            sm, icon only, aria-label, and a Trash2 painted text-danger
      *   footer   inside a Modal or a footer snippet: text only, default size,
      *            secondary, primary or danger. The first of a pair is the
-     *            secondary Cancel
+     *            secondary Cancel. One delete may lead a footer of three
+     *            or more, ahead of that order, so it never sits beside the
+     *            primary
      */
     test: (src, file = '') => {
       const body = markup(src);
@@ -1134,8 +1193,11 @@ export const rules = [
         }
       }
       for (const group of footerGroups.values()) {
-        if (group.length >= 2 && group[0].variant !== 'secondary')
-          hits.push(`footer "${group[0].label}": the first of a pair is the secondary Cancel`);
+        const rest = group.slice(1);
+        const lead = group.length >= 3 && group[0].variant === 'danger' && !rest.some((b) => b.variant === 'danger');
+        const pair = lead ? rest : group;
+        if (pair.length >= 2 && pair[0].variant !== 'secondary')
+          hits.push(`footer "${pair[0].label}": the first of a pair is the secondary Cancel`);
       }
       return hits;
     },
@@ -1184,12 +1246,12 @@ export const rules = [
           const inner = enclosed(body, el)?.replace(HEADING_SNIPPET, '');
           if (inner != null && !/[<{]/.test(inner)) labels.push(inner);
         }
-        for (const name of ['title', 'label']) {
+        for (const name of ['title', 'label', 'documentTitle']) {
           const a = attr(el.attrs, name);
           if (!a || a.dynamic) continue;
           // A tab title names the page, then the section it sits in, so each
           // part is its own phrase and starts with a capital.
-          if (el.name === 'PageTitle') labels.push(...a.value.split(' - '));
+          if (el.name === 'PageTitle' || name === 'documentTitle') labels.push(...a.value.split(' - '));
           else labels.push(a.value);
         }
       }

@@ -10,6 +10,7 @@
  * configured to do. The addresses come off the bound listeners, so a port that
  * was already taken reports the port actually in use.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 
@@ -69,7 +70,7 @@ export const HEALTH_LABELS: Readonly<Record<GrpcHealth, string>> = {
 	disabled: 'Not started on this instance',
 };
 
-export function healthTone(h: GrpcHealth): 'success' | 'danger' | 'warn' | 'neutral' {
+export function healthTone(h: GrpcHealth): StatusTone {
 	if (h === 'serving') return 'success';
 	if (h === 'down') return 'danger';
 	if (h === 'partial' || h === 'disabled') return 'warn';
@@ -94,7 +95,7 @@ export function serviceStatusLabel(status: string): string {
 	return SERVICE_STATUS_LABELS[status] ?? status;
 }
 
-export function serviceTone(status: string): 'success' | 'danger' | 'warn' | 'neutral' {
+export function serviceTone(status: string): StatusTone {
 	if (status === 'SERVING') return 'success';
 	if (status === 'NOT_SERVING') return 'danger';
 	if (status === 'SERVICE_UNKNOWN') return 'warn';

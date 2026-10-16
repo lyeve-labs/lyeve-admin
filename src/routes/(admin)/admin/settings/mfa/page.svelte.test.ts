@@ -1,18 +1,44 @@
 // @vitest-environment jsdom
-import { cleanup, render, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn(async () => 'data:image/png;base64,AA') } }));
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 
 const licensed = { plan: 'example', state: 'active', features: ['mfa'], tenant_quota: 1 };
 
-function setup(mfaEnabled: boolean, form: unknown = null) {
-	return render(Page, { props: { data: { mfaEnabled, entitlements: licensed }, form } as never });
+function setup(mfaEnabled: boolean | { ok: false; gate: unknown }, form: unknown = null, hasPasskeys = false) {
+	const mfa = typeof mfaEnabled === 'boolean' ? { ok: true, value: { enabled: mfaEnabled, hasPasskeys } } : mfaEnabled;
+	return render(Page, { props: { data: { mfa, entitlements: licensed }, form } as never });
 }
+
+describe('an account with a passkey', () => {
+	it('says passkeys keep two-factor on and offers both app controls', () => {
+		const { container, getByRole } = setup(true, null, true);
+		expect(container.textContent).toContain('This account has a passkey');
+		expect(container.textContent).not.toContain('takes a TOTP code');
+		expect(getByRole('button', { name: /Set up an authenticator app/ })).toBeTruthy();
+		expect(container.querySelector('form[action="?/setup"]')).not.toBeNull();
+		expect(container.querySelector('form[action="?/disable"]')).not.toBeNull();
+	});
+});
+
+describe('setting up an app beside a passkey', () => {
+	// The engine stores the new key as soon as setup starts, so an app set up
+	// earlier stops working before any code is verified.
+	it('says before setup that starting it replaces an app already set up', () => {
+		const { container } = setup(true, null, true);
+		const text = container.querySelector('form[action="?/setup"]')?.textContent ?? '';
+		expect(text).toContain('Starting setup replaces any authenticator app already set up on this account, so finish it once you start.');
+		expect(text).not.toContain('once you verify a code');
+	});
+});
 
 describe('two-factor authentication page', () => {
 	it('offers to turn it on through the setup action', () => {
@@ -39,8 +65,51 @@ describe('two-factor authentication page', () => {
 		expect(getByText(/not shown again/)).toBeTruthy();
 	});
 
+	it('says the state could not be read instead of offering to turn it on', () => {
+		const { container, queryByRole } = setup({ ok: false, gate: { state: 'unavailable' } });
+		expect(container.textContent).toContain('could not be read');
+		expect(container.textContent).not.toContain('is off for this account');
+		expect(queryByRole('button', { name: /Turn on/ })).toBeNull();
+		expect(queryByRole('button', { name: /Turn off/ })).toBeNull();
+	});
+
 	it('asks for a code to turn it off when it is on', () => {
 		const { container } = setup(true);
 		expect(container.querySelector('form[action="?/disable"] input[name="code"]')).not.toBeNull();
+	});
+
+	it('copies every backup code at once and confirms for a second and a half', async () => {
+		vi.useFakeTimers();
+		const writeText = vi.fn(async (_text: string) => {});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		const { getByRole } = setup(false, { step: 'done', backupCodes: ['a1', 'b2'] });
+		const copy = getByRole('button', { name: 'Copy all codes' });
+		const status = copy.parentElement!.querySelector('[role="status"]')!;
+
+		await fireEvent.click(copy);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(writeText).toHaveBeenCalledWith('a1\nb2');
+		expect(status.textContent).toBe('Copied');
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(status.textContent).toBe('');
+	});
+
+	it('keeps the advice to write the codes down after a copy fails', async () => {
+		vi.useFakeTimers();
+		const writeText = vi.fn(async (_text: string) => {
+			throw new Error('denied');
+		});
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		Object.defineProperty(document, 'execCommand', { value: vi.fn(() => false), configurable: true });
+		const { getByRole, getByText, queryByText } = setup(false, { step: 'done', backupCodes: ['a1', 'b2'] });
+
+		await fireEvent.click(getByRole('button', { name: 'Copy all codes' }));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(getByText('Copy failed')).toBeTruthy();
+
+		await vi.advanceTimersByTimeAsync(1500);
+		expect(queryByText('Copy failed')).toBeNull();
+		expect(getByText(/If the copy fails, write them down before you leave this page\./)).toBeTruthy();
 	});
 });

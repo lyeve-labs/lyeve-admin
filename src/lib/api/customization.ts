@@ -9,6 +9,7 @@
  * renders. Writing is an admin's, and only where the read says it may.
  */
 import type { HttpClient } from '@lyeve-labs/client';
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 
 export const ROLE_CHOICES = ['viewer', 'editor', 'admin'] as const;
 
@@ -45,7 +46,8 @@ export interface Block {
 	type: BlockType;
 	title?: string;
 	body?: string;
-	tone?: '' | 'neutral' | 'brand' | 'success' | 'warn' | 'danger';
+	/** A callout's Alert tone. The empty string is a block that chose none. */
+	tone?: '' | StatusTone;
 	schema?: string;
 	status?: '' | 'draft' | 'published' | 'archived';
 	limit?: number;

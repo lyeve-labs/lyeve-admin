@@ -235,10 +235,29 @@ export function getDashboard(client: HttpClient): Promise<CostDashboard> {
 	return client.get<Record<string, unknown>>(`${BASE}/dashboard`).then(toDashboard);
 }
 
+/** The plugin's ceiling on one page of budgets. */
+const BUDGET_PAGE = 200;
+
+/** How many pages of budgets one read walks before it stops. */
+const BUDGET_PAGES = 25;
+
+/**
+ * Every budget the tenant holds. The plugin pages the list and states the
+ * count, so the read walks the pages up to it rather than drawing the first
+ * page as the whole list.
+ */
 export async function listBudgets(client: HttpClient): Promise<Budget[]> {
-	const res = await client.get<unknown>(`${BASE}/budgets?limit=100&offset=0`);
-	const list = Array.isArray(res) ? res : (asObject(res).data ?? []);
-	return (Array.isArray(list) ? list : []).map((b) => toBudget(asObject(b)));
+	const out: Budget[] = [];
+	for (let page = 0; page < BUDGET_PAGES; page++) {
+		const res = await client.get<unknown>(`${BASE}/budgets?limit=${BUDGET_PAGE}&offset=${page * BUDGET_PAGE}`);
+		const list = Array.isArray(res) ? res : (asObject(res).data ?? []);
+		const rows = (Array.isArray(list) ? list : []).map((b) => toBudget(asObject(b)));
+		out.push(...rows);
+		const stated = Array.isArray(res) ? null : asObject(res).total_count;
+		const total = typeof stated === 'number' ? stated : null;
+		if (rows.length < BUDGET_PAGE || (total !== null && out.length >= total)) break;
+	}
+	return out;
 }
 
 export function createBudget(client: HttpClient, input: BudgetInput): Promise<Budget> {

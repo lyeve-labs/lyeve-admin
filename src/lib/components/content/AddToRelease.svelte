@@ -4,7 +4,7 @@
 	 * the releases the page read, and the write is the entry page's own form
 	 * action, so a refusal comes back to this card.
 	 */
-	import { Alert, Button, Card, SectionHeading, Select } from '@lyeve-labs/ui-kit';
+	import { Alert, Button, Card, SectionHeading, SegmentedControl, Select } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { submitter } from '$lib/forms.svelte';
@@ -18,15 +18,17 @@
 		error?: string;
 		refused?: Refusal | null;
 		added?: boolean;
+		/** The releases could not be read, so the card has none to offer. */
+		failed?: boolean;
 	}
 
-	let { releases, holding, error = undefined, refused = null, added = false }: Props = $props();
+	let { releases, holding, error = undefined, refused = null, added = false, failed = false }: Props = $props();
 
 	const options = $derived(releases.map((r) => ({ value: r.id, label: `${r.name} (${r.status})` })));
 	// svelte-ignore state_referenced_locally
 	let target = $state(releases[0]?.id ?? '');
-	let action = $state('publish');
-	const ACTIONS = [
+	let action = $state<'publish' | 'unpublish'>('publish');
+	const ACTIONS: { value: 'publish' | 'unpublish'; label: string }[] = [
 		{ value: 'publish', label: 'Publish it' },
 		{ value: 'unpublish', label: 'Unpublish it' },
 	];
@@ -53,14 +55,16 @@
 				{/each}
 			</p>
 		{/if}
-		{#if options.length === 0}
+		{#if failed}
+			<p class="text-sm text-muted">The releases could not be read, so this entry cannot be added to one. Reload the page to try again.</p>
+		{:else if options.length === 0}
 			<p class="text-sm text-muted">
 				No release is open for changes. <a class="text-brand" href="/admin/releases">Create one</a> to publish this entry with others.
 			</p>
 		{:else}
 			<form method="POST" action="?/addToRelease" use:enhance={add.enhance} class="flex flex-col gap-3">
-				<Select id="entry-release" name="release_id" label="Release" {options} value={target} onvaluechange={(v) => (target = v)} />
-				<Select id="entry-release-action" name="action" label="When it goes out" options={ACTIONS} value={action} onvaluechange={(v) => (action = v)} />
+				<Select id="entry-release" name="release_id" label="Release" searchable {options} value={target} onvaluechange={(v) => (target = v)} />
+				<SegmentedControl name="action" label="When it goes out" options={ACTIONS} bind:value={action} />
 				<div class="flex justify-end">
 					<Button variant="secondary" size="sm" type="submit" disabled={!target} loading={add.pending}>Add to release</Button>
 				</div>

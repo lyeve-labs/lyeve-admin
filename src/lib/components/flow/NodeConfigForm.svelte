@@ -7,6 +7,7 @@
 	import GridEditor from './GridEditor.svelte';
 	import type { TablesState } from './TablesPanel.svelte';
 	import type { DatasourceOption, FlowOption, JsonSchema, SchemaOption, SystemEvent } from '$lib/flow/types';
+	import { GATE_OK, type Gate } from '$lib/api/gate';
 	import type { ValidationError } from '$lib/api/flows';
 	import {
 		datasourceOptions,
@@ -41,6 +42,8 @@
 		schemas?: SchemaOption[];
 		/** The tenant's datasources, for the datasource picker and the SQL tables. */
 		datasources?: DatasourceOption[];
+		/** How the datasource read went, so an empty list that was never read is not called empty. */
+		datasourcesGate?: Gate;
 		/** The published flows, for the flow picker. */
 		flows?: FlowOption[];
 		/** The id of the flow being edited, which the flow picker leaves out. */
@@ -62,6 +65,7 @@
 		idPrefix = 'cfg',
 		schemas = [],
 		datasources = [],
+		datasourcesGate = GATE_OK,
 		flows = [],
 		selfId,
 		events = [],
@@ -241,6 +245,22 @@
 	function nested(v: unknown): Record<string, unknown> {
 		return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 	}
+
+	const datasourcesEmpty = $derived.by(() => {
+		switch (datasourcesGate.state) {
+			case 'ok':
+				return 'No datasource of a matching kind exists yet. Type the name.';
+			case 'forbidden':
+				return 'Your role cannot list the datasources. Type the name.';
+			case 'locked':
+			case 'full':
+				return 'Datasources are not enabled on this instance. Type the name.';
+			case 'absent':
+				return 'This instance does not serve datasources. Type the name.';
+			default:
+				return 'The datasources could not be read. Type the name.';
+		}
+	});
 </script>
 
 <div class="flex flex-col gap-3" data-testid="node-config-form">
@@ -345,7 +365,7 @@
 				value={str(current)}
 				{hint}
 				{error}
-				emptyHint="No content schemas were loaded; type the name."
+				emptyHint="No content schemas were loaded. Type the name."
 				onchange={(v) => set(field.key, v)}
 			/>
 		{:else if widget === 'field'}
@@ -369,7 +389,7 @@
 				value={str(current)}
 				{hint}
 				{error}
-				emptyHint="No datasource of a matching kind exists yet; type the name."
+				emptyHint={datasourcesEmpty}
 				onchange={(v) => set(field.key, v)}
 			/>
 		{:else if widget === 'flow'}
@@ -381,7 +401,7 @@
 				value={str(current)}
 				{hint}
 				{error}
-				emptyHint="No other flow is published yet; type the slug."
+				emptyHint="No other flow is published yet. Type the slug."
 				customLabel="Another slug or an expression"
 				onchange={(v) => set(field.key, v)}
 			/>
@@ -394,7 +414,7 @@
 				value={str(current)}
 				hint={eventDescription(events, current) ?? hint}
 				error={error ?? hookNameError(current)}
-				emptyHint="The engine listed no hooks; type the name a plugin publishes."
+				emptyHint="The engine listed no hooks. Type the name a plugin publishes."
 				customLabel="Another hook name"
 				customPlaceholder="plugin:after_something"
 				customHint="The name a plugin publishes, such as flow.run_failed."
@@ -430,7 +450,7 @@
 					<Select
 						{id}
 						{label}
-						searchable={siblingFields.length > 8}
+						searchable
 						options={fieldRows(field.key).filter((o) => !tags(current).includes(o.value))}
 						value={null}
 						placeholder="Add a field"
@@ -523,7 +543,7 @@
 						<Select
 							id="{id}-new"
 							label="New key"
-							searchable={siblingFields.length > 8}
+							searchable
 							options={fieldRows(field.key).filter((o) => !entries(current).some(([k]) => k === o.value))}
 							value={draftKeys[field.key] ?? null}
 							placeholder="Pick a field"

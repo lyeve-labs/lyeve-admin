@@ -38,7 +38,7 @@ export const actions: Actions = {
 		try {
 			await updateProvider(client, event.params.id, read.input);
 		} catch (err) {
-			return fail(400, { scope: 'config', error: aiActionError(err, 'Failed to save the provider') });
+			return fail(400, { scope: 'config', error: aiActionError(err, 'Failed to save the provider', 'super_admin') });
 		}
 		return { scope: 'config', saved: true };
 	},
@@ -48,7 +48,7 @@ export const actions: Actions = {
 		try {
 			await deleteProvider(authedClient(event), event.params.id);
 		} catch (err) {
-			return fail(400, { scope: 'delete', error: aiActionError(err, 'Failed to delete the provider') });
+			return fail(400, { scope: 'delete', error: aiActionError(err, 'Failed to delete the provider', 'super_admin') });
 		}
 		redirect(303, '/admin/ai/providers');
 	},

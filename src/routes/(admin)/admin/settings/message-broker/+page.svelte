@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -21,6 +20,7 @@
 		backendLabel,
 		brokerHealth,
 		deliveryRate,
+		hasBroker,
 		healthTone,
 	} from '$lib/api/messagebroker';
 	import { NO_VALUE, formatDateTime } from '$lib/format';
@@ -40,12 +40,12 @@
 	}
 
 	const health = $derived(brokerHealth(data.status));
+	const broker = $derived(hasBroker(data.status));
 	const rate = $derived(deliveryRate(data.status));
+	const outbox = $derived(data.status?.outbox);
 	const guide = $derived(data.status ? connectionGuide(data.status.backend, data.status.topic_prefix) : null);
 	const backendSettings = $derived(data.status ? (BACKEND_SETTINGS[data.status.backend] ?? []) : []);
 </script>
-
-<PageTitle title="Message broker" />
 
 <PageShell
 	title="Message broker"
@@ -68,6 +68,7 @@
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Message broker"
 			absent="The message broker plugin is not part of this build, so no event is published."
@@ -82,6 +83,28 @@
 			<Alert tone="warn">
 				This instance does not enable the plugin, so every event is dropped rather than
 				published. Nothing is wrong with the broker.
+			</Alert>
+		{:else if outbox?.enabled && outbox.available && (outbox.dead > 0 || data.status.failed > 0)}
+			<!-- With an outbox a refused event is retried, so the lost and the
+			     waiting counts lead, and Failed counts attempts. -->
+			<Alert tone={outbox.dead > 0 ? 'danger' : 'warn'}>
+				{#if outbox.dead > 0}
+					{outbox.dead}
+					{outbox.dead === 1 ? 'event' : 'events'} ran out of attempts and never reached the broker.
+				{/if}
+				{outbox.pending}
+				{outbox.pending === 1 ? 'event is' : 'events are'} waiting in the outbox.
+				{#if data.status.failed > 0}
+					The broker refused {data.status.failed} publish
+					{data.status.failed === 1 ? 'attempt' : 'attempts'} since this process started. The outbox
+					retries a refused event until the broker takes it or its attempts run out.
+				{/if}
+			</Alert>
+		{:else if outbox?.enabled && !outbox.available && data.status.failed > 0}
+			<Alert tone="warn">
+				The broker refused {data.status.failed} publish
+				{data.status.failed === 1 ? 'attempt' : 'attempts'} since this process started. The outbox
+				retries them, but its counts could not be read, so whether any event was lost is unknown.
 			</Alert>
 		{:else if data.status.failed > 0}
 			<Alert tone="danger">
@@ -103,9 +126,9 @@
 			<Stat
 				size="sm"
 				mono
-				label="Refused by the broker"
+				label={outbox?.enabled ? 'Attempts refused by the broker' : 'Refused by the broker'}
 				value={data.status.failed}
-				tone={data.status.failed > 0 ? 'danger' : 'neutral'}
+				tone={data.status.failed > 0 ? (outbox?.enabled ? 'warn' : 'danger') : 'neutral'}
 			/>
 			<Stat
 				size="sm"
@@ -114,11 +137,29 @@
 				value={data.status.dropped}
 				tone={data.status.dropped > 0 ? 'warn' : 'neutral'}
 			/>
+			{#if outbox?.enabled}
+				<Stat
+					size="sm"
+					mono
+					label="Waiting in the outbox"
+					value={outbox.available ? outbox.pending : NO_VALUE}
+					tone={outbox.available && outbox.pending > 0 ? 'warn' : 'neutral'}
+				/>
+				<Stat
+					size="sm"
+					mono
+					label="Lost after every attempt"
+					value={outbox.available ? outbox.dead : NO_VALUE}
+					tone={outbox.available && outbox.dead > 0 ? 'danger' : 'neutral'}
+				/>
+			{/if}
 		</div>
 		<p class="text-xs text-muted">
 			Counted since this process started. A restart sets them back to zero, so a low number is
 			not on its own a quiet week.
-			{#if rate !== null}
+			{#if !broker}
+				With no broker set, Published counts events that were discarded.
+			{:else if rate !== null}
 				{rate}% of attempts reached the broker.
 			{/if}
 		</p>
@@ -134,9 +175,13 @@
 					<tr>
 						<th scope="row">Connected</th>
 						<td>
-							<Badge tone={data.status.connected ? 'success' : 'warn'} dot>
-								{data.status.connected ? 'Yes' : 'No'}
-							</Badge>
+							{#if broker}
+								<Badge tone={data.status.connected ? 'success' : 'warn'} dot>
+									{data.status.connected ? 'Yes' : 'No'}
+								</Badge>
+							{:else}
+								<span class="text-faint">{NO_VALUE}</span>
+							{/if}
 						</td>
 					</tr>
 					<tr>
@@ -161,9 +206,13 @@
 					<tr>
 						<th scope="row">TLS</th>
 						<td>
-							<Badge tone={data.status.tls ? 'success' : 'danger'}>
-								{data.status.tls ? 'On' : 'Off'}
-							</Badge>
+							{#if broker}
+								<Badge tone={data.status.tls ? 'success' : 'danger'}>
+									{data.status.tls ? 'On' : 'Off'}
+								</Badge>
+							{:else}
+								<span class="text-faint">{NO_VALUE}</span>
+							{/if}
 						</td>
 					</tr>
 					<tr>
@@ -173,7 +222,7 @@
 					<tr>
 						<th scope="row">Last publish</th>
 						<td class="text-xs text-faint">
-							{data.status.last_publish_at
+							{broker && data.status.last_publish_at
 								? formatDateTime(data.status.last_publish_at)
 								: 'Nothing has been published'}
 						</td>
@@ -216,7 +265,7 @@
 								builds, on a subject under the run's tenant, so a flow can call another service the same way
 								a content event does.
 							</p>
-							<a href="/admin/flows" class="text-sm text-brand hover:underline">Open flows</a>
+							<a href="/admin/flows" class="relative hit-area self-start text-sm text-brand hover:underline">Open flows</a>
 						</div>
 					</Card>
 				</div>
@@ -226,10 +275,15 @@
 					discarded and no flow can hear a message. Set it to nats, kafka or rabbitmq.
 				</Alert>
 			{/if}
+			<!-- One run of text per sentence end: a line break inside the markup
+			     before a period renders as a space in front of it. -->
 			<p class="text-xs text-muted">
-				The broker is configured by the deployment, through <span class="font-mono">EVENT_BUS</span>
-				{#if backendSettings.length}and {backendSettings.join(', ')}{/if}. Set them as
-				environment variables or in the configuration file, and see what each does on
+				The broker is configured by the deployment, through <span class="font-mono">EVENT_BUS</span
+				>{#if backendSettings.length}{' '}and {backendSettings.join(', ')}{/if}.
+				{backendSettings.length
+					? 'Set them as environment variables or in the configuration file'
+					: 'Set it as an environment variable or in the configuration file'}, and see what each
+				setting does on
 				<a href="/admin/settings/configuration" class="text-brand hover:underline">Configuration</a>. TLS is on
 				by default and a broker's certificate is always verified.
 			</p>

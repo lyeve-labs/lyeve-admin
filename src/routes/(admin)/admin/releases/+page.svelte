@@ -1,6 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Badge, Button, Drawer, EmptyState, Input, PageShell, Pagination, SegmentedControl, Table, Textarea } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, FilterChips, Input, PageShell, Pagination, Table, Textarea } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { CalendarClock, Plus } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
@@ -31,7 +30,7 @@
 		open = true;
 	}
 
-	// Each segment is a link, so a filtered list is a URL somebody can keep.
+	// Each chip is a link, so a filtered list is a URL somebody can keep.
 	const FILTERS = [
 		{ value: '', label: 'All', href: '/admin/releases' },
 		{ value: 'draft', label: 'Draft', href: '/admin/releases?status=draft' },
@@ -41,8 +40,6 @@
 		{ value: 'canceled', label: 'Canceled', href: '/admin/releases?status=canceled' },
 	];
 </script>
-
-<PageTitle title="Releases" />
 
 <PageShell
 	title="Releases"
@@ -59,6 +56,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Releases"
 			absent="This build serves no content releases, so entries publish one at a time."
@@ -69,12 +67,13 @@
 		{/if}
 		<ListToolbar label="Filter releases">
 			{#snippet filters()}
-				<SegmentedControl label="Status" labelHidden value={data.status} options={FILTERS} />
+				<FilterChips label="Status" value={data.status} options={FILTERS} />
 			{/snippet}
 		</ListToolbar>
 
 		{#if data.releases.length === 0}
 			<EmptyState
+				level={2}
 				title={data.status ? 'No release has this status' : 'No releases yet'}
 				description={data.status
 					? 'Pick another status to see the rest.'
@@ -102,7 +101,7 @@
 					{#each data.releases as r (r.id)}
 						<tr>
 							<td>
-								<a href="/admin/releases/{r.id}" class="font-medium text-fg transition-colors hover:text-brand">{r.name}</a>
+								<a href="/admin/releases/{r.id}" class="relative hit-area font-medium text-fg transition-colors hover:text-brand">{r.name}</a>
 								{#if r.failure_reason}
 									<span class="block text-xs text-danger">{r.failure_reason}</span>
 								{/if}

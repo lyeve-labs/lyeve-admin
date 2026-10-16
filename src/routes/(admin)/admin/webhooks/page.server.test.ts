@@ -91,7 +91,7 @@ describe('admin/webhooks/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.webhooks).toHaveLength(50);
+		expect(result.webhooks.ok && result.webhooks.value).toHaveLength(50);
 		expect(result.hasMore).toBe(true);
 	});
 
@@ -117,24 +117,39 @@ describe('admin/webhooks/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.webhooks).toHaveLength(50);
+		expect(result.webhooks.ok && result.webhooks.value).toHaveLength(50);
 	});
 
-	it('still renders when the endpoint fails', async () => {
+	function failing(status: number, schemas = 200, search = '?offset=50') {
 		const fetch = vi.fn(async (url: string) =>
-			String(url).includes('/schemas') ? json([]) : json({ error: 'nope' }, 500)
+			String(url).includes('/schemas')
+				? schemas === 200
+					? json([])
+					: json({ error: 'nope' }, schemas)
+				: json({ error: 'nope' }, status)
 		) as unknown as typeof globalThis.fetch;
-		const event = {
+		return {
 			fetch,
 			cookies: mockCookies(),
-			url: new URL('http://localhost/admin/webhooks'),
+			url: new URL(`http://localhost/admin/webhooks${search}`),
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
+	}
 
-		const result = (await load(event)) as Loaded;
+	// An empty list is the first-run state with an offer to create the first
+	// webhook. A read that failed is a gate, never that state, and it is not
+	// sent back to page one as if the list had ended.
+	it('keeps a failed list read as its gate, never as no webhooks', async () => {
+		const failed = (await load(failing(500))) as Loaded;
+		expect(failed.webhooks).toMatchObject({ ok: false, gate: { state: 'error' } });
+		expect(failed.hasMore).toBe(false);
+		expect(((await load(failing(503))) as Loaded).webhooks).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(((await load(failing(403))) as Loaded).webhooks).toEqual({ ok: false, gate: { state: 'forbidden' } });
+	});
 
-		expect(result.webhooks).toEqual([]);
-		expect(result.hasMore).toBe(false);
+	it('keeps a failed schema read apart from a list of none', async () => {
+		const result = (await load(failing(200, 503, ''))) as Loaded;
+		expect(result.schemas).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 });
 
@@ -192,5 +207,176 @@ describe('admin/webhooks/+page.server.ts dead-letters action', () => {
 		const all = actionEvent({ data: [], total_count: 0 });
 		await actions['dead-letters'](all.event);
 		expect(all.seen.find((u) => u.includes('/webhook-dead-letters'))).not.toContain('status=');
+	});
+});
+
+/*
+ * The plugin serves create, update, delete and rotate to a super admin only, so
+ * an admin's direct POST stops here before it reaches the engine.
+ */
+describe('admin/webhooks/+page.server.ts writes by role', () => {
+	function writeEvent(roles: string[]) {
+		const seen: string[] = [];
+		const fetch = vi.fn(async (url: string) => {
+			seen.push(String(url));
+			if (String(url).includes('/auth/me')) return json({ id: 'u1', roles, disabled: false });
+			return json({});
+		}) as unknown as typeof globalThis.fetch;
+		const form = new FormData();
+		form.set('id', 'w1');
+		return {
+			seen,
+			event: {
+				fetch,
+				cookies: mockCookies(),
+				request: { formData: async () => form },
+				url: new URL('http://localhost/admin/webhooks'),
+			} as never,
+		};
+	}
+
+	it.each(['create', 'update', 'delete', 'rotate-secret'] as const)('refuses %s to an admin', async (name) => {
+		const { event, seen } = writeEvent(['admin']);
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(seen.filter((u) => !u.includes('/auth/me'))).toEqual([]);
+	});
+
+	it('lets a super admin delete', async () => {
+		const { event, seen } = writeEvent(['super_admin']);
+		await actions.delete(event);
+		expect(seen.some((u) => u.includes('/api/admin/webhooks/w1'))).toBe(true);
+	});
+});
+
+/** An action event whose session reads as `roles` and whose writes answer `answer`. */
+function postEvent(fields: Record<string, string>, answer: (url: string) => Response, roles = ['admin']) {
+	const seen: string[] = [];
+	const fetch = vi.fn(async (url: string) => {
+		const asked = String(url);
+		if (asked.includes('/auth/me')) return json({ id: 'u1', roles, disabled: false });
+		seen.push(asked);
+		return answer(asked);
+	}) as unknown as typeof globalThis.fetch;
+	const form = new FormData();
+	for (const [key, value] of Object.entries(fields)) form.set(key, value);
+	return {
+		seen,
+		event: {
+			fetch,
+			cookies: mockCookies(),
+			request: { formData: async () => form },
+			url: new URL('http://localhost/admin/webhooks'),
+		} as never,
+	};
+}
+
+describe('rotating a webhook signing secret', () => {
+	// The plugin answers the webhook and the secret it generated, and shows
+	// the secret this once.
+	it('hands the page the new secret and the webhook it signs for', async () => {
+		const { event } = postEvent(
+			{ id: 'w1' },
+			() => json({ webhook: { id: 'w1', name: 'Ship it', secret: '[redacted]' }, new_secret: 'c0ffee-secret' }),
+			['super_admin'],
+		);
+		expect(await actions['rotate-secret'](event)).toEqual({ rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } });
+	});
+
+	it('names its action on a refusal and keeps driver text out of an outage', async () => {
+		const refused = postEvent({ id: 'w1' }, () => json({ error: 'failed to rotate webhook secret' }, 404), ['super_admin']);
+		expect(await actions['rotate-secret'](refused.event)).toEqual({
+			status: 400,
+			data: { action: 'rotate-secret', error: 'failed to rotate webhook secret' },
+		});
+		const down = postEvent({ id: 'w1' }, () => json({ error: 'pq: timeout' }, 503), ['super_admin']);
+		expect(await actions['rotate-secret'](down.event)).toEqual({
+			status: 400,
+			data: { action: 'rotate-secret', error: 'Failed to rotate webhook secret' },
+		});
+	});
+});
+
+/*
+ * Every one of these actions is the plugin's GroupAdmin route, so any signed
+ * in admin may call it. Each answers a write the plugin accepts, a refusal
+ * under its own action name, and an outage without driver text.
+ */
+describe('the delivery and dead-letter actions each report their own outcome', () => {
+	const cases = {
+		test: { fields: { id: 'w1' }, ok: { success: true, status_code: 200, message: 'OK' }, fallback: 'Failed to test webhook' },
+		deliveries: { fields: { id: 'w1' }, ok: [], fallback: 'Failed to load deliveries' },
+		'retry-delivery': {
+			fields: { id: 'w1', delivery_id: 'd1' },
+			ok: { delivery_id: 'd1', success: true, message: 'Delivered' },
+			fallback: 'Failed to retry delivery',
+		},
+		'dead-letter-replay': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'replayed', http_status: 200 }, fallback: 'Failed to replay dead letter' },
+		'dead-letter-dismiss': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'dismissed' }, fallback: 'Failed to dismiss dead letter' },
+		'dead-letter-delete': { fields: { id: 'dl1' }, ok: null, fallback: 'Failed to delete dead letter' },
+	} as const;
+	const names = Object.keys(cases) as (keyof typeof cases)[];
+
+	it.each(names)('%s succeeds for an admin', async (name) => {
+		const { event, seen } = postEvent(cases[name].fields, () =>
+			cases[name].ok === null ? new Response(null, { status: 204 }) : json(cases[name].ok),
+		);
+		const result = await actions[name](event);
+		expect(seen).toHaveLength(1);
+		// A failure comes back as fail(), which carries a status. A success does not.
+		expect((result as { status?: number } | undefined)?.status).toBeUndefined();
+	});
+
+	it.each(names)('%s names its action on a refusal', async (name) => {
+		const { event } = postEvent(cases[name].fields, () => json({ error: 'dead letter entry is not pending' }, 409));
+		expect(await actions[name](event)).toMatchObject({ status: 400, data: { action: name, error: 'dead letter entry is not pending' } });
+	});
+
+	it.each(names)('%s keeps driver text out of an outage', async (name) => {
+		const { event } = postEvent(cases[name].fields, () => json({ error: 'pq: connection refused' }, 503));
+		expect(await actions[name](event)).toMatchObject({ data: { action: name, error: cases[name].fallback } });
+	});
+
+	it('passes the replay result through, the receiver code included', async () => {
+		const { event } = postEvent({ id: 'dl1' }, () => json({ id: 'dl1', status: 'replayed', http_status: 502 }));
+		expect(await actions['dead-letter-replay'](event)).toEqual({
+			deadLetterReplay: { id: 'dl1', status: 'replayed', http_status: 502 },
+		});
+	});
+
+	it('renders a license refusal of a replay through the refusal notice', async () => {
+		const { event } = postEvent({ id: 'dl1' }, () =>
+			json({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature' }, 402),
+		);
+		expect(await actions['dead-letter-replay'](event)).toMatchObject({
+			status: 402,
+			data: { action: 'dead-letter-replay', id: 'dl1', refused: { kind: 'feature' } },
+		});
+	});
+
+	it('asks for the page of the queue the form names', async () => {
+		const { event, seen } = postEvent({ offset: '100' }, () => json({ data: [], total_count: 120 }));
+		expect(await actions['dead-letters'](event)).toMatchObject({ deadLetterOffset: 100, deadLetterLimit: 50 });
+		expect(seen[0]).toContain('offset=100');
+	});
+
+	it('reports a failed page turn inside the queue and a failed first read above the list', async () => {
+		const turned = postEvent({ turn: 'page', offset: '50' }, () => json({ error: 'pq: timeout' }, 503));
+		expect(await actions['dead-letters'](turned.event)).toMatchObject({ data: { action: 'dead-letters-page' } });
+		// A turn back to the first page is still a turn inside the open queue.
+		const back = postEvent({ turn: 'page', offset: '0' }, () => json({ error: 'pq: timeout' }, 503));
+		expect(await actions['dead-letters'](back.event)).toMatchObject({ data: { action: 'dead-letters-page' } });
+		const first = postEvent({}, () => json({ error: 'pq: timeout' }, 503));
+		expect(await actions['dead-letters'](first.event)).toMatchObject({ data: { action: 'dead-letters' } });
+	});
+
+	it.each([...names, 'dead-letters'] as const)('%s is refused to a session the engine does not sign in', async (name) => {
+		const fetch = vi.fn(async () => json({ error: 'unauthorized' }, 401)) as unknown as typeof globalThis.fetch;
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			request: { formData: async () => new FormData() },
+			url: new URL('http://localhost/admin/webhooks'),
+		} as never;
+		await expect(actions[name](event)).rejects.toBeDefined();
 	});
 });

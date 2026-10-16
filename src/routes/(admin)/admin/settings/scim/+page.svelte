@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -9,21 +8,24 @@
 		Input,
 		PageShell,
 		PasswordInput,
+		RadioGroup,
+		SearchInput,
 		SectionHeading,
-		Select,
 		Stat,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 		CopyField,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { KeyRound, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import { narrows } from '$lib/narrow';
 	import {
 		MIN_TOKEN_LENGTH,
 		SCIM_BASE_PATH,
@@ -38,13 +40,45 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const deprovisioning = $derived(data.providers.filter((p) => p.deprovision_on_delete).length);
+	/*
+	 * Each failure names the action that caused it. A drawer shows only its own
+	 * actions' failures, and only one that came back after it was opened, so a
+	 * failed delete never reads as a failure of the form opened next. The rest
+	 * show above the list.
+	 */
+	const failure = $derived(form as { error?: string; action?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	function failedIn(actions: string[]): string | undefined {
+		if (!failure?.error || form === openedOver) return undefined;
+		return actions.includes(failure.action ?? '') ? failure.error : undefined;
+	}
+	const rowError = $derived(failure?.error && failure.action !== 'create' && failure.action !== 'rotate' ? failure.error : '');
+
+	// An admin may read the connections. Every write is the super admin's, so an
+	// admin is shown the list and no control that would only be refused.
+	const canWrite = $derived(data.user.roles.includes('super_admin'));
+
+	// The endpoint takes no search, so the box narrows the page on screen and
+	// the pager below still walks every connection.
+	let query = $state('');
+	const visible = $derived(data.providers.filter((p) => narrows(query, p.name)));
+
+	const DEPROVISION_OPTIONS = [
+		{
+			value: 'disable',
+			label: 'Disable the account',
+			description: 'The account stays, with its history, and can no longer sign in.',
+		},
+		{
+			value: 'delete',
+			label: 'Delete the account',
+			description: 'The account and its history are removed. This cannot be undone.',
+		},
+	];
 
 	let creating = $state(false);
 	let name = $state('');
 	let token = $state('');
-	let deprovisionOnDelete = $state(true);
 	let action = $state('disable');
 
 	// One rotation panel at a time, keyed by the connection it belongs to. The
@@ -55,12 +89,13 @@
 	function openCreate() {
 		name = '';
 		token = '';
-		deprovisionOnDelete = true;
 		action = 'disable';
+		openedOver = form;
 		creating = true;
 	}
 
 	function openRotate(p: ScimProvider) {
+		openedOver = form;
 		rotating = p;
 		newToken = '';
 	}
@@ -89,28 +124,16 @@
 	 * saying: an operator expecting a cleanup would otherwise get none.
 	 */
 	function removeConnection(p: ScimProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
-				'The identity provider stops being able to create or remove accounts here. Accounts it already created are left as they are.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete SCIM connection ${p.name}`,
+			'The identity provider stops being able to create or remove accounts here. Accounts it already created are left as they are.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 
 	const saveConnectionSubmit = tracked(saveConnection);
 	const saveTokenSubmit = tracked(saveToken);
 </script>
-
-<PageTitle title="SCIM provisioning" />
 
 <PageShell
 	title="SCIM provisioning"
@@ -118,7 +141,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		{#if data.gate.state === 'ok'}
+		{#if data.gate.state === 'ok' && canWrite}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} /> New connection
 			</Button>
@@ -127,18 +150,21 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="SCIM provisioning"
 			absent="The SCIM plugin is not part of this build, so no directory can provision accounts here."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
+		{/if}
+		{#if !canWrite}
+			<Alert tone="brand">Only a super admin can add or remove a connection, or rotate its token.</Alert>
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-2">
 			<Stat size="sm" mono label="Connections" value={data.providers.length} />
-			<Stat size="sm" mono label="Deprovisioning accounts" value={deprovisioning} />
 		</div>
 
 		<section class="flex flex-col gap-4">
@@ -157,79 +183,96 @@
 			{#if data.providers.length === 0}
 				<EmptyState
 					title="No directory is connected"
-					description="Add a connection to let an identity provider manage accounts here."
+					description={canWrite ? 'Add a connection to let an identity provider manage accounts here.' : 'A super admin adds a connection to let an identity provider manage accounts here.'}
 				>
 					{#snippet iconSnippet()}
 						<KeyRound size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openCreate}>
-							<Plus size={ICON.sm} /> New connection
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openCreate}>
+								<Plus size={ICON.sm} /> New connection
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
-				<Table label="Connections">
-					<thead>
-						<tr>
-							<th scope="col">Connection</th>
-							<th scope="col">Deprovisioned accounts are</th>
-							<th scope="col">Created</th>
-							<th scope="col"><span class="sr-only">Actions</span></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each data.providers as p (p.id)}
+				<ListToolbar label="Filter connections">
+					{#snippet search()}
+						<label for="scim-search" class="sr-only">Narrow this page</label>
+						<SearchInput id="scim-search" bind:value={query} placeholder="Connection name on this page" />
+					{/snippet}
+				</ListToolbar>
+				{#if visible.length === 0}
+					<EmptyState
+						title="No connection on this page matches"
+						description="Clear the search, or turn the page: the box narrows what is on screen."
+					/>
+				{:else}
+					<Table label="Connections">
+						<thead>
 							<tr>
-								<td data-cell="nowrap">
-									<div class="flex items-center gap-2">
-										<span class="font-medium text-fg">{p.name}</span>
-										<Badge tone={p.enabled ? 'success' : 'neutral'} dot>
-											{p.enabled ? 'Enabled' : 'Disabled'}
-										</Badge>
-									</div>
-								</td>
-								<td data-cell="nowrap">
-									<Badge tone={deprovisionTone(p)}>{deprovisionLabel(p)}</Badge>
-								</td>
-								<td data-cell="nowrap" class="text-xs text-faint">
-									{formatDateTime(p.created_at)}
-								</td>
-								<td data-cell="nowrap">
-									<div class="flex items-center justify-end gap-1">
-										<Button
-											variant="ghost"
-											size="sm"
-											aria-label="Rotate the token for {p.name}"
-											title="Rotate token"
-											onclick={() => openRotate(p)}
-										>
-											<RefreshCw size={ICON.sm} />
-										</Button>
-										<form method="POST" action="?/delete" use:enhance={removeConnection(p)}>
-											<input type="hidden" name="id" value={p.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												aria-label="Delete {p.name}"
-											>
-												<Trash2 size={ICON.sm} class="text-danger" />
-											</Button>
-										</form>
-									</div>
-								</td>
+								<th scope="col">Connection</th>
+								<th scope="col">Deprovisioned accounts are</th>
+								<th scope="col">Created</th>
+								<th scope="col"><span class="sr-only">Actions</span></th>
 							</tr>
-						{/each}
-					</tbody>
-				</Table>
+						</thead>
+						<tbody>
+							{#each visible as p (p.id)}
+								<tr>
+									<td data-cell="nowrap">
+										<div class="flex items-center gap-2">
+											<span class="font-medium text-fg">{p.name}</span>
+											<Badge tone={p.enabled ? 'success' : 'neutral'} dot>
+												{p.enabled ? 'Enabled' : 'Disabled'}
+											</Badge>
+										</div>
+									</td>
+									<td data-cell="nowrap">
+										<Badge tone={deprovisionTone(p)}>{deprovisionLabel(p)}</Badge>
+									</td>
+									<td data-cell="nowrap" class="text-xs text-faint">
+										{formatDateTime(p.created_at)}
+									</td>
+									<td data-cell="nowrap">
+										{#if canWrite}
+											<div class="flex items-center justify-end gap-1">
+												<Button
+													variant="ghost"
+													size="sm"
+													aria-label="Rotate the token for {p.name}"
+													title="Rotate token"
+													onclick={() => openRotate(p)}
+												>
+													<RefreshCw size={ICON.sm} />
+												</Button>
+												<form method="POST" action="?/delete" use:enhance={removeConnection(p)}>
+													<input type="hidden" name="id" value={p.id} />
+													<Button
+														variant="ghost"
+														size="sm"
+														type="submit"
+														aria-label="Delete {p.name}"
+													>
+														<Trash2 size={ICON.sm} class="text-danger" />
+													</Button>
+												</form>
+											</div>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</Table>
+				{/if}
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
 					count={data.providers.length}
 					total={data.total ?? undefined}
 					hasNext={data.hasMore}
-					noun="providers"
+					noun="connections"
 					href={pageHref('/admin/settings/scim', data.limit)}
 				/>
 			{/if}
@@ -240,6 +283,9 @@
 <Drawer bind:open={creating} title="New connection">
 	<form id="scim-connection-form" method="POST" action="?/create" use:enhance={saveConnectionSubmit.enhance}>
 		<div class="flex flex-col gap-4">
+			<!-- A refused save keeps the drawer open, so the reason has to be in
+			     it and not behind the panel on the page. -->
+			<FormErrors message={failedIn(['create'])} />
 			<Input
 				id="scim-name"
 				name="name"
@@ -256,30 +302,22 @@
 				bind:value={token}
 				required
 			/>
-			<Select
-				id="scim-deprovision-action"
+			<RadioGroup
 				name="deprovision_action"
 				label="When the directory removes somebody"
-				hint="Disabling keeps the account and its history. Deleting does not, and cannot be undone."
 				bind:value={action}
-				options={[
-					{ value: 'disable', label: 'Disable the account' },
-					{ value: 'delete', label: 'Delete the account' },
-				]}
+				options={DEPROVISION_OPTIONS}
 			/>
-			<!-- Toggle renders a button, and a button submits nothing. The action
-			     reads an absent field as false, which would silently store a
-			     connection that never deprovisions anybody. -->
-			<input
-				type="hidden"
-				name="deprovision_on_delete"
-				value={deprovisionOnDelete ? 'true' : 'false'}
-			/>
+			<!-- The plugin acts on every removal whatever this field says, so the
+			     switch shows that fact rather than offering a choice that does
+			     nothing. The field still says true, which is what gets stored. -->
+			<input type="hidden" name="deprovision_on_delete" value="true" />
 			<Toggle
 				id="scim-deprovision"
 				label="Act on removals at all"
-				hint="Off means an account stays exactly as it is when the directory stops listing it."
-				bind:checked={deprovisionOnDelete}
+				hint="Always on. It governs a directory that deletes the person, which is handled the way chosen above. Okta and Microsoft Entra mark the person inactive instead, and that always disables the account, whichever way is chosen."
+				checked={true}
+				disabled
 			/>
 		</div>
 	</form>
@@ -297,6 +335,7 @@
 	<form id="scim-rotate-form" method="POST" action="?/rotate" use:enhance={saveTokenSubmit.enhance}>
 		<input type="hidden" name="id" value={rotating?.id ?? ''} />
 		<div class="flex flex-col gap-4">
+			<FormErrors message={failedIn(['rotate'])} />
 			<Alert tone="warn">
 				The old token stops working the moment this one is stored. Provisioning fails until
 				the directory is updated with the new one.

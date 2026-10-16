@@ -45,6 +45,7 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	'rate-limits': 'Every limit a request passes through, and who is close to one right now.',
 	'tenant-rate-limits': "This tenant's own limit, the addresses it always allows or refuses, and what was refused.",
 	captcha: "The captcha this tenant's own pages and flows check. The admin login keeps the install's.",
+	'sign-in': 'How long accounts your identity provider created may sign in without it.',
 	'api-access': 'How external apps authenticate, what each role may do, and a token to try it with.',
 	'api-keys': 'Machine-to-machine credentials for the content API, with their usage.',
 	'admin-tokens': 'Scoped, expiring credentials for scripts that call the admin API, and what each one did.',
@@ -72,7 +73,7 @@ const GROUPS: readonly { id: string; label: string; description: string; ids: re
 		id: 'access',
 		label: 'Sign-in and access',
 		description: 'Who may sign in, on whose word, and what each role may do.',
-		ids: ['permissions', 'security', 'oauth', 'saml', 'scim', 'rate-limits', 'tenant-rate-limits', 'captcha'],
+		ids: ['permissions', 'security', 'sign-in', 'oauth', 'saml', 'scim', 'rate-limits', 'tenant-rate-limits', 'captcha'],
 	},
 	{
 		id: 'apis',

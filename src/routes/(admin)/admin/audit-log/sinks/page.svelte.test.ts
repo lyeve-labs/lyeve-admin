@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
 
 import SinksPage from './+page.svelte';
 
@@ -49,10 +55,10 @@ describe('audit sinks page', () => {
 		expect(container.textContent).toContain('Hook is streaming the audit log');
 	});
 
-	it('renders a refused create as the refusal notice', () => {
+	it('renders a refused delete as the refusal notice', () => {
 		const { getAllByTestId } = setup(
 			{ sinks: [sink] },
-			{ error: 'x', refused: { kind: 'feature', feature: 'example-capability', plugin: 'example', upgradeUrl: '' } },
+			{ action: 'delete', error: 'x', refused: { kind: 'feature', feature: 'example-capability', plugin: 'example', upgradeUrl: '' } },
 		);
 		expect(getAllByTestId('refusal-notice')[0].textContent).toContain('example-capability');
 	});
@@ -60,5 +66,36 @@ describe('audit sinks page', () => {
 	it('says why the page is empty when the plugin is not there', () => {
 		const { container } = setup({ gate: { state: 'absent' } });
 		expect(container.textContent).toContain('does not stream the audit log');
+	});
+});
+
+describe('audit sink controls', () => {
+	// Three short kinds are a row of segments, every one in sight at once.
+	it('offers the destination kinds as segments, not a list to open', async () => {
+		setup({ sinks: [sink] });
+		await fireEvent.click(screen.getByRole('button', { name: /new destination/i }));
+		expect(screen.getByRole('radio', { name: 'HTTPS endpoint' })).toBeTruthy();
+		expect(screen.getByRole('radiogroup', { name: 'Destination' })).toBeTruthy();
+	});
+
+	it('names the destination in the delete confirmation title', async () => {
+		setup({ sinks: [sink] });
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete Security SIEM' }));
+		const [title] = kit.confirm.mock.calls[0] as unknown as [string];
+		expect(title).toBe('Delete destination Security SIEM');
+	});
+});
+
+describe('audit sink failures stay where they were made', () => {
+	it('shows a failed test on the page and opens the destination drawer clean', async () => {
+		const { container } = setup({ sinks: [sink] }, { action: 'test', error: 'The test could not be sent.' });
+		expect(container.textContent).toContain('The test could not be sent.');
+		await fireEvent.click(screen.getByRole('button', { name: /new destination/i }));
+		expect((document.getElementById('sink-form') as HTMLFormElement).textContent).not.toContain('could not be sent');
+	});
+
+	it('keeps a refused create in the drawer and off the page', () => {
+		const { container } = setup({ sinks: [sink] }, { action: 'create', error: 'Check the highlighted fields.', fields: { url: 'URL is required' } });
+		expect(container.textContent).not.toContain('Check the highlighted fields.');
 	});
 });

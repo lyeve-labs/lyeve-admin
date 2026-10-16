@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { Badge, Button, EmptyState, PageShell, Table } from '@lyeve-labs/ui-kit';
 	import { ChevronRight, MessageSquareText } from '@lucide/svelte';
 	import type { PageData } from './$types';
@@ -11,16 +10,14 @@
 	let { data }: { data: PageData } = $props();
 </script>
 
-<PageTitle title="AI prompts" />
-
 <PageShell
 	title="AI prompts"
 	description="One system prompt per use case. The shipped text is version 0. Every save is a new version and a transcript records the one it ran under."
 	width="wide"
 >
-	<AiSection tab="prompts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prompts">
+	<AiSection level={2} tab="prompts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prompts">
 		{#if data.prompts.length === 0}
-			<EmptyState title="No use cases" description="The plugin listed no prompt use cases. This is not a state a mounted plugin answers with.">
+			<EmptyState level={2} title="No use cases" description="The plugin listed no prompt use cases. This is not a state a mounted plugin answers with.">
 				{#snippet iconSnippet()}
 					<MessageSquareText size={ICON.lg} />
 				{/snippet}

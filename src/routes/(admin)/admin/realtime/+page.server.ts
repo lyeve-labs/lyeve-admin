@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types';
 import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
+import { gateOf, type Gate } from '$lib/api/gate';
 import {
 	REALTIME_OK,
 	getPlatformMetrics,
@@ -24,6 +25,9 @@ export const load: PageServerLoad = async (event) => {
 			socket: null as SocketMetrics | null,
 			platform: null as StreamMetrics | null,
 			gate: { state: 'absent' } as RealtimeGate,
+			streamGate: null as Gate | null,
+			socketGate: null as Gate | null,
+			platformGate: null as Gate | null,
 			superAdmin,
 		};
 	}
@@ -51,9 +55,22 @@ export const load: PageServerLoad = async (event) => {
 	// The per-tenant roster is the operator's view and the engine gates it on
 	// the role, so it is not asked for on a tenant admin's behalf.
 	let platform: StreamMetrics | null = null;
+	let platformGate: Gate | null = null;
 	if (superAdmin && gate.state === 'ok') {
-		platform = await getPlatformMetrics(client).catch(() => null);
+		try {
+			platform = await getPlatformMetrics(client);
+		} catch (err) {
+			platformGate = gateOf(err, 'The per-tenant roster could not be read. The counters above are unaffected.');
+		}
 	}
 
-	return { stream, socket, platform, gate, superAdmin };
+	// Each transport that did not answer keeps the reason, so the page reports
+	// it beside the other rather than calling it a transport nobody uses.
+	const failed = (what: string) => `The ${what} counters could not be read. This is not a report that nobody is connected.`;
+	const streamGate =
+		gate.state === 'ok' && streamRes.status === 'rejected' ? gateOf(streamRes.reason, failed('server-sent events')) : null;
+	const socketGate =
+		gate.state === 'ok' && socketRes.status === 'rejected' ? gateOf(socketRes.reason, failed('WebSocket')) : null;
+
+	return { stream, socket, platform, gate, streamGate, socketGate, platformGate, superAdmin };
 };

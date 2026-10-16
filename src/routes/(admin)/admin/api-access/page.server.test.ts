@@ -30,4 +30,15 @@ describe('API access token action', () => {
 		const broken = event(500, { error: 'pq: boom' }, { email: 'a@b.c', password: 'x' });
 		expect(((await actions.token(broken.ev)) as { data: { tokenError: string } }).data.tokenError).toBe('The token could not be issued.');
 	});
+
+	it.each([
+		['answers 503', () => new Response(JSON.stringify({ error: 'dial tcp 10.0.0.4:5432: connection refused' }), { status: 503 })],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('issues nothing and keeps the detail off the page when the engine %s', async (_case, answer) => {
+		const { ev, fetch } = event(200, {}, { email: 'a@b.c', password: 'x' });
+		fetch.mockImplementation(async () => answer());
+		const r = (await actions.token(ev)) as { status: number; data: { tokenError: string } };
+		expect(r.status).toBe(400);
+		expect(r.data.tokenError).toBe('The token could not be issued.');
+	});
 });

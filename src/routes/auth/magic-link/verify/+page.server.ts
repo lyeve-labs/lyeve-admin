@@ -1,10 +1,11 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { createClient } from '@lyeve-labs/client';
 import { mfaVerify } from '@lyeve-labs/client-rest';
 import { isMagicLinkMFAChallenge, verifyMagicLink } from '$lib/api/magic-link';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
-import { setSessionCookie } from '$lib/server/session-cookie';
+import { secondFactorFailure } from '$lib/server/second-factor';
+import { setRefreshCookie, setSessionCookie } from '$lib/server/session-cookie';
 import { LANDING } from '$lib/landing';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -32,6 +33,7 @@ export const actions: Actions = {
 				return { mfa_required: true, challenge_token: res.challenge_token };
 			}
 			setSessionCookie(event, res.access_token);
+			setRefreshCookie(event, res.refresh_token);
 		} catch (e) {
 			const refused = recoveryRefusal(e, 'Email sign-in');
 			if (refused) return fail(refused.status, { error: refused.error });
@@ -53,17 +55,15 @@ export const actions: Actions = {
 		}
 
 		try {
-			const res = await mfaVerify(challengeToken, code, createClient(event.fetch));
+			const res: { token: string; refresh_token?: string } = await mfaVerify(challengeToken, code, createClient(event.fetch));
 			setSessionCookie(event, res.token);
+			setRefreshCookie(event, res.refresh_token);
 		} catch (e) {
-			if (e instanceof ApiError && e.status === 429) {
-				return fail(429, {
-					error: 'Too many verification attempts. Please wait before trying again.',
-					mfa_required: true,
-					challenge_token: challengeToken,
-				});
-			}
-			return fail(400, { error: 'Invalid code.', mfa_required: true, challenge_token: challengeToken });
+			// The link was spent when the challenge was issued, so a new sign-in
+			// starts from a new link.
+			const failed = secondFactorFailure(e, 'request a new link to sign in again');
+			if (failed.restart) return fail(failed.status, { error: failed.error });
+			return fail(failed.status, { error: failed.error, mfa_required: true, challenge_token: challengeToken });
 		}
 		redirect(303, LANDING);
 	},

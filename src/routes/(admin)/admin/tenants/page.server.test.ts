@@ -69,7 +69,8 @@ describe('admin/tenants load', () => {
 		const result = await run(event);
 
 		expect(result.total).toBe(731);
-		expect(result.tenants).toHaveLength(50);
+		expect(result.tenants).toMatchObject({ ok: true });
+		expect(result.tenants.ok && result.tenants.value).toHaveLength(50);
 	});
 
 	it('defaults to the engine page size and the first page', async () => {
@@ -121,9 +122,11 @@ describe('admin/tenants load', () => {
 		expect(result.total).toBe(750);
 	});
 
-	it('renders an empty page when the engine cannot be reached', async () => {
+	// An empty list is the first-run state with an offer to create the first
+	// tenant. A read that failed is a gate, never that state.
+	it('keeps an unreachable engine as an outage, never as no tenants', async () => {
 		const fetch = vi.fn(async () => {
-			throw new Error('engine unreachable');
+			throw new TypeError('fetch failed');
 		}) as unknown as typeof globalThis.fetch;
 
 		const result = await run({
@@ -133,8 +136,25 @@ describe('admin/tenants load', () => {
 			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never);
 
-		expect(result.tenants).toEqual([]);
-		expect(result.total).toBe(0);
+		expect(result.tenants).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(result.canProvision).toBe(false);
+	});
+
+	it('keeps a refused or failed list read as its gate', async () => {
+		const refuse = (status: number) => {
+			const fetch = vi.fn(async (url: string) =>
+				String(url).includes('/provisioning') ? json({ enabled: true }) : json({ error: 'no' }, status),
+			) as unknown as typeof globalThis.fetch;
+			return run({
+				fetch,
+				cookies: mockCookies(),
+				url: new URL('http://localhost/admin/tenants'),
+				parent: async () => ({ user: { roles: ['super_admin'] } }),
+			} as never);
+		};
+		expect((await refuse(403)).tenants).toEqual({ ok: false, gate: { state: 'forbidden' } });
+		expect((await refuse(503)).tenants).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect((await refuse(500)).tenants).toMatchObject({ ok: false, gate: { state: 'error' } });
 	});
 
 	it('throws 403 for anyone but a super_admin', async () => {
@@ -178,6 +198,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { slug: 'Slug is required' },
 			},
@@ -190,6 +211,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 		expect(result).toEqual({
 			status: 400,
 			data: {
+				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { slug: 'Slug is required', name: 'Display name is required' },
 			},
@@ -214,6 +236,48 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 		await actions.create(event);
 
 		expect(sentBody(event)).not.toHaveProperty('plan');
+	});
+
+	/** A create event whose POST answers the refusal body with a 402. */
+	function refusedEvent(body: unknown) {
+		const form = new FormData();
+		form.append('slug', 'acme');
+		form.append('name', 'ACME Corp');
+		const fetch = vi.fn(async (_url: string, init?: RequestInit) =>
+			init?.method === 'POST' ? json(body, 402) : json({ id: 'u1', email: 'admin@b.co', roles: ['super_admin'] })
+		) as unknown as typeof globalThis.fetch;
+		return {
+			request: { formData: async () => form },
+			fetch,
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/tenants'),
+		} as never;
+	}
+
+	it('returns a missing capability as a refusal with the link the plugin sent', async () => {
+		const link = 'https://shop.example.com/pricing?skus=example-pro&utm_campaign=example';
+		const result = await actions.create(
+			refusedEvent({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature', upgrade_url: link })
+		);
+
+		expect(result).toMatchObject({
+			status: 402,
+			data: { refused: { kind: 'feature', feature: 'example-feature', upgradeUrl: link } },
+		});
+		expect((result as { data: { error: string } }).data.error).toContain('does not include example-feature');
+	});
+
+	it('returns the tenant ceiling as a limit reached with the link the plugin sent', async () => {
+		const link = 'https://shop.example.com/pricing?plan=larger&utm_campaign=tenants';
+		const result = await actions.create(
+			refusedEvent({ error: 'tenant quota reached (1); upgrade your plan to add more tenants', upgrade_url: link })
+		);
+
+		expect(result).toMatchObject({
+			status: 402,
+			data: { refused: { kind: 'cap', cap: 'tenants', limit: null, current: null, upgradeUrl: link } },
+		});
+		expect((result as { data: { error: string } }).data.error).toContain('This instance allows no more tenants.');
 	});
 
 	it('sends the plan as typed', async () => {
@@ -242,8 +306,169 @@ describe('admin/tenants load provisioning', () => {
 		expect((await run(eventFor(() => json({ enabled: false })))).canProvision).toBe(false);
 	});
 
-	it('reads a plugin without the route, or a failed read, as not enabled', async () => {
-		expect((await run(eventFor(() => json({ error: 'not found' }, 404))))).toMatchObject({ canProvision: false, total: 1 });
-		expect((await run(eventFor(() => json({ error: 'unavailable' }, 503))))).toMatchObject({ canProvision: false, total: 1 });
+	it('carries the link a read that says no names, and none when it says yes', async () => {
+		const link = 'https://shop.example.com/pricing?skus=example-pro&utm_campaign=example';
+		expect(await run(eventFor(() => json({ enabled: false, upgrade_url: link })))).toMatchObject({
+			canProvision: false,
+			provisioningUrl: link,
+		});
+		expect(await run(eventFor(() => json({ enabled: true, upgrade_url: link })))).toMatchObject({
+			canProvision: true,
+			provisioningUrl: '',
+		});
+		expect((await run(eventFor(() => json({ error: 'unavailable' }, 503)))).provisioningUrl).toBe('');
+	});
+
+	// The refusal carries the link that lifts it, as a read that says no does.
+	it('carries the link a refused provisioning read names', async () => {
+		const link = 'https://shop.example.com/pricing?skus=example-pro';
+		expect(await run(eventFor(() => json({ error: 'payment_required', upgrade_url: link }, 402)))).toMatchObject({
+			canProvision: false,
+			provisionGate: null,
+			provisioningUrl: link,
+		});
+	});
+
+	it('reads a refusal as not enabled', async () => {
+		expect(await run(eventFor(() => json({ error: 'payment_required' }, 402)))).toMatchObject({ canProvision: false, provisionGate: null });
+	});
+
+	// A route that is not served says nothing about the license, so the page
+	// has to tell it apart from a refusal.
+	it('keeps a plugin without the provisioning route as its own gate', async () => {
+		expect(await run(eventFor(() => json({ error: 'not found' }, 404)))).toMatchObject({ canProvision: false, provisionGate: { state: 'absent' }, total: 1 });
+	});
+
+	// An outage says nothing about the license, so it is never drawn as
+	// creating not being enabled.
+	it('keeps a provisioning read that did not answer as its gate', async () => {
+		const result = await run(eventFor(() => json({ error: 'unavailable' }, 503)));
+		expect(result).toMatchObject({ canProvision: false, provisionGate: { state: 'unavailable' }, total: 1 });
+		const busy = await run(eventFor(() => json({ error: 'slow down' }, 429)));
+		expect(busy.provisionGate).toEqual({ state: 'busy' });
+	});
+});
+
+/*
+ * A page past the end draws the first-run state, which says the instance has
+ * no tenants. A bookmark or a delete leaves such an offset behind.
+ */
+describe('admin/tenants load past the end', () => {
+	it('sends a page past the end back to the last page that holds rows', async () => {
+		const { event } = loadEvent({ data: [], total_count: 120 }, '?limit=50&offset=500');
+		await expect(load(event)).rejects.toMatchObject({ status: 307, location: '/admin/tenants?limit=50&offset=100' });
+	});
+
+	it('renders an empty first page as it is', async () => {
+		const { event } = loadEvent({ data: [], total_count: 0 });
+		const result = await run(event);
+		expect(result.tenants).toEqual({ ok: true, value: [] });
+	});
+});
+
+/** An action event whose fetch answers the session read, then `answer` for the write. */
+function writeEvent(
+	fields: Record<string, string>,
+	answer: (url: string, init?: RequestInit) => Response,
+	roles = ['super_admin'],
+) {
+	const form = new FormData();
+	for (const [key, value] of Object.entries(fields)) form.append(key, value);
+	const fetch = vi.fn(async (url: string, init?: RequestInit) =>
+		init?.method && init.method !== 'GET'
+			? answer(String(url), init)
+			: json({ id: 'u1', email: 'admin@b.co', roles })
+	) as unknown as typeof globalThis.fetch;
+	return {
+		request: { formData: async () => form },
+		fetch,
+		cookies: mockCookies(),
+		url: new URL('http://localhost/admin/tenants'),
+	} as never;
+}
+
+/** The body of the one write the action sent. */
+function writtenBody(event: unknown): Record<string, unknown> {
+	const calls = (event as { fetch: { mock: { calls: [unknown, RequestInit | undefined][] } } }).fetch.mock.calls;
+	const write = calls.find(([, init]) => init?.method && init.method !== 'GET');
+	return JSON.parse(String(write?.[1]?.body));
+}
+
+describe('admin/tenants create refusals', () => {
+	it('puts a slug the engine refuses on the Slug field', async () => {
+		const message = 'invalid slug: must be lowercase alphanumeric + underscore, 1-63 chars, starting with a letter';
+		const result = await actions.create(
+			writeEvent({ slug: 'acme-corp', name: 'ACME' }, () => json({ error: message }, 400))
+		);
+		expect(result).toEqual({
+			status: 400,
+			data: { action: 'create', error: 'Check the highlighted fields.', fields: { slug: message } },
+		});
+	});
+
+	it('renders a license refusal through the refusal notice, never as its code', async () => {
+		const result = await actions.create(
+			writeEvent({ slug: 'acme', name: 'ACME' }, () =>
+				json({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature', upgrade_url: '' }, 402)
+			)
+		);
+		expect(result).toMatchObject({
+			status: 402,
+			data: { action: 'create', refused: { kind: 'feature', feature: 'example-feature' } },
+		});
+		expect(JSON.stringify(result)).not.toContain('payment_required');
+	});
+});
+
+describe('admin/tenants update, toggle and delete', () => {
+	const tenant = { id: 't1', slug: 'acme', name: 'ACME', plan: 'free', enabled: true };
+
+	it('sends the plan a create with none gets when the field is emptied', async () => {
+		const event = writeEvent({ id: 't1', name: 'ACME', plan: '  ' }, () => json(tenant));
+		await actions.update(event);
+		expect(writtenBody(event)).toEqual({ name: 'ACME', plan: 'free' });
+	});
+
+	it('sends the plan as typed on an edit', async () => {
+		const event = writeEvent({ id: 't1', name: 'ACME', plan: 'gold' }, () => json(tenant));
+		await actions.update(event);
+		expect(writtenBody(event)).toEqual({ name: 'ACME', plan: 'gold' });
+	});
+
+	it('flips the enabled state it was handed', async () => {
+		const event = writeEvent({ id: 't1', enabled: 'true' }, () => json(tenant));
+		await actions.toggle(event);
+		expect(writtenBody(event)).toEqual({ enabled: false });
+	});
+
+	it('names the action that failed, for each write', async () => {
+		const refuse = () => json({ error: 'tenant not found' }, 404);
+		expect(await actions.update(writeEvent({ id: 't1', name: 'ACME' }, refuse))).toEqual({
+			status: 400,
+			data: { action: 'update', error: 'tenant not found' },
+		});
+		expect(await actions.toggle(writeEvent({ id: 't1', enabled: 'true' }, refuse))).toMatchObject({
+			data: { action: 'toggle', error: 'tenant not found' },
+		});
+		expect(await actions.delete(writeEvent({ id: 't1' }, refuse))).toMatchObject({
+			data: { action: 'delete', error: 'tenant not found' },
+		});
+	});
+
+	it('keeps driver text out of an outage on delete', async () => {
+		const result = await actions.delete(writeEvent({ id: 't1' }, () => json({ error: 'pq: connection refused' }, 503)));
+		expect(result).toEqual({ status: 400, data: { action: 'delete', error: 'Failed to delete tenant' } });
+	});
+
+	it('deletes a tenant the engine accepts', async () => {
+		const event = writeEvent({ id: 't1' }, () => new Response(null, { status: 204 }));
+		expect(await actions.delete(event)).toBeUndefined();
+	});
+
+	it.each(['create', 'update', 'toggle', 'delete'] as const)('refuses %s to an admin', async (name) => {
+		const answer = vi.fn(() => json({}));
+		const event = writeEvent({ id: 't1', slug: 'acme', name: 'ACME', enabled: 'true' }, answer, ['admin']);
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(answer).not.toHaveBeenCalled();
 	});
 });

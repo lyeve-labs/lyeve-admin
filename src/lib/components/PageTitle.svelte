@@ -1,4 +1,7 @@
 <script lang="ts">
+	// The tab title for a page that renders no PageShell: the error page and
+	// the signed-out cards. A PageShell titles the tab itself, in the format
+	// the root layout states, which is this one.
 	import { page } from '$app/state';
 	import { documentTitle, pageBrand } from '$lib/brand';
 

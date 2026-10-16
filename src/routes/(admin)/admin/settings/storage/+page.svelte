@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -15,15 +14,15 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, HardDrive, Pencil, Plug, Plus, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import {
 		PROVIDER_FIELDS,
 		PROVIDER_LABELS,
@@ -47,7 +46,15 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const formError = $derived((form as { error?: string } | null)?.error ?? '');
-	const providerError = $derived((form as { providerError?: string } | null)?.providerError ?? '');
+	// Create and update share one drawer and one form result, so the drawer
+	// shows only a failure of the action it is showing that came back after
+	// it opened. A failed create never shows in the next edit.
+	let openedOver = $state.raw<unknown>(null);
+	const providerError = $derived.by(() => {
+		const failed = form as { action?: string; providerError?: string } | null;
+		if (!failed?.providerError || form === openedOver) return '';
+		return failed.action === (editing ? 'update' : 'create') ? failed.providerError : '';
+	});
 
 	// One drawer for create and edit. A null target is a new provider.
 	let drawerOpen = $state(false);
@@ -74,6 +81,7 @@
 		enabled = true;
 		priority = '0';
 		publicUnsigned = false;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -87,6 +95,7 @@
 		enabled = p.enabled;
 		priority = String(p.priority);
 		publicUnsigned = p.local_public_unsigned;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -119,6 +128,7 @@
 		enabled = false;
 		priority = String(source.priority);
 		publicUnsigned = source.local_public_unsigned;
+		openedOver = form;
 		drawerOpen = true;
 	}
 
@@ -142,25 +152,13 @@
 	}
 
 	function remove(p: StorageProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
-				'Objects already stored there stay where they are, and nothing in this instance can read them afterwards.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete provider ${p.name}`,
+			'Objects already stored there stay where they are, and nothing in this instance can read them afterwards.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 </script>
-
-<PageTitle title="Storage" />
 
 <PageShell
 	title="Storage"
@@ -178,6 +176,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Storage"
 			absent="The storage plugin is not part of this build, so uploads have nowhere to go."
@@ -185,6 +184,11 @@
 	{:else}
 		{#if formError}
 			<Alert tone="danger">{formError}</Alert>
+		{/if}
+		{#if !data.canConfigure}
+			<Alert tone="info">
+				Only a super admin can add, change or delete a provider. Any admin can test one.
+			</Alert>
 		{/if}
 
 		{#if broken.length > 0}
@@ -213,7 +217,8 @@
 		{#if active}
 			<p class="text-xs text-muted">
 				New uploads go to <span class="font-medium text-fg">{active.name}</span>, which has
-				the lowest priority number among the providers that can take them.
+				{active.cost_weight > 0 ? 'the lowest cost weight' : 'the lowest priority number'} among
+				the providers that can take them.
 			</p>
 		{:else if data.providers.length > 0}
 			<Alert tone="danger">
@@ -224,7 +229,7 @@
 
 		<Card>
 			<div class="flex flex-col gap-3 text-sm text-muted">
-				<SectionHeading level={3}>How storage works</SectionHeading>
+				<SectionHeading level={2}>How storage works</SectionHeading>
 				<p>
 					With nothing configured, uploads are written to a directory on the engine host, the one
 					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span> names (<span class="font-mono text-xs">./uploads</span>
@@ -241,7 +246,8 @@
 				<p>
 					A tenant writes to the providers configured in that tenant. A tenant with none uses the
 					providers of the default tenant, and without those, the engine's directory. Among the
-					providers that can take a write, the lowest priority number receives it. Objects are kept
+					providers that can take a write, one given a cost weight through the API is preferred,
+					the lowest weight first. Without one, the lowest priority number receives it. Objects are kept
 					under a prefix per tenant in every store.
 				</p>
 				<p>
@@ -271,6 +277,11 @@
 			>
 				{#snippet iconSnippet()}
 					<HardDrive size={ICON.lg} />
+				{/snippet}
+				{#snippet action()}
+					{#if data.canConfigure}
+						<Button variant="secondary" onclick={openCreate}><Plus size={ICON.sm} /> New provider</Button>
+					{/if}
 				{/snippet}
 			</EmptyState>
 		{:else}
@@ -323,17 +334,19 @@
 											<Copy size={ICON.sm} />
 										</Button>
 									{/if}
-									<form method="POST" action="?/delete" use:enhance={remove(p)}>
-										<input type="hidden" name="id" value={p.id} />
-										<Button
-											variant="ghost"
-											size="sm"
-											type="submit"
-											aria-label="Delete {p.name}"
-										>
-											<Trash2 size={ICON.sm} class="text-danger" />
-										</Button>
-									</form>
+									{#if data.canConfigure}
+										<form method="POST" action="?/delete" use:enhance={remove(p)}>
+											<input type="hidden" name="id" value={p.id} />
+											<Button
+												variant="ghost"
+												size="sm"
+												type="submit"
+												aria-label="Delete {p.name}"
+											>
+												<Trash2 size={ICON.sm} class="text-danger" />
+											</Button>
+										</form>
+									{/if}
 								</div>
 							</td>
 						</tr>
@@ -346,10 +359,13 @@
 
 <Drawer bind:open={drawerOpen} title={editing ? `Edit ${editing.name}` : 'New provider'}>
 	<form method="POST" action={editing ? '?/update' : '?/create'} id="provider-form" use:enhance={save.enhance} class="flex flex-col gap-4">
-		{#if providerError}
-			<Alert tone="danger">{providerError}</Alert>
+		<FormErrors message={providerError || undefined} />
+		{#if editing}
+			<input type="hidden" name="id" value={editing.id} />
+			<!-- The plugin replaces the whole row on a save and the form has no
+			     cost field, so the stored weight goes back as it was read. -->
+			<input type="hidden" name="cost_weight" value={String(editing.cost_weight ?? 0)} />
 		{/if}
-		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="use_ssl" value={useSSL ? 'true' : 'false'} />
 		<input type="hidden" name="path_style" value={pathStyle ? 'true' : 'false'} />
 		<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />

@@ -6,7 +6,7 @@
 	import CodeEditor from './CodeEditor.svelte';
 	import Markdown from '$lib/components/Markdown.svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
-	import type { AssistProblem, AssistUsage } from '$lib/api/assist';
+	import { parseCost, type AssistProblem, type AssistUsage } from '$lib/api/assist';
 	import { AI_OFF_HREF, type AssistantAnswer, type AssistantDraft, type AssistantStatus } from '$lib/flow/assistant';
 	import { formatCount } from '$lib/format';
 	import { ICON } from '$lib/icon';
@@ -71,7 +71,8 @@
 
 	function usageLine(u: AssistUsage): string {
 		const tokens = formatCount(u.tokens, '?');
-		const cost = Number.isFinite(u.cost) ? `$${u.cost.toFixed(4)}` : '';
+		const dollars = parseCost(u.cost);
+		const cost = dollars === null ? '' : `$${dollars.toFixed(4)}`;
 		return [u.model, `${tokens} tokens`, cost].filter(Boolean).join(', ');
 	}
 

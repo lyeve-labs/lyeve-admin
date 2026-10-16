@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Autocomplete,
@@ -18,6 +17,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { RefreshCw, Sparkles, UserSearch } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		hasUsers,
 		percent,
@@ -34,20 +34,27 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	// The accounts the preview can run for, searchable by email. The field still
-	// takes a typed id, so an account past the first page is reachable.
+	// The accounts the preview can run for, searchable by email. Picking one
+	// fills the id field, which is what the form posts, so an account past the
+	// first page is reachable by pasting its id there.
 	const readerOptions = $derived(
-		(data.readers ?? []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
+		(data.readers.ok ? data.readers.value : []).map((r) => ({ value: r.id, label: r.email, keywords: [r.id] }))
 	);
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	// The recompute and the preview report through the one `form`. A failed
+	// preview shows in its own form, beside the id that caused it, and a failed
+	// recompute shows at the top of the page.
+	const failure = $derived(form as { action?: string; error?: string } | null);
+	const formError = $derived(failure?.action === 'preview' ? '' : (failure?.error ?? ''));
+	const previewError = $derived(failure?.action === 'preview' ? (failure.error ?? '') : '');
 	const outcome = $derived(
 		form as { refreshed?: boolean; pairs?: number; trending?: number; feeds?: number; ms?: number } | null,
 	);
 	const preview = $derived(
 		(form as { previewFor?: string; feed?: FeedEntry[] } | null)?.feed ?? null,
 	);
-	const previewFor = $derived((form as { previewFor?: string } | null)?.previewFor ?? '');
+	const previewId = $derived((form as { previewFor?: string } | null)?.previewFor ?? '');
+	const previewFor = $derived((data.readers.ok ? data.readers.value : []).find((r) => r.id === previewId)?.email ?? previewId);
 
 	const stats = $derived(data.stats);
 	const skewed = $derived(splitIsSkewed(stats));
@@ -67,8 +74,6 @@
 	};
 </script>
 
-<PageTitle title="Recommendations" />
-
 <PageShell
 	title="Recommendations"
 	description="Similar entries, trending entries and a feed per reader, computed from what your readers do."
@@ -87,6 +92,7 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Recommendations"
 			absent="The recommendations plugin is not part of this build, so nothing is being computed."
@@ -107,14 +113,19 @@
 
 		<Card>
 			<div class="flex flex-col gap-3 text-sm text-muted">
-				<SectionHeading level={3}>What recommendations do</SectionHeading>
+				<SectionHeading level={2}>What recommendations do</SectionHeading>
 				<p>
 					Your application tells the engine what each reader does: views, likes, bookmarks and shares,
-					weighted 1, 2, 5 and 3. From that the plugin works out three lists: entries similar to one
-					another (read by the same people over the last 30 days), what is trending this week, and a
-					feed per reader built from what people like them read. Readers are split between the
-					recommended feed and a random baseline, so the split below shows whether recommending changes
-					what people read.
+					weighted 1, 2, 5 and 3. From that, each reader gets:
+				</p>
+				<ul class="flex list-disc flex-col gap-1 ps-5">
+					<li>More like the entry they are on: entries the same people read over the last 30 days.</li>
+					<li>What is trending: the entries with the most activity this week.</li>
+					<li>A feed of their own: what readers who liked the same entries read next.</li>
+				</ul>
+				<p>
+					Readers are split between the recommended feed and a random baseline, so the split below
+					shows whether recommending changes what people read.
 				</p>
 				<p>
 					The lists are computed, not live: new behavior counts once a super admin recomputes them.
@@ -127,9 +138,13 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Trending now</SectionHeading>
-			{#if !data.trending}
-				<Alert tone="warn">The trending list could not be read.</Alert>
-			{:else if data.trending.length === 0}
+			{#if !data.trending.ok}
+				<GateNotice
+					gate={data.trending.gate}
+					title="Trending entries"
+					absent="This version of the recommendations plugin keeps no trending list."
+				/>
+			{:else if data.trending.value.length === 0}
 				<EmptyState
 					title="Nothing is trending yet"
 					description="An entry trends once readers have been tracked on it and a recompute has run."
@@ -144,7 +159,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.trending as item (item.content_id)}
+						{#each data.trending.value as item (item.content_id)}
 							<tr>
 								<td>
 									<span class="text-sm text-fg">{item.title || item.slug || item.content_id}</span>
@@ -218,39 +233,45 @@
 				<p class="text-xs text-muted">
 					Generates the feed for one reader now. This is the same computation the reader would
 					get, so it shows what they would actually be shown rather than a sample.
-					{#if readerOptions.length > 0}
-						Search by email, or paste an id for an account past the first page.
+					{#if !data.readers.ok}
+						The accounts could not be read, so give the user id as it appears on the Users page.
+					{:else if readerOptions.length > 0}
+						Find a reader by email to fill in their id, or paste the id of any account from the Users
+						page.
 					{:else}
 						Give the user id as it appears on the Users page.
 					{/if}
 				</p>
-				<!-- A field and its button, at the width the field needs. The
-				     guidance sits in the paragraph above rather than under the
-				     field, because a hint there would make the field taller than
-				     the button and align the button with the hint instead of the
-				     input. -->
-				<form method="POST" action="?/preview" use:enhance class="flex flex-wrap items-end gap-2">
-					<div class="w-full min-w-0 sm:w-80">
-						{#if readerOptions.length > 0}
+				<!-- The combobox posts the label it shows, an email, so it only
+				     fills the id field and the id field is what the form posts.
+				     The guidance sits in the paragraph above rather than under the
+				     id field, because a hint there would make the field taller
+				     than the button and align the button with the hint instead of
+				     the input. -->
+				<form method="POST" action="?/preview" use:enhance class="flex flex-col gap-3" id="rec-preview-form">
+					<FormErrors message={previewError || undefined} />
+					{#if readerOptions.length > 0}
+						<div class="w-full min-w-0 sm:w-80">
 							<Autocomplete
-								id="rec-user"
-								name="user_id"
-								label="Reader"
+								id="rec-reader"
+								label="Find a reader"
+								placeholder="Search by email"
 								options={readerOptions}
-								bind:value={userId}
+								value={userId}
+								onchange={(v) => {
+									if (v) userId = v;
+								}}
 							/>
-						{:else}
-							<Input
-								id="rec-user"
-								name="user_id"
-								label="Reader"
-								bind:value={userId}
-							/>
-						{/if}
+						</div>
+					{/if}
+					<div class="flex flex-wrap items-end gap-2">
+						<div class="w-full min-w-0 sm:w-80">
+							<Input id="rec-user" name="user_id" label="User id" bind:value={userId} />
+						</div>
+						<Button variant="secondary" type="submit">
+							<UserSearch size={ICON.sm} /> Generate
+						</Button>
 					</div>
-					<Button variant="secondary" type="submit">
-						<UserSearch size={ICON.sm} /> Generate
-					</Button>
 				</form>
 
 				{#if preview !== null}
@@ -265,7 +286,7 @@
 						</EmptyState>
 					{:else}
 						<p class="text-xs text-muted">
-							{preview.length} entries for {previewFor}.
+							{preview.length} {preview.length === 1 ? 'entry' : 'entries'} for {previewFor}.
 						</p>
 						<Table label="What one reader would see">
 							<thead>

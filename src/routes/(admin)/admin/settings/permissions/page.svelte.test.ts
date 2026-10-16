@@ -14,11 +14,13 @@ type SubmitFn = (input: unknown) => EnhanceCallback | void;
 
 // The real enhance is not exercised here, but the submit function each form
 // passes it is: it decides whether the modal closes and whether load reruns.
-const forms = vi.hoisted(() => ({ submits: [] as SubmitFn[] }));
+const forms = vi.hoisted(() => ({ submits: [] as SubmitFn[], byAction: new Map<string, SubmitFn>() }));
 
+vi.mock('$app/state', () => ({ page: { url: new URL('http://admin/admin/settings/permissions') } }));
 vi.mock('$app/forms', () => ({
 	enhance: (_node: HTMLFormElement, submit?: SubmitFn) => {
 		if (submit) forms.submits.push(submit);
+		if (submit) forms.byAction.set(_node.getAttribute('action') ?? '', submit);
 		return { destroy() {} };
 	},
 }));
@@ -74,14 +76,14 @@ function setup() {
 	});
 }
 
-function setupFailedLoad() {
+function setupFailedLoad(loadGate: unknown = { state: 'error', message: 'Permission rules could not be read from the engine.' }) {
 	return render(PermissionsPage, {
 		props: {
 			data: {
 				permissions: [],
 				schemas: [],
 				entitlements,
-				loadError: 'Permission rules could not be read from the engine.',
+				loadGate,
 			},
 			form: null,
 		} as never,
@@ -106,7 +108,12 @@ describe('permissions page', () => {
 		// sends a null `id`, and removing a rule silently never succeeds.
 		const { container, getAllByRole } = setup();
 		const form = container.querySelector('form[action="?/delete"]') as HTMLFormElement;
-		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+		// The id is read when the form posts, so the spy captures it at that
+		// moment. Read afterwards, it would pass even if the post went out first.
+		let posted: string | null = null;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {
+			posted = new FormData(form).get('id') as string | null;
+		});
 		const remove = getAllByRole('button').find((b) =>
 			b.getAttribute('aria-label')?.startsWith('Remove rule'),
 		);
@@ -120,8 +127,8 @@ describe('permissions page', () => {
 		await fireEvent.click(remove!);
 		await tick();
 		await tick();
-		expect(new FormData(form).get('id')).toBe(permission.id);
 		expect(submit).toHaveBeenCalled();
+		expect(posted).toBe(permission.id);
 	});
 
 	it('names the rule it is about to remove', async () => {
@@ -133,7 +140,7 @@ describe('permissions page', () => {
 		await tick();
 		// A destructive confirmation has to say which object it means.
 		const [title, message, options] = kit.confirm.mock.calls[0] as unknown as [string, string, { confirmLabel: string }];
-		expect(title).toBe('Remove permission');
+		expect(title).toBe('Delete rule for editor on article');
 		expect(message).toContain('editor');
 		expect(message).toContain('article');
 		expect(options.confirmLabel).toBe('Delete');
@@ -149,6 +156,13 @@ describe('permissions page load failure', () => {
 		const { container } = setupFailedLoad();
 		expect(container.textContent).toContain('Permission rules could not be read from the engine.');
 		expect(container.querySelector('table'), 'a matrix was drawn from a failed read').toBeNull();
+	});
+
+	it('says a busy engine is busy rather than that the session expired', () => {
+		const { container } = setupFailedLoad({ state: 'busy' });
+		expect(container.textContent).toContain('Too many requests');
+		expect(container.textContent).not.toContain('session has');
+		expect(container.querySelector('table')).toBeNull();
 	});
 
 	it('offers no write control while the rules are unknown', () => {
@@ -418,21 +432,41 @@ describe('permissions page collapsed summary', () => {
 });
 
 describe('permissions page inherited grants', () => {
-	it('names the wildcard rule as the source of an inherited grant', () => {
-		// GetEffective unions the schema row's actions with the wildcard row's,
-		// so a grant the wildcard makes cannot be revoked on one schema.
+	// The engine reads a schema's own rule alone when it has one. The wildcard
+	// rule's actions apply only to a schema without a rule of its own, so a
+	// schema rule can take back what the wildcard grants everywhere else.
+	it('marks the wildcard grant denied on a schema whose own rule leaves it out', () => {
 		const { container } = setupWith(
 			[rule('editor', '*', ['read']), rule('editor', 'article', ['create'])],
 			['article'],
 		);
 		const row = childRow(container, 'editor', 'article');
-		expect(row.textContent).toContain(
-			'editor is granted read on article by the wildcard rule. Clearing this rule does not revoke it.',
-		);
 		expect(row.textContent).toContain('editor is granted create on article by this rule.');
+		expect(row.textContent).toContain(
+			'editor is denied read on article. This rule replaces the wildcard rule, which grants it.',
+		);
+		expect(row.textContent).not.toContain('does not revoke');
 	});
 
-	it('warns in the editor that clearing an inherited action revokes nothing', async () => {
+	it('names the wildcard rule as the source on a schema with no rule of its own', async () => {
+		const { container } = setupWith([rule('editor', '*', ['read'])], ['article']);
+		await fireEvent.click(container.querySelector('#show-unruled') as HTMLElement);
+		const row = childRow(container, 'editor', 'article');
+		expect(row.textContent).toContain(
+			'editor is granted read on article by the wildcard rule, because article has no rule of its own.',
+		);
+	});
+
+	it('counts a schema whose own rule takes back a wildcard grant as not granted', () => {
+		const { container } = setupWith(
+			[rule('editor', '*', ['read', 'update']), rule('editor', 'article', ['read'])],
+			['article', 'page'],
+		);
+		expect(roleRow(container, 'editor').textContent).toContain('editor grants read on every schema.');
+		expect(roleRow(container, 'editor').textContent).toContain('editor grants update on some schemas.');
+	});
+
+	it('warns in the editor that an action left clear is denied on the schema', async () => {
 		const { container, getAllByRole } = setupWith(
 			[rule('editor', '*', ['read']), rule('editor', 'article', ['create'])],
 			['article'],
@@ -443,11 +477,51 @@ describe('permissions page inherited grants', () => {
 		await fireEvent.click(edit!);
 
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
-		expect(dialog.textContent).toContain('does not revoke it');
+		expect(dialog.textContent).toContain('This rule replaces the wildcard rule on article');
+		expect(dialog.textContent).toContain('an action left clear is denied on article');
+		expect(dialog.textContent).not.toContain('does not revoke');
 	});
 
-	it('tells the operator a removal leaves the inherited grant standing', async () => {
+	it('starts a new schema rule from the wildcard rule it replaces', async () => {
+		const { container, getAllByRole, getByLabelText } = setupWith(
+			[rule('editor', '*', ['read', 'update'])],
+			['article'],
+		);
+		await fireEvent.click(container.querySelector('#show-unruled') as HTMLElement);
+		const add = getAllByRole('button').find(
+			(b) => b.getAttribute('aria-label') === 'Add rule for editor on article',
+		);
+		await fireEvent.click(add!);
+		await tick();
+
+		expect((getByLabelText('Read') as HTMLInputElement).checked).toBe(true);
+		expect((getByLabelText('Update') as HTMLInputElement).checked).toBe(true);
+		expect((getByLabelText('Delete') as HTMLInputElement).checked).toBe(false);
+	});
+
+	// A schema rule with no action is how one schema is shut to a role the
+	// wildcard opens everything to, so the editor has to let it be saved.
+	it('lets an empty schema rule be saved when it takes a wildcard grant back', async () => {
 		const { container, getAllByRole } = setupWith(
+			[rule('editor', '*', ['read']), rule('editor', 'payroll', [])],
+			['payroll'],
+		);
+		const edit = getAllByRole('button').find(
+			(b) => b.getAttribute('aria-label') === 'Edit rule for editor on payroll',
+		);
+		await fireEvent.click(edit!);
+		await tick();
+
+		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+		expect(dialog.textContent).not.toContain('This rule would do nothing');
+		expect(dialog.textContent).toContain('editor is denied every action on payroll');
+		const save = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Save');
+		expect(save, 'no Save button').toBeTruthy();
+		expect((save as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('tells the operator a removal puts the wildcard rule back in force', async () => {
+		const { getAllByRole } = setupWith(
 			[rule('editor', '*', ['read']), rule('editor', 'article', ['create'])],
 			['article'],
 		);
@@ -458,7 +532,8 @@ describe('permissions page inherited grants', () => {
 
 		await tick();
 		const [, message] = kit.confirm.mock.calls[0] as unknown as [string, string];
-		expect(message).toContain('still grants read on this schema');
+		expect(message).toContain('The wildcard rule for editor then applies to this schema and grants read.');
+		expect(message).not.toContain('does not revoke');
 	});
 });
 
@@ -513,6 +588,14 @@ describe('permissions page schema filter', () => {
 });
 
 describe('permissions page copy', () => {
+	it('says a schema rule replaces the wildcard rule rather than adding to it', () => {
+		const { container } = setupWith([], ['article']);
+		const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+		expect(text).toContain('A schema rule replaces the wildcard rule on that schema.');
+		expect(text).not.toContain('their actions are unioned');
+		expect(text).not.toContain('cannot be taken back');
+	});
+
 	it('says a missing rule denies', () => {
 		// The gate skips every role whose rule is missing and answers 403 when
 		// none granted the action, so a row with no entry is not unrestricted.
@@ -558,10 +641,12 @@ describe('permissions page flow resources', () => {
 		expect(queryByLabelText('Activate')).toBeTruthy();
 	});
 
-	it('draws no activate mark on a schema row and inherits a flow row from the All flows rule', () => {
+	it('draws no activate mark on a schema row, and a flow rule replaces the All flows rule', () => {
 		const { container } = setupFlows([rule('publisher', 'flows', ['read', 'activate']), rule('publisher', 'flow:send-receipt', ['update'])]);
 		const flowRow = childRow(container, 'publisher', 'flow:send-receipt');
-		expect(flowRow.textContent).toContain('publisher is granted activate on flow send-receipt by the All flows rule.');
+		expect(flowRow.textContent).toContain(
+			'publisher is denied activate on flow send-receipt. This rule replaces the All flows rule, which grants it.',
+		);
 		expect(flowRow.textContent).toContain('publisher is granted update on flow send-receipt by this rule.');
 		const all = childRow(container, 'publisher', 'flows');
 		expect(all.textContent).toContain('Every flow');
@@ -573,5 +658,187 @@ describe('permissions page flow resources', () => {
 		expect(roleRow(container, 'reviewer').textContent).toContain('reviewer grants read on every schema.');
 		expect(roleRow(container, 'reviewer').textContent).toContain('reviewer grants read on no flow.');
 		expect(roleRow(container, 'reviewer').textContent).toContain('reviewer grants activate on no flow.');
+	});
+});
+
+describe('permissions page drawers', () => {
+	function setupWith(form: unknown, over: Record<string, unknown> = {}) {
+		return render(PermissionsPage, {
+			props: {
+				data: { permissions: [permission], schemas: [{ name: 'article' }], entitlements, loadError: null, ...over },
+				form,
+			} as never,
+		});
+	}
+
+	const dataWith = (over: Record<string, unknown> = {}) => ({
+		permissions: [permission],
+		schemas: [{ name: 'article' }],
+		entitlements,
+		loadError: null,
+		...over,
+	});
+	const ruleText = () => document.body.querySelector('form#rule-form')?.textContent ?? '';
+	const roleText = () => document.body.querySelector('form#role-form')?.textContent ?? '';
+	const editButton = (all: HTMLElement[]) => all.find((b) => b.getAttribute('aria-label')?.startsWith('Edit rule'))!;
+	const newRoleButton = (all: HTMLElement[]) => all.find((b) => b.textContent?.includes('New role'))!;
+
+	it('shows a refused rule save inside the open rule drawer', async () => {
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(editButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
+		expect(ruleText()).toContain('The rule could not be saved.');
+	});
+
+	it('shows a refused role inside the open role drawer', async () => {
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'role', error: 'The rule could not be saved.' } } as never);
+		expect(roleText()).toContain('The rule could not be saved.');
+	});
+
+	it('takes the ceiling from the refusal when the limits read failed', () => {
+		const refused = { kind: 'cap', cap: 'rbac.roles', limit: 5, current: 5, upgradeUrl: '' };
+		const { container } = setupWith({ action: 'role', roleCapReached: true, refused }, { roleCap: 0, roleCount: null });
+		expect(container.textContent).toContain('The ceiling is 5 roles and this instance has 5.');
+		expect(container.textContent).not.toContain('The ceiling is 0 roles');
+	});
+
+	it('states no ceiling when neither the refusal nor the read gave one', () => {
+		const { container } = setupWith({ action: 'role', roleCapReached: true }, { roleCap: 0, roleCount: null });
+		expect(container.textContent).toContain('This instance allows no more roles.');
+		expect(container.textContent).not.toContain('The ceiling is 0 roles');
+	});
+
+	it('shows the role ceiling refusal with its numbers in the role drawer', async () => {
+		const refused = { kind: 'cap', cap: 'rbac.roles', limit: 3, current: 3, upgradeUrl: '' };
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'role', roleCapReached: true, refused } } as never);
+		expect(roleText()).toContain('3 of 3 roles are in use');
+	});
+
+	it('leaves newly opened drawers clean after a failed delete', async () => {
+		const { container, getAllByRole } = setupWith({ action: 'delete', error: 'The rule could not be removed.' });
+		expect(container.textContent).toContain('The rule could not be removed.');
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		expect(roleText()).not.toContain('could not be removed');
+		await fireEvent.click(editButton(getAllByRole('button')));
+		expect(ruleText()).not.toContain('could not be removed');
+	});
+
+	it('keeps a failed rule save out of the role drawer', async () => {
+		const { getAllByRole, rerender } = setupWith(null);
+		await fireEvent.click(newRoleButton(getAllByRole('button')));
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
+		expect(roleText()).not.toContain('could not be saved');
+	});
+
+	it('says in the new rule form that the flows could not be read', async () => {
+		const { container, getAllByRole } = setupWith(null, { flowsFailed: true });
+		const add = getAllByRole('button').find((b) => b.getAttribute('aria-label') === 'Add a schema rule for editor');
+		expect(add, 'no control adds a rule for a new resource').toBeTruthy();
+		await fireEvent.click(add!);
+		expect(container.ownerDocument.body.textContent).toContain('The flows could not be read');
+	});
+});
+
+describe('permissions page marks without color', () => {
+	// Each state has a shape of its own, so a reader who cannot tell the
+	// colors apart still reads the matrix. Every mark is an SVG drawn in
+	// currentColor and none is a background, which a forced-colors theme
+	// would erase, so the shapes also hold when that theme paints them all
+	// one ink.
+	function shapeOf(el: Element | null): string {
+		expect(el).toBeTruthy();
+		expect(el!.tagName.toLowerCase()).toBe('svg');
+		const icon = [...el!.classList].find((c) => c.startsWith('lucide-') && c !== 'lucide-icon');
+		if (icon) return icon;
+		const circle = el!.querySelector('circle');
+		if (circle?.getAttribute('fill') === 'currentColor') return 'dot';
+		if (circle?.getAttribute('stroke') === 'currentColor') return 'ring';
+		return 'unknown';
+	}
+
+	it('draws a stored grant, an inherited one, a denial and an exempt role as four shapes', async () => {
+		const { container } = setupWith(
+			[
+				rule('editor', '*', ['read']),
+				rule('editor', 'article', ['create']),
+				rule('super_admin', 'article', ['read']),
+			],
+			['article', 'page'],
+		);
+		await fireEvent.click(container.querySelector('#show-unruled') as HTMLElement);
+		const article = childRow(container, 'editor', 'article');
+		const page = childRow(container, 'editor', 'page');
+		const shapes = {
+			stored: shapeOf(article.querySelector('[data-mark="stored"]')),
+			none: shapeOf(article.querySelector('[data-mark="none"]')),
+			inherited: shapeOf(page.querySelector('[data-mark="inherited"]')),
+			exempt: shapeOf(childRow(container, 'super_admin', 'article').querySelector('[data-mark="exempt"]')),
+		};
+		expect(shapes).toEqual({ stored: 'dot', none: 'lucide-minus', inherited: 'ring', exempt: 'lucide-shield-check' });
+		expect(new Set(Object.values(shapes)).size).toBe(4);
+	});
+
+	it('fills a summary bar empty for none, half for some and full for all', () => {
+		const { container } = setupWith(
+			[rule('editor', 'article', ['read']), rule('reviewer', '*', ['read']), rule('reviewer', 'flows', ['read'])],
+			['article', 'page'],
+		);
+		const fill = (role: string, state: string) => {
+			const bar = roleRow(container, role).querySelector(`svg[data-summary="${state}"]`);
+			// The outline and the fill are both drawn in currentColor, so the bar
+			// keeps its shape under forced colors.
+			expect(bar?.querySelector('rect:not([data-fill])')?.getAttribute('stroke')).toBe('currentColor');
+			const rect = bar?.querySelector('rect[data-fill]');
+			expect(rect?.getAttribute('fill')).toBe('currentColor');
+			return rect?.getAttribute('width');
+		};
+		expect(fill('admin', 'none')).toBe('0');
+		expect(fill('editor', 'some')).toBe('16');
+		expect(fill('reviewer', 'all')).toBe('32');
+		expect(roleRow(container, 'super_admin').querySelector('[data-mark="exempt"]')).toBeTruthy();
+	});
+});
+
+// The row and the drawer that asked for a removal are gone once it lands, so
+// focus has to go somewhere a keyboard can carry on from.
+describe('after a rule is removed', () => {
+	it('moves focus to the filter above the rules', async () => {
+		const { container } = setup();
+		const submit = forms.byAction.get('?/delete');
+		expect(submit, 'the delete form registered no submit function').toBeTruthy();
+		const callback = (await submit!({})) as EnhanceCallback;
+		await callback({ result: { type: 'success' } as EnhanceResult, update: vi.fn(async () => {}) });
+		expect(document.activeElement).toBe(container.ownerDocument.getElementById('schema-filter'));
+	});
+});
+
+
+describe('a refusal shown on the page', () => {
+	const link = 'https://shop.example.com/pricing?plan=basic';
+	const refused = { kind: 'feature', feature: 'feature-b', plugin: 'rbac', upgradeUrl: link };
+	const render_ = (over: Record<string, unknown>) =>
+		render(PermissionsPage, {
+			props: {
+				data: { permissions: [permission], schemas: [{ name: 'article' }], entitlements, loadError: null, ...over },
+				form: { action: 'delete', error: 'refused', refused },
+			} as never,
+		});
+
+	// The page leads with New role, so the way forward is not a second primary.
+	it('makes the way forward a secondary beside New role', () => {
+		const { getByRole } = render_({ roleCap: 0 });
+		expect(getByRole('button', { name: 'New role' })).toBeTruthy();
+		expect(getByRole('link', { name: 'View the plan' }).classList.contains('bg-brand')).toBe(false);
+	});
+
+	// At the ceiling New role is withdrawn, and the way forward is the one action left.
+	it('makes the way forward the primary at the ceiling, where New role is withdrawn', () => {
+		const { queryByRole, getByRole } = render_({ roleCap: 1, roleCount: 1 });
+		expect(queryByRole('button', { name: 'New role' })).toBeNull();
+		expect(getByRole('link', { name: 'View the plan' }).classList.contains('bg-brand')).toBe(true);
 	});
 });

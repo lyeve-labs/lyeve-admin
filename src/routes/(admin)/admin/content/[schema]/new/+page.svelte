@@ -1,6 +1,5 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Card, Breadcrumb, Button, Label, PageShell, Select } from '@lyeve-labs/ui-kit';
+	import { Alert, Card, Breadcrumb, Button, PageShell, Select } from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { enhance } from '$app/forms';
@@ -21,8 +20,9 @@
 	let validationErrors = $state<Record<string, string>>({});
 	let submitting = $state(false);
 
-	// Locale. Default to first locale's code or 'en'
-	let locales = $derived(data.locales ?? []);
+	// Locale. Default to first locale's code or 'en'. A schema that is not
+	// localized, or an instance without the localization plugin, has none.
+	let locales = $derived(data.locales?.ok ? data.locales.value : []);
 	// svelte-ignore state_referenced_locally
 	let selectedLocale = $state((locales.find((l) => l.is_default) ?? locales[0])?.code ?? 'en');
 
@@ -34,6 +34,16 @@
 	let m2mRelations = $derived(JSON.stringify(
 		Object.fromEntries(extractM2MRelations(userFields, formValues).map((r) => [r.fieldName, r.ids]))
 	));
+
+	// A value the plugin refused comes back by field, so each control marks its
+	// own message the way a value refused before sending does.
+	$effect(() => {
+		if (form && 'fieldErrors' in form && form.fieldErrors) validationErrors = form.fieldErrors as Record<string, string>;
+	});
+
+	// Set once the create answered but a link did not land. The entry exists,
+	// so the form offers the entry instead of a second Create.
+	let created = $derived(form && 'created' in form && typeof form.created === 'string' ? form.created : '');
 
 	function handleSubmit(e: SubmitEvent) {
 		const errors = validate(userFields, formValues);
@@ -48,8 +58,6 @@
 
 	const back = $derived({ href: `/admin/content/${schemaName}`, label: schemaLabel });
 </script>
-
-<PageTitle title="New entry" />
 
 <PageShell
 	title="New entry"
@@ -67,9 +75,12 @@
 
 	{#snippet actions()}
 		{#if locales.length > 0}
-			<div class="flex items-center gap-2">
-				<Globe size={ICON.sm} class="text-muted" />
+			<div class="flex items-end gap-2">
+				<Globe size={ICON.sm} class="mb-2.5 text-muted" aria-hidden="true" />
 				<Select
+					id="entry-locale"
+					label="Locale"
+					searchable
 					options={locales.map((l) => ({ value: l.code, label: `${l.name} (${l.code})` }))}
 					value={selectedLocale}
 					onvaluechange={(v) => (selectedLocale = v)}
@@ -77,6 +88,12 @@
 			</div>
 		{/if}
 	{/snippet}
+
+	{#if data.locales && !data.locales.ok}
+		<Alert tone="warn">
+			The locales could not be read, so no locale can be picked. The entry is saved without one. Reload the page to try again.
+		</Alert>
+	{/if}
 
 	<form
 		method="POST"
@@ -98,14 +115,18 @@
 				fields={userFields}
 				{formValues}
 				{validationErrors}
-				relationItems={data.relationItems}
+				relations={data.relations}
 				mediaChoices={data.mediaChoices}
 				error={form?.error}
 			/>
 		</Card>
 
 		<div class="mt-5 flex justify-end">
-			<Button type="submit" loading={submitting}>Create</Button>
+			{#if created}
+				<Button href={`/admin/content/${schemaName}/${encodeURIComponent(created)}`}>Open the entry</Button>
+			{:else}
+				<Button type="submit" loading={submitting}>Create</Button>
+			{/if}
 		</div>
 	</form>
 </PageShell>

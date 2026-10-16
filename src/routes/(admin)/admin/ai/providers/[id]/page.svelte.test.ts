@@ -3,6 +3,7 @@ import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 import { fixtureLocalProvider, fixtureProvider, fixtureSettings } from '$lib/components/ai/fixtures';
+import { outlineSkips } from '$lib/test-outline';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -25,7 +26,23 @@ function setup(overrides: Record<string, unknown> = {}, form: unknown = null) {
 	});
 }
 
+/** Every heading level in document order, so a test can say none is skipped. */
+function levels(root: HTMLElement): number[] {
+	return [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => Number(h.tagName.slice(1)));
+}
+
+function skips(list: number[]): boolean {
+	return list.some((level, i) => level > (i === 0 ? 1 : list[i - 1]) + 1);
+}
+
 describe('AI provider detail page', () => {
+	it('puts Models and Capabilities at level 2, with no level skipped', () => {
+		const { container, getByRole } = setup();
+		expect(getByRole('heading', { level: 2, name: 'Models' })).toBeTruthy();
+		expect(getByRole('heading', { level: 2, name: 'Capabilities' })).toBeTruthy();
+		expect(skips(levels(container))).toBe(false);
+	});
+
 	it('shows a stored key as a placeholder and keeps it on a blank save', () => {
 		const { container } = setup();
 		const key = container.querySelector('input[name="api_key"]') as HTMLInputElement;
@@ -57,11 +74,29 @@ describe('AI provider detail page', () => {
 		cleanup();
 		const caps = setup({}, { scope: 'capabilities', capabilities: { model: 'gpt-4o', kind: 'openai', max_tokens: 128000, text: true, embed: false, image: true, vision: true } });
 		expect(caps.getByTestId('capabilities').textContent).toContain('128000 tokens');
+		// What a model cannot do is said in words, not by a muted color alone.
+		expect(caps.getByTestId('capabilities').textContent).toContain('no embed');
+		expect(caps.getByTestId('capabilities').textContent).not.toContain('no text');
 	});
 
 	it('paints the off state with the switch instead of the row', () => {
 		const { getByText, container } = setup({ gate: { state: 'off' }, provider: null });
 		expect(getByText('AI is switched off for this tenant')).toBeTruthy();
 		expect(container.querySelector('form[action="?/update"]')).toBeNull();
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = setup();
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = setup({ gate: { state: 'locked' } });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

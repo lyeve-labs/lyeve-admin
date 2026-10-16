@@ -1,8 +1,7 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import OlderHidden from '$lib/components/OlderHidden.svelte';
-	import { Badge, Breadcrumb, Button, Card, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
+	import { Badge, Breadcrumb, Button, Card, NumberInput, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { enhance } from '$app/forms';
@@ -55,6 +54,12 @@
 		),
 	);
 
+	// A value the plugin refused comes back by field, so each control marks its
+	// own message the way a value refused before sending does.
+	$effect(() => {
+		if (form && 'fieldErrors' in form && form.fieldErrors) validationErrors = form.fieldErrors as Record<string, string>;
+	});
+
 	function handleSubmit(e: SubmitEvent) {
 		const errors = validate(userFields, formValues);
 		if (Object.keys(errors).length > 0) {
@@ -100,11 +105,21 @@
 	let hiddenOlder = $derived(data.revisionWindow?.hiddenOlder ?? 0);
 	let windowDays = $derived(data.revisionWindow?.windowDays ?? null);
 	let olderHidden = $derived(hiddenOlder > 0 && windowDays !== null);
+	// One read lists at most the engine's page ceiling. Past it, the count is
+	// the plugin's total and the older revisions open one at a time by number.
+	let revisionTotal = $derived(Math.max(data.revisionTotal ?? 0, revisions.length));
+	let olderUnlisted = $derived(revisionTotal - revisions.length);
 	// The revision just older than the oldest listed. Opening it is how the
 	// panel asks, and the plugin answers 402 when it is outside the window.
 	let nextOlder = $derived(
 		revisions.length > 0 ? Math.min(...revisions.map((r) => r.revision_num)) - 1 : 0,
 	);
+	// The number the opener asks for. It starts at the next older revision and
+	// takes any number down to the first, so every revision can be opened.
+	let openNum = $state(0);
+	$effect(() => {
+		if (openNum < 1 || openNum > nextOlder) openNum = nextOlder;
+	});
 
 	// A refusal from opening or restoring a revision stays in the panel.
 	let revisionError = $derived(form && 'revision' in form && form.revision === true ? (form.error ?? '') : '');
@@ -138,18 +153,12 @@
 	let releaseError = $derived(form && 'release' in form && form.release === true ? (form.error ?? '') : '');
 	let sideRefusal = $derived(commentError || releaseError ? formRefusal(form) : null);
 
-	function formatDate(iso: string) {
-		return formatDateTime(iso);
-	}
-
 	function revDiff(rev: Revision): string {
 		const keys = Object.keys(rev.data ?? {}).filter((k) => !['_status', '_locale'].includes(k));
 		const shown = keys.slice(0, 3).join(', ');
 		return keys.length > 3 ? `${shown} and ${keys.length - 3} more` : shown;
 	}
 </script>
-
-<PageTitle title={heading} />
 
 <PageShell title={heading} description={entryId} width="wide" {back}>
 	{#snippet breadcrumb()}
@@ -190,16 +199,19 @@
 						type="button"
 						onclick={() => (showHistory = !showHistory)}
 					>
-						<History size={ICON.sm} /> History ({revisions.length})
+						<History size={ICON.sm} /> History ({revisionTotal})
 					</Button>
+				{/if}
+				{#if data.revisionsFailed}
+					<span class="text-xs text-muted">The revision history could not be read.</span>
 				{/if}
 				<div class="flex flex-col items-end gap-1 text-xs text-faint">
 					<span class="flex items-center gap-1">
-						<Clock size={ICON.xs} /> Created {formatDate(data.item?.created_at ?? '')}
+						<Clock size={ICON.xs} /> Created {formatDateTime(data.item?.created_at ?? '')}
 					</span>
 					{#if data.schemaDef?.with_updated_at}
 						<span class="flex items-center gap-1">
-							<Clock size={ICON.xs} /> Updated {formatDate(data.item?.updated_at ?? '')}
+							<Clock size={ICON.xs} /> Updated {formatDateTime(data.item?.updated_at ?? '')}
 						</span>
 					{/if}
 				</div>
@@ -218,8 +230,10 @@
 						definitions={data.review.definitions}
 						approvalsNeeded={data.review.approvalsNeeded}
 						userId={data.review.userId}
+						people={data.review.people}
 						unavailable={data.review.unavailable}
 						forbidden={data.review.forbidden}
+						definitionsFailed={data.review.definitionsFailed}
 						error={reviewError?.message}
 						errorStatus={reviewError?.status}
 					/>
@@ -248,8 +262,8 @@
 							fields={userFields}
 							{formValues}
 							{validationErrors}
-							relationItems={data.relationItems}
-				mediaChoices={data.mediaChoices}
+							relations={data.relations}
+							mediaChoices={data.mediaChoices}
 							error={translationError || reviewError || commentError || releaseError || revisionError ? null : form?.error}
 						/>
 					</div>
@@ -265,6 +279,7 @@
 					<AddToRelease
 						releases={data.releases.open}
 						holding={data.releases.holding}
+						failed={data.releases.failed}
 						error={releaseError || undefined}
 						refused={releaseError ? sideRefusal : null}
 						added={!!form && 'addedToRelease' in form}
@@ -313,14 +328,14 @@
 										focus-visible:ring-brand"
 									onclick={() => (selectedRev = selectedRev === rev.id ? null : rev.id)}
 								>
-									<span class="block text-xs text-fg">{formatDate(rev.created_at)}</span>
+									<span class="block text-xs text-fg">{formatDateTime(rev.created_at)}</span>
 									<span class="mt-0.5 block truncate text-xs text-faint">{revDiff(rev)}</span>
 								</button>
 								{#if selectedRev === rev.id}
 									<form method="POST" action="?/restore" use:enhance class="mt-2">
 										<input type="hidden" name="rev_num" value={rev.revision_num} />
 										<Button variant="secondary" size="sm" type="submit">
-											<RotateCcw size={ICON.xs} /> Restore
+											<RotateCcw size={ICON.sm} /> Restore
 										</Button>
 									</form>
 								{/if}
@@ -330,25 +345,30 @@
 					{#if openedRevision}
 						<div class="border-t border-line px-4 py-3" data-testid="opened-revision">
 							<p class="text-xs font-medium text-fg">Revision {openedRevision.revision_num}</p>
-							<p class="mt-0.5 text-xs text-faint">{formatDate(openedRevision.created_at)}</p>
+							<p class="mt-0.5 text-xs text-faint">{formatDateTime(openedRevision.created_at)}</p>
 							<p class="mt-0.5 truncate text-xs text-faint">{revDiff(openedRevision)}</p>
 							<form method="POST" action="?/restore" use:enhance class="mt-2">
 								<input type="hidden" name="rev_num" value={openedRevision.revision_num} />
 								<Button variant="secondary" size="sm" type="submit">
-									<RotateCcw size={ICON.xs} /> Restore
+									<RotateCcw size={ICON.sm} /> Restore
 								</Button>
 							</form>
 						</div>
 					{/if}
-					{#if olderHidden || revisionError}
+					{#if olderHidden || olderUnlisted > 0 || revisionError}
 						<div class="flex flex-col gap-3 border-t border-line p-3">
+							{#if olderUnlisted > 0 && !olderHidden}
+								<p class="text-xs text-muted">
+									The newest {revisions.length} of {revisionTotal} revisions are listed. Open an older one by number.
+								</p>
+								{#if nextOlder > 0}
+									{@render revisionOpener()}
+								{/if}
+							{/if}
 							{#if olderHidden}
 								<OlderHidden count={hiddenOlder} noun="revisions" {windowDays}>
-									{#if nextOlder > 0 && !openedRevision}
-										<form method="POST" action="?/openRevision" use:enhance>
-											<input type="hidden" name="rev_num" value={nextOlder} />
-											<Button variant="secondary" size="sm" type="submit">Open revision {nextOlder}</Button>
-										</form>
+									{#if nextOlder > 0}
+										{@render revisionOpener()}
 									{/if}
 								</OlderHidden>
 							{/if}
@@ -362,3 +382,19 @@
 		{/if}
 	</div>
 </PageShell>
+
+<!-- Opens an older revision by number, from one up to the next older than the oldest listed. -->
+{#snippet revisionOpener()}
+	<form method="POST" action="?/openRevision" use:enhance class="flex items-end gap-2" data-testid="open-revision">
+		<NumberInput
+			id="open-revision-num"
+			name="rev_num"
+			label="Revision number"
+			min={1}
+			max={nextOlder}
+			bind:value={openNum}
+			class="min-w-0 flex-1"
+		/>
+		<Button variant="secondary" size="sm" type="submit">Open</Button>
+	</form>
+{/snippet}

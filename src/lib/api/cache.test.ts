@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
-	bytes,
 	cacheGate,
 	circuitState,
 	circuitTone,
@@ -98,20 +97,14 @@ describe('entries', () => {
 		];
 		expect(tagsOf(entries)).toEqual(['home', 'posts']);
 	});
-
-	it('reads a size a person can', () => {
-		expect(bytes(512)).toBe('512 B');
-		expect(bytes(2048)).toBe('2.0 KB');
-		expect(bytes(0)).toBe('0 B');
-		expect(bytes(null)).toBe('0 B');
-	});
 });
 
 describe('the gate', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(cacheGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(cacheGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(cacheGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(cacheGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(cacheGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as a healthy cache', () => {
