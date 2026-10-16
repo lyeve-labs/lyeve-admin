@@ -1,4 +1,5 @@
 import { globSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { entryTone, httpStatusTone, methodTone } from './tones';
 
@@ -49,17 +50,31 @@ describe('httpStatusTone', () => {
 
 // A tone union written out by hand drifts from the kit's when the kit adds
 // or renames a tone, so a tone is typed as the kit's StatusTone, or
-// AccentTone where a label may be violet.
+// AccentTone where a label may be violet. A subset the caller depends on
+// narrows the kit's type with Extract, which still breaks when the kit
+// renames a member.
+const TONE_UNION = /'(neutral|brand|success|warn|danger|violet)'(\s*\|\s*'(neutral|brand|success|warn|danger|violet)')+/;
+const handWritten = (line: string) => TONE_UNION.test(line) && !line.includes('Extract<');
+
+// The glob is resolved from this file, not the working directory, so the
+// scan reads the same tree wherever the suite is started.
+const ROOT = join(import.meta.dirname, '..', '..');
+
 describe('tone types', () => {
+	it('tells a hand-written union from a narrowed kit type', () => {
+		expect(handWritten("function t(): 'warn' | 'danger' {")).toBe(true);
+		expect(handWritten("\ttone: Extract<StatusTone, 'warn' | 'danger'>;")).toBe(false);
+		expect(handWritten('function t(): StatusTone {')).toBe(false);
+	});
+
 	it('writes no tone union by hand', () => {
-		const union = /'(neutral|brand|success|warn|danger|violet)'(\s*\|\s*'(neutral|brand|success|warn|danger|violet)')+/;
-		const offenders = globSync('src/**/*.{ts,svelte}')
-			.filter((file) => !file.endsWith('.test.ts'))
-			.flatMap((file) =>
-				readFileSync(file, 'utf8')
-					.split('\n')
-					.flatMap((line, i) => (union.test(line) ? [`${file}:${i + 1}`] : [])),
-			);
+		const files = globSync('src/**/*.{ts,svelte}', { cwd: ROOT }).filter((file) => !file.endsWith('.test.ts'));
+		expect(files.length).toBeGreaterThan(100);
+		const offenders = files.flatMap((file) =>
+			readFileSync(join(ROOT, file), 'utf8')
+				.split('\n')
+				.flatMap((line, i) => (handWritten(line) ? [`${file}:${i + 1}`] : [])),
+		);
 		expect(offenders).toEqual([]);
 	});
 });
