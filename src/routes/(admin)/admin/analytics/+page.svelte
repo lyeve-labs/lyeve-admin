@@ -9,6 +9,7 @@
 		SectionHeading,
 		Stat,
 		Table,
+		type StatusTone,
 	} from '@lyeve-labs/ui-kit';
 	import { TrendingUp, Gauge, Globe, Server } from '@lucide/svelte';
 	import { NO_VALUE, formatBytes, formatCount, formatDateTime } from '$lib/format';
@@ -54,7 +55,7 @@
 		return `${(fraction * 100).toFixed(2)}%`;
 	}
 
-	function errorRateVariant(rate: number): 'danger' | 'warn' | 'success' {
+	function errorRateVariant(rate: number): StatusTone {
 		if (rate >= 0.05) return 'danger';
 		if (rate >= 0.01) return 'warn';
 		return 'success';
@@ -105,7 +106,7 @@
 			.slice(0, 3)
 	);
 
-	function severityVariant(sev: string): 'danger' | 'warn' | 'brand' | 'neutral' {
+	function severityVariant(sev: string): StatusTone {
 		switch (sev) {
 			case 'high': return 'danger';
 			case 'medium': return 'warn';

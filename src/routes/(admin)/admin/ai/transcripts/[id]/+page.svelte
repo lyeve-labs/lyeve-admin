@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Breadcrumb, Button, Card, DescriptionList, PageShell, SectionHeading, Stat } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Breadcrumb, Button, Card, DescriptionList, PageShell, SectionHeading, Stat, type AccentTone } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { FileJson, FileText, Sparkles } from '@lucide/svelte';
@@ -33,7 +33,7 @@
 			: []
 	);
 
-	function roleTone(role: string): 'brand' | 'violet' | 'neutral' | 'warn' {
+	function roleTone(role: string): AccentTone {
 		if (role === 'user') return 'brand';
 		if (role === 'assistant') return 'violet';
 		if (role === 'system') return 'warn';

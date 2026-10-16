@@ -5,7 +5,7 @@
 		Button,
 		Card,
 		EmptyState,
-		CopyButton,
+		CopyField,
 		Drawer,
 		Input,
 		MultiSelect,
@@ -192,10 +192,7 @@
 							<input type="hidden" name="schemas" value={name} />
 						{/each}
 						{#if publicChoice.length > 0}
-							<div class="flex items-start gap-1">
-								<code class="min-w-0 flex-1 break-all text-xs text-muted">GET /api/v1/search/{publicChoice[0]}?q=kettle</code>
-								<CopyButton value={`/api/v1/search/${publicChoice[0]}?q=kettle`} label="Copy the request" class="shrink-0" />
-							</div>
+							<CopyField label="Example GET request" value={`/api/v1/search/${publicChoice[0]}?q=kettle`} copyLabel="Copy the request" wrap />
 						{/if}
 						<div><Button variant="primary" size="sm" type="submit">Save</Button></div>
 					</form>

@@ -122,10 +122,15 @@
 					break;
 				}
 				if (!res.ok) {
-					const j = (await res.json().catch(() => ({ error: 'Upload failed' }))) as {
-						error?: string;
-					};
-					uploadError = j.error ?? 'Upload failed';
+					const j = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+					// Only the engine's refusals carry a code, and their sentence is
+					// written for the operator. A 5xx can come from a proxy after the
+					// engine stored the file, so it names the file and claims nothing.
+					if (res.status >= 500) {
+						uploadError = `The engine did not confirm ${file.name}. Check the library, then try again in a moment.`;
+					} else {
+						uploadError = j.code && j.error ? j.error : `${file.name} was refused, so it was not stored.`;
+					}
 					break;
 				}
 				uploaded += 1;

@@ -11,6 +11,7 @@
  * like any other. Reading a dry run's counts as content that now exists is
  * the second mistake available here, so the list marks them.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -390,20 +391,31 @@ async function postImport<T>(fetchFn: typeof fetch, path: string, body: unknown)
 		body: JSON.stringify(body),
 	});
 	if (!res.ok) {
-		const j = (await res.json().catch(() => ({}))) as { error?: string };
-		// A refusal's sentence is written for the operator and is shown as
-		// sent. A 5xx body can carry driver detail, so it never reaches the
-		// page, and the status picks the sentence instead. An ApiError keeps
+		const j = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+		// The engine's refusals carry a code, and their sentence is written for
+		// the operator and shown as sent. A 5xx body can carry driver detail,
+		// and an uncoded 4xx is not the engine's, so the status picks the
+		// sentence for both. An ApiError keeps
 		// the body, so a license refusal renders through RefusalNotice with
 		// what the plugin sent.
-		const said = res.status < 500 && j.error ? j.error : importFailure(res.status);
+		const engineSaid = typeof j.code === 'string' && j.code !== '';
+		const said = res.status < 500 && engineSaid && j.error ? j.error : importFailure(res.status, path === '', engineSaid);
 		throw new ApiError(res.status, said, j);
 	}
 	return (await res.json()) as T;
 }
 
-function importFailure(status: number): string {
+/**
+ * The sentence for a failed import call. The engine answers a start once it
+ * has stored the job and imports the rows after that, so its own 5xx means
+ * no job was made. A 5xx it did not write, such as a proxy's 502 or 504, can
+ * arrive after the job was made, so a start claims only what is known.
+ */
+function importFailure(status: number, starts: boolean, engineSaid: boolean): string {
 	if (status === 413) return 'The file is larger than the 50 MB an import takes. Split it and import the parts.';
+	if (status >= 500 && starts && !engineSaid) {
+		return 'The engine did not confirm the import. Check the entries before trying again.';
+	}
 	if (status === 502 || status === 503 || status === 504) {
 		return 'The engine or its database did not answer. Nothing was imported. Try again in a moment.';
 	}
@@ -550,7 +562,7 @@ export const OUTCOME_LABELS: Readonly<Record<ImportOutcome, string>> = {
 	failed: 'Failed',
 };
 
-export function outcomeTone(o: ImportOutcome): 'success' | 'danger' | 'warn' | 'neutral' {
+export function outcomeTone(o: ImportOutcome): StatusTone {
 	if (o === 'clean') return 'success';
 	if (o === 'failed' || o === 'nothing') return 'danger';
 	if (o === 'partial') return 'warn';

@@ -233,7 +233,7 @@
 		};
 	}
 
-	async function run<T>(fn: () => Promise<T>): Promise<T | null> {
+	async function run<T>(fn: () => Promise<T>, starts = false): Promise<T | null> {
 		busy = true;
 		error = '';
 		hint = '';
@@ -250,7 +250,11 @@
 				return null;
 			}
 			if (!(e instanceof ApiError)) {
-				error = 'The request did not reach the engine. Nothing was imported. Try again in a moment.';
+				// The engine stores a start's job before it answers, so a start
+				// whose answer never came back may already be importing.
+				error = starts
+					? 'The engine did not confirm the import. Check the entries before trying again.'
+					: 'The request did not reach the engine. Nothing was imported. Try again in a moment.';
 				return null;
 			}
 			refusal = refusalOf(e);
@@ -341,7 +345,7 @@
 			error = own;
 			return;
 		}
-		const job = await run(() => startImport(fetch, request(own)));
+		const job = await run(() => startImport(fetch, request(own)), true);
 		if (!job) return;
 		open = false;
 		onstarted(job);

@@ -36,7 +36,7 @@ export function entryTone(status: string): StatusTone {
  * server failure danger. A status outside those ranges, such as a 0 for a
  * request that got no answer, says nothing about the response and is neutral.
  */
-export function httpStatusTone(status: number): 'success' | 'neutral' | 'warn' | 'danger' {
+export function httpStatusTone(status: number): StatusTone {
 	if (status >= 200 && status < 300) return 'success';
 	if (status >= 400 && status < 500) return 'warn';
 	if (status >= 500 && status < 600) return 'danger';

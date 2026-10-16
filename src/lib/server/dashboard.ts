@@ -4,6 +4,7 @@
  * handlers: a stray export there passes the type check and the tests and is
  * a 500 in the browser.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { TrendPoint } from '@lyeve-labs/client-rest';
 import { trafficTone, type Window } from '$lib/dashboard';
 
@@ -16,7 +17,8 @@ export interface TrafficHour {
 
 /** One thing an operator should act on, and where to do it. */
 export interface Attention {
-	tone: 'warn' | 'danger';
+	// The dashboard draws every tone but danger with the warning icon.
+	tone: Extract<StatusTone, 'warn' | 'danger'>;
 	text: string;
 	href: string;
 	action: string;

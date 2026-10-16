@@ -245,6 +245,60 @@ describe('an upload whose session ended', () => {
 	});
 });
 
+describe('a refused or failed upload', () => {
+	function pick(...names: string[]) {
+		const picker = screen.getByLabelText('Choose files to upload') as HTMLInputElement;
+		const files = (names.length > 0 ? names : ['new.png']).map((n) => new File(['x'], n, { type: 'image/png' }));
+		Object.defineProperty(picker, 'files', { value: files, configurable: true });
+		return fireEvent.change(picker);
+	}
+	const answer = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+
+	it('relays the reason the engine gave for refusing the file', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => answer(415, { error: 'The file type image/x-icon is not allowed.', code: 'unsupported_media_type' })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('The file type image/x-icon is not allowed.'));
+		vi.unstubAllGlobals();
+	});
+
+	// Only the engine's refusals carry a code. A 4xx body without one, such
+	// as a proxy's, is not the engine's sentence.
+	it('says it in its own words when a refusal carries no code', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => answer(413, { error: 'client intended to send too large body' })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('new.png was refused, so it was not stored.'));
+		expect(document.body.textContent).not.toContain('client intended');
+		vi.unstubAllGlobals();
+	});
+
+	// A 5xx body can carry driver or proxy text, and a proxy's 502 or 504 can
+	// arrive after the engine stored the file, so the page names the file and
+	// claims nothing it does not know.
+	it('keeps the body of a 5xx answer off the page and claims only what it knows', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => answer(503, { error: 'dial tcp 10.0.0.4:5432: connect: connection refused' })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('The engine did not confirm new.png. Check the library, then try again in a moment.'));
+		expect(document.body.textContent).not.toContain('dial tcp');
+		expect(document.body.textContent).not.toContain('Nothing was uploaded');
+		vi.unstubAllGlobals();
+	});
+
+	it('counts the files stored before a later one failed', async () => {
+		const answers = [answer(201, {}), answer(502, { error: 'Bad Gateway' })];
+		vi.stubGlobal('fetch', vi.fn(async () => answers.shift() as Response));
+		setup();
+		await pick('first.png', 'second.png');
+		await waitFor(() => expect(kit.success).toHaveBeenCalledWith('Uploaded 1 file'));
+		expect(document.body.textContent).toContain('The engine did not confirm second.png.');
+		expect(document.body.textContent).not.toContain('first.png');
+		expect(document.body.textContent).not.toContain('Nothing was uploaded');
+		vi.unstubAllGlobals();
+	});
+});
+
 describe('media library controls carry a name', () => {
 	it('names the file picker the upload button opens', () => {
 		// sr-only hides the picker from the eye and not from a screen reader, so

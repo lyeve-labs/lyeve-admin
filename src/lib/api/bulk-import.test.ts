@@ -7,6 +7,7 @@ import {
 	outcome,
 	outcomeTone,
 	previewImport,
+	startImport,
 	progress,
 	rejectionRate,
 	rollbackable,
@@ -194,7 +195,15 @@ describe('a refused import call', () => {
 	}
 
 	it('shows a refusal written for the operator as it was sent', async () => {
-		expect((await refusal(400, { error: 'source_url must be http or https' })).message).toBe('source_url must be http or https');
+		expect((await refusal(400, { error: 'source_url must be http or https', code: 'bad_request' })).message).toBe('source_url must be http or https');
+	});
+
+	// The engine's refusals carry a code. A 4xx body without one, such as a
+	// proxy's, is not a sentence written for the operator.
+	it('says it in its own words when a refusal carries no code', async () => {
+		const err = await refusal(413, { error: 'client intended to send too large body' });
+		expect(err.message).toBe('The file is larger than the 50 MB an import takes. Split it and import the parts.');
+		expect((await refusal(400, { error: 'bad request from upstream' })).message).toBe('The engine refused the request.');
 	});
 
 	// A 5xx body can carry driver detail, and the outage sentence is the one
@@ -202,6 +211,39 @@ describe('a refused import call', () => {
 	it('keeps the body of an outage off the page and says the engine did not answer', async () => {
 		const err = await refusal(503, { error: 'dial tcp 10.0.0.4:5432: connection refused' });
 		expect(err.message).not.toContain('10.0.0.4');
+		expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+	});
+
+	// The engine answers a start once it has stored the job and imports the
+	// rows after that, so its own 5xx means no job was made. A proxy's 502 or
+	// 504 can arrive after the job was made, so it claims only what is known.
+	describe('on a start', () => {
+		const UNCONFIRMED = 'The engine did not confirm the import. Check the entries before trying again.';
+		async function started(res: Response): Promise<ApiError> {
+			try {
+				await startImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv', content_type: 'posts', field_mappings: [], mode: 'insert' } as never);
+			} catch (err) {
+				return err as ApiError;
+			}
+			throw new Error('the call did not fail');
+		}
+
+		it('claims nothing about a proxy page or an uncoded 5xx', async () => {
+			const timeout = await started(new Response('<html>504 Gateway Time-out</html>', { status: 504 }));
+			expect(timeout.message).toBe(UNCONFIRMED);
+			const gateway = await started(new Response(JSON.stringify({ error: 'Bad Gateway' }), { status: 502 }));
+			expect(gateway.message).toBe(UNCONFIRMED);
+		});
+
+		it('says nothing was imported when the engine itself answered the 5xx', async () => {
+			const err = await started(new Response(JSON.stringify({ error: 'failed to create import job', code: 'service_unavailable' }), { status: 503 }));
+			expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+		});
+	});
+
+	it('says nothing was imported by a preview, which imports nothing, whoever answered', async () => {
+		const res = new Response('<html>504 Gateway Time-out</html>', { status: 504 });
+		const err = (await previewImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv' }).catch((e: unknown) => e)) as ApiError;
 		expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
 	});
 

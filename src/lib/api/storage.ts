@@ -12,6 +12,7 @@
  * to anyone holding the key, with no expiry, which is a deliberate choice for
  * a CDN in front of the directory and a data leak anywhere else.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -152,7 +153,7 @@ export function publiclyReadable(
 
 export function providerTone(
 	p: StorageProvider
-): 'success' | 'danger' | 'warn' | 'neutral' {
+): StatusTone {
 	if (p.credentials_unavailable) return 'danger';
 	if (!p.enabled) return 'neutral';
 	if (p.local_public_unsigned) return 'warn';

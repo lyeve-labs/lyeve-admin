@@ -31,8 +31,7 @@
 	import { flowGrants } from '$lib/flow/permissions';
 	import type { RefusalNotice } from '$lib/flow/types';
 	import { useInstance } from '$lib/instance.svelte';
-	import { isExternalHref } from '$lib/links';
-	import { upgradeLabel } from '$lib/api/refusal';
+	import InlineUpgradeLink from '$lib/components/InlineUpgradeLink.svelte';
 	import type { Flow, ValidationError } from '$lib/api/flows';
 	import { listQuery } from '$lib/back';
 	import { pageHref, pageNumber } from '$lib/api/list';
@@ -144,7 +143,6 @@
 	// A ceiling refusal can name where a license allowing more is bought,
 	// and that link goes first when it is safe to follow.
 	const enableLink = $derived(instance.upgradeLink(refusal?.upgradeUrl || null));
-	const enableAway = $derived(enableLink !== null && isExternalHref(enableLink.href));
 
 	const MODES = [
 		{ value: 'create', label: 'Create a new flow', description: 'The definition becomes a flow of its own, under the slug it carries.' },
@@ -219,7 +217,7 @@
 				{#snippet children()}
 					{pageFailure?.error ?? ''}
 					{#if enableLink}
-						<a class="ml-1 underline" href={enableLink.href} target={enableAway ? '_blank' : undefined} rel={enableAway ? 'noopener noreferrer' : undefined}>{upgradeLabel(enableLink.href) ?? enableLink.label ?? (refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+						<InlineUpgradeLink link={enableLink} raises={refusal.limit !== null} />
 					{/if}
 					{#if errorList.length > 0}
 						<ul class="mt-1 list-disc pl-5">
@@ -390,8 +388,7 @@
 		{#if f?.refusal}
 			{@const link = instance.upgradeLink(f.refusal.upgradeUrl || null)}
 			{#if link}
-				{@const away = isExternalHref(link.href)}
-				<a class="relative hit-area self-start text-sm underline" href={link.href} target={away ? '_blank' : undefined} rel={away ? 'noopener noreferrer' : undefined}>{upgradeLabel(link.href) ?? link.label ?? (f.refusal.limit !== null ? 'How to raise the limit' : 'How to enable it')}</a>
+				<InlineUpgradeLink {link} raises={f.refusal.limit !== null} standalone />
 			{/if}
 		{/if}
 		{#if f && f.errors.length > 0}

@@ -15,6 +15,7 @@
  * the identity provider's, not this screen's. What this screen owns is who may
  * call them.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -127,7 +128,7 @@ export function deprovisionLabel(p: ScimProvider): string {
  * Deleting an account on deprovision is the irreversible option, so it is
  * marked rather than stated flatly beside the reversible one.
  */
-export function deprovisionTone(p: ScimProvider): 'danger' | 'warn' | 'neutral' {
+export function deprovisionTone(p: ScimProvider): StatusTone {
 	if (!p.deprovision_on_delete) return 'danger';
 	return p.deprovision_action === 'delete' ? 'danger' : 'warn';
 }

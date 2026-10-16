@@ -180,6 +180,34 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		expect(document.body.textContent).not.toContain('Failed to fetch');
 	});
 
+	// The engine stores the job before it answers a start, so a start whose
+	// connection dropped may already be importing. Saying nothing was imported
+	// would invite a second, duplicate import.
+	it('claims no outcome for a start whose request did not come back', async () => {
+		const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				if (url.endsWith('/preview')) {
+					return json({ source_format: 'csv', source_name: 'orders.csv', columns: ['placed_at'], rows: [], total_rows: 1, errors: [], export: false, schemas: {} });
+				}
+				if (url.endsWith('/validate')) return json({ total_rows: 1, valid_rows: 1, error_rows: 0, errors: [] });
+				throw new TypeError('network error');
+			}),
+		);
+		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'From a web address' }));
+		await fireEvent.input(document.getElementById('import-url') as HTMLInputElement, {
+			target: { value: 'https://example.com/orders.csv' },
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Read the file' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Dry run' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Import 1 row' }));
+		await waitFor(() => expect(document.body.textContent).toContain('The engine did not confirm the import. Check the entries before trying again.'));
+		expect(document.body.textContent).not.toContain('Nothing was imported');
+		expect(document.body.textContent).not.toContain('network error');
+	});
+
 	// The console renews the engine's short token only on a request its own
 	// server handles, so a request sent straight to the engine can carry one
 	// that lapsed on a live session. Rerunning the loads renews it, and the
@@ -190,7 +218,7 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		const statuses = [401];
 		const answer = vi.fn(async () => {
 			const status = statuses.shift() ?? 400;
-			return new Response(JSON.stringify({ error: status === 401 ? 'unauthorized' : 'The file has no header row.' }), { status, headers: { 'content-type': 'application/json' } });
+			return new Response(JSON.stringify(status === 401 ? { error: 'unauthorized', code: 'unauthorized' } : { error: 'The file has no header row.', code: 'bad_request' }), { status, headers: { 'content-type': 'application/json' } });
 		});
 		await readWith(answer);
 		await waitFor(() => expect(document.body.textContent).toContain('The file has no header row.'));

@@ -47,12 +47,12 @@
 		return '';
 	});
 
-	const MEDALLION = {
+	const MEDALLION: Record<ReturnType<typeof licenseTone>, string> = {
 		success: 'bg-success/15 text-success',
 		warn: 'bg-warn/15 text-warn',
 		danger: 'bg-danger/15 text-danger',
 		neutral: 'bg-surface-2 text-muted',
-	} as const;
+	};
 	const tone = $derived(licenseTone(status));
 
 	// The source is the module's word for what renews the license, shown as it

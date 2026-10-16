@@ -11,6 +11,7 @@
  * blocks every retry of that key until it expires, and nothing else in the
  * product reports it.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -107,7 +108,7 @@ export function replaysServed(keys: readonly IdempotencyKey[]): number {
 export function keyTone(
 	key: IdempotencyKey,
 	now: Date = new Date()
-): 'success' | 'warn' | 'danger' {
+): StatusTone {
 	if (key.completed) return 'success';
 	return ageSeconds(key, now) > ABANDONED_AFTER_SECONDS ? 'danger' : 'warn';
 }

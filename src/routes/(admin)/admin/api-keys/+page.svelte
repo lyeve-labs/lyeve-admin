@@ -16,6 +16,7 @@
 		SegmentedControl,
 		Pagination,
 		Table,
+		type StatusTone,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -74,7 +75,7 @@
 		return Math.min(100, Math.round((usage.requests / key.monthly_limit) * 100));
 	}
 
-	function usageTone(pct: number): 'danger' | 'warn' | 'brand' {
+	function usageTone(pct: number): StatusTone {
 		if (pct >= 90) return 'danger';
 		if (pct >= 70) return 'warn';
 		return 'brand';

@@ -12,6 +12,7 @@
  * every flushed key is recomputed on its next request, so a flush at the wrong
  * moment is a thundering herd against the database.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -288,7 +289,7 @@ export const CIRCUIT_LABELS: Readonly<Record<CircuitState, string>> = {
 	unknown: 'Not reported',
 };
 
-export function circuitTone(state: CircuitState): 'success' | 'danger' | 'warn' | 'neutral' {
+export function circuitTone(state: CircuitState): StatusTone {
 	if (state === 'closed') return 'success';
 	if (state === 'open') return 'danger';
 	if (state === 'half-open') return 'warn';

@@ -7,6 +7,7 @@
  * list shows what the engine it talks to carries and nothing else. A plugin
  * that sends no manifest is listed by its name, under Other.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type {
 	PluginManifest,
 	PluginRoute,
@@ -57,7 +58,7 @@ export const STATE_LABEL: Record<PluginState, string> = {
 };
 
 /** The badge tone for each state. Only a failure and a running plugin carry a color. */
-export const STATE_TONE: Record<PluginState, 'danger' | 'success' | 'neutral'> = {
+export const STATE_TONE: Record<PluginState, StatusTone> = {
 	failed: 'danger',
 	running: 'success',
 	'not-enabled': 'neutral',

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Card, PageShell, SectionHeading, Stat, EmptyState } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Card, PageShell, SectionHeading, Stat, EmptyState, type StatusTone } from '@lyeve-labs/ui-kit';
 	import { CircleCheck, CircleAlert, CircleX, CircleDashed } from '@lucide/svelte';
 	import type { PageData } from './$types';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -15,7 +15,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const TONE: Record<ControlStatus, 'success' | 'warn' | 'danger' | 'neutral'> = {
+	const TONE: Record<ControlStatus, StatusTone> = {
 		PASS: 'success',
 		WARN: 'warn',
 		FAIL: 'danger',

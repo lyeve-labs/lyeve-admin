@@ -13,7 +13,7 @@
 	import { useInstance } from '$lib/instance.svelte';
 	import { isExternalHref } from '$lib/links';
 	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
-	import { upgradeLabel } from '$lib/api/refusal';
+	import { upgradeWords } from '$lib/api/refusal';
 
 	let {
 		title,
@@ -48,9 +48,7 @@
 	const away = $derived(target !== null && isExternalHref(target.href));
 	// A link that opens a plan or an add-on is named by what it opens, as a
 	// refusal names it.
-	const targetLabel = $derived(
-		target === null ? '' : (upgradeLabel(target.href) ?? target.label ?? 'How to enable it'),
-	);
+	const targetLabel = $derived(target === null ? '' : upgradeWords(target));
 </script>
 
 {#snippet lock()}

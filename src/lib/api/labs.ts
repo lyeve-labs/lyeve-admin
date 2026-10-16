@@ -32,6 +32,7 @@
  * decides what the request may do. The labs add no capability: anything a
  * lab can send, its operator could already have sent with curl.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { EndpointDoc, EndpointGroup, HttpMethod } from './reference';
 import { httpStatusTone } from '../tones';
 
@@ -64,7 +65,7 @@ export const RISK_LABELS: Readonly<Record<Risk, string>> = {
 	destructive: 'Deletes from this instance',
 };
 
-export function riskTone(risk: Risk): 'success' | 'warn' | 'danger' {
+export function riskTone(risk: Risk): StatusTone {
 	if (risk === 'read') return 'success';
 	return risk === 'write' ? 'warn' : 'danger';
 }
@@ -255,7 +256,7 @@ export function formatBody(raw: string, contentType: string | null): { body: str
 }
 
 /** How a status reads, for the badge beside it. */
-export function statusTone(status: number): 'success' | 'warn' | 'danger' | 'neutral' {
+export function statusTone(status: number): StatusTone {
 	return httpStatusTone(status);
 }
 

@@ -8,6 +8,7 @@
  * validates no list on the way in, so a role is whatever string is sent and
  * only this file keeps the two pickers offering the same four.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 
 /**
  * Least privileged first. The order is a privilege ladder rather than an
@@ -24,16 +25,14 @@ export const ROLE_OPTIONS: { value: string; label: string }[] = ROLES.map((role)
 	label: role,
 }));
 
-/** A subset of the kit's accent tones: a role is a privilege, not a decoration. */
-export type RoleTone = 'neutral' | 'brand' | 'warn' | 'danger';
-
 /**
  * Badge tone for a role.
  *
  * One function for both pages, so a role reads the same on each. An unknown
- * role stays neutral rather than reading as a granted capability.
+ * role stays neutral rather than reading as a granted capability. A role is
+ * a privilege, not a decoration, so it never takes the violet accent.
  */
-export function roleTone(role: string): RoleTone {
+export function roleTone(role: string): StatusTone {
 	if (role === 'super_admin') return 'danger';
 	if (role === 'admin') return 'warn';
 	if (role === 'editor') return 'brand';
