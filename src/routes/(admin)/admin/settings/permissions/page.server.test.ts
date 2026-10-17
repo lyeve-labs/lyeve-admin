@@ -276,7 +276,7 @@ describe('refused writes', () => {
 
 	it('renders a license refusal that is not the role ceiling as a refusal, not as engine text', async () => {
 		const refusal = Object.assign(new ApiError(402, 'payment_required'), {
-			body: { error: 'payment_required', feature: 'feature:rbac', plugin: 'permissions' },
+			body: { error: 'payment_required', feature: 'feature:example_feature', plugin: 'permissions' },
 		});
 		mockedUpsertPermission.mockRejectedValueOnce(refusal);
 		const result = (await actions.upsert(upsertEvent({ role: 'editor', schema_name: 'article', drawer: 'rule' }))) as Failed;
