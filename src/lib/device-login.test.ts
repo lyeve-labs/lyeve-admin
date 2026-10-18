@@ -79,18 +79,15 @@ describe('loginRedirect', () => {
 });
 
 describe('isStepUpRefusal', () => {
-	it('recognizes a refused confirmation', () => {
-		expect(isStepUpRefusal(403, 'password is required to confirm this change.')).toBe(true);
-		expect(isStepUpRefusal(403, 'The password is not valid.')).toBe(true);
-		expect(isStepUpRefusal(403, 'The MFA code is not valid.')).toBe(true);
-		expect(isStepUpRefusal(403, 'mfa_code is required: this account has MFA enrolled.')).toBe(true);
-		expect(isStepUpRefusal(403, 'This MFA code was already used. Wait for the next one.')).toBe(true);
-		expect(isStepUpRefusal(429, 'Too many failed password attempts. Try again later.')).toBe(true);
+	it('reads every refused confirmation and a locked account as the form', () => {
+		expect(isStepUpRefusal(403)).toBe(true);
+		expect(isStepUpRefusal(429)).toBe(true);
 	});
 	it('leaves every other refusal to the outcome', () => {
-		expect(isStepUpRefusal(403, 'insufficient permissions')).toBe(false);
-		expect(isStepUpRefusal(404, 'This sign-in was already approved or denied.')).toBe(false);
-		expect(isStepUpRefusal(409, 'This sign-in was already approved or denied.')).toBe(false);
+		expect(isStepUpRefusal(401)).toBe(false);
+		expect(isStepUpRefusal(402)).toBe(false);
+		expect(isStepUpRefusal(404)).toBe(false);
+		expect(isStepUpRefusal(409)).toBe(false);
 	});
 });
 
