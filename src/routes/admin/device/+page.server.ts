@@ -132,9 +132,9 @@ async function decide(event: Parameters<Actions[string]>[0], approve: boolean) {
 		}
 	} catch (e) {
 		if (e instanceof ApiError) {
-			// A wrong or missing confirmation leaves the request open: say so on
-			// the field and keep the card on screen.
-			if (approve && isStepUpRefusal(e.status, e.message)) {
+			// A refused confirmation leaves the request open: say so on the form
+			// and keep the card on screen.
+			if (approve && isStepUpRefusal(e.status)) {
 				const r = describeRefusal(e.status, e.message, step.step);
 				const field = r.fields.password ?? r.fields.mfa_code ?? '';
 				return fail(e.status === 429 ? 429 : 400, {

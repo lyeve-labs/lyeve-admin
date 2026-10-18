@@ -224,6 +224,16 @@ describe('admin/device actions', () => {
 		expect(result.data.stepUp.needsMfa).toBe(true);
 	});
 
+	it('reports a confirmation it has no field for on the form', async () => {
+		const message = "This account's only second factor is a passkey, which cannot confirm this change.";
+		const fetch = engine(['admin'], {
+			'/api/admin/auth/device/WDJB-MJHT/approve': () => json({ error: message }, 403),
+		});
+		const result = (await actions.approve(actionEvent('WDJB-MJHT', fetch))) as { status: number; data: Record<string, unknown> };
+		expect(result.status).toBe(400);
+		expect(result.data).toEqual({ stepUp: { error: message, field: '', needsMfa: false } });
+	});
+
 	it('reports a locked account on the form', async () => {
 		const fetch = engine(['admin'], {
 			'/api/admin/auth/device/WDJB-MJHT/approve': () => json({ error: 'Too many failed password attempts. Try again later.' }, 429),
