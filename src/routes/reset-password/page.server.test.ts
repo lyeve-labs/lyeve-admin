@@ -95,6 +95,25 @@ describe('reset-password action', () => {
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
+	// The engine applies its password policy before it claims the token, so a
+	// refusal leaves the link valid. The reader keeps the form and sees the
+	// engine's own sentence, never the expired-link page.
+	it.each([
+		['AUTH_PASSWORD_TOO_COMMON', 'This password is too common. Please choose a more unique password.'],
+		['AUTH_PASSWORD_NEEDS_COMPLEXITY', 'Password must contain at least one uppercase letter, one lowercase letter, and one digit.'],
+		['AUTH_PASSWORD_TOO_SHORT', 'Password must be at least 16 characters.'],
+		['AUTH_PASSWORD_TOO_LONG', 'Password must be at most 72 bytes. A character outside ASCII takes two bytes or more.'],
+	])('keeps the form and shows the engine text for %s', async (code, error) => {
+		const fetch = vi.fn(async () => json({ error, code }, 422)) as unknown as typeof globalThis.fetch;
+		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG }, fetch)) as {
+			status: number;
+			data: Record<string, unknown>;
+		};
+		expect(result.status).toBe(422);
+		expect(result.data.error).toBe(error);
+		expect(result.data.expired).toBeUndefined();
+	});
+
 	it('reads a refused token as an expired link', async () => {
 		const fetch = vi.fn(async () => json({ error: 'invalid or expired reset token' }, 400)) as unknown as typeof globalThis.fetch;
 		const result = (await submit({ token: 'spent', password: STRONG, confirm: STRONG }, fetch)) as {
