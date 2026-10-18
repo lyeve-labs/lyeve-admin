@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { listTenants, type Tenant } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import {
 	allowedIPsProblem,
 	createAdminToken,
@@ -46,8 +46,8 @@ function loadError(err: unknown, what: string): string {
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { parent, url } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 	if (!user.roles.some((r) => OWNER_ROLES.includes(r))) error(403, 'Requires the admin or super_admin role');
 	const superAdmin = user.roles.includes('super_admin');
 	const client = authedClient(event);

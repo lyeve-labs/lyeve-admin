@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { ApiError } from '@lyeve-labs/client';
-import { authedHeaders, requireRole, authedClient } from '$lib/server/authz';
+import { authedClient, authedHeaders, loadUser, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { unwrapList } from '@lyeve-labs/client-rest';
@@ -23,8 +23,8 @@ export interface AuditEntry {
 const PAGE_SIZE = 50;
 
 export const load: PageServerLoad = async (event) => {
-	const { url, parent } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) error(403, 'Requires admin role');
 	const client = authedClient(event);
 	const limit = PAGE_SIZE;

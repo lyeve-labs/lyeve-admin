@@ -1,15 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { actions, load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 const cookies = { get: () => 'tok', set: vi.fn(), delete: vi.fn(), getAll: () => [], serialize: () => '' } as unknown as Cookies;
 
 function event(status: number, body: unknown) {
 	return {
-		fetch: vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })),
+		fetch: signedIn(
+			vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })),
+			{ roles: ['super_admin'] }
+		),
 		cookies,
 		url: new URL('http://admin/admin/settings/oauth'),
-		parent: async () => ({ user: { roles: ['super_admin'] } }),
 	} as never;
 }
 

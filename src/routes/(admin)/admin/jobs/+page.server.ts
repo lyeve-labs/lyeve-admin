@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
 import { section, type Gate, type Section } from '$lib/api/gate';
@@ -52,8 +52,8 @@ async function listJobs(
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { url, parent } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, DEFAULT_LIMIT, MAX_LIMIT);

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
 import { actions, load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -162,7 +163,7 @@ describe('admin/api-labs gRPC status', () => {
 		}) as unknown as typeof globalThis.fetch;
 		return {
 			asked,
-			event: { fetch, cookies: mockCookies(null), url: new URL('http://x/admin/api-labs'), parent: async () => ({ user: { roles } }) } as never,
+			event: { fetch: signedIn(fetch, { roles }), cookies: mockCookies(null), url: new URL('http://x/admin/api-labs') } as never,
 		};
 	}
 	type Loaded = { grpc: { gate: { state: string }; routes: string[] } };

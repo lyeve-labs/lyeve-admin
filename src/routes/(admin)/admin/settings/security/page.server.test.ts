@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const engine = vi.hoisted(() => ({ get: vi.fn() }));
+const session = vi.hoisted(() => ({ user: { id: 'u1', roles: ['super_admin'] } as { id: string; roles: string[] } }));
 
 // The role check is the real one, so the load's own refusal is what is tested.
 vi.mock('$lib/server/authz', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/server/authz')>()),
 	authedClient: vi.fn(() => engine),
+	loadUser: vi.fn(async () => session.user),
 }));
 vi.mock('@lyeve-labs/client', () => ({
 	createClient: vi.fn(() => engine),
@@ -21,9 +23,10 @@ vi.mock('@lyeve-labs/client', () => ({
 import { load } from './+page.server';
 import { ApiError } from '@lyeve-labs/client';
 
-/** The page's event, with the session user the layout already read. */
+/** The page's event, for a session whose account holds these roles. */
 function event(roles: string[] = ['super_admin']) {
-	return { parent: async () => ({ user: { id: 'u1', roles } }) } as never;
+	session.user = { id: 'u1', roles };
+	return {} as never;
 }
 const report = {
 	checked_at: '2026-09-13T22:00:00Z',

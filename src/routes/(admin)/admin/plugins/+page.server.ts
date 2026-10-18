@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { getPluginStatus, type PluginStatus } from '@lyeve-labs/client-rest';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, loadUser } from '$lib/server/authz';
 
 /**
  * The plugin status, read on every visit rather than taken from the shell's
@@ -12,8 +12,7 @@ import { authedClient } from '$lib/server/authz';
  * and a body from a failing engine can carry driver text.
  */
 export const load: PageServerLoad = async (event) => {
-	const { parent } = event;
-	await parent();
+	await loadUser(event);
 	const client = authedClient(event);
 
 	return getPluginStatus(client).then(

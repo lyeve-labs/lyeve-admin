@@ -17,7 +17,7 @@ import {
 } from '$lib/api/profiler';
 import { section, type Section } from '$lib/api/gate';
 import { actionError } from '$lib/server/action-error';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 
 /**
  * What the page renders. Every view is the profiler plugin's, under
@@ -62,8 +62,8 @@ async function sampled(read: Promise<EndpointDetail>): Promise<EndpointDetail | 
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { url, parent } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
 		error(403, 'Requires super_admin role');
 	}

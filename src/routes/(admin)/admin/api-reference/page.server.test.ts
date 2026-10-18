@@ -3,6 +3,7 @@ import type { Cookies } from '@sveltejs/kit';
 import { load } from './+page.server';
 import type { ReferencePageData } from './+page.server';
 import { staticGroups } from '$lib/api/reference';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function engineDocument(collections: string[]) {
 	const paths: Record<string, unknown> = {
@@ -20,10 +21,9 @@ async function runLoad(
 	{ roles = ['admin'], search = '' }: { roles?: string[]; search?: string } = {},
 ): Promise<ReferencePageData> {
 	const event = {
-		fetch: fetchImpl,
+		fetch: signedIn(fetchImpl, { roles }),
 		cookies: { get: vi.fn(() => 'tok') } as unknown as Cookies,
 		url: new URL(`http://admin.test/admin/api-reference${search}`),
-		parent: async () => ({ user: { roles } }),
 	} as never;
 	return (await load(event)) as unknown as ReferencePageData;
 }

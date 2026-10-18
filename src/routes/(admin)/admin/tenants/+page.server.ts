@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, error, redirect } from '@sveltejs/kit';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import {
 	listTenants,
 	createTenant,
@@ -52,8 +52,8 @@ function createFailure(err: unknown) {
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { url, parent } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 

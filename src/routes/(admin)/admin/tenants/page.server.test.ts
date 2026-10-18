@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
 import { actions, load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -44,10 +45,9 @@ function loadEvent(body: unknown, search = '') {
 	return {
 		seen,
 		event: {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/tenants${search}`),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never,
 	};
 }
@@ -130,10 +130,9 @@ describe('admin/tenants load', () => {
 		}) as unknown as typeof globalThis.fetch;
 
 		const result = await run({
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/tenants'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never);
 
 		expect(result.tenants).toEqual({ ok: false, gate: { state: 'unavailable' } });
@@ -146,10 +145,9 @@ describe('admin/tenants load', () => {
 				String(url).includes('/provisioning') ? json({ enabled: true }) : json({ error: 'no' }, status),
 			) as unknown as typeof globalThis.fetch;
 			return run({
-				fetch,
+				fetch: signedIn(fetch, { roles: ['super_admin'] }),
 				cookies: mockCookies(),
 				url: new URL('http://localhost/admin/tenants'),
-				parent: async () => ({ user: { roles: ['super_admin'] } }),
 			} as never);
 		};
 		expect((await refuse(403)).tenants).toEqual({ ok: false, gate: { state: 'forbidden' } });
@@ -159,11 +157,12 @@ describe('admin/tenants load', () => {
 
 	it('throws 403 for anyone but a super_admin', async () => {
 		const { event } = loadEvent({ data: [], total_count: 0 });
+		const page = vi.fn(async () => new Response('{}')) as unknown as typeof globalThis.fetch;
 
 		await expect(
 			load({
 				...(event as object),
-				parent: async () => ({ user: { roles: ['admin'] } }),
+				fetch: signedIn(page, { roles: ['admin'] }),
 			} as never)
 		).rejects.toThrow();
 	});
@@ -294,10 +293,9 @@ describe('admin/tenants load provisioning', () => {
 			String(url).includes('/tenants/provisioning') ? provisioning() : json({ data: tenants(1), total_count: 1 })
 		) as unknown as typeof globalThis.fetch;
 		return {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/tenants'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 	}
 

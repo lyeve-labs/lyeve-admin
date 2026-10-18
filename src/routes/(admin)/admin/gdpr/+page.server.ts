@@ -1,12 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
 import { exportSubject, eraseSubject } from '@lyeve-labs/client-rest';
 import { fail, error } from '@sveltejs/kit';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { forbiddenText } from '$lib/api/gate';
 
-export const load: PageServerLoad = async ({ parent }) => {
-	const { user } = await parent();
+export const load: PageServerLoad = async (event) => {
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
 		error(403, forbiddenText('privacy requests'));
 	}

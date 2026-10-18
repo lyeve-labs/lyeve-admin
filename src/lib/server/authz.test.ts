@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
-import { assertRole, authedClient, authedHeaders, requireUser, requireRole, stripProtectedFields } from './authz';
+import {
+	assertRole,
+	authedClient,
+	authedHeaders,
+	loadUser,
+	requireUser,
+	requireRole,
+	stripProtectedFields,
+} from './authz';
 import { BUSY, OUTAGE } from '$lib/outage';
 
 // event stub
@@ -183,6 +191,119 @@ describe('assertRole', () => {
 			}
 		})();
 		expect(err?.status).toBe(403);
+	});
+});
+
+// one session read per request
+
+describe('the session read', () => {
+	const user = { id: 'u1', email: 'a@b.co', roles: ['admin'], tenant_id: 't', disabled: false, created_at: '' };
+
+	/** Events for one request, as SvelteKit hands one to an action and one to each load. */
+	function eventsOf(request: Request, fetchImpl: typeof fetch, cookie = () => 'sess-tok'): RequestEvent[] {
+		const event = () =>
+			({
+				request,
+				url: new URL(request.url),
+				cookies: { get: vi.fn(cookie), delete: vi.fn() },
+				fetch: fetchImpl,
+			}) as unknown as RequestEvent;
+		return [event(), event(), event()];
+	}
+
+	function meCalls(fetchImpl: typeof fetch): number {
+		return (fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter(([url]) =>
+			String(url).includes('/api/admin/auth/me')
+		).length;
+	}
+
+	it('asks the engine once for all the loads of a request', async () => {
+		const fetchImpl = vi.fn(async () => jsonResponse(user)) as unknown as typeof fetch;
+		const [shell, page] = eventsOf(new Request('http://localhost/admin/jobs'), fetchImpl);
+
+		await Promise.all([loadUser(shell), loadUser(page)]);
+
+		expect(meCalls(fetchImpl)).toBe(1);
+	});
+
+	it('asks again for the loads after an action, which may have ended the session', async () => {
+		let live = true;
+		const fetchImpl = vi.fn(async () =>
+			live ? jsonResponse(user) : jsonResponse({ error: 'unauthorized' }, 401)
+		) as unknown as typeof fetch;
+		const [action, shell] = eventsOf(new Request('http://localhost/admin/users?/setPassword', { method: 'POST' }), fetchImpl);
+
+		await requireRole(action, ['admin']);
+		live = false;
+		const err = (await loadUser(shell).catch((e: unknown) => e)) as { status?: number; location?: string };
+
+		expect(err.status).toBe(302);
+		expect(err.location).toContain('/login?ended=1');
+		expect(shell.cookies.delete).toHaveBeenCalled();
+	});
+
+	it('asks again on the next request, so a session ended in between is refused', async () => {
+		let live = true;
+		const fetchImpl = vi.fn(async () =>
+			live ? jsonResponse(user) : jsonResponse({ error: 'unauthorized' }, 401)
+		) as unknown as typeof fetch;
+		const [first] = eventsOf(new Request('http://localhost/admin/jobs?/create', { method: 'POST' }), fetchImpl);
+		const [second] = eventsOf(new Request('http://localhost/admin/jobs?/create', { method: 'POST' }), fetchImpl);
+
+		await requireUser(first);
+		live = false;
+		const err = (await requireUser(second).catch((e: unknown) => e)) as { status?: number };
+
+		expect(err.status).toBe(401);
+		expect(meCalls(fetchImpl)).toBe(2);
+	});
+
+	it('asks again within a request once the session cookie changed', async () => {
+		let token = 'old-tok';
+		const fetchImpl = vi.fn(async () => jsonResponse(user)) as unknown as typeof fetch;
+		const [before, after] = eventsOf(new Request('http://localhost/login'), fetchImpl, () => token);
+
+		await loadUser(before);
+		token = 'new-tok';
+		await loadUser(after);
+
+		expect(meCalls(fetchImpl)).toBe(2);
+	});
+
+	it('gives every load in the request the same refusal when the engine cannot check', async () => {
+		const fetchImpl = vi.fn(async () => jsonResponse({ error: 'unavailable' }, 503)) as unknown as typeof fetch;
+		const events = eventsOf(new Request('http://localhost/admin/jobs'), fetchImpl);
+
+		const errs = (await Promise.all(events.map((e) => loadUser(e).catch((x: unknown) => x)))) as {
+			status?: number;
+			body?: { message?: string };
+		}[];
+
+		expect(errs.map((e) => e.status)).toEqual([503, 503, 503]);
+		expect(errs[0].body?.message).toBe(OUTAGE.body);
+		expect(meCalls(fetchImpl)).toBe(1);
+		for (const e of events) expect(e.cookies.delete).not.toHaveBeenCalled();
+	});
+
+	it('sends a load to sign in again when the engine ended the session', async () => {
+		const fetchImpl = vi.fn(async () => jsonResponse({ error: 'unauthorized' }, 401)) as unknown as typeof fetch;
+		const [page] = eventsOf(new Request('http://localhost/admin/jobs'), fetchImpl);
+
+		const err = (await loadUser(page).catch((e: unknown) => e)) as { status?: number; location?: string };
+
+		expect(err.status).toBe(302);
+		expect(err.location).toContain('/login?ended=1');
+		expect(page.cookies.delete).toHaveBeenCalled();
+	});
+
+	it('sends a load without a session to sign in without asking the engine', async () => {
+		const fetchImpl = vi.fn() as unknown as typeof fetch;
+		const [page] = eventsOf(new Request('http://localhost/admin/jobs'), fetchImpl, () => undefined as never);
+
+		const err = (await loadUser(page).catch((e: unknown) => e)) as { status?: number; location?: string };
+
+		expect(err).toMatchObject({ status: 302, location: '/login' });
+		expect(fetchImpl).not.toHaveBeenCalled();
 	});
 });
 

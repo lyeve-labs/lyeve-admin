@@ -77,10 +77,10 @@ interface LoadResult {
 
 /** One load, for a reader with these roles, holding a session. */
 function loadEvent(roles: string[]) {
+	mockedGetMe.mockResolvedValue(sessionUser(roles));
 	return {
 		fetch: mockFetch({}),
 		cookies: mockCookies({ '__Host-sys_session': 'valid-token' }),
-		parent: async () => ({ user: sessionUser(roles) }),
 	} as never;
 }
 

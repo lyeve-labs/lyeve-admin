@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from './$types';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, loadUser } from '$lib/server/authz';
 import { AI_OK, aiSettingsGate, type AiGate } from '$lib/server/ai-load';
 import { getAiSettings, type AiSettings } from '$lib/api/ai';
 
@@ -9,7 +9,7 @@ import { getAiSettings, type AiSettings } from '$lib/api/ai';
  * the state the off panel's own switch flips.
  */
 export const load: LayoutServerLoad = async (event) => {
-	const { user } = await event.parent();
+	const user = await loadUser(event);
 	const client = authedClient(event);
 	let aiSettings: AiSettings | null = null;
 	let aiLayoutGate: AiGate = AI_OK;

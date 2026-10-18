@@ -4,7 +4,7 @@ import { staticGroups, type EndpointGroup } from '$lib/api/reference';
 import { buildReference, type OpenAPIDocument } from '$lib/api/openapi';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
-import { authedClient, authedHeaders } from '$lib/server/authz';
+import { authedClient, authedHeaders, loadUser } from '$lib/server/authz';
 import {
 	GRAPHQL_URL,
 	GRPC_INVOKE_URL,
@@ -65,7 +65,7 @@ async function readGroups(client: HttpClient): Promise<{ groups: EndpointGroup[]
 const GRPC_FAILED = 'The gRPC listener status could not be read. This is not a report that the plugin is absent.';
 
 export const load: PageServerLoad = async (event) => {
-	const { user } = await event.parent();
+	const user = await loadUser(event);
 	const client = authedClient(event);
 	const { groups, source } = await readGroups(client);
 	// The listener's status and the invoke route are a super admin's, so the

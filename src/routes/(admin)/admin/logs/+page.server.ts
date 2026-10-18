@@ -4,11 +4,11 @@ import { getLoggingLevels, getLoggingConfig, getLogVolume } from '@lyeve-labs/cl
 import { section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { LOG_DEFAULT_LIMIT, LOG_MAX_LIMIT, searchLogEntries } from '$lib/api/logs';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, loadUser } from '$lib/server/authz';
 
 export const load: PageServerLoad = async (event) => {
-	const { url, parent } = event;
-	await parent();
+	const { url } = event;
+	await loadUser(event);
 
 	const client = authedClient(event);
 

@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { archiveTenant, getEntitlements, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { refusalText } from '$lib/api/refusal';
@@ -30,7 +30,7 @@ import {
 } from '$lib/api/tenant-access';
 
 export const load: PageServerLoad = async (event) => {
-	const { user } = await event.parent();
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 

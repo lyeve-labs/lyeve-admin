@@ -27,9 +27,11 @@ vi.mock('$lib/api/flows', () => ({ listAllFlows: flows.listAllFlows }));
 const limits = vi.hoisted(() => ({ getRoleLimits: vi.fn(async (): Promise<{ roles: { limit: number; current: number } }> => ({ roles: { limit: 0, current: 0 } })) }));
 vi.mock('$lib/api/permissions', () => ({ getRoleLimits: limits.getRoleLimits }));
 
+const session = vi.hoisted(() => ({ user: { roles: ['super_admin'] } as { roles: string[] } }));
 vi.mock('$lib/server/authz', () => ({
 	authedClient: vi.fn(() => ({})),
 	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['super_admin'] })),
+	loadUser: vi.fn(async () => session.user),
 }));
 
 import { load, actions } from './+page.server';
@@ -45,10 +47,10 @@ function mockCookies(): Cookies {
 }
 
 function loadEvent() {
+	session.user = { roles: ['super_admin'] };
 	return {
 		fetch: vi.fn(),
 		cookies: mockCookies(),
-		parent: async () => ({ user: { roles: ['super_admin'] } }),
 	} as never;
 }
 
@@ -116,10 +118,10 @@ describe('reading the rules', () => {
 	});
 
 	it('refuses a session without super_admin', async () => {
+		session.user = { roles: ['editor'] };
 		const event = {
 			fetch: vi.fn(),
 			cookies: mockCookies(),
-			parent: async () => ({ user: { roles: ['editor'] } }),
 		} as never;
 
 		await expect(load(event)).rejects.toMatchObject({ status: 403 });

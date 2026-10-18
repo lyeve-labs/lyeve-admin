@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -11,10 +12,9 @@ const cookies = { get: () => 'tok', set: vi.fn(), delete: vi.fn(), getAll: () =>
 /** A load event whose fetch answers each path with what `answer` returns. */
 function event(answer: (path: string) => Response, search = '') {
 	return {
-		fetch: vi.fn(async (url: string) => answer(String(url))) as unknown as typeof fetch,
+		fetch: signedIn(vi.fn(async (url: string) => answer(String(url))) as unknown as typeof fetch, { roles: ['super_admin'] }),
 		cookies,
 		url: new URL(`http://localhost/admin/api-keys${search}`),
-		parent: async () => ({ user: { roles: ['super_admin'] } }),
 	} as never;
 }
 

@@ -13,7 +13,7 @@ import {
 	type CollectionSort,
 	type SortDir
 } from '$lib/api/collections';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, loadUser } from '$lib/server/authz';
 
 /**
  * Resolve typed text to exactly one collection.
@@ -172,8 +172,8 @@ function ordered(
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { url, parent } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 	const client = authedClient(event);
 	const read: Section<Schema[]> = user.roles.some((r) => CONTENT_ROLES.includes(r))
 		? await section(getSchemas(client), LIST_FAILED)

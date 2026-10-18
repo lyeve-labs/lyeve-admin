@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { actions, load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 type Reply = { status: number; body?: unknown };
 
@@ -111,8 +112,8 @@ describe('the revoke action', () => {
 describe('the load', () => {
 	function loadEvent(roles: string[], replies: Record<string, Reply>, url = 'http://admin/admin/admin-tokens') {
 		const { ev, fetch } = event(replies, {}, url);
-		const parent = async () => ({ user: { id: 'u1', email: 'a@b.test', roles, tenant_id: 'default' } });
-		return { ev: { ...(ev as object), parent } as never, fetch };
+		const user = { id: 'u1', email: 'a@b.test', roles, tenant_id: 'default' };
+		return { ev: { ...(ev as object), fetch: signedIn(fetch, user) } as never, fetch };
 	}
 
 	it('refuses a role that cannot own a token', async () => {

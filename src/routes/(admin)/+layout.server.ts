@@ -1,10 +1,7 @@
-import { redirect } from '@sveltejs/kit';
-import { authedClient, sessionUser } from '$lib/server/authz';
+import { authedClient, loadUser } from '$lib/server/authz';
 import type { LayoutServerLoad } from './$types';
 import { getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
 import { NO_ENTITLEMENTS, type LicenseEntitlements } from '$lib/entitlements';
-import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
-import { sessionEndedTarget } from '$lib/server/session-refresh';
 import { pendingMigrations } from '$lib/api/migrate';
 import { getCustomization, NO_CUSTOMIZATION, type Customization } from '$lib/api/customization';
 import { brandOf } from '$lib/brand';
@@ -30,24 +27,10 @@ const OPERATOR_ROLES = ['admin', 'super_admin'];
 export type MigrationStatus = { pending: number | null } | null;
 
 export const load: LayoutServerLoad = async (event) => {
-	const { cookies } = event;
-
-	const token = sessionToken(event);
-	if (!token) {
-		redirect(302, '/login');
-	}
-
-	const authed = authedClient(event);
 	// Only an engine that says the session is over ends it here. One that
 	// cannot check it throws the outage page, and the cookie outlives the blip.
-	const user = await sessionUser(authed);
-	if (!user) {
-		clearSessionCookie(event);
-		// The address is read only here, on the way out, so a session that
-		// stands does not make this load depend on it and re-run on every
-		// navigation.
-		redirect(302, sessionEndedTarget(event.url, event.request.method));
-	}
+	const user = await loadUser(event);
+	const authed = authedClient(event);
 
 	/*
 	 * The shell's reads, in two rounds.
@@ -71,10 +54,11 @@ export const load: LayoutServerLoad = async (event) => {
 	 * and the renewal belong to the license module, and the entitlements say
 	 * whether the build links one.
 	 *
-	 * None of this re-runs when the reader moves between admin pages: the load
-	 * reads no url and no params, so SvelteKit keeps the shell's data across a
-	 * client-side navigation and asks the engine again only on a fresh document
-	 * or after a write invalidates.
+	 * The load reads no url and no params, so SvelteKit keeps the shell's data
+	 * across a client-side navigation and asks the engine again on a fresh
+	 * document or after a write invalidates. A page load that awaits parent()
+	 * runs all of it again on the server, so a page that wants only the account
+	 * reads it with loadUser, which asks once per request.
 	 */
 	const operator = user.roles.some((role) => OPERATOR_ROLES.includes(role));
 	const [read, status, listed] = await Promise.all([
