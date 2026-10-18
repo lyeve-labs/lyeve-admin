@@ -36,9 +36,9 @@ const config = {
 	kit: {
 		adapter: adapter(),
 		// CSP via SvelteKit so its inline hydration scripts get nonces automatically.
-		// Google Fonts (fonts.googleapis.com / fonts.gstatic.com) are allowlisted to
-		// match src/app.html. The sign-in challenge loads its widget from whichever
-		// provider the captcha plugin is configured for (Turnstile, hCaptcha or
+		// The fonts ship with the build, so no font origin is allowed. The sign-in
+		// challenge loads its widget from whichever provider the captcha plugin
+		// is configured for (Turnstile, hCaptcha or
 		// reCAPTCHA), so those origins are allowed for scripts and frames. The list
 		// matches captchaScriptURL in src/lib/captcha.ts. Everything else is locked
 		// to 'self'.
@@ -47,8 +47,8 @@ const config = {
 			directives: {
 				'default-src': ['self'],
 				'script-src': ['self', ...CAPTCHA_SCRIPT_ORIGINS],
-				'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com', 'https://hcaptcha.com', 'https://*.hcaptcha.com'],
-				'font-src': ['self', 'data:', 'https://fonts.gstatic.com'],
+				'style-src': ['self', 'unsafe-inline', 'https://hcaptcha.com', 'https://*.hcaptcha.com'],
+				'font-src': ['self', 'data:'],
 				'img-src': ['self', 'data:'],
 				'connect-src': ['self', 'https://hcaptcha.com', 'https://*.hcaptcha.com'],
 				'frame-src': CAPTCHA_FRAME_ORIGINS,
