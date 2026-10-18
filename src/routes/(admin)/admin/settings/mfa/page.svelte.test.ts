@@ -48,15 +48,27 @@ describe('setting up an app beside a passkey', () => {
 	});
 });
 
+// A backup code is 16 hexadecimal characters.
+const BACKUP_CODE = 'a1b2c3d4e5f60718';
+
+/** Whether a field lets a whole backup code be typed into it. */
+function fitsBackupCode(field: Element | null): boolean {
+	const cap = field?.getAttribute('maxlength');
+	return field !== null && (cap === null || Number(cap) >= BACKUP_CODE.length);
+}
+
 // Backup codes are hexadecimal, so a field that takes one must not bring up a
-// number pad on a phone.
+// number pad on a phone, and it must hold the whole code.
 describe('fields that take a backup code', () => {
 	it('keep the full keyboard on every form that accepts one', () => {
 		for (const hasPasskeys of [false, true]) {
 			const { container } = setup(true, null, hasPasskeys);
 			const fields = container.querySelectorAll('form[action="?/disable"] input[name="code"], form[action="?/setup"] input[name="code"]');
 			expect(fields).toHaveLength(2);
-			for (const f of fields) expect(f.getAttribute('inputmode')).toBeNull();
+			for (const f of fields) {
+				expect(f.getAttribute('inputmode')).toBeNull();
+				expect(fitsBackupCode(f)).toBe(true);
+			}
 			cleanup();
 		}
 	});
