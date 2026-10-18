@@ -3,6 +3,7 @@ import type { Cookies } from '@sveltejs/kit';
 import { isRedirect } from '@sveltejs/kit';
 
 import { load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -32,10 +33,9 @@ function schemas(count: number, from = 0) {
 function loadEvent(body: unknown, search = '') {
 	const fetch = vi.fn(async () => json(body)) as unknown as typeof globalThis.fetch;
 	return {
-		fetch,
+		fetch: signedIn(fetch, { roles: ['super_admin'] }),
 		cookies: mockCookies(),
 		url: new URL(`http://localhost/admin/content${search}`),
-		parent: async () => ({ user: { roles: ['super_admin'] } }),
 	} as never;
 }
 
@@ -116,10 +116,9 @@ describe('admin/content/+page.server.ts load', () => {
 			return json(schemas(60));
 		}) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content?limit=3'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;
@@ -138,10 +137,9 @@ describe('admin/content/+page.server.ts load', () => {
 	])('draws a gate, never an empty index, when the read answers %i', async (status, state) => {
 		const fetch = vi.fn(async () => json({ error: 'nope' }, status)) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const result = (await load(event)) as Loaded;
@@ -171,10 +169,9 @@ describe('admin/content/+page.server.ts load', () => {
 			return json(schemas(9));
 		}) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content?limit=3&sort=rows'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;
@@ -196,10 +193,9 @@ describe('admin/content/+page.server.ts load', () => {
 			return json(schemas(4));
 		}) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content?sort=rows&dir=asc'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;
@@ -226,10 +222,9 @@ describe('admin/content/+page.server.ts load', () => {
 			);
 		}) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content?limit=2&sort=fields'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;
@@ -272,10 +267,9 @@ describe('admin/content/+page.server.ts load', () => {
 			return json(schemas(5));
 		}) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content?limit=3&sort=updated'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;
@@ -310,10 +304,9 @@ describe('admin/content/+page.server.ts load', () => {
 			);
 		}) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content?filter=draft-publish&limit=2'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;
@@ -338,10 +331,9 @@ describe('admin/content/+page.server.ts load', () => {
 			return json(schemas(5));
 		}) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content?filter=empty'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;
@@ -363,10 +355,9 @@ describe('admin/content/+page.server.ts load', () => {
 	it.each(['editor', 'viewer'])('answers the forbidden gate for the %s role without reading', async (role) => {
 		const fetch = vi.fn(async () => json(schemas(3))) as unknown as typeof globalThis.fetch;
 		const event = {
-			fetch,
+			fetch: signedIn(fetch, { roles: [role] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/content'),
-			parent: async () => ({ user: { roles: [role] } }),
 		} as never;
 
 		const data = (await load(event)) as Loaded;

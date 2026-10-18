@@ -5,9 +5,11 @@ import type { Cookies } from '@sveltejs/kit';
 // header it builds is the subject of the two cases below: a write that reaches
 // the engine without X-CSRF-Token is refused 403, and a stub that returns a
 // fixed bag would pass whether the action spread it or not.
+const session = vi.hoisted(() => ({ user: { roles: ['super_admin'] } as { roles: string[] } }));
 vi.mock('$lib/server/authz', async (importOriginal) => ({
 	...((await importOriginal()) as object),
 	requireRole: vi.fn(async () => ({ id: 'u1', role: 'super_admin' })),
+	loadUser: vi.fn(async () => session.user),
 }));
 
 const engine = vi.hoisted(() => ({ get: vi.fn() }));
@@ -111,11 +113,11 @@ describe('audit-log load reports the row count the engine sent', () => {
 	}
 
 	async function runLoad(offset: number) {
+		session.user = { roles: ['super_admin'] };
 		const event = {
 			fetch: vi.fn() as unknown as typeof globalThis.fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 			url: new URL(`http://localhost/admin/audit-log?offset=${offset}`),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 		return (await load(event)) as unknown as { total: number; entries: { ok: true; value: unknown[] } };
 	}
@@ -152,11 +154,11 @@ describe('audit-log load reports the row count the engine sent', () => {
  */
 describe('audit-log load keeps a failed read apart from an empty log', () => {
 	function event(query = '') {
+		session.user = { roles: ['admin'] };
 		return {
 			fetch: vi.fn() as unknown as typeof globalThis.fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 			url: new URL(`http://localhost/admin/audit-log${query}`),
-			parent: async () => ({ user: { roles: ['admin'] } }),
 		} as never;
 	}
 
@@ -263,11 +265,11 @@ describe('audit-log search maps to the endpoint filters', () => {
 				],
 				total: 2,
 			});
+		session.user = { roles: ['super_admin'] };
 		const event = {
 			fetch: vi.fn() as unknown as typeof globalThis.fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 			url: new URL('http://localhost/admin/audit-log?action=content.delete'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 		const result = (await load(event)) as unknown as { actions: string[] };
 		expect(String(engine.get.mock.calls[1][0])).not.toContain('action=');
@@ -279,11 +281,11 @@ describe('audit-log search maps to the endpoint filters', () => {
 		engine.get
 			.mockResolvedValueOnce({ data: [], total: 0 })
 			.mockResolvedValueOnce({ data: [{ id: 'e1', action: 'content.delete' }], total: 1 });
+		session.user = { roles: ['super_admin'] };
 		const event = {
 			fetch: vi.fn() as unknown as typeof globalThis.fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 			url: new URL('http://localhost/admin/audit-log?q=a1b2c3d4-0000-0000-0000-000000000000'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 		const result = (await load(event)) as unknown as { entries: { ok: true; value: unknown[] }; actions: string[] };
 		expect(engine.get).toHaveBeenCalledTimes(2);

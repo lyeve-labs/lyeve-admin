@@ -8,7 +8,7 @@ import {
 	getAnomalies
 } from '@lyeve-labs/client-rest';
 import { section } from '$lib/api/gate';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, loadUser } from '$lib/server/authz';
 
 /** What each part of the page says when its read failed for a reason it cannot name. */
 const FAILED = {
@@ -20,8 +20,7 @@ const FAILED = {
 } as const;
 
 export const load: PageServerLoad = async (event) => {
-	const { parent } = event;
-	const { user } = await parent();
+	const user = await loadUser(event);
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
 		error(403, 'Requires admin or super_admin role');
 	}

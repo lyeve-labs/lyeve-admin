@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError, type Schema, type HttpClient } from '@lyeve-labs/client';
 import { getSchemas, getSchemaStats } from '@lyeve-labs/client-rest';
-import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
+import { authedClient, authedHeaders, loadUser, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { retryBusy } from '$lib/server/retry-busy';
 import { bundleContentType, readImportForm } from '$lib/server/flow-import';
@@ -68,8 +68,7 @@ async function countRows(schemas: Schema[], client: HttpClient): Promise<Record<
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { parent } = event;
-	const { user } = await parent();
+	const user = await loadUser(event);
 	const client = authedClient(event);
 	const canWrite = (user?.roles ?? []).some((r: string) => WRITERS.includes(r));
 	const isSuperAdmin = (user?.roles ?? []).includes('super_admin');

@@ -3,7 +3,7 @@ import type { Permission, Schema } from '@lyeve-labs/client';
 import { getSchemas, listPermissions, upsertPermission, deletePermission } from '@lyeve-labs/client-rest';
 import { refusalOf } from '$lib/api/refusal';
 import { fail, error, isHttpError, isRedirect } from '@sveltejs/kit';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { listAllFlows } from '$lib/api/flows';
 import type { FlowOption } from '$lib/flow/types';
 import { isFlowResource } from '$lib/flow/permissions';
@@ -17,8 +17,7 @@ import { gateOf, section, type Gate } from '$lib/api/gate';
 const LOAD_FAILED = 'Permission rules could not be read from the engine. This is not a report that the instance has no rules.';
 
 export const load: PageServerLoad = async (event) => {
-	const { parent } = event;
-	const { user } = await parent();
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
 		error(403, 'Requires super_admin role');
 	}

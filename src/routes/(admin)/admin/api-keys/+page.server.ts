@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, error, redirect } from '@sveltejs/kit';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { revokeAPIKey, deleteAPIKey } from '@lyeve-labs/client-rest';
 import type { APIKey } from '@lyeve-labs/client';
 import { actionError, actionFailure } from '$lib/server/action-error';
@@ -37,8 +37,8 @@ export interface UsageSummary {
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { parent, url } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 	// The endpoint pages at fifty, so a read that names no window shows the

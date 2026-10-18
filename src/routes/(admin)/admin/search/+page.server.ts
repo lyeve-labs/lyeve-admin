@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { getRanking, type RankingConfig } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import {
 	createSynonym,
@@ -37,8 +37,8 @@ const MAX_RESULTS_LIMIT = 200;
 const attempt = <T>(f: () => Promise<T>): Promise<T> => Promise.resolve().then(f);
 
 export const load: PageServerLoad = async (event) => {
-	const { url, parent } = event;
-	const { user } = await parent();
+	const { url } = event;
+	const user = await loadUser(event);
 
 	const client = authedClient(event);
 

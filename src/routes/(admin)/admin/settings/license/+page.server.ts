@@ -1,6 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { ApiError } from '@lyeve-labs/client';
 import { getEntitlements } from '@lyeve-labs/client-rest';
 import type { LicenseEntitlements } from '$lib/entitlements';
@@ -42,7 +42,7 @@ const EXCHANGE_FAILURES: Readonly<Record<string, string>> = {
 const READER_ROLES = ['admin', 'super_admin'];
 
 export const load: PageServerLoad = async (event) => {
-	const { user } = await event.parent();
+	const user = await loadUser(event);
 	if (!user.roles.some((role) => READER_ROLES.includes(role))) {
 		error(403, forbiddenText('the license'));
 	}

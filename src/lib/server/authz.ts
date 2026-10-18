@@ -1,8 +1,9 @@
-import { error, type RequestEvent } from '@sveltejs/kit';
+import { error, redirect, type RequestEvent } from '@sveltejs/kit';
 import { ApiError, createClient, type HttpClient } from '@lyeve-labs/client';
 import { getMe } from '@lyeve-labs/client-rest';
 import type { User } from '@lyeve-labs/client';
-import { sessionToken, type SessionRead } from '$lib/server/session-cookie';
+import { clearSessionCookie, sessionToken, type SessionRead } from '$lib/server/session-cookie';
+import { sessionEndedTarget } from '$lib/server/session-refresh';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { BUSY, OUTAGE } from '$lib/outage';
 
@@ -106,10 +107,63 @@ export async function sessionUser(client: HttpClient): Promise<User | null> {
 	}
 }
 
+/*
+ * The session check each request's loads have made, by request and token. The
+ * shell's load and a page's load can each need the account within one
+ * request, and each used to ask the engine again. A request asks once, and
+ * the next request asks again, so a session the engine ended is refused on
+ * the very next page. The token is part of the key because a request that
+ * signs in or renews sets a new cookie partway through.
+ *
+ * An action never fills it. A write can end or demote the caller's own
+ * session, such as a super admin setting their own password, and the page
+ * that renders after the write in the same request has to see the account as
+ * the engine holds it then, which may be no account at all.
+ */
+const sessionReads = new WeakMap<Request, { token: string; user: Promise<User | null> }>();
+
+function loadSessionUser(event: RequestEvent): Promise<User | null> {
+	const token = sessionToken(event);
+	const held = event.request ? sessionReads.get(event.request) : undefined;
+	if (held && held.token === token) return held.user;
+	const user = sessionUser(authedClient(event));
+	if (event.request && token) sessionReads.set(event.request, { token, user });
+	return user;
+}
+
+/**
+ * The session's account for a server load, read once per request.
+ *
+ * A page that wants only the account reads it here instead of awaiting the
+ * shell's data. SvelteKit keeps the shell's data in the browser between admin
+ * pages, so the server holds none of it on a client-side navigation, and a
+ * load that awaits it makes the server run the whole shell again first.
+ *
+ * Without a session it sends the reader to sign in. When the engine says the
+ * session is over it clears the cookie and sends the reader to sign in again.
+ * A check the engine refused or could not answer throws its own page, and the
+ * cookie outlives it.
+ */
+export async function loadUser(event: RequestEvent): Promise<User> {
+	if (!sessionToken(event)) {
+		redirect(302, '/login');
+	}
+	const user = await loadSessionUser(event);
+	if (!user) {
+		clearSessionCookie(event);
+		// The address is read only here, on the way out, so a session that
+		// stands does not make the load depend on it and re-run on every
+		// navigation.
+		redirect(302, sessionEndedTarget(event.url, event.request.method));
+	}
+	return user;
+}
+
 /**
  * Require a valid session. Returns the authenticated user, throws 401 when the
  * engine ended the session, and throws whatever page `sessionUser` throws when
- * the engine refused the check or could not answer it.
+ * the engine refused the check or could not answer it. Every call asks the
+ * engine, because the write it guards may change the answer.
  */
 export async function requireUser(event: RequestEvent): Promise<User> {
 	const user = await sessionUser(authedClient(event));
@@ -134,8 +188,7 @@ export async function requireRole(event: RequestEvent, roles: string[]): Promise
 
 /**
  * Throw 403 unless the user holds at least one of the given roles. A load
- * takes the user from the layout's data and checks it here, so it asks the
- * engine for the session once per page and not once per load.
+ * takes the user from `loadUser` and checks it here.
  */
 export function assertRole(user: User, roles: string[]): User {
 	if (!roles.some((r) => user.roles.includes(r))) {

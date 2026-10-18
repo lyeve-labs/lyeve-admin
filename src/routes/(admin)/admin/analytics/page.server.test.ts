@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
 import { load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -32,9 +33,8 @@ function loadEvent(roles: string[], status: (path: string) => number = () => 200
 	return {
 		queries,
 		event: {
-			fetch,
+			fetch: signedIn(fetch, { roles }),
 			cookies: mockCookies(),
-			parent: async () => ({ user: { roles } }),
 		} as never,
 	};
 }

@@ -41,7 +41,11 @@ function event(routes: Record<string, unknown>, form?: FormData) {
 		const asked = new URL(String(url), 'http://localhost');
 		const path = asked.pathname;
 		calls.push({ url: path, query: asked.search, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-		const answers: Record<string, unknown> = { 'GET /api/admin/entitlements': LICENSE, ...routes };
+		const answers: Record<string, unknown> = {
+			'GET /api/admin/entitlements': LICENSE,
+			'GET /api/admin/auth/me': { roles: ['super_admin'] },
+			...routes,
+		};
 		const hit = answers[`${method} ${path}`];
 		if (hit === undefined) return json({ error: 'not found' }, 404);
 		if (hit instanceof Response) return hit;
@@ -55,9 +59,6 @@ function event(routes: Record<string, unknown>, form?: FormData) {
 			params: { id: 't1' },
 			url: new URL('http://localhost/admin/tenants/t1'),
 			request: form ? new Request('http://localhost', { method: 'POST', body: form }) : undefined,
-			// The shell's entitlements are its failed read, so nothing here may
-			// take the license from them.
-			parent: async () => ({ user: { roles: ['super_admin'] }, entitlements: { plan: '', state: '', features: [], tenant_quota: 0 } }),
 		} as never,
 	};
 }

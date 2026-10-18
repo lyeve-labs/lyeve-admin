@@ -23,7 +23,7 @@ import { errorCodeOf } from '$lib/api/limits';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { actionError } from '$lib/server/action-error';
 import { section, type Section } from '$lib/api/gate';
-import { authedClient, authedHeaders, requireRole } from '$lib/server/authz';
+import { authedClient, authedHeaders, loadUser, requireRole } from '$lib/server/authz';
 
 /**
  * What the page renders.
@@ -44,8 +44,8 @@ export interface TelemetryPage {
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { fetch, parent } = event;
-	const { user } = await parent();
+	const { fetch } = event;
+	const user = await loadUser(event);
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
 		error(403, 'Requires admin or super_admin role');
 	}

@@ -1,13 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
 import { listOAuthProviders, createOAuthProvider, updateOAuthProvider, deleteOAuthProvider } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { fail, error, type ActionFailure } from '@sveltejs/kit';
 import { actionFailure } from '$lib/server/action-error';
 import { section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
-	const { parent } = event;
-	const { user } = await parent();
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 	const providers = await section(

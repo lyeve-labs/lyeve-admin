@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
+import { authedClient, authedHeaders, loadUser, requireUser } from '$lib/server/authz';
 import { engineOriginFor } from '$lib/server/engine';
 import {
 	MAX_SHOWN_BODY,
@@ -39,7 +39,7 @@ export interface ReferencePageData {
 // tab is hidden for them, and the engine is what refuses.
 export const load: PageServerLoad = async (event): Promise<ReferencePageData> => {
 	const { url } = event;
-	const { user } = await event.parent();
+	const user = await loadUser(event);
 	const canSeeAdmin = user.roles.includes('super_admin');
 	const half: ReferenceHalf = canSeeAdmin && url.searchParams.get('api') === 'admin' ? 'admin' : 'public';
 	const specHref = `/api/admin/openapi/${half}.json`;

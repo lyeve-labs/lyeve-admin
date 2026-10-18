@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { actions, load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -42,9 +43,8 @@ function loadEvent(routes: Record<string, Route>, roles: string[] = ['super_admi
 	return {
 		calls,
 		event: {
-			fetch,
+			fetch: signedIn(fetch, { roles }),
 			cookies: mockCookies(),
-			parent: async () => ({ user: { roles } }),
 		} as never,
 	};
 }

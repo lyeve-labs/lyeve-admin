@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
 const api = vi.hoisted(() => ({
+	getMe: vi.fn(async () => ({ id: 'u1', roles: ['super_admin'] })),
 	getPluginStatus: vi.fn(),
 	getEntitlements: vi.fn(),
 }));
@@ -24,7 +25,6 @@ async function runLoad(): Promise<PluginsLoadResult> {
 	const event = {
 		fetch: vi.fn() as unknown as typeof globalThis.fetch,
 		cookies: { get: vi.fn(() => 'tok') } as unknown as Cookies,
-		parent: async () => ({}),
 	} as never;
 	return (await load(event)) as unknown as PluginsLoadResult;
 }

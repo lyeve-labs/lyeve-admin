@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
 import { load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -46,10 +47,9 @@ function loadEvent(body: unknown, search = '', roles = ['super_admin']) {
 	return {
 		seen,
 		event: {
-			fetch,
+			fetch: signedIn(fetch, { roles }),
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/jobs${search}`),
-			parent: async () => ({ user: { roles } }),
 		} as never,
 	};
 }
@@ -128,10 +128,11 @@ describe('admin/jobs/+page.server.ts load when the list cannot be read', () => {
 	function failing(answer: () => Response, search = '') {
 		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
 		return {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
+			// The page's own calls, without the session check.
+			asked: fetch,
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/jobs${search}`),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 	}
 
@@ -179,7 +180,7 @@ describe('admin/jobs/+page.server.ts load when the list cannot be read', () => {
 		const event = failing(() => json({ error: 'down' }, 503), '?edit=j9');
 		const editing = (await load(event)) as Loaded;
 		expect(editing.openJob).toBeNull();
-		expect((event as { fetch: ReturnType<typeof vi.fn> }).fetch).toHaveBeenCalledTimes(1);
+		expect((event as { asked: ReturnType<typeof vi.fn> }).asked).toHaveBeenCalledTimes(1);
 	});
 
 	it('keeps the window the request named', async () => {
@@ -201,10 +202,11 @@ describe('admin/jobs/+page.server.ts load opens the drawer from the address', ()
 			/\/api\/admin\/jobs\/[^?]+$/.test(String(url)) ? json(byId) : json(jobs(2))
 		) as unknown as typeof globalThis.fetch;
 		return {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
+			// The page's own calls, without the session check.
+			asked: fetch,
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/jobs${search}`),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 	}
 
@@ -223,7 +225,7 @@ describe('admin/jobs/+page.server.ts load opens the drawer from the address', ()
 		const event = routed('?edit=j1', null);
 		const result = (await load(event)) as Loaded;
 		expect(result.openJob?.id).toBe('j1');
-		expect((event as { fetch: ReturnType<typeof vi.fn> }).fetch).toHaveBeenCalledTimes(1);
+		expect((event as { asked: ReturnType<typeof vi.fn> }).asked).toHaveBeenCalledTimes(1);
 	});
 
 	it('reads a job off the page on its own', async () => {
@@ -244,10 +246,9 @@ describe('admin/jobs/+page.server.ts load opens the drawer from the address', ()
 			/\/api\/admin\/jobs\/[^?]+$/.test(String(url)) ? json({ error: 'down' }, 503) : json(jobs(2))
 		) as unknown as typeof globalThis.fetch;
 		const result = (await load({
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/jobs?edit=j9'),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never)) as Loaded;
 		expect(result.openJob).toBeNull();
 		expect(result.openGate).toEqual({ state: 'unavailable' });

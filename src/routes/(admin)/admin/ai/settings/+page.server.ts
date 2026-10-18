@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { authedClient, requireRole, requireUser } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole, requireUser } from '$lib/server/authz';
 import { aiActionError } from '$lib/server/ai-load';
 import { putAiSettings } from '$lib/api/ai';
 
@@ -38,7 +38,7 @@ const DEFAULTS: Record<string, string> = { ai_transcript_retention: '720h', ai_t
  * unknown, and the page shows none of them as this instance's.
  */
 export const load: PageServerLoad = async (event) => {
-	const { user } = await event.parent();
+	const user = await loadUser(event);
 	let instance: InstanceSetting[] = INSTANCE_KEYS.map((key) => ({ key, value: DEFAULTS[key], source: 'default', editable: false }));
 	let instanceReadable = false;
 	if (user.roles.includes('super_admin')) {
