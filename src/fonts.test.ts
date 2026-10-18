@@ -1,0 +1,50 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+/**
+ * Where the console's typefaces come from.
+ *
+ * A font loaded from a hosted font service sends every visitor's address and
+ * browser to that service on every page, on every install. The console serves
+ * Inter and JetBrains Mono from its own build instead, so the page shell may
+ * name no font origin and the policy may allow none.
+ */
+const root = process.cwd();
+const appHtml = readFileSync(resolve(root, 'src/app.html'), 'utf8');
+const appCss = readFileSync(resolve(root, 'src/app.css'), 'utf8');
+// Read as text: importing the config would put it under the type check, which
+// types each directive as a list of CSP source keywords.
+const svelteConfig = readFileSync(resolve(root, 'svelte.config.js'), 'utf8');
+
+function directive(name: string): string {
+	const found = svelteConfig.match(new RegExp(`'${name}': \\[([^\\]]*)\\]`));
+	if (!found) throw new Error(`svelte.config.js sets no ${name}`);
+	return found[1];
+}
+
+const FONT_HOSTS = /fonts\.googleapis\.com|fonts\.gstatic\.com/;
+
+describe('console fonts', () => {
+	it('loads no stylesheet or connection from another origin in the page shell', () => {
+		expect(appHtml).not.toMatch(FONT_HOSTS);
+		expect(appHtml).not.toMatch(/<link[^>]+href="https?:\/\//);
+	});
+
+	it('allows fonts and stylesheets from no font service', () => {
+		expect(directive('font-src')).toBe("'self', 'data:'");
+		expect(directive('style-src')).not.toMatch(FONT_HOSTS);
+	});
+
+	it('bundles each face the theme names from an installed package', () => {
+		const require = createRequire(resolve(root, 'package.json'));
+		const imports = [...appCss.matchAll(/@import '(@fontsource\/[^']+)';/g)].map((m) => m[1]);
+		for (const face of ['inter', 'jetbrains-mono']) {
+			expect(imports.some((i) => i.startsWith(`@fontsource/${face}/`))).toBe(true);
+		}
+		for (const file of imports) {
+			expect(() => require.resolve(file)).not.toThrow();
+		}
+	});
+});
