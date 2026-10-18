@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
-## [0.20.2] - 2026-10-12
+## [0.20.2] - 2026-10-21
 
 ### Added
 
@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.39.1.
+- The theme toggle shows its name on hover as well as to a screen reader. The console runs ui-kit 0.40.0, and under reduced motion the kit's own rule ends the page fade instead of a second check in the console.
 - The console's docs link and the README point at the documentation's new address, lyeve.com/docs. The old host redirects there.
 - A release candidate image is published under its exact tag only, `X.Y.Z-rc.N`, and never as `latest` or the minor line.
 - The release jobs that read secrets run in a release environment that admits only version tags. Pull requests no longer run the suite with the visual editors, which needs those secrets and failed on every pull request. The release runs it before it builds.
@@ -38,6 +38,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Media: Build URL keeps the Width, Height and Quality fields, and a focal point click is measured against the image rather than its frame. Asking for a description with no AI provider enabled says so, and a spent AI budget and a license without AI each have their own sentence. After a delete, focus moves to the upload control.
 - Schema: a previewed column drop is badged as Queued, with a note that it drops data and runs only when a super admin applies it from History. A failed canvas layout read no longer claims the license leaves the canvas out, and an editor is told the role cannot open it.
 - Imports: the rejected share names the rows it was counted against. The file picker lists only extensions, which no longer spill past the box on a phone, and the chosen file's size uses the console's byte format.
+- Media: a server failure during an upload no longer prints its error text on the page, and a refusal shows the engine's own reason only when the engine sent it. When the engine does not confirm an upload, the page names the file and asks the reader to check the library, instead of saying nothing was uploaded when earlier files of the same pick, or the file itself, may have been stored.
+- Imports: a refusal shows the engine's own sentence only when the engine sent it, and the console's sentence otherwise. A start that a proxy failed, or whose answer never came back, says the import was not confirmed and asks the reader to check the entries before trying again, because the import may still be running and a retry would import the rows twice. A preview or a dry run still says nothing was imported.
+- Schema: the copy button on each collection API route reads curl, because it copies a curl command, and a screen reader hears which route it copies.
+- Search: the example request on the public search card is now the one its copy button copies, shown in the kit's copy field with the method in its label.
+- Every page loaded Inter and JetBrains Mono from Google's font service, so each visit sent the reader's address and browser to Google. The fonts now ship inside the console's build and are served from its own origin, the security policy allows no font service, and the fonts' license ships beside the build.
 - Recommendations: the intro says what a reader gets, and the feed preview posts the chosen reader's id and shows the generated feed.
 - Synthetic monitoring: the New probe hint names the interval floor the plugin answers, and Run now fails when any region failed. Open alerts appear on the page. A probe edit keeps the regions, headers, payload and expected response set through the API, asks for a stored password or token again, and names the masked headers it drops.
 - Query monitor: a slow query analysis reads the plugin's answer and says why no plan was read.
