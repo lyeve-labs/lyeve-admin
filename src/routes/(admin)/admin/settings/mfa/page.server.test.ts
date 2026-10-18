@@ -84,7 +84,7 @@ describe('mfa setup over an authenticator app already set up', () => {
 		expect(r.status).toBe(400);
 		expect(r.data).toEqual({
 			step: 'idle',
-			error: 'An authenticator app is already set up. Enter a current code from it, or a backup code, to replace it.',
+			error: 'This account already has a second factor. Confirm it with a passkey, a current code from the authenticator app or a backup code first.',
 		});
 	});
 
@@ -94,8 +94,17 @@ describe('mfa setup over an authenticator app already set up', () => {
 		expect(r.status).toBe(400);
 		expect(r.data).toEqual({
 			step: 'idle',
-			error: 'That code matches neither the authenticator app already set up nor an unused backup code.',
+			error: 'That code matches no second factor on this account.',
 		});
+	});
+
+	it('gives its own sentence for a failure that is not an engine answer', async () => {
+		const { ev } = event({});
+		(ev as { fetch: unknown }).fetch = vi.fn(async () => {
+			throw new TypeError('fetch failed: connect ECONNREFUSED 10.0.0.7:3002');
+		});
+		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.data).toEqual({ step: 'idle', error: 'The authenticator key could not be generated.' });
 	});
 
 	it('keeps a server failure body off the page', async () => {
@@ -124,6 +133,19 @@ describe('mfa verify and disable', () => {
 		expect(r.data).toMatchObject({ step: 'confirming', uri: 'otpauth://x', secret: 'ABC', error: 'invalid code' });
 	});
 
+	it('starts over when the setup began before the account had a second factor', async () => {
+		const { ev } = event(
+			{ '/api/admin/mfa/totp/verify': { status: 409, body: { error: 'engine words', code: 'mfa.totp.setup_unproven' } } },
+			{ code: '123456', uri: 'otpauth://x', secret: 'ABC' },
+		);
+		const r = (await actions.verify(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(409);
+		expect(r.data).toEqual({
+			step: 'idle',
+			error: 'This setup started before the account had a second factor. Start the setup again.',
+		});
+	});
+
 	it('hands back the backup codes once the code is accepted', async () => {
 		const { ev, calls } = event(
 			{ '/api/admin/mfa/totp/verify': { status: 200, body: { backup_codes: ['a1', 'b2'] } } },
@@ -137,5 +159,51 @@ describe('mfa verify and disable', () => {
 		const { ev } = event({ '/api/admin/mfa/totp/disable': { status: 500, body: { error: 'pq: relation missing' } } }, { code: '123456' });
 		const r = (await actions.disable(ev)) as { data: Record<string, unknown> };
 		expect(r.data.error).toBe('Two-factor authentication could not be turned off.');
+	});
+});
+
+describe('mfa setup proven by a passkey', () => {
+	const setupPath = '/api/admin/mfa/totp/setup';
+	const proofPath = '/api/admin/mfa/proof/begin';
+
+	it('starts a proof and hands the challenge to the page', async () => {
+		const options = { publicKey: { challenge: 'AAEC' } };
+		const { ev, calls } = event({ [proofPath]: { status: 200, body: { session_id: 'proof-1', options } } });
+		expect(await actions.prove(ev)).toEqual({ step: 'proving', proofSessionId: 'proof-1', options });
+		expect(calls[0].url).toBe(proofPath);
+	});
+
+	it('says there is no passkey when the engine finds none', async () => {
+		const { ev } = event({ [proofPath]: { status: 404, body: { error: 'no passkey is registered on this account', code: 'not_found' } } });
+		const r = (await actions.prove(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.data).toEqual({ step: 'idle', error: 'No passkey is registered on this account. Enter a code instead.' });
+	});
+
+	it('keeps an outage of the proof off the page', async () => {
+		const { ev } = event({ [proofPath]: { status: 503, body: { error: 'dial tcp: refused' } } });
+		const r = (await actions.prove(ev)) as { data: Record<string, unknown> };
+		expect(r.data).toMatchObject({ step: 'idle', error: 'The passkey check could not be started.' });
+	});
+
+	it('sends the signed assertion with the proof session', async () => {
+		const assertion = { id: 'BAUG', response: { signature: 'Aw' } };
+		const { ev, calls } = event(
+			{ [setupPath]: { status: 200, body: { provisioning_uri: 'otpauth://x', secret: 'ABC' } } },
+			{ proof_session_id: 'proof-1', assertion: JSON.stringify(assertion) },
+		);
+		expect(await actions.setup(ev)).toEqual({ step: 'confirming', uri: 'otpauth://x', secret: 'ABC' });
+		expect(calls[0].body).toEqual({ proof_session_id: 'proof-1', assertion });
+	});
+
+	it('calls a refused passkey a refused passkey, not a wrong code', async () => {
+		const { ev } = event(
+			{ [setupPath]: { status: 422, body: { error: 'engine words', code: 'mfa.totp.current_code_invalid' } } },
+			{ proof_session_id: 'proof-1', assertion: '{}' },
+		);
+		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.data).toEqual({
+			step: 'idle',
+			error: 'The passkey did not confirm a second factor on this account. Try again, or enter a code instead.',
+		});
 	});
 });

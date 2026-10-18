@@ -23,28 +23,92 @@ describe('an account with a passkey', () => {
 		const { container, getByRole } = setup(true, null, true);
 		expect(container.textContent).toContain('This account has a passkey');
 		expect(container.textContent).not.toContain('takes a TOTP code');
-		expect(getByRole('button', { name: /Set up an authenticator app/ })).toBeTruthy();
+		expect(getByRole('button', { name: /Set up with this code/ })).toBeTruthy();
 		expect(container.querySelector('form[action="?/setup"]')).not.toBeNull();
 		expect(container.querySelector('form[action="?/disable"]')).not.toBeNull();
 	});
 });
 
 describe('setting up an app beside a passkey', () => {
-	// The engine holds the new key apart until a code from it verifies, and
-	// replacing an app already set up takes a code from it or a backup code.
+	// The engine holds the new key apart until a code from it verifies.
 	it('says the new key replaces an app already set up once a code verifies', () => {
 		const { container } = setup(true, null, true);
-		const text = container.querySelector('form[action="?/setup"]')?.textContent ?? '';
-		expect(text).toContain('If one is already set up, the new key replaces it once you verify a code.');
-		expect(text).not.toContain('Starting setup replaces');
+		expect(container.textContent).toContain('the new key replaces it once you verify a code.');
+		expect(container.textContent).not.toContain('Starting setup replaces');
 	});
 
-	// The status cannot say whether an app is set up beside a passkey, so the
-	// code is asked for and left optional.
-	it('asks for an optional code that proves an app already set up', () => {
+	// The account holds a passkey, so a session alone cannot add an app: the
+	// page offers the passkey, or a code, before setup starts.
+	it('asks for a passkey or a code before setup starts', async () => {
 		const { container, getByRole } = setup(true, null, true);
-		expect(container.querySelector('form[action="?/setup"] input[name="code"]')).not.toBeNull();
-		expect((getByRole('button', { name: /Set up an authenticator app/ }) as HTMLButtonElement).disabled).toBe(false);
+		expect(container.querySelector('form[action="?/prove"]')).not.toBeNull();
+		expect(getByRole('button', { name: /Confirm with a passkey/ })).toBeTruthy();
+		const button = getByRole('button', { name: /Set up with this code/ }) as HTMLButtonElement;
+		expect(button.disabled).toBe(true);
+		const input = container.querySelector('form[action="?/setup"] input[name="code"]') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'a1b2c3d4e5f60718' } });
+		expect(button.disabled).toBe(false);
+	});
+});
+
+describe('confirming with a passkey', () => {
+	const options = { publicKey: { challenge: 'AAEC', allowCredentials: [{ type: 'public-key', id: 'BAUG' }] } };
+	const proving = { step: 'proving', proofSessionId: 'proof-1', options };
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('carries the proof session to the setup form and waits for a click', () => {
+		const { container, getByRole } = setup(true, proving, true);
+		expect((container.querySelector('input[name="proof_session_id"]') as HTMLInputElement).value).toBe('proof-1');
+		expect(container.querySelector('form[action="?/setup"]')).not.toBeNull();
+		expect(getByRole('button', { name: /Use a passkey/ })).toBeTruthy();
+		expect(getByRole('link', { name: /Cancel/ }).getAttribute('href')).toBe('/admin/settings/mfa');
+	});
+
+	it('posts the signed assertion with the setup form', async () => {
+		const get = vi.fn(async () => ({
+			id: 'BAUG',
+			type: 'public-key',
+			rawId: new Uint8Array([4, 5, 6]).buffer,
+			response: {
+				clientDataJSON: new Uint8Array([1]).buffer,
+				authenticatorData: new Uint8Array([2]).buffer,
+				signature: new Uint8Array([3]).buffer,
+				userHandle: null,
+			},
+		}));
+		vi.stubGlobal('PublicKeyCredential', class {});
+		vi.stubGlobal('navigator', { ...navigator, credentials: { get } });
+		const submit = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(() => {});
+
+		const { container, getByRole } = setup(true, proving, true);
+		await fireEvent.click(getByRole('button', { name: /Use a passkey/ }));
+
+		await waitFor(() => expect(submit).toHaveBeenCalled());
+		const sent = JSON.parse((container.querySelector('input[name="assertion"]') as HTMLInputElement).value);
+		expect(sent).toMatchObject({ id: 'BAUG', rawId: 'BAUG', response: { signature: 'Aw' } });
+		expect(get).toHaveBeenCalledOnce();
+		submit.mockRestore();
+	});
+
+	it('says in its own words when the passkey does not answer', async () => {
+		vi.stubGlobal('PublicKeyCredential', class {});
+		vi.stubGlobal('navigator', {
+			...navigator,
+			credentials: { get: vi.fn(async () => Promise.reject(new DOMException('denied', 'NotAllowedError'))) },
+		});
+		const { getByRole, findByText } = setup(true, proving, true);
+		await fireEvent.click(getByRole('button', { name: /Use a passkey/ }));
+		expect(await findByText(/The passkey did not answer, or the request was canceled/)).toBeTruthy();
+	});
+
+	it('says so when the browser has no passkey support', async () => {
+		vi.stubGlobal('PublicKeyCredential', undefined);
+		const { getByRole, findByText } = setup(true, proving, true);
+		await fireEvent.click(getByRole('button', { name: /Use a passkey/ }));
+		expect(await findByText('This browser cannot use a passkey. Enter a code instead.')).toBeTruthy();
 	});
 });
 
