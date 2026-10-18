@@ -63,9 +63,49 @@ describe('mfa disable with no app set up', () => {
 
 describe('mfa actions', () => {
 	it('moves to the QR step with the key the engine generated', async () => {
-		const { ev } = event({ '/api/admin/mfa/totp/setup': { status: 200, body: { provisioning_uri: 'otpauth://x', secret: 'ABC' } } });
+		const { ev, calls } = event({ '/api/admin/mfa/totp/setup': { status: 200, body: { provisioning_uri: 'otpauth://x', secret: 'ABC' } } });
 		expect(await actions.setup(ev)).toEqual({ step: 'confirming', uri: 'otpauth://x', secret: 'ABC' });
+		expect(calls[0].body).toEqual({});
 	});
+});
+
+describe('mfa setup over an authenticator app already set up', () => {
+	const setupPath = '/api/admin/mfa/totp/setup';
+
+	it('sends the code that proves the app already set up', async () => {
+		const { ev, calls } = event({ [setupPath]: { status: 200, body: { provisioning_uri: 'otpauth://x', secret: 'ABC' } } }, { code: ' 123456 ' });
+		expect(await actions.setup(ev)).toEqual({ step: 'confirming', uri: 'otpauth://x', secret: 'ABC' });
+		expect(calls[0].body).toEqual({ code: '123456' });
+	});
+
+	it('asks for a code when the engine says one is required', async () => {
+		const { ev } = event({ [setupPath]: { status: 400, body: { error: 'engine words', code: 'mfa.totp.current_code_required' } } });
+		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(400);
+		expect(r.data).toEqual({
+			step: 'idle',
+			error: 'An authenticator app is already set up. Enter a current code from it, or a backup code, to replace it.',
+		});
+	});
+
+	it('says the code did not match when the engine refuses it', async () => {
+		const { ev } = event({ [setupPath]: { status: 422, body: { error: 'engine words', code: 'mfa.totp.current_code_invalid' } } }, { code: '000000' });
+		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(400);
+		expect(r.data).toEqual({
+			step: 'idle',
+			error: 'That code matches neither the authenticator app already set up nor an unused backup code.',
+		});
+	});
+
+	it('keeps a server failure body off the page', async () => {
+		const { ev } = event({ [setupPath]: { status: 503, body: { error: 'dial tcp: refused', code: 'mfa.totp.current_code_invalid' } } }, { code: '000000' });
+		const r = (await actions.setup(ev)) as { data: Record<string, unknown> };
+		expect(r.data).toMatchObject({ step: 'idle', error: 'The authenticator key could not be generated.' });
+	});
+});
+
+describe('mfa verify and disable', () => {
 
 	it('refuses a code that is not six digits before asking the engine', async () => {
 		const { ev, calls } = event({}, { code: '12', uri: 'otpauth://x', secret: 'ABC' });

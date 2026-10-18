@@ -30,13 +30,39 @@ describe('an account with a passkey', () => {
 });
 
 describe('setting up an app beside a passkey', () => {
-	// The engine stores the new key as soon as setup starts, so an app set up
-	// earlier stops working before any code is verified.
-	it('says before setup that starting it replaces an app already set up', () => {
+	// The engine holds the new key apart until a code from it verifies, and
+	// replacing an app already set up takes a code from it or a backup code.
+	it('says the new key replaces an app already set up once a code verifies', () => {
 		const { container } = setup(true, null, true);
 		const text = container.querySelector('form[action="?/setup"]')?.textContent ?? '';
-		expect(text).toContain('Starting setup replaces any authenticator app already set up on this account, so finish it once you start.');
-		expect(text).not.toContain('once you verify a code');
+		expect(text).toContain('If one is already set up, the new key replaces it once you verify a code.');
+		expect(text).not.toContain('Starting setup replaces');
+	});
+
+	// The status cannot say whether an app is set up beside a passkey, so the
+	// code is asked for and left optional.
+	it('asks for an optional code that proves an app already set up', () => {
+		const { container, getByRole } = setup(true, null, true);
+		expect(container.querySelector('form[action="?/setup"] input[name="code"]')).not.toBeNull();
+		expect((getByRole('button', { name: /Set up an authenticator app/ }) as HTMLButtonElement).disabled).toBe(false);
+	});
+});
+
+describe('replacing the authenticator app', () => {
+	it('asks for a current code or a backup code before setup starts', async () => {
+		const { container, getByRole } = setup(true);
+		const input = container.querySelector('form[action="?/setup"] input[name="code"]') as HTMLInputElement;
+		expect(input).not.toBeNull();
+		const button = getByRole('button', { name: /Replace the authenticator app/ }) as HTMLButtonElement;
+		expect(button.disabled).toBe(true);
+		await fireEvent.input(input, { target: { value: 'a1b2c3d4' } });
+		expect(button.disabled).toBe(false);
+	});
+
+	it('shows the refusal the setup action answered', () => {
+		const error = 'That code matches neither the authenticator app already set up nor an unused backup code.';
+		const { getByText } = setup(true, { step: 'idle', error });
+		expect(getByText(error)).toBeTruthy();
 	});
 });
 

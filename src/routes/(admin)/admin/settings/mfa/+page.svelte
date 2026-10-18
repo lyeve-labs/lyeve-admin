@@ -28,6 +28,7 @@
 
 	let code = $state('');
 	let disableCode = $state('');
+	let replaceCode = $state('');
 	let qrDataUrl = $state('');
 
 	// Only the browser draws the code, so the generator is loaded here and
@@ -142,8 +143,16 @@
 		<Card>
 			<form method="POST" action="?/setup" use:enhance={setup.enhance} class="flex flex-col gap-4">
 				<p class="text-fg text-sm">
-					Set up an authenticator app as well. Starting setup replaces any authenticator app already set up on this account, so finish it once you start.
+					Set up an authenticator app as well. If one is already set up, the new key replaces it once you verify a code.
 				</p>
+				<Input
+					id="replace-code"
+					name="code"
+					label="Code"
+					hint="Only if an authenticator app is already set up: a current code from it, or a backup code."
+					bind:value={replaceCode}
+					autocomplete="one-time-code"
+				/>
 				<div class="flex justify-end">
 					<Button type="submit" variant="secondary" loading={setup.pending}>
 						<Shield size={ICON.sm} aria-hidden="true" />
@@ -174,6 +183,27 @@
 		<Alert tone="success" title="Two-factor authentication is on">
 			Signing in to this account takes a TOTP code.
 		</Alert>
+		<Card>
+			<form method="POST" action="?/setup" use:enhance={setup.enhance} class="flex flex-col gap-4">
+				<p class="text-fg text-sm">
+					Move to another authenticator app. The new key replaces the current one once you verify a code from it.
+				</p>
+				<Input
+					id="replace-code"
+					name="code"
+					label="Code"
+					hint="A current TOTP code, or a backup code."
+					bind:value={replaceCode}
+					autocomplete="one-time-code"
+				/>
+				<div class="flex justify-end">
+					<Button type="submit" variant="secondary" disabled={replaceCode.trim().length === 0} loading={setup.pending}>
+						<Shield size={ICON.sm} aria-hidden="true" />
+						Replace the authenticator app
+					</Button>
+				</div>
+			</form>
+		</Card>
 		<Card>
 			<form method="POST" action="?/disable" use:enhance={disable.enhance} class="flex flex-col gap-4">
 				<Input
