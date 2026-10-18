@@ -44,8 +44,7 @@
 				label="Authenticator code"
 				hint="Enter the 6-digit code from your authenticator app or a backup code."
 				placeholder="000000"
-				inputmode="numeric"
-				maxlength={10}
+				maxlength={16}
 				autocomplete="one-time-code"
 				required
 				autofocus

@@ -7,6 +7,23 @@ import { section } from '$lib/api/gate';
 
 type Setup = { provisioning_uri: string; secret: string };
 
+/**
+ * The console's sentence for a setup the engine refused because the account
+ * already has an authenticator app and the request did not prove it. Any
+ * other failure is not this refusal and gets undefined.
+ */
+function replaceRefusal(err: unknown): { status: number; error: string } | undefined {
+	if (!(err instanceof ApiError)) return undefined;
+	const code = (err.body as { code?: unknown } | undefined)?.code;
+	if (err.status === 400 && code === 'mfa.totp.current_code_required') {
+		return { status: 400, error: 'An authenticator app is already set up. Enter a current code from it, or a backup code, to replace it.' };
+	}
+	if (err.status === 422 && code === 'mfa.totp.current_code_invalid') {
+		return { status: 400, error: 'That code matches neither the authenticator app already set up nor an unused backup code.' };
+	}
+	return undefined;
+}
+
 export const load: PageServerLoad = async (event) => {
 	// An unread status is unknown, never off: drawn as off it offers to turn on
 	// a second factor the account may already have.
@@ -29,11 +46,18 @@ export const load: PageServerLoad = async (event) => {
  * place, and a 5xx body never reaches the operator as the error.
  */
 export const actions: Actions = {
+	// Replacing an authenticator app that is already set up takes a current
+	// code from it or a backup code, and the engine refuses the setup without
+	// one. A first app takes no code, so an empty field sends none.
 	setup: async (event) => {
+		const form = await event.request.formData();
+		const code = String(form.get('code') ?? '').trim();
 		try {
-			const s = await authedClient(event).post<Setup>('/api/admin/mfa/totp/setup', {});
+			const s = await authedClient(event).post<Setup>('/api/admin/mfa/totp/setup', code ? { code } : {});
 			return { step: 'confirming' as const, uri: s.provisioning_uri, secret: s.secret };
 		} catch (err) {
+			const refused = replaceRefusal(err);
+			if (refused) return fail(refused.status, { step: 'idle' as const, error: refused.error });
 			const failed = actionFailure(err, 'The authenticator key could not be generated.');
 			return fail(failed.status, { step: 'idle' as const, ...failed.data });
 		}

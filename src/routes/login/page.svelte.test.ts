@@ -17,6 +17,15 @@ const props = (extra: Record<string, unknown> = {}) =>
 		...extra,
 	}) as never;
 
+// A backup code is 16 hexadecimal characters.
+const BACKUP_CODE = 'a1b2c3d4e5f60718';
+
+/** Whether a field lets a whole backup code be typed into it. */
+function fitsBackupCode(field: Element | null): boolean {
+	const cap = field?.getAttribute('maxlength');
+	return field !== null && (cap === null || Number(cap) >= BACKUP_CODE.length);
+}
+
 describe('Login page', () => {
 	it('asks the browser for the saved password for this account', () => {
 		const { container } = render(LoginPage, { props: props() });
@@ -54,6 +63,22 @@ describe('Login page', () => {
 		expect(hidden.value).toBe('tok-1');
 		expect(container.querySelector('h1')?.textContent?.trim()).toBe('Two-factor verification');
 		expect(container.querySelector('#password')).toBeNull();
+	});
+
+	// The code field also takes a backup code, which is hexadecimal, so it
+	// must not bring up a number pad on a phone.
+	it('keeps the full keyboard on the second factor code field', () => {
+		const { container } = render(LoginPage, {
+			props: props({ form: { mfa_required: true, challenge_token: 'tok-1' } }),
+		});
+		expect(container.querySelector('input[name="code"]')?.getAttribute('inputmode')).toBeNull();
+	});
+
+	it('holds a whole backup code in the second factor code field', () => {
+		const { container } = render(LoginPage, {
+			props: props({ form: { mfa_required: true, challenge_token: 'tok-1' } }),
+		});
+		expect(fitsBackupCode(container.querySelector('input[name="code"]'))).toBe(true);
 	});
 
 	// A glyph read as an arrow by a sighted reader is read as "left arrow" or
