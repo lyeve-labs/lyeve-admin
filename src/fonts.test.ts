@@ -47,4 +47,13 @@ describe('console fonts', () => {
 			expect(() => require.resolve(file)).not.toThrow();
 		}
 	});
+
+	// The Open Font License travels with every copy of the font files, and the
+	// image carries each root LICENSE* file beside the build.
+	it('ships the license of both typefaces at the repository root', () => {
+		const license = readFileSync(resolve(root, 'LICENSE-FONTS'), 'utf8');
+		expect(license).toContain('SIL OPEN FONT LICENSE Version 1.1');
+		expect(license).toContain('Copyright 2016 The Inter Project Authors');
+		expect(license).toContain('Copyright 2020 The JetBrains Mono Project Authors');
+	});
 });
