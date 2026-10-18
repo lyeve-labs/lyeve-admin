@@ -25,7 +25,7 @@ function proofRefusal(err: unknown, byPasskey: boolean): { status: number; error
 	if (err.status === 422 && code === 'mfa.totp.current_code_invalid') {
 		return byPasskey
 			? { status: 400, error: 'The passkey did not confirm a second factor on this account. Try again, or enter a code instead.' }
-			: { status: 400, error: 'That code matches neither the authenticator app already set up nor an unused backup code.' };
+			: { status: 400, error: 'That code matches no second factor on this account.' };
 	}
 	return undefined;
 }
@@ -112,6 +112,11 @@ export const actions: Actions = {
 			const r = await authedClient(event).post<{ backup_codes: string[] }>('/api/admin/mfa/totp/verify', { code });
 			return { step: 'done' as const, backupCodes: r.backup_codes ?? [] };
 		} catch (err) {
+			// A key set up before the account held a second factor never
+			// activates, so the operator starts the setup again from the top.
+			if (err instanceof ApiError && err.status === 409 && (err.body as { code?: unknown } | undefined)?.code === 'mfa.totp.setup_unproven') {
+				return fail(409, { step: 'idle' as const, error: 'This setup started before the account had a second factor. Start the setup again.' });
+			}
 			const failed = actionFailure(err, 'The code could not be checked.');
 			return fail(failed.status, { step: 'confirming' as const, uri, secret, ...failed.data });
 		}

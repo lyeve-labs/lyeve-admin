@@ -94,7 +94,7 @@ describe('mfa setup over an authenticator app already set up', () => {
 		expect(r.status).toBe(400);
 		expect(r.data).toEqual({
 			step: 'idle',
-			error: 'That code matches neither the authenticator app already set up nor an unused backup code.',
+			error: 'That code matches no second factor on this account.',
 		});
 	});
 
@@ -131,6 +131,19 @@ describe('mfa verify and disable', () => {
 		);
 		const r = (await actions.verify(ev)) as { data: Record<string, unknown> };
 		expect(r.data).toMatchObject({ step: 'confirming', uri: 'otpauth://x', secret: 'ABC', error: 'invalid code' });
+	});
+
+	it('starts over when the setup began before the account had a second factor', async () => {
+		const { ev } = event(
+			{ '/api/admin/mfa/totp/verify': { status: 409, body: { error: 'engine words', code: 'mfa.totp.setup_unproven' } } },
+			{ code: '123456', uri: 'otpauth://x', secret: 'ABC' },
+		);
+		const r = (await actions.verify(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(409);
+		expect(r.data).toEqual({
+			step: 'idle',
+			error: 'This setup started before the account had a second factor. Start the setup again.',
+		});
 	});
 
 	it('hands back the backup codes once the code is accepted', async () => {
