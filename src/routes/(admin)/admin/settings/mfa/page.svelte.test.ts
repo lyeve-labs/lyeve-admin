@@ -48,6 +48,20 @@ describe('setting up an app beside a passkey', () => {
 	});
 });
 
+// Backup codes are hexadecimal, so a field that takes one must not bring up a
+// number pad on a phone.
+describe('fields that take a backup code', () => {
+	it('keep the full keyboard on every form that accepts one', () => {
+		for (const hasPasskeys of [false, true]) {
+			const { container } = setup(true, null, hasPasskeys);
+			const fields = container.querySelectorAll('form[action="?/disable"] input[name="code"], form[action="?/setup"] input[name="code"]');
+			expect(fields).toHaveLength(2);
+			for (const f of fields) expect(f.getAttribute('inputmode')).toBeNull();
+			cleanup();
+		}
+	});
+});
+
 describe('replacing the authenticator app', () => {
 	it('asks for a current code or a backup code before setup starts', async () => {
 		const { container, getByRole } = setup(true);

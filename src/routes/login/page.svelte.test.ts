@@ -56,6 +56,15 @@ describe('Login page', () => {
 		expect(container.querySelector('#password')).toBeNull();
 	});
 
+	// The code field also takes a backup code, which is hexadecimal, so it
+	// must not bring up a number pad on a phone.
+	it('keeps the full keyboard on the second factor code field', () => {
+		const { container } = render(LoginPage, {
+			props: props({ form: { mfa_required: true, challenge_token: 'tok-1' } }),
+		});
+		expect(container.querySelector('input[name="code"]')?.getAttribute('inputmode')).toBeNull();
+	});
+
 	// A glyph read as an arrow by a sighted reader is read as "left arrow" or
 	// skipped entirely by a screen reader, so the icon carries no text.
 	it('offers a way back from the second factor step with no glyph standing in for an icon', () => {

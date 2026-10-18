@@ -25,6 +25,9 @@ describe('Magic link verify page', () => {
 		expect(container.querySelector('h1')?.textContent?.trim()).toBe('Two-factor verification');
 		expect((container.querySelector('input[name="challenge_token"]') as HTMLInputElement).value).toBe('ch');
 		expect(container.querySelector('form')?.getAttribute('action')).toBe('?/mfa');
+		// The field also takes a backup code, which is hexadecimal, so it must
+		// not bring up a number pad on a phone.
+		expect(container.querySelector('input[name="code"]')?.getAttribute('inputmode')).toBeNull();
 	});
 
 	it('offers a new link when the email link carried no token', () => {

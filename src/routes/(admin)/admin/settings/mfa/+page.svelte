@@ -170,7 +170,6 @@
 					hint="A current code from the authenticator app, or a backup code. This turns off the app only. Passkeys stay."
 					bind:value={disableCode}
 					autocomplete="one-time-code"
-					inputmode="numeric"
 				/>
 				<div class="flex justify-end">
 					<Button type="submit" variant="danger" disabled={disableCode.trim().length === 0} loading={disable.pending}>
@@ -213,7 +212,6 @@
 					hint="A current TOTP code, or a backup code."
 					bind:value={disableCode}
 					autocomplete="one-time-code"
-					inputmode="numeric"
 				/>
 				<div class="flex justify-end">
 					<Button type="submit" variant="danger" disabled={disableCode.trim().length === 0} loading={disable.pending}>
