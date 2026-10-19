@@ -18,8 +18,11 @@ vi.mock('$lib/api/graphql', async (orig) => ({
 
 const { load, actions } = await import('./+page.server');
 
-const event = (running: string[]) =>
-	({ parent: async () => ({ plugins: { state: 'named', running, withheld: [] }, user: { roles: ['admin'] } }) }) as never;
+const event = (running: string[], search = '') =>
+	({
+		url: new URL(`http://localhost/admin/settings/graphql${search}`),
+		parent: async () => ({ plugins: { state: 'named', running, withheld: [] }, user: { roles: ['admin'] } }),
+	}) as never;
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -108,5 +111,22 @@ describe('the persisted query total', () => {
 		listPersisted.mockResolvedValue({ data: [{ hash: 'h1' }], total: 340 });
 		const data = (await load(event(['graphql']))) as Record<string, unknown>;
 		expect(data.persistedTotal).toBe(340);
+	});
+
+	it('reads the window the URL names, so every query can be reached', async () => {
+		introspect.mockResolvedValue({ roots: null, refused: null });
+		listPersisted.mockResolvedValue({ data: [{ hash: 'h51' }], total: 340 });
+		const data = (await load(event(['graphql'], '?limit=50&offset=50'))) as Record<string, unknown>;
+		expect(listPersisted).toHaveBeenCalledWith(expect.anything(), 50, 50);
+		expect(data).toMatchObject({ limit: 50, offset: 50 });
+	});
+
+	it('sends a page past the end back to the last page that holds queries', async () => {
+		introspect.mockResolvedValue({ roots: null, refused: null });
+		listPersisted.mockResolvedValue({ data: [], total: 60 });
+		await expect(load(event(['graphql'], '?limit=50&offset=200'))).rejects.toMatchObject({
+			status: 307,
+			location: '/admin/settings/graphql?limit=50&offset=50',
+		});
 	});
 });

@@ -250,3 +250,17 @@ export function engineFetch(
 	signEngineRequest(headers, rest.method ?? 'GET', url, callerOf(event));
 	return fetch(url.href, { ...rest, headers });
 }
+
+/**
+ * How long the engine has to answer the console's readiness probe. A probe
+ * that waits on a stalled engine holds a connection for every check, and the
+ * image's health check gives up at five seconds.
+ */
+export const ENGINE_READY_TIMEOUT_MS = 3000;
+
+/**
+ * How long the engine has to answer the pool health read. Without it a
+ * stalled engine holds the request, and the caller waiting on it, open until
+ * the socket gives up.
+ */
+export const POOL_HEALTH_TIMEOUT_MS = 5000;

@@ -44,11 +44,13 @@ export async function readEngineSetup(fetchFn: typeof fetch): Promise<EngineSetu
 
 /**
  * Paths the gate never redirects: the setup screen itself, the admin's own
- * server endpoints, SvelteKit's assets, and static files (anything whose last
- * segment has an extension).
+ * server endpoints, SvelteKit's assets, static files (anything whose last
+ * segment has an extension), and the readiness probe, whose 503 a redirect
+ * to the setup screen would turn into a 200.
  */
 export function isGatedPath(pathname: string): boolean {
 	if (pathname === '/setup' || pathname.startsWith('/setup/')) return false;
+	if (pathname === '/readyz') return false;
 	if (pathname.startsWith('/api/') || pathname.startsWith('/_app/')) return false;
 	const last = pathname.slice(pathname.lastIndexOf('/') + 1);
 	return !last.includes('.');

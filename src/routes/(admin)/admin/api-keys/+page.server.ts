@@ -8,7 +8,7 @@ import {
 	createKey,
 	keyExpiryProblem,
 	keyScopeProblem,
-	keyUsage,
+	keysUsage,
 	listKeys,
 	parseLimits,
 	setLimits,
@@ -56,27 +56,28 @@ export const load: PageServerLoad = async (event) => {
 	const keys: Section<APIKey[]> = read.ok ? { ok: true, value: rows } : read;
 	const total = read.ok ? Math.max(totalOf(read.value), offset + rows.length) : 0;
 
-	// One usage read per key, so the page bound is the request bound too: an
-	// unpaged list would fan out one request per key on every load. A 404 is an
-	// engine without usage metering or a key it does not count, and the cell
-	// says nothing for those. Any other failure leaves the figure unknown,
-	// which the cell says rather than showing no use.
+	// One usage read for the whole page. A 404 is an engine without usage
+	// metering, and the cells say nothing. Any other failure leaves every
+	// figure unknown, which the cells say rather than showing no use. A key
+	// the plugin leaves out of its answer is one it does not count.
 	const month = new Date().toISOString().slice(0, 7);
 	const usageMap: Record<string, UsageSummary> = {};
-	const usageUnknown: string[] = [];
-	await Promise.all(
-		rows.map(async (key) => {
-			const u = await section(
-				keyUsage<UsageSummary>(client, key.id, month),
-				'The usage could not be read.'
-			);
-			if (u.ok) {
-				if (u.value) usageMap[key.id] = u.value;
-			} else if (u.gate.state !== 'absent') {
-				usageUnknown.push(key.id);
-			}
-		}),
-	);
+	let usageUnknown: string[] = [];
+	if (rows.length > 0) {
+		const usage = await section(
+			keysUsage<UsageSummary>(
+				client,
+				rows.map((k) => k.id),
+				month,
+			),
+			'The usage could not be read.',
+		);
+		if (usage.ok) {
+			for (const u of Array.isArray(usage.value) ? usage.value : []) usageMap[u.api_key_id] = u;
+		} else if (usage.gate.state !== 'absent') {
+			usageUnknown = rows.map((k) => k.id);
+		}
+	}
 
 	// What the create drawer offers: the routes a key can call, from the
 	// engine's own catalog, and the schemas a key can be held to. A missing

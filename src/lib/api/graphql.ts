@@ -75,8 +75,12 @@ export async function introspect(client: HttpClient): Promise<{ roots: SchemaRoo
 	return readRoots(await client.post<IntrospectionAnswer>(GRAPHQL_HTTP, { query: ROOTS_QUERY, operationName: 'Roots' }));
 }
 
-export async function listPersisted(client: HttpClient): Promise<{ data: PersistedQuery[]; total: number }> {
-	const res = await client.get<{ data?: PersistedQuery[]; total?: number }>(`${PERSISTED_URL}?limit=200`);
+export async function listPersisted(
+	client: HttpClient,
+	limit: number,
+	offset: number,
+): Promise<{ data: PersistedQuery[]; total: number }> {
+	const res = await client.get<{ data?: PersistedQuery[]; total?: number }>(`${PERSISTED_URL}?limit=${limit}&offset=${offset}`);
 	return { data: res.data ?? [], total: res.total ?? 0 };
 }
 

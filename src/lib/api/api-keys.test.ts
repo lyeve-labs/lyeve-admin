@@ -4,7 +4,7 @@ import {
 	isPrivilegedKey,
 	keyExpiryProblem,
 	keyScopeProblem,
-	keyUsage,
+	keysUsage,
 	limitOrderProblem,
 	limitsOf,
 	parseLimits,
@@ -16,17 +16,18 @@ function clientReturning(get: ReturnType<typeof vi.fn>): HttpClient {
 	return { get } as unknown as HttpClient;
 }
 
-describe('keyUsage', () => {
-	it('reads the usage plugin, which meters the key', async () => {
-		const get = vi.fn().mockResolvedValue({ requests: 7 });
-		const usage = await keyUsage<{ requests: number }>(clientReturning(get), 'k/1', '2026-09');
-		expect(get).toHaveBeenCalledWith('/api/admin/usage/api-key/k%2F1?period=2026-09');
-		expect(usage).toEqual({ requests: 7 });
+describe('keysUsage', () => {
+	it('reads every key on the page from the usage plugin in one request', async () => {
+		const get = vi.fn().mockResolvedValue([{ api_key_id: 'k1', requests: 7 }]);
+		const usage = await keysUsage<{ requests: number }>(clientReturning(get), ['k1', 'k2'], '2026-09');
+		expect(get).toHaveBeenCalledTimes(1);
+		expect(get).toHaveBeenCalledWith('/api/admin/usage/api-keys?ids=k1%2Ck2&period=2026-09');
+		expect(usage).toEqual([{ api_key_id: 'k1', requests: 7 }]);
 	});
 
-	it('rejects when the read fails, so the page can say the figure is unknown', async () => {
+	it('rejects when the read fails, so the page can say the figures are unknown', async () => {
 		const get = vi.fn().mockRejectedValue(new Error('down'));
-		await expect(keyUsage(clientReturning(get), 'k1', '2026-09')).rejects.toThrow('down');
+		await expect(keysUsage(clientReturning(get), ['k1'], '2026-09')).rejects.toThrow('down');
 	});
 });
 

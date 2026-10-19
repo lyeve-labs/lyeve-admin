@@ -44,6 +44,7 @@ describe('isGatedPath', () => {
 		['/_app/immutable/entry.js', false],
 		['/favicon.svg', false],
 		['/robots.txt', false],
+		['/readyz', false],
 	])('%s -> %s', (path, gated) => {
 		expect(isGatedPath(path)).toBe(gated);
 	});
