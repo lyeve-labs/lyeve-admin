@@ -26,6 +26,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The plugin page colors HTTP methods the way the schema builder and the API reference do. An HTTP status takes one badge color on every page that shows one.
 - The UI check refuses a style block in a component, a date or time written with no locale, and a native disclosure or dialog.
 - A refusal at a license limit says what happened, then that a license allowing more lifts the limit, and only then that removing one also makes room. When the engine names a page where more can be bought, that link leads the notice, opens in a new tab and is named by what it opens, a plan or an add-on. The admin seat refusal on the users page and on a tenant's members, and the flow limit refusal, read this way.
+- Two-factor: adding an authenticator app to an account that already holds a second factor asks for proof of one, a current code or a backup code, or beside a passkey the passkey itself on a click. Replacing an app that is set up asks for a current code from it or an unused backup code, and the page no longer says that starting setup replaces the app at once, because the new key replaces it only once a code from it verifies. A setup begun before the account held a factor is refused at its confirm step and sends the reader back to start again, and a refused code on an account with only a passkey no longer mentions an authenticator app. These need the engine release that requires the proof.
+- A page reads the signed-in account once per request instead of running the console frame's whole load again on every move between pages. A visit to the jobs page asks the engine twice instead of seven times, tenants three times instead of eight and the permissions page five times instead of ten. The page shown after a form post still asks the engine again, so a session the post ended goes to sign-in.
+- Tenants: the usage page says its API-call and bandwidth figures count only requests made with an API key, so requests from a signed-in session never appear in them.
 
 ### Fixed
 
@@ -117,6 +120,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Content: a list column that links to another entry shows the linked entry's title for an entry saved in the console, and for one the console took in from a row written through the API, instead of an empty cell.
 - A screen reader names every row of a JSON field's key and value editor. Every row used to share one Key id and one Value id, so only the first row's fields had a name. This comes with ui-kit 0.39.0.
 - A list or calendar opened in a dialog too short for it opens whole below its field, and the dialog grows or scrolls to show it. Under a finger, a tap just inside a number no longer steps it, the Show and Copy buttons beside a secret no longer overlap, and a multi-select's remove crosses stay inside the field. The show, hide and copy icons in password and copy fields are 14 pixels, matching their text, and the sidebar toggle is 20 pixels. These come with ui-kit 0.39.0.
+- The sign-in and email link pages take a whole 16-character backup code as the second factor, where the field stopped at 10. Every field that takes a backup code keeps the full keyboard on a phone instead of a number pad, because a backup code holds letters.
+- Device approval: every refusal of the approval's confirmation, such as for an account whose only second factor is a passkey, shows on the form in the engine's own words and leaves the request open. Only a refusal that named a password or a code did before, and any other read as a missing role to an admin who holds it.
+- Password reset: when the engine's password policy refuses the new password, the form stays and shows the engine's sentence, and the link still works. The refusal used to read as a spent or expired link.
+- Residency: when a new region could not be closed after it was created, the notice says the region still takes new tenants.
+
+### Security
+
+- The console image runs on Node 24.22 with OpenSSL 3.5.8, which carries the fix for CVE-2026-14456. Its runtime no longer carries npm, npx, corepack or yarn, which the server never runs and whose own dependencies brought one critical and ten high advisories into every scan of the image. A command that ran one of them inside the container, such as through `docker exec`, now fails with "not found".
 
 ### Upgrade notes
 
