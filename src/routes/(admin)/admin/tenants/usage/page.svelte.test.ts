@@ -239,3 +239,12 @@ describe('a license without paid quotas', () => {
 		expect(remove?.classList.contains('me-auto')).toBe(true);
 	});
 });
+
+describe('What the usage figures count', () => {
+	it('says the request counts cover API-key traffic only', () => {
+		const { getByTestId } = render(UsagePage, { props: props() });
+		const line = said(getByTestId('usage-scope'));
+		expect(line).toContain('requests made with an API key only');
+		expect(line).toContain('Requests from a signed-in session are not counted.');
+	});
+});

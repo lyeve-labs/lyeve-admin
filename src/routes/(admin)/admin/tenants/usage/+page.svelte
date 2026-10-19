@@ -239,6 +239,10 @@
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Quotas</SectionHeading>
+			<p class="text-xs text-muted" data-testid="usage-scope">
+				API calls and bandwidth count requests made with an API key only. Requests from a signed-in
+				session are not counted.
+			</p>
 			{#if data.quotas.length === 0}
 				<EmptyState
 					title="No quota is set"
