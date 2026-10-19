@@ -2,7 +2,7 @@
 
 # Stage 1: install dependencies
 # node:24-alpine
-FROM node@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS deps
+FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS deps
 WORKDIR /app
 
 # Install pnpm directly: the Node base image does not bundle corepack.
@@ -24,7 +24,7 @@ RUN pnpm install --frozen-lockfile
 
 # Stage 2: build
 # node:24-alpine
-FROM node@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS builder
+FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS builder
 WORKDIR /app
 
 RUN npm install -g pnpm@11.25.0
@@ -63,8 +63,15 @@ RUN node tools/check-server-bundle.mjs build
 
 # Stage 3: runtime
 # node:24-alpine
-FROM node@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS runtime
+FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS runtime
 WORKDIR /app
+
+# The runtime only runs node build/index.js, so the package managers the base
+# image bundles go. Their own dependencies carry advisories that nothing here
+# reaches, and every scan of the image would report them.
+RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 ENV NODE_ENV=production
 # adapter-node honors PORT and ORIGIN at runtime.
