@@ -126,7 +126,7 @@ export const actions: Actions = {
 			} catch {
 				return fail(400, {
 					action: 'close',
-					error: `Region ${displayName} was created but could not be closed, so it is listed to clients and used for nearest-region routing. Edit it and turn off Accepting new tenants.`,
+					error: `Region ${displayName} was created but could not be closed, so it is listed to clients, used for nearest-region routing and still takes new tenants. Edit it and turn off Accepting new tenants.`,
 				});
 			}
 		}
