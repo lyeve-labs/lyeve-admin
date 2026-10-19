@@ -89,7 +89,7 @@ describe('region writes', () => {
 		const out = (await actions.create(event)) as Failure;
 		expect(out.data.action).toBe('close');
 		expect(out.data.error).toContain('was created but could not be closed');
-		expect(out.data.error).toContain('listed to clients and used for nearest-region routing');
+		expect(out.data.error).toContain('listed to clients, used for nearest-region routing and still takes new tenants');
 		expect(out.data.error.endsWith('Edit it and turn off Accepting new tenants.')).toBe(true);
 	});
 
