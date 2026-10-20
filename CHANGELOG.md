@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
-## [0.20.2] - 2026-10-21
+## [0.21.0] - 2026-10-22
 
 ### Added
 
@@ -131,6 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Upgrade notes
 
+- This console needs lyeve-core 0.55.0 or later, so upgrade the engine first. Some of its pages call routes that earlier engines do not serve.
 - Run one console replica, or give the proxy cookie affinity when you run several, because two requests that renew one session on different replicas at the same moment can end that session.
 
 ## [0.20.1] - 2026-10-10
