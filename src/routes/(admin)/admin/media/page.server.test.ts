@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-import { load } from './+page.server';
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/authz')>()),
+	requireUser: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
+}));
+
+import { actions, load } from './+page.server';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -58,6 +63,12 @@ function loadEvent(body: unknown, search = '') {
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
+/** The rows a load answered. A failed read fails the test here, so no assertion reads it as empty. */
+function rows(result: Loaded) {
+	if (!result.items.ok) throw new Error(`the read failed: ${result.items.gate.state}`);
+	return result.items.value;
+}
+
 /*
  * The request always carries a limit and an offset. A library of ten thousand
  * files is a page the browser cannot lay out, and an operator could not reach
@@ -90,7 +101,7 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toHaveLength(60);
+		expect(rows(result)).toHaveLength(60);
 		expect(result.hasMore).toBe(true);
 	});
 
@@ -99,7 +110,7 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toHaveLength(12);
+		expect(rows(result)).toHaveLength(12);
 		expect(result.hasMore).toBe(false);
 	});
 
@@ -110,7 +121,7 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toHaveLength(60);
+		expect(rows(result)).toHaveLength(60);
 	});
 
 	it('states a total only when the endpoint sent one', async () => {
@@ -121,7 +132,7 @@ describe('admin/media/+page.server.ts load', () => {
 		expect(((await load(counted.event)) as Loaded).total).toBe(4210);
 	});
 
-	it('renders an empty library rather than failing when the endpoint errors', async () => {
+	it('keeps a failed read as a failure rather than an empty library', async () => {
 		const fetch = vi.fn(async () => json({ error: 'nope' }, 500)) as unknown as typeof globalThis.fetch;
 		const event = {
 			fetch,
@@ -132,8 +143,24 @@ describe('admin/media/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.items).toEqual([]);
+		expect(result.items.ok).toBe(false);
+		if (!result.items.ok) expect(result.items.gate.state).toBe('error');
 		expect(result.hasMore).toBe(false);
+		expect(result.total).toBeNull();
+	});
+
+	it('says the role was refused when the engine answers 403', async () => {
+		const fetch = vi.fn(async () => json({ error: 'forbidden' }, 403)) as unknown as typeof globalThis.fetch;
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/media'),
+			parent: async () => ({ user: { roles: ['editor'] } }),
+		} as never;
+
+		const result = (await load(event)) as Loaded;
+
+		expect(result.items).toEqual({ ok: false, gate: { state: 'forbidden' } });
 	});
 
 	/*
@@ -163,7 +190,7 @@ describe('admin/media/+page.server.ts load', () => {
 	it('renders an empty library rather than correcting it', async () => {
 		const { event } = loadEvent({ data: [], total_count: 0 });
 		const result = (await load(event)) as Loaded;
-		expect(result.items).toEqual([]);
+		expect(result.items).toEqual({ ok: true, value: [] });
 	});
 
 	// The list route has no text filter, so a search is a different request
@@ -182,7 +209,7 @@ describe('admin/media/+page.server.ts load', () => {
 			expect(sent.offset).toBe(0);
 			expect(sent.sort_by).toBe('created_at');
 			expect(sent.sort_desc).toBe(true);
-			expect(result.items).toHaveLength(3);
+			expect(rows(result)).toHaveLength(3);
 			expect(result.total).toBe(3);
 			expect(result.q).toBe('invoice');
 		});
@@ -196,7 +223,7 @@ describe('admin/media/+page.server.ts load', () => {
 			expect(result.q).toBe('');
 		});
 
-		it('renders an empty library rather than failing when the search errors', async () => {
+		it('says the outage when the search does not answer', async () => {
 			const fetch = vi.fn(async () => json({ error: 'search failed' }, 503)) as unknown as typeof globalThis.fetch;
 			const event = {
 				fetch,
@@ -207,7 +234,101 @@ describe('admin/media/+page.server.ts load', () => {
 
 			const result = (await load(event)) as Loaded;
 
-			expect(result.items).toEqual([]);
+			expect(result.items).toEqual({ ok: false, gate: { state: 'unavailable' } });
 		});
 	});
 });
+
+type Failure = { status: number; data: Record<string, unknown> };
+
+/** An action event whose fetch answers every call with `answer` and records it. */
+function actionEvent(fields: Record<string, string>, answer: () => Response = () => json({})) {
+	const calls: { method: string; path: string; body: unknown }[] = [];
+	const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+		calls.push({ method: init?.method ?? 'GET', path, body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined });
+		return answer();
+	}) as unknown as typeof globalThis.fetch;
+	const fd = new FormData();
+	for (const [k, v] of Object.entries(fields)) fd.set(k, v);
+	return { event: { fetch, cookies: mockCookies(), request: { formData: async () => fd } } as never, calls };
+}
+
+describe('deleting a file', () => {
+	it('deletes the file it names', async () => {
+		const { event, calls } = actionEvent({ id: 'm 1' }, () => new Response(null, { status: 204 }));
+		expect(await actions.delete(event)).toBeUndefined();
+		expect(calls).toEqual([{ method: 'DELETE', path: '/api/admin/media/m%201', body: undefined }]);
+	});
+
+	// The delete is asked from the preview drawer, which stays open on a
+	// refusal, so the failure names its file for that drawer to show.
+	it('returns a refusal against the file it was for', async () => {
+		const { event } = actionEvent({ id: 'm1' }, () => json({ error: 'media is referenced by a content entry' }, 409));
+		const out = (await actions.delete(event)) as Failure;
+		expect(out.data).toEqual({ deleteError: 'media is referenced by a content entry', deleteId: 'm1' });
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		const { event } = actionEvent({ id: 'm1' }, () => json({ error: 'pq: down' }, 503));
+		expect(((await actions.delete(event)) as Failure).data).toEqual({ deleteError: 'The file could not be deleted.', deleteId: 'm1' });
+	});
+
+	it('names no file at the top of the page when none was sent', async () => {
+		const { event, calls } = actionEvent({});
+		expect(((await actions.delete(event)) as Failure).data).toEqual({ error: 'No file was named.' });
+		expect(calls).toEqual([]);
+	});
+});
+
+describe('importing a file from an address', () => {
+	it('sends the address, the alt text and the publish choice', async () => {
+		const { event, calls } = actionEvent({ url: 'https://example.com/a.png', alt_text: 'A', public: 'true' }, () => json({ id: 'm9' }, 201));
+		expect(await actions.importUrl(event)).toEqual({ imported: { id: 'm9' } });
+		expect(calls[0]).toMatchObject({ method: 'POST', body: { url: 'https://example.com/a.png', alt_text: 'A', public: true } });
+	});
+
+	it('refuses an address that is not http or https before it reaches the plugin', async () => {
+		const { event, calls } = actionEvent({ url: 'file:///etc/passwd' });
+		expect(((await actions.importUrl(event)) as Failure).data).toEqual({ importError: 'Give an http or https address.' });
+		expect(calls).toEqual([]);
+	});
+
+	it('relays the reason the plugin refused', async () => {
+		const { event } = actionEvent({ url: 'https://example.com/a.png' }, () => json({ error: 'file type not allowed' }, 415));
+		expect(((await actions.importUrl(event)) as Failure).data.importError).toContain('file type not allowed');
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		const { event } = actionEvent({ url: 'https://example.com/a.png' }, () => json({ error: 'pq: down' }, 503));
+		expect(((await actions.importUrl(event)) as Failure).data.importError).toBe('The file could not be imported.');
+	});
+});
+
+describe('describing an image', () => {
+	const describe503 = () => json({ error: 'no enabled AI provider configured' }, 503);
+
+	it('says no AI provider is enabled instead of that nothing came back', async () => {
+		const { event } = actionEvent({ id: 'm1' }, describe503);
+		const out = (await actions.describe(event)) as Failure;
+		expect(out.data.detailsError).toMatch(/^No AI provider is enabled/);
+		expect(out.data.detailsId).toBe('m1');
+	});
+
+	it('tells a spent budget from a license that leaves AI out', async () => {
+		const budget = actionEvent({ id: 'm1' }, () => json({ error: 'ai budget exhausted for this billing period' }, 402));
+		expect(((await actions.describe(budget.event)) as Failure).data.detailsError).toMatch(/budget for this billing period is spent/);
+
+		const license = actionEvent({ id: 'm1' }, () =>
+			json({ error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' }, 402),
+		);
+		expect(((await actions.describe(license.event)) as Failure).data.detailsError).toBe(
+			'The license on this instance does not include ai. Nothing was changed.',
+		);
+	});
+
+	it('still says the outage plainly when the engine itself is down', async () => {
+		const { event } = actionEvent({ id: 'm1' }, () => json({ error: 'database unavailable' }, 503));
+		expect(((await actions.describe(event)) as Failure).data.detailsError).toBe('No description came back.');
+	});
+});
+

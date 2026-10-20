@@ -10,6 +10,7 @@
  * at export, and the same passphrase opens it on the target. All three routes
  * are the super admin's, from a signed-in session only.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 
 export const CONFIG_SYNC_URL = '/api/admin/config-sync';
@@ -115,7 +116,7 @@ export const ACTION_LABELS: Readonly<Record<ConfigAction, string>> = {
 	unchanged: 'Unchanged',
 };
 
-export function actionTone(a: ConfigAction): 'success' | 'brand' | 'danger' | 'neutral' {
+export function actionTone(a: ConfigAction): StatusTone {
 	switch (a) {
 		case 'create':
 			return 'success';

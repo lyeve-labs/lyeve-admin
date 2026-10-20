@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { tick } from 'svelte';
 import AiSection from './AiSection.svelte';
 import Body from './ai-section-body.test.svelte';
 import type { AiGate } from '$lib/api/ai';
 
 const goto = vi.fn();
 vi.mock('$app/navigation', () => ({ goto: (...args: unknown[]) => goto(...args) }));
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+
+// The switch's submit handler, as the page hands it to enhance, so a case can
+// answer it the way the settings action would.
+const submits = vi.hoisted(() => [] as unknown[]);
+vi.mock('$app/forms', () => ({
+	enhance: (_form: HTMLFormElement, submit: unknown) => {
+		submits.push(submit);
+		return { destroy() {} };
+	},
+}));
 
 afterEach(cleanup);
 
@@ -35,6 +45,13 @@ describe('AiSection', () => {
 		expect(getByText('Not enabled on this instance.')).toBeTruthy();
 	});
 
+	it('heads its blocked state at the level the page asks for', () => {
+		const { getByRole } = render(AiSection, {
+			props: { tab: 'providers', gate: { state: 'absent' }, layoutGate: ok, noun: 'providers', level: 2, children: Body } as never,
+		});
+		expect(getByRole('heading', { name: 'The AI plugin is not installed', level: 2 })).toBeTruthy();
+	});
+
 	it('names the role and the resource when forbidden', () => {
 		const { getByText, queryByTestId } = setup({ state: 'forbidden' });
 		expect(getByText('Your role cannot read AI providers.')).toBeTruthy();
@@ -49,6 +66,18 @@ describe('AiSection', () => {
 		expect((form.querySelector('input[name="enabled"]') as HTMLInputElement).value).toBe('true');
 		expect(getByText('Turn AI on')).toBeTruthy();
 		expect(queryByTestId('body')).toBeNull();
+	});
+
+	// The switch posts to the settings action from any tab, and the tab's own
+	// form result is not where its failure belongs.
+	it('says under the switch when turning AI on was refused', async () => {
+		submits.length = 0;
+		const { getByTestId } = setup({ state: 'off' });
+		const submit = submits.at(-1) as (input: unknown) => Promise<(opts: unknown) => Promise<void>>;
+		const after = await submit({});
+		await after({ result: { type: 'failure', status: 400, data: { scope: 'switch', error: 'Your role cannot do this.' } }, update: vi.fn() });
+		await tick();
+		expect(getByTestId('ai-off-switch').textContent).toContain('Your role cannot do this.');
 	});
 
 	it('keeps the settings tab reachable while off', () => {

@@ -14,6 +14,8 @@ import {
 	type Widget,
 } from '$lib/api/custom-dashboard';
 import { resolveWidgets } from '$lib/server/dashboard-widgets';
+import { readError } from '$lib/server/read-error';
+import { GATE_OK, section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, customization } = await event.parent();
@@ -23,13 +25,19 @@ export const load: PageServerLoad = async (event) => {
 	if (!customization.entitled) redirect(303, '/admin/settings/customization');
 	const client = authedClient(event);
 	const [layout, schemas] = await Promise.all([
-		getDashboardLayout(client).catch(() => null),
-		Promise.resolve()
-			.then(() => listSchemaNames(client))
-			.catch((): string[] => []),
+		// The editor has nothing to draw without the layout, so a failed read
+		// ends in the error page with a status of its own.
+		getDashboardLayout(client).catch((err: unknown) =>
+			readError(err, 'This instance does not serve a dashboard layout.'),
+		),
+		// The gate says why the list is missing, so a role refusal and an
+		// outage are not one failure.
+		section(
+			Promise.resolve().then(() => listSchemaNames(client)),
+			'The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.',
+		),
 	]);
-	if (!layout) error(503, 'The dashboard layout could not be read.');
-	return { layout, schemas };
+	return { layout, schemas: schemas.ok ? schemas.value : [], schemasGate: schemas.ok ? GATE_OK : schemas.gate };
 };
 
 /** The widgets a form posted, or null when the field is not a widget list. */

@@ -4,7 +4,6 @@ import {
 	deprovisionAction,
 	deprovisionLabel,
 	deprovisionTone,
-	scimBaseUrl,
 	scimGate,
 	type ScimProvider,
 } from './scim';
@@ -26,13 +25,13 @@ function provider(over: Partial<ScimProvider> = {}): ScimProvider {
 
 describe('what happens to a deprovisioned account', () => {
 	// The two fields are stored independently, so the action survives the
-	// switch being turned off. Reading it alone says accounts are deleted when
-	// in fact nothing touches them.
+	// switch being turned off. With the switch off the plugin deletes the
+	// account on a directory delete, even when the stored action is disable.
 	it('reads both fields, not just the action', () => {
-		expect(deprovisionLabel(provider({ deprovision_on_delete: false, deprovision_action: 'delete' })))
-			.toBe('Left alone');
-		expect(deprovisionTone(provider({ deprovision_on_delete: false, deprovision_action: 'delete' })))
-			.toBe('neutral');
+		expect(deprovisionLabel(provider({ deprovision_on_delete: false, deprovision_action: 'disable' })))
+			.toBe('Deleted');
+		expect(deprovisionTone(provider({ deprovision_on_delete: false, deprovision_action: 'disable' })))
+			.toBe('danger');
 	});
 
 	it('marks the irreversible option', () => {
@@ -58,18 +57,12 @@ describe('the action the form may send', () => {
 	});
 });
 
-describe('the base URL a directory is configured with', () => {
-	it('joins the origin without doubling the slash', () => {
-		expect(scimBaseUrl('https://cms.example.com')).toBe('https://cms.example.com/api/v1/scim/v2');
-		expect(scimBaseUrl('https://cms.example.com/')).toBe('https://cms.example.com/api/v1/scim/v2');
-	});
-});
-
 describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(scimGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(scimGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(scimGate(new ApiError(503, 'database error')).state).toBe('error');
+		expect(scimGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(scimGate(new ApiError(503, 'database error')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as an empty list', () => {

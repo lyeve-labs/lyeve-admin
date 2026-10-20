@@ -1,6 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
+import { sessionTenant } from '$lib/server/session-refresh';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
@@ -31,7 +32,7 @@ import {
 	type Limit,
 } from '$lib/api/cache';
 import { gateOf, type Gate } from '$lib/api/gate';
-import { pageOf, pageWindow, rowsOf } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 /** What the response cache rules read answered, beside the rest of the page. */
 export interface RulesState {
@@ -55,6 +56,11 @@ export const load: PageServerLoad = async (event) => {
 	// serves them to a super admin only. A tenant admin's page is its own
 	// rules and the providers, and never asks for the rest.
 	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	// The plugin flushes only the request's tenant whenever the request names
+	// one. A session names its own tenant, and a tenant admin's session always
+	// resolves to one. Only a super admin with no tenant of their own can reach
+	// the whole store, and only on an install that keeps many tenants.
+	const flushScoped = Boolean(sessionTenant(event)) || !superAdmin;
 
 	const client = authedClient(event);
 	let stats: CacheStats | null = null;
@@ -71,7 +77,8 @@ export const load: PageServerLoad = async (event) => {
 	// Providers are the half the stats hide: a tripped backend leaves the hit
 	// rate plausible because a lower-priority provider picks up. Losing this
 	// read must not read as every provider being healthy.
-	const providers =
+	const unread = { rows: [] as CacheProvider[], read: false, licensed: null as boolean | null, inactive: [] as InactiveProvider[] };
+	const providers: typeof unread & { gate: Gate | null } =
 		gate.state === 'ok'
 			? await listProviders(client)
 					.then((p) => ({
@@ -79,9 +86,13 @@ export const load: PageServerLoad = async (event) => {
 						read: true,
 						licensed: typeof p?.licensed === 'boolean' ? p.licensed : null,
 						inactive: p?.inactive ?? [],
+						gate: null,
 					}))
-					.catch(() => ({ rows: [] as CacheProvider[], read: false, licensed: null, inactive: [] as InactiveProvider[] }))
-			: { rows: [] as CacheProvider[], read: false, licensed: null, inactive: [] as InactiveProvider[] };
+					.catch((err: unknown) => ({
+						...unread,
+						gate: gateOf(err, 'The providers could not be read. This is not a report that all of them are healthy.'),
+					}))
+			: { ...unread, gate: null };
 
 	// The rules are the tenant's own and read on their own, so a refused or
 	// failed read says so in their section and leaves the rest of the page.
@@ -103,22 +114,41 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	const entries =
-		gate.state === 'ok' && superAdmin
-			? await listEntries(client, limit + 1, offset)
-					.then((p) => pageOf(p, limit, offset))
-					.catch(() => ({ rows: [] as CacheEntry[], limit, offset, total: null, hasMore: false }))
-			: { rows: [] as CacheEntry[], limit, offset, total: null, hasMore: false };
+	// A failed read of the stored keys keeps its reason. Drawn as no rows, it
+	// said nothing is cached beside a counter of thousands of entries.
+	let entries: { rows: CacheEntry[]; total: number | null; hasMore: boolean } = { rows: [], total: null, hasMore: false };
+	let entriesGate: Gate | null = null;
+	// A provider that cannot list what it holds answers an empty page with a
+	// note. Drawn as an empty list, it said nothing is cached beside a counter
+	// of thousands of entries.
+	let unlisted = false;
+	if (gate.state === 'ok' && superAdmin) {
+		try {
+			const read = await listEntries(client, limit + 1, offset);
+			unlisted = typeof read?.note === 'string' && read.note !== '';
+			entries = pageOf(read, limit, offset);
+		} catch (err) {
+			entriesGate = gateOf(err, 'The stored entries could not be read. This is not a report that nothing is cached.');
+		}
+		if (!entriesGate) {
+			const back = pastEndOffset(entries.rows.length, limit, offset, entries.total);
+			if (back !== null) redirect(307, withOffset(event.url, back));
+		}
+	}
 
 	return {
 		superAdmin,
 		stats,
 		providers: providers.rows,
 		providersRead: providers.read,
+		providersGate: providers.gate,
 		providersLicensed: providers.licensed,
 		inactive: providers.inactive,
 		rules,
 		entries: entries.rows,
+		entriesGate,
+		unlisted,
+		flushScoped,
 		total: entries.total,
 		limit,
 		offset,
@@ -148,12 +178,13 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 	const client = authedClient(event);
 	const form = await event.request.formData();
 	const body = ruleBody(form);
-	if (typeof body === 'string') return fail(400, { error: body });
+	if (typeof body === 'string') return fail(400, { error: body, drawer: 'rule' });
 	try {
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		return actionFailure(err, 'The rule could not be saved.');
+		const failed = actionFailure(err, 'The rule could not be saved.');
+		return fail(failed.status, { ...failed.data, drawer: 'rule' });
 	}
 	return { savedRule: body.pattern };
 }
@@ -164,7 +195,7 @@ export const actions: Actions = {
 	updateRule: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { error: 'No rule was named.', drawer: 'rule' });
 		return saveRule(event, id);
 	},
 
@@ -203,12 +234,16 @@ export const actions: Actions = {
 
 	// Flushing is not a clearing convenience. Every flushed key is recomputed
 	// on its next request, so this is a deliberate load against the database
-	// and the page says so before it happens.
+	// and the page says so before it happens. The plugin admits a tenant admin
+	// and scopes the flush to the tenant.
 	flush: async (event) => {
-		await requireRole(event, ['super_admin']);
+		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const tag = String(form.get('tag') ?? '').trim();
+		// The plugin scopes only a tenant tag to the tenant. Any other tag is
+		// flushed from every tenant's entries, so it stays with a super admin.
+		if (tag) await requireRole(event, ['super_admin']);
 		try {
 			if (tag) await flushTag(client, tag);
 			else await flushAll(client);

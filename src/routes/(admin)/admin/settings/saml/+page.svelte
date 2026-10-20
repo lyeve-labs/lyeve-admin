@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -15,14 +14,14 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm as confirmDialog,
 		toast,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { KeyRound, Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from '@lucide/svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import {
@@ -40,7 +39,25 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const formError = $derived((form as { error?: string } | null)?.error ?? '');
+	/*
+	 * Each failure names the action that caused it. A drawer shows only its own
+	 * actions' failures, and only one that came back after it was opened, so a
+	 * failed delete never reads as a failure of the form opened next. The rest
+	 * show above the list.
+	 */
+	const failure = $derived(form as { error?: string; action?: string } | null);
+	let openedOver = $state.raw<unknown>(null);
+	function failedIn(actions: string[]): string | undefined {
+		if (!failure?.error || form === openedOver) return undefined;
+		return actions.includes(failure.action ?? '') ? failure.error : undefined;
+	}
+	const DRAWER_ACTIONS = ['create', 'update'];
+	const drawerError = $derived(failedIn(DRAWER_ACTIONS));
+	const rowError = $derived(failure?.error && !DRAWER_ACTIONS.includes(failure.action ?? '') ? failure.error : '');
+
+	// An admin may read the providers. Every write is the super admin's, so an
+	// admin is shown the list and no control that would only be refused.
+	const canWrite = $derived(data.user.roles.includes('super_admin'));
 
 	let narrow = $state('');
 	const visible = $derived(
@@ -93,6 +110,7 @@
 		signAuthnRequests = true;
 		encryptAssertions = false;
 		enabled = true;
+		openedOver = form;
 		open = true;
 	}
 
@@ -114,6 +132,7 @@
 		signAuthnRequests = p.sign_authn_requests;
 		encryptAssertions = p.encrypt_assertions;
 		enabled = p.enabled;
+		openedOver = form;
 		open = true;
 	}
 
@@ -133,21 +152,11 @@
 	 * no undo: the private key is deleted with the row.
 	 */
 	function removeProvider(p: SamlProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Delete ${p.name}?`,
-				'Anyone who signs in through this provider will lose access, and the private key is deleted with it.',
-				{ confirmLabel: 'Delete' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${p.name}`);
-			};
-		};
+		return confirmed(
+			`Delete SAML provider ${p.name}`,
+			'Anyone who signs in through this provider will lose access, and the private key is deleted with it.',
+			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+		);
 	}
 
 	/**
@@ -155,27 +164,15 @@
 	 * first and says what has to be true before it is safe.
 	 */
 	function promote(p: SamlProvider): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Promote the new certificate for ${p.name}?`,
-				'Every request will be signed with it from now on. Do this once the identity provider has read the metadata document and trusts it.',
-				{ confirmLabel: 'Promote' },
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`${p.name} is using the new certificate`);
-			};
-		};
+		return confirmed(
+			`Promote the new certificate for ${p.name}?`,
+			'Every request will be signed with it from now on. Do this once the identity provider has read the metadata document and trusts it.',
+			{ confirmLabel: 'Promote', success: `${p.name} is using the new certificate` },
+		);
 	}
 
 	const saveProviderSubmit = tracked(saveProvider);
 </script>
-
-<PageTitle title="SAML SSO" />
 
 <PageShell
 	title="SAML SSO"
@@ -183,7 +180,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		{#if data.gate.state === 'ok'}
+		{#if data.gate.state === 'ok' && canWrite}
 			<Button variant="primary" size="sm" onclick={openCreate}>
 				<Plus size={ICON.sm} /> New provider
 			</Button>
@@ -192,13 +189,17 @@
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="SAML SSO"
 			absent="The SAML plugin is not part of this build, so no identity provider can be configured here."
 		/>
 	{:else}
-		{#if formError}
-			<Alert tone="danger">{formError}</Alert>
+		{#if rowError}
+			<Alert tone="danger">{rowError}</Alert>
+		{/if}
+		{#if !canWrite}
+			<Alert tone="brand">Only a super admin can add, change or remove an identity provider, or renew its certificate.</Alert>
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-3">
@@ -233,10 +234,12 @@
 								</div>
 								<div class="flex items-center gap-2">
 									<CopyButton value={p.sp_cert_next ?? ''} label="Copy certificate" />
-									<form method="POST" action="?/rollover" use:enhance={promote(p)}>
-										<input type="hidden" name="id" value={p.id} />
-										<Button variant="primary" size="sm" type="submit">Promote</Button>
-									</form>
+									{#if canWrite}
+										<form method="POST" action="?/rollover" use:enhance={promote(p)}>
+											<input type="hidden" name="id" value={p.id} />
+											<Button variant="primary" size="sm" type="submit">Promote</Button>
+										</form>
+									{/if}
 								</div>
 							</div>
 						</div>
@@ -251,21 +254,24 @@
 			{#if data.providers.length === 0}
 				<EmptyState
 					title="No identity provider is configured"
-					description="Add one to put a sign-in button on the login page."
+					description={canWrite ? 'Add one to put a sign-in button on the login page.' : 'A super admin adds one to put a sign-in button on the login page.'}
 				>
 					{#snippet iconSnippet()}
 						<KeyRound size={ICON.lg} />
 					{/snippet}
 					{#snippet action()}
-						<Button variant="secondary" onclick={openCreate}>
-							<Plus size={ICON.sm} /> New provider
-						</Button>
+						{#if canWrite}
+							<Button variant="secondary" onclick={openCreate}>
+								<Plus size={ICON.sm} /> New provider
+							</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
 				<ListToolbar label="Filter providers">
 					{#snippet search()}
-						<SearchInput bind:value={narrow} placeholder="Search providers" />
+						<label for="saml-search" class="sr-only">Search providers</label>
+						<SearchInput id="saml-search" bind:value={narrow} placeholder="Search providers" />
 					{/snippet}
 				</ListToolbar>
 
@@ -299,10 +305,12 @@
 												{p.enabled ? 'Enabled' : 'Disabled'}
 											</Badge>
 										</div>
+										<!-- Under a finger the separator widens, so the two links' hit
+										     areas sit apart instead of overlapping on a short link. -->
 										<div class="text-xs text-faint">
-											<a class="underline" href={metadataPath(p.name)}>Metadata</a>
-											<span class="mx-1">·</span>
-											<a class="underline" href={signInPath(p.name)}>Test sign-in</a>
+											<a class="relative hit-area underline" href={metadataPath(p.name)}>Metadata</a>
+											<span class="mx-1 coarse:mx-4">·</span>
+											<a class="relative hit-area underline" href={signInPath(p.name)}>Test sign-in</a>
 										</div>
 									</td>
 									<td class="max-w-xs truncate text-xs text-faint" title={p.entity_id}>
@@ -321,56 +329,58 @@
 										<div class="text-xs text-faint">{expiryLabel(p.idp_cert_expires_at)}</div>
 									</td>
 									<td data-cell="nowrap">
-										<div class="flex items-center justify-end gap-1">
-											{#if !p.sp_cert_next}
-												<form method="POST" action="?/prepare" use:enhance>
+										{#if canWrite}
+											<div class="flex items-center justify-end gap-1">
+												{#if !p.sp_cert_next}
+													<form method="POST" action="?/prepare" use:enhance>
+														<input type="hidden" name="id" value={p.id} />
+														<Button
+															variant="ghost"
+															size="sm"
+															type="submit"
+															aria-label="Prepare a new certificate for {p.name}"
+															title="Prepare a new certificate"
+														>
+															<RefreshCw size={ICON.sm} />
+														</Button>
+													</form>
+												{/if}
+												<Button
+													variant="ghost"
+													size="sm"
+													aria-label="Edit {p.name}"
+													onclick={() => openEdit(p)}
+												>
+													<Pencil size={ICON.sm} />
+												</Button>
+												<form method="POST" action="?/delete" use:enhance={removeProvider(p)}>
 													<input type="hidden" name="id" value={p.id} />
 													<Button
 														variant="ghost"
 														size="sm"
 														type="submit"
-														aria-label="Prepare a new certificate for {p.name}"
-														title="Prepare a new certificate"
+														aria-label="Delete {p.name}"
 													>
-														<RefreshCw size={ICON.sm} />
+														<Trash2 size={ICON.sm} class="text-danger" />
 													</Button>
 												</form>
-											{/if}
-											<Button
-												variant="ghost"
-												size="sm"
-												aria-label="Edit {p.name}"
-												onclick={() => openEdit(p)}
-											>
-												<Pencil size={ICON.sm} />
-											</Button>
-											<form method="POST" action="?/delete" use:enhance={removeProvider(p)}>
-												<input type="hidden" name="id" value={p.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													aria-label="Delete {p.name}"
-												>
-													<Trash2 size={ICON.sm} class="text-danger" />
-												</Button>
-											</form>
-										</div>
+											</div>
+										{/if}
 									</td>
 								</tr>
 							{/each}
 						</tbody>
 					</Table>
-					<Pagination
-						page={pageNumber(data.offset, data.limit)}
-						perPage={data.limit}
-						count={data.providers.length}
-						total={data.total ?? undefined}
-						hasNext={data.hasMore}
-						noun="providers"
-						href={pageHref('/admin/settings/saml', data.limit)}
-					/>
 				{/if}
+				<Pagination
+					page={pageNumber(data.offset, data.limit)}
+					perPage={data.limit}
+					count={data.providers.length}
+					total={data.total ?? undefined}
+					hasNext={data.hasMore}
+					noun="providers"
+					href={pageHref('/admin/settings/saml', data.limit)}
+				/>
 			{/if}
 		</section>
 	{/if}
@@ -388,6 +398,9 @@
 		{/if}
 
 		<div class="flex flex-col gap-4">
+			<!-- A refused save keeps the drawer open, so the reason has to be in
+			     it and not behind the panel on the page. -->
+			<FormErrors message={drawerError} />
 			<Input
 				id="saml-name"
 				name="name"
@@ -448,53 +461,64 @@
 			<!-- Toggle renders a button, and a button submits nothing. Each state
 			     reaches the action through the hidden field beside it, and every
 			     one of these is a security setting, so an unchecked switch has to
-			     say false rather than go missing. -->
-			<input
-				type="hidden"
-				name="want_assertions_signed"
-				value={wantAssertionsSigned ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-want-assertions-signed"
-				label="Require signed assertions"
-				bind:checked={wantAssertionsSigned}
-			/>
-			<input
-				type="hidden"
-				name="want_response_signed"
-				value={wantResponseSigned ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-want-response-signed"
-				label="Require a signed response"
-				bind:checked={wantResponseSigned}
-			/>
-			<input
-				type="hidden"
-				name="sign_authn_requests"
-				value={signAuthnRequests ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-sign-authn"
-				label="Sign our requests"
-				bind:checked={signAuthnRequests}
-			/>
-			<input
-				type="hidden"
-				name="encrypt_assertions"
-				value={encryptAssertions ? 'true' : 'false'}
-			/>
-			<Toggle
-				id="saml-encrypt"
-				label="Expect encrypted assertions"
-				bind:checked={encryptAssertions}
-			/>
-			<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
-			<Toggle
-				id="saml-enabled"
-				label="Show on the sign-in page"
-				bind:checked={enabled}
-			/>
+			     say false rather than go missing. The plugin turns the first three
+			     on for every new provider whatever the form sends, so a create shows
+			     them on and fixed, and an edit can turn them off. -->
+			<!-- Under a finger each switch takes a 44px hit area around its 20px
+			     track. Rows 16px apart let two neighbors share 6px of it, and
+			     24px apart they share none. -->
+			<div class="flex flex-col gap-4 coarse:gap-6">
+				<input
+					type="hidden"
+					name="want_assertions_signed"
+					value={wantAssertionsSigned ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-want-assertions-signed"
+					label="Require signed assertions"
+					bind:checked={wantAssertionsSigned}
+					disabled={!editing}
+				/>
+				<input
+					type="hidden"
+					name="want_response_signed"
+					value={wantResponseSigned ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-want-response-signed"
+					label="Require a signed response"
+					bind:checked={wantResponseSigned}
+					disabled={!editing}
+				/>
+				<input
+					type="hidden"
+					name="sign_authn_requests"
+					value={signAuthnRequests ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-sign-authn"
+					label="Sign our requests"
+					bind:checked={signAuthnRequests}
+					disabled={!editing}
+					hint={editing ? undefined : 'A new provider starts with these three on. Edit it after creating to turn one off.'}
+				/>
+				<input
+					type="hidden"
+					name="encrypt_assertions"
+					value={encryptAssertions ? 'true' : 'false'}
+				/>
+				<Toggle
+					id="saml-encrypt"
+					label="Expect encrypted assertions"
+					bind:checked={encryptAssertions}
+				/>
+				<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
+				<Toggle
+					id="saml-enabled"
+					label="Show on the sign-in page"
+					bind:checked={enabled}
+				/>
+			</div>
 		</div>
 	</form>
 	{#snippet footer()}

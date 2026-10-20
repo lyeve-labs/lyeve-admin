@@ -36,7 +36,8 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		offset: 0,
 		hasMore: false,
 		gate: { state: 'ok' },
-		schemas: [{ name: 'order', fields: [{ name: 'placed_at', field_type: 'datetime' }] }],
+		schemas: { ok: true, value: [{ name: 'order', fields: [{ name: 'placed_at', field_type: 'datetime' }] }] },
+		user: { id: 'u1', roles: ['super_admin'] },
 		detail: null,
 		templates: [template],
 		templatesRead: true,
@@ -66,6 +67,13 @@ describe('mapping templates', () => {
 		expect(said(container)).not.toContain('No mapping template');
 	});
 
+	it('says a role refusal of the templates as one', () => {
+		const { container } = render(ImportsPage, {
+			props: props({ templates: [], templatesRead: false, templatesGate: { state: 'forbidden' } }),
+		});
+		expect(said(container)).toContain('Your role cannot open templates');
+	});
+
 	it('says what an unlicensed install keeps', () => {
 		const { container } = render(ImportsPage, { props: props({ licensed: false }) });
 		expect(said(container)).toContain('Saving a template and the date, split and lookup transforms need a license');
@@ -80,7 +88,7 @@ describe('mapping templates', () => {
 
 	it('renders a refused save through the refusal notice', () => {
 		render(ImportsPage, {
-			props: props({}, { error: 'x', refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } }),
+			props: props({}, { action: 'deleteTemplate', error: 'x', refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } }),
 		});
 		expect(screen.getAllByTestId('refusal-notice').length).toBeGreaterThan(0);
 	});

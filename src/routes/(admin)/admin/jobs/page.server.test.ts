@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
 import { load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -46,10 +47,9 @@ function loadEvent(body: unknown, search = '', roles = ['super_admin']) {
 	return {
 		seen,
 		event: {
-			fetch,
+			fetch: signedIn(fetch, { roles }),
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/jobs${search}`),
-			parent: async () => ({ user: { roles } }),
 		} as never,
 	};
 }
@@ -86,7 +86,7 @@ describe('admin/jobs/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.jobs).toHaveLength(50);
+		expect(result.jobs.value).toHaveLength(50);
 		expect(result.hasMore).toBe(true);
 	});
 
@@ -106,7 +106,7 @@ describe('admin/jobs/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.jobs).toHaveLength(50);
+		expect(result.jobs.value).toHaveLength(50);
 		expect(result.hasMore).toBe(true);
 	});
 
@@ -115,7 +115,79 @@ describe('admin/jobs/+page.server.ts load', () => {
 
 		const result = (await load(event)) as Loaded;
 
-		expect(result.jobs).toHaveLength(50);
+		expect(result.jobs.value).toHaveLength(50);
+	});
+});
+
+/*
+ * A list that could not be read is not an empty list. The first-run state
+ * offers to create the first job, which is the wrong thing to say to a reader
+ * whose engine is down or whose role was refused.
+ */
+describe('admin/jobs/+page.server.ts load when the list cannot be read', () => {
+	function failing(answer: () => Response, search = '') {
+		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
+		return {
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
+			// The page's own calls, without the session check.
+			asked: fetch,
+			cookies: mockCookies(),
+			url: new URL(`http://localhost/admin/jobs${search}`),
+		} as never;
+	}
+
+	it('keeps an empty list a list that answered', async () => {
+		const result = (await load(loadEvent([]).event)) as Loaded;
+		expect(result.jobs).toEqual({ ok: true, value: [] });
+	});
+
+	it('reads a 503 as an outage', async () => {
+		const result = (await load(failing(() => json({ error: 'database unavailable' }, 503)))) as Loaded;
+		expect(result.jobs).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('reads an engine that did not answer at all as the same outage', async () => {
+		const result = (await load(
+			failing(() => {
+				throw new TypeError('fetch failed');
+			}),
+		)) as Loaded;
+		expect(result.jobs).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('reads a 403 as the role', async () => {
+		const result = (await load(failing(() => json({ error: 'insufficient permissions' }, 403)))) as Loaded;
+		expect(result.jobs).toEqual({ ok: false, gate: { state: 'forbidden' } });
+	});
+
+	it('reads a 404 as a build without the route', async () => {
+		const result = (await load(failing(() => json({ error: 'not found' }, 404)))) as Loaded;
+		expect(result.jobs).toEqual({ ok: false, gate: { state: 'absent' } });
+	});
+
+	it('says anything else failed, in words that are not a report of none, and keeps the engine\'s out', async () => {
+		const result = (await load(failing(() => json({ error: 'pq: relation "sys_jobs" does not exist' }, 500)))) as Loaded;
+		expect(result.jobs).toEqual({
+			ok: false,
+			gate: { state: 'error', message: 'The jobs could not be read. This is not a report that there are none.' },
+		});
+		expect(JSON.stringify(result)).not.toContain('pq:');
+	});
+
+	it('opens no drawer over a list it could not read', async () => {
+		const asked = (await load(failing(() => json({ error: 'down' }, 503), '?new=1'))) as Loaded;
+		expect(asked.openNew).toBe(false);
+		const event = failing(() => json({ error: 'down' }, 503), '?edit=j9');
+		const editing = (await load(event)) as Loaded;
+		expect(editing.openJob).toBeNull();
+		expect((event as { asked: ReturnType<typeof vi.fn> }).asked).toHaveBeenCalledTimes(1);
+	});
+
+	it('keeps the window the request named', async () => {
+		const result = (await load(failing(() => json({ error: 'down' }, 503), '?limit=10&offset=20'))) as Loaded;
+		expect(result.limit).toBe(10);
+		expect(result.offset).toBe(20);
+		expect(result.hasMore).toBe(false);
 	});
 });
 
@@ -130,10 +202,11 @@ describe('admin/jobs/+page.server.ts load opens the drawer from the address', ()
 			/\/api\/admin\/jobs\/[^?]+$/.test(String(url)) ? json(byId) : json(jobs(2))
 		) as unknown as typeof globalThis.fetch;
 		return {
-			fetch,
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
+			// The page's own calls, without the session check.
+			asked: fetch,
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/jobs${search}`),
-			parent: async () => ({ user: { roles: ['super_admin'] } }),
 		} as never;
 	}
 
@@ -152,7 +225,7 @@ describe('admin/jobs/+page.server.ts load opens the drawer from the address', ()
 		const event = routed('?edit=j1', null);
 		const result = (await load(event)) as Loaded;
 		expect(result.openJob?.id).toBe('j1');
-		expect((event as { fetch: ReturnType<typeof vi.fn> }).fetch).toHaveBeenCalledTimes(1);
+		expect((event as { asked: ReturnType<typeof vi.fn> }).asked).toHaveBeenCalledTimes(1);
 	});
 
 	it('reads a job off the page on its own', async () => {
@@ -160,8 +233,29 @@ describe('admin/jobs/+page.server.ts load opens the drawer from the address', ()
 		expect(result.openJob?.id).toBe('j9');
 	});
 
-	it('opens nothing for a job that does not exist', async () => {
+	it('opens nothing for a job that does not exist, and says so', async () => {
 		const result = (await load(routed('?edit=nope', { error: 'not found' }))) as Loaded;
 		expect(result.openJob).toBeNull();
+		expect(result.openGate).toEqual({ state: 'absent' });
+	});
+
+	// A link that opened nothing said nothing, so a failed read of the job
+	// looked like a link that does nothing.
+	it('keeps a failed read of the linked job as its gate', async () => {
+		const fetch = vi.fn(async (url: string) =>
+			/\/api\/admin\/jobs\/[^?]+$/.test(String(url)) ? json({ error: 'down' }, 503) : json(jobs(2))
+		) as unknown as typeof globalThis.fetch;
+		const result = (await load({
+			fetch: signedIn(fetch, { roles: ['super_admin'] }),
+			cookies: mockCookies(),
+			url: new URL('http://localhost/admin/jobs?edit=j9'),
+		} as never)) as Loaded;
+		expect(result.openJob).toBeNull();
+		expect(result.openGate).toEqual({ state: 'unavailable' });
+	});
+
+	it('reports no failure for a job it opened', async () => {
+		const result = (await load(routed('?edit=j9', jobs(1, 9)[0]))) as Loaded;
+		expect(result.openGate).toBeNull();
 	});
 });

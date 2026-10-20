@@ -118,7 +118,8 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(grpcGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(grpcGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(grpcGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(grpcGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(grpcGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as a listener that is up', () => {

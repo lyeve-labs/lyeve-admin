@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
 import { render, cleanup, screen } from '@testing-library/svelte';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import DashboardPage from './+page.svelte';
+
+vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin') } }));
 
 afterEach(cleanup);
 
 function data(overrides: Record<string, unknown> = {}) {
 	return {
-		schemas: [{ name: 'post', display_name: 'Post', fields: [] }],
+		schemas: { ok: true, value: [{ name: 'post', display_name: 'Post', fields: [] }] },
 		isAdmin: true,
+		superAdmin: true,
 		offers: { schema: true, content: true, analytics: true, jobs: true, logs: true, webhooks: true, audit: true },
 		entries: [],
 		entryTotal: 0,
@@ -29,7 +32,16 @@ function data(overrides: Record<string, unknown> = {}) {
 	} as never;
 }
 
-const empty = data({ schemas: [], entryTotal: null });
+const empty = data({ schemas: { ok: true, value: [] }, entryTotal: null });
+
+/** Every tile read and answered, with nothing wrong. */
+const quiet = {
+	controlFailures: 0,
+	requests: { total: 10, errorRate: 0, p95: 5 },
+	jobs: { enabled: 1, failed: [] },
+	errorsLogged: 0,
+	webhooks: { total: 1, unhealthy: 0, pendingDlq: 0 },
+};
 
 /*
  * The migration control sits in the shell header on every screen and posts to
@@ -94,7 +106,7 @@ describe('dashboard tiles', () => {
 
 	it('draws no tile and no list for a plugin that does not run', () => {
 		const none = { schema: false, content: false, analytics: false, jobs: false, logs: false, webhooks: false, audit: false };
-		const { container } = render(DashboardPage, { props: { data: data({ schemas: [], offers: none }), form: null } });
+		const { container } = render(DashboardPage, { props: { data: data({ schemas: null, offers: none }), form: null } });
 
 		const text = container.textContent ?? '';
 		for (const gone of ['Collections', 'Entries', 'Requests, 24h', 'Failed jobs', 'Errors logged', 'Webhooks failing', 'What changed', 'No schemas yet']) {
@@ -116,16 +128,77 @@ describe('dashboard tiles', () => {
 		expect(container.textContent).not.toContain('License');
 	});
 
+	// The entry list and counts are admin routes, so an editor is shown no
+	// count rather than a refusal drawn as nothing.
 	it('shows an editor only what the engine would let them read', () => {
 		const { container } = render(DashboardPage, {
-			props: { data: data({ isAdmin: false, entryTotal: 3 }), form: null },
+			props: { data: data({ isAdmin: false, superAdmin: false, entryTotal: null, entries: null }), form: null },
 		});
 
 		const text = container.textContent ?? '';
-		expect(text).toContain('Entries');
+		expect(text).toContain('Collections');
+		expect(text).not.toContain('Entries');
 		expect(text).not.toContain('Requests, 24h');
 		expect(text).not.toContain('Recent audit entries');
-		expect(text).toContain('Recent entries');
+		expect(text).not.toContain('Recent entries');
+		expect(text).not.toContain('unknown');
+	});
+
+	it('shows no jobs tile to an admin, whom the scheduler does not answer', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ superAdmin: false }), form: null },
+		});
+
+		expect(container.textContent).not.toContain('Failed jobs');
+		expect(container.querySelector('a[href="/admin/jobs"]')).toBeNull();
+	});
+
+	it('keeps the dashboard and says unknown when the schemas could not be read', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+
+		const text = container.textContent ?? '';
+		expect(text).not.toContain('No schemas yet');
+		expect(text).toContain('Right now');
+		expect(text).toContain('schemas unavailable');
+	});
+
+	it('offers the first schema only to a role that may make one', () => {
+		const admin = render(DashboardPage, { props: { data: empty, form: null } });
+		expect(admin.container.textContent).toContain('No schemas yet');
+		expect(admin.container.querySelector('a[href="/admin/schema"]')).not.toBeNull();
+		cleanup();
+
+		const { container } = render(DashboardPage, {
+			props: { data: data({ schemas: { ok: true, value: [] }, isAdmin: false, superAdmin: false }), form: null },
+		});
+		expect(container.textContent).toContain('An admin makes the first content type.');
+		expect(container.querySelector('a[href="/admin/schema"]')).toBeNull();
+	});
+
+	it('says each list could not be read rather than that it is empty', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ entries: null, audit: null, deadLetters: null, errors: null }), form: null },
+		});
+
+		const text = container.textContent ?? '';
+		expect(text).toContain('The recent entries could not be read.');
+		expect(text).toContain('The audit log could not be read.');
+		expect(text).toContain('The dead letter queue could not be read.');
+		expect(text).toContain('The log could not be read.');
+		expect(text).not.toContain('No entries yet.');
+		expect(text).not.toContain('No delivery is waiting');
+	});
+
+	it('says each list is empty when its read answered with nothing', () => {
+		const { container } = render(DashboardPage, { props: { data: data(), form: null } });
+
+		const text = container.textContent ?? '';
+		expect(text).toContain('No entries yet.');
+		expect(text).toContain('Nothing recorded yet.');
+		expect(text).toContain('No delivery is waiting in the dead letter queue.');
+		expect(text).toContain('No error has been logged in the last 24 hours.');
 	});
 
 	it('links each recent entry to its editor', () => {
@@ -164,6 +237,17 @@ describe('dashboard window', () => {
 		expect(container.textContent).toContain('Requests, 7d');
 	});
 
+	// The labels are two and three characters, so the segments drew 35 to 42px
+	// wide and their touch hit areas shared the gaps between them.
+	it('gives each window segment the control width under a finger', () => {
+		const { container } = render(DashboardPage, {
+			props: { data: data({ window: '7d' }), form: null },
+		});
+		for (const link of container.querySelectorAll('a[href^="/admin?window="]')) {
+			expect(link.className).toContain('coarse:min-w-control');
+		}
+	});
+
 	it('does not offer a window to an editor, whose tiles are not windowed', () => {
 		const { container } = render(DashboardPage, {
 			props: { data: data({ isAdmin: false }), form: null },
@@ -180,9 +264,23 @@ describe('dashboard window', () => {
  */
 describe('needs attention', () => {
 	it('says so when nothing does', () => {
-		const { container } = render(DashboardPage, { props: { data: data(), form: null } });
+		const { container } = render(DashboardPage, { props: { data: data(quiet), form: null } });
 
 		expect(container.textContent).toContain('Nothing needs attention in the last 24 hours.');
+	});
+
+	it('does not call the instance quiet when the security report could not be read', () => {
+		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, controlFailures: null }), form: null } });
+
+		expect(container.textContent).toContain('Nothing needs attention in what could be read.');
+	});
+
+	it('does not call the instance quiet when a tile could not be read', () => {
+		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, jobs: null }), form: null } });
+
+		const text = container.textContent ?? '';
+		expect(text).not.toContain('Nothing needs attention in the last 24 hours.');
+		expect(text).toContain('Nothing needs attention in what could be read.');
 	});
 
 	it('lists each item with its link', () => {
@@ -253,5 +351,61 @@ describe('traffic', () => {
 		const { container } = render(DashboardPage, { props: { data: data(), form: null } });
 
 		expect(container.textContent).not.toContain('Requests per hour');
+	});
+});
+
+describe('the chosen home page', () => {
+	it('says the chosen home page could not be read, with a way to try again', () => {
+		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'unavailable' } } }), form: null } });
+		expect(document.body.textContent).toContain('so the home page could not be read');
+		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin');
+	});
+
+	it('says the chosen home page no longer exists when the engine has none by that name', () => {
+		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'absent' } } }), form: null } });
+		expect(document.body.textContent).toContain('The home page chosen in customization, welcome, was not found.');
+	});
+
+	it('says nothing when the tenant chose no home page', () => {
+		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: null }), form: null } });
+		expect(document.body.textContent).not.toContain('home page');
+	});
+});
+
+describe('the missing home page for each role', () => {
+	const missing = { homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'absent' } } };
+
+	it('tells an admin where to choose another', () => {
+		render(DashboardPage, { props: { data: data({ ...missing, isAdmin: true }), form: null } });
+		expect(document.body.textContent).toContain('Choose another one there.');
+	});
+
+	// The plugin answers 404 for a page hidden from the reader's role as well
+	// as for a missing one, so a reader outside its roles sees the dashboard
+	// without it and is told nothing, not even its slug.
+	it('says nothing to a reader for whom the page was not found', () => {
+		render(DashboardPage, { props: { data: data({ ...missing, isAdmin: false, superAdmin: false }), form: null } });
+		expect(document.body.textContent).not.toContain('home page');
+		expect(document.body.textContent).not.toContain('welcome');
+	});
+
+	it('keeps Try again for a reader when the page could not be read', () => {
+		const down = { ...missing, home: { slug: 'welcome', gate: { state: 'unavailable' } } };
+		render(DashboardPage, { props: { data: data({ ...down, isAdmin: false, superAdmin: false }), form: null } });
+		expect(document.body.textContent).toContain('so the home page could not be read');
+		expect(screen.getByRole('link', { name: /Try again/ })).toBeTruthy();
+	});
+});
+
+describe('a composed dashboard that could not be read', () => {
+	it('says the stock dashboard stands in for it, with a way to try again', () => {
+		render(DashboardPage, { props: { data: data({ layoutUnread: true }), form: null } });
+		expect(document.body.textContent).toContain("This tenant's own dashboard could not be read, so the standard one is shown.");
+		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin');
+	});
+
+	it('says nothing when the layout was read', () => {
+		render(DashboardPage, { props: { data: data({ layoutUnread: false }), form: null } });
+		expect(document.body.textContent).not.toContain('own dashboard could not be read');
 	});
 });

@@ -1,6 +1,6 @@
 import { readRouteOptions, routeOptions } from '$lib/api/route-options';
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -24,7 +24,8 @@ import {
 	type RateLimitOverview,
 	type RateRule,
 } from '$lib/api/rate-limit';
-import { pageOf, pageWindow, rowsOf } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { section, type Section } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -60,6 +61,11 @@ export const load: PageServerLoad = async (event) => {
 			gate = rateLimitGate(err);
 		}
 	}
+	// An offset past the last rule draws the empty state, which would say no
+	// rule is configured. Outside the try, so the redirect is not taken for a
+	// failed read.
+	const back = gate.state === 'ok' ? pastEndOffset(rules.length, limit, offset, total) : null;
+	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// The overview says whether custom rules are enabled, which only the engine
 	// can answer: a missing read is shown as unknown, never as locked or
@@ -71,12 +77,13 @@ export const load: PageServerLoad = async (event) => {
 
 	// The live view is a snapshot from the process that answered, so losing it
 	// must not lose the rules, and an unread one is never drawn as quiet.
-	const status =
+	const status: Section<LimiterState[]> =
 		gate.state === 'ok'
-			? await readStatus(client)
-					.then((r) => ({ rows: rowsOf(r), read: true }))
-					.catch(() => ({ rows: [] as LimiterState[], read: false }))
-			: { rows: [] as LimiterState[], read: false };
+			? await section(
+					readStatus(client).then((r) => r.buckets ?? []),
+					'The live counters could not be read. This is not a report that nobody is being throttled.',
+				)
+			: { ok: false, gate };
 
 	// The routes the instance serves, to pick a rule's endpoint from. The
 	// document is read as the caller: an admin gets the public routes, a super
@@ -92,8 +99,7 @@ export const load: PageServerLoad = async (event) => {
 		hasMore,
 		overview,
 		superAdmin,
-		status: status.rows,
-		statusRead: status.read,
+		status,
 		gate,
 	};
 };
@@ -106,6 +112,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	const endpoint = String(form.get('endpoint') ?? '').trim();
 	if (!endpointIsSound(endpoint)) {
 		return fail(400, {
+			action: 'rule',
 			error: 'An endpoint is "*" for every request, or a method and a path such as GET /api/v1/content/{schema}. A segment may be a {name} placeholder and the last one may be *.',
 		});
 	}
@@ -113,15 +120,15 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	const rate = num(form.get('rate'));
 	const burst = Math.floor(num(form.get('burst')));
 	if (!Number.isFinite(rate) || rate <= 0) {
-		return fail(400, { error: 'The rate is requests per second and must be more than zero.' });
+		return fail(400, { action: 'rule', error: 'The rate is requests per second and must be more than zero.' });
 	}
 	if (!Number.isFinite(burst) || burst < 1) {
-		return fail(400, { error: 'The burst is a number of requests and must be at least one.' });
+		return fail(400, { action: 'rule', error: 'The burst is a number of requests and must be at least one.' });
 	}
 
 	const role = String(form.get('role') ?? '').trim();
 	if (role && !roleIsSound(role)) {
-		return fail(400, { error: 'A role is 1 to 64 letters, digits or _ . : -' });
+		return fail(400, { action: 'rule', error: 'A role is 1 to 64 letters, digits or _ . : -' });
 	}
 	const keyBy = form.get('key_by') === 'user' ? 'user' : 'ip';
 
@@ -130,8 +137,10 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		rate,
 		burst,
 		enabled: form.get('enabled') === 'true',
-		// An empty role clears it, so the rule applies to every caller.
-		role: role || null,
+		// An empty role clears it, so the rule applies to every caller. On an
+		// edit the plugin reads null as "keep the stored role" and an empty
+		// string as a clear, so the clear goes as an empty string.
+		role,
 		key_by: keyBy,
 	};
 	// Only a super_admin can place a rule on another tenant or on every
@@ -139,16 +148,19 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	// whatever the form says, so the field is neither shown nor sent.
 	if (user.roles.includes('super_admin')) {
 		const tenant = String(form.get('tenant_id') ?? '').trim();
-		// An empty tenant means every tenant. Sent as null rather than "" so
-		// the engine stores the scope the form actually showed.
-		body.tenant_id = tenant || null;
+		// On create an empty tenant means every tenant, sent as null so the
+		// engine stores the scope the form showed. On an edit the plugin reads
+		// an absent or null tenant as "keep", so only a named tenant is sent,
+		// which moves the rule there.
+		if (!id) body.tenant_id = tenant || null;
+		else if (tenant) body.tenant_id = tenant;
 	}
 
 	try {
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		return fail(400, { error: actionError(err, 'The rule could not be saved.') });
+		return fail(400, { action: 'rule', error: actionError(err, 'The rule could not be saved.') });
 	}
 	return { saved: endpoint };
 }
@@ -159,7 +171,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { action: 'rule', error: 'No rule was named.' });
 		return save(event, id);
 	},
 
@@ -168,11 +180,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'No rule was named.' });
 		try {
 			await deleteRule(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The rule could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'The rule could not be removed.') });
 		}
 		return { removed: id };
 	},
@@ -184,15 +196,15 @@ export const actions: Actions = {
 		const rate = num(form.get('rate'));
 		const burst = Math.floor(num(form.get('burst')));
 		if (!Number.isFinite(rate) || rate <= 0) {
-			return fail(400, { error: 'The rate is requests per second and must be more than zero.' });
+			return fail(400, { action: 'global', error: 'The rate is requests per second and must be more than zero.' });
 		}
 		if (!Number.isFinite(burst) || burst < 1) {
-			return fail(400, { error: 'The burst must be at least one request.' });
+			return fail(400, { action: 'global', error: 'The burst must be at least one request.' });
 		}
 		try {
 			await updateGlobal(client, { rate, burst, enabled: form.get('enabled') === 'true' });
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The global limit could not be saved.') });
+			return fail(400, { action: 'global', error: actionError(err, 'The global limit could not be saved.') });
 		}
 		return { savedGlobal: true };
 	},
@@ -204,14 +216,15 @@ export const actions: Actions = {
 		const name = String(form.get('name') ?? '');
 		const requests = Math.floor(num(form.get('requests')));
 		const minutes = num(form.get('window_minutes'));
-		if (!name) return fail(400, { error: 'No protection was named.' });
+		if (!name) return fail(400, { action: 'protection', error: 'No protection was named.' });
 		if (!Number.isFinite(requests) || requests < 1 || requests > 100000) {
 			return fail(400, {
+				action: 'protection',
 				error: 'Requests must be between 1 and 100000. Zero would lock every caller out of signing in.',
 			});
 		}
 		if (!Number.isFinite(minutes) || minutes <= 0 || minutes > MAX_WINDOW_MINUTES) {
-			return fail(400, { error: 'The window is in minutes, more than zero and at most a day.' });
+			return fail(400, { action: 'protection', error: 'The window is in minutes, more than zero and at most a day.' });
 		}
 		try {
 			await setProtection(client, {
@@ -220,7 +233,7 @@ export const actions: Actions = {
 				window_seconds: Math.max(1, Math.round(minutes * 60)),
 			});
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The protection could not be saved.') });
+			return fail(400, { action: 'protection', error: actionError(err, 'The protection could not be saved.') });
 		}
 		return { savedProtection: name };
 	},
@@ -230,11 +243,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '');
-		if (!name) return fail(400, { error: 'No protection was named.' });
+		if (!name) return fail(400, { action: 'resetProtection', error: 'No protection was named.' });
 		try {
 			await resetProtection(client, name);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The protection could not be reset.') });
+			return fail(400, { action: 'resetProtection', error: actionError(err, 'The protection could not be reset.') });
 		}
 		return { resetProtection: name };
 	},

@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -17,7 +17,7 @@ import {
 	type PiiGate,
 	type RuleCatalog,
 } from '$lib/api/pii-mask';
-import { pageWindow } from '$lib/api/list';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
@@ -56,14 +56,28 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			const page = await listAccessLog(client, limit, offset);
 			entries = page.data ?? [];
+			const back = pastEndOffset(entries.length, limit, offset, page.total_count ?? null);
+			if (back !== null) redirect(307, withOffset(event.url, back));
 			total = Math.max(page.total_count ?? 0, offset + entries.length);
-		} catch {
+		} catch (err) {
+			if (isRedirect(err)) throw err;
 			logFailed = true;
 		}
 	}
 
 	return { rules, entries, total, limit, offset, gate, logFailed };
 };
+
+/**
+ * An empty priority is not zero. Zero runs the rule before every preset,
+ * which is the opposite of what leaving the field blank means, so a blank
+ * field is 100 and a typed 0 stays 0.
+ */
+function priorityFrom(raw: FormDataEntryValue | null): number {
+	const text = String(raw ?? '').trim();
+	const n = Number(text);
+	return text === '' || !Number.isFinite(n) ? 100 : n;
+}
 
 /** One rule out of a submitted form, with the numbers already numbers. */
 function draftFrom(form: FormData) {
@@ -72,9 +86,7 @@ function draftFrom(form: FormData) {
 		description: String(form.get('description') ?? '').trim(),
 		pattern: String(form.get('pattern') ?? '').trim(),
 		replacement: String(form.get('replacement') ?? '').trim(),
-		// An empty priority is not zero. Zero would run the rule before every
-		// preset, which is the opposite of what leaving a field blank means.
-		priority: Number(form.get('priority')) || 100,
+		priority: priorityFrom(form.get('priority')),
 		enabled: form.get('enabled') === 'on' || form.get('enabled') === 'true',
 	};
 }
@@ -83,11 +95,20 @@ export const actions: Actions = {
 	create: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
+		const draft = draftFrom(form);
+		// The plugin reads a priority of 0 on create as unset and stores 100,
+		// which runs the rule last where 0 asked for first.
+		if (draft.priority === 0) {
+			return fail(400, {
+				action: 'create',
+				error: 'A new rule cannot take priority 0, which the plugin reads as unset and stores as 100. Create it with 1, or set 0 by editing it once it exists.',
+			});
+		}
 		try {
-			await createRule(authedClient(event), draftFrom(form));
+			await createRule(authedClient(event), draft);
 			return { saved: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not save the rule.'));
+			return fail(422, { action: 'create', error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -95,12 +116,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'update', error: 'Which rule?' });
 		try {
 			await updateRule(authedClient(event), id, draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not save the rule.'));
+			return fail(422, { action: 'update', error: actionError(err, 'The rule could not be saved.') });
 		}
 	},
 
@@ -108,12 +129,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'delete', error: 'Which rule?' });
 		try {
 			await deleteRule(authedClient(event), id);
 			return { deleted: true };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not delete the rule.'));
+			return fail(422, { action: 'delete', error: actionError(err, 'The rule could not be deleted.') });
 		}
 	},
 
@@ -131,7 +152,7 @@ export const actions: Actions = {
 			);
 			return { test: result };
 		} catch (err) {
-			return fail(422, actionError(err, 'Could not run the pattern.'));
+			return fail(422, { action: 'test', error: actionError(err, 'The pattern could not be run.') });
 		}
 	},
 };

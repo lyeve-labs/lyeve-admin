@@ -7,8 +7,8 @@
 	 * only the fields, so the owner decides where the buttons go: a drawer
 	 * footer on create, a card on the detail page.
 	 */
-	import { Checkbox, Input, NumberInput, PasswordInput, Select, Toggle } from '@lyeve-labs/ui-kit';
-	import { MODALITIES, PRESETS, PROVIDER_KINDS, isCompatibleKind, providerKindLabel, type AiProvider, type Modality, type ProviderKind } from '$lib/api/ai';
+	import { CheckboxGroup, Input, NumberInput, PasswordInput, RadioGroup, Select, Toggle } from '@lyeve-labs/ui-kit';
+	import { MODALITIES, PRESETS, PROVIDER_KINDS, isCompatibleKind, providerKindDescription, providerKindLabel, type AiProvider, type Modality, type ProviderKind } from '$lib/api/ai';
 
 	let {
 		id,
@@ -43,7 +43,7 @@
 
 	const compatible = $derived(isCompatibleKind(kind));
 	const anthropicShaped = $derived(kind === 'anthropic_compatible');
-	const kindOptions = PROVIDER_KINDS.map((k) => ({ value: k, label: providerKindLabel(k) }));
+	const kindOptions = PROVIDER_KINDS.map((k) => ({ value: k, label: providerKindLabel(k), description: providerKindDescription(k) }));
 	const presetOptions = [{ value: '', label: 'None' }, ...PRESETS.map((p) => ({ value: p.id, label: p.label }))];
 
 	// A preset fills what is blank and never overwrites what the operator typed.
@@ -72,15 +72,11 @@
 
 <div class="grid gap-4 md:grid-cols-2">
 	<Input id="{id}-name" name="name" label="Name" required value={provider?.name ?? ''} placeholder="openai-primary" />
-	<Select
-		id="{id}-kind"
-		name="kind"
-		label="Kind"
-		required
-		options={kindOptions}
-		value={kind}
-		onvaluechange={(v) => (kind = v as ProviderKind)}
-	/>
+	<!-- Two of the four labels are long, so a strip of segments overflows a
+	     phone. A list with a sentence on each stays inside it. -->
+	<div class="md:col-span-2">
+		<RadioGroup name="kind" label="Kind" options={kindOptions} bind:value={kind} />
+	</div>
 
 	{#if compatible && !anthropicShaped}
 		<Select
@@ -89,6 +85,7 @@
 			label="Preset"
 			hint="Fills the base URL and the key header for a server people run. The row stays OpenAI-compatible."
 			options={presetOptions}
+			searchable
 			value={preset}
 			onvaluechange={applyPreset}
 		/>
@@ -155,15 +152,16 @@
 		hint="Lower is tried first when a call names no provider."
 	/>
 
-	<fieldset class="md:col-span-2 flex flex-col gap-2">
-		<legend class="text-sm font-medium text-fg">Modalities</legend>
-		<div class="flex flex-wrap gap-4">
-			{#each MODALITIES as m (m)}
-				<Checkbox id="{id}-mod-{m}" name="modalities" value={m} label={m} bind:checked={modalities[m]} />
-			{/each}
-		</div>
-		<p class="text-xs text-faint">What this row may serve. The model's own table decides the rest. A call needs both.</p>
-	</fieldset>
+	<CheckboxGroup
+		class="md:col-span-2"
+		name="modalities"
+		label="Modalities"
+		orientation="horizontal"
+		options={MODALITIES.map((m) => ({ value: m, label: m }))}
+		value={MODALITIES.filter((m) => modalities[m])}
+		onchange={(v) => (modalities = { text: v.includes('text'), embed: v.includes('embed'), image: v.includes('image') })}
+		hint="What this row may serve. The model's own table decides the rest. A call needs both."
+	/>
 
 	<NumberInput
 		id="{id}-rpm"

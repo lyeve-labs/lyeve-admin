@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
+import { isRedirect } from '@sveltejs/kit';
 
 const engine = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }));
 vi.mock('$lib/server/authz', () => ({
@@ -39,10 +40,17 @@ describe('releases load', () => {
 	});
 
 	it('says a failed read failed, never that there are none', async () => {
-		engine.get.mockRejectedValue(new ApiError(503, 'down'));
+		engine.get.mockRejectedValue(new ApiError(500, 'internal error'));
 		const out = (await load(event())) as { gate: { state: string; message?: string } };
 		expect(out.gate.state).toBe('error');
 		expect(out.gate.message).toContain('not a report that there are none');
+	});
+
+	it('sends a page past the end back to the last page that holds releases', async () => {
+		engine.get.mockResolvedValue({ data: [], total_count: 120 });
+		const thrown = await Promise.resolve(load(event({}, 'http://x/admin/releases?limit=50&offset=500'))).catch((err: unknown) => err);
+		expect(isRedirect(thrown)).toBe(true);
+		expect((thrown as { location: string }).location).toBe('/admin/releases?limit=50&offset=100');
 	});
 });
 

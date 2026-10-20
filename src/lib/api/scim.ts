@@ -15,6 +15,7 @@
  * the identity provider's, not this screen's. What this screen owns is who may
  * call them.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -109,14 +110,15 @@ export function deprovisionAction(value: string): DeprovisionAction | null {
 }
 
 /**
- * What happens to an account this provider stops listing, in words.
+ * What happens to an account the directory deletes, in words.
  *
- * The two fields are read together on purpose: `deprovision_action` is stored
- * whether or not deprovisioning is switched on, so showing it alone tells an
- * operator that accounts are deleted when in fact nothing happens to them.
+ * The two fields are read together on purpose. The plugin disables the
+ * account only while the switch is on and the action is disable. With the
+ * switch off it deletes the account whatever the stored action says, so
+ * reading the action alone would promise a disable that never happens.
  */
 export function deprovisionLabel(p: ScimProvider): string {
-	if (!p.deprovision_on_delete) return 'Left alone';
+	if (!p.deprovision_on_delete) return 'Deleted';
 	return p.deprovision_action === 'delete' ? 'Deleted' : 'Disabled';
 }
 
@@ -126,21 +128,17 @@ export function deprovisionLabel(p: ScimProvider): string {
  * Deleting an account on deprovision is the irreversible option, so it is
  * marked rather than stated flatly beside the reversible one.
  */
-export function deprovisionTone(p: ScimProvider): 'danger' | 'warn' | 'neutral' {
-	if (!p.deprovision_on_delete) return 'neutral';
+export function deprovisionTone(p: ScimProvider): StatusTone {
+	if (!p.deprovision_on_delete) return 'danger';
 	return p.deprovision_action === 'delete' ? 'danger' : 'warn';
 }
 
 /**
  * Minimum length for a bearer token this screen will accept.
  *
- * The engine takes any non-empty string. A token is the whole authentication
- * for a route that creates and deletes accounts, so a short one is a real
- * exposure and the form refuses it here rather than storing it and hoping.
+ * A token is the whole authentication for a route that creates and deletes
+ * accounts, so a short one is a real exposure. The API refuses one under this
+ * length on create and on rotate, and the form refuses it first so the reason
+ * reads next to the field.
  */
 export const MIN_TOKEN_LENGTH = 32;
-
-/** The SCIM base URL an identity provider is configured with. */
-export function scimBaseUrl(origin: string): string {
-	return `${origin.replace(/\/+$/, '')}${SCIM_BASE_PATH}`;
-}

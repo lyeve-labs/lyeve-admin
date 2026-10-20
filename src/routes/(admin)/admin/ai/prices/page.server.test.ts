@@ -19,7 +19,7 @@ describe('admin/ai/prices load', () => {
 		[404, 'off'],
 		[503, 'no_provider'],
 	])('sorts a %i into the %s state', async (status, state) => {
-		const { event } = loadEvent({ '/api/admin/ai/prices': () => refused(status, 'refused') }, { path });
+		const { event } = loadEvent({ '/api/admin/ai/prices': () => refused(status, status === 503 ? 'no enabled AI provider configured' : 'refused') }, { path });
 		const out = (await load(event)) as Loaded;
 		expect(out.gate.state).toBe(state);
 		expect(out.prices).toEqual([]);

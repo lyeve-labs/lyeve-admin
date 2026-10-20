@@ -38,17 +38,3 @@ export const NO_ENTITLEMENTS: Entitlements = {
 	features: [],
 	tenant_quota: 0,
 };
-
-/**
- * Whether the active license grants a feature to the signed-in tenant. Fails
- * closed on nullish input.
- *
- * `features` is the license and answers for the whole instance. `withheld`
- * is what a super admin took away from this tenant, already expanded by the
- * engine to every name that falls with it, and the engine refuses those
- * routes, so a page gated on one would only draw refusals.
- */
-export function hasFeature(ent: LicenseEntitlements | null | undefined, feature: string): boolean {
-	if (!(ent?.features?.includes(feature) ?? false)) return false;
-	return !(ent?.withheld?.includes(feature) ?? false);
-}

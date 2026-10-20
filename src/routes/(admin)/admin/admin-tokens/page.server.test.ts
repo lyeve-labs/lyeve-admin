@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { actions, load } from './+page.server';
+import { signedIn } from '$lib/server/test-support/signed-in';
 
 type Reply = { status: number; body?: unknown };
 
@@ -111,8 +112,8 @@ describe('the revoke action', () => {
 describe('the load', () => {
 	function loadEvent(roles: string[], replies: Record<string, Reply>, url = 'http://admin/admin/admin-tokens') {
 		const { ev, fetch } = event(replies, {}, url);
-		const parent = async () => ({ user: { id: 'u1', email: 'a@b.test', roles, tenant_id: 'default' } });
-		return { ev: { ...(ev as object), parent } as never, fetch };
+		const user = { id: 'u1', email: 'a@b.test', roles, tenant_id: 'default' };
+		return { ev: { ...(ev as object), fetch: signedIn(fetch, user) } as never, fetch };
 	}
 
 	it('refuses a role that cannot own a token', async () => {
@@ -127,16 +128,43 @@ describe('the load', () => {
 			'GET /api/admin/mfa/status': { status: 200, body: { enabled: true } },
 		});
 		const out = (await load(ev)) as Record<string, unknown>;
-		expect(out).toMatchObject({ total: 1, listError: '', mfaEnrolled: true, tenants: [], log: null, adminOrigin: 'http://admin' });
-		expect((out.grants as unknown[]).length).toBe(1);
+		expect(out).toMatchObject({ total: 1, mfaEnrolled: true, tenants: { ok: true, value: [] }, log: null, adminOrigin: 'http://admin' });
+		expect(out.tokens).toMatchObject({ ok: true });
+		expect(out.grants).toMatchObject({ ok: true, value: [{ name: 'schemas:read' }] });
 		expect(fetch.mock.calls.some(([u]) => String(u).includes('/api/admin/tenants'))).toBe(false);
 	});
 
 	it('says the database is down rather than showing an empty list', async () => {
 		const { ev } = loadEvent(['admin'], { 'GET /api/admin/admin-tokens': { status: 503, body: { error: 'x' } } });
-		const out = (await load(ev)) as { listError: string; tokens: unknown[] };
-		expect(out.tokens).toEqual([]);
-		expect(out.listError).toContain('database is unavailable');
+		const out = (await load(ev)) as { tokens: unknown };
+		expect(out.tokens).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('keeps a failed grants read apart from a catalog with none', async () => {
+		const { ev } = loadEvent(['admin'], {
+			'GET /api/admin/admin-tokens': { status: 200, body: { data: [], total_count: 0 } },
+			'GET /api/admin/admin-tokens/grants': { status: 500, body: { error: 'x' } },
+		});
+		const out = (await load(ev)) as { grants: { ok: boolean } };
+		expect(out.grants.ok).toBe(false);
+	});
+
+	it('keeps a failed tenant read apart from an install with one tenant', async () => {
+		const { ev } = loadEvent(['super_admin'], {
+			'GET /api/admin/admin-tokens': { status: 200, body: { data: [], total_count: 0 } },
+			'GET /api/admin/tenants': { status: 500, body: { error: 'x' } },
+		});
+		const out = (await load(ev)) as { tenants: { ok: boolean } };
+		expect(out.tenants.ok).toBe(false);
+	});
+
+	it('sends a page past the end back to the last page that holds tokens', async () => {
+		const { ev } = loadEvent(
+			['admin'],
+			{ 'GET /api/admin/admin-tokens': { status: 200, body: { data: [], total_count: 3 } } },
+			'http://admin/admin/admin-tokens?offset=100'
+		);
+		await expect(load(ev)).rejects.toMatchObject({ status: 307, location: '/admin/admin-tokens?offset=0' });
 	});
 
 	it('reads the request log the URL names', async () => {
@@ -149,8 +177,39 @@ describe('the load', () => {
 			},
 			'http://admin/admin/admin-tokens?log=t1&log_offset=50'
 		);
-		const out = (await load(ev)) as { log: { token: string; total: number; offset: number }; tenants: { slug: string }[] };
+		const out = (await load(ev)) as { log: { token: string; total: number; offset: number }; tenants: { ok: true; value: { slug: string }[] } };
 		expect(out.log).toMatchObject({ token: 't1', total: 51, offset: 50 });
-		expect(out.tenants.map((t) => t.slug)).toEqual(['default']);
+		expect(out.tenants.value.map((t) => t.slug)).toEqual(['default']);
+	});
+
+	it.each([
+		[502, 'did not answer'],
+		[504, 'did not answer'],
+		[429, 'Too many requests'],
+	])('says what a %i on the request log means', async (status, words) => {
+		const { ev } = loadEvent(
+			['super_admin'],
+			{
+				'GET /api/admin/admin-tokens': { status: 200, body: { data: [], total_count: 0 } },
+				'GET /api/admin/admin-tokens/t1/requests': { status, body: { error: 'x' } },
+				'GET /api/admin/tenants': { status: 200, body: { data: [], total_count: 0 } },
+			},
+			'http://admin/admin/admin-tokens?log=t1'
+		);
+		const out = (await load(ev)) as { log: { error: string } };
+		expect(out.log.error).toContain(words);
+	});
+
+	it('sends a request log offset past the end back to its last page', async () => {
+		const { ev } = loadEvent(
+			['super_admin'],
+			{
+				'GET /api/admin/admin-tokens': { status: 200, body: { data: [], total_count: 0 } },
+				'GET /api/admin/admin-tokens/t1/requests': { status: 200, body: { data: [], limit: 50, offset: 500, total_count: 51 } },
+				'GET /api/admin/tenants': { status: 200, body: { data: [], total_count: 0 } },
+			},
+			'http://admin/admin/admin-tokens?log=t1&log_offset=500'
+		);
+		await expect(load(ev)).rejects.toMatchObject({ status: 307, location: '/admin/admin-tokens?log=t1&log_offset=50' });
 	});
 });

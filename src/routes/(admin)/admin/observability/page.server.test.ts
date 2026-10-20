@@ -51,13 +51,13 @@ function withTuning(tuning: Route): Record<string, Route> {
 
 // The layout hands every page the entitlements. This one reads none of them,
 // so an instance that serves no feature is the case to prove.
-function loadEvent(routes: Record<string, Route>, roles = ['super_admin']) {
+function loadEvent(routes: Record<string, Route>, roles = ['super_admin'], plugins: unknown = null) {
 	const { fetch } = fetchFor(routes, roles);
 	return {
 		fetch,
 		cookies: mockCookies(),
 		url: new URL('http://localhost/admin/observability'),
-		parent: async () => ({ user: { id: 'u1', roles }, entitlements: NO_ENTITLEMENTS }),
+		parent: async () => ({ user: { id: 'u1', roles }, entitlements: NO_ENTITLEMENTS, plugins }),
 	} as never;
 }
 
@@ -178,5 +178,29 @@ describe('the tunable actions', () => {
 		const { event, calls } = actionEvent(form({ size: '10' }), {}, ['admin']);
 		await expect(actions.pool(event)).rejects.toMatchObject({ status: 403 });
 		expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
+	});
+});
+
+describe('observability reads that fail', () => {
+	it('keeps a failed latency read as a gate rather than an empty ranking', async () => {
+		const result = (await load(loadEvent({ ...views, '/debug/latency': () => json({ error: 'down' }, 503) }))) as Loaded;
+		expect(result.latency).toEqual({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('keeps a failed pool health read as a gate rather than an unhealthy pool', async () => {
+		const result = (await load(loadEvent({ ...views, '/pool/health': () => json({ error: 'boom' }, 500) }))) as Loaded;
+		expect(result.poolHealth.ok).toBe(false);
+	});
+
+	it('does not offer the tail while the logging plugin does not run', async () => {
+		const plugins = { state: 'named', running: ['cron'], withheld: [] };
+		const result = (await load(loadEvent(views, ['super_admin'], plugins))) as Loaded;
+		expect(result.logTail).toBe(false);
+	});
+
+	it('offers the tail while the logging plugin runs', async () => {
+		const plugins = { state: 'named', running: ['logging'], withheld: [] };
+		const result = (await load(loadEvent(views, ['super_admin'], plugins))) as Loaded;
+		expect(result.logTail).toBe(true);
 	});
 });

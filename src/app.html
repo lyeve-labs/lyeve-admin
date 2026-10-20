@@ -6,7 +6,8 @@
 		<link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
 		<!-- The dark ink, as the markup default. The script below resolves the
 		     real theme before first paint and moves this with it, so a
-		     light-theme reader gets light browser chrome. -->
+		     light-theme reader gets light browser chrome, and keeps it with
+		     each later switch of the theme control. -->
 		<meta name="theme-color" content="#0b1422" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<!-- Resolves the stored palette before first paint so a light-theme user
@@ -20,6 +21,12 @@
 		     later by the first control that reads the preference back. -->
 		<script nonce="%sveltekit.nonce%">
 			(function () {
+				var root = document.documentElement;
+				// The browser chrome takes the same ink the page does.
+				function paintChrome(theme) {
+					var meta = document.querySelector('meta[name="theme-color"]');
+					if (meta) meta.setAttribute('content', theme === 'light' ? '#f6f7f9' : '#0b1422');
+				}
 				var stored = null;
 				try {
 					stored = localStorage.getItem('lyeve-theme');
@@ -33,19 +40,23 @@
 							: matchMedia('(prefers-color-scheme: light)').matches
 								? 'light'
 								: 'dark';
-					document.documentElement.setAttribute('data-theme', t);
-					// The browser chrome takes the same ink the page does.
-					var meta = document.querySelector('meta[name="theme-color"]');
-					if (meta) meta.setAttribute('content', t === 'light' ? '#f6f7f9' : '#0b1422');
+					root.setAttribute('data-theme', t);
+					paintChrome(t);
 				} catch (e) {
 					/* no matchMedia either: the dark markup default stands */
 				}
+				// The theme control switches the palette by writing data-theme, and
+				// the chrome follows each write. Painted only here, it kept the old
+				// color until the next page load.
+				try {
+					new MutationObserver(function () {
+						paintChrome(root.getAttribute('data-theme'));
+					}).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+				} catch (e) {
+					/* no MutationObserver: the chrome keeps the color of the load */
+				}
 			})();
 		</script>
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link rel="stylesheet"
-			href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" />
 		%sveltekit.head%
 	</head>
 	<body class="bg-ink text-fg min-h-screen font-sans antialiased" data-sveltekit-preload-data="hover">

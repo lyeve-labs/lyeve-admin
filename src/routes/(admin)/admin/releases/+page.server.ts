@@ -5,7 +5,7 @@ import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
-import { pageWindow, rowsOf, totalOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { RELEASE_STATUSES, createRelease, listReleases, type Release } from '$lib/api/content-releases';
 
 export const load: PageServerLoad = async (event) => {
@@ -16,16 +16,20 @@ export const load: PageServerLoad = async (event) => {
 
 	let releases: Release[] = [];
 	let total = 0;
+	let stated: number | null = null;
 	let gate: Gate = notRunning(plugins, PLUGIN.content) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			const res = await listReleases(authedClient(event), status, limit, offset);
 			releases = rowsOf(res);
 			total = Math.max(totalOf(res), offset + releases.length);
+			stated = statedTotal(res);
 		} catch (err) {
 			gate = gateOf(err, 'Releases could not be read. This is not a report that there are none.');
 		}
 	}
+	const back = gate.state === 'ok' ? pastEndOffset(releases.length, limit, offset, stated) : null;
+	if (back !== null) redirect(307, withOffset(event.url, back));
 	return { releases, total, limit, offset, status, gate };
 };
 

@@ -15,6 +15,7 @@
  * Enforcement is the destructive control. It deletes, it is not a dry run, and
  * nothing undoes it.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -22,7 +23,6 @@ import type { ListEnvelope } from './list';
 export const POLICIES_URL = '/api/admin/retention-policies';
 export const HOLDS_URL = '/api/admin/legal-holds';
 export const ENFORCE_URL = '/api/admin/retention/enforce';
-export const EXPORT_URL = '/api/admin/retention/compliance-export';
 
 export interface RetentionPolicy {
 	id: string;
@@ -66,12 +66,33 @@ export function retentionGate(err: unknown): RetentionGate {
 	return gateOf(err, 'The retention rules could not be read. This is not a report that nothing is being deleted.');
 }
 
+/** The largest page the plugin serves. */
+const PAGE = 500;
+
+/**
+ * Every row of a paged list. The plugin pages at 50 by default, and the page
+ * judges whether deletion is blocked from the whole set, so a partial read
+ * would answer wrong.
+ */
+async function readAll<T>(client: HttpClient, url: string): Promise<ListEnvelope<T>> {
+	const rows: T[] = [];
+	for (let offset = 0; ; offset += PAGE) {
+		const page = await client.get<ListEnvelope<T>>(`${url}?limit=${PAGE}&offset=${offset}`);
+		const got = page.data ?? [];
+		rows.push(...got);
+		const total = page.total_count ?? page.total;
+		if (got.length < PAGE || (typeof total === 'number' && rows.length >= total)) {
+			return { data: rows, total_count: total ?? rows.length };
+		}
+	}
+}
+
 export async function listPolicies(client: HttpClient): Promise<ListEnvelope<RetentionPolicy>> {
-	return client.get<ListEnvelope<RetentionPolicy>>(POLICIES_URL);
+	return readAll<RetentionPolicy>(client, POLICIES_URL);
 }
 
 export async function listHolds(client: HttpClient): Promise<ListEnvelope<LegalHold>> {
-	return client.get<ListEnvelope<LegalHold>>(HOLDS_URL);
+	return readAll<LegalHold>(client, HOLDS_URL);
 }
 
 export interface SavePolicy {
@@ -111,8 +132,43 @@ export async function releaseHold(client: HttpClient, id: string): Promise<void>
 	await client.delete(`${HOLDS_URL}/${encodeURIComponent(id)}`);
 }
 
-export async function enforceNow(client: HttpClient): Promise<{ deleted?: number }> {
-	return client.post<{ deleted?: number }>(ENFORCE_URL, {});
+/** One policy's share of an enforcement run, as the audit plugin reports it. */
+export interface EnforceResult {
+	policy_id: string;
+	event_type?: string;
+	resource_type?: string;
+	entries_archived?: number;
+	entries_deleted?: number;
+	/** The archive upload failed, so the plugin deleted nothing for this policy. */
+	archive_failed?: boolean;
+	archive_error?: string;
+}
+
+/** What an enforcement run answers. The plugin counts per policy and never sends a total. */
+export interface EnforceResponse {
+	policies_processed?: number;
+	results?: EnforceResult[] | null;
+	elapsed?: string;
+}
+
+export async function enforceNow(client: HttpClient): Promise<EnforceResponse> {
+	return client.post<EnforceResponse>(ENFORCE_URL, {});
+}
+
+/** The entries a run deleted across every policy it processed. */
+export function entriesDeleted(run: EnforceResponse): number {
+	return (run.results ?? []).reduce((sum, r) => sum + (r.entries_deleted ?? 0), 0);
+}
+
+/**
+ * The policies whose archive failed in a run, in words. The plugin answers
+ * 200 for those and deletes nothing they cover, so a run that reports zero
+ * deleted may be one that could not archive.
+ */
+export function archiveFailures(run: EnforceResponse): string[] {
+	return (run.results ?? [])
+		.filter((r) => r.archive_failed)
+		.map((r) => policyScope({ event_type: r.event_type ?? '', resource_type: r.resource_type ?? '' } as RetentionPolicy));
 }
 
 /** Holds still in force. A soft-deleted hold protects nothing. */
@@ -205,6 +261,6 @@ export function archivalLabel(p: RetentionPolicy): string {
 	return p.archival_storage ? `Archived to ${p.archival_storage}` : 'Archived';
 }
 
-export function archivalTone(p: RetentionPolicy): 'success' | 'warn' {
+export function archivalTone(p: RetentionPolicy): StatusTone {
 	return p.archival_enabled ? 'success' : 'warn';
 }

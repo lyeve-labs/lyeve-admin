@@ -80,8 +80,20 @@ export function resetSetupGateCache(): void {
  * The one setup check: returns where to send the request, or null to let it
  * through. Every route reads this one answer, so no two disagree when the
  * engine cannot be reached.
+ *
+ * A request that carries a session goes through when the engine cannot be
+ * reached. That session belonged to an install that already had an account,
+ * so the engine is down rather than unset, and the page's own session check
+ * shows the outage page. The setup screen would ask a signed-in reader to
+ * configure an engine that is only away, and a form posted during the outage
+ * would lose its edits to the redirect.
  */
-export async function setupGateRedirect(url: URL, fetchFn: typeof fetch, now = Date.now()): Promise<string | null> {
+export async function setupGateRedirect(
+	url: URL,
+	fetchFn: typeof fetch,
+	now = Date.now(),
+	signedIn = false,
+): Promise<string | null> {
 	if (!isGatedPath(url.pathname)) return null;
 	if (now < readyUntil) return null;
 	const { state } = await readEngineSetup(fetchFn);
@@ -90,6 +102,7 @@ export async function setupGateRedirect(url: URL, fetchFn: typeof fetch, now = D
 		return null;
 	}
 	if (state === 'busy') return null;
+	if (state === 'unreachable' && signedIn) return null;
 	const next = url.pathname + url.search;
 	return next === '/' ? '/setup' : `/setup?next=${encodeURIComponent(next)}`;
 }

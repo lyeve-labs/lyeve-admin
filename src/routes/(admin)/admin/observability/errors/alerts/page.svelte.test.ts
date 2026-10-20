@@ -6,6 +6,7 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/observability/errors/alerts') } }));
 
 import SpikePage from './+page.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -58,5 +59,31 @@ describe('the spike alerts page', () => {
 	it('says why there is nothing to set while the plugin does not run', () => {
 		const { container } = setup(null, null, { state: 'absent' } as never);
 		expect(container.textContent).toContain('not part of this build');
+	});
+});
+
+describe('the heading outline', () => {
+	// The page title is the h1, so its top sections are h2. An h3 straight
+	// under the h1 skips a level in a screen reader's heading list.
+	it('puts its top sections at the second level', () => {
+		const { container } = setup(BASE);
+		const levels = [...container.querySelectorAll('h2, h3')].map((h) => `${h.tagName} ${h.textContent?.trim()}`);
+		expect(levels).toContain('H2 Where alerts go');
+		expect(levels).toContain('H2 What counts as a spike');
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = setup(BASE);
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = setup(BASE, null, { state: 'locked', upgradeUrl: '' } as never);
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

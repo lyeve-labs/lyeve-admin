@@ -2,8 +2,8 @@
  * Hands the browser the engine's CSRF cookie from a server-side call.
  *
  * SvelteKit applies the Set-Cookie headers of a server fetch only when the
- * request stays inside this app. `handleFetch` sends engine calls to
- * CORE_INTERNAL_URL instead, so without this the engine's CSRF cookie would
+ * request stays inside this app. `handleFetch` sends every engine call to the
+ * engine's own address instead, so without this the engine's CSRF cookie would
  * never reach the browser, and a browser-side write (a media upload) would
  * have no token to echo.
  *

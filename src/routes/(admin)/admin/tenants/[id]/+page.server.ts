@@ -1,50 +1,94 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error, fail } from '@sveltejs/kit';
-import { archiveTenant, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { error, fail, redirect } from '@sveltejs/kit';
+import { archiveTenant, getEntitlements, getTenant, restoreTenant } from '@lyeve-labs/client-rest';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { seatRefusal } from '$lib/api/admin-seats';
+import { refusalText } from '$lib/api/refusal';
+import { section, type Section } from '$lib/api/gate';
+import { readError } from '$lib/server/read-error';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+
+/** The members page size when a request names none. */
+const MEMBERS_LIMIT = 50;
+
+/** The most members one page asks for. */
+const MEMBERS_MAX = 200;
 import {
 	featureChoices,
 	findUserByEmail,
+	findUserById,
 	getTenantFeatures,
 	grantMembership,
 	listTenantMembers,
 	revokeMembership,
 	setTenantFeatures,
+	superAdminsAmong,
 	withheldFrom,
 	type FeatureChoice,
 	type TenantMember,
 } from '$lib/api/tenant-access';
 
 export const load: PageServerLoad = async (event) => {
-	const { user, entitlements } = await event.parent();
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
 	const client = authedClient(event);
 
-	const tenant = await getTenant(event.params.id, client).catch(() => null);
-	if (!tenant) error(404, 'No tenant has that id.');
+	// Only the engine's 404 says the tenant does not exist. A refusal or an
+	// outage keeps a status of its own.
+	const tenant = await getTenant(event.params.id, client).catch((err: unknown) =>
+		readError(err, 'No tenant has that id.'),
+	);
+
+	// The members are paged rather than capped, so a tenant with more than one
+	// page of accounts shows every one of them a page at a time.
+	const { limit, offset } = pageWindow(event.url, MEMBERS_LIMIT, MEMBERS_MAX);
 
 	// Each half is read on its own: a members list that fails is no reason to
-	// hide what the tenant may use, and the reverse.
-	const [features, members] = await Promise.all([
-		getTenantFeatures(client, tenant.slug).catch(() => null),
-		listTenantMembers(client, tenant.slug, 200, 0).catch(() => null),
+	// hide what the tenant may use, and the reverse. The license is read here
+	// rather than taken from the shell, which reads a failed read as a license
+	// with nothing in it, and an empty list here would offer only what is
+	// already withheld.
+	const [features, license, members] = await Promise.all([
+		section(getTenantFeatures(client, tenant.slug), "This tenant's features could not be read."),
+		section(getEntitlements(client), 'The license could not be read, so what this tenant may use cannot be offered.'),
+		section(
+			listTenantMembers(client, tenant.slug, limit, offset),
+			"This tenant's members could not be read. This is not a report that it has none.",
+		),
 	]);
 
-	// The entitlements the layout read are the signed-in super admin's, whose
-	// tenant is not this one, so only `features` is read from them: the
-	// license, which is the same for every tenant.
-	const licensed = entitlements?.features ?? [];
-	const choices: FeatureChoice[] | null = features
-		? featureChoices(features.known, licensed, features.withheld)
-		: null;
+	// The entitlements are the signed-in super admin's, whose tenant is not
+	// this one, so only `features` is read from them: the license, which is
+	// the same for every tenant.
+	const choices: Section<FeatureChoice[]> = !features.ok
+		? features
+		: !license.ok
+			? license
+			: { ok: true, value: featureChoices(features.value.known, license.value.features ?? [], features.value.withheld) };
+	if (members.ok) {
+		const back = pastEndOffset(members.value.members?.length ?? 0, limit, offset, members.value.total ?? null);
+		if (back !== null) redirect(307, withOffset(event.url, back));
+	}
+	const people: Section<TenantMember[]> = members.ok ? { ok: true, value: members.value.members ?? [] } : members;
+
+	// A home row lists the roles its membership sets, which can leave out the
+	// account's own super_admin, and the engine signs the account in here with
+	// those roles. Only the account says whether it holds super_admin. A failed
+	// read leaves these rows as they are listed: their roles already lack
+	// super_admin, so an edit cannot take it away. It is kept as unknown, so
+	// the page says it could not tell rather than that nobody lost the role.
+	const quiet = people.ok ? people.value.filter((m) => m.home && !m.roles.includes('super_admin')).map((m) => m.id) : [];
+	const homeSuperAdmins: string[] | null = await superAdminsAmong(client, quiet).catch(() => null);
 
 	return {
 		tenant,
 		choices,
-		members: (members?.members ?? null) as TenantMember[] | null,
-		memberTotal: members?.total ?? 0,
+		members: people,
+		homeSuperAdmins,
+		memberTotal: members.ok ? members.value.total : 0,
+		limit,
+		offset,
 	};
 };
 
@@ -74,24 +118,36 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '').trim();
 		const userId = String(form.get('user_id') ?? '').trim();
 		const roles = form.getAll('roles').map(String).filter(Boolean);
-		if (!userId && !email) return fail(400, { memberError: 'Name the account by its email.', fields: { email: 'Required' } });
-		if (roles.length === 0) return fail(400, { memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
+		if (!userId && !email) return fail(400, { action: 'grant', memberError: 'Name the account by its email.', fields: { email: 'Required' } });
+		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
 		const client = authedClient(event);
 		try {
-			let id = userId;
-			if (!id) {
-				const found = await findUserByEmail(client, email);
-				if (!found) {
-					return fail(404, { memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
-				}
-				id = found.id;
+			const slug = await tenantSlug(event);
+			const found = userId ? await findUserById(client, userId) : await findUserByEmail(client, email);
+			if (!found && !userId) {
+				return fail(404, { action: 'grant', memberError: `No account uses ${email}. Create it on the Users page first.`, fields: { email: 'No such account' } });
 			}
-			await grantMembership(client, id, await tenantSlug(event), roles);
+			// An account the lookup did not reach could be a super admin at home
+			// here, so nothing is saved for it.
+			if (!found) {
+				return fail(404, { action: 'grant', memberError: 'The account could not be found, so nothing was saved.' });
+			}
+			// A membership in the home tenant replaces the account's roles when it
+			// signs in there. Written for a super admin, it would either drop
+			// super_admin or hold it past a removal on the Users page.
+			if (found && found.tenant_id === slug && (found.roles ?? []).includes('super_admin')) {
+				return fail(409, {
+					action: 'grant',
+					memberError: `${found.email} is a super admin whose home is this tenant. Its roles are set on the Users page.`,
+					fields: userId ? undefined : { email: 'A super admin at home' },
+				});
+			}
+			await grantMembership(client, found.id, slug, roles);
 			return { memberSaved: true };
 		} catch (err) {
 			const full = seatRefusal(err);
-			if (full) return fail(402, { memberError: full });
-			return fail(400, { memberError: actionError(err, 'The membership could not be saved.') });
+			if (full) return fail(402, { action: 'grant', memberError: refusalText(full), refused: full });
+			return fail(400, { action: 'grant', memberError: actionError(err, 'The membership could not be saved.') });
 		}
 	},
 
@@ -103,7 +159,7 @@ export const actions: Actions = {
 			await revokeMembership(authedClient(event), userId, await tenantSlug(event));
 			return { memberRevoked: true };
 		} catch (err) {
-			return fail(400, { memberError: actionError(err, 'The membership could not be removed.') });
+			return fail(400, { action: 'revoke', memberError: actionError(err, 'The membership could not be removed.') });
 		}
 	},
 

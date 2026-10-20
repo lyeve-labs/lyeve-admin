@@ -54,6 +54,22 @@ export function providerKindLabel(kind: string): string {
 	}
 }
 
+/** One sentence per kind, so the four read as a list that fits a phone. */
+export function providerKindDescription(kind: string): string {
+	switch (kind) {
+		case 'openai':
+			return 'The OpenAI API.';
+		case 'anthropic':
+			return 'The Anthropic API.';
+		case 'openai_compatible':
+			return 'Any server that speaks the OpenAI API, such as Ollama or vLLM.';
+		case 'anthropic_compatible':
+			return 'A gateway that speaks the Anthropic API.';
+		default:
+			return '';
+	}
+}
+
 export interface AiSettings {
 	tenant_id: string;
 	enabled: boolean;

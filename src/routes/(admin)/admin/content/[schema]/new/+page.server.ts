@@ -1,58 +1,73 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
-import { getSchema, listContent } from '@lyeve-labs/client-rest';
+import type { Schema } from '@lyeve-labs/client';
+import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { setRelations } from '$lib/server/content-relations';
+import { readError } from '$lib/server/read-error';
+import { setEntryRelations } from '$lib/server/content-relations';
+import { fieldRefusalOf } from '$lib/server/content-validation';
 import { entryIdentity } from '$lib/utils/new-entry';
 import { listMediaChoices, type MediaChoice } from '$lib/api/media';
-import { sessionToken } from '$lib/server/session-cookie';
+import { getLocales } from '$lib/api/localization';
+import { forbiddenText, section, type Section } from '$lib/api/gate';
+import { PLUGIN } from '$lib/plugin-names';
+import { runs } from '$lib/plugins';
+import { readRelationChoices } from '$lib/server/relation-choices';
 
-export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+/** One locale the new entry can be written in. */
+type LocaleChoice = { code: string; name: string; is_default: boolean };
 
-	const schemaDef = await getSchema(params.schema, client).catch(() => null);
-	if (!schemaDef) {
-		error(404, `Schema "${params.schema}" not found`);
+const LOCALES_FAILED = 'The locales could not be read, so no locale can be picked for this entry.';
+
+export const load: PageServerLoad = async (event) => {
+	const { params, parent } = event;
+	const client = authedClient(event);
+	const { plugins, user } = await parent();
+	// The create route admits an admin and a super admin only. The schema read
+	// admits any signed-in reader, so without this an editor would get a whole
+	// form whose Create the engine then refuses.
+	if (!user.roles.some((role) => role === 'admin' || role === 'super_admin')) {
+		error(403, forbiddenText('the new entry form'));
 	}
 
-	// Load available locales if schema supports localization
-	let locales: { code: string; name: string; is_default: boolean }[] = [];
-	if (schemaDef.with_localization) {
-		const prefs = await client.get<{ default_locale: string; enabled_locales: string[] }>(
-			'/api/admin/localization/locales'
-		);
-		locales = prefs.enabled_locales.map((code) => ({
-			code,
-			name: code,
-			is_default: code === prefs.default_locale,
-		}));
+	let schemaDef: Schema;
+	try {
+		schemaDef = await getSchema(params.schema, client);
+	} catch (err) {
+		readError(err, `Schema "${params.schema}" not found`);
 	}
 
-	// Load relation picker items
-	const relationItems: Record<string, import('@lyeve-labs/client').Content[]> = {};
-	const relSchemas = [
-		...new Set(
-			schemaDef.fields
-				.filter((f) => f.field_type === 'relation' && f.relation_to)
-				.map((f) => f.relation_to as string),
-		),
-	];
-	await Promise.all(
-		relSchemas.map(async (name) => {
-			relationItems[name] = await listContent(name, client, 500, 0).catch(() => []);
-		}),
-	);
+	// The locale routes belong to the localization plugin. Without it there is
+	// no locale to pick, and a read of them would only be refused. A read that
+	// fails while the plugin runs is said so beside the form.
+	const locales: Section<LocaleChoice[]> | null =
+		schemaDef.with_localization && runs(plugins, PLUGIN.localization)
+			? await section(
+					getLocales(client).then((prefs) =>
+						prefs.enabled_locales.map((code) => ({
+							code,
+							name: code,
+							is_default: code === prefs.default_locale,
+						})),
+					),
+					LOCALES_FAILED,
+				)
+			: null;
+
+	// The pickers read the admin store, the one this form writes to. The
+	// public content routes read a different store, so an entry made here
+	// would not be in a picker fed from them.
+	const relations = await readRelationChoices(client, schemaDef.fields ?? []);
 
 	// Published library files, for a media field's picker. Read only when
-	// the schema has one.
-	const mediaChoices = schemaDef.fields.some((f) => f.field_type === 'media')
-		? await Promise.resolve().then(() => listMediaChoices(client)).catch((): MediaChoice[] => [])
+	// the schema has one. A read that fails is null, so the picker says the
+	// library could not be read instead of claiming nothing is published.
+	const mediaChoices: MediaChoice[] | null = schemaDef.fields.some((f) => f.field_type === 'media')
+		? await Promise.resolve().then(() => listMediaChoices(client)).catch(() => null)
 		: [];
 
-	return { schemaDef, relationItems, locales, mediaChoices };
+	return { schemaDef, relations, locales, mediaChoices };
 };
 
 /**
@@ -78,9 +93,13 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const raw = form.get('data') as string;
 		const m2mRaw = form.get('m2m_relations') as string | null;
+		let schemaDef: Schema | null = null;
+		let created = '';
+		let links: Record<string, string[]> | null = null;
 		try {
 			const data = stripProtectedFields(JSON.parse(raw) as Record<string, unknown>);
-			const schemaDef = await getSchema(params.schema, client).catch(() => null);
+			links = m2mRaw ? (JSON.parse(m2mRaw) as Record<string, string[]>) : null;
+			schemaDef = await getSchema(params.schema, client).catch(() => null);
 			const { title, slug } = entryIdentity(data, schemaDef?.fields ?? []);
 
 			// title and slug are columns on the entry and stay in the body as
@@ -96,17 +115,22 @@ export const actions: Actions = {
 				slug,
 				body: data,
 			});
-
-			if (m2mRaw && item?.id) {
-				const m2m = JSON.parse(m2mRaw) as Record<string, string[]>;
-				await Promise.all(
-					Object.entries(m2m).map(([fieldName, ids]) =>
-						setRelations(event, item.id, fieldName, ids),
-					),
-				);
-			}
+			created = item?.id ?? '';
 		} catch (err) {
+			const shown = (schemaDef?.fields ?? []).filter((f) => !f.system).map((f) => f.name);
+			const refused = fieldRefusalOf(err, shown);
+			if (refused) return fail(422, refused);
 			return fail(400, { error: actionError(err, 'Failed to create entry. Check all fields and try again.') });
+		}
+
+		// The entry exists once the create answered, so a refused link is
+		// reported beside its id. Sending the form again would create a second
+		// entry, and a redirect to the list would read as a full success.
+		if (links && created) {
+			const failed = await setEntryRelations(event, created, links);
+			if (failed) {
+				return fail(400, { error: `The entry was created, but not every link was saved. ${failed}`, created });
+			}
 		}
 		redirect(303, `/admin/content/${params.schema}`);
 	},

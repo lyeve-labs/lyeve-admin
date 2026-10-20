@@ -1,20 +1,20 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	import type { Schema } from '@lyeve-labs/client';
 	import {
 		Badge,
 		Button,
 		EmptyState,
+		FilterChips,
 		PageShell,
 		Pagination,
 		SearchInput,
 		SectionHeading,
-		SegmentedControl,
 		Table,
 	} from '@lyeve-labs/ui-kit';
 	import { ArrowDown, ArrowUp, CalendarClock, Database, Inbox, LayoutGrid, Plus } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { planSchemaRelations } from '$lib/relations';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import {
@@ -47,8 +47,12 @@
 		);
 	}
 
+	// A failed read draws its gate instead of the list, so the rows are only
+	// ever the ones the engine answered with.
+	const rows = $derived(data.schemas.ok ? data.schemas.value : []);
+
 	let filtered = $derived(
-		data.schemas.filter((s: Schema) => matches(s, query.trim().toLowerCase())),
+		rows.filter((s: Schema) => matches(s, query.trim().toLowerCase())),
 	);
 
 	/**
@@ -70,7 +74,7 @@
 			rows: st?.rows ?? null,
 			updated: st?.last_updated ?? null,
 			fields: fields.length,
-			relations: planSchemaRelations(schema, data.schemas).length,
+			relations: planSchemaRelations(schema, rows).length,
 		};
 	}
 
@@ -137,13 +141,14 @@
 	);
 </script>
 
-<PageTitle title="Content" />
-
 {#snippet sortHeader(key: CollectionSort, label: string, align: 'left' | 'right')}
 	<th scope="col" aria-sort={ariaSort(key)} class={align === 'right' ? 'text-right' : undefined}>
+		<!-- The header row is 40px tall and the scroll box clips the link's 44px
+		     hit area to it. Under a finger the link gives back 4px of its negative
+		     margin, so the row grows to 44px and holds the whole area. -->
 		<a
 			href={sortHref(key)}
-			class="relative -my-1 py-1 inline-flex items-center gap-1 hit-area outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-brand"
+			class="relative -my-1 coarse:-my-0.5 py-1 inline-flex items-center gap-1 hit-area outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-brand"
 		>
 			{label}
 			{#if data.sort === key}
@@ -159,16 +164,28 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="ghost" size="sm" href="/admin/releases">
-			<CalendarClock size={ICON.sm} /> Releases
-		</Button>
+		<!-- Releases are served by the same plugin, so a role it refuses here
+		     is refused there too. -->
+		{#if data.schemas.ok || data.schemas.gate.state !== 'forbidden'}
+			<Button variant="ghost" size="sm" href="/admin/releases">
+				<CalendarClock size={ICON.sm} /> Releases
+			</Button>
+		{/if}
 		<Button variant="secondary" size="sm" href="/admin/schema">
 			<LayoutGrid size={ICON.sm} /> Schema builder
 		</Button>
 	{/snippet}
 
-	{#if data.schemas.length === 0 && data.filter === 'all' && !data.query}
+	{#if !data.schemas.ok}
+		<GateNotice
+			level={2}
+			gate={data.schemas.gate}
+			title="Content"
+			absent="This build does not serve the collections."
+		/>
+	{:else if rows.length === 0 && data.filter === 'all' && !data.query}
 		<EmptyState
+			level={2}
 			title="No schemas yet"
 			description="Build a schema first, then come back here to manage content."
 		>
@@ -206,12 +223,7 @@
 				{/snippet}
 				{#snippet filters()}
 					<nav aria-label="Narrow the collections">
-						<SegmentedControl
-							label="Narrow the collections"
-							labelHidden
-							value={data.filter}
-							options={filterOptions}
-						/>
+						<FilterChips label="Narrow the collections" value={data.filter} options={filterOptions} />
 					</nav>
 				{/snippet}
 			</ListToolbar>
@@ -221,7 +233,7 @@
 			<SectionHeading level={2}>
 				Collections
 				<span class="ml-2 text-sm font-normal tabular-nums text-faint">
-					{data.total ?? data.schemas.length}
+					{data.total ?? rows.length}
 					{#if data.filter !== 'all'}{filterLabel}{/if}
 				</span>
 			</SectionHeading>
@@ -316,7 +328,7 @@
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
-					count={data.schemas.length}
+					count={rows.length}
 					total={data.total ?? undefined}
 					hasNext={data.hasMore}
 					noun="collections"

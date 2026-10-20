@@ -105,8 +105,20 @@ describe('admin/plugins/[name]/+page.server.ts load', () => {
 		expect((await runLoad('media', REPORT)).plugin).toMatchObject({ name: 'media', state: 'not-built' });
 	});
 
-	it('describes nothing for a reader the report is refused to', async () => {
-		expect((await runLoad('search', null)).plugin).toBeNull();
+	it('says an operator whose status read failed could not be told, rather than describing nothing', async () => {
+		const result = (await runLoad('search', null)) as DetailLoadResult & { statusGate: { state: string } | null };
+		expect(result.plugin).toBeNull();
+		expect(result.statusGate).toMatchObject({ state: 'error' });
+	});
+
+	it('tells a reader outside the operator roles the report is not theirs', async () => {
+		const result = (await runLoad('search', null, ['editor'])) as DetailLoadResult & { statusGate: { state: string } | null };
+		expect(result.statusGate).toEqual({ state: 'forbidden' });
+	});
+
+	it('raises no notice when the report was read', async () => {
+		const result = (await runLoad('search', REPORT)) as DetailLoadResult & { statusGate: unknown };
+		expect(result.statusGate).toBeNull();
 	});
 
 	it("reads this plugin's sampled requests for a super admin", async () => {

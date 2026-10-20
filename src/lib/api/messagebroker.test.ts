@@ -5,6 +5,7 @@ import {
 	brokerGate,
 	brokerHealth,
 	deliveryRate,
+	hasBroker,
 	healthTone,
 	type BrokerStatus,
 } from './messagebroker';
@@ -40,10 +41,27 @@ describe('the one sentence the page leads with', () => {
 
 	// A fresh install has published nothing, which is correct and must not
 	// read as a fault.
+	it('reads refused attempts through the outbox, where only dead events are lost', () => {
+		const outbox = { enabled: true, available: true, pending: 0, dead: 0 };
+		expect(brokerHealth(status({ failed: 3, published: 10, outbox }))).toBe('publishing');
+		expect(brokerHealth(status({ failed: 3, outbox: { ...outbox, pending: 2 } }))).toBe('retrying');
+		expect(brokerHealth(status({ failed: 0, outbox: { ...outbox, dead: 1 } }))).toBe('lost');
+		expect(brokerHealth(status({ failed: 3, outbox: { ...outbox, available: false } }))).toBe('retrying');
+		expect(brokerHealth(status({ failed: 3, outbox: { ...outbox, enabled: false } }))).toBe('refusing');
+	});
+
 	it('says nothing published rather than healthy on a fresh install', () => {
 		expect(brokerHealth(status({ published: 0 }))).toBe('idle');
 		expect(brokerHealth(null)).toBe('idle');
 		expect(healthTone('idle')).toBe('neutral');
+	});
+
+	// With no broker the plugin counts every discarded event as published.
+	it('says events are discarded when no broker is set, whatever the counters say', () => {
+		expect(brokerHealth(status({ backend: '', published: 25 }))).toBe('discarding');
+		expect(brokerHealth(status({ backend: 'noop', published: 0 }))).toBe('discarding');
+		expect(brokerHealth(status({ backend: '', degraded: true }))).toBe('disabled');
+		expect(healthTone('discarding')).toBe('warn');
 	});
 
 	it('says publishing when events are getting through', () => {
@@ -64,6 +82,13 @@ describe('the delivery rate', () => {
 		expect(deliveryRate(status({ published: 0, failed: 0, dropped: 0 }))).toBeNull();
 		expect(deliveryRate(null)).toBeNull();
 	});
+
+	it('reports nothing when there is no broker to reach', () => {
+		expect(deliveryRate(status({ backend: '', published: 25 }))).toBeNull();
+		expect(deliveryRate(status({ backend: 'noop', published: 25 }))).toBeNull();
+		expect(hasBroker(status({ backend: 'kafka' }))).toBe(true);
+		expect(hasBroker(null)).toBe(false);
+	});
 });
 
 describe('naming the backend', () => {
@@ -72,6 +97,7 @@ describe('naming the backend', () => {
 		expect(backendLabel('kafka')).toBe('Apache Kafka');
 		expect(backendLabel('rabbitmq')).toBe('RabbitMQ');
 		expect(backendLabel('')).toBe('No broker configured');
+		expect(backendLabel('noop')).toBe('No broker configured');
 	});
 
 	it('prints a backend it does not know rather than hiding it', () => {
@@ -83,7 +109,8 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(brokerGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(brokerGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(brokerGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(brokerGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(brokerGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as a healthy broker', () => {

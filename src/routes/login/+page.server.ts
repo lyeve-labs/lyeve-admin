@@ -1,13 +1,18 @@
 import { redirect, fail } from '@sveltejs/kit';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, sessionUser } from '$lib/server/authz';
 import type { PageServerLoad, Actions } from './$types';
 import { createClient, ApiError } from '@lyeve-labs/client';
-import { getMe, mfaVerify, isMFAChallenge, type LoginResponse } from '@lyeve-labs/client-rest';
+import { mfaVerify, isMFAChallenge, type LoginResponse } from '@lyeve-labs/client-rest';
 import { checkRateLimit } from '$lib/server/rate-limit';
-import { clearSessionCookie, setSessionCookie, sessionToken } from '$lib/server/session-cookie';
+import { clientAddressOf } from '$lib/server/engine';
+import { secondFactorFailure } from '$lib/server/second-factor';
+import { clearSessionCookie, setRefreshCookie, setSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import { adminReturnPath } from '$lib/server/local-path';
 import { LANDING } from '$lib/landing';
 import { challengeFrom } from '$lib/captcha';
+import { organizationFromForm, organizationFromUrl } from '$lib/organization';
+
+const SIGN_IN_UNAVAILABLE = 'Sign-in is unavailable right now. Please try again shortly.';
 
 /**
  * The page a sign-in returns to: the `next` query when it is an admin page,
@@ -41,16 +46,32 @@ async function providerNames(
 	}
 }
 
+/**
+ * Whether a plugin's public sign-in route is mounted. The recovery routes take
+ * POST only, so a GET answers 405 while the plugin runs and 404 when it does
+ * not, and asks the plugin for nothing. Only a definite 404 hides the link: any
+ * other answer, or none, leaves it, because the form reports a refusal anyway.
+ */
+async function routeMounted(fetch: typeof globalThis.fetch, url: string): Promise<boolean> {
+	try {
+		return (await fetch(url)).status !== 404;
+	} catch {
+		return true;
+	}
+}
+
 export const load: PageServerLoad = async (event) => {
 	const { fetch, cookies } = event;
 
 	// Already logged in, or only holding a cookie that says so? A session the
 	// engine has revoked or expired still looks like one from here, and sending
 	// its holder to /admin means bouncing straight back, forever. Ask the engine
-	// before trusting it, and drop what it rejects so the form renders.
+	// before trusting it, and drop what it rejects so the form renders. An
+	// engine that cannot answer has rejected nothing, so the cookie stays and
+	// the reader sees the outage page.
 	const token = sessionToken(event);
 	if (token) {
-		const user = await getMe(authedClient(event)).catch(() => null);
+		const user = await sessionUser(authedClient(event));
 		if (user) {
 			redirect(302, returnTo(event.url));
 		}
@@ -61,12 +82,22 @@ export const load: PageServerLoad = async (event) => {
 	// refuse, so a non-ok response means no button and never an error on the
 	// form: somebody with a password must still be able to get in when SSO is
 	// unavailable.
-	const [oauthProviders, samlProviders] = await Promise.all([
+	const [oauthProviders, samlProviders, passwordReset, magicLink] = await Promise.all([
 		providerNames(fetch, '/api/admin/auth/oauth-providers'),
 		providerNames(fetch, '/api/admin/auth/saml-providers'),
+		routeMounted(fetch, '/api/admin/auth/password-reset/request'),
+		routeMounted(fetch, '/api/admin/auth/magic-link/request'),
 	]);
 
-	return { oauthProviders, samlProviders };
+	return {
+		oauthProviders,
+		samlProviders,
+		passwordReset,
+		magicLink,
+		ended: event.url?.searchParams.has('ended') === true,
+		// A link that names the organization fills the field in, and the reader can change or clear it.
+		carried: organizationFromUrl(event.url),
+	};
 };
 
 export const actions: Actions = {
@@ -74,7 +105,7 @@ export const actions: Actions = {
 		const { request, fetch, cookies } = event;
 
 		// Rate limit login attempts per IP to deter credential stuffing.
-		const ip = event.getClientAddress();
+		const ip = clientAddressOf(event);
 		const limit = checkRateLimit(ip);
 		if (!limit.allowed) {
 			return fail(429, { error: 'Too many attempts. Please try again later.', retryAfterSec: limit.retryAfterSec });
@@ -88,20 +119,13 @@ export const actions: Actions = {
 			const code = form.get('code') as string;
 			if (!code) return { error: 'Verification code is required.', mfa_required: true, challenge_token: challengeToken };
 			try {
-				const res = await mfaVerify(challengeToken, code, createClient(fetch));
+				const res: { token: string; refresh_token?: string } = await mfaVerify(challengeToken, code, createClient(fetch));
 				setSessionCookie(event, res.token);
+				setRefreshCookie(event, res.refresh_token);
 			} catch (e) {
-				// The engine returns 429 for both MFA lockout and challenge
-				// exhaustion. Calling either an invalid code tells the user to
-				// keep retrying the one thing that cannot work.
-				if (e instanceof ApiError && e.status === 429) {
-					return fail(429, {
-						error: 'Too many verification attempts. Please wait before trying again.',
-						mfa_required: true,
-						challenge_token: challengeToken,
-					});
-				}
-				return { error: 'Invalid code.', mfa_required: true, challenge_token: challengeToken };
+				const failed = secondFactorFailure(e);
+				if (failed.restart) return fail(failed.status, { error: failed.error });
+				return fail(failed.status, { error: failed.error, mfa_required: true, challenge_token: challengeToken });
 			}
 			redirect(302, returnTo(event.url));
 		}
@@ -110,9 +134,15 @@ export const actions: Actions = {
 		const email = form.get('email') as string;
 		const password = form.get('password') as string;
 
+		const typed = String(form.get('tenant') ?? '').trim();
 		if (!email || !password) {
-			return { error: 'Email and password are required.' };
+			return { error: 'Email and password are required.', tenant: typed };
 		}
+		// Only the shape is checked. Whether the organization exists is never
+		// asked, and a wrong one is refused by the engine exactly as a wrong
+		// password is.
+		const organization = organizationFromForm(form);
+		if (!organization.ok) return fail(400, { error: organization.error, tenant: typed });
 
 		// The captcha plugin reads the token from the login body itself, so it
 		// travels beside the credentials rather than in a header. Absent until
@@ -120,20 +150,23 @@ export const actions: Actions = {
 		const captchaToken = String(form.get('captcha_token') ?? '').trim();
 		const body: Record<string, string> = { email, password };
 		if (captchaToken) body.captcha_token = captchaToken;
+		if (organization.value) body.tenant = organization.value;
 
 		const client = createClient(fetch);
 		try {
-			const res = await client.post<LoginResponse>('/api/admin/auth/login', body);
+			const res = await client.post<LoginResponse & { refresh_token?: string }>('/api/admin/auth/login', body);
 			if (isMFAChallenge(res)) {
 				// Return challenge token to trigger TOTP step in the UI.
 				return { mfa_required: true, challenge_token: res.challenge_token };
 			}
 			setSessionCookie(event, res.token);
+			setRefreshCookie(event, res.refresh_token);
 		} catch (e) {
 			// Only a rejected credential should read as a rejected credential.
 			// The engine rate-limits this endpoint at 5 attempts, and reporting
 			// that as a bad password sends people to reset a password that was
-			// never wrong. A 5xx reported the same way hides an outage.
+			// never wrong. A 5xx reported the same way hides an outage, and so
+			// does an engine that never answered.
 			if (e instanceof ApiError) {
 				// After repeated failures the engine asks for a challenge. A 400
 				// carrying it means the token was missing or refused. A 401
@@ -149,16 +182,19 @@ export const actions: Actions = {
 								: 'Complete the security check to sign in.',
 						captcha,
 						email,
+						tenant: typed,
 					});
 				}
 				if (e.status === 429) {
 					return fail(429, { error: 'Too many attempts. Please try again in a moment.' });
 				}
 				if (e.status >= 500) {
-					return fail(e.status, { error: 'Sign-in is unavailable right now. Please try again shortly.' });
+					return fail(e.status, { error: SIGN_IN_UNAVAILABLE });
 				}
+			} else {
+				return fail(503, { error: SIGN_IN_UNAVAILABLE });
 			}
-			return { error: 'Invalid email or password.' };
+			return { error: 'Invalid email or password.', tenant: typed };
 		}
 
 		redirect(302, returnTo(event.url));

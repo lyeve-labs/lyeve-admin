@@ -1,19 +1,24 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
+	SECRET_MASK,
 	SYNTHETIC_OK,
 	acknowledgeAlert,
 	createProbe,
 	deleteProbe,
 	getProbeChannels,
+	keptConfig,
 	listOpenAlerts,
 	listProbes,
+	probeHealth,
 	probeType,
 	putProbeChannels,
+	readProbeLimits,
+	runOutcome,
 	runProbeNow,
 	syntheticGate,
 	updateProbe,
@@ -21,10 +26,11 @@ import {
 	type ProbeAlert,
 	type ProbeChannels,
 	type ProbeConfig,
+	type ProbeLimits,
 	type SyntheticGate,
 } from '$lib/api/synthetic';
 import { channelsFrom, hasChannels } from '$lib/api/alert-channels';
-import { gateOf, type Gate } from '$lib/api/gate';
+import { gateOf, section, type Gate, type Section } from '$lib/api/gate';
 
 /** What the notice channels drawer posts its fields under. */
 const CHANNEL_PREFIX = 'channel_';
@@ -34,20 +40,24 @@ const CHANNEL_PREFIX = 'channel_';
  * A refused or failed read is said in the drawer rather than as no channels.
  */
 type ChannelsFor = { probe: Probe; read: ProbeChannels | null; gate: Gate } | null;
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
+
+const NO_ALERTS: Section<ProbeAlert[]> = { ok: true, value: [] };
+
+/** The probes failing and paused across every probe, when every probe was read. */
+interface ProbeCounts {
+	failing: number;
+	paused: number;
+}
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 
 /**
- * Bounds the engine does not enforce.
- *
- * A probe is the instance making requests of itself on a timer, so an interval
- * of one second is a load generator with a monitoring label on it. The floor
- * is here rather than in the engine because the engine's callers include a
- * migration and a restore, which legitimately write whatever was stored.
+ * The interval floor is not here. The plugin holds every write to the floor
+ * the install is licensed for and answers it on its limits read, which the
+ * form's hint shows, and a write under it is refused with the reason.
  */
-const MIN_INTERVAL_SECONDS = 30;
 const MIN_TIMEOUT_SECONDS = 1;
 
 function positive(raw: FormDataEntryValue | null, fallback: number): number {
@@ -80,6 +90,31 @@ function configFor(type: string, form: FormData): ProbeConfig {
 	}
 }
 
+interface Kept {
+	config: ProbeConfig;
+	regions?: string[];
+	/** The secrets the read masked, which a save without them erases. */
+	masked: { password: boolean; auth_token: boolean };
+}
+
+/**
+ * What an edit read and the form does not show: the stored config and regions
+ * the drawer sends back as JSON. The plugin replaces both whole on a save, so
+ * anything left out of the body is erased.
+ */
+function keptFrom(raw: FormDataEntryValue | null): Kept {
+	const none: Kept = { config: {}, masked: { password: false, auth_token: false } };
+	if (typeof raw !== 'string' || raw === '') return none;
+	try {
+		const read = JSON.parse(raw) as { config?: ProbeConfig | null; regions?: unknown };
+		const regions = Array.isArray(read.regions) ? read.regions.filter((r): r is string => typeof r === 'string') : undefined;
+		const masked = { password: read.config?.password === SECRET_MASK, auth_token: read.config?.auth_token === SECRET_MASK };
+		return { config: keptConfig(read.config), regions, masked };
+	} catch {
+		return none;
+	}
+}
+
 /** The one field each probe type cannot run without. */
 const REQUIRED_TARGET: Readonly<Record<string, { field: keyof ProbeConfig; says: string }>> = {
 	health_check: { field: 'url', says: 'A health check needs a URL to fetch.' },
@@ -96,45 +131,69 @@ export const load: PageServerLoad = async (event) => {
 	if (notRunning(plugins, PLUGIN.syntheticMonitoring)) {
 		return {
 			probes: [] as Probe[],
-			alerts: [] as ProbeAlert[],
+			alerts: NO_ALERTS,
 			total: null as number | null,
 			limit,
 			offset,
 			hasMore: false,
 			gate: { state: 'absent' } as SyntheticGate,
 			channelsFor: null as ChannelsFor,
+			limits: null as ProbeLimits | null,
+			counts: null as ProbeCounts | null,
 		};
 	}
 
 	const client = authedClient(event);
 	let probes: Probe[] = [];
+	let every: Probe[] = [];
+	let counts: ProbeCounts | null = null;
 	let total: number | null = null;
 	let hasMore = false;
 	let gate: SyntheticGate = SYNTHETIC_OK;
 	try {
-		const page = pageOf(await listProbes(client, limit + 1, offset), limit, offset);
-		probes = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
+		const read = await listProbes(client, limit + 1, offset);
+		if (Array.isArray(read)) {
+			// The plugin answers every probe as a bare array and ignores the
+			// window it was asked for, so the page is cut here, and every count
+			// covers every probe rather than the rows on this page.
+			every = read;
+			total = read.length;
+			probes = read.slice(offset, offset + limit);
+			hasMore = offset + probes.length < total;
+			counts = {
+				failing: read.filter((p) => probeHealth(p) === 'failing').length,
+				paused: read.filter((p) => probeHealth(p) === 'paused').length,
+			};
+		} else {
+			const page = pageOf(read, limit, offset);
+			every = page.rows;
+			probes = page.rows;
+			total = page.total;
+			hasMore = page.hasMore;
+		}
+		const back = pastEndOffset(probes.length, limit, offset, total);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
+		if (isRedirect(err)) throw err;
 		gate = syntheticGate(err);
 	}
 
 	// Alerts are a band above the list. Losing them must not lose the probes,
-	// but an unread alert list is never rendered as "nothing is wrong": the
-	// page shows the band only when the read succeeded.
+	// and an unread alert list is never rendered as "nothing is wrong": the
+	// band says the read failed.
 	const alerts =
 		gate.state === 'ok'
-			? await listOpenAlerts(client)
-					.then((p) => p.data ?? [])
-					.catch((): ProbeAlert[] => [])
-			: [];
+			? await section(
+					listOpenAlerts(client).then((p) => rowsOf(p)),
+					'The open alerts could not be read. This is not a report that no probe is alerting.'
+				)
+			: NO_ALERTS;
 
 	// `?channels=<id>` opens the notice channels drawer on that probe. The
 	// channels are a read of their own, so they are asked for only then.
 	let channelsFor: ChannelsFor = null;
 	const channelsId = event.url.searchParams.get('channels');
-	const probe = channelsId ? probes.find((p) => p.id === channelsId) : undefined;
+	const probe = channelsId ? every.find((p) => p.id === channelsId) : undefined;
 	if (gate.state === 'ok' && probe) {
 		try {
 			channelsFor = { probe, read: await getProbeChannels(client, probe.id), gate: { state: 'ok' } };
@@ -143,7 +202,11 @@ export const load: PageServerLoad = async (event) => {
 		}
 	}
 
-	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor };
+	// What a write will accept. Unread, the form says less rather than a
+	// floor that may not be this install's.
+	const limits = gate.state === 'ok' ? await readProbeLimits(client).catch(() => null) : null;
+
+	return { probes, alerts, total, limit, offset, hasMore, gate, channelsFor, limits, counts };
 };
 
 async function save(event: Parameters<Actions[string]>[0], id: string | null) {
@@ -153,24 +216,32 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 
 	const name = String(form.get('name') ?? '').trim();
 	const type = probeType(String(form.get('type') ?? ''));
-	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.' });
-	if (!type) return fail(400, { error: 'Choose a probe type.' });
+	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' });
+	if (!type) return fail(400, { error: 'Choose a probe type.', drawer: 'probe' });
 
-	const config = configFor(type, form);
+	const kept = id ? keptFrom(form.get('kept')) : keptFrom(null);
+	const config: ProbeConfig = { ...kept.config, ...configFor(type, form) };
+	// No read returns a stored secret, so a save sends only the one typed here.
+	// The plugin replaces the config whole, so a save without it would erase
+	// the stored one.
+	const secret = String(form.get('secret') ?? '');
+	if (!secret && type === 'login_flow' && kept.masked.password) {
+		return fail(400, { error: 'This probe has a stored password that no read returns. Enter it again to save.', drawer: 'probe' });
+	}
+	if (!secret && type === 'api_canary' && kept.masked.auth_token) {
+		return fail(400, { error: 'This canary has a stored auth token that no read returns. Enter it again to save.', drawer: 'probe' });
+	}
+	if (secret && type === 'login_flow') config.password = secret;
+	if (secret && type === 'api_canary') config.auth_token = secret;
 	const required = REQUIRED_TARGET[type];
 	if (required && !config[required.field]) {
-		return fail(400, { error: required.says });
+		return fail(400, { error: required.says, drawer: 'probe' });
 	}
 
 	const interval = positive(form.get('interval_seconds'), 300);
-	if (interval < MIN_INTERVAL_SECONDS) {
-		return fail(400, {
-			error: `A probe runs against this instance, so the shortest interval is ${MIN_INTERVAL_SECONDS} seconds.`,
-		});
-	}
 	const timeout = positive(form.get('timeout_seconds'), 10);
 	if (timeout < MIN_TIMEOUT_SECONDS || timeout >= interval) {
-		return fail(400, { error: 'The timeout has to be shorter than the interval.' });
+		return fail(400, { error: 'The timeout has to be shorter than the interval.', drawer: 'probe' });
 	}
 
 	const body = {
@@ -181,13 +252,15 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		interval_seconds: interval,
 		timeout_seconds: timeout,
 		alert_threshold: positive(form.get('alert_threshold'), 3),
+		...(kept.regions ? { regions: kept.regions } : {}),
 	};
 
 	try {
 		if (id) await updateProbe(client, id, body);
 		else await createProbe(client, body);
 	} catch (err) {
-		return actionFailure(err, 'The probe could not be saved.');
+		const failed = actionFailure(err, 'The probe could not be saved.');
+		return fail(failed.status, { ...failed.data, drawer: 'probe' });
 	}
 	return { saved: name };
 }
@@ -198,7 +271,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No probe was named.' });
+		if (!id) return fail(400, { error: 'No probe was named.', drawer: 'probe' });
 		return save(event, id);
 	},
 
@@ -223,8 +296,8 @@ export const actions: Actions = {
 		const id = String(form.get('id') ?? '');
 		if (!id) return fail(400, { error: 'No probe was named.' });
 		try {
-			const result = await runProbeNow(client, id);
-			return { ran: id, status: result.status, ms: result.response_time_ms };
+			const run = runOutcome(await runProbeNow(client, id));
+			return { ran: id, status: run.status, ms: run.ms, failed: run.failed, regions: run.regions };
 		} catch (err) {
 			return actionFailure(err, 'The probe could not be run.');
 		}

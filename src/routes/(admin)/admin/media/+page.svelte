@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Button,
@@ -11,10 +10,11 @@
 		Pagination,
 		SearchInput,
 		SegmentedControl,
-		Toolbar,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { csrfHeaders } from '$lib/api/csrf';
+	import { SIGN_IN_AGAIN } from '$lib/session';
+	import { renewingOnce } from '$lib/renew';
 	import type { MediaItem } from '$lib/api/media';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import type { PageData, ActionData } from './$types';
@@ -32,11 +32,15 @@
 	} from '$lib/components/media/view-preference';
 	import { ICON } from '$lib/icon';
 	import { formRefusal } from '$lib/api/refusal';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	// A refused transform belongs to the file it was asked for, and only that
-	// file's drawer shows it.
+	// The drawer's forms share one `form` result with the page's. Each failure
+	// names the file it was asked for, and only that file's drawer shows it.
+	// A refused transform carries a refusal as well as its sentence.
 	const transformFailure = $derived.by(() => {
 		const f = form as Record<string, unknown> | null;
 		if (!f || !('transformError' in f) || f.transformId !== selected?.id) return null;
@@ -49,7 +53,7 @@
 	 * showing page one. A delete goes back through the action result, which is
 	 * also what keeps the count under the pager honest.
 	 */
-	const items = $derived<MediaItem[]>(data.items ?? []);
+	const items = $derived<MediaItem[]>(data.items.ok ? data.items.value : []);
 	const total = $derived(data.total ?? items.length);
 	let uploading = $state(false);
 	// Import from URL: a file on another site copied into the library through
@@ -102,16 +106,31 @@
 		uploadError = '';
 		let uploaded = 0;
 
+		// The upload goes from the browser to the engine's own route rather than
+		// through a form action. A file can be larger than the body limit the
+		// admin server accepts, and the engine applies the limit that is meant
+		// for uploads.
 		for (const file of Array.from(files)) {
 			const body = new FormData();
 			body.append('file', file);
 			try {
-				const res = await fetch('/api/admin/media', { method: 'POST', headers: csrfHeaders(), body });
+				const res = await renewingOnce(() => fetch('/api/admin/media', { method: 'POST', headers: csrfHeaders(), body }));
+				// A 401 after a renewal is a session that ended. The files stay
+				// picked, so the reader can sign in and send them again.
+				if (res.status === 401) {
+					uploadError = SIGN_IN_AGAIN;
+					break;
+				}
 				if (!res.ok) {
-					const j = (await res.json().catch(() => ({ error: 'Upload failed' }))) as {
-						error?: string;
-					};
-					uploadError = j.error ?? 'Upload failed';
+					const j = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+					// Only the engine's refusals carry a code, and their sentence is
+					// written for the operator. A 5xx can come from a proxy after the
+					// engine stored the file, so it names the file and claims nothing.
+					if (res.status >= 500) {
+						uploadError = `The engine did not confirm ${file.name}. Check the library, then try again in a moment.`;
+					} else {
+						uploadError = j.code && j.error ? j.error : `${file.name} was refused, so it was not stored.`;
+					}
 					break;
 				}
 				uploaded += 1;
@@ -135,38 +154,43 @@
 	}
 </script>
 
-<PageTitle title="Media library" />
-
-<PageShell title="Media library" description={`${total} ${total === 1 ? 'file' : 'files'}`} width="wide">
+<PageShell
+	title="Media library"
+	description={data.items.ok ? `${total} ${total === 1 ? 'file' : 'files'}` : undefined}
+	width="wide"
+>
 	{#snippet actions()}
-		<!-- The kit's FileInput is a drop zone, and the library's upload control is
-		     a button in the title row, so the picker stays hidden and the Button
-		     opens it. A Button inside a <label> does not work: the label's
-		     activation behavior is skipped for interactive descendants, so the
-		     picker would never open for a mouse user.
+		<!-- A library that could not be read offers nothing to add to it. -->
+		{#if data.items.ok}
+			<!-- The kit's FileInput is a drop zone, and the library's upload control is
+			     a button in the title row, so the picker stays hidden and the Button
+			     opens it. A Button inside a <label> does not work: the label's
+			     activation behavior is skipped for interactive descendants, so the
+			     picker would never open for a mouse user.
 
-		     Hidden from the eye is not hidden from a screen reader: sr-only keeps
-		     the picker in the accessibility tree, where an input carrying no label
-		     is announced as an unnamed file field. The name says what the picker
-		     does rather than repeating the Button, because the two are reached
-		     separately. -->
-		<input
-			bind:this={picker}
-			type="file"
-			multiple
-			accept="image/*,application/pdf,video/*,audio/*,text/*"
-			aria-label="Choose files to upload"
-			tabindex={-1}
-			class="sr-only"
-			onchange={handleUpload}
-			disabled={uploading}
-		/>
-		<Button variant="secondary" size="sm" onclick={() => (importOpen = true)}>
-			<Link size={ICON.sm} /> Import from URL
-		</Button>
-		<Button variant="primary" size="sm" loading={uploading} onclick={() => picker?.click()}>
-			<Upload size={ICON.sm} /> Upload files
-		</Button>
+			     Hidden from the eye is not hidden from a screen reader: sr-only keeps
+			     the picker in the accessibility tree, where an input carrying no label
+			     is announced as an unnamed file field. The name says what the picker
+			     does rather than repeating the Button, because the two are reached
+			     separately. -->
+			<input
+				bind:this={picker}
+				type="file"
+				multiple
+				accept="image/*,application/pdf,video/*,audio/*,text/*"
+				aria-label="Choose files to upload"
+				tabindex={-1}
+				class="sr-only"
+				onchange={handleUpload}
+				disabled={uploading}
+			/>
+			<Button variant="secondary" size="sm" onclick={() => (importOpen = true)}>
+				<Link size={ICON.sm} /> Import from URL
+			</Button>
+			<Button variant="primary" size="sm" loading={uploading} onclick={() => picker?.click()} data-media-upload>
+				<Upload size={ICON.sm} /> Upload files
+			</Button>
+		{/if}
 	{/snippet}
 
 	{#if uploadError}
@@ -178,14 +202,18 @@
 	{/if}
 
 	<form method="GET" data-testid="media-filters">
-		<Toolbar label="Filter media">
-			<label for="media-search" class="sr-only">Search files</label>
-			<SearchInput id="media-search" name="q" bind:value={q} placeholder="File name" class="w-64" />
-			<Button type="submit" variant="secondary">Search</Button>
-			{#if data.q}
-				<Button variant="ghost" href="/admin/media">Clear</Button>
-			{/if}
-			{#snippet actions()}
+		<ListToolbar label="Filter media">
+			{#snippet search()}
+				<div class="flex items-center gap-2">
+					<label for="media-search" class="sr-only">Search files</label>
+					<SearchInput id="media-search" name="q" bind:value={q} placeholder="File name" class="min-w-0 flex-1" />
+					<Button type="submit" variant="secondary">Search</Button>
+					{#if data.q}
+						<Button variant="ghost" href="/admin/media">Clear</Button>
+					{/if}
+				</div>
+			{/snippet}
+			{#snippet filters()}
 				<SegmentedControl
 					label="View"
 					labelHidden
@@ -194,13 +222,20 @@
 					onchange={writeMediaView}
 				/>
 			{/snippet}
-		</Toolbar>
+		</ListToolbar>
 	</form>
 
-	{#if items.length === 0 && data.q}
-		<EmptyState title="No files match" description="Clear the search to see the whole library." />
+	{#if !data.items.ok}
+		<GateNotice
+			level={2}
+			gate={data.items.gate}
+			title="Media library"
+			absent="The media plugin does not run on this instance, so there is no library to show."
+		/>
+	{:else if items.length === 0 && data.q}
+		<EmptyState level={2} title="No files match" description="Clear the search to see the whole library." />
 	{:else if items.length === 0}
-		<EmptyState title="No files uploaded yet." description="Images, PDFs, video and audio.">
+		<EmptyState level={2} title="No files uploaded yet." description="Images, PDFs, video and audio.">
 			{#snippet iconSnippet()}
 				<Image size={ICON.lg} />
 			{/snippet}
@@ -252,9 +287,7 @@
 			};
 		}}
 	>
-		{#if importError}
-			<Alert tone="danger">{importError}</Alert>
-		{/if}
+		<FormErrors message={importError || undefined} />
 		<Input id="import-url" name="url" label="Address" type="url" mono required placeholder="https://example.com/logo.png" bind:value={importUrl} />
 		<Input id="import-alt" name="alt_text" label="Alt text" hint="What the image shows, for readers who cannot see it." />
 		<Checkbox name="public" value="true" label="Publish it, so a site or a content field can use its address" bind:checked={importPublic} />
@@ -270,8 +303,9 @@
 	{deleting}
 	aiEnabled={data.aiEnabled}
 	suggestion={form && 'described' in form && form.described && form.described.id === selected?.id ? form.described.text : ''}
-	detailsError={form && 'detailsError' in form ? String(form.detailsError ?? '') : ''}
-	focalError={form && 'focalError' in form ? String(form.focalError ?? '') : ''}
+	deleteError={form && 'deleteError' in form && 'deleteId' in form && form.deleteId === selected?.id ? String(form.deleteError ?? '') : ''}
+	detailsError={form && 'detailsError' in form && 'detailsId' in form && form.detailsId === selected?.id ? String(form.detailsError ?? '') : ''}
+	focalError={form && 'focalError' in form && 'focalId' in form && form.focalId === selected?.id ? String(form.focalError ?? '') : ''}
 	focalSaved={!!form && 'focalSaved' in form && form.focalSaved === selected?.id}
 	transform={form && 'transform' in form && form.transform && form.transform.id === selected?.id ? form.transform : null}
 	transformError={transformFailure?.error ?? ''}
@@ -296,7 +330,13 @@
 			deleting = false;
 			if (result.type === 'success') selectedId = null;
 			await update();
-			if (result.type === 'success') toast.success(`Deleted ${name}`);
+			if (result.type === 'success') {
+				toast.success(`Deleted ${name}`);
+				// The drawer's opener was the deleted file's tile, so focus would
+				// fall to the page body. It goes to the library's own control.
+				await tick();
+				document.querySelector<HTMLElement>('[data-media-upload]')?.focus();
+			}
 		};
 	}}
 >

@@ -19,6 +19,8 @@
 	import type { Snippet } from 'svelte';
 	import { effectiveGate, type AiGate } from '$lib/api/ai';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { ICON } from '$lib/icon';
 
 	export type AiTab = 'providers' | 'prompts' | 'transcripts' | 'prices' | 'settings';
@@ -28,6 +30,7 @@
 		gate,
 		layoutGate,
 		noun,
+		level = 3,
 		children,
 	}: {
 		tab: AiTab;
@@ -37,6 +40,11 @@
 		layoutGate: AiGate;
 		/** The resource, in the plural, for the forbidden words. */
 		noun: string;
+		/**
+		 * The heading level of the title. 3 by default, for a block inside a
+		 * section. A caller placed straight under the page title passes 2.
+		 */
+		level?: 2 | 3;
 		children: Snippet;
 	} = $props();
 
@@ -53,6 +61,25 @@
 	const blocked = $derived(effective.state !== 'ok' && !(tab === 'settings' && effective.state === 'off'));
 
 	let switchForm = $state<HTMLFormElement | null>(null);
+
+	/*
+	 * The switch posts to the settings page's action from whatever tab is open.
+	 * Its failure is kept here and shown under the switch, because the tab's
+	 * own `form` belongs to the tab's forms and only one tab drew it. A success
+	 * reloads the layout, which reads the switch on again.
+	 */
+	let switchError = $state('');
+	const flip: SubmitFunction = () => {
+		switchError = '';
+		return async ({ result, update }) => {
+			if (result.type === 'failure') {
+				const said = (result.data as { error?: unknown } | undefined)?.error;
+				switchError = typeof said === 'string' && said ? said : 'The setting could not be saved.';
+				return;
+			}
+			await update();
+		};
+	};
 </script>
 
 <!-- Wrapping, because five tabs on one line are wider than a phone and the
@@ -64,12 +91,14 @@
 {:else if effective.state === 'locked'}
 	<NotEnabled
 		title="AI"
+		{level}
 		description="Providers, prompts, transcripts and the editor assistant are part of the AI plugin."
 	/>
 {:else if effective.state === 'forbidden'}
 	<Alert tone="danger" title="Not allowed">Your role cannot read AI {noun}.</Alert>
 {:else if effective.state === 'absent'}
 	<EmptyState
+		{level}
 		title="The AI plugin is not installed"
 		description="This instance does not carry the AI plugin, so there is nothing to configure here."
 	>
@@ -79,6 +108,7 @@
 	</EmptyState>
 {:else if effective.state === 'off'}
 	<EmptyState
+		{level}
 		title="AI is switched off for this tenant"
 		description="Every AI surface on this tenant is off: the providers, the editor assistant, the flow nodes and every call another plugin makes. Nothing is sent anywhere while it is off. The switch is the way back."
 	>
@@ -89,10 +119,11 @@
 			bind:this={switchForm}
 			method="POST"
 			action="/admin/ai/settings?/save"
-			use:enhance
+			use:enhance={flip}
 			class="mt-3 flex flex-col items-center gap-3"
 			data-testid="ai-off-switch"
 		>
+			<FormErrors message={switchError || undefined} />
 			<input type="hidden" name="enabled" value="true" />
 			<Toggle id="ai-off-toggle" label="AI for this tenant" checked={false} onchange={() => switchForm?.requestSubmit()} />
 			<Button variant="secondary" type="submit">Turn AI on</Button>
@@ -100,6 +131,7 @@
 	</EmptyState>
 {:else if effective.state === 'no_provider'}
 	<EmptyState
+		{level}
 		title="AI has nothing to answer through"
 		description="The plugin answered 503: no enabled provider is configured, or its store did not answer. Add or enable a provider, then try again."
 	>

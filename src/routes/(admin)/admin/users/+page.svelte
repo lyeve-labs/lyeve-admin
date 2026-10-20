@@ -1,20 +1,19 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
+		Alert,
 		Badge,
 		Button,
 		CheckboxGroup,
 		Drawer,
 		Select,
 		EmptyState,
+		FilterChips,
 		Input,
 		PageShell,
 		PasswordInput,
 		Pagination,
 		SearchInput,
-		SegmentedControl,
 		Table,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
@@ -23,19 +22,45 @@
 	import { invalidateAll } from '$app/navigation';
 	import { KeyRound, Pencil, Plus, Trash2, Users } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import { formRefusal } from '$lib/api/refusal';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { fieldErrors, tracked } from '$lib/forms.svelte';
+	import { confirmed, fieldErrors, tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
-	import { formatDate as formatDay } from '$lib/format';
+	import { formatDate } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
-	type User = PageData['users'][number];
+	type User = Extract<PageData['users'], { ok: true }>['value'][number];
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const errors = $derived(fieldErrors(form));
+	/*
+	 * Every action answers into the one `form`, so each failure names its
+	 * action and each surface shows only its own. A drawer shows a failure only
+	 * when it came back after the drawer opened, so a failed delete never
+	 * appears inside the next New user form as if that form had failed.
+	 */
+	type Failure = { action?: string; error?: string; fields?: Record<string, string> };
+	const failure = $derived(form && typeof form === 'object' && 'error' in form ? (form as Failure) : null);
+	let accountOpenedOver = $state.raw<unknown>(null);
+	let passwordOpenedOver = $state.raw<unknown>(null);
+	const accountFailure = $derived(
+		form !== accountOpenedOver && (failure?.action === 'create' || failure?.action === 'updateRoles') ? failure : null
+	);
+	const passwordFailure = $derived(
+		form !== passwordOpenedOver && failure?.action === 'setPassword' ? failure : null
+	);
+	const pageFailure = $derived(
+		failure && failure.action !== 'create' && failure.action !== 'updateRoles' && failure.action !== 'setPassword'
+			? failure
+			: null
+	);
+	const errors = $derived(fieldErrors(accountFailure));
+	const passwordErrors = $derived(fieldErrors(passwordFailure));
+	// A seat refusal renders with the numbers and the link the engine sent.
+	const refused = $derived(formRefusal(accountFailure));
 
 	// One drawer for both writes. A null target is a new account. A user is the
 	// account whose roles are being changed.
@@ -47,12 +72,14 @@
 	let tenant = $state('');
 	// A tenant is chosen only on an install with several. With one, the engine
 	// resolves it on its own.
+	const tenants = $derived(data.tenants.ok ? data.tenants.value : []);
 	const tenantOptions = $derived([
 		{ value: '', label: 'Choose a tenant' },
-		...data.tenants.map((t) => ({ value: t.slug, label: t.name && t.name !== t.slug ? `${t.name} (${t.slug})` : t.slug })),
+		...tenants.map((t) => ({ value: t.slug, label: t.name && t.name !== t.slug ? `${t.name} (${t.slug})` : t.slug })),
 	]);
 
 	function openCreate() {
+		accountOpenedOver = form;
 		editing = null;
 		email = '';
 		password = '';
@@ -62,6 +89,7 @@
 	}
 
 	function openEdit(user: User) {
+		accountOpenedOver = form;
 		editing = user;
 		email = user.email;
 		password = '';
@@ -75,21 +103,11 @@
 	 * anything, so canceling here means the request is never made.
 	 */
 	function deleteAccount(email: string): SubmitFunction {
-		return async ({ cancel }) => {
-			const confirmed = await confirmDialog(
-				`Permanently delete ${email}?`,
-				'Their sessions end at once and their audit trail stays.',
-				{ confirmLabel: 'Delete' }
-			);
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${email}`);
-			};
-		};
+		return confirmed(
+			`Delete user ${email}`,
+			'Their sessions end at once and their audit trail stays.',
+			{ confirmLabel: 'Delete', success: `Deleted ${email}` },
+		);
 	}
 
 	// The password drawer is its own, not a third mode of the one above: it
@@ -100,6 +118,7 @@
 	let newPassword = $state('');
 
 	function openSetPassword(user: User) {
+		passwordOpenedOver = form;
 		passwordFor = user;
 		newPassword = '';
 		passwordOpen = true;
@@ -139,19 +158,14 @@
 		};
 	};
 
-	// An account with no readable timestamp still has to render a row, so the
-	// cell names the gap rather than printing "Invalid Date".
-	function formatDate(iso: string | null | undefined): string {
-		return formatDay(iso, 'Unknown');
-	}
-
 	// The endpoint takes no search, so the box narrows the page on screen and
 	// the pager below still walks the whole collection.
 	let query = $state('');
 	let role = $state('');
 	const ROLE_FILTERS = [{ value: '', label: 'All' }, ...ROLE_OPTIONS];
+	const rows = $derived(data.users.ok ? data.users.value : []);
 	const visible = $derived(
-		data.users.filter(
+		rows.filter(
 			(u) => narrows(query, u.email, u.roles.join(' ')) && (role === '' || u.roles.includes(role))
 		)
 	);
@@ -170,22 +184,28 @@
 	const savePasswordSubmit = tracked(savePassword);
 </script>
 
-<PageTitle title="Users" />
-
 <PageShell
 	title="Users"
 	description="Admin accounts on this instance. Super admins only."
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} /> New user
-		</Button>
+		{#if data.users.ok}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} /> New user
+			</Button>
+		{/if}
 	{/snippet}
 
-	<FormErrors message={form?.error} fields={errors} />
+	<FormErrors message={pageFailure?.error} />
 
-	{#if data.users.length === 0}
+	<!-- The kit's empty state titles itself as an h3. This names the list
+	     under the page title so a heading list never skips a level. -->
+	<h2 class="sr-only">Accounts</h2>
+
+	{#if !data.users.ok}
+		<GateNotice gate={data.users.gate} title="Users" absent="This engine does not serve the accounts list." />
+	{:else if rows.length === 0}
 		<EmptyState
 			title="No users yet"
 			description="Create an account to give someone access to this instance."
@@ -206,7 +226,7 @@
 				<SearchInput id="user-search" bind:value={query} placeholder="Email or role on this page" />
 			{/snippet}
 			{#snippet filters()}
-				<SegmentedControl label="Role" labelHidden bind:value={role} options={ROLE_FILTERS} />
+				<FilterChips label="Role" bind:value={role} options={ROLE_FILTERS} />
 			{/snippet}
 		</ListToolbar>
 
@@ -228,7 +248,16 @@
 				<tbody>
 					{#each visible as user (user.id)}
 						<tr>
-							<td data-cell="nowrap">{user.email}</td>
+							<td data-cell="nowrap">
+								<div class="flex flex-wrap items-center gap-2">
+									<span>{user.email}</span>
+									<!-- Such an account belongs to one tenant, and its address can
+									     repeat in another, so two rows may show the same address. -->
+									{#if user.tenant_local}
+										<Badge tone="neutral">Signs in through your identity provider</Badge>
+									{/if}
+								</div>
+							</td>
 							<td data-cell="nowrap">
 								<div class="flex flex-wrap gap-1">
 									{#each user.roles as held (held)}
@@ -239,7 +268,7 @@
 									{/if}
 								</div>
 							</td>
-							<td data-cell="nowrap" class="text-xs text-faint">{formatDate(user.created_at)}</td>
+							<td data-cell="nowrap" class="text-xs text-faint">{formatDate(user.created_at, 'Unknown')}</td>
 							<td>
 								<div class="flex items-center justify-end gap-2">
 									<Button
@@ -285,7 +314,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.users.length}
+			count={rows.length}
 			hasNext={data.hasMore}
 			noun="accounts"
 			href={pageHref('/admin/users', data.limit)}
@@ -304,7 +333,7 @@
 		use:enhance={saveAccountSubmit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={form?.error} fields={errors} />
+		<FormErrors message={accountFailure?.error} fields={errors} {refused} />
 
 		{#if editing}
 			<input type="hidden" name="id" value={editing.id} />
@@ -327,10 +356,17 @@
 				bind:value={password}
 				required
 				autocomplete="new-password"
-				hint="At least 12 characters, with upper case, lower case and a digit"
+				hint="The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
 				error={errors.password}
 			/>
-			{#if data.tenants.length > 1}
+			{#if !data.tenants.ok}
+				<!-- Without the roster the form cannot offer the choice. Saying so
+				     here keeps a refusal for a missing tenant from reading as a
+				     fault in the fields the operator filled in. -->
+				<Alert tone="warn" title="Tenants could not be read">
+					This form cannot name the tenant a new account belongs to. On an install with several tenants the engine refuses the account. Reload the page to try again.
+				</Alert>
+			{:else if tenants.length > 1}
 				<input type="hidden" name="tenant_required" value="1" />
 				<Select
 					id="new-tenant"
@@ -375,7 +411,7 @@
 		use:enhance={savePasswordSubmit.enhance}
 		class="flex flex-col gap-4"
 	>
-		<FormErrors message={form?.error} fields={errors} />
+		<FormErrors message={passwordFailure?.error} fields={passwordErrors} />
 
 		{#if passwordFor}
 			<input type="hidden" name="id" value={passwordFor.id} />
@@ -387,7 +423,7 @@
 			bind:value={newPassword}
 			required
 			autocomplete="new-password"
-			error={errors.new_password}
+			error={passwordErrors.new_password}
 		/>
 	</form>
 	{#snippet footer()}

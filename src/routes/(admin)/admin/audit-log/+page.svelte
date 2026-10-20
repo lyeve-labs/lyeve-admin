@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -15,11 +14,14 @@
 		closeDialog,
 		dismissDialog,
 		openDialog,
+		type StatusTone,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { ScrollText, Download, Trash2 } from '@lucide/svelte';
 	import AuditTabs from '$lib/components/AuditTabs.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { NO_VALUE, formatDateTime } from '$lib/format';
 	import { listQuery } from '$lib/back';
@@ -35,7 +37,7 @@
 	let pruneForm = $state<HTMLFormElement>();
 	let error = $state<string | null>(null);
 
-	function actionVariant(action: string): 'success' | 'warn' | 'danger' | 'brand' | 'neutral' {
+	function actionVariant(action: string): StatusTone {
 		if (action.startsWith('create')) return 'success';
 		if (action.startsWith('delete') || action.startsWith('drop')) return 'danger';
 		if (action.startsWith('update') || action.startsWith('alter')) return 'warn';
@@ -57,7 +59,8 @@
 			size: 'sm',
 		}).catch(() => false);
 		if (!ok || !pruneDate) return;
-		await Promise.resolve();
+		// The form's field takes the chosen date on the next render.
+		await tick();
 		pruneForm?.requestSubmit();
 	}
 
@@ -92,10 +95,16 @@
 	const prunedCount = $derived(Number(page.url.searchParams.get('pruned') ?? 0));
 </script>
 
-<PageTitle title="Audit log" />
-
 {#snippet emptyIcon()}
 	<ScrollText size={ICON.lg} />
+{/snippet}
+
+<!-- The export takes the filter in force, so the file holds what the list
+     shows. -->
+{#snippet exportFilter()}
+	{#each Object.entries(data.filter) as [key, value] (key)}
+		{#if value}<input type="hidden" name={key} value={value} />{/if}
+	{/each}
 {/snippet}
 
 {#snippet pruneBody()}
@@ -120,13 +129,14 @@
 
 <PageShell
 	title="Audit log"
-	description={`${data.total} ${data.total === 1 ? 'entry' : 'entries'}`}
+	description={data.total === null ? undefined : `${data.total} ${data.total === 1 ? 'entry' : 'entries'}`}
 	width="wide"
 >
 	{#snippet actions()}
 		<!-- Posts to an endpoint, not an action: SvelteKit refuses a Response from a
 		     form action, and a download has to be one. -->
 		<form method="POST" action="/api/admin/audit-log/export">
+			{@render exportFilter()}
 			<Button type="submit" variant="secondary" size="sm">
 				<Download size={ICON.sm} /> Export JSON
 			</Button>
@@ -134,6 +144,7 @@
 
 		{#if data.isSuperAdmin}
 			<form method="POST" action="/api/admin/audit-log/export-all">
+				{@render exportFilter()}
 				<Button type="submit" variant="secondary" size="sm">
 					<Download size={ICON.sm} /> Export all
 				</Button>
@@ -144,7 +155,7 @@
 		{/if}
 	{/snippet}
 
-	<AuditTabs active="entries" entries={data.total} />
+	<AuditTabs active="entries" entries={data.total ?? undefined} />
 
 	{#if prunedCount > 0}
 		<Alert tone="success" autoDismiss>
@@ -179,27 +190,48 @@
 			{/snippet}
 			{#snippet filters()}
 				<label for="audit-action" class="sr-only">Action</label>
-				<Select id="audit-action" name="action" options={actionOptions} bind:value={action} class="w-44" />
+				<Select id="audit-action" name="action" options={actionOptions} bind:value={action} searchable class="w-44" />
+				<label for="audit-from" class="sr-only">From</label>
 				<DatePicker id="audit-from" placeholder="From" bind:value={from} class="w-36" />
 				<input type="hidden" name="from" value={from} />
+				<label for="audit-to" class="sr-only">To</label>
 				<DatePicker id="audit-to" placeholder="To" bind:value={to} class="w-36" />
 				<input type="hidden" name="to" value={to} />
 			{/snippet}
 		</ListToolbar>
 	</form>
+	<p class="text-xs text-muted">{data.exportNote}</p>
 
 	<!-- The table is over a thousand cells under the page title alone, which is
 	     a screen reader's only landmark on this page and no way to skim it. -->
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Entries</SectionHeading>
 
-		{#if data.entries.length === 0 && filtered}
+		{#if !data.entries.ok}
+			<GateNotice
+				gate={data.entries.gate}
+				title="Audit log"
+				absent="The audit plugin is not in this build, so there is no audit log to read."
+			/>
+		{:else if data.entries.value.length === 0 && (data.total ?? 0) > 0}
+			<!-- The count and the rows were read apart, so a page can come back
+			     empty while the log is not. Neither empty state is true then. -->
+			<EmptyState
+				iconSnippet={emptyIcon}
+				title="Nothing on this page"
+				description={`The log holds ${data.total} ${data.total === 1 ? 'entry' : 'entries'}, but this page came back empty. Entries may have been pruned since the count was taken.`}
+			>
+				{#snippet action()}
+					<Button variant="secondary" href={pageHref(0)}>Go to the first page</Button>
+				{/snippet}
+			</EmptyState>
+		{:else if data.entries.value.length === 0 && filtered}
 			<EmptyState
 				iconSnippet={emptyIcon}
 				title="No audit entries match"
 				description="Widen the dates, clear the action, or search another exact name: the engine matches whole values."
 			/>
-		{:else if data.entries.length === 0}
+		{:else if data.entries.value.length === 0}
 			<EmptyState
 				iconSnippet={emptyIcon}
 				title="No audit entries yet"
@@ -218,7 +250,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.entries as entry (entry.id)}
+						{#each data.entries.value as entry (entry.id)}
 							<tr>
 								<td class="whitespace-nowrap text-xs">
 									<span class="text-faint">{formatDateTime(entry.created_at)}</span>
@@ -243,8 +275,8 @@
 				<Pagination
 					page={pageNumber(data.offset, data.limit)}
 					perPage={data.limit}
-					count={data.entries.length}
-					total={data.total}
+					count={data.entries.value.length}
+					total={data.total ?? undefined}
 					noun="entries"
 					href={(page) => pageHref(pageOffset(page, data.limit))}
 				/>

@@ -80,14 +80,14 @@ describe('admin/flows/datasources load', () => {
 	it('leaves a failed read enabled, so the banner is what the page draws', async () => {
 		const result = (await load(loadEvent({ '/datasources': () => json({ error: 'x' }, 503) }))) as Loaded;
 		expect(result.available).toBe(true);
-		expect(result.loadError).toBeTruthy();
+		expect(result.gate.state).not.toBe('ok');
 	});
 
 	it('maps a 402 to the locked state', async () => {
 		const result = (await load(loadEvent({ '/datasources': () => json({ error: 'nope' }, 402) }))) as Loaded;
 		expect(result.locked).toBe(true);
 		expect(result.datasources).toEqual([]);
-		expect(result.loadError).toBeNull();
+		expect(result.gate).toEqual({ state: 'ok' });
 	});
 
 	it('sends an expired session to the login page with the cookie cleared', async () => {
@@ -99,7 +99,7 @@ describe('admin/flows/datasources load', () => {
 	it('names the role as the reason for a 403', async () => {
 		const result = (await load(loadEvent({ '/datasources': () => json({ error: 'forbidden' }, 403) }))) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBe('Your role cannot read datasources.');
+		expect(result.gate).toEqual({ state: 'forbidden' });
 	});
 
 	it('keeps the engine banner for a network failure', async () => {
@@ -110,14 +110,13 @@ describe('admin/flows/datasources load', () => {
 				},
 			})
 		)) as Loaded;
-		expect(result.loadError).toContain('could not be read from the engine');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 
 	it('reports a failed read as a static message rather than an empty list', async () => {
 		const result = (await load(loadEvent({ '/datasources': () => json({ error: 'pq: connection refused' }, 503) }))) as Loaded;
 		expect(result.locked).toBe(false);
-		expect(result.loadError).toBeTruthy();
-		expect(result.loadError).not.toContain('pq:');
+		expect(result.gate).toEqual({ state: 'unavailable' });
 	});
 });
 
@@ -331,6 +330,23 @@ describe('admin/flows/datasources actions', () => {
 		const sent = body(calls, 'PUT');
 		expect(sent.config.auth).toEqual({ type: 'bearer' });
 		expect(sent.secret).toEqual({ headers: { 'X-Api-Key': 'k' } });
+	});
+
+	it('reads a refused name out of the 422 list and never relays the JSON text', async () => {
+		const refused = { ok: false, errors: [{ path: '/name', message: 'a name of the shape [a-z][a-z0-9_-]{0,39} is required' }] };
+		const { event } = actionEvent(httpForm({ name: 'Orders DB' }), { '/datasources': () => json(refused, 422) });
+		const result = (await actions.create(event)) as { status: number; data: { error: string; nameError: string } };
+		expect(result.status).toBe(422);
+		expect(result.data.nameError).toContain('starts with a lower case letter');
+		expect(result.data.error).not.toContain('{');
+	});
+
+	it('relays a refused secret in the plugin words on an update', async () => {
+		const refused = { ok: false, errors: [{ path: '/secret', message: 'invalid datasource config: secret.token is required for bearer auth' }] };
+		const { event } = actionEvent(httpForm({ auth_type: 'bearer' }, 'd2'), { '/datasources/d2': () => json(refused, 422) });
+		const result = (await actions.update(event)) as { status: number; data: { error: string; nameError: string } };
+		expect(result.status).toBe(422);
+		expect(result.data).toMatchObject({ error: 'invalid datasource config: secret.token is required for bearer auth', nameError: '' });
 	});
 
 	it('refuses a scheme missing what it cannot work without, before the engine sees it', async () => {

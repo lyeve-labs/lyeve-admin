@@ -1,13 +1,15 @@
 import { createHash, createHmac } from 'node:crypto';
 import type { RequestEvent } from '@sveltejs/kit';
 
+/** Where every relative /api/ call made on the server goes, when it is set. */
+const INTERNAL_URL = process.env.CORE_INTERNAL_URL;
+
 /**
- * Where server-side code reaches the engine. Unset in dev, where the Vite
- * proxy routes relative /api/* calls instead, and an absolute call goes where
- * that proxy does.
+ * Where server-side code reaches the engine's admin listener. Without
+ * CORE_INTERNAL_URL it falls back to where the dev server's proxy sends the
+ * browser's /api/admin calls.
  */
-export const ENGINE_URL =
-	process.env.CORE_INTERNAL_URL || process.env.PROXY_ADMIN_TARGET || 'http://localhost:3001';
+export const ENGINE_URL = INTERNAL_URL || process.env.PROXY_ADMIN_TARGET || 'http://localhost:3001';
 
 /**
  * Where the Content API answers, which is a different listener from the admin
@@ -90,6 +92,18 @@ export function contentApiAddressProblem(
  */
 export function engineOriginFor(path: string): string {
 	return path.startsWith('/api/admin') ? ENGINE_URL : CONTENT_API_URL;
+}
+
+/**
+ * Where a relative /api/ call made on the server goes. CORE_INTERNAL_URL takes
+ * every one, as the proxy in front of a deployment does. Without it each goes
+ * to the listener that serves it, which is where the dev server's proxy sends
+ * the same call from the browser. A relative call is never left to this
+ * console: it has no route for the engine's paths, and a renewal sent to
+ * itself would wait on itself.
+ */
+export function engineBaseFor(path: string): string {
+	return INTERNAL_URL || engineOriginFor(path);
 }
 
 /**

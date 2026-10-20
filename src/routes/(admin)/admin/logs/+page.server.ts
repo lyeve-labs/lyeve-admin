@@ -1,50 +1,42 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
-import {
-	getLoggingLevels,
-	getLoggingConfig,
-	getLogVolume,
-	type LogSearchResponse
-} from '@lyeve-labs/client-rest';
+import { getLoggingLevels, getLoggingConfig, getLogVolume } from '@lyeve-labs/client-rest';
+import { section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { LOG_DEFAULT_LIMIT, LOG_MAX_LIMIT } from '$lib/api/logs';
-import { sessionToken } from '$lib/server/session-cookie';
+import { LOG_DEFAULT_LIMIT, LOG_MAX_LIMIT, searchLogEntries } from '$lib/api/logs';
+import { authedClient, loadUser } from '$lib/server/authz';
 
-export const load: PageServerLoad = async ({ fetch, cookies, url, parent }) => {
-	await parent();
+export const load: PageServerLoad = async (event) => {
+	const { url } = event;
+	await loadUser(event);
 
-	const token = sessionToken({ cookies, url }) ?? '';
-	const client = createClient(fetch, { Authorization: `Bearer ${token}` });
+	const client = authedClient(event);
 
 	const q = url.searchParams.get('q') ?? '';
 	const level = url.searchParams.get('level') ?? '';
 	const { limit, offset } = pageWindow(url, LOG_DEFAULT_LIMIT, LOG_MAX_LIMIT);
 
-	// Built here rather than through searchLogs(), which sends no offset.
-	const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-	if (q) qs.set('query', q);
-	if (level) qs.set('level', level);
-
 	const [search, levels, config, volume] = await Promise.all([
-		client.get<LogSearchResponse>(`/api/admin/logs/search?${qs}`).catch(() => null),
-		getLoggingLevels(client).catch(() => null),
-		getLoggingConfig(client).catch(() => null),
-		getLogVolume(client, '24h').catch(() => null)
+		section(
+			searchLogEntries(client, { q, level, limit, offset }),
+			'The log entries could not be read. This is not a report that none match.'
+		),
+		section(getLoggingLevels(client), 'The log levels could not be read.'),
+		section(getLoggingConfig(client), 'The log sinks could not be read.'),
+		section(getLogVolume(client, '24h'), 'The log volume could not be read.')
 	]);
 
 	// The stated count is trusted as it is. Raising it to offset plus rows read,
 	// as the audit log does, turns an offset past the end into the total, and
 	// the correction below then walks back one page per redirect until the
 	// browser gives up.
-	const entries = search?.results ?? [];
-	const total = search?.total ?? null;
-	const back = pastEndOffset(entries.length, limit, offset, total);
-	if (back !== null) redirect(307, withOffset(url, back));
+	if (search.ok) {
+		const back = pastEndOffset(search.value.results?.length ?? 0, limit, offset, search.value.total ?? null);
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
 
 	return {
-		entries,
-		total,
+		search,
 		limit,
 		offset,
 		levels,

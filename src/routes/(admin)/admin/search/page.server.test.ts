@@ -1,76 +1,323 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-const api = vi.hoisted(() => ({
-	search: vi.fn(),
-	listSynonyms: vi.fn(),
-	getRanking: vi.fn(),
+// The session client is real and runs over the event's fetch, so every read
+// and write lands in one call log with the body it would send.
+const authz = vi.hoisted(() => ({ roles: ['admin'] as string[] }));
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/authz')>()),
+	requireRole: vi.fn(async (_event: unknown, allowed: string[]) => {
+		if (!allowed.some((r) => authz.roles.includes(r))) throw Object.assign(new Error('403'), { status: 403 });
+		return { id: 'u1', roles: authz.roles };
+	}),
 }));
 
-vi.mock('@lyeve-labs/client', () => ({ createClient: vi.fn(() => ({})) }));
-vi.mock('@lyeve-labs/client-rest', () => api);
+import { actions, load } from './+page.server';
 
-import { load } from './+page.server';
+function json(body: unknown, status = 200): Response {
+	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+}
 
 function mockCookies(): Cookies {
-	return { get: vi.fn(() => 'tok') } as unknown as Cookies;
+	return { get: vi.fn((name: string) => (name === '__Host-csrf' ? 'csrf' : 'tok')) } as unknown as Cookies;
 }
 
-interface SearchLoadResult {
-	results: unknown[];
-	searchFailed: boolean;
+type Read = { ok: true; value: unknown } | { ok: false; gate: { state: string } };
+type Failure = { status: number; data: Record<string, unknown> };
+interface Call {
+	method: string;
+	path: string;
+	body: unknown;
 }
 
-// The load signature widens to `void` once the event is cast, so pin the shape here.
-async function runLoad(q: string): Promise<SearchLoadResult> {
+const RANKING = {
+	schema_name: '*',
+	title_weight: 2,
+	body_weight: 1,
+	tag_weight: 1,
+	boost_rules: [{ field: 'status', value: 'featured', boost: 3 }],
+};
+
+/**
+ * A fetch answering each route from `routes`, by the first key the path
+ * starts with after the method. Anything unrouted answers an empty success.
+ */
+function engine(routes: Record<string, () => Response> = {}) {
+	const calls: Call[] = [];
+	const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+		const method = init?.method ?? 'GET';
+		calls.push({ method, path, body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined });
+		for (const [key, answer] of Object.entries(routes)) {
+			if (`${method} ${path}`.startsWith(key)) return answer();
+		}
+		if (path.startsWith('/api/admin/search/ranking')) return json(RANKING);
+		if (path.startsWith('/api/admin/search/synonyms')) return json({ data: [], total_count: 0 });
+		if (path.startsWith('/api/admin/search/public-schemas')) return json({ schemas: [] });
+		if (path.startsWith('/api/admin/schemas')) return json([]);
+		return json({});
+	}) as unknown as typeof globalThis.fetch;
+	return { fetch, calls };
+}
+
+interface Loaded {
+	limit: number;
+	results: Read | null;
+	ranking: Read;
+	synonyms: Read;
+}
+
+async function runLoad(search: string, routes: Record<string, () => Response> = {}) {
+	const { fetch, calls } = engine(routes);
 	const event = {
-		fetch: vi.fn() as unknown as typeof globalThis.fetch,
+		fetch,
 		cookies: mockCookies(),
-		url: new URL(`http://localhost/admin/search?q=${encodeURIComponent(q)}`),
-		parent: async () => ({}),
+		url: new URL(`http://localhost/admin/search${search}`),
+		parent: async () => ({ user: { roles: ['admin'] } }),
 	} as never;
-	return (await load(event)) as unknown as SearchLoadResult;
+	return { result: (await load(event)) as unknown as Loaded, calls };
+}
+
+function actionEvent(fields: Record<string, string | string[]>, routes: Record<string, () => Response> = {}) {
+	const { fetch, calls } = engine(routes);
+	const fd = new FormData();
+	for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) fd.append(k, one);
+	const event = { fetch, cookies: mockCookies(), request: { formData: async () => fd } } as never;
+	return { event, calls };
 }
 
 beforeEach(() => {
-	vi.clearAllMocks();
-	api.listSynonyms.mockResolvedValue([]);
-	api.getRanking.mockResolvedValue({ schema_name: '*', boost_rules: [] });
+	authz.roles = ['admin'];
 });
 
-describe('admin/search/+page.server.ts load', () => {
-	it('returns hits and no failure flag on success', async () => {
-		api.search.mockResolvedValue({ results: [{ entry_id: 'e1' }] });
+describe('the search load', () => {
+	it('asks for one page of results and keeps the total the plugin counted', async () => {
+		const { result, calls } = await runLoad('?q=cats', {
+			'GET /api/admin/search?': () => json({ results: [{ entry_id: 'e1' }], total: 73 }),
+		});
 
-		const result = await runLoad('cats');
-
-		expect(result.results).toEqual([{ entry_id: 'e1' }]);
-		expect(result.searchFailed).toBe(false);
+		const asked = new URL(calls.find((c) => c.path.startsWith('/api/admin/search?'))!.path, 'http://x');
+		expect(asked.searchParams.get('limit')).toBe('20');
+		expect(asked.searchParams.get('offset')).toBe('0');
+		expect(result.results).toEqual({ ok: true, value: { results: [{ entry_id: 'e1' }], total: 73 } });
 	});
 
-	it('flags the failure instead of returning an empty result set', async () => {
-		api.search.mockRejectedValue(new Error('search service down'));
+	it('pages by the 200 results the search store returns at most, so no result is skipped', async () => {
+		const page = Array.from({ length: 200 }, (_, i) => ({ entry_id: `e${i}` }));
+		const { result, calls } = await runLoad('?q=cats&limit=300&offset=200', {
+			'GET /api/admin/search?': () => json({ results: page, total: 650 }),
+		});
 
-		const result = await runLoad('cats');
-
-		expect(result.searchFailed).toBe(true);
-		expect(result.results).toEqual([]);
+		const asked = new URL(calls.find((c) => c.path.startsWith('/api/admin/search?'))!.path, 'http://x');
+		expect(asked.searchParams.get('limit')).toBe('200');
+		expect(asked.searchParams.get('offset')).toBe('200');
+		expect(result.limit).toBe(200);
 	});
 
-	it('skips the search call and flags nothing when the query is empty', async () => {
-		const result = await runLoad('');
+	it('keeps a failed search as a gate instead of an empty result set', async () => {
+		const { result } = await runLoad('?q=cats', { 'GET /api/admin/search?': () => json({ error: 'search failed' }, 500) });
 
-		expect(api.search).not.toHaveBeenCalled();
-		expect(result.searchFailed).toBe(false);
-		expect(result.results).toEqual([]);
+		expect(result.results).toMatchObject({ ok: false, gate: { state: 'error' } });
+	});
+
+	it('skips the search call when the query is empty', async () => {
+		const { result, calls } = await runLoad('');
+
+		expect(calls.some((c) => c.path.startsWith('/api/admin/search?'))).toBe(false);
+		expect(result.results).toBeNull();
 	});
 
 	it('treats a missing results array as no hits, not a failure', async () => {
-		api.search.mockResolvedValue({});
+		const { result } = await runLoad('?q=cats', { 'GET /api/admin/search?': () => json({}) });
 
-		const result = await runLoad('cats');
+		expect(result.results).toEqual({ ok: true, value: { results: [], total: 0 } });
+	});
 
-		expect(result.results).toEqual([]);
-		expect(result.searchFailed).toBe(false);
+	it('sends a page past the end back to the last page that holds rows', async () => {
+		await expect(
+			runLoad('?q=cats&offset=200', { 'GET /api/admin/search?': () => json({ results: [], total: 30 }) }),
+		).rejects.toMatchObject({ status: 307, location: '/admin/search?q=cats&offset=20' });
+	});
+
+	it('keeps a failed ranking read as a gate, never as the default weights', async () => {
+		const { result } = await runLoad('', { 'GET /api/admin/search/ranking': () => json({ error: 'down' }, 503) });
+
+		expect(result.ranking).toMatchObject({ ok: false, gate: { state: 'unavailable' } });
+	});
+
+	it('reads the synonym groups up to the page ceiling and keeps their total', async () => {
+		const { result, calls } = await runLoad('', {
+			'GET /api/admin/search/synonyms': () => json({ data: [{ id: 's1', base_term: 'tv', synonyms: ['telly'] }], total_count: 612 }),
+		});
+
+		const asked = new URL(calls.find((c) => c.path.startsWith('/api/admin/search/synonyms'))!.path, 'http://x');
+		expect(asked.searchParams.get('limit')).toBe('500');
+		expect(result.synonyms).toMatchObject({ ok: true, value: { total: 612 } });
+	});
+
+	it('keeps a failed synonym read as a gate, never as no groups', async () => {
+		const { result } = await runLoad('', { 'GET /api/admin/search/synonyms': () => json({ error: 'internal' }, 500) });
+
+		expect(result.synonyms).toMatchObject({ ok: false, gate: { state: 'error' } });
+	});
+});
+
+describe('saving the default weights', () => {
+	const weights = { title_weight: '3', body_weight: '1', tag_weight: '0.5' };
+
+	// The plugin replaces the whole row, so weights sent alone erase the rules.
+	it('sends back the boost rules it read beside the weights', async () => {
+		const { event, calls } = actionEvent(weights);
+
+		expect(await actions.ranking(event)).toEqual({ rankingSaved: true });
+		const put = calls.find((c) => c.method === 'PUT');
+		expect(put?.body).toEqual({
+			schema_name: '*',
+			title_weight: 3,
+			body_weight: 1,
+			tag_weight: 0.5,
+			boost_rules: RANKING.boost_rules,
+		});
+	});
+
+	it('writes nothing when the rules could not be read', async () => {
+		const { event, calls } = actionEvent(weights, { 'GET /api/admin/search/ranking': () => json({ error: 'down' }, 503) });
+
+		const out = (await actions.ranking(event)) as Failure;
+		expect(out.data.rankingError).toBe('The weights could not be saved.');
+		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+	});
+
+	it('relays the reason the plugin refused', async () => {
+		const { event } = actionEvent(weights, { 'PUT /api/admin/search/ranking': () => json({ error: 'schema_name is required' }, 400) });
+
+		expect(((await actions.ranking(event)) as Failure).data.rankingError).toBe('schema_name is required');
+	});
+
+	it('refuses a weight outside 0 to 10 before it reaches the plugin', async () => {
+		const { event, calls } = actionEvent({ ...weights, tag_weight: '11' });
+
+		expect(((await actions.ranking(event)) as Failure).status).toBe(400);
+		expect(calls).toEqual([]);
+	});
+});
+
+describe('the public schemas', () => {
+	it('saves the picked schemas', async () => {
+		const { event, calls } = actionEvent({ schemas: ['posts', 'pages'] }, {
+			'PUT /api/admin/search/public-schemas': () => json({ schemas: ['posts', 'pages'] }),
+		});
+
+		expect(await actions.publicSchemas(event)).toEqual({ publicSaved: 2 });
+		expect(calls[0].body).toEqual({ schemas: ['posts', 'pages'] });
+	});
+
+	it('relays the reason the plugin refused', async () => {
+		const { event } = actionEvent({ schemas: 'nope' }, {
+			'PUT /api/admin/search/public-schemas': () => json({ error: 'unknown schema nope' }, 400),
+		});
+
+		expect(((await actions.publicSchemas(event)) as Failure).data.publicError).toBe('unknown schema nope');
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		const { event } = actionEvent({ schemas: 'posts' }, {
+			'PUT /api/admin/search/public-schemas': () => json({ error: 'pq: connection refused' }, 503),
+		});
+
+		expect(((await actions.publicSchemas(event)) as Failure).data.publicError).toBe('The public schemas could not be saved.');
+	});
+});
+
+describe('the synonym groups', () => {
+	it('creates a group named after its term', async () => {
+		const { event, calls } = actionEvent({ base_term: 'tv', synonyms: 'telly, television' });
+
+		expect(await actions.createSynonym(event)).toEqual({ synonymSaved: true });
+		expect(calls[0]).toMatchObject({ method: 'POST', body: { name: 'tv', base_term: 'tv', synonyms: ['telly', 'television'] } });
+	});
+
+	it('relays the reason the plugin refused a group', async () => {
+		const { event } = actionEvent({ base_term: 'tv', synonyms: 'telly' }, {
+			'POST /api/admin/search/synonyms': () => json({ error: 'synonym group already exists' }, 409),
+		});
+
+		expect(((await actions.createSynonym(event)) as Failure).data.synonymError).toBe('synonym group already exists');
+	});
+
+	it('keeps outage detail out of a failed create', async () => {
+		const { event } = actionEvent({ base_term: 'tv', synonyms: 'telly' }, {
+			'POST /api/admin/search/synonyms': () => json({ error: 'pq: down' }, 503),
+		});
+
+		expect(((await actions.createSynonym(event)) as Failure).data.synonymError).toBe('The synonym could not be saved.');
+	});
+
+	it('deletes the named group', async () => {
+		const { event, calls } = actionEvent({ id: 's 1' });
+
+		expect(await actions.deleteSynonym(event)).toEqual({ synonymDeleted: true });
+		expect(calls[0]).toMatchObject({ method: 'DELETE', path: '/api/admin/search/synonyms/s%201' });
+	});
+
+	// The New synonym drawer shows create failures. A delete failure under the
+	// same key opened the next drawer with it, as if the create had failed.
+	it('returns a failed delete under its own key', async () => {
+		const { event } = actionEvent({ id: 's1' }, { 'DELETE /api/admin/search/synonyms': () => json({ error: 'not found' }, 404) });
+
+		const out = (await actions.deleteSynonym(event)) as Failure;
+		expect(out.data).toEqual({ synonymDeleteError: 'not found' });
+	});
+
+	it('keeps outage detail out of a failed delete', async () => {
+		const { event } = actionEvent({ id: 's1' }, { 'DELETE /api/admin/search/synonyms': () => json({ error: 'pq: down' }, 503) });
+
+		expect(((await actions.deleteSynonym(event)) as Failure).data).toEqual({ synonymDeleteError: 'The synonym could not be deleted.' });
+	});
+});
+
+describe('rebuilding the index', () => {
+	it('reports how many entries were indexed', async () => {
+		authz.roles = ['super_admin'];
+		const { event } = actionEvent({}, { 'POST /api/admin/search/reindex': () => json({ indexed: 12, message: 'Indexed 12 entries.' }) });
+
+		expect(await actions.reindex(event)).toEqual({ reindexed: 12, reindexMessage: 'Indexed 12 entries.' });
+	});
+
+	it('relays the reason the plugin refused', async () => {
+		authz.roles = ['super_admin'];
+		const { event } = actionEvent({}, { 'POST /api/admin/search/reindex': () => json({ error: 'a reindex is already running' }, 409) });
+
+		expect(((await actions.reindex(event)) as Failure).data.reindexError).toBe('a reindex is already running');
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		authz.roles = ['super_admin'];
+		const { event } = actionEvent({}, { 'POST /api/admin/search/reindex': () => json({ error: 'pq: down' }, 503) });
+
+		expect(((await actions.reindex(event)) as Failure).data.reindexError).toBe('The index could not be rebuilt.');
+	});
+
+	it('refuses an admin before it reaches the plugin', async () => {
+		const { event, calls } = actionEvent({});
+
+		await expect(actions.reindex(event)).rejects.toMatchObject({ status: 403 });
+		expect(calls).toEqual([]);
+	});
+});
+
+describe('the role check', () => {
+	const cases = [
+		['publicSchemas', { schemas: 'posts' }],
+		['ranking', { title_weight: '1', body_weight: '1', tag_weight: '1' }],
+		['createSynonym', { base_term: 'tv', synonyms: 'telly' }],
+		['deleteSynonym', { id: 's1' }],
+	] as const;
+
+	it.each(cases)('refuses %s to an editor before it reaches the plugin', async (name, fields) => {
+		authz.roles = ['editor'];
+		const { event, calls } = actionEvent(fields);
+
+		await expect(actions[name](event)).rejects.toMatchObject({ status: 403 });
+		expect(calls).toEqual([]);
 	});
 });

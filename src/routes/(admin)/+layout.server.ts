@@ -1,14 +1,12 @@
-import { redirect } from '@sveltejs/kit';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, loadUser } from '$lib/server/authz';
 import type { LayoutServerLoad } from './$types';
-import { getMe, getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
+import { getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
 import { NO_ENTITLEMENTS, type LicenseEntitlements } from '$lib/entitlements';
-import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import { pendingMigrations } from '$lib/api/migrate';
 import { getCustomization, NO_CUSTOMIZATION, type Customization } from '$lib/api/customization';
 import { brandOf } from '$lib/brand';
 import { NO_LICENSING, readLicensing } from '$lib/api/license';
-import { readRunningPlugins } from '$lib/api/plugins-running';
+import { readRunningPlugins, runningFromStatus, type RunningRead } from '$lib/api/plugins-running';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning, pluginSetOf } from '$lib/plugins';
 
@@ -29,28 +27,26 @@ const OPERATOR_ROLES = ['admin', 'super_admin'];
 export type MigrationStatus = { pending: number | null } | null;
 
 export const load: LayoutServerLoad = async (event) => {
-	const { cookies } = event;
-
-	const token = sessionToken(event);
-	if (!token) {
-		redirect(302, '/login');
-	}
-
+	// Only an engine that says the session is over ends it here. One that
+	// cannot check it throws the outage page, and the cookie outlives the blip.
+	const user = await loadUser(event);
 	const authed = authedClient(event);
-	const user = await getMe(authed).catch(() => null);
-	if (!user) {
-		clearSessionCookie(event);
-		redirect(302, '/login');
-	}
 
 	/*
 	 * The shell's reads, in two rounds.
 	 *
-	 * The first says what the instance is. Entitlements decide the license's
-	 * answers, and an endpoint that cannot be read reads as no features. The
-	 * running list decides which plugin pages exist at all, for every role. An
-	 * operator also reads the plugin status, which says why a plugin does not
-	 * run, so a page reached by its URL can say so.
+	 * The first says what the instance is. Which plugins run decides which
+	 * plugin pages exist at all, for every role. An operator reads the
+	 * entitlements, which decide the license's answers, and the plugin status,
+	 * which says why a plugin does not run, so a page reached by its URL can
+	 * say so. The engine refuses both to every other role, so nobody else is
+	 * asked for them, and their entitlements read as no features, as a failed
+	 * read does.
+	 *
+	 * The running list is the status report's serving plugins less what the
+	 * entitlements withhold from this tenant. An operator who read both has
+	 * that answer already and reads the list only when either read failed.
+	 * Everybody else reads the list.
 	 *
 	 * The second round asks only the parts that are there. The migration count
 	 * is the schema plugin's and the tenant's frame is the multitenant
@@ -58,21 +54,27 @@ export const load: LayoutServerLoad = async (event) => {
 	 * and the renewal belong to the license module, and the entitlements say
 	 * whether the build links one.
 	 *
-	 * None of this re-runs when the reader moves between admin pages: the load
-	 * reads no url and no params, so SvelteKit keeps the shell's data across a
-	 * client-side navigation and asks the engine again only on a fresh document
-	 * or after a write invalidates.
+	 * The load reads no url and no params, so SvelteKit keeps the shell's data
+	 * across a client-side navigation and asks the engine again on a fresh
+	 * document or after a write invalidates. A page load that awaits parent()
+	 * runs all of it again on the server, so a page that wants only the account
+	 * reads it with loadUser, which asks once per request.
 	 */
 	const operator = user.roles.some((role) => OPERATOR_ROLES.includes(role));
-	const readEntitlements: Promise<LicenseEntitlements> = getEntitlements(authed).catch(() => NO_ENTITLEMENTS);
-	const [entitlements, running, status] = await Promise.all([
-		readEntitlements,
-		readRunningPlugins(authed),
+	const [read, status, listed] = await Promise.all([
+		operator
+			? getEntitlements(authed).catch((): LicenseEntitlements | null => null)
+			: Promise.resolve<LicenseEntitlements | null>(null),
 		operator
 			? getPluginStatus(authed).catch((): PluginStatusReport | null => null)
 			: Promise.resolve<PluginStatusReport | null>(null),
+		operator ? Promise.resolve<RunningRead | null>(null) : readRunningPlugins(authed),
 	]);
+	const entitlements = read ?? NO_ENTITLEMENTS;
 	const withheld = entitlements.withheld ?? [];
+	const running: RunningRead =
+		listed ??
+		(status && Array.isArray(read?.withheld) ? runningFromStatus(status, withheld) : await readRunningPlugins(authed));
 	const plugins = pluginSetOf({ running, status, operator, withheld });
 
 	/*

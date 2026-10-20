@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -14,17 +13,18 @@
 		SegmentedControl,
 		Select,
 		Table,
-		confirm as confirmDialog,
 		toast,
 	} from '@lyeve-labs/ui-kit';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Activity, AlertTriangle, CheckCircle, Plus, RefreshCw, Send, Trash2, Upload } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { tracked } from '$lib/forms.svelte';
+	import { confirmed, tracked } from '$lib/forms.svelte';
 	import {
 		DESTINATION_KINDS,
 		familiesMatching,
@@ -69,7 +69,7 @@
 		{ value: 'summary', label: 'Summaries' },
 	];
 
-	const families = $derived(data.families ?? []);
+	const families = $derived(data.families.ok ? data.families.value : []);
 	const shown = $derived(
 		familiesMatching(families, query).filter((f) => typeFilter === 'all' || f.type === typeFilter),
 	);
@@ -107,10 +107,23 @@
 		return formatDateTime(e.last_export, NO_VALUE);
 	}
 
-	const refusal = $derived(formRefusal(form));
-	const destinationError = $derived((form as { destinationError?: string } | null)?.destinationError ?? '');
-	const hostMoved = $derived((form as { hostMoved?: boolean } | null)?.hostMoved === true);
-	const destination = $derived(data.destination?.destination ?? null);
+	// The save and the delete share one form result. Each failure names the
+	// write that failed, so a failed delete never shows inside the save form.
+	type DestinationFailure = {
+		destinationAction?: 'save' | 'remove';
+		destinationError?: string;
+		hostMoved?: boolean;
+		refused?: unknown;
+	};
+	const failure = $derived(form as DestinationFailure | null);
+	const saveFailure = $derived(failure?.destinationAction === 'save' ? failure : null);
+	const removeFailure = $derived(failure?.destinationAction === 'remove' ? failure : null);
+	const saveRefusal = $derived(formRefusal(saveFailure));
+	const hostMoved = $derived(saveFailure?.hostMoved === true);
+
+	const destinationRead = $derived(data.destination.ok ? data.destination.value : null);
+	const destination = $derived(destinationRead?.destination ?? null);
+	const licensed = $derived(destinationRead?.licensed === true);
 
 	let kind = $state<DestinationKind>('otlp');
 	let destUrl = $state('');
@@ -118,12 +131,23 @@
 	let headers = $state<{ id: number; name: string; value: string }[]>([]);
 	let nextHeader = 0;
 
-	// The form starts from what is stored, and follows a save or a removal.
-	$effect(() => {
+	function fillDestinationForm() {
 		kind = destination?.kind ?? 'otlp';
 		destUrl = destination?.url ?? '';
 		headersMode = destination && destination.header_names.length > 0 ? 'keep' : 'replace';
 		headers = [];
+	}
+
+	// The form starts from what is stored, and follows a save or a removal.
+	// Every reload hands the page a new destination object, a refresh or an
+	// export included, so the effect follows what is stored rather than the
+	// object, and an edit in progress survives a reload that changed nothing.
+	const storedDestination = $derived(
+		destination ? JSON.stringify([destination.kind, destination.url, destination.header_names]) : '',
+	);
+	$effect(() => {
+		void storedDestination;
+		untrack(fillDestinationForm);
 	});
 
 	// Leaving the stored headers in place while the host changes is the one
@@ -146,27 +170,23 @@
 
 	const saveDest = tracked(() => async ({ result, update }) => {
 		await update({ reset: false });
-		if (result.type === 'success') toast.success('Saved the destination');
+		if (result.type === 'success') {
+			// A save that changed only header values stores what the effect
+			// cannot see, and the values typed must not stay on screen.
+			fillDestinationForm();
+			toast.success('Saved the destination');
+		}
 	});
 
-	const removeDest: SubmitFunction = async ({ cancel }) => {
-		const confirmed = await confirmDialog(
-			'Remove the destination?',
+	// Built at submit time, so the question names the destination on screen
+	// then rather than the one there when the page first drew.
+	const removeDest: SubmitFunction = (input) =>
+		confirmed(
+			destination ? `Delete the destination ${destination.url}?` : 'Delete the destination?',
 			"This tenant's series stop being pushed there, and its stored headers are deleted.",
-			{ confirmLabel: 'Delete' },
-		);
-		if (!confirmed) {
-			cancel();
-			return;
-		}
-		return async ({ result, update }) => {
-			await update();
-			if (result.type === 'success') toast.success('Removed the destination');
-		};
-	};
+			{ confirmLabel: 'Delete', success: 'Removed the destination' },
+		)(input);
 </script>
-
-<PageTitle title="Telemetry" />
 
 {#snippet noMetrics()}
 	<Activity size={ICON.lg} />
@@ -212,22 +232,24 @@
 			</span>
 		</div>
 
-		<ListToolbar label="Filter the metrics">
-			{#snippet search()}
-				<SearchInput label="Filter families" placeholder="Family, help text or label value" bind:value={query} />
-			{/snippet}
-			{#snippet filters()}
-				<span class="text-xs text-muted">{shown.length} of {families.length} families, {sampleCount} samples</span>
-				<label for="metric-type" class="sr-only">Type</label>
-				<Select id="metric-type" options={TYPE_OPTIONS} value={typeFilter} onvaluechange={(v) => { typeFilter = v; }} class="w-40" />
-			{/snippet}
-		</ListToolbar>
+		{#if data.families.ok}
+			<ListToolbar label="Filter the metrics">
+				{#snippet search()}
+					<SearchInput label="Filter families" placeholder="Family, help text or label value" bind:value={query} />
+				{/snippet}
+				{#snippet filters()}
+					<span class="text-xs text-muted">{shown.length} of {families.length} families, {sampleCount} samples</span>
+					<label for="metric-type" class="sr-only">Type</label>
+					<Select id="metric-type" options={TYPE_OPTIONS} value={typeFilter} onvaluechange={(v) => { typeFilter = v; }} class="w-40" />
+				{/snippet}
+			</ListToolbar>
+		{/if}
 
-		{#if data.families === null}
-			<EmptyState
-				iconSnippet={noMetrics}
-				title="Metrics unavailable"
-				description="The telemetry plugin did not answer the scrape. It may not be in this build, or the registry is not initialized yet."
+		{#if !data.families.ok}
+			<GateNotice
+				gate={data.families.gate}
+				title="Telemetry metrics"
+				absent="The telemetry plugin is not in this build, so there is no metrics registry to show."
 			/>
 		{:else if families.length === 0}
 			<EmptyState
@@ -247,7 +269,7 @@
 					<Card>
 						{#snippet header()}
 							<div class="flex flex-wrap items-center gap-2">
-								<SectionHeading level={3}><span class="font-mono text-sm">{family.name}</span></SectionHeading>
+								<SectionHeading level={3}><span class="font-mono text-sm [overflow-wrap:anywhere]">{family.name}</span></SectionHeading>
 								<Badge tone="neutral">{family.type}</Badge>
 								<span class="ms-auto text-xs text-faint">{family.samples.length} samples</span>
 							</div>
@@ -296,26 +318,17 @@
 			</span>
 		</div>
 
-		{#if !data.destination}
-			<Alert tone="danger">The destination could not be read. This is not a report that none is set.</Alert>
+		{#if !data.destination.ok}
+			<GateNotice
+				gate={data.destination.gate}
+				title="Tenant destination"
+				absent="This build of the telemetry plugin does not serve tenant destinations."
+			/>
 		{:else}
-			{#if refusal}
-				<RefusalNotice {refusal} />
-			{:else if hostMoved}
-				<Alert tone="warn" title="Send the headers again for the new host">
-					<p>
-						The stored headers usually carry the collector's key, so they are never carried to a different host.
-						Choose to replace the headers and enter them for the new address. Nothing was saved.
-					</p>
-				</Alert>
-			{:else if destinationError}
-				<Alert tone="danger">{destinationError}</Alert>
-			{/if}
-
-			{#if !data.destination.licensed}
-				<p class="text-sm text-muted">
+			{#if !licensed}
+				<p class="text-sm text-muted" id="destination-unlicensed">
 					Setting or changing a destination needs a license this install does not hold. A destination already
-					saved keeps receiving, and removing it is always allowed.
+					saved keeps receiving, and deleting it is always allowed.
 				</p>
 			{/if}
 
@@ -342,86 +355,112 @@
 					use:enhance={saveDest.enhance}
 					class="flex flex-col gap-4"
 				>
-					<SegmentedControl label="Protocol" name="kind" bind:value={kind} options={[...DESTINATION_KINDS]} />
-					<Input
-						id="destination-url"
-						name="url"
-						label="URL"
-						placeholder="https://otlp.example.com/v1/metrics"
-						hint="An http or https address. Credentials go in a header, never in the URL."
-						bind:value={destUrl}
-						required
-					/>
-
-					{#if destination && destination.header_names.length > 0}
-						<SegmentedControl
-							label="Headers"
-							name="headers_mode"
-							bind:value={headersMode}
-							options={[
-								{ value: 'keep', label: 'Keep the stored headers' },
-								{ value: 'replace', label: 'Replace them' },
-							]}
-						/>
-						{#if headersMode === 'keep'}
-							<p class="text-xs text-muted">
-								Stored: <span class="font-mono">{destination.header_names.join(', ')}</span>. Their values are
-								never shown.
+					<FormErrors message={hostMoved ? undefined : saveFailure?.destinationError} refused={saveRefusal} />
+					{#if hostMoved}
+						<Alert tone="warn" title="Send the headers again for the new host">
+							<p>
+								The stored headers usually carry the collector's key, so they are never carried to a different host.
+								Choose to replace the headers and enter them for the new address. Nothing was saved.
 							</p>
-						{/if}
-					{:else}
-						<input type="hidden" name="headers_mode" value="replace" />
-					{/if}
-
-					{#if movesHost}
-						<Alert tone="warn">
-							This URL is on another host than the stored one, so the stored headers will not follow it. Replace
-							the headers to save.
 						</Alert>
 					{/if}
+					<!-- A save the license refuses is not offered. The fields stay in
+					     sight, so the reader sees what is set, and the reason is
+					     beside the button. -->
+					<fieldset class="contents" disabled={!licensed}>
+						<SegmentedControl label="Protocol" name="kind" bind:value={kind} options={[...DESTINATION_KINDS]} disabled={!licensed} />
+						<Input
+							id="destination-url"
+							name="url"
+							label="URL"
+							placeholder="https://otlp.example.com/v1/metrics"
+							hint="An http or https address. Credentials go in a header, never in the URL."
+							bind:value={destUrl}
+							required
+						/>
 
-					{#if headersMode === 'replace'}
-						<div class="flex flex-col gap-3">
-							{#each headers as h (h.id)}
-								<div class="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
-									<Input id="header-name-{h.id}" name="header_name" label="Header" placeholder="Authorization" bind:value={h.name} />
-									<PasswordInput
-										id="header-value-{h.id}"
-										name="header_value"
-										label="Value"
-										autocomplete="off"
-										bind:value={h.value}
-									/>
-									<Button variant="ghost" size="sm" aria-label="Remove header {h.name || h.id}" onclick={() => dropHeader(h.id)}>
-										<Trash2 size={ICON.sm} class="text-danger" />
+						{#if destination && destination.header_names.length > 0}
+							<SegmentedControl
+								label="Headers"
+								name="headers_mode"
+								bind:value={headersMode}
+								disabled={!licensed}
+								options={[
+									{ value: 'keep', label: 'Keep the stored headers' },
+									{ value: 'replace', label: 'Replace them' },
+								]}
+								hint={headersMode === 'keep'
+									? `Stored: ${destination.header_names.join(', ')}. Their values are never shown.`
+									: undefined}
+							/>
+						{:else}
+							<input type="hidden" name="headers_mode" value="replace" />
+						{/if}
+
+						{#if movesHost}
+							<Alert tone="warn">
+								This URL is on another host than the stored one, so the stored headers will not follow it. Replace
+								the headers to save.
+							</Alert>
+						{/if}
+
+						{#if headersMode === 'replace'}
+							<div class="flex flex-col gap-3">
+								{#each headers as h (h.id)}
+									<div class="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
+										<Input id="header-name-{h.id}" name="header_name" label="Header" placeholder="Authorization" bind:value={h.name} />
+										<PasswordInput
+											id="header-value-{h.id}"
+											name="header_value"
+											label="Value"
+											autocomplete="off"
+											bind:value={h.value}
+										/>
+										<Button variant="ghost" size="sm" aria-label="Remove header {h.name || h.id}" onclick={() => dropHeader(h.id)}>
+											<Trash2 size={ICON.sm} class="text-danger" />
+										</Button>
+									</div>
+								{/each}
+								<div>
+									<Button variant="secondary" size="sm" onclick={addHeader}>
+										<Plus size={ICON.sm} /> Add header
 									</Button>
 								</div>
-							{/each}
-							<div>
-								<Button variant="secondary" size="sm" onclick={addHeader}>
-									<Plus size={ICON.sm} /> Add header
-								</Button>
+								{#if destination && destination.header_names.length > 0 && headers.length === 0}
+									<p class="text-xs text-muted">Saving with no header clears the stored ones.</p>
+								{/if}
 							</div>
-							{#if destination && destination.header_names.length > 0 && headers.length === 0}
-								<p class="text-xs text-muted">Saving with no header clears the stored ones.</p>
+						{/if}
+
+						<div class="flex flex-wrap items-center gap-2">
+							<Button
+								variant="primary"
+								type="submit"
+								loading={saveDest.pending}
+								disabled={!licensed}
+								aria-describedby={licensed ? undefined : 'destination-unlicensed'}
+							>
+								Save
+							</Button>
+							{#if !licensed}
+								<span class="text-xs text-muted">Not enabled on this instance.</span>
 							{/if}
 						</div>
-					{/if}
-
-					<div class="flex flex-wrap gap-2">
-						<Button variant="primary" type="submit" loading={saveDest.pending}>Save</Button>
-					</div>
+					</fieldset>
 				</form>
 				{#if destination}
-					<form method="POST" action="?/removeDestination" class="mt-4 border-t border-line pt-4" use:enhance={removeDest}>
-						<Button variant="secondary" size="sm" type="submit">Remove destination</Button>
+					<form method="POST" action="?/removeDestination" class="mt-4 flex flex-col gap-3 border-t border-line pt-4" use:enhance={removeDest}>
+						<FormErrors message={removeFailure?.destinationError} refused={formRefusal(removeFailure)} />
+						<div>
+							<Button variant="secondary" size="sm" type="submit">Delete destination</Button>
+						</div>
 					</form>
 				{/if}
 			</Card>
 		{/if}
 	</section>
 
-	{#if data.superAdmin}
+	{#if data.exporters}
 		<!-- The exporters are the instance's export configuration, which no tenant
 		     owns, so a tenant admin's page has no such section rather than an
 		     empty one. -->
@@ -439,13 +478,13 @@
 				<Alert tone="success" autoDismiss>{form.message}</Alert>
 			{/if}
 
-			{#if data.exporters === null}
-				<EmptyState
-					iconSnippet={noExporters}
-					title="Exporters unavailable"
-					description="The telemetry plugin did not answer with its exporter list."
+			{#if !data.exporters.ok}
+				<GateNotice
+					gate={data.exporters.gate}
+					title="Telemetry exporters"
+					absent="The telemetry plugin is not in this build, so no exporter is running."
 				/>
-			{:else if data.exporters.length === 0}
+			{:else if data.exporters.value.length === 0}
 				<EmptyState
 					iconSnippet={noExporters}
 					title="No exporter configured"
@@ -465,7 +504,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.exporters as exporter (exporter.name)}
+						{#each data.exporters.value as exporter (exporter.name)}
 							<tr>
 								<td data-cell="nowrap" class="font-mono text-xs">{exporter.name}</td>
 								<td>

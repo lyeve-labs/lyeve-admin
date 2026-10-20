@@ -3,7 +3,11 @@ import { ApiError } from '@lyeve-labs/client';
 
 const api = vi.hoisted(() => ({
 	listJobs: vi.fn(),
+	getJob: vi.fn(),
+	listRows: vi.fn(),
 	listTemplates: vi.fn(),
+	rollbackJob: vi.fn(),
+	cancelJob: vi.fn(),
 	createTemplate: vi.fn(),
 	updateTemplate: vi.fn(),
 	deleteTemplate: vi.fn(),
@@ -22,12 +26,13 @@ vi.mock('$lib/server/authz', () => ({
 }));
 
 import { load, actions } from './+page.server';
+import { requireRole } from '$lib/server/authz';
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
-function loadEvent() {
+function loadEvent(query = '') {
 	return {
-		url: new URL('http://admin/admin/imports'),
+		url: new URL(`http://admin/admin/imports${query}`),
 		fetch: vi.fn(),
 		cookies: {},
 		depends: vi.fn(),
@@ -78,6 +83,56 @@ describe('imports load', () => {
 		expect(result.templatesRead).toBe(false);
 		expect(result.licensed).toBeNull();
 	});
+
+	it('keeps the reason the templates were not read', async () => {
+		api.listTemplates.mockRejectedValue(new ApiError(403, 'insufficient permissions'));
+		const result = (await load(loadEvent())) as Loaded & { templatesGate: unknown };
+		expect(result.templatesGate).toEqual({ state: 'forbidden' });
+	});
+});
+
+describe('imports load keeps failed reads apart from empty ones', () => {
+	it('keeps an unread content type list as a failure', async () => {
+		const rest = await import('@lyeve-labs/client-rest');
+		vi.mocked(rest.getSchemas).mockRejectedValueOnce(new Error('down'));
+		const result = (await load(loadEvent())) as Loaded;
+		expect(result.schemas.ok).toBe(false);
+	});
+
+	it('hands over the content types a read answered with', async () => {
+		const result = (await load(loadEvent())) as Loaded;
+		expect(result.schemas).toEqual({ ok: true, value: [] });
+	});
+
+	it('opens the rows panel with the failure when the job cannot be read', async () => {
+		api.getJob.mockRejectedValue(new ApiError(404, 'not found'));
+		api.listRows.mockResolvedValue({ rows: [], total: 0 });
+		const result = (await load(loadEvent('?job=j9'))) as Loaded;
+		expect(result.detail).toEqual({ ok: false, gate: { state: 'absent' } });
+	});
+
+	it('reads no rows panel when none was asked for', async () => {
+		const result = (await load(loadEvent())) as Loaded;
+		expect(result.detail).toBeNull();
+	});
+
+	it('sends a page past the end back to the last page', async () => {
+		api.listJobs.mockResolvedValue({ data: [], total_count: 30 });
+		await expect(load(loadEvent('?offset=100'))).rejects.toMatchObject({
+			status: 307,
+			location: '/admin/imports?offset=25',
+		});
+	});
+});
+
+describe('rollback', () => {
+	// The engine admits any admin to the rollback route, so the console asks
+	// for no more than that.
+	it('takes a rollback from an admin', async () => {
+		api.rollbackJob.mockResolvedValue(undefined);
+		expect(await actions.rollback(formEvent({ id: 'j1' }))).toEqual({ rolledBack: 'j1' });
+		expect(requireRole).toHaveBeenCalledWith(expect.anything(), ['admin', 'super_admin']);
+	});
 });
 
 describe('template actions', () => {
@@ -119,6 +174,7 @@ describe('template actions', () => {
 		)) as { status: number; data: { refused: { kind: string } } };
 		expect(out.status).toBe(402);
 		expect(out.data.refused.kind).toBe('feature');
+		expect((out.data as unknown as { action: string }).action).toBe('saveTemplate');
 		expect(api.updateTemplate).toHaveBeenCalledWith(expect.anything(), 't1', expect.anything());
 	});
 
@@ -127,3 +183,33 @@ describe('template actions', () => {
 		expect(await actions.deleteTemplate(formEvent({ id: 't1' }))).toEqual({ removedTemplate: 't1' });
 	});
 });
+
+describe('canceling an import', () => {
+	type Failure = { status: number; data: Record<string, unknown> };
+
+	it('cancels the import it names', async () => {
+		api.cancelJob.mockResolvedValue(undefined);
+		expect(await actions.cancel(formEvent({ id: 'j1' }))).toEqual({ canceled: 'j1' });
+		expect(api.cancelJob).toHaveBeenCalledWith(expect.anything(), 'j1');
+	});
+
+	it('names the cancel on a refusal and relays its reason', async () => {
+		api.cancelJob.mockRejectedValue(new ApiError(409, 'job is not running'));
+		expect(((await actions.cancel(formEvent({ id: 'j1' }))) as Failure).data).toEqual({ action: 'cancel', error: 'job is not running' });
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		api.cancelJob.mockRejectedValue(new ApiError(503, 'pq: down'));
+		expect(((await actions.cancel(formEvent({ id: 'j1' }))) as Failure).data).toEqual({
+			action: 'cancel',
+			error: 'The import could not be canceled.',
+		});
+	});
+
+	it('refuses an editor before it reaches the plugin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }));
+		await expect(actions.cancel(formEvent({ id: 'j1' }))).rejects.toMatchObject({ status: 403 });
+		expect(api.cancelJob).not.toHaveBeenCalled();
+	});
+});
+

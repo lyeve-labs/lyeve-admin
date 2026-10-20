@@ -25,6 +25,9 @@ export const ADMIN_SEATS_CAP = 'admin.seats';
 /** Where an operator reads and changes what this instance is licensed for. */
 export const LICENSE_PAGE = '/admin/settings/license';
 
+/** The way forward from any limit, said first. */
+export const LIFTS = 'A license that allows more lifts the limit.';
+
 export type Refusal =
 	| {
 			kind: 'cap';
@@ -106,7 +109,10 @@ export function refusalTitle(r: Refusal): string {
 
 /**
  * The sentence for a refusal: "7 of 7 items are in use" for a cap, and the
- * capability's name for a feature.
+ * capability's name for a feature. A cap says what happened, then the way
+ * forward: a license that allows more, and only after it removing one. It
+ * reads the same to an install with no license and to one whose license
+ * allows less than it needs.
  */
 export function refusalText(r: Refusal): string {
 	if (r.kind === 'cap') {
@@ -122,12 +128,40 @@ export function refusalText(r: Refusal): string {
 		if (r.cap === ADMIN_SEATS_CAP) {
 			// The heading already names the seats, so the count stands alone.
 			const held = line.replace(` ${noun} are in use`, ' are in use');
-			return `Every admin seat is taken. ${held} Editors and viewers take no seat, so remove the admin role from an account to add another.`;
+			return `Every admin seat is taken. ${held} ${LIFTS} Removing the admin role from an account also frees a seat. Editors and viewers take no seat.`;
 		}
-		return `${line} Remove one, or change the license to allow more.`;
+		return `${line} ${LIFTS} Removing one also makes room.`;
 	}
 	if (!r.feature) return 'This needs a capability this license does not include. Nothing was changed.';
 	return `The license on this instance does not include ${r.feature}. Nothing was changed.`;
+}
+
+/**
+ * The words for a link to where more is bought, read from what the link
+ * opens: a plan, or an add-on the visitor's build holds. Null for a link
+ * that says neither, such as a path on this console, and the caller uses
+ * words of its own.
+ */
+export function upgradeLabel(href: string): string | null {
+	let url: URL;
+	try {
+		url = new URL(href);
+	} catch {
+		return null;
+	}
+	const addOns = url.searchParams.get('skus');
+	if (addOns) return addOns.includes(',') ? 'View the add-ons' : 'View the add-on';
+	if (url.searchParams.get('plan')) return 'View the plan';
+	return null;
+}
+
+/**
+ * The words for a link out of a refusal: what the address opens, then the
+ * label it was served with, then the step the refusal asks for. `raises` is
+ * a refusal at a ceiling, where more is bought rather than turned on.
+ */
+export function upgradeWords(link: { href: string; label?: string }, raises = false): string {
+	return upgradeLabel(link.href) ?? link.label ?? (raises ? 'How to raise the limit' : 'How to enable it');
 }
 
 /**

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Checkbox, Collapsible, Input, SearchInput, SegmentedControl, Table } from '@lyeve-labs/ui-kit';
+	import { Alert, Checkbox, CheckboxGroup, Collapsible, Input, SearchInput, SegmentedControl, Table } from '@lyeve-labs/ui-kit';
 	import { Database, BookOpen, Plug } from '@lucide/svelte';
 	import {
 		KEY_ACTIONS,
@@ -29,12 +29,18 @@
 		groups,
 		privileged = false,
 		error,
+		schemasFailed = false,
+		catalogFailed = false,
 	}: {
 		access: KeyAccess;
 		schemas: string[];
 		groups: ResourceGroup[];
 		privileged?: boolean;
 		error?: string;
+		/** The schema list did not answer, so an empty list means nothing. */
+		schemasFailed?: boolean;
+		/** The route catalog did not answer, so no resource below is offered. */
+		catalogFailed?: boolean;
 	} = $props();
 
 	const scopes = $derived(accessScopes(access));
@@ -50,10 +56,6 @@
 
 	function toggle(list: readonly string[], action: string, on: boolean): string[] {
 		return on ? [...new Set([...list, action])] : list.filter((a) => a !== action);
-	}
-
-	function setContentAction(action: string, on: boolean) {
-		access = { ...access, contentActions: toggle(access.contentActions, action, on) };
 	}
 
 	function setSchemaAction(schema: string, action: string, on: boolean) {
@@ -124,17 +126,18 @@
 					bind:value={() => access.contentMode, (v) => (access = { ...access, contentMode: v })}
 				/>
 				{#if access.contentMode === 'all'}
-					<div class="flex flex-wrap gap-x-4 gap-y-2" role="group" aria-label="Actions on every schema">
-						{#each KEY_ACTIONS as a (a.value)}
-							<Checkbox
-								label={a.label}
-								checked={access.contentActions.includes(a.value)}
-								onchange={(on) => setContentAction(a.value, on)}
-							/>
-						{/each}
-					</div>
+					<CheckboxGroup
+						label="Actions on every schema"
+						labelHidden
+						orientation="horizontal"
+						options={KEY_ACTIONS}
+						value={access.contentActions}
+						onchange={(v) => (access = { ...access, contentActions: v as typeof access.contentActions })}
+					/>
+				{:else if schemasFailed}
+					<Alert tone="warn">The schemas could not be read, so none can be chosen now. Reload the page to try again.</Alert>
 				{:else if schemas.length === 0}
-					<p class="text-xs text-faint">This instance has no schemas yet, or they could not be read.</p>
+					<p class="text-xs text-faint">This instance has no schemas yet.</p>
 				{:else}
 					{#if schemas.length > 8}
 						<label for="key-schema-search" class="sr-only">Narrow the schemas</label>
@@ -186,13 +189,17 @@
 			<div class="pt-2">
 				<Checkbox
 					label="Discover content types"
-					description="List the schemas and their fields at /api/v1/schemas."
+					description="List the schemas and their fields at /api/v1/schemas. A schema is listed only when this key can also read its content."
 					checked={access.discoverSchemas}
 					onchange={(on) => (access = { ...access, discoverSchemas: on })}
 				/>
 			</div>
 		</Collapsible>
 	</div>
+
+	{#if catalogFailed}
+		<Alert tone="warn">The engine's route catalog could not be read, so no other resource can be granted now. Reload the page to try again.</Alert>
+	{/if}
 
 	{#each groups as g (g.resource)}
 		{@const st = resourceState(g.resource)}
@@ -204,15 +211,14 @@
 							{g.label} reads every schema, whichever schemas are chosen above. Leave it off for a key held to some schemas.
 						</Alert>
 					{/if}
-					<div class="flex flex-wrap gap-x-4 gap-y-2" role="group" aria-label="Actions on {g.label}">
-						{#each g.actions as action (action)}
-							<Checkbox
-								label={actionLabel(action)}
-								checked={st.actions.includes(action)}
-								onchange={(on) => setResource(g.resource, { actions: toggle(st.actions, action, on) })}
-							/>
-						{/each}
-					</div>
+					<CheckboxGroup
+						label="Actions on {g.label}"
+						labelHidden
+						orientation="horizontal"
+						options={g.actions.map((action) => ({ value: action, label: actionLabel(action) }))}
+						value={st.actions}
+						onchange={(v) => setResource(g.resource, { actions: v })}
+					/>
 					{#if g.nameParam}
 						<Input
 							id="key-names-{g.resource}"

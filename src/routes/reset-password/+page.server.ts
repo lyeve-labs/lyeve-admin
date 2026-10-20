@@ -1,16 +1,30 @@
 import { fail } from '@sveltejs/kit';
-import { createClient } from '@lyeve-labs/client';
+import { ApiError, createClient } from '@lyeve-labs/client';
 import { confirmPasswordReset, RESET_MIN_PASSWORD_LENGTH } from '$lib/api/password-reset';
+import { passwordTooLong } from '$lib/api/users';
+import { actionError } from '$lib/server/action-error';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { organizationFromUrl } from '$lib/organization';
 import type { Actions, PageServerLoad } from './$types';
 
 const EXPIRED = 'This reset link is invalid or has expired. Request a new one.';
 
+function apiCode(e: ApiError): string {
+	const body = e.body as { code?: unknown } | undefined;
+	return typeof body?.code === 'string' ? body.code : '';
+}
+
 // The token is read here and only spent by the submit, so a mail scanner that
-// opens the link leaves it usable.
+// opens the link leaves it usable. The token already names the account, so
+// this page never asks for an organization. One the link carries goes on to
+// the sign-in and new-link pages, so they do not ask either.
 export const load: PageServerLoad = ({ url }) => {
-	return { token: url.searchParams.get('token') ?? '', minLength: RESET_MIN_PASSWORD_LENGTH };
+	return {
+		token: url.searchParams.get('token') ?? '',
+		minLength: RESET_MIN_PASSWORD_LENGTH,
+		carried: organizationFromUrl(url),
+	};
 };
 
 export const actions: Actions = {
@@ -27,6 +41,10 @@ export const actions: Actions = {
 		if (password.length < RESET_MIN_PASSWORD_LENGTH) {
 			return fail(400, { error: `Use at least ${RESET_MIN_PASSWORD_LENGTH} characters.` });
 		}
+		// Checked here because the engine spends the link before it hashes the
+		// password, so a refusal there would cost the reader the link.
+		const tooLong = passwordTooLong(password);
+		if (tooLong) return fail(400, { error: tooLong });
 		if (password !== confirm) return fail(400, { error: 'The two passwords do not match.' });
 
 		try {
@@ -34,9 +52,13 @@ export const actions: Actions = {
 		} catch (e) {
 			const refused = recoveryRefusal(e, 'Password reset');
 			if (refused) return fail(refused.status, { error: refused.error });
-			// The engine refuses a spent, expired or unknown token with the same
-			// 400, and a password it finds too short the same way. The length is
-			// checked above, so what is left is the link.
+			// A 422 with an engine code is the engine's password policy, which
+			// refuses before the token is claimed. The link still works, so the
+			// form stays and shows the engine's sentence. A spent, expired or
+			// unknown token answers 400.
+			if (e instanceof ApiError && e.status === 422 && apiCode(e)) {
+				return fail(422, { error: actionError(e, 'Choose a different password.') });
+			}
 			return fail(400, { error: EXPIRED, expired: true });
 		}
 		return { done: true };

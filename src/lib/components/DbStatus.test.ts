@@ -127,3 +127,28 @@ describe('DbStatus', () => {
 		expect(screen.queryByText('Network error')).toBeNull();
 	});
 });
+
+/*
+ * Below sm the words were hidden from everyone, so a reader on a phone had a
+ * colored dot and a tooltip a finger cannot open. The words stay for a screen
+ * reader and an icon of its own shape stands for each state.
+ */
+describe('DbStatus on a narrow screen', () => {
+	it.each([
+		[null, 'Database unknown'],
+		[0, 'Database synced'],
+	])('keeps the words for a screen reader when pending is %s', (pending, words) => {
+		render(DbStatus, { props: { pending, redirectTo: '/admin' } });
+		const label = screen.getByText(words);
+		expect(label.className).toContain('sr-only');
+		expect(label.className).not.toContain('hidden');
+		expect(screen.getByTestId('db-status').querySelector('svg')).not.toBeNull();
+	});
+
+	it('draws a different icon for each state', () => {
+		const { container: unknown } = render(DbStatus, { props: { pending: null, redirectTo: '/admin' } });
+		const { container: synced } = render(DbStatus, { props: { pending: 0, redirectTo: '/admin' } });
+		const shape = (c: HTMLElement) => c.querySelector('[data-testid="db-status"] svg')?.getAttribute('class') ?? '';
+		expect(shape(unknown)).not.toBe(shape(synced));
+	});
+});

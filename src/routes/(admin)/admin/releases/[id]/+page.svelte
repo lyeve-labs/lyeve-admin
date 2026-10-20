@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -11,11 +10,13 @@
 		Input,
 		PageShell,
 		SectionHeading,
+		SegmentedControl,
 		Select,
 		Table,
 		Textarea,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { CalendarClock, FileText, Pencil, Plus, Send, Trash2, X } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
@@ -42,6 +43,15 @@
 	const errors = $derived(fieldErrors(form));
 	const formError = $derived(form && 'error' in form ? String(form.error) : undefined);
 	const refused = $derived(formRefusal(form));
+	// Which write failed. The two drawers each show only their own action's
+	// failure, so a refused publish or delete never opens the next drawer as
+	// if its own save had failed.
+	const failedAction = $derived(form && 'action' in form ? String(form.action) : '');
+	function failureOf(action: string) {
+		return failedAction === action
+			? { message: formError, fields: errors, refused }
+			: { message: undefined, fields: {}, refused: null };
+	}
 
 	// A refused schedule or publish carries the conflicts that stopped it,
 	// which are fresher than the ones the page read.
@@ -80,17 +90,38 @@
 	// The add-entry drawer.
 	let addOpen = $state(false);
 	let entryId = $state('');
-	let itemAction = $state('publish');
+	let picked = $state<string | null>(null);
+	let itemAction = $state<'publish' | 'unpublish'>('publish');
 	const add = submitter(() => (addOpen = false));
-	const ACTIONS = [
+	const ACTIONS: { value: 'publish' | 'unpublish'; label: string }[] = [
 		{ value: 'publish', label: 'Publish it' },
 		{ value: 'unpublish', label: 'Unpublish it' },
 	];
+	// The entries the release can take, grouped by collection. A group is a
+	// run of neighboring rows, so the rows are ordered by collection, and the
+	// sort is stable, so each group keeps the newest first.
+	const entryOptions = $derived(
+		[...(data.choices ?? [])]
+			.sort((a, b) => a.schema.localeCompare(b.schema))
+			.map((c) => ({
+				value: c.id,
+				label: c.title || c.slug || shortId(c.id),
+				group: c.schema || undefined,
+				keywords: [c.id, c.slug].filter(Boolean),
+			})),
+	);
+
 	function openAdd() {
 		entryId = '';
+		picked = null;
 		itemAction = 'publish';
 		addOpen = true;
 	}
+
+	// A drawer that is open shows its own failure, so the page banner leaves it out.
+	const drawerFailed = $derived(
+		(editOpen && failedAction === 'update') || (addOpen && failedAction === 'addItem'),
+	);
 
 	// The schedule. The picker answers local time, and the action receives
 	// it as UTC so the server never guesses the operator's zone.
@@ -108,21 +139,26 @@
 	let removeEntry = $state('');
 	let removeForm = $state<HTMLFormElement>();
 
+	// Each question names the release, so a reader with two tabs open can
+	// tell which one the answer goes to.
 	async function ask(action: 'publish' | 'cancel' | 'delete') {
+		const named = release?.name ?? '';
 		const copy = {
-			publish: ['Publish this release now?', 'Every entry in it is published or unpublished at once.', 'Publish now'],
-			cancel: ['Cancel this release?', 'Nothing in it goes out, and it can no longer change.', 'Cancel release'],
-			delete: ['Delete this release?', 'The release and its list of entries are removed. The entries themselves stay.', 'Delete'],
+			publish: [`Publish release ${named} now?`, 'Every entry in it is published or unpublished at once.', 'Publish now'],
+			cancel: [`Cancel release ${named}?`, 'Nothing in it goes out, and it can no longer change.', 'Cancel release'],
+			delete: [`Delete release ${named}?`, 'The release and its list of entries are removed. The entries themselves stay.', 'Delete'],
 		}[action];
 		if (!(await confirmDialog(copy[0], copy[1], { confirmLabel: copy[2] }))) return;
 		confirmAction = action;
-		await Promise.resolve();
+		// The hidden form reads the action from the DOM, so it waits for Svelte
+		// to write it there.
+		await tick();
 		confirmForm?.requestSubmit();
 	}
 
 	async function askRemove(id: string) {
 		removeEntry = id;
-		await Promise.resolve();
+		await tick();
 		removeForm?.requestSubmit();
 	}
 
@@ -131,8 +167,6 @@
 		return label?.schema ? `/admin/content/${encodeURIComponent(label.schema)}/${encodeURIComponent(id)}` : null;
 	}
 </script>
-
-<PageTitle title={release?.name ?? 'Release'} />
 
 <PageShell title={release?.name ?? 'Release'} description={release?.description || undefined} width="wide" {back}>
 	{#snippet actions()}
@@ -156,10 +190,10 @@
 	{/snippet}
 
 	{#if !release}
-		<GateNotice gate={data.gate} title="Releases" absent="This build serves no content releases." />
+		<GateNotice level={2} gate={data.gate} title="Releases" absent="This build serves no content releases." />
 	{:else}
 		<div class="flex flex-col gap-5">
-			{#if !editOpen && !addOpen}
+			{#if !drawerFailed}
 				<FormErrors message={formError} fields={errors} {refused} />
 			{/if}
 			{#if success}
@@ -171,7 +205,7 @@
 
 			<Card>
 				{#snippet header()}
-					<SectionHeading level={3}>Schedule</SectionHeading>
+					<SectionHeading level={2}>Schedule</SectionHeading>
 				{/snippet}
 				{#if release.status === 'scheduled' && release.scheduled_at}
 					<div class="flex flex-wrap items-center justify-between gap-3">
@@ -198,18 +232,18 @@
 			</Card>
 
 			{#if !data.conflictsRead && !(form && 'conflicts' in form)}
-				<Alert tone="warn">Conflicts could not be checked. The engine checks again before the release goes out.</Alert>
+				<GateNotice gate={data.conflictsGate} title="Conflicts" absent="This build does not check release conflicts. The engine checks again before the release goes out." />
 			{:else if conflicts.length > 0}
 				<Card>
 					{#snippet header()}
-						<SectionHeading level={3}>Conflicts</SectionHeading>
+						<SectionHeading level={2}>Conflicts</SectionHeading>
 					{/snippet}
 					<p class="mb-3 text-sm text-muted">
 						{blocking.length > 0
 							? `${blocking.length} ${blocking.length === 1 ? 'conflict stops' : 'conflicts stop'} this release from going out. Resolve each one or remove the entry.`
 							: 'Nothing here stops the release. Deleted entries are skipped when it goes out.'}
 					</p>
-					<ul class="flex flex-col gap-2" data-testid="release-conflicts">
+					<ul class="flex flex-col gap-2 coarse:gap-6" data-testid="release-conflicts">
 						{#each conflicts as c, i (`${c.entry_id}-${c.kind}-${i}`)}
 							<li class="flex flex-wrap items-center gap-2 text-sm">
 								<Badge tone={blocks(c) ? 'danger' : 'neutral'}>{blocks(c) ? 'Blocks' : 'Skipped'}</Badge>
@@ -217,7 +251,7 @@
 								<span class="text-muted">{CONFLICT_LABELS[c.kind] ?? c.detail}</span>
 								{#if c.at}<span class="text-xs text-faint">{formatDateTime(c.at)}</span>{/if}
 								{#if c.release_id}
-									<a class="text-xs text-brand" href="/admin/releases/{c.release_id}">Open the other release</a>
+									<a class="relative hit-area text-xs text-brand" href="/admin/releases/{c.release_id}">Open the other release</a>
 								{/if}
 							</li>
 						{/each}
@@ -228,7 +262,7 @@
 			<Card pad="none">
 				{#snippet header()}
 					<div class="flex items-center justify-between gap-3">
-						<SectionHeading level={3}>Entries ({release.item_count})</SectionHeading>
+						<SectionHeading level={2}>Entries ({release.item_count})</SectionHeading>
 						{#if canEdit}
 							<Button variant="secondary" size="sm" onclick={openAdd}><Plus size={ICON.sm} /> Include entry</Button>
 						{/if}
@@ -237,7 +271,7 @@
 				{#if (release.items ?? []).length === 0}
 					<EmptyState
 						title="No entries yet"
-						description="Add an entry here by its ID, or from the entry's own page."
+						description="Add an entry here, or from the entry's own page."
 					>
 						{#snippet iconSnippet()}<FileText size={ICON.lg} />{/snippet}
 					</EmptyState>
@@ -259,7 +293,7 @@
 								<tr>
 									<td>
 										{#if href}
-											<a {href} class="text-fg transition-colors hover:text-brand">{label?.title || shortId(it.entry_id)}</a>
+											<a {href} class="relative hit-area text-fg transition-colors hover:text-brand">{label?.title || shortId(it.entry_id)}</a>
 										{:else}
 											<span class="font-mono text-xs text-muted">{it.entry_id}</span>
 										{/if}
@@ -288,9 +322,10 @@
 </PageShell>
 
 <Drawer bind:open={editOpen} title="Edit release">
+	{@const own = failureOf('update')}
 	<form method="POST" action="?/update" id="release-edit" use:enhance={save.enhance} class="flex flex-col gap-4">
-		<FormErrors message={formError} fields={errors} {refused} />
-		<Input id="release-name" name="name" label="Name" required bind:value={name} error={errors.name} />
+		<FormErrors message={own.message} fields={own.fields} refused={own.refused} />
+		<Input id="release-name" name="name" label="Name" required bind:value={name} error={own.fields.name} />
 		<Textarea id="release-description" name="description" label="Description" rows={3} bind:value={description} />
 	</form>
 	{#snippet footer()}
@@ -299,30 +334,41 @@
 	{/snippet}
 </Drawer>
 
-<Drawer bind:open={addOpen} title="Add an entry">
+<Drawer bind:open={addOpen} title="Include an entry">
+	{@const own = failureOf('addItem')}
 	<form method="POST" action="?/addItem" id="release-add" use:enhance={add.enhance} class="flex flex-col gap-4">
-		<FormErrors message={formError} fields={errors} {refused} />
-		<Input
-			id="release-entry"
-			name="entry_id"
-			label="Entry ID"
-			required
-			bind:value={entryId}
-			error={errors.entry_id}
-			hint="The ID shown under an entry's title on its page."
-		/>
-		<Select
-			id="release-action"
-			name="action"
-			label="When the release goes out"
-			options={ACTIONS}
-			value={itemAction}
-			onvaluechange={(v) => (itemAction = v)}
-		/>
+		<FormErrors message={own.message} fields={own.fields} refused={own.refused} />
+		{#if data.choices}
+			<Select
+				id="release-entry"
+				name="entry_id"
+				label="Entry"
+				placeholder="Pick an entry"
+				options={entryOptions}
+				searchable
+				required
+				bind:value={picked}
+				error={own.fields.entry_id}
+				hint="The most recently changed entries, by collection. Add an older one from its own page."
+			/>
+		{:else}
+			<!-- The entry list could not be read, so the drawer takes an id and
+			     says why it offers no list. -->
+			<Input
+				id="release-entry"
+				name="entry_id"
+				label="Entry ID"
+				required
+				bind:value={entryId}
+				error={own.fields.entry_id}
+				hint="The entry list could not be read. Enter the ID shown under an entry's title on its page."
+			/>
+		{/if}
+		<SegmentedControl name="action" label="When the release goes out" options={ACTIONS} bind:value={itemAction} />
 	</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (addOpen = false)}>Cancel</Button>
-		<Button variant="primary" type="submit" form="release-add" disabled={!entryId.trim()} loading={add.pending}>Create</Button>
+		<Button variant="primary" type="submit" form="release-add" disabled={!(data.choices ? picked : entryId.trim())} loading={add.pending}>Include</Button>
 	{/snippet}
 </Drawer>
 

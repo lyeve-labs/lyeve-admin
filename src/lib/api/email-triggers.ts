@@ -5,6 +5,7 @@
 
 import type { HttpClient } from '@lyeve-labs/client';
 import { rowsOf, type ListEnvelope } from '$lib/api/list';
+import { refusalOf, type Refusal } from '$lib/api/refusal';
 
 const BASE = '/api/admin/email/triggers';
 
@@ -72,4 +73,23 @@ export function deleteEmailTrigger(client: HttpClient, id: string): Promise<void
 export async function listEmailTemplates(client: HttpClient): Promise<EmailTemplateSummary[]> {
 	const res = await client.get<ListEnvelope<EmailTemplateSummary> | EmailTemplateSummary[]>('/api/admin/email-templates?limit=200');
 	return rowsOf(res).map((t) => ({ id: t.id, key: t.key, subject: t.subject, status: t.status }));
+}
+
+/**
+ * The license refusal a trigger create or update would meet, or null.
+ *
+ * The plugin licenses trigger writes with the same paid capability as its
+ * webhook list, and its trigger list says nothing about the license. So the
+ * webhook list is read as a probe: a 402 naming a capability means a create
+ * or an edit would be refused too. Any other answer, a failure included, is
+ * not a refusal, and the save reports for itself.
+ */
+export async function triggerWriteRefusal(client: HttpClient): Promise<Refusal | null> {
+	try {
+		await client.get('/api/admin/email/webhooks');
+		return null;
+	} catch (err) {
+		const refused = refusalOf(err);
+		return refused?.kind === 'feature' ? refused : null;
+	}
 }

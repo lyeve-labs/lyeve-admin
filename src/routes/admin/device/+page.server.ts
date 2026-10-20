@@ -1,7 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { getMe } from '@lyeve-labs/client-rest';
-import { authedClient } from '$lib/server/authz';
+import { authedClient, sessionUser } from '$lib/server/authz';
 import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import {
 	approveDeviceLogin,
@@ -11,6 +10,7 @@ import {
 	type DeviceStepUp,
 } from '$lib/api/device-login';
 import { describeRefusal } from '$lib/api/admin-tokens';
+import { refusalOf, refusalText } from '$lib/api/refusal';
 import {
 	canApprove,
 	isStepUpRefusal,
@@ -21,8 +21,25 @@ import {
 } from '$lib/device-login';
 import type { Actions, PageServerLoad } from './$types';
 
-/** What the page is showing: the code field, a request to decide, or an outcome. */
-type View = 'enter' | 'pending' | DeviceOutcome;
+/**
+ * What the page is showing: the code field, a request to decide, or an outcome.
+ * `busy` is a rate refusal and `refused` a 402. Neither is an outage, and
+ * the same request can pass later or on another license.
+ */
+type View = 'enter' | 'pending' | 'busy' | 'refused' | DeviceOutcome;
+
+/** The view an engine refusal stands for, with the sentence a 402 carries. */
+function refusalView(e: ApiError): { view: View; refusal: string } {
+	if (e.status === 429) return { view: 'busy', refusal: '' };
+	if (e.status === 402) {
+		const r = refusalOf(e);
+		return {
+			view: 'refused',
+			refusal: r ? refusalText(r) : 'This instance does not allow device sign-in right now. Nothing was changed.',
+		};
+	}
+	return { view: outcomeForRefusal(e.status, e.message), refusal: '' };
+}
 
 /*
  * This page sits outside the console frame, like the sign-in page, so the
@@ -35,19 +52,28 @@ export const load: PageServerLoad = async (event) => {
 		redirect(302, loginRedirect(url.pathname, url.search));
 	}
 	const client = authedClient(event);
-	const user = await getMe(client).catch(() => null);
+	// Only an engine that says the session is over ends it. One that cannot
+	// check it throws the outage page, and the cookie outlives the blip.
+	const user = await sessionUser(client);
 	if (!user) {
 		clearSessionCookie(event);
 		redirect(302, loginRedirect(url.pathname, url.search));
 	}
 
 	const raw = url.searchParams.get('code') ?? '';
-	const page = (view: View, code: string, request: DeviceLoginRequest | null = null, mfaEnrolled = false) => ({
+	const page = (
+		view: View,
+		code: string,
+		request: DeviceLoginRequest | null = null,
+		mfaEnrolled = false,
+		refusal = '',
+	) => ({
 		email: user.email,
 		view,
 		code,
 		request,
 		mfaEnrolled,
+		refusal,
 	});
 
 	if (!canApprove(user.roles)) return page('forbidden', raw);
@@ -66,7 +92,10 @@ export const load: PageServerLoad = async (event) => {
 		]);
 		return page('pending', code, request, mfaEnrolled);
 	} catch (e) {
-		if (e instanceof ApiError) return page(outcomeForRefusal(e.status, e.message), code);
+		if (e instanceof ApiError) {
+			const { view, refusal } = refusalView(e);
+			return page(view, code, null, false, refusal);
+		}
 		return page('error', code);
 	}
 };
@@ -103,16 +132,17 @@ async function decide(event: Parameters<Actions[string]>[0], approve: boolean) {
 		}
 	} catch (e) {
 		if (e instanceof ApiError) {
-			// A wrong or missing confirmation leaves the request open: say so on
-			// the field and keep the card on screen.
-			if (approve && isStepUpRefusal(e.status, e.message)) {
+			// A refused confirmation leaves the request open: say so on the form
+			// and keep the card on screen.
+			if (approve && isStepUpRefusal(e.status)) {
 				const r = describeRefusal(e.status, e.message, step.step);
 				const field = r.fields.password ?? r.fields.mfa_code ?? '';
 				return fail(e.status === 429 ? 429 : 400, {
 					stepUp: { error: field ? '' : r.error, field, needsMfa: !!r.needsMfa || step.step === 'mfa_code' },
 				});
 			}
-			return fail(e.status, { outcome: outcomeForRefusal(e.status, e.message) });
+			const { view, refusal } = refusalView(e);
+			return fail(e.status, refusal ? { outcome: view, refusal } : { outcome: view });
 		}
 		return fail(503, { outcome: 'error' as DeviceOutcome });
 	}

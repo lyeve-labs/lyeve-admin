@@ -3,9 +3,10 @@ import type { PageServerLoad, Actions } from './$types';
 import { createClient, ApiError } from '@lyeve-labs/client';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { claimSetup, getSetupModeStatus } from '$lib/api/setup';
+import { passwordTooLong } from '$lib/api/users';
 import { readEngineSetup, safeNext } from '$lib/server/setup-gate';
 import { LANDING } from '$lib/landing';
-import { setSessionCookie } from '$lib/server/session-cookie';
+import { setRefreshCookie, setSessionCookie } from '$lib/server/session-cookie';
 import { actionError } from '$lib/server/action-error';
 
 export const load: PageServerLoad = async ({ fetch, url }) => {
@@ -22,6 +23,8 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 
 const TOKEN_REFUSED =
 	'The engine did not accept that setup token. Copy it again from the place named under the field.';
+
+const ENGINE_SILENT = 'The engine did not answer. It may be restarting. Try again in a moment.';
 
 function limited(ip: string) {
 	const limit = checkRateLimit(ip);
@@ -55,7 +58,7 @@ export const actions: Actions = {
 				// settings. The next load shows the step that applies.
 				return { status: null };
 			}
-			return fail(503, { error: 'The engine did not answer. It may be restarting; try again in a moment.' });
+			return fail(503, { error: ENGINE_SILENT });
 		}
 	},
 
@@ -82,11 +85,16 @@ export const actions: Actions = {
 		if (password !== confirm) {
 			return { error: 'Passwords do not match.' };
 		}
+		// The engine's hasher reads 72 bytes at most and fails a longer password
+		// with a 500 that names no rule, so the limit is checked here.
+		const tooLong = passwordTooLong(password);
+		if (tooLong) return fail(400, { error: tooLong, fields: { password: tooLong } });
 
 		const client = createClient(fetch);
 		try {
-			const res = await claimSetup({ email, password, setup_token: setupToken }, client);
+			const res: { token: string; refresh_token?: string } = await claimSetup({ email, password, setup_token: setupToken }, client);
 			setSessionCookie(event, res.token);
+			setRefreshCookie(event, res.refresh_token);
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 401) {
 				return fail(401, { error: TOKEN_REFUSED });
@@ -99,6 +107,13 @@ export const actions: Actions = {
 			// install that changed it.
 			if (err instanceof ApiError && err.status === 422) {
 				return fail(422, { error: actionError(err, 'The password does not meet the password policy.') });
+			}
+			// A 5xx or no answer at all says nothing about the form, so the
+			// operator is told to wait rather than to change it. An account
+			// created before the answer was lost shows on the retry: the engine
+			// answers 409, and the branch above sends the operator to sign in.
+			if (!(err instanceof ApiError) || err.status >= 500) {
+				return fail(503, { error: ENGINE_SILENT });
 			}
 			return { error: 'Setup failed.' };
 		}

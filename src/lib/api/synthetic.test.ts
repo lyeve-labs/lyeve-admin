@@ -2,13 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
 	everyLabel,
-	millis,
+	intervalHint,
+	listOpenAlerts,
+	readProbeLimits,
+	runOutcome,
+	runProbeNow,
 	probeHealth,
 	probeTarget,
 	probeTone,
 	probeType,
 	syntheticGate,
 	type Probe,
+	type ProbeResult,
 } from './synthetic';
 
 function probe(over: Partial<Probe> = {}): Probe {
@@ -101,20 +106,6 @@ describe('intervals in words', () => {
 	});
 });
 
-describe('response times', () => {
-	it('keeps milliseconds until they stop reading as milliseconds', () => {
-		expect(millis(0)).toBe('0 ms');
-		expect(millis(342)).toBe('342 ms');
-		expect(millis(999)).toBe('999 ms');
-		expect(millis(1500)).toBe('1.50 s');
-	});
-
-	it('prints nothing it was not given', () => {
-		expect(millis(null)).toBe('-');
-		expect(millis(undefined)).toBe('-');
-	});
-});
-
 describe('the type the form may send', () => {
 	it('accepts the four the engine runs and refuses the rest', () => {
 		expect(probeType('health_check')).toBe('health_check');
@@ -128,7 +119,8 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(syntheticGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(syntheticGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(syntheticGate(new ApiError(503, 'database error')).state).toBe('error');
+		expect(syntheticGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(syntheticGate(new ApiError(503, 'database error')).state).toBe('unavailable');
 	});
 
 	// An operator reading "nothing is wrong" after a failed read is the worst
@@ -136,5 +128,77 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('never reports a failed read as everything passing', () => {
 		const gate = syntheticGate(new Error('network'));
 		expect(gate.state === 'error' && gate.message).toContain('not a report that everything is passing');
+	});
+});
+
+function result(over: Partial<ProbeResult> = {}): ProbeResult {
+	return {
+		id: 'r1',
+		probe_id: 'p1',
+		status: 'pass',
+		response_time_ms: 120,
+		region: 'us-east',
+		created_at: '2026-09-22T10:00:00Z',
+		...over,
+	};
+}
+
+function fakeClient(answer: unknown) {
+	const calls: string[] = [];
+	const respond = async (url: string) => {
+		calls.push(url);
+		return answer;
+	};
+	return { calls, client: { get: respond, post: respond } as never };
+}
+
+describe('a run now', () => {
+	// The plugin answers one result per region. Read as a single result, the
+	// array had no status, so a failing run was reported as passing in 0 ms.
+	it('reads the array of results the plugin answers', async () => {
+		const { client } = fakeClient([result(), result({ id: 'r2', region: 'eu-west', status: 'fail' })]);
+		const results = await runProbeNow(client, 'p1');
+		expect(results).toHaveLength(2);
+	});
+
+	it('fails when any region failed, timed by the slowest region', () => {
+		expect(
+			runOutcome([
+				result({ response_time_ms: 80 }),
+				result({ id: 'r2', status: 'fail', response_time_ms: 2400 }),
+			]),
+		).toEqual({ status: 'fail', ms: 2400, failed: 1, regions: 2 });
+		expect(runOutcome([result()])).toEqual({ status: 'pass', ms: 120, failed: 0, regions: 1 });
+	});
+
+	it('says nothing passed when no result was recorded', () => {
+		expect(runOutcome([]).status).toBeNull();
+	});
+});
+
+describe('the probe limits', () => {
+	it('reads the floor and the ceiling the plugin answers', async () => {
+		const { client, calls } = fakeClient({ probes: { limit: 3, current: 2 }, min_interval_seconds: 300 });
+		expect(await readProbeLimits(client)).toEqual({ probes: { limit: 3, current: 2 }, minIntervalSeconds: 300 });
+		expect(calls).toEqual(['/api/admin/synthetic-monitoring/limits']);
+	});
+
+	it('reads an answer without a floor as unknown', async () => {
+		expect(await readProbeLimits(fakeClient({ probes: { limit: 0, current: 4 } }).client)).toBeNull();
+	});
+
+	it('puts the floor in the hint only when it is known', () => {
+		expect(intervalHint({ probes: { limit: 0, current: 0 }, minIntervalSeconds: 15 })).toBe(
+			'At least 15. A probe is this instance calling itself.',
+		);
+		expect(intervalHint(null)).toBe('A probe is this instance calling itself.');
+	});
+});
+
+describe('the open alerts', () => {
+	// The plugin answers a bare array, which the callers read as a list envelope.
+	it('reads a bare array as an envelope', async () => {
+		const alert = { id: 'a1', probe_id: 'p1' };
+		expect(await listOpenAlerts(fakeClient([alert]).client)).toEqual({ data: [alert], total_count: 1 });
 	});
 });

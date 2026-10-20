@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import { Alert, Badge, Breadcrumb, Button, Card, DescriptionList, Input, PageShell, SectionHeading, Tag, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
@@ -21,7 +20,7 @@
 
 	async function askDelete(name: string) {
 		const ok = await confirmDialog(
-			`Delete ${name}?`,
+			`Delete provider ${name}?`,
 			'Calls that named it fall back to the next row by priority. The key goes with it.',
 			{ confirmLabel: 'Delete' }
 		);
@@ -54,9 +53,8 @@
 	);
 
 	const saveCaps = tracked(() => async ({ update }) => update({ reset: false }));
+	const saveConfig = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
-
-<PageTitle title={p?.name ?? 'Provider'} />
 
 <PageShell
 	title={p?.name ?? 'Provider'}
@@ -68,7 +66,7 @@
 		<Breadcrumb items={crumbsAfter(back, [{ label: 'AI', href: '/admin/ai' }, { label: 'Providers', href: '/admin/ai/providers' }, { label: p?.name ?? 'Provider' }])} />
 	{/snippet}
 
-	<AiSection tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
+	<AiSection level={2} tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
 		{#if p}
 			<div class="flex flex-wrap items-center gap-2">
 				{#if p.enabled}<Badge tone="success" dot>Enabled</Badge>{:else}<Badge tone="neutral" dot>Disabled</Badge>{/if}
@@ -80,7 +78,7 @@
 			<DescriptionList items={facts} />
 
 			<section class="grid gap-4 md:grid-cols-2">
-				<Card heading="Models" headingLevel={3} description="Ask the provider which models it serves. Nothing is stored.">
+				<Card heading="Models" headingLevel={2} description="Ask the provider which models it serves. Nothing is stored.">
 					<form method="POST" action="?/models" use:enhance class="flex flex-col gap-3">
 						<div>
 							<Button variant="secondary" size="sm" type="submit">
@@ -101,7 +99,7 @@
 					</form>
 				</Card>
 
-				<Card heading="Capabilities" headingLevel={3} description="What one model on this row can do, from the driver's own table and this row's modalities. The key is not needed.">
+				<Card heading="Capabilities" headingLevel={2} description="What one model on this row can do, from the driver's own table and this row's modalities. The key is not needed.">
 					<form method="POST" action="?/capabilities" use:enhance={saveCaps.enhance} class="flex flex-col gap-3">
 						<Input id="cap-model" name="model" label="Model" bind:value={capModel} placeholder={p.default_model || 'the default model'} />
 						<div>
@@ -115,10 +113,11 @@
 							{@const c = capabilities}
 							<div class="flex flex-wrap items-center gap-2" data-testid="capabilities">
 								<span class="text-xs text-muted">{c.model}</span>
-								<Badge tone={c.text ? 'success' : 'neutral'} size="sm">text</Badge>
-								<Badge tone={c.embed ? 'success' : 'neutral'} size="sm">embed</Badge>
-								<Badge tone={c.image ? 'success' : 'neutral'} size="sm">image</Badge>
-								<Badge tone={c.vision ? 'success' : 'neutral'} size="sm">vision</Badge>
+								<!-- The words say which it can do, so the tone is not the only sign. -->
+								<Badge tone={c.text ? 'success' : 'neutral'} size="sm">{c.text ? 'text' : 'no text'}</Badge>
+								<Badge tone={c.embed ? 'success' : 'neutral'} size="sm">{c.embed ? 'embed' : 'no embed'}</Badge>
+								<Badge tone={c.image ? 'success' : 'neutral'} size="sm">{c.image ? 'image' : 'no image'}</Badge>
+								<Badge tone={c.vision ? 'success' : 'neutral'} size="sm">{c.vision ? 'vision' : 'no vision'}</Badge>
 								{#if c.max_tokens > 0}<span class="text-xs text-faint">{c.max_tokens} tokens</span>{/if}
 							</div>
 						{/if}
@@ -134,7 +133,7 @@
 							id="provider-update"
 							method="POST"
 							action="?/update"
-							use:enhance={() => async ({ update }) => update({ reset: false })}
+							use:enhance={saveConfig.enhance}
 							class="flex flex-col gap-4"
 						>
 							{#key p.updated_at}
@@ -149,7 +148,7 @@
 								<Button variant="ghost" onclick={() => askDelete(p.name)}>
 									<Trash2 size={ICON.sm} aria-hidden="true" class="text-danger" /> Delete
 								</Button>
-								<Button variant="primary" type="submit" loading={saveCaps.pending}>Save</Button>
+								<Button variant="primary" type="submit" loading={saveConfig.pending}>Save</Button>
 							</div>
 						</form>
 					</Card>

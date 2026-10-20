@@ -7,6 +7,7 @@ vi.mock('$lib/server/authz', () => ({
 	requireRole: vi.fn(async () => ({ id: 'u1', roles: ['admin'] })),
 }));
 
+import { requireRole } from '$lib/server/authz';
 import { actions, load } from './+page.server';
 
 function event(form: Record<string, string> = {}) {
@@ -59,5 +60,69 @@ describe('audit sinks', () => {
 		engine.post.mockResolvedValue({ delivered: false, error: 'receiver answered 500' });
 		const out = await actions.test(event({ id: 's1' }));
 		expect(out).toEqual({ tested: 's1', delivered: false, testError: 'receiver answered 500' });
+	});
+});
+
+type Failure = { status: number; data: Record<string, unknown> };
+
+const EDIT = { id: 's1', name: 'SIEM', url: 'https://siem.example.com', enabled: 'true' };
+
+describe('editing a destination', () => {
+	it('saves the fields and keeps the stored secret when none is typed', async () => {
+		engine.put.mockResolvedValue({});
+		const out = await actions.update(event(EDIT));
+		expect(engine.put.mock.calls[0][0]).toBe('/api/admin/audit-log/sinks/s1');
+		expect(engine.put.mock.calls[0][1]).not.toHaveProperty('secret');
+		expect(out).toEqual({ saved: 'SIEM' });
+	});
+
+	it('relays a refusal under its own action', async () => {
+		engine.put.mockRejectedValue(new ApiError(400, 'url must be https', {}));
+		const out = (await actions.update(event(EDIT))) as Failure;
+		expect(out.data).toMatchObject({ action: 'update' });
+		expect(String(out.data.error)).toContain('url must be https');
+	});
+
+	it('gives its own sentence for an outage', async () => {
+		engine.put.mockRejectedValue(new ApiError(503, 'connection refused', {}));
+		const out = (await actions.update(event(EDIT))) as Failure;
+		expect(String(out.data.error)).toContain('The destination could not be saved.');
+		expect(String(out.data.error)).not.toContain('connection refused');
+	});
+
+	it('is for an admin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(new Error('forbidden'));
+		await expect(actions.update(event(EDIT))).rejects.toThrow('forbidden');
+		expect(vi.mocked(requireRole).mock.calls[0][1]).toEqual(['admin', 'super_admin']);
+		expect(engine.put).not.toHaveBeenCalled();
+	});
+});
+
+describe('deleting a destination', () => {
+	it('deletes the one named', async () => {
+		engine.delete.mockResolvedValue(undefined);
+		const out = await actions.delete(event({ id: 's1' }));
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/audit-log/sinks/s1');
+		expect(out).toEqual({ deleted: true });
+	});
+
+	it('relays a refusal under its own action', async () => {
+		engine.delete.mockRejectedValue(new ApiError(404, 'sink not found', {}));
+		const out = (await actions.delete(event({ id: 's1' }))) as Failure;
+		expect(out.data).toMatchObject({ action: 'delete' });
+		expect(String(out.data.error)).toContain('sink not found');
+	});
+
+	it('gives its own sentence for an outage', async () => {
+		engine.delete.mockRejectedValue(new ApiError(503, 'connection refused', {}));
+		const out = (await actions.delete(event({ id: 's1' }))) as Failure;
+		expect(String(out.data.error)).toContain('The destination could not be deleted.');
+	});
+
+	it('is for an admin', async () => {
+		vi.mocked(requireRole).mockRejectedValueOnce(new Error('forbidden'));
+		await expect(actions.delete(event({ id: 's1' }))).rejects.toThrow('forbidden');
+		expect(vi.mocked(requireRole).mock.calls[0][1]).toEqual(['admin', 'super_admin']);
+		expect(engine.delete).not.toHaveBeenCalled();
 	});
 });

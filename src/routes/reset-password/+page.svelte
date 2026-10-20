@@ -6,6 +6,7 @@
 	import AuthShell from '$lib/components/AuthShell.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { ICON } from '$lib/icon';
+	import { withOrganization } from '$lib/organization';
 	import type { ActionData, PageData } from './$types';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
@@ -22,13 +23,13 @@
 	{#if done}
 		<div class="space-y-5">
 			<Alert tone="success">Your password has been changed. Sign in with the new one.</Alert>
-			<Button href="/login" variant="primary" full>Sign in</Button>
+			<Button href={withOrganization('/login', data.carried)} variant="primary" full>Sign in</Button>
 		</div>
 	{:else if !data.token || expired}
 		<div class="space-y-5">
 			<Alert tone="danger">{form?.error ?? 'This reset link is incomplete. Open the link from the email again, or request a new one.'}</Alert>
-			<Button href="/forgot-password" variant="secondary" full>Request a new link</Button>
-			<Button href="/login" variant="ghost" size="sm" full>
+			<Button href={withOrganization('/forgot-password', data.carried)} variant="secondary" full>Request a new link</Button>
+			<Button href={withOrganization('/login', data.carried)} variant="ghost" size="sm" full>
 				<ArrowLeft size={ICON.sm} aria-hidden="true" />
 				Back to sign in
 			</Button>

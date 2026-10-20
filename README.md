@@ -15,7 +15,7 @@ goes through the engine's API. The engine is
 | **UI kit** | `@lyeve-labs/ui-kit` |
 | **API client** | `@lyeve-labs/client`, `@lyeve-labs/client-rest` |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
-| **Documentation** | [docs.lyeve.com](https://docs.lyeve.com) |
+| **Documentation** | [lyeve.com/docs](https://lyeve.com/docs/) |
 
 ## How LyEve fits together
 
@@ -28,7 +28,7 @@ LyEve runs as two services, each with its own repository and image.
 
 Put both behind one address. A proxy sends `/api/admin/*` to the engine's
 admin port, `/api/v1/*` to its content API, and every other path to the
-console. The [Docker Compose guide](https://docs.lyeve.com/deploy/docker-compose/)
+console. The [Docker Compose guide](https://lyeve.com/docs/deploy/docker-compose/)
 sets up the whole stack, TLS included, on one host.
 
 ## Features
@@ -51,7 +51,7 @@ sets up the whole stack, TLS included, on one host.
 ## Quick start
 
 The console needs a running engine. The
-[Docker Compose guide](https://docs.lyeve.com/deploy/docker-compose/) runs
+[Docker Compose guide](https://lyeve.com/docs/deploy/docker-compose/) runs
 both on one host.
 
 To run the console from source against an engine on this machine (admin API
@@ -87,7 +87,7 @@ engine logged on its first start, and create the first super admin.
 | `BODY_SIZE_LIMIT` | no | The largest request the console accepts. The image sets `10M`, enough for a settings bundle or a schema import. |
 
 [`.env.example`](.env.example) explains each one, and the
-[installation guide](https://docs.lyeve.com/getting-started/installation/)
+[installation guide](https://lyeve.com/docs/getting-started/installation/)
 shows them in a full deployment.
 
 To build and run the image yourself:
@@ -134,7 +134,7 @@ any LyEve engine, including one built from
 The official image, `ghcr.io/lyeve-labs/lyeve-admin`, adds visual editors for
 flows and content types under a commercial license, and its label names both
 licenses. A build from source shows list editors in their place.
-[Source code](https://docs.lyeve.com/trust/source-code/) has the details.
+[Source code](https://lyeve.com/docs/trust/source-code/) has the details.
 
 ## Contributing
 

@@ -2,13 +2,9 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { staticGroups, type EndpointGroup } from '$lib/api/reference';
 import { buildReference, type OpenAPIDocument } from '$lib/api/openapi';
-import { sessionToken } from '$lib/server/session-cookie';
-
-// The engine's double-submit CSRF cookie, secure name first. Named here rather
-// than imported because the server helper that owns them builds a whole client,
-// and a lab sends one raw request.
-const CSRF_COOKIE = '__Host-csrf';
-const CSRF_COOKIE_INSECURE = 'csrf';
+import type { HttpClient } from '@lyeve-labs/client';
+import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
+import { authedClient, authedHeaders, loadUser } from '$lib/server/authz';
 import {
 	GRAPHQL_URL,
 	GRPC_INVOKE_URL,
@@ -50,19 +46,13 @@ const MAX_SHOWN_CHARS = 512 * 1024;
  * anything that travels through the browser is the caller's to choose, and an
  * allowlist the caller can choose is not one.
  */
-async function readGroups(
-	fetch: typeof globalThis.fetch,
-	token: string,
-): Promise<{ groups: EndpointGroup[]; source: 'engine' | 'catalog' }> {
+async function readGroups(client: HttpClient): Promise<{ groups: EndpointGroup[]; source: 'engine' | 'catalog' }> {
 	try {
-		const res = await fetch('/api/admin/openapi.json', {
-			headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+		const doc = await client.get<OpenAPIDocument | null>('/api/admin/openapi.json', {
+			headers: { Accept: 'application/json' },
 		});
-		if (res.ok) {
-			const doc = (await res.json()) as OpenAPIDocument;
-			if (doc && typeof doc.paths === 'object') {
-				return { groups: buildReference(doc, staticGroups).groups, source: 'engine' };
-			}
+		if (doc && typeof doc.paths === 'object') {
+			return { groups: buildReference(doc, staticGroups).groups, source: 'engine' };
 		}
 	} catch {
 		// The catalog alone still lists endpoints worth trying, and the page
@@ -71,9 +61,19 @@ async function readGroups(
 	return { groups: staticGroups, source: 'catalog' };
 }
 
-export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
-	const { groups, source } = await readGroups(fetch, sessionToken({ cookies, url }) ?? '');
-	const grpc = await readGrpcRoutes(fetch, sessionToken({ cookies, url }) ?? '');
+/** What the gRPC tab says when the listener's status could not be read. */
+const GRPC_FAILED = 'The gRPC listener status could not be read. This is not a report that the plugin is absent.';
+
+export const load: PageServerLoad = async (event) => {
+	const user = await loadUser(event);
+	const client = authedClient(event);
+	const { groups, source } = await readGroups(client);
+	// The listener's status and the invoke route are a super admin's, so the
+	// read is not made for anyone else, and the tab says the role is why
+	// rather than that the plugin is missing.
+	const grpc = user.roles.includes('super_admin')
+		? await readGrpcRoutes(client)
+		: { listening: false, routes: [], gate: { state: 'forbidden' } as Gate };
 	return { endpoints: labEndpoints(groups), source, grpc };
 };
 
@@ -90,23 +90,21 @@ export const load: PageServerLoad = async ({ fetch, cookies, url }) => {
  * listener actually serves. A build without the plugin answers 404 and the
  * page says the listener is absent rather than offering paths nothing serves.
  */
-async function readGrpcRoutes(
-	fetch: typeof globalThis.fetch,
-	token: string,
-): Promise<{ listening: boolean; routes: string[]; reachable: boolean }> {
+async function readGrpcRoutes(client: HttpClient): Promise<{ listening: boolean; routes: string[]; gate: Gate }> {
 	try {
-		const res = await fetch('/api/admin/grpc/status', {
-			headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-		});
-		if (!res.ok) return { listening: false, routes: [], reachable: false };
-		const body = (await res.json()) as { listening?: boolean; transcoded_routes?: string[] };
+		const body = await client.get<{ listening?: boolean; transcoded_routes?: string[] } | null>(
+			'/api/admin/grpc/status',
+			{ headers: { Accept: 'application/json' } },
+		);
 		return {
-			listening: body.listening === true,
-			routes: body.transcoded_routes ?? [],
-			reachable: true,
+			listening: body?.listening === true,
+			routes: body?.transcoded_routes ?? [],
+			gate: GATE_OK,
 		};
-	} catch {
-		return { listening: false, routes: [], reachable: false };
+	} catch (err) {
+		// A refused read is sorted the way every page sorts one: only a 404
+		// says the plugin is not here, and an outage offers a retry.
+		return { listening: false, routes: [], gate: gateOf(err, GRPC_FAILED) };
 	}
 }
 
@@ -126,19 +124,10 @@ async function send(
 	body: string | undefined,
 	contentType: string,
 ): Promise<{ result: LabResult } | { error: string }> {
-	const token = sessionToken(event) ?? '';
-	const headers: Record<string, string> = {
-		Authorization: `Bearer ${token}`,
-		Accept: 'application/json',
-	};
-	// event.fetch forwards the browser's cookies on a same-origin subrequest,
-	// so the engine sees its own session cookie and switches from bearer auth
-	// to cookie auth, where the double-submit CSRF check applies. Without this
-	// every write a lab sends is refused with 403 "csrf token required", which
-	// reads as the route rejecting the request rather than the lab never
-	// having been allowed to make it. Harmless when no cookie was forwarded.
-	const csrf = event.cookies.get(CSRF_COOKIE) ?? event.cookies.get(CSRF_COOKIE_INSECURE);
-	if (csrf) headers['X-CSRF-Token'] = csrf;
+	// A raw request rather than the client, because the lab shows the reply's
+	// status, headers and text as they came. The session headers carry the CSRF
+	// token, without which every write a lab sends is refused with 403.
+	const headers: Record<string, string> = { ...authedHeaders(event), Accept: 'application/json' };
 	if (body !== undefined) headers['Content-Type'] = contentType;
 
 	if (!isSameOriginPath(path)) {
@@ -151,9 +140,11 @@ async function send(
 	try {
 		res = await event.fetch(path, { method, headers, body, signal: abort });
 	} catch (err) {
+		// The runtime's own words for a failed connection can name an internal
+		// address, so none of them are shown.
 		const msg = err instanceof Error && err.name === 'TimeoutError'
 			? `The request did not answer within ${TIMEOUT_MS / 1000} seconds.`
-			: `The request could not be sent: ${err instanceof Error ? err.message : 'unknown error'}`;
+			: 'The request could not be sent to the engine. Try again in a moment.';
 		return { error: msg };
 	}
 
@@ -183,7 +174,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('endpoint') ?? '');
 
-		const { groups } = await readGroups(event.fetch, sessionToken(event) ?? '');
+		const { groups } = await readGroups(authedClient(event));
 		const ep = findEndpoint(groups, id);
 		if (!ep) {
 			return fail(400, { error: 'That is not an endpoint this instance documents.' });
@@ -248,7 +239,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const route = String(form.get('route') ?? '');
 
-		const grpc = await readGrpcRoutes(event.fetch, sessionToken(event) ?? '');
+		const grpc = await readGrpcRoutes(authedClient(event));
 		if (!grpc.routes.includes(route)) {
 			return fail(400, { error: 'That is not a route this listener transcodes.' });
 		}

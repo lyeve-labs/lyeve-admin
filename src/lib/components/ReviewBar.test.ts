@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReviewAssignment, StageSLA } from '$lib/api/review';
 
@@ -174,5 +174,51 @@ describe('ReviewBar, several assignees', () => {
 			},
 		});
 		expect(document.querySelector('textarea[name="other_assignees"]')).not.toBeNull();
+	});
+});
+
+describe('ReviewBar, picking the assignees', () => {
+	const people = [
+		{ id: USER, email: 'me@example.com' },
+		{ id: OTHER, email: 'mira.costa@example.com' },
+	];
+	const definitions = [
+		{ id: 'd1', name: 'Legal', slug: 'legal', content_schema: 'article', publish_on_approve: true, created_at: '', updated_at: '' },
+	];
+
+	it('offers the accounts by email and starts on the signed-in user', () => {
+		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [], userId: USER, definitions, people } });
+		expect(screen.queryByRole('textbox', { name: /Assignee/ })).toBeNull();
+		expect((document.querySelector('input[name="assignee_id"]') as HTMLInputElement).value).toBe(USER);
+		expect(screen.getByTestId('review-bar').textContent).toContain('me@example.com (you)');
+		expect(document.querySelector('textarea[name="other_assignees"]')).toBeNull();
+	});
+
+	it('posts each further assignee it picks as its own field', async () => {
+		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [], userId: USER, definitions, people } });
+		const more = screen.getAllByRole('combobox').find((c) => c.getAttribute('aria-labelledby')?.startsWith('review-other-assignees'));
+		await fireEvent.click(more as HTMLElement);
+		await fireEvent.click(screen.getByRole('option', { name: /mira\.costa@example\.com/ }));
+		const posted = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="other_assignees"]')).map((i) => i.value);
+		expect(posted).toEqual([OTHER]);
+	});
+
+	it('names an assignee by email', () => {
+		render(ReviewBar, {
+			props: { entryId: 'e1', assignment: assignment({ assignee_ids: [USER, OTHER] }), stages, userId: USER, people },
+		});
+		expect(screen.getByTestId('review-assignee').textContent).toBe('You, mira.costa@example.com');
+	});
+});
+
+describe('ReviewBar with no definitions to offer', () => {
+	it('says the definitions could not be read instead of hiding the start form', () => {
+		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [], definitionsFailed: true } });
+		expect(screen.getByText(/review definitions could not be read/)).toBeTruthy();
+	});
+
+	it('says nothing more for a reader who may not start a review', () => {
+		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [] } });
+		expect(screen.queryByText(/could not be read/)).toBeNull();
 	});
 });

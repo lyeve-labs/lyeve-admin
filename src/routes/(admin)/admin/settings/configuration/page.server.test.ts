@@ -6,9 +6,11 @@ vi.mock('@lyeve-labs/client', () => {
 		createClient: vi.fn(),
 		ApiError: class ApiError extends Error {
 			status: number;
-			constructor(status: number, message: string) {
+			body: unknown;
+			constructor(status: number, message: string, body?: unknown) {
 				super(message);
 				this.status = status;
+				this.body = body;
 			}
 		},
 	};
@@ -43,12 +45,6 @@ beforeEach(() => {
 });
 
 describe('configuration load', () => {
-	it('returns nothing without a session', async () => {
-		const result = await load({ fetch: vi.fn(), cookies: mockCookies() } as never);
-		expect(result).toEqual({ provenance: null });
-		expect(mockedCreateClient).not.toHaveBeenCalled();
-	});
-
 	it('returns the provenance report', async () => {
 		const provenance = {
 			settings: [{ key: 'STORAGE_DRIVER', source: 'file', value: 'local', editable: true }],
@@ -57,12 +53,12 @@ describe('configuration load', () => {
 		mockedCreateClient.mockReturnValue({ get: vi.fn(async () => provenance) } as never);
 
 		const result = await load({ fetch: vi.fn(), cookies: authed(), url: new URL('http://admin.test/admin/settings/configuration') } as never);
-		expect(result).toEqual({ provenance, plugin: null });
+		expect(result).toEqual({ provenance: { ok: true, value: provenance }, plugin: null });
 	});
 
-	// The page renders a read-only notice rather than failing: a session that
-	// is not super admin gets 403 here, and that is a normal state.
-	it('returns nothing when the report cannot be read', async () => {
+	// A role refusal is a normal state for an admin. The page says so through
+	// the forbidden notice and draws no settings.
+	it('keeps a role refusal as the forbidden state', async () => {
 		mockedCreateClient.mockReturnValue({
 			get: vi.fn(async () => {
 				throw new ApiError(403, 'forbidden');
@@ -70,7 +66,20 @@ describe('configuration load', () => {
 		} as never);
 
 		const result = await load({ fetch: vi.fn(), cookies: authed(), url: new URL('http://admin.test/admin/settings/configuration') } as never);
-		expect(result).toEqual({ provenance: null, plugin: null });
+		expect(result).toEqual({ provenance: { ok: false, gate: { state: 'forbidden' } }, plugin: null });
+	});
+
+	// An engine whose database is down is not a reader without the role. Told
+	// so, a super admin would go looking for a role they already hold.
+	it('reports an outage as unavailable, not as a missing role', async () => {
+		mockedCreateClient.mockReturnValue({
+			get: vi.fn(async () => {
+				throw new ApiError(503, 'database unavailable');
+			}),
+		} as never);
+
+		const result = await load({ fetch: vi.fn(), cookies: authed(), url: new URL('http://admin.test/admin/settings/configuration') } as never);
+		expect(result).toEqual({ provenance: { ok: false, gate: { state: 'unavailable' } }, plugin: null });
 	});
 
 	// Opened for one plugin, the list gains the keys its schema declares that
@@ -83,15 +92,56 @@ describe('configuration load', () => {
 		});
 		mockedCreateClient.mockReturnValue({ get } as never);
 		const result = (await load({ fetch: vi.fn(), cookies: authed(), url: new URL('http://admin.test/x?plugin=email') } as never)) as {
-			provenance: { settings: { key: string; source: string }[] };
+			provenance: { value: { settings: { key: string; source: string }[] } };
 			plugin: { name: string; keys: string[]; found: boolean };
 		};
-		expect(result.plugin).toEqual({ name: 'email', keys: ['SMTP_HOST', 'SMTP_PORT'], found: true });
-		expect(result.provenance.settings.map((s) => [s.key, s.source])).toEqual([['SMTP_HOST', 'env'], ['SMTP_PORT', 'default']]);
+		expect(result.plugin).toEqual({ name: 'email', keys: ['SMTP_HOST', 'SMTP_PORT'], found: true, failed: false });
+		expect(result.provenance.value.settings.map((s) => [s.key, s.source])).toEqual([['SMTP_HOST', 'env'], ['SMTP_PORT', 'default']]);
+	});
+});
+
+describe('configuration load for a plugin', () => {
+	async function loadWith(schemaError: Error) {
+		const get = vi.fn(async (path: string) => {
+			if (path === '/api/admin/config') return { settings: [], counts: {} };
+			throw schemaError;
+		});
+		mockedCreateClient.mockReturnValue({ get } as never);
+		return (await load({ fetch: vi.fn(), cookies: authed(), url: new URL('http://admin.test/x?plugin=email') } as never)) as {
+			plugin: { found: boolean; failed: boolean };
+		};
+	}
+
+	it('reads only a 404 as a plugin with no settings', async () => {
+		expect((await loadWith(new ApiError(404, 'not found'))).plugin).toMatchObject({ found: false, failed: false });
+	});
+
+	it('reports a failed schema read as a failure, not as no settings', async () => {
+		expect((await loadWith(new ApiError(503, 'down'))).plugin).toMatchObject({ found: false, failed: true });
+		expect((await loadWith(new ApiError(429, 'busy'))).plugin).toMatchObject({ failed: true });
 	});
 });
 
 describe('configuration save', () => {
+	it('reads the refusal from a 409 whose only key was refused', async () => {
+		mockedCreateClient.mockReturnValue({
+			put: vi.fn(async () => {
+				throw new ApiError(409, '{"refused":[...]}', {
+					refused: [{ key: 'APP_ENV', reason: 'set by the environment', origin: 'APP_ENV' }],
+				});
+			}),
+		} as never);
+
+		const result = (await actions.save({
+			request: request({ key: 'APP_ENV', value: 'development', secret: 'false' }),
+			fetch: vi.fn(),
+			cookies: authed(),
+		} as never)) as { status: number; data: { error: string } };
+
+		expect(result.status).toBe(409);
+		expect(result.data.error).toBe('set by the environment (APP_ENV)');
+	});
+
 	it('sends one setting', async () => {
 		const put = vi.fn(async () => ({ saved: [{ key: 'STORAGE_DRIVER' }] }));
 		mockedCreateClient.mockReturnValue({ put } as never);
@@ -139,6 +189,43 @@ describe('configuration save', () => {
 
 		expect(result.status).toBe(409);
 		expect(result.data.error).toContain('lyeve.yaml:3');
+	});
+
+	// The engine's own failure text can carry driver detail, so it never
+	// reaches the page. A refusal written for the operator still does.
+	it('keeps an engine failure out of the message', async () => {
+		mockedCreateClient.mockReturnValue({
+			put: vi.fn(async () => {
+				throw new ApiError(500, 'pq: relation "sys_config" does not exist');
+			}),
+		} as never);
+
+		const result = (await actions.save({
+			request: request({ key: 'APP_ENV', value: 'development', secret: 'false' }),
+			fetch: vi.fn(),
+			cookies: authed(),
+		} as never)) as { status: number; data: { error: string } };
+
+		expect(result.status).toBe(502);
+		expect(result.data.error).not.toContain('sys_config');
+		expect(result.data.error).toBe('The setting could not be saved. Nothing was changed.');
+	});
+
+	it('relays a refusal written for the operator', async () => {
+		mockedCreateClient.mockReturnValue({
+			put: vi.fn(async () => {
+				throw new ApiError(400, 'APP_ENV must be one of development, production');
+			}),
+		} as never);
+
+		const result = (await actions.save({
+			request: request({ key: 'APP_ENV', value: 'nope', secret: 'false' }),
+			fetch: vi.fn(),
+			cookies: authed(),
+		} as never)) as { status: number; data: { error: string } };
+
+		expect(result.status).toBe(400);
+		expect(result.data.error).toBe('APP_ENV must be one of development, production');
 	});
 
 	it('requires a session', async () => {

@@ -94,7 +94,9 @@ describe('inUse', () => {
 		expect(inUse(metrics({ total_connections: 4, active_connections: 0 }))).toBe(true);
 	});
 
-	it('is true when events were pushed without a connection still open', () => {
-		expect(inUse(metrics({ events_dispatched: 11 }))).toBe(true);
+	// The plugin counts pushed events across every tenant, so they cannot
+	// say this tenant uses the transport.
+	it('is false when only another tenant pushed events', () => {
+		expect(inUse(metrics({ events_dispatched: 11 }))).toBe(false);
 	});
 });

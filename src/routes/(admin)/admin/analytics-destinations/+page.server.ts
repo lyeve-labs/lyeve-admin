@@ -7,6 +7,7 @@ import { notRunning } from '$lib/plugins';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import {
 	CONFIG_FIELDS,
+	DELIVERY_LIMIT,
 	DELIVERY_STATUSES,
 	MAX_ATTEMPTS,
 	MAX_BACKOFF_SECONDS,
@@ -37,6 +38,10 @@ export const load: PageServerLoad = async (event) => {
 	let providers: Listed<Provider> = { data: [], licensed: false };
 	// A failed delivery read is said as one, never drawn as an empty queue.
 	let deliveries: Listed<Delivery> | null = null;
+	let deliveriesGate: Gate | null = null;
+	// The plugin takes no offset and sends no count, so one row past the list
+	// is asked for. It says more are owed than the list shows, and is dropped.
+	let moreDeliveries = false;
 	if (gate.state === 'ok') {
 		const client = authedClient(event);
 		try {
@@ -44,9 +49,26 @@ export const load: PageServerLoad = async (event) => {
 		} catch (err) {
 			gate = gateOf(err, 'The destinations could not be read.');
 		}
-		if (gate.state === 'ok') deliveries = await listDeliveries(client, status).catch(() => null);
+		if (gate.state === 'ok') {
+			try {
+				const read = await listDeliveries(client, status, DELIVERY_LIMIT + 1);
+				moreDeliveries = read.data.length > DELIVERY_LIMIT;
+				deliveries = { ...read, data: read.data.slice(0, DELIVERY_LIMIT) };
+			} catch (err) {
+				deliveriesGate = gateOf(err, 'The deliveries could not be read. This is not a report that every event arrived.');
+			}
+		}
 	}
-	return { gate, providers: providers.data, licensed: providers.licensed, deliveries, status };
+	return {
+		gate,
+		providers: providers.data,
+		licensed: providers.licensed,
+		deliveries,
+		deliveriesGate,
+		moreDeliveries,
+		deliveryLimit: DELIVERY_LIMIT,
+		status,
+	};
 };
 
 /** The settings the form named for a type, or null when it named none. */

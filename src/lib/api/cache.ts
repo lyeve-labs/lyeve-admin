@@ -12,13 +12,13 @@
  * every flushed key is recomputed on its next request, so a flush at the wrong
  * moment is a thundering herd against the database.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import type { Limit } from './limits';
 
 export const STATS_URL = '/api/admin/cache/stats';
-export const METRICS_URL = '/api/admin/cache/metrics';
 export const PROVIDERS_URL = '/api/admin/cache/providers';
 export const ENTRIES_URL = '/api/admin/cache/entries';
 export const FLUSH_URL = '/api/admin/cache/flush';
@@ -225,8 +225,9 @@ export async function listEntries(
 	client: HttpClient,
 	limit: number,
 	offset: number
-): Promise<ListEnvelope<CacheEntry>> {
-	return client.get<ListEnvelope<CacheEntry>>(`${ENTRIES_URL}?limit=${limit}&offset=${offset}`);
+): Promise<ListEnvelope<CacheEntry> & { note?: string }> {
+	// A provider that cannot list its entries answers an empty page and a note.
+	return client.get<ListEnvelope<CacheEntry> & { note?: string }>(`${ENTRIES_URL}?limit=${limit}&offset=${offset}`);
 }
 
 export async function flushAll(client: HttpClient): Promise<void> {
@@ -288,7 +289,7 @@ export const CIRCUIT_LABELS: Readonly<Record<CircuitState, string>> = {
 	unknown: 'Not reported',
 };
 
-export function circuitTone(state: CircuitState): 'success' | 'danger' | 'warn' | 'neutral' {
+export function circuitTone(state: CircuitState): StatusTone {
 	if (state === 'closed') return 'success';
 	if (state === 'open') return 'danger';
 	if (state === 'half-open') return 'warn';
@@ -304,19 +305,6 @@ export function circuitTone(state: CircuitState): 'success' | 'danger' | 'warn' 
  */
 export function trippedProviders(providers: readonly CacheProvider[]): CacheProvider[] {
 	return providers.filter((p) => circuitState(p) === 'open');
-}
-
-/** A byte count a person can read. */
-export function bytes(size: number | null | undefined): string {
-	if (size === null || size === undefined || !Number.isFinite(size) || size <= 0) return '0 B';
-	const units = ['B', 'KB', 'MB', 'GB'];
-	let n = size;
-	let i = 0;
-	while (n >= 1024 && i < units.length - 1) {
-		n /= 1024;
-		i += 1;
-	}
-	return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
 }
 
 /** Every tag in use, so a targeted flush can offer them rather than ask. */

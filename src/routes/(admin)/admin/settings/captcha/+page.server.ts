@@ -52,12 +52,20 @@ export const actions: Actions = {
 			scoreFloor = n;
 		}
 
+		// The form has no threshold field, and the plugin replaces the stored
+		// threshold with whatever the body carries, so the one the page read
+		// goes back unchanged.
+		const thresholdRaw = String(form.get('failure_threshold') ?? '').trim();
+		const threshold = thresholdRaw === '' ? Number.NaN : Number(thresholdRaw);
+		const failureThreshold = Number.isInteger(threshold) && threshold >= 1 ? threshold : null;
+
 		try {
 			await saveCaptchaSettings(authedClient(event), {
 				provider,
 				site_key: siteKey,
 				secret_key: secret,
 				score_floor: scoreFloor,
+				failure_threshold: failureThreshold,
 			});
 		} catch (err) {
 			return actionFailure(err, 'The captcha settings could not be saved.');

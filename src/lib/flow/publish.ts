@@ -55,10 +55,13 @@ export interface WriteButtons {
 export function writeButtons(state: {
 	dirty: boolean;
 	live: boolean;
+	/** The versions could not be read, so whether the saved draft runs is not known. */
+	liveUnknown?: boolean;
 	publishable: boolean;
 	refusal: string;
 }): WriteButtons {
 	const { dirty, live, publishable, refusal } = state;
+	const unknown = state.liveUnknown === true && !live && !dirty;
 	const publishDisabled = !publishable || (live && !dirty);
 	return {
 		save: {
@@ -68,8 +71,14 @@ export function writeButtons(state: {
 		},
 		publish: {
 			disabled: publishDisabled,
-			variant: !dirty && !publishDisabled ? 'primary' : 'secondary',
-			hint: !publishable ? refusal : live && !dirty ? 'The live version is this draft' : 'Save and publish',
+			variant: !dirty && !publishDisabled && !unknown ? 'primary' : 'secondary',
+			hint: !publishable
+				? refusal
+				: live && !dirty
+					? 'The live version is this draft'
+					: unknown
+						? 'The versions could not be read, so this draft may already be live'
+						: 'Save and publish',
 		},
 	};
 }

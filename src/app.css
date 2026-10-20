@@ -19,6 +19,20 @@
  */
 
 @import '@lyeve-labs/ui-kit/styles.css';
+/*
+ * The kit's font tokens name Inter and JetBrains Mono. The faces ship with the
+ * console, because a hosted font service would receive the address and browser
+ * of every visitor on every page.
+ */
+@import '@fontsource/inter/300.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/inter/800.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
 
 /*
  * The visual editors sit in a directory the ignore rule keeps out of the tree,
@@ -72,4 +86,134 @@
     --color-brand-light: var(--tenant-brand-light-on-light);
     --color-brand-deep: var(--tenant-brand-deep-on-light);
   }
+}
+
+/*
+ * A route change fades the page. src/lib/page-transition.ts starts it and
+ * marks the document while it runs. Inside the console's frame only the
+ * content region fades, and the sidebar and the header swap in place. A page
+ * with no frame, such as sign-in, fades whole. The exit runs a rung faster
+ * than the entrance, on the kit's clock.
+ */
+:root[data-page-fading] #content {
+	view-transition-name: page;
+}
+::view-transition-old(root),
+::view-transition-old(page) {
+	animation: page-out var(--duration-fast) var(--ease-exit) both;
+}
+::view-transition-new(root),
+::view-transition-new(page) {
+	animation: page-in var(--duration-base) var(--ease-enter) both;
+}
+:root:has(#content)::view-transition-old(root),
+:root:has(#content)::view-transition-new(root),
+::view-transition-group(page) {
+	animation: none;
+}
+@keyframes page-out {
+	to {
+		opacity: 0;
+	}
+}
+@keyframes page-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}
+
+/*
+ * The rich text editor's content. ProseMirror renders the paragraphs, headings
+ * and lists itself, so no utility class reaches them. They are styled here,
+ * under the editor's own class.
+ *
+ * Every color is a theme token. A hardcoded dark palette would put near-white
+ * text onto the light theme's white surface, and the author could not read what
+ * they had written. Sizes come from the console's type scale and insets from
+ * the spacing grid. Two values stay in em because they follow the text they sit
+ * in: the gap above a block, which grows with a heading, and the size of code,
+ * which matches its line.
+ */
+.rte .ProseMirror {
+	outline: none;
+	padding: --spacing(2.5) --spacing(3);
+	min-height: --spacing(40);
+	color: var(--color-fg);
+	line-height: var(--leading-relaxed);
+}
+.rte .ProseMirror > * + * {
+	margin-top: 0.4em;
+}
+.rte .ProseMirror h1 {
+	font-size: var(--text-2xl);
+	font-weight: var(--font-weight-bold);
+	line-height: var(--leading-tight);
+}
+.rte .ProseMirror h2 {
+	font-size: var(--text-xl);
+	font-weight: var(--font-weight-semibold);
+	line-height: var(--leading-tight);
+}
+.rte .ProseMirror h3 {
+	font-size: var(--text-lg);
+	font-weight: var(--font-weight-semibold);
+	line-height: var(--leading-snug);
+}
+.rte .ProseMirror p {
+	margin: 0;
+}
+.rte .ProseMirror ul {
+	list-style: disc;
+	padding-left: --spacing(5);
+}
+.rte .ProseMirror ol {
+	list-style: decimal;
+	padding-left: --spacing(5);
+}
+.rte .ProseMirror li {
+	margin: --spacing(0.5) 0;
+}
+.rte .ProseMirror blockquote {
+	border-left: 3px solid var(--color-brand);
+	padding-left: --spacing(2.5);
+	color: var(--color-muted);
+	font-style: italic;
+}
+.rte .ProseMirror code {
+	background: var(--color-surface-2);
+	padding: 1px --spacing(1);
+	border-radius: var(--radius-xs);
+	font-family: var(--font-mono);
+	font-size: 0.83em;
+	color: var(--color-violet);
+}
+.rte .ProseMirror pre {
+	background: var(--color-surface-2);
+	padding: --spacing(2.5) --spacing(3.5);
+	border-radius: var(--radius-sm);
+	overflow-x: auto;
+}
+.rte .ProseMirror pre code {
+	background: none;
+	padding: 0;
+	color: var(--color-fg);
+	font-size: 0.85em;
+}
+.rte .ProseMirror hr {
+	border: none;
+	border-top: 1px solid var(--color-line);
+	margin: --spacing(2.5) 0;
+}
+.rte .ProseMirror a {
+	color: var(--color-brand);
+	text-decoration: underline;
+	cursor: pointer;
+}
+.rte .ProseMirror u {
+	text-decoration: underline;
+}
+.rte .ProseMirror s {
+	text-decoration: line-through;
+	color: var(--color-faint);
 }

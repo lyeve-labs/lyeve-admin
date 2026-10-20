@@ -1,22 +1,23 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { filtersText, keptJSON, type WebhookRecord } from '$lib/api/webhook-options';
-	import { formRefusal } from '$lib/api/refusal';
+	import { formRefusal, type Refusal } from '$lib/api/refusal';
 	import {
 		Alert,
 		Badge,
 		Button,
 		CheckboxGroup,
+		CopyField,
 		Drawer,
 		EmptyState,
 		Input,
+		Modal,
+		MultiSelect,
 		PageShell,
 		Pagination,
 		PasswordInput,
 		SearchInput,
 		SegmentedControl,
-		toast,
 		Table,
 		Textarea,
 		Toggle,
@@ -24,9 +25,10 @@
 		type ChoiceOption
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
-	import type { SubmitFunction } from '@sveltejs/kit';
-	import type { Webhook, WebhookDelivery, DeadLetter } from '@lyeve-labs/client';
+	import type { Webhook } from '@lyeve-labs/client';
+	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { fieldErrors, submitter } from '$lib/forms.svelte';
 	import {
 		Plus,
@@ -38,19 +40,59 @@
 		CheckCircle,
 		XCircle,
 		History,
-		RotateCcw,
 		KeyRound,
 		Skull
 	} from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { formatDateTime } from '$lib/format';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { narrows } from '$lib/narrow';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
+	import { eventTone } from './event-tone';
+	import { DeliveryHistory } from './delivery-history.svelte';
+	import DeliveriesDrawer from './DeliveriesDrawer.svelte';
+	import DeadLetterDrawer from './DeadLetterDrawer.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const pageRefusal = $derived(formRefusal(form));
+
+	/*
+	 * Each failure names the action that caused it. The drawer shows only its
+	 * own writes' failures, and only one that came back after it was opened, so
+	 * a failed delete never reads as a failure of the form opened next. The
+	 * rest show above the list.
+	 */
+	type Failure = { action?: string; error?: string } | null;
+	const DRAWER_ACTIONS = ['create', 'update'];
+	// The history and the queue draw their own writes' failures inside them,
+	// where the reader clicked, rather than behind the open panel.
+	const OTHER_DRAWERS = ['retry-delivery', 'dead-letters-page', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
+	const inDrawer = $derived(DRAWER_ACTIONS.includes((form as Failure)?.action ?? ''));
+	let openedOver = $state.raw<unknown>(null);
+	const drawerForm = $derived(inDrawer && form !== openedOver ? form : null);
+	// A rotation that succeeds settles the result shown before it. The secret
+	// never reaches the form, so the earlier result is set aside instead.
+	let settled = $state.raw<unknown>(null);
+	const pageForm = $derived(
+		inDrawer || OTHER_DRAWERS.includes((form as Failure)?.action ?? '') || (form !== null && form === settled) ? null : form,
+	);
+
+	/*
+	 * The plugin says nothing about its license until a paid write is
+	 * refused, so the first refusal of a retry, a replay or a dismissal is
+	 * what the page learns it from. The drawers then hold those three with the
+	 * reason beside them.
+	 */
+	const PAID_ACTIONS = ['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss'];
+	let held = $state.raw<Refusal | null>(null);
+	$effect(() => {
+		const refused = formRefusal(form);
+		if (refused?.kind === 'feature' && PAID_ACTIONS.includes((form as Failure)?.action ?? '')) held = refused;
+	});
+	const drawerError = $derived((drawerForm as Failure)?.error || undefined);
+	const pageError = $derived((pageForm as Failure)?.error || undefined);
+	const drawerRefusal = $derived(formRefusal(drawerForm));
+	const pageRefusal = $derived(formRefusal(pageForm));
 
 	const submit = submitter(() => (open = false));
 
@@ -67,9 +109,8 @@
 		'after_delete'
 	].map((value) => ({ value, label: value }));
 
-	const schemaOptions = $derived<ChoiceOption[]>(
-		data.schemas.map((s) => ({ value: s.name, label: s.name }))
-	);
+	const rows = $derived(data.webhooks.ok ? data.webhooks.value : []);
+
 
 	// One drawer for both writes: a null target is a new webhook.
 	let open = $state(false);
@@ -80,6 +121,14 @@
 	let enabled = $state(true);
 	let events = $state<string[]>([]);
 	let schemas = $state<string[]>([]);
+
+	// A schema the webhook already names stays among the options even when the
+	// schema list could not be read, so saving an edit never drops it.
+	const schemaOptions = $derived<ChoiceOption[]>(
+		[...new Set([...(data.schemas.ok ? data.schemas.value.map((s) => s.name) : []), ...schemas])].map(
+			(name) => ({ value: name, label: name })
+		)
+	);
 	// The delivery options. An edit sends back what it read, so an endpoint keeps
 	// them through a change of its name.
 	let template = $state('');
@@ -97,9 +146,10 @@
 		retryDelay = wh?.retry_delay_seconds != null ? String(wh.retry_delay_seconds) : '';
 		kept = keptJSON(wh);
 	}
-	const formErrors = $derived(fieldErrors(form));
+	const formErrors = $derived(fieldErrors(drawerForm));
 
 	function openCreate() {
+		openedOver = form;
 		editing = null;
 		name = '';
 		url = '';
@@ -112,6 +162,7 @@
 	}
 
 	function openEdit(wh: Webhook) {
+		openedOver = form;
 		editing = wh;
 		name = wh.name;
 		url = wh.url;
@@ -133,8 +184,9 @@
 	 */
 	function openDuplicate(wh: Webhook) {
 		const draft = duplicateRow(wh as unknown as Record<string, unknown>, {
-			taken: data.webhooks.map((w) => w.name),
+			taken: rows.map((w) => w.name),
 		});
+		openedOver = form;
 		editing = null;
 		name = String(draft.name ?? wh.name);
 		url = wh.url;
@@ -152,12 +204,13 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(wh: Webhook) {
-		const ok = await confirmDialog('Delete webhook', `Delete ${wh.name}? This cannot be undone.`, {
+		const ok = await confirmDialog(`Delete webhook ${wh.name}`, `Delete ${wh.name}? This cannot be undone.`, {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
 		deleteId = wh.id;
-		await Promise.resolve();
+		// The hidden form posts what it holds once the value has reached the DOM.
+		await tick();
 		deleteForm?.requestSubmit();
 	}
 
@@ -171,7 +224,7 @@
 		{ value: 'disabled', label: 'Disabled' },
 	];
 	const visible = $derived(
-		data.webhooks.filter(
+		rows.filter(
 			(wh) =>
 				narrows(query, wh.name, wh.url, wh.events.join(' '), wh.schemas.join(' ')) &&
 				(status === '' || (status === 'enabled') === wh.enabled)
@@ -182,6 +235,8 @@
 		Record<string, { success: boolean; status_code: number; message: string }>
 	>({});
 
+	// The map is read untracked: an effect that tracks the map it rewrites
+	// reruns on its own write until Svelte stops it.
 	$effect(() => {
 		if (form && 'testResult' in form && form.testResult) {
 			const tr = form.testResult as {
@@ -190,98 +245,39 @@
 				status_code: number;
 				message: string;
 			};
-			testResults = { ...testResults, [tr.id]: tr };
+			testResults = { ...untrack(() => testResults), [tr.id]: tr };
 		}
 	});
 
-	let showDeliveries = $state(false);
-	let deliveriesWebhookId = $state('');
-	let deliveriesWebhookName = $state('');
-	let deliveryItems = $state<WebhookDelivery[]>([]);
+	// The history drawer reads what the row's submit names, so the two share it.
+	const history = new DeliveryHistory();
 
-	$effect(() => {
-		if (form && 'deliveries' in form && form.deliveries) {
-			const d = form.deliveries as { id: string; items: WebhookDelivery[] };
-			deliveryItems = d.items ?? [];
-			showDeliveries = true;
-		}
-	});
-
-	/**
-	 * Names the row being inspected, then lets the action result through.
-	 *
-	 * A submit handler that returns without awaiting `update()` tells SvelteKit
-	 * to skip applying the result, so `form.deliveries` would never arrive and
-	 * the history modal would open empty.
+	/*
+	 * The plugin shows a rotated secret once and never again, and the old one
+	 * stops verifying at once, so the new one is shown in a panel the reader
+	 * copies from, naming the webhook it signs for.
 	 */
-	function loadDeliveries(wh: Webhook): SubmitFunction {
-		return () =>
-			async ({ update }) => {
-				deliveriesWebhookId = wh.id;
-				deliveriesWebhookName = wh.name;
-				deliveryItems = [];
-				await update({ reset: false });
-			};
-	}
-
-	/**
-	 * Every write in this application reports through the toast, which is one
-	 * place a reader learns to look, so a rotated secret is announced there too
-	 * and not in the row.
-	 */
-	$effect(() => {
-		if (form && 'rotateSecretResult' in form && form.rotateSecretResult) {
-			const wh = form.rotateSecretResult as Webhook;
-			toast.success(`Rotated the secret for ${wh.name}`);
+	let reveal = $state<{ name: string; secret: string } | null>(null);
+	// The secret is taken straight from the result and never applied to the
+	// page's form, so closing the panel leaves no copy of it behind.
+	const takeSecret: SubmitFunction = () => async ({ result, update }) => {
+		if (result.type === 'success' && result.data && 'rotated' in result.data) {
+			const r = result.data.rotated as { name: string; secret: string };
+			reveal = { name: r.name, secret: r.secret };
+			settled = form;
+			return;
 		}
-	});
-
-	let retryResults = $state<Record<string, { success: boolean; message: string }>>({});
-
-	$effect(() => {
-		if (form && 'retryResult' in form && form.retryResult) {
-			const r = form.retryResult as { delivery_id: string; success: boolean; message: string };
-			retryResults = { ...retryResults, [r.delivery_id]: { success: r.success, message: r.message } };
-		}
-	});
-
-	let showDeadLetters = $state(false);
-	let deadLetterItems = $state<DeadLetter[]>([]);
-	let deadLetterTotal = $state<number | null>(null);
-
-	$effect(() => {
-		if (form && 'deadLetters' in form && form.deadLetters) {
-			deadLetterItems = form.deadLetters as DeadLetter[];
-			deadLetterTotal = (form.deadLetterTotal as number | null | undefined) ?? null;
-			showDeadLetters = true;
-		}
-	});
-
-	let deadLetterResults = $state<Record<string, string>>({});
-
-	$effect(() => {
-		if (form && 'deadLetterReplay' in form && form.deadLetterReplay) {
-			const r = form.deadLetterReplay as { id: string; status: string };
-			deadLetterResults = { ...deadLetterResults, [r.id]: `Replayed with status ${r.status}` };
-		}
-		if (form && 'deadLetterDismiss' in form && form.deadLetterDismiss) {
-			const r = form.deadLetterDismiss as { id: string; status: string };
-			deadLetterResults = { ...deadLetterResults, [r.id]: 'Dismissed' };
-		}
-	});
-
-	function eventTone(event: string): 'success' | 'warn' {
-		return event.startsWith('after_') ? 'success' : 'warn';
-	}
+		await update();
+	};
 
 	function truncate(url: string, max = 48): string {
 		return url.length > max ? url.slice(0, max) + '...' : url;
 	}
 
+	// The webhook plugin serves create, update, delete and rotate to a super
+	// admin only. An admin reads, tests and replays, and is told the rest.
 	const isSuperAdmin = $derived(data.user?.roles?.includes('super_admin') ?? false);
 </script>
-
-<PageTitle title="Webhooks" />
 
 <PageShell
 	title="Webhooks"
@@ -289,37 +285,52 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<form method="POST" action="?/dead-letters" use:enhance>
-			<Button variant="secondary" size="sm" type="submit" title="View dead letter queue">
-				<Skull size={ICON.sm} />
-				Dead letters
+		<!-- The queue is the same plugin's read: a list that could not be
+		     read offers no queue either. -->
+		{#if data.webhooks.ok}
+			<form method="POST" action="?/dead-letters" use:enhance>
+				<Button variant="secondary" size="sm" type="submit" title="View dead letter queue">
+					<Skull size={ICON.sm} />
+					Dead letters
+				</Button>
+			</form>
+		{/if}
+		<!-- A list that could not be read offers no write against it. -->
+		{#if data.webhooks.ok && isSuperAdmin}
+			<Button variant="primary" size="sm" onclick={openCreate}>
+				<Plus size={ICON.sm} />
+				New webhook
 			</Button>
-		</form>
-		<Button variant="primary" size="sm" onclick={openCreate}>
-			<Plus size={ICON.sm} />
-			New webhook
-		</Button>
+		{/if}
 	{/snippet}
 
-	{#if pageRefusal}
-		<RefusalNotice refusal={pageRefusal} />
-	{:else if form && 'error' in form && form.error}
-		<Alert tone="danger">
-			{#snippet children()}{form.error}{/snippet}
-		</Alert>
+	<FormErrors message={pageError} refused={pageRefusal} />
+
+	{#if data.webhooks.ok && !isSuperAdmin}
+		<Alert tone="brand">Your role reads and tests webhooks. Creating, changing or deleting one takes a super admin.</Alert>
 	{/if}
 
-	{#if data.webhooks.length === 0}
+	{#if !data.webhooks.ok}
+		<GateNotice
+			level={2}
+			gate={data.webhooks.gate}
+			title="Webhooks"
+			absent="The webhook plugin is not part of this build, so no callback is sent on a content event."
+		/>
+	{:else if data.webhooks.value.length === 0}
 		<EmptyState
+			level={2}
 			title="No webhooks configured yet"
 			description="Add one to receive HTTP callbacks on content events."
 		>
 			{#snippet iconSnippet()}<WebhookIcon size={ICON.lg} />{/snippet}
 			{#snippet action()}
-				<Button variant="secondary" onclick={openCreate}>
-					<Plus size={ICON.sm} />
-					New webhook
-				</Button>
+				{#if isSuperAdmin}
+					<Button variant="secondary" onclick={openCreate}>
+						<Plus size={ICON.sm} />
+						New webhook
+					</Button>
+				{/if}
 			{/snippet}
 		</EmptyState>
 	{:else}
@@ -334,7 +345,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState title="No webhook on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
+			<EmptyState level={2} title="No webhook on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
 		{:else}
 		<Table label="Webhooks">
 			<thead>
@@ -393,7 +404,7 @@
 										<FlaskConical size={ICON.sm} />
 									</Button>
 								</form>
-								<form method="POST" action="?/deliveries" use:enhance={loadDeliveries(wh)}>
+								<form method="POST" action="?/deliveries" use:enhance={history.load(wh)}>
 									<input type="hidden" name="id" value={wh.id} />
 									<Button
 										variant="ghost"
@@ -406,7 +417,7 @@
 									</Button>
 								</form>
 								{#if isSuperAdmin}
-									<form method="POST" action="?/rotate-secret" use:enhance>
+									<form method="POST" action="?/rotate-secret" use:enhance={takeSecret}>
 										<input type="hidden" name="id" value={wh.id} />
 										<Button
 											variant="ghost"
@@ -418,8 +429,7 @@
 											<KeyRound size={ICON.sm} />
 										</Button>
 									</form>
-								{/if}
-								<Button
+									<Button
 									variant="ghost"
 									size="sm"
 									onclick={() => openEdit(wh)}
@@ -447,6 +457,7 @@
 								>
 									<Trash2 size={ICON.sm} class="text-danger" />
 								</Button>
+								{/if}
 							</div>
 
 							{#if testResults[wh.id]}
@@ -475,7 +486,7 @@
 		<Pagination
 			page={pageNumber(data.offset, data.limit)}
 			perPage={data.limit}
-			count={data.webhooks.length}
+			count={data.webhooks.value.length}
 			total={data.total ?? undefined}
 			hasNext={data.hasMore}
 			noun="webhooks"
@@ -492,11 +503,7 @@
 		use:enhance={submit.enhance}
 		class="flex flex-col gap-4"
 	>
-		{#if pageRefusal}
-			<RefusalNotice refusal={pageRefusal} />
-		{:else if form && 'error' in form && form.error}
-			<Alert tone="danger">{form.error}</Alert>
-		{/if}
+		<FormErrors message={drawerError} fields={formErrors} refused={drawerRefusal} />
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<input type="hidden" name="kept" value={kept} />
 		<Input id="webhook-name" name="name" label="Name" bind:value={name} placeholder="Slack notifier" required />
@@ -509,14 +516,25 @@
 			bind:value={secret}
 		/>
 		<CheckboxGroup name="events" label="Events" orientation="horizontal" options={EVENT_OPTIONS} bind:value={events} />
-		<CheckboxGroup
-			name="schemas"
+		<!-- The schemas are rows from data, so they are searched rather than
+		     listed as boxes. Each pick posts its own value, the way the event
+		     boxes do. -->
+		<MultiSelect
+			id="webhook-schemas"
 			label="Schemas"
-			hint="Leave empty to fire on every schema."
-			orientation="horizontal"
+			placeholder="Every schema"
+			hint={data.schemas.ok
+				? 'Leave empty to fire on every schema.'
+				: editing
+					? 'The schemas could not be read, so only the ones this webhook already names are listed.'
+					: 'The schemas could not be read, so none can be picked. Saved like this, the webhook fires on every schema.'}
+			searchable
 			options={schemaOptions}
 			bind:value={schemas}
 		/>
+		{#each schemas as s (s)}
+			<input type="hidden" name="schemas" value={s} />
+		{/each}
 		<div>
 			<!-- The action reads `enabled` from the body. Without this the
 			     switch posts nothing and every webhook is created disabled. -->
@@ -566,212 +584,20 @@
 
 <!-- A row's history is a read on that row, so it opens over the list the way
      its edit does, and the queue does the same. -->
-<Drawer bind:open={showDeliveries} title="Delivery history for {deliveriesWebhookName}" size="xl">
-	{#snippet children()}
-			{#if deliveryItems.length === 0}
-				<EmptyState
-					title="No deliveries recorded yet"
-					description="Every attempt this webhook makes is listed here."
-				>
-					{#snippet iconSnippet()}<History size={ICON.lg} />{/snippet}
-				</EmptyState>
-			{:else}
-				<Table label="Delivery history">
-					<thead>
-						<tr>
-							<th scope="col">Time</th>
-							<th scope="col">Event</th>
-							<th scope="col">Schema</th>
-							<th scope="col">Status</th>
-							<th scope="col">Duration</th>
-							<th scope="col">Result</th>
-							<th scope="col">Retry</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each deliveryItems as d (d.id)}
-							<tr>
-								<td class="font-mono text-xs whitespace-nowrap text-muted">
-									{formatDateTime(d.attempted_at)}
-								</td>
-								<td><Badge tone={eventTone(d.event_type)}>{d.event_type}</Badge></td>
-								<td data-cell="nowrap">{d.schema_name}</td>
-								<td data-cell="nowrap" class="font-mono text-xs">
-									{#if d.status_code != null}
-										<span class={d.success ? 'text-success' : 'text-danger'}>{d.status_code}</span>
-									{:else}
-										<span class="text-faint">No response</span>
-									{/if}
-								</td>
-								<td data-cell="nowrap" class="text-xs text-muted">
-									{d.duration_ms != null ? `${d.duration_ms}ms` : 'Not recorded'}
-								</td>
-								<td data-cell="nowrap">
-									{#if d.success}
-										<span class="flex items-center gap-1 text-xs text-success">
-											<CheckCircle class="h-3.5 w-3.5" /> OK
-										</span>
-									{:else if d.error}
-										<span class="flex items-center gap-1 text-xs text-danger" title={d.error}>
-											<XCircle class="h-3.5 w-3.5" />
-											{d.error.slice(0, 40)}
-										</span>
-									{:else}
-										<span class="flex items-center gap-1 text-xs text-danger">
-											<XCircle class="h-3.5 w-3.5" /> Failed
-										</span>
-									{/if}
-								</td>
-								<td>
-									{#if !d.success}
-										<form method="POST" action="?/retry-delivery" use:enhance>
-											<input type="hidden" name="id" value={deliveriesWebhookId} />
-											<input type="hidden" name="delivery_id" value={d.id} />
-											<Button
-												variant="ghost"
-												size="sm"
-												type="submit"
-												title="Retry this delivery"
-												aria-label="Retry the delivery attempted at {formatDateTime(
-													d.attempted_at
-												)}"
-											>
-												<RotateCcw class="h-3.5 w-3.5" />
-											</Button>
-										</form>
-									{:else if retryResults[d.id]}
-										{@const rr = retryResults[d.id]}
-										<span class="text-xs {rr.success ? 'text-success' : 'text-danger'}">
-											{rr.message.slice(0, 30)}
-										</span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-			{/if}
-		{/snippet}
-		{#snippet footer()}
-			<Button variant="secondary" type="button" onclick={() => (showDeliveries = false)}>
-				Close
-			</Button>
-		{/snippet}
-</Drawer>
+<DeliveriesDrawer {form} {history} {held} />
 
-<Drawer bind:open={showDeadLetters} title="Dead letter queue" size="xl">
-	{#snippet children()}
-			{#if deadLetterItems.length === 0}
-				<EmptyState
-					title="No dead letter entries"
-					description="Exhausted deliveries appear here when retries are depleted."
-				>
-					{#snippet iconSnippet()}<Skull size={ICON.lg} />{/snippet}
-				</EmptyState>
-			{:else}
-				{#if deadLetterTotal !== null && deadLetterTotal > deadLetterItems.length}
-					<p class="mb-2 text-xs text-faint">
-						Showing {deadLetterItems.length} of {deadLetterTotal} entries.
-					</p>
-				{/if}
-				<Table label="Dead letters">
-					<thead>
-						<tr>
-							<th scope="col">Webhook</th>
-							<th scope="col">Event</th>
-							<th scope="col">Schema</th>
-							<th scope="col">Attempts</th>
-							<th scope="col">Last error</th>
-							<th scope="col">Status</th>
-							<th scope="col">Dead at</th>
-							<th scope="col">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each deadLetterItems as dl (dl.id)}
-							<tr>
-								<td data-cell="nowrap" class="text-xs font-medium text-fg">{dl.webhook_name}</td>
-								<td><Badge tone={eventTone(dl.event_type)}>{dl.event_type}</Badge></td>
-								<td data-cell="nowrap" class="text-xs">{dl.schema_name}</td>
-								<td data-cell="nowrap" class="font-mono text-xs text-muted">{dl.total_attempts}</td>
-								<td class="max-w-48 truncate text-xs text-muted" title={dl.last_error ?? ''}>
-									{dl.last_error ? dl.last_error.slice(0, 60) : 'None'}
-								</td>
-								<td>
-									{#if dl.status === 'pending'}
-										<Badge tone="warn">{dl.status}</Badge>
-									{:else if dl.status === 'replayed'}
-										<Badge tone="success">{dl.status}</Badge>
-									{:else}
-										<Badge tone="neutral">{dl.status}</Badge>
-									{/if}
-								</td>
-								<td class="font-mono text-xs whitespace-nowrap text-muted">
-									{formatDateTime(dl.dead_at)}
-								</td>
-								<td>
-									{#if deadLetterResults[dl.id]}
-										<span class="text-xs text-muted">{deadLetterResults[dl.id]}</span>
-									{:else if dl.status === 'pending'}
-										<div class="flex items-center gap-1">
-											<form method="POST" action="?/dead-letter-replay" use:enhance>
-												<input type="hidden" name="id" value={dl.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													title="Replay"
-													aria-label="Replay the dead letter from {dl.webhook_name}"
-												>
-													<RotateCcw class="h-3.5 w-3.5" />
-												</Button>
-											</form>
-											<form method="POST" action="?/dead-letter-dismiss" use:enhance>
-												<input type="hidden" name="id" value={dl.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													title="Dismiss"
-													aria-label="Dismiss the dead letter from {dl.webhook_name}"
-												>
-													<XCircle class="h-3.5 w-3.5" />
-												</Button>
-											</form>
-											<form
-												method="POST"
-												action="?/dead-letter-delete"
-												use:enhance={() =>
-													async ({ result, update }) => {
-														if (result.type === 'success') {
-															deadLetterItems = deadLetterItems.filter((x) => x.id !== dl.id);
-														}
-														await update({ reset: false });
-													}}
-											>
-												<input type="hidden" name="id" value={dl.id} />
-												<Button
-													variant="ghost"
-													size="sm"
-													type="submit"
-													title="Delete permanently"
-													aria-label="Delete the dead letter from {dl.webhook_name} permanently"
-												>
-													<Trash2 class="h-3.5 w-3.5 text-danger" />
-												</Button>
-											</form>
-										</div>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</Table>
-			{/if}
-		{/snippet}
+<DeadLetterDrawer {form} {held} />
+
+{#if reveal}
+	<Modal open title="New signing secret for {reveal.name}" onclose={() => (reveal = null)}>
+		<div class="flex flex-col gap-3">
+			<p class="text-sm text-fg">
+				{reveal.name} now signs every delivery with this secret, and the old one no longer verifies. Copy it to the receiver now. It is not shown again.
+			</p>
+			<CopyField value={reveal.secret} label="Signing secret" mono secret />
+		</div>
 		{#snippet footer()}
-			<Button variant="secondary" type="button" onclick={() => (showDeadLetters = false)}>
-				Close
-			</Button>
+			<Button variant="secondary" onclick={() => (reveal = null)}>Close</Button>
 		{/snippet}
-</Drawer>
+	</Modal>
+{/if}

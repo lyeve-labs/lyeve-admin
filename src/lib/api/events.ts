@@ -3,12 +3,15 @@
  *
  * The log is durable and the replay runs against it. A replay is the reason
  * the log is kept: something downstream missed a window, and the events that
- * fell in it are posted again to one handler.
+ * fell in it are published again to everything that listens.
+ *
+ * A run's handler is a name, not a destination. A later run under the same
+ * name skips the events that name already replayed.
  *
  * Every replay is asked for with a dry run first because the plugin offers
- * one, and because a replay that fans out to the wrong handler cannot be
- * taken back.
+ * one, and because a replay that fans out cannot be taken back.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 
@@ -93,7 +96,7 @@ export async function startReplay(
 }
 
 /** The tone a run's status wears, in the kit's own vocabulary. */
-export function runTone(status: ReplayStatus): 'success' | 'danger' | 'warn' | 'neutral' {
+export function runTone(status: ReplayStatus): StatusTone {
 	if (status === 'completed') return 'success';
 	if (status === 'failed') return 'danger';
 	if (status === 'running') return 'warn';

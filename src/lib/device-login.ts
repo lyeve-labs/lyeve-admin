@@ -77,14 +77,14 @@ export function loginRedirect(pathname: string, search: string): string {
 }
 
 /**
- * Whether a refused approval is about the confirmation rather than the code:
- * a missing or wrong password or MFA code, a used code, or a locked account.
- * Those are answered on the confirmation field and the request stays open.
+ * Whether a refused approval is about the confirmation rather than the code.
+ * The page offers the approve form only to an approver, so a 403 from the
+ * approval is the engine refusing the confirmation, whatever its wording, and
+ * a 429 is a locked account. Those are answered on the form, the engine's own
+ * sentence included, and the request stays open.
  */
-export function isStepUpRefusal(status: number, message: string): boolean {
-	if (status === 429) return true;
-	if (status !== 403) return false;
-	return /password|mfa code|mfa_code|already used/i.test(message);
+export function isStepUpRefusal(status: number): boolean {
+	return status === 403 || status === 429;
 }
 
 /** The roles a session would carry, as the page names them. */

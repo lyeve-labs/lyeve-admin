@@ -1,6 +1,6 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { fieldErrors, submitter } from '$lib/forms.svelte';
+	import { passwordTooLong } from '$lib/api/users';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import {
@@ -8,6 +8,7 @@
 		Button,
 		Card,
 		CopyButton,
+		CopyField,
 		Input,
 		PageShell,
 		PasswordInput,
@@ -60,6 +61,7 @@
 	);
 
 	const formError = $derived(form && 'error' in form ? (form.error as string) : null);
+	const serverFields = $derived(fieldErrors(form));
 
 	// The browser's own bubble for a `required` field disappears on the next
 	// click and is never announced a second time, so the page validates before
@@ -80,8 +82,11 @@
 		const found: Record<string, string> = {};
 		if (!setupToken) found.setup_token = 'Setup token is required';
 		if (!email) found.email = 'Email is required';
+		// The rules are the engine's password policy, which an install can
+		// change. The engine names the rule a refused password broke, so the
+		// page states no rule of its own that could disagree with it.
 		if (!password) found.password = 'Password is required';
-		else if (password.length < 8) found.password = 'Password must be at least 8 characters';
+		else if (passwordTooLong(password)) found.password = passwordTooLong(password) ?? '';
 		if (!confirm) found.confirm = 'Confirm password is required';
 		else if (password && confirm !== password) found.confirm = 'Passwords do not match';
 
@@ -112,9 +117,7 @@
 	const read = submitter();
 </script>
 
-<PageTitle title="Set up" />
-
-<PageShell width="narrow" title="Set up LyEve" description="Finish configuring the engine and create the first super admin.">
+<PageShell width="narrow" title="Set up LyEve" documentTitle="Set up" description="Finish configuring the engine and create the first super admin.">
 	<div class="space-y-6">
 		<StepIndicator {steps} current={currentStep} />
 
@@ -209,13 +212,7 @@
 						<p class="text-sm text-muted">The engine cannot restart itself. Use the command for how you run it:</p>
 						<ul class="space-y-2">
 							{#each modeStatus.restart as step (step.label)}
-								<li class="flex items-center justify-between gap-3 text-sm">
-									<span class="min-w-0">
-										<span class="font-medium text-fg">{step.label}:</span>
-										<code class="break-all text-muted">{step.command}</code>
-									</span>
-									<CopyButton value={step.command} label="Copy" />
-								</li>
+								<li><CopyField label={step.label} value={step.command} wrap /></li>
 							{/each}
 						</ul>
 					</div>
@@ -274,10 +271,10 @@
 						id="password"
 						name="password"
 						label="Password"
-						placeholder="At least 12 characters"
 						autocomplete="new-password"
 						required
-						error={errors.password}
+						hint="The engine's password policy sets the rules. If it refuses this password, the refusal names the rule it broke."
+						error={errors.password ?? serverFields.password}
 					/>
 
 					<PasswordInput

@@ -89,7 +89,8 @@ describe('the gate', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(idempotencyGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(idempotencyGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(idempotencyGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(idempotencyGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(idempotencyGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as no keys being held', () => {

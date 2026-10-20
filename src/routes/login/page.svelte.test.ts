@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import LoginPage from './+page.svelte';
 
@@ -11,7 +11,20 @@ const providerLinks = (links: HTMLElement[]) =>
 	links.filter((a) => a.getAttribute('href')?.startsWith('/api/admin/auth/'));
 
 const props = (extra: Record<string, unknown> = {}) =>
-	({ form: null, data: { oauthProviders: [], samlProviders: [] }, ...extra }) as never;
+	({
+		form: null,
+		data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: '' },
+		...extra,
+	}) as never;
+
+// A backup code is 16 hexadecimal characters.
+const BACKUP_CODE = 'a1b2c3d4e5f60718';
+
+/** Whether a field lets a whole backup code be typed into it. */
+function fitsBackupCode(field: Element | null): boolean {
+	const cap = field?.getAttribute('maxlength');
+	return field !== null && (cap === null || Number(cap) >= BACKUP_CODE.length);
+}
 
 describe('Login page', () => {
 	it('asks the browser for the saved password for this account', () => {
@@ -50,6 +63,22 @@ describe('Login page', () => {
 		expect(hidden.value).toBe('tok-1');
 		expect(container.querySelector('h1')?.textContent?.trim()).toBe('Two-factor verification');
 		expect(container.querySelector('#password')).toBeNull();
+	});
+
+	// The code field also takes a backup code, which is hexadecimal, so it
+	// must not bring up a number pad on a phone.
+	it('keeps the full keyboard on the second factor code field', () => {
+		const { container } = render(LoginPage, {
+			props: props({ form: { mfa_required: true, challenge_token: 'tok-1' } }),
+		});
+		expect(container.querySelector('input[name="code"]')?.getAttribute('inputmode')).toBeNull();
+	});
+
+	it('holds a whole backup code in the second factor code field', () => {
+		const { container } = render(LoginPage, {
+			props: props({ form: { mfa_required: true, challenge_token: 'tok-1' } }),
+		});
+		expect(fitsBackupCode(container.querySelector('input[name="code"]'))).toBe(true);
 	});
 
 	// A glyph read as an arrow by a sighted reader is read as "left arrow" or
@@ -174,6 +203,15 @@ describe('Login page recovery links', () => {
 		expect(getByRole('link', { name: /email me a sign-in link/i }).getAttribute('href')).toBe('/login/magic-link');
 	});
 
+	it('leaves out each link whose plugin is not running', () => {
+		const { queryByRole } = render(LoginPage, {
+			props: props({ data: { oauthProviders: [], samlProviders: [], passwordReset: false, magicLink: false } }),
+		});
+
+		expect(queryByRole('link', { name: /forgot password/i })).toBeNull();
+		expect(queryByRole('link', { name: /email me a sign-in link/i })).toBeNull();
+	});
+
 	it('hides them during the second factor step', () => {
 		const { queryByRole } = render(LoginPage, {
 			props: props({ form: { mfa_required: true, challenge_token: 'tok-1' } }),
@@ -181,5 +219,77 @@ describe('Login page recovery links', () => {
 
 		expect(queryByRole('link', { name: /forgot password/i })).toBeNull();
 		expect(queryByRole('link', { name: /email me a sign-in link/i })).toBeNull();
+	});
+});
+
+describe('Login page after a session ended', () => {
+	it('says the session ended', () => {
+		const { container } = render(LoginPage, {
+			props: props({ data: { oauthProviders: [], samlProviders: [], ended: true } }),
+		});
+		expect(container.textContent).toContain('Your session ended. Sign in again to continue.');
+	});
+
+	it('says nothing of it on an ordinary visit', () => {
+		const { container } = render(LoginPage, { props: props() });
+		expect(container.textContent).not.toContain('Your session ended');
+	});
+
+	it('offers an optional organization field that says when to fill it in', () => {
+		const { container } = render(LoginPage, { props: props() });
+
+		const field = container.querySelector('#tenant') as HTMLInputElement;
+		expect(field.name).toBe('tenant');
+		expect(field.required).toBe(false);
+		expect(container.textContent).toContain('Organization (optional)');
+		expect(container.textContent).toContain("Leave this empty unless your organization's identity provider created your account.");
+	});
+
+	it('keeps the organization a refused sign-in named', () => {
+		const { container } = render(LoginPage, {
+			props: props({ form: { error: 'Invalid email or password.', tenant: 'acme' } }),
+		});
+
+		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('acme');
+	});
+
+	it('shows the organization its link named, in a field the reader sees', () => {
+		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+
+		const field = container.querySelector('#tenant') as HTMLInputElement;
+		expect(field.type).toBe('text');
+		expect(field.value).toBe('acme');
+		expect(container.querySelectorAll('[name="tenant"]')).toHaveLength(1);
+		expect(container.querySelector('input[type="hidden"][name="tenant"]')).toBeNull();
+		expect(container.textContent).toContain('The link you followed filled this in. Change or clear it if it is not your organization.');
+		expect(container.querySelector('a[href="/forgot-password?tenant=acme"]')).not.toBeNull();
+		expect(container.querySelector('a[href="/login/magic-link?tenant=acme"]')).not.toBeNull();
+	});
+
+	it('submits what the field shows after the reader changes or clears it', async () => {
+		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+		const field = container.querySelector('#tenant') as HTMLInputElement;
+		const posted = () => new FormData(field.form as HTMLFormElement).get('tenant');
+
+		expect(posted()).toBe('acme');
+		await fireEvent.input(field, { target: { value: 'globex' } });
+		expect(posted()).toBe('globex');
+		await fireEvent.input(field, { target: { value: '' } });
+		expect(posted()).toBe('');
+	});
+
+	it('keeps an organization the reader cleared when the form comes back refused', () => {
+		const { container } = render(LoginPage, { props: { form: { error: 'x', tenant: '' }, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+
+		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('');
+	});
+});
+
+describe('the sign-in links under a finger', () => {
+	const hasHitArea = (el: Element | null) => !!el && ['relative', 'hit-area'].every((c) => el.classList.contains(c));
+
+	it('gives Forgot password a touch hit area', () => {
+		const { getByRole } = render(LoginPage, props());
+		expect(hasHitArea(getByRole('link', { name: 'Forgot password?' }))).toBe(true);
 	});
 });

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import { Alert, Badge, Breadcrumb, Button, Card, Collapsible, PageShell, SectionHeading, Table, Textarea } from '@lyeve-labs/ui-kit';
@@ -15,11 +14,18 @@
 
 	const back = { href: '/admin/ai/prompts', label: 'Prompts' };
 	const p = $derived(data.prompt);
-	// The editor starts from the text in force and is re-seeded after a save,
-	// which the key on the form does.
+	// The editor starts from the text in force and is re-seeded when a new
+	// version comes into force, after a save or a restore, even one whose text
+	// matches the old. The version and the text are read through derived
+	// values of their own, so a reload that hands back the same version, as
+	// the layout does when the AI switch is read again, leaves what the reader
+	// typed.
+	const active = $derived(p?.active ?? '');
+	const activeVersion = $derived(p?.active_version ?? 0);
 	let body = $state('');
 	$effect(() => {
-		body = p?.active ?? '';
+		void activeVersion;
+		body = active;
 	});
 	const dirty = $derived(!!p && body.trim() !== '' && body !== p.active);
 	const nextVersion = $derived(p ? Math.max(0, ...p.versions.map((v) => v.version)) + 1 : 1);
@@ -27,14 +33,12 @@
 	const save = tracked(() => async ({ update }) => update({ reset: false }));
 </script>
 
-<PageTitle title={p ? useCaseLabel(p.use_case) : 'Prompt'} />
-
 <PageShell title={p ? useCaseLabel(p.use_case) : 'Prompt'} description={p ? `The system prompt for ${p.use_case}.` : ''} width="wide" {back}>
 	{#snippet breadcrumb()}
 		<Breadcrumb items={crumbsAfter(back, [{ label: 'AI', href: '/admin/ai' }, { label: 'Prompts', href: '/admin/ai/prompts' }, { label: p ? useCaseLabel(p.use_case) : 'Prompt' }])} />
 	{/snippet}
 
-	<AiSection tab="prompts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prompts">
+	<AiSection level={2} tab="prompts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prompts">
 		{#if p}
 			<div class="flex flex-wrap items-center gap-2">
 				{#if p.active_version === 0}

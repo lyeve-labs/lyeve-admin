@@ -19,6 +19,8 @@ vi.mock('$app/forms', () => ({
 }));
 const nav = vi.hoisted(() => ({ goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
 vi.mock('$app/navigation', () => nav);
+const state = vi.hoisted(() => ({ page: { url: new URL('http://localhost/admin/media') } }));
+vi.mock('$app/state', () => state);
 
 const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false), success: vi.fn() }));
 vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
@@ -33,6 +35,7 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
 import MediaPage from './+page.svelte';
 import type { PageData } from './$types';
 import type { MediaItem } from '$lib/api/media';
+import type { Gate } from '$lib/api/gate';
 import { MEDIA_VIEW_KEY } from '$lib/components/media/view-preference';
 import { IMAGE, ONE_OF_EACH, PDF } from '$lib/components/media/fixtures';
 
@@ -48,7 +51,7 @@ function setup(items: MediaItem[] = ONE_OF_EACH, extra: Partial<PageData> = {}) 
 	return render(MediaPage, {
 		props: {
 			data: {
-				items,
+				items: { ok: true, value: items },
 				limit: 60,
 				offset: 0,
 				total: items.length,
@@ -56,6 +59,15 @@ function setup(items: MediaItem[] = ONE_OF_EACH, extra: Partial<PageData> = {}) 
 				q: '',
 				...extra,
 			} as unknown as PageData,
+			form: null,
+		},
+	});
+}
+
+function failed(gate: Gate) {
+	return render(MediaPage, {
+		props: {
+			data: { items: { ok: false, gate }, limit: 60, offset: 0, total: null, hasMore: false, q: '' } as unknown as PageData,
 			form: null,
 		},
 	});
@@ -151,9 +163,12 @@ describe('media library preview', () => {
 		await (after as (a: unknown) => Promise<void>)({ result: { type: 'success' }, update });
 		expect(update).toHaveBeenCalled();
 		expect(kit.success).toHaveBeenCalledWith('Deleted clip.webm');
+		// The tile that opened the drawer is gone, so focus goes to a control
+		// that is still there rather than falling to the page body.
+		expect(document.activeElement?.hasAttribute('data-media-upload')).toBe(true);
 
 		await rerender({
-			data: { items: [IMAGE, PDF], limit: 60, offset: 0, total: 2, hasMore: false, q: '' } as unknown as PageData,
+			data: { items: { ok: true, value: [IMAGE, PDF] }, limit: 60, offset: 0, total: 2, hasMore: false, q: '' } as unknown as PageData,
 			form: null,
 		});
 		expect(screen.queryByRole('dialog')).toBeNull();
@@ -195,6 +210,95 @@ describe('media library upload', () => {
 	});
 });
 
+describe('an upload whose session ended', () => {
+	function pick() {
+		const picker = screen.getByLabelText('Choose files to upload') as HTMLInputElement;
+		Object.defineProperty(picker, 'files', { value: [new File(['x'], 'new.png', { type: 'image/png' })], configurable: true });
+		return fireEvent.change(picker);
+	}
+
+	// The console renews the engine's short token only on a request its own
+	// server handles, so an upload sent straight to the engine can carry one
+	// that lapsed on a live session. Rerunning the loads renews it.
+	it('renews the session and sends the file again', async () => {
+		const answers = [new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }), new Response('{}', { status: 201 })];
+		const fetch = vi.fn(async () => answers.shift() as Response);
+		vi.stubGlobal('fetch', fetch);
+		setup();
+		await pick();
+		await waitFor(() => expect(kit.success).toHaveBeenCalledWith('Uploaded 1 file'));
+		expect(fetch).toHaveBeenCalledTimes(2);
+		expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
+		expect(nav.goto).toHaveBeenCalledTimes(1);
+		expect(nav.goto).toHaveBeenCalledWith('/admin/media', { invalidateAll: true });
+		vi.unstubAllGlobals();
+	});
+
+	it('says to sign in again when the renewed upload is refused too', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('Your session ended. Sign in again in another tab, then try again here.'));
+		expect(nav.goto).not.toHaveBeenCalled();
+		expect(document.body.textContent).not.toContain('unauthorized');
+		vi.unstubAllGlobals();
+	});
+});
+
+describe('a refused or failed upload', () => {
+	function pick(...names: string[]) {
+		const picker = screen.getByLabelText('Choose files to upload') as HTMLInputElement;
+		const files = (names.length > 0 ? names : ['new.png']).map((n) => new File(['x'], n, { type: 'image/png' }));
+		Object.defineProperty(picker, 'files', { value: files, configurable: true });
+		return fireEvent.change(picker);
+	}
+	const answer = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+
+	it('relays the reason the engine gave for refusing the file', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => answer(415, { error: 'The file type image/x-icon is not allowed.', code: 'unsupported_media_type' })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('The file type image/x-icon is not allowed.'));
+		vi.unstubAllGlobals();
+	});
+
+	// Only the engine's refusals carry a code. A 4xx body without one, such
+	// as a proxy's, is not the engine's sentence.
+	it('says it in its own words when a refusal carries no code', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => answer(413, { error: 'client intended to send too large body' })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('new.png was refused, so it was not stored.'));
+		expect(document.body.textContent).not.toContain('client intended');
+		vi.unstubAllGlobals();
+	});
+
+	// A 5xx body can carry driver or proxy text, and a proxy's 502 or 504 can
+	// arrive after the engine stored the file, so the page names the file and
+	// claims nothing it does not know.
+	it('keeps the body of a 5xx answer off the page and claims only what it knows', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => answer(503, { error: 'dial tcp 10.0.0.4:5432: connect: connection refused' })));
+		setup();
+		await pick();
+		await waitFor(() => expect(document.body.textContent).toContain('The engine did not confirm new.png. Check the library, then try again in a moment.'));
+		expect(document.body.textContent).not.toContain('dial tcp');
+		expect(document.body.textContent).not.toContain('Nothing was uploaded');
+		vi.unstubAllGlobals();
+	});
+
+	it('counts the files stored before a later one failed', async () => {
+		const answers = [answer(201, {}), answer(502, { error: 'Bad Gateway' })];
+		vi.stubGlobal('fetch', vi.fn(async () => answers.shift() as Response));
+		setup();
+		await pick('first.png', 'second.png');
+		await waitFor(() => expect(kit.success).toHaveBeenCalledWith('Uploaded 1 file'));
+		expect(document.body.textContent).toContain('The engine did not confirm second.png.');
+		expect(document.body.textContent).not.toContain('first.png');
+		expect(document.body.textContent).not.toContain('Nothing was uploaded');
+		vi.unstubAllGlobals();
+	});
+});
+
 describe('media library controls carry a name', () => {
 	it('names the file picker the upload button opens', () => {
 		// sr-only hides the picker from the eye and not from a screen reader, so
@@ -226,3 +330,77 @@ describe('media library controls carry a name', () => {
 		expect(unnamed.map((el) => el.outerHTML)).toEqual([]);
 	});
 });
+
+describe('media library read failures', () => {
+	it('says the library could not be read rather than that nothing was uploaded', () => {
+		failed({ state: 'unavailable' });
+		expect(screen.queryByText('No files uploaded yet.')).toBeNull();
+		expect(screen.getByText(/could not be read/)).toBeTruthy();
+		expect(screen.getByRole('link', { name: /Try again/ })).toBeTruthy();
+	});
+
+	it('offers no upload or import over a library it could not read', () => {
+		failed({ state: 'error', message: 'The media library could not be read.' });
+		expect(screen.queryByRole('button', { name: /Upload files/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Import from URL/ })).toBeNull();
+		expect(screen.queryByText(/files?$/, { selector: 'p' })).toBeNull();
+	});
+
+	it('tells a role the engine refused that it cannot open the library', () => {
+		failed({ state: 'forbidden' });
+		expect(screen.getByText(/Your role cannot open media library/)).toBeTruthy();
+		expect(screen.queryByText('No files uploaded yet.')).toBeNull();
+	});
+});
+
+describe('media library failures stay with their file and form', () => {
+	function withForm(form: Record<string, unknown>) {
+		return render(MediaPage, {
+			props: {
+				data: { items: { ok: true, value: ONE_OF_EACH }, limit: 60, offset: 0, total: ONE_OF_EACH.length, hasMore: false, q: '' } as unknown as PageData,
+				form: form as never,
+			},
+		});
+	}
+	const open = async (name: string) => {
+		const tile = screen.getAllByRole('button').find((el) => (el.textContent ?? '').includes(name)) as HTMLElement;
+		await fireEvent.click(tile);
+	};
+
+	it('shows a failed save only in the drawer of the file it was for', async () => {
+		withForm({ detailsError: 'The details could not be saved.', detailsId: 'm-video' });
+		await open(IMAGE.filename);
+		expect(screen.queryByText('The details could not be saved.')).toBeNull();
+	});
+
+	it('shows a failed save in its own file drawer', async () => {
+		withForm({ detailsError: 'The details could not be saved.', detailsId: IMAGE.id });
+		await open(IMAGE.filename);
+		expect(screen.getByText('The details could not be saved.')).toBeTruthy();
+	});
+
+	it('shows a write that named no file at the top of the page', () => {
+		withForm({ error: 'No file was named.' });
+		expect(screen.getByText('No file was named.')).toBeTruthy();
+	});
+
+	it('shows a failed delete in the drawer the delete was asked from', async () => {
+		withForm({ deleteError: 'media is referenced by a content entry', deleteId: IMAGE.id });
+		await open(IMAGE.filename);
+		expect(screen.getByRole('dialog').textContent).toContain('media is referenced by a content entry');
+	});
+
+	it('keeps a failed delete out of another file drawer', async () => {
+		withForm({ deleteError: 'media is referenced by a content entry', deleteId: 'm-video' });
+		await open(IMAGE.filename);
+		expect(screen.queryByText('media is referenced by a content entry')).toBeNull();
+	});
+
+	it('leaves the import drawer clean after a failed delete', async () => {
+		withForm({ error: 'Failed to delete media' });
+		await fireEvent.click(screen.getByRole('button', { name: /Import from URL/ }));
+		const importForm = document.querySelector('form#import-form') as HTMLFormElement;
+		expect(importForm.textContent).not.toContain('Failed to delete media');
+	});
+});
+

@@ -3,6 +3,7 @@
 	import { Play, Square } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { streamUrl, parseTopics, STREAM_KEEP, type StreamTransport } from '$lib/api/stream-lab';
+	import { formatTime } from '$lib/format';
 
 	// A stream is the one lab a form action cannot send: it stays open and
 	// the answer arrives over time. The browser opens it itself, on this
@@ -20,7 +21,7 @@
 	const url = $derived(streamUrl(transport, parseTopics(topics), typeof location === 'undefined' ? '' : location.host, typeof location === 'undefined' ? 'https:' : location.protocol));
 
 	function keep(topic: string, id: string, data: string) {
-		received = [{ at: new Date().toLocaleTimeString(), topic, id, data }, ...received].slice(0, STREAM_KEEP);
+		received = [{ at: formatTime(new Date()), topic, id, data }, ...received].slice(0, STREAM_KEEP);
 	}
 
 	function connect() {

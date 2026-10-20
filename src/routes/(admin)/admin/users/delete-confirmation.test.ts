@@ -57,7 +57,13 @@ function accounts(count: number) {
 }
 
 const props = () => ({
-	data: { users: accounts(2), limit: 25, offset: 0, hasMore: false, tenants: [] } as never,
+	data: {
+		users: { ok: true, value: accounts(2) },
+		limit: 25,
+		offset: 0,
+		hasMore: false,
+		tenants: { ok: true, value: [] },
+	} as never,
 	form: null as never,
 });
 

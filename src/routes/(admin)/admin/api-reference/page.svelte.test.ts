@@ -3,17 +3,20 @@ import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The only call the page makes off the page is to the clipboard, which jsdom
-// does not implement and which the copy control's tick depends on.
-const clip = vi.hoisted(() => ({ copyText: vi.fn(async (_text: string) => true) }));
-vi.mock('$lib/clipboard', () => clip);
+// does not implement, so each case installs a writer it can read.
+const writeText = vi.fn(async (_text: string) => {});
 
 import ApiReferencePage from './+page.svelte';
 import type { EndpointGroup } from '$lib/api/reference';
 import type { PageData } from './$types';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 beforeEach(() => {
 	vi.clearAllMocks();
+	Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 });
 
 /** Two endpoints. Every row discloses at least its gate and a request preview. */
@@ -44,6 +47,13 @@ const groups: EndpointGroup[] = [
 		],
 	},
 ];
+
+/** The kit's copy control: the frame that holds the button, its tooltip and its live region. */
+function copyFrame(button: HTMLElement): HTMLElement {
+	let node = button.parentElement;
+	while (node && !node.querySelector(':scope > [role="status"]')) node = node.parentElement;
+	return node!;
+}
 
 function setup() {
 	return render(ApiReferencePage, {
@@ -113,6 +123,7 @@ describe('api reference rows', () => {
 		const row = [...container.querySelectorAll('span')].filter((s) => s.textContent?.trim() === 'GET /api/admin/waf/config');
 		expect(row).toHaveLength(0);
 		const fold = getByRole('button', { name: /Plugins \(1\)/ });
+		expect(fold.className).toContain('coarse:min-h-control');
 		expect(fold.getAttribute('aria-expanded')).toBe('false');
 		expect(queryByRole('button', { name: 'waf' })).toBeNull();
 	});
@@ -152,8 +163,48 @@ describe('api reference rows', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Copy the path /api/admin/media' }));
 
-		expect(clip.copyText).toHaveBeenCalledWith('/api/admin/media');
+		expect(writeText).toHaveBeenCalledWith('/api/admin/media');
 		expect(disclosure.getAttribute('aria-expanded')).toBe('false');
+	});
+
+	it('confirms a copy for a second and a half', async () => {
+		vi.useFakeTimers();
+		setup();
+		const copy = screen.getByRole('button', { name: 'Copy the path /api/admin/media' });
+		const status = copyFrame(copy).querySelector('[role="status"]')!;
+
+		await fireEvent.click(copy);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(status.textContent).toBe('Copied');
+
+		await vi.advanceTimersByTimeAsync(1499);
+		expect(status.textContent).toBe('Copied');
+		await vi.advanceTimersByTimeAsync(1);
+		expect(status.textContent).toBe('');
+	});
+
+	// A code block's copy control stays out of the way until the block is
+	// hovered or the control is reached by keyboard. Revealing it on any focus
+	// left it standing after a mouse click until focus moved on.
+	it('reveals a code block copy control on keyboard focus, not on a click', async () => {
+		const { container } = setup();
+		await fireEvent.click(disclosures(container)[0]);
+
+		const copy = screen.getByRole('button', { name: 'Copy a curl request for GET /api/admin/media' });
+		const wrapper = copyFrame(copy);
+		expect(wrapper.classList.contains('opacity-0')).toBe(true);
+		expect(wrapper.classList.contains('has-[:focus-visible]:opacity-100')).toBe(true);
+		expect([...wrapper.classList].some((c) => c.startsWith('focus-within:'))).toBe(false);
+	});
+
+	it('copies the request preview from an open row', async () => {
+		const { container } = setup();
+		await fireEvent.click(disclosures(container)[0]);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Copy a curl request for GET /api/admin/media' }));
+
+		expect(writeText).toHaveBeenCalledTimes(1);
+		expect(writeText.mock.calls[0][0]).toContain('/api/admin/media');
 	});
 
 	it('names every copy control by what it copies', async () => {
@@ -167,10 +218,34 @@ describe('api reference rows', () => {
 		).toBeTruthy();
 	});
 
+	it('shows a tooltip on every icon-only copy control naming what it copies', async () => {
+		const { container } = setup();
+		await fireEvent.click(disclosures(container)[0]);
+
+		for (const name of [
+			'Copy the path /api/admin/media',
+			'Copy a curl request for GET /api/admin/media',
+			'Copy the example response body for GET /api/admin/media',
+		]) {
+			const button = screen.getByRole('button', { name });
+			expect(copyFrame(button).textContent, name).toContain(name);
+			// The tooltip says what the name says, so it is not read a second time.
+			expect(button.hasAttribute('aria-describedby'), name).toBe(false);
+		}
+	});
+
 	it('names the search box for a reader who cannot see the placeholder', () => {
 		setup();
 
 		expect(screen.getByLabelText('Search endpoints')).toBeTruthy();
+	});
+
+	// The search narrows the list, so it sits on the list's row, not the header.
+	it('puts the search on the list toolbar', () => {
+		setup();
+
+		const toolbar = screen.getByRole('toolbar', { name: 'Filter endpoints' });
+		expect(toolbar.querySelector('#endpoint-search')).not.toBeNull();
 	});
 });
 
@@ -216,6 +291,15 @@ describe('try it', () => {
 		await fireEvent.click(getByRole('button', { name: /GET \/api\/v1\/content\/post/ }));
 		expect(container.textContent).toContain('Try it');
 		expect(container.textContent).toContain('Send');
+	});
+
+	// The native element draws the browser's own marker and cannot be driven
+	// from the page. The kit's disclosure is a button that says its state.
+	it('is the kit disclosure, not the native element', async () => {
+		const { getByRole, container } = withMethod('GET', false);
+		await fireEvent.click(getByRole('button', { name: /GET \/api\/v1\/content\/post/ }));
+		expect(container.querySelector('details')).toBeNull();
+		expect(getByRole('button', { name: /Try it/ }).getAttribute('aria-expanded')).toBe('false');
 	});
 
 	it('marks a write as one before it is opened', async () => {

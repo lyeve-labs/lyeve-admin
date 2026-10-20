@@ -8,34 +8,46 @@
 	 */
 	import { Alert, Button } from '@lyeve-labs/ui-kit';
 	import { useInstance } from '$lib/instance.svelte';
-	import { isExternalHref } from '$lib/links';
-	import { LICENSE_PAGE, refusalText, refusalTitle, type Refusal } from '$lib/api/refusal';
+	import UpgradeLink from '$lib/components/UpgradeLink.svelte';
+	import { LICENSE_PAGE, refusalText, refusalTitle, upgradeWords, type Refusal } from '$lib/api/refusal';
 
-	let { refusal }: { refusal: Refusal } = $props();
+	let {
+		refusal,
+		lead = false,
+	}: {
+		refusal: Refusal;
+		/**
+		 * True where the way forward is the one action on its surface. A
+		 * surface holds one primary, and the notice usually sits in a drawer or
+		 * a page that has its own Create or Save, so by default its links stay
+		 * below that: the way forward secondary and the license page ghost.
+		 */
+		lead?: boolean;
+	} = $props();
 
 	const instance = useInstance();
 	// The license page is always offered. A link the engine or the license
-	// module names goes beside it, because that is where the license changes.
+	// module names elsewhere is where more is bought or the feature turned
+	// on, so it is the way forward and leads, named by what it opens.
 	const upgrade = $derived(instance.upgradeLink(refusal.upgradeUrl || null));
-	const away = $derived(upgrade !== null && isExternalHref(upgrade.href));
+	const offered = $derived(
+		upgrade !== null && upgrade.href !== LICENSE_PAGE
+			? {
+					href: upgrade.href,
+					label: upgradeWords(upgrade, refusal.kind === 'cap'),
+				}
+			: null,
+	);
 </script>
 
 <div data-testid="refusal-notice">
 	<Alert tone="warn" title={refusalTitle(refusal)}>
 		<p>{refusalText(refusal)}</p>
 		<div class="mt-3 flex flex-wrap gap-2">
-			<Button variant="secondary" size="sm" href={LICENSE_PAGE}>View the license</Button>
-			{#if upgrade && upgrade.href !== LICENSE_PAGE}
-				<Button
-					variant="ghost"
-					size="sm"
-					href={upgrade.href}
-					target={away ? '_blank' : undefined}
-					rel={away ? 'noopener noreferrer' : undefined}
-				>
-					{upgrade.label ?? 'How to enable it'}
-				</Button>
+			{#if offered}
+				<UpgradeLink link={offered} variant={lead ? 'primary' : 'secondary'} size="sm" />
 			{/if}
+			<Button variant={offered && !lead ? 'ghost' : 'secondary'} size="sm" href={LICENSE_PAGE}>View the license</Button>
 		</div>
 	</Alert>
 </div>

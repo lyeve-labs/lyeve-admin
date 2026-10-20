@@ -15,10 +15,12 @@
  * A limit of zero leaves that dimension unchecked entirely. It reads like the
  * strictest possible setting and it is the loosest.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
-import { formatCount } from '$lib/format';
+import { formatBytes, formatCount } from '$lib/format';
+import { shortId } from '$lib/utils/entry-identity';
 
 export const QUOTAS_URL = '/api/admin/quotas';
 export const REQUESTS_URL = '/api/admin/quota-requests';
@@ -54,6 +56,21 @@ export interface QuotaRequest {
 	created_at: string;
 }
 
+/** What the plugin writes over a requester whose personal data was erased. */
+export const ERASED_REQUESTER = 'erased';
+
+/**
+ * Who asked for more, as a reader recognizes them.
+ *
+ * The plugin stores the requester's account id. The email comes from the
+ * account directory, and an account the page could not read keeps its short id.
+ */
+export function requesterName(id: string, people: Readonly<Record<string, string>>): string {
+	if (!id) return 'an unknown account';
+	if (id === ERASED_REQUESTER) return 'an erased account';
+	return people[id] ?? shortId(id);
+}
+
 export interface TenantUsage {
 	tenant_id: string;
 	billing_period: string;
@@ -81,23 +98,40 @@ export async function listQuotas(
 	return client.get<ListEnvelope<Quota>>(`${QUOTAS_URL}?limit=${limit}&offset=${offset}`);
 }
 
-export async function listRequests(client: HttpClient): Promise<ListEnvelope<QuotaRequest>> {
-	return client.get<ListEnvelope<QuotaRequest>>(REQUESTS_URL);
+/** The most requests one read asks for, the engine's page ceiling. */
+export const REQUESTS_LIMIT = 500;
+
+/**
+ * Quota requests, newest first. A status narrows the list on the server, so
+ * a pending request older than the newest page of every status is still read.
+ */
+export async function listRequests(
+	client: HttpClient,
+	status = '',
+	limit = REQUESTS_LIMIT
+): Promise<ListEnvelope<QuotaRequest>> {
+	const qs = new URLSearchParams({ limit: String(limit), offset: '0' });
+	if (status) qs.set('status', status);
+	return client.get<ListEnvelope<QuotaRequest>>(`${REQUESTS_URL}?${qs}`);
 }
 
+/** Every tenant's usage this period. Super admin only. */
 export async function listTenantUsage(client: HttpClient): Promise<ListEnvelope<TenantUsage>> {
 	return client.get<ListEnvelope<TenantUsage>>(TENANTS_URL);
 }
 
-export async function reviewRequest(
-	client: HttpClient,
-	id: string,
-	approve: boolean,
-	note: string
-): Promise<void> {
+/** One tenant's usage this period. An admin may read their own tenant's. */
+export async function getTenantUsage(client: HttpClient, tenantId: string): Promise<TenantUsage> {
+	return client.get<TenantUsage>(`/api/admin/usage/tenant/${encodeURIComponent(tenantId)}`);
+}
+
+/**
+ * Approve or deny a request. The plugin decodes the body strictly and reads
+ * only the status, so any other key fails the review with 400.
+ */
+export async function reviewRequest(client: HttpClient, id: string, approve: boolean): Promise<void> {
 	await client.post(`${REQUESTS_URL}/${encodeURIComponent(id)}/review`, {
 		status: approve ? 'approved' : 'denied',
-		reason: note,
 	});
 }
 
@@ -128,7 +162,7 @@ export async function deleteQuota(client: HttpClient, tenantId: string): Promise
 
 const GIB = 1024 ** 3;
 
-/** Whole gigabytes, the unit the editor speaks, to the bytes the engine stores. */
+/** GiB, the unit the editor speaks, to the bytes the engine stores. */
 export function gibToBytes(gib: number): number {
 	return Number.isFinite(gib) && gib > 0 ? Math.round(gib * GIB) : 0;
 }
@@ -137,17 +171,31 @@ export function bytesToGib(b: number): number {
 	return b > 0 ? Math.round((b / GIB) * 100) / 100 : 0;
 }
 
-/** The quota a form names. A field that is not a non-negative number reads as 0. */
+/**
+ * The bytes a byte limit field posts: the stored value while the field still
+ * shows what it showed when the editor opened, so a limit the editor can only
+ * round to hundredths of a GiB is sent back unchanged.
+ */
+export function keptBytes(gib: number, shownGib: number, storedBytes: number): number {
+	return gib === shownGib ? storedBytes : gibToBytes(gib);
+}
+
+/**
+ * The quota a form names. A field that is not a non-negative number reads as
+ * 0. A byte limit posted in bytes wins over the same limit in GiB.
+ */
 export function quotaFrom(form: FormData): QuotaInput {
 	const n = (key: string) => {
 		const v = Number(String(form.get(key) ?? '').trim());
 		return Number.isFinite(v) && v > 0 ? v : 0;
 	};
+	const bytes = (key: string, gibKey: string) =>
+		form.has(key) ? Math.round(n(key)) : gibToBytes(n(gibKey));
 	const on = (key: string) => form.get(key) === 'true';
 	return {
 		requests_limit: Math.round(n('requests_limit')),
-		storage_bytes_limit: gibToBytes(n('storage_gib')),
-		bandwidth_bytes_limit: gibToBytes(n('bandwidth_gib')),
+		storage_bytes_limit: bytes('storage_bytes_limit', 'storage_gib'),
+		bandwidth_bytes_limit: bytes('bandwidth_bytes_limit', 'bandwidth_gib'),
 		is_hard_limit: on('is_hard_limit'),
 		grace_period_hours: Math.round(n('grace_period_hours')),
 		warn_at_pct_80: on('warn_at_pct_80'),
@@ -180,7 +228,7 @@ export function enforcementLabel(q: Quota): string {
 	return 'Reported only, never blocks';
 }
 
-export function enforcementTone(q: Quota): 'success' | 'warn' | 'neutral' {
+export function enforcementTone(q: Quota): StatusTone {
 	if (!hasAnyLimit(q)) return 'neutral';
 	return enforces(q) ? 'success' : 'warn';
 }
@@ -221,28 +269,15 @@ export function usedPct(used: number, limit: number): number | null {
 	return Math.round((used / limit) * 1000) / 10;
 }
 
-export function usageTone(pct: number | null): 'danger' | 'warn' | 'success' | 'neutral' {
+export function usageTone(pct: number | null): StatusTone {
 	if (pct === null) return 'neutral';
 	if (pct >= 100) return 'danger';
 	if (pct >= 80) return 'warn';
 	return 'success';
 }
 
-/** A byte count a person can read. */
-export function bytes(size: number | null | undefined): string {
-	if (size === null || size === undefined || !Number.isFinite(size) || size <= 0) return '0 B';
-	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-	let n = size;
-	let i = 0;
-	while (n >= 1024 && i < units.length - 1) {
-		n /= 1024;
-		i += 1;
-	}
-	return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
-}
-
 /** A limit as written, with zero spelled out rather than shown as a number. */
 export function limitLabel(limit: number, asBytes = false): string {
 	if (limit <= 0) return 'Unchecked';
-	return asBytes ? bytes(limit) : formatCount(limit);
+	return asBytes ? formatBytes(limit) : formatCount(limit);
 }

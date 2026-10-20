@@ -130,7 +130,8 @@ describe('the gate sorts a refusal by what it means', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(samlGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(samlGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(samlGate(new ApiError(503, 'database error')).state).toBe('error');
+		expect(samlGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(samlGate(new ApiError(503, 'database error')).state).toBe('unavailable');
 		expect(samlGate(new Error('network')).state).toBe('error');
 	});
 

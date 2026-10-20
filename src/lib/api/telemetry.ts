@@ -2,11 +2,12 @@
  * The telemetry plugin's admin routes.
  *
  * The scrape route answers Prometheus text exposition, not JSON, so it is
- * read with `fetch` rather than the client and parsed here into families the
- * page can filter and tabulate. What comes back depends on who asks: a super
- * admin gets the whole gathered registry, a tenant admin only the samples
- * carrying its own tenant label, in the families they came from. The page
- * does not narrow anything itself. The split is the engine's.
+ * read with `fetch` and the session's headers rather than the client, and
+ * parsed here into families the page can filter and tabulate. What comes
+ * back depends on who asks: a super admin gets the whole gathered registry,
+ * a tenant admin only the samples carrying its own tenant label, in the
+ * families they came from. The page does not narrow anything itself. The
+ * split is the engine's.
  *
  * The exporter list and the manual export describe the instance's export
  * configuration, which no tenant owns, so both are super admin routes and
@@ -55,15 +56,36 @@ export interface ExportResult {
 	message?: string;
 }
 
+/** How long the scrape may take, the same bound the JSON client sets. */
+const METRICS_TIMEOUT_MS = 15_000;
+
 /**
  * Reads the exposition as the session. A tenant admin's answer is already
- * filtered to that tenant's series. Throws on a refused or failed read.
+ * filtered to that tenant's series. `headers` are the session's headers,
+ * bearer and CSRF token both, because the JSON client cannot read plain
+ * text and this read has to carry the same session every other read does.
+ *
+ * A refusal throws an ApiError with the body the engine sent, so a 402
+ * keeps its upgrade link and a 403 reads as the role it is. A scrape that
+ * takes too long throws a TimeoutError, which reads as the engine not
+ * answering.
  */
-export async function readMetricsText(fetchFn: typeof fetch, token: string): Promise<string> {
+export async function readMetricsText(fetchFn: typeof fetch, headers: Record<string, string>): Promise<string> {
 	const res = await fetchFn(METRICS_URL, {
-		headers: { Authorization: `Bearer ${token}`, Accept: 'text/plain' },
+		signal: AbortSignal.timeout(METRICS_TIMEOUT_MS),
+		headers: { ...headers, Accept: 'text/plain' },
 	});
-	if (!res.ok) throw new ApiError(res.status, 'metrics read refused');
+	if (!res.ok) {
+		const text = await res.text();
+		let body: unknown;
+		try {
+			body = JSON.parse(text);
+		} catch {
+			body = undefined;
+		}
+		const said = (body as { error?: unknown } | undefined)?.error;
+		throw new ApiError(res.status, typeof said === 'string' ? said : 'metrics read refused', body);
+	}
 	return res.text();
 }
 

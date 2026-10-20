@@ -44,21 +44,28 @@ const assignment = {
 	updated_at: '',
 };
 
+/** A test names each read's rows as an array. The load hands the page a read that succeeded, or the gate of one that failed. */
+function read(value: unknown) {
+	return Array.isArray(value) ? { ok: true, value } : value;
+}
+
 function data(overrides: Record<string, unknown> = {}): PageData {
-	return {
+	const merged: Record<string, unknown> = {
 		operator: true,
 		definitions: [definition],
-		definitionsForbidden: false,
 		assignments: [assignment],
 		total: 1,
 		offset: 0,
 		limit: 50,
 		status: '',
-		assignmentsForbidden: false,
-		unavailable: false,
 		schemas: ['article'],
+		entries: {},
+		entriesNamed: true,
+		people: {},
 		...overrides,
-	} as unknown as PageData;
+	};
+	for (const key of ['definitions', 'assignments', 'schemas']) merged[key] = read(merged[key]);
+	return merged as unknown as PageData;
 }
 
 describe('reviews page', () => {
@@ -83,6 +90,38 @@ describe('reviews page', () => {
 		expect(row.textContent).toContain('Overdue');
 		const link = row.querySelector('a') as HTMLAnchorElement;
 		expect(link.getAttribute('href')).toBe('/admin/content/article/e1e1e1e1-0000-0000-0000-000000000000');
+	});
+
+	it('names the entry by its title and the assignee by their email', () => {
+		render(ReviewsPage, {
+			props: {
+				data: data({
+					entries: { [assignment.entry_id]: 'Spring launch notes' },
+					people: { [assignment.assignee_id]: 'mira.costa@example.com' },
+				}),
+				form: null,
+			},
+		});
+		const row = screen.getByTestId('assignment-row');
+		expect((row.querySelector('a') as HTMLAnchorElement).textContent).toBe('Spring launch notes');
+		expect(row.textContent).toContain('mira.costa@example.com');
+		expect(row.textContent).not.toContain('e1e1e1e1');
+		expect(row.textContent).not.toContain('22222222');
+	});
+
+	it('falls back to the short ids when the page could not read the names', () => {
+		render(ReviewsPage, { props: { data: data(), form: null } });
+		const row = screen.getByTestId('assignment-row');
+		expect(row.textContent).toContain('e1e1e1e1');
+		expect(row.textContent).toContain('22222222');
+	});
+
+	it('counts the assignments in the pager, not the definitions', () => {
+		const second = { ...assignment, id: 'a2' };
+		render(ReviewsPage, { props: { data: data({ assignments: [assignment, second], total: 2 }), form: null } });
+		const section = screen.getByRole('region', { name: 'Assignments' });
+		expect(section.textContent).toContain('assignments 1 to 2 of 2');
+		expect(section.textContent).not.toContain('definitions 1');
 	});
 
 	it('shows the approvals a quorum stage holds and the other assignees', () => {
@@ -118,8 +157,35 @@ describe('reviews page', () => {
 		expect(screen.getByTestId('assignment-row')).toBeTruthy();
 	});
 
+	it('lists an editor reviewer\'s queue by entry id and says why there are no titles', () => {
+		render(ReviewsPage, {
+			props: { data: data({ operator: false, definitions: [], entriesNamed: false }), form: null },
+		});
+		expect(screen.getByText(/Entries, definitions and stages are listed by ID/)).toBeTruthy();
+		const row = screen.getByTestId('assignment-row');
+		expect(row.textContent).toContain('e1e1e1e1');
+		expect(row.querySelector('a')).toBeNull();
+	});
+
+	it('names the read that failed in its own section, never the first-run state', () => {
+		render(ReviewsPage, {
+			props: {
+				data: data({
+					assignments: { ok: false, gate: { state: 'unavailable' } },
+					definitions: { ok: false, gate: { state: 'error', message: 'The review definitions could not be read.' } },
+				}),
+				form: null,
+			},
+		});
+		expect(screen.getByText(/review assignments could not be read/)).toBeTruthy();
+		expect(screen.getByText('The review definitions could not be read.')).toBeTruthy();
+		expect(screen.queryByText('Nothing under review')).toBeNull();
+		expect(screen.queryByText('No definition yet')).toBeNull();
+		expect(screen.queryByRole('button', { name: /New definition/ })).toBeNull();
+	});
+
 	it('says when the rules refuse the assignment list', () => {
-		render(ReviewsPage, { props: { data: data({ assignments: [], assignmentsForbidden: true }), form: null } });
+		render(ReviewsPage, { props: { data: data({ assignments: { ok: false, gate: { state: 'forbidden' } } }), form: null } });
 		expect(screen.getByText('You may not list reviews')).toBeTruthy();
 	});
 
@@ -225,6 +291,37 @@ describe('reviews page, what the install allows', () => {
 		expect((document.querySelector('input[id^="stage-quorum-"]') as HTMLInputElement).disabled).toBe(false);
 	});
 
+	it('picks the escalation user by email and saves their id', async () => {
+		render(ReviewsPage, {
+			props: {
+				data: data({
+					limits: { licensed: true, workflows: { limit: null, current: 1 } },
+					people: { 'u-ada': 'ada@example.com', 'u-jon': 'jon@example.com' },
+				}),
+				form: null,
+			},
+		});
+		await fireEvent.click(screen.getByRole('button', { name: /New definition/ }));
+		const sla = document.querySelector('input[id^="stage-sla-"]') as HTMLInputElement;
+		await fireEvent.input(sla, { target: { value: '24' } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'A user' }));
+		expect(screen.queryByRole('textbox', { name: /User id/ })).toBeNull();
+		await fireEvent.click(screen.getByRole('combobox', { name: /^User/ }));
+		await fireEvent.click(screen.getByRole('option', { name: 'jon@example.com' }));
+		const stages = JSON.parse((document.querySelector('input[name="stages"]') as HTMLInputElement).value);
+		expect(stages[0]).toMatchObject({ escalate_kind: 'user', escalate_to: 'u-jon' });
+	});
+
+	it('keeps the typed id when the page could not read the directory', async () => {
+		render(ReviewsPage, {
+			props: { data: data({ limits: { licensed: true, workflows: { limit: null, current: 1 } } }), form: null },
+		});
+		await fireEvent.click(screen.getByRole('button', { name: /New definition/ }));
+		await fireEvent.input(document.querySelector('input[id^="stage-sla-"]') as HTMLInputElement, { target: { value: '24' } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'A user' }));
+		expect(screen.getByRole('textbox', { name: /User id/ })).toBeTruthy();
+	});
+
 	it('renders a refused create with the plugin numbers', () => {
 		render(ReviewsPage, {
 			props: {
@@ -236,5 +333,52 @@ describe('reviews page, what the install allows', () => {
 			},
 		});
 		expect(screen.getByTestId('refusal-notice').textContent).toContain('1 of 1 workflows are in use');
+	});
+});
+
+describe('reviews page, failures and unread stages', () => {
+	it('says the stages could not be read instead of drawing an empty cell', () => {
+		render(ReviewsPage, {
+			props: { data: data({ definitions: [{ ...definition, stages: null }] }), form: null },
+		});
+		expect(screen.getByText('Stages could not be read')).toBeTruthy();
+	});
+
+	it('keeps a failed delete out of the New definition drawer', async () => {
+		render(ReviewsPage, {
+			props: { data: data(), form: { action: 'delete', error: 'Failed to delete the definition.' } as never },
+		});
+		expect(screen.getAllByText('Failed to delete the definition.')).toHaveLength(1);
+		await fireEvent.click(screen.getAllByRole('button', { name: /New definition/ })[0]);
+		const drawerForm = document.querySelector('form#definition-form') as HTMLFormElement;
+		expect(drawerForm.textContent).not.toContain('Failed to delete the definition.');
+		expect(screen.getAllByText('Failed to delete the definition.')).toHaveLength(1);
+	});
+});
+
+describe('definition stages', () => {
+	// Every other column holds its text on one line, so on a phone a stage
+	// name got 7px and stacked one or two letters a line.
+	it('keeps each stage on one line', () => {
+		render(ReviewsPage, { props: { data: data(), form: null } });
+		for (const chip of screen.getAllByTestId('stage-chip')) {
+			expect(chip.className).toContain('whitespace-nowrap');
+		}
+	});
+});
+
+describe('the definition drawer stages', () => {
+	it('keeps the stage name beside its number and wraps the stage buttons as one group', async () => {
+		render(ReviewsPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: /New definition/ }));
+		const field = (document.body.querySelector('input[id^="stage-name-"]') as HTMLElement).closest('.min-w-48') as HTMLElement;
+		expect(field.className).toContain('flex-1');
+		const row = field.parentElement as HTMLElement;
+		expect(row.className).toContain('flex-wrap');
+		const group = (document.body.querySelector('[aria-label="Move stage 1 up"]') as HTMLElement).closest('.ms-auto') as HTMLElement;
+		expect(group.parentElement).toBe(row);
+		for (const name of ['Move stage 1 up', 'Move stage 1 down', 'Remove stage 1']) {
+			expect(group.querySelector(`[aria-label="${name}"]`), name).not.toBeNull();
+		}
 	});
 });

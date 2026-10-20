@@ -12,12 +12,12 @@
  * to anyone holding the key, with no expiry, which is a deliberate choice for
  * a CDN in front of the directory and a data leak anywhere else.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const PROVIDERS_URL = '/api/admin/storage/providers';
-export const HEALTH_URL = '/api/admin/storage/health';
 
 export const PROVIDER_TYPES = ['s3', 'gcs', 'azure_blob', 'minio', 'local'] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
@@ -52,10 +52,14 @@ export interface StorageProvider {
 	updated_at: string;
 }
 
+/** What the storage plugin answers for a ping: whether the provider answered, and why not. */
 export interface TestResult {
-	success?: boolean;
-	ok?: boolean;
-	message?: string;
+	provider_id?: string;
+	provider_type?: string;
+	provider_name?: string;
+	healthy?: boolean;
+	latency_ms?: number;
+	/** Empty when the provider answered. */
 	error?: string;
 }
 
@@ -85,33 +89,40 @@ export function providerLabel(type: string): string {
 }
 
 /**
- * Whether the test route reported success.
+ * Whether the test route reported a healthy provider.
  *
- * The engine may answer under either of two field names, and a caller reading
- * only one treats a refusal as a pass. Both are read, and absence of an
- * explicit success is not success.
+ * The route answers 200 whether or not the provider answered the ping, so
+ * the status says nothing. Only an explicit healthy is a pass.
  */
 export function testPassed(result: TestResult | null | undefined): boolean {
-	if (!result) return false;
-	return result.success === true || result.ok === true;
+	return result?.healthy === true;
 }
 
+/** Why a provider failed its test. The plugin sends an empty error on a pass. */
 export function testMessage(result: TestResult | null | undefined): string {
-	return result?.message ?? result?.error ?? 'The provider did not say why.';
+	return result?.error?.trim() || 'The provider did not say why.';
 }
 
 /**
  * The provider a new upload goes to.
  *
- * Lowest priority number wins among enabled providers, so the list can say
- * which one is actually receiving writes rather than leaving somebody to work
- * it out from a column of integers.
+ * The plugin picks by cost before priority: among enabled providers, the
+ * lowest cost weight above zero wins, and only when none carries a weight
+ * does the lowest priority number win. The list says which one is actually
+ * receiving writes rather than leaving somebody to work it out from a column
+ * of integers.
  */
 export function activeProvider(
 	providers: readonly StorageProvider[]
 ): StorageProvider | null {
 	const usable = providers.filter((p) => p.enabled && !p.credentials_unavailable);
 	if (usable.length === 0) return null;
+	const weighted = usable.filter((p) => p.cost_weight > 0);
+	if (weighted.length > 0) {
+		return weighted.reduce((best, p) =>
+			p.cost_weight < best.cost_weight || (p.cost_weight === best.cost_weight && p.priority < best.priority) ? p : best,
+		);
+	}
 	return usable.reduce((best, p) => (p.priority < best.priority ? p : best));
 }
 
@@ -142,7 +153,7 @@ export function publiclyReadable(
 
 export function providerTone(
 	p: StorageProvider
-): 'success' | 'danger' | 'warn' | 'neutral' {
+): StatusTone {
 	if (p.credentials_unavailable) return 'danger';
 	if (!p.enabled) return 'neutral';
 	if (p.local_public_unsigned) return 'warn';
@@ -176,6 +187,8 @@ export interface ProviderBody {
 	use_ssl: boolean;
 	path_style: boolean;
 	priority: number;
+	/** The plugin replaces the row on a save, so an edit sends back the weight it read. */
+	cost_weight?: number;
 	enabled: boolean;
 	local_public_unsigned: boolean;
 }
@@ -230,6 +243,9 @@ export const PROVIDER_FIELDS: Readonly<Record<ProviderType, readonly ProviderFie
 		{ key: 'bucket', label: 'Container', hint: 'The blob container objects are written to.', required: true },
 		{ key: 'access_key', label: 'Storage account name', hint: 'The account the container belongs to.', required: true },
 		{ key: 'secret_key', label: 'Account key', hint: 'One of the account access keys. Stored encrypted.', required: true, secret: true },
+		// The plugin stores what a save sends, so an endpoint missing from the
+		// form would be erased by every save.
+		{ key: 'endpoint', label: 'Endpoint', hint: "Optional. For a custom domain on a public address. Empty uses the account's default address.", required: false, placeholder: 'https://<account>.blob.core.windows.net' },
 		{ key: 'cdn_base_url', label: 'CDN base URL', hint: 'Optional. A CDN in front of the container.', required: false },
 	],
 	local: [
@@ -257,6 +273,8 @@ export function providerBodyFrom(form: FormData, creating: boolean): { body: Pro
 		local_public_unsigned: type === 'local' && (form.get('local_public_unsigned') === 'on' || form.get('local_public_unsigned') === 'true'),
 		priority: Math.max(0, Math.trunc(Number(form.get('priority') ?? 0)) || 0),
 	};
+	const cost = Number(form.get('cost_weight'));
+	if (form.has('cost_weight') && Number.isFinite(cost) && cost >= 0) body.cost_weight = cost;
 	for (const f of PROVIDER_FIELDS[type]) {
 		const v = String(form.get(f.key) ?? '').trim();
 		if (!v) {

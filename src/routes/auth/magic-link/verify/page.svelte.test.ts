@@ -7,6 +7,15 @@ afterEach(cleanup);
 
 const props = (token: string, form: unknown = null) => ({ form, data: { token } }) as never;
 
+// A backup code is 16 hexadecimal characters.
+const BACKUP_CODE = 'a1b2c3d4e5f60718';
+
+/** Whether a field lets a whole backup code be typed into it. */
+function fitsBackupCode(field: Element | null): boolean {
+	const cap = field?.getAttribute('maxlength');
+	return field !== null && (cap === null || Number(cap) >= BACKUP_CODE.length);
+}
+
 describe('Magic link verify page', () => {
 	it('waits for a click before redeeming the token', () => {
 		const { container, getByRole } = render(VerifyPage, { props: props('abc') });
@@ -25,6 +34,10 @@ describe('Magic link verify page', () => {
 		expect(container.querySelector('h1')?.textContent?.trim()).toBe('Two-factor verification');
 		expect((container.querySelector('input[name="challenge_token"]') as HTMLInputElement).value).toBe('ch');
 		expect(container.querySelector('form')?.getAttribute('action')).toBe('?/mfa');
+		// The field also takes a backup code, which is hexadecimal, so it must
+		// not bring up a number pad on a phone.
+		expect(container.querySelector('input[name="code"]')?.getAttribute('inputmode')).toBeNull();
+		expect(fitsBackupCode(container.querySelector('input[name="code"]'))).toBe(true);
 	});
 
 	it('offers a new link when the email link carried no token', () => {

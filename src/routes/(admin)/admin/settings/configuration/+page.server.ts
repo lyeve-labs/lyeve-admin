@@ -5,6 +5,8 @@ import { ApiError } from '@lyeve-labs/client';
 import { getPluginSchema } from '@lyeve-labs/client-rest';
 import { pluginSettings } from '$lib/config-forms';
 import { sessionToken } from '$lib/server/session-cookie';
+import { actionError } from '$lib/server/action-error';
+import { section, type Section } from '$lib/api/gate';
 
 export interface ConfigSetting {
 	key: string;
@@ -31,22 +33,43 @@ interface ConfigRefusal {
 	origin?: string;
 }
 
-export const load: PageServerLoad = async (event) => {
-	if (!sessionToken(event)) return { provenance: null };
+function refusalSentence(refusal: ConfigRefusal): string {
+	const where = refusal.origin ? ` (${refusal.origin})` : '';
+	return `${refusal.reason}${where}`;
+}
 
+function refusedIn(body: unknown): ConfigRefusal | null {
+	const first = (body as { refused?: unknown } | null)?.refused;
+	if (!Array.isArray(first) || first.length === 0) return null;
+	const r = first[0] as Partial<ConfigRefusal>;
+	return typeof r?.reason === 'string' ? { key: String(r.key ?? ''), reason: r.reason, origin: r.origin } : null;
+}
+
+export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
-	const provenance = await client.get<ConfigProvenance>('/api/admin/config').catch(() => null);
+	const read = await section(
+		client.get<ConfigProvenance>('/api/admin/config'),
+		'The configuration could not be read. This is not a report that nothing is set.'
+	);
 
 	// Opened for one plugin, the page shows that plugin's settings: the ones
 	// its schema declares, including those nothing has read yet, which the
 	// engine's list cannot know about.
 	const pluginName = event.url.searchParams.get('plugin')?.trim() ?? '';
-	if (!pluginName || !provenance) return { provenance, plugin: null };
-	const schema = await getPluginSchema(pluginName, client).catch(() => null);
-	const merged = pluginSettings(provenance.settings, schema);
+	if (!pluginName || !read.ok) return { provenance: read, plugin: null };
+	// The engine answers 404 for a plugin that declares no settings or is not
+	// running. Any other failure is a read that did not happen, and the page
+	// says so rather than reporting a plugin with nothing to set.
+	let failed = false;
+	const schema = await getPluginSchema(pluginName, client).catch((err: unknown) => {
+		if (!(err instanceof ApiError && err.status === 404)) failed = true;
+		return null;
+	});
+	const merged = pluginSettings(read.value.settings, schema);
+	const provenance: Section<ConfigProvenance> = { ok: true, value: { ...read.value, settings: merged.settings } };
 	return {
-		provenance: { ...provenance, settings: merged.settings },
-		plugin: { name: pluginName, keys: merged.keys, found: schema !== null },
+		provenance,
+		plugin: { name: pluginName, keys: merged.keys, found: schema !== null, failed },
 	};
 };
 
@@ -75,14 +98,17 @@ export const actions: Actions = {
 			}>('/api/admin/config', { values: { [key]: value } });
 
 			const refusal = result.refused?.[0];
-			if (refusal) {
-				const where = refusal.origin ? ` (${refusal.origin})` : '';
-				return fail(409, { key, error: `${refusal.reason}${where}` });
-			}
+			if (refusal) return fail(409, { key, error: refusalSentence(refusal) });
 			return { success: true, key };
 		} catch (e) {
-			if (e instanceof ApiError) return fail(e.status, { key, error: e.message });
-			return fail(500, { key, error: 'Could not save the setting' });
+			// A save whose only key is refused answers 409 with the refusal in
+			// the body and no error field.
+			const refused = e instanceof ApiError && e.status === 409 ? refusedIn(e.body) : null;
+			if (refused) return fail(409, { key, error: refusalSentence(refused) });
+			// A refusal keeps its status and its sentence. A failure of the engine
+			// keeps neither, because its text is not written for the operator.
+			const status = e instanceof ApiError && e.status < 500 ? e.status : 502;
+			return fail(status, { key, error: actionError(e, 'The setting could not be saved. Nothing was changed.') });
 		}
 	},
 };

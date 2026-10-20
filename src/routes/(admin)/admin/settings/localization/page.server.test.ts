@@ -31,7 +31,7 @@ describe('locales load', () => {
 	it('reads nothing while the plugin does not run', async () => {
 		const data = await load(event(none));
 		expect(engine.get).not.toHaveBeenCalled();
-		expect(data).toMatchObject({ unavailable: false });
+		expect(data).toEqual({ locales: { ok: false, gate: { state: 'absent' } } });
 	});
 
 	it('reads the preferences while the plugin runs', async () => {
@@ -39,14 +39,13 @@ describe('locales load', () => {
 		const data = await load(event(running));
 		expect(engine.get).toHaveBeenCalledWith('/api/admin/localization/locales');
 		expect(data).toEqual({
-			unavailable: false,
-			locales: { default_locale: 'en', enabled_locales: ['en', 'fr'], fallback_chain: ['fr'] },
+			locales: { ok: true, value: { default_locale: 'en', enabled_locales: ['en', 'fr'], fallback_chain: ['fr'] } },
 		});
 	});
 
-	it('marks the plugin unavailable when it does not answer', async () => {
+	it('keeps a failed read as a failure, never as no locales', async () => {
 		engine.get.mockRejectedValue(new Error('503'));
-		expect(await load(event(running))).toMatchObject({ unavailable: true });
+		expect(await load(event(running))).toMatchObject({ locales: { ok: false, gate: { state: 'error' } } });
 	});
 });
 

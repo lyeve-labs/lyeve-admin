@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Button,
@@ -57,8 +56,6 @@
 	});
 </script>
 
-<PageTitle title="Spike alerts" />
-
 <PageShell
 	title="Spike alerts"
 	description="Where this tenant hears about a sudden rise in errors, and what counts as one."
@@ -67,6 +64,7 @@
 >
 	{#if data.gate.state !== 'ok' || !settings}
 		<GateNotice
+			level={2}
 			gate={data.gate}
 			title="Spike alerts"
 			absent="The error tracking plugin is not part of this build, so there are no spike alerts to set."
@@ -80,7 +78,7 @@
 
 			<Card>
 				{#snippet header()}
-					<SectionHeading level={3}>Where alerts go</SectionHeading>
+					<SectionHeading level={2}>Where alerts go</SectionHeading>
 				{/snippet}
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted">
@@ -98,7 +96,7 @@
 
 			<Card>
 				{#snippet header()}
-					<SectionHeading level={3}>What counts as a spike</SectionHeading>
+					<SectionHeading level={2}>What counts as a spike</SectionHeading>
 				{/snippet}
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted">

@@ -8,10 +8,34 @@ import { blockedFlow, blockedRunError, fixtureCatalog, fixtureFlow, fixtureRun, 
 import { BLOCKED_TEXT } from '$lib/flow/blocked';
 import { FOCUS_KEY } from '$lib/flow/prefs';
 import { SHELL_KEY, type Shell } from '$lib/shell.svelte';
+import { outlineSkips } from '$lib/test-outline';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/f1') } }));
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}) }));
+const nav = vi.hoisted(() => ({ guard: null as null | ((n: unknown) => void), invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({
+	beforeNavigate: vi.fn((fn: (n: unknown) => void) => {
+		nav.guard = fn;
+	}),
+	goto: vi.fn(async () => {}),
+	invalidateAll: nav.invalidateAll,
+}));
+
+// The instance the layout provides, so a refusal has a way to enable to name.
+vi.mock('$lib/instance.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/instance.svelte')>();
+	const { licensingOf } = await import('$lib/api/license');
+	const licensing = licensingOf({ links: [{ rel: 'upgrade', label: 'Turn it on', url: '/admin/settings/license' }], renew: true });
+	return { ...real, useInstance: () => real.instanceFrom(() => ({ licensing })) };
+});
+
+// The kit's confirm renders through a container the layout mounts and this
+// test does not, so the call is captured and answered here.
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
 
 // The page is tested with the list editor whatever the build carries, so the
 // suite reads the same with the visual editor mounted and without it. A case
@@ -49,6 +73,8 @@ function refusingTestFetch(body: unknown) {
 }
 let fetchMock: ReturnType<typeof validFetch> | ReturnType<typeof refusingTestFetch> = validFetch();
 beforeEach(() => {
+	kit.confirm.mockReset();
+	kit.confirm.mockResolvedValue(false);
 	fetchMock = validFetch();
 	vi.stubGlobal('fetch', fetchMock);
 	localStorage.clear();
@@ -68,14 +94,16 @@ function setup(form: unknown = null, overrides: Record<string, unknown> = {}, co
 				locked: false,
 				flow: fixtureFlow,
 				catalog: fixtureCatalog,
+				catalogGate: { state: 'ok' },
 				datasources: [{ id: 'd1', name: 'warehouse', kind: 'postgres' }],
 				variables: ['region'],
 				schemas: [],
-				runs: [fixtureRun],
-				versions: [],
+				runs: { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 0, total: 1, hasMore: false } },
+				versions: { ok: true, value: [] },
 				templates: fixtureTemplates,
 				entitlements: licensed,
 				assistant: 'ready',
+				user: { roles: ['admin'] },
 				...overrides,
 			},
 			form,
@@ -172,6 +200,37 @@ describe('flow editor page', () => {
 		expect((form.querySelector('[name="slug"]') as HTMLInputElement).value).toBe(fixtureFlow.slug);
 	});
 
+	// The import drawer and the rest of the editor share one form result.
+	it('keeps a failed save out of the import drawer opened after it', async () => {
+		const { container, getByRole } = setup({ error: 'A flow needs a name.' });
+		expect(container.textContent).toContain('A flow needs a name.');
+		await pickOverflow(getByRole, 'Import');
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).not.toContain('A flow needs a name.');
+	});
+
+	it('shows a failed import inside the import drawer and not above the canvas', async () => {
+		const { container, getByRole, rerender } = setup();
+		await pickOverflow(getByRole, 'Import');
+		await rerender({ form: { action: 'import', error: 'Paste a definition or choose a file.' } } as never);
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).toContain('Paste a definition or choose a file.');
+		expect(document.body.textContent?.split('Paste a definition or choose a file.').length).toBe(2);
+	});
+
+	// The notice above the canvas leaves an import's refusal to the drawer, so
+	// the way to enable it is drawn there.
+	it('names the way to enable a refused import inside the import drawer', async () => {
+		const { container, getByRole, rerender } = setup();
+		await pickOverflow(getByRole, 'Import');
+		await rerender({
+			form: { action: 'import', error: '7 of 7 flows are in use, the most this instance keeps.', refusal: { nodeIds: [], limit: 7, current: 7 } },
+		} as never);
+		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
+		expect(form.textContent).toContain('7 of 7 flows are in use');
+		expect(form.querySelector('a[href="/admin/settings/license"]')?.textContent).toContain('Turn it on');
+	});
+
 	it('validates the draft 500 ms after a change through the flow endpoint', async () => {
 		vi.useFakeTimers();
 		try {
@@ -255,6 +314,12 @@ describe('flow editor page', () => {
 		]);
 	});
 
+	it('draws no datasource or variable shortcut for a role those routes refuse', () => {
+		const { queryByTestId } = setup(null, { user: { roles: ['editor'] } });
+		expect(queryByTestId('flow-datasources')).toBeNull();
+		expect(queryByTestId('flow-variables')).toBeNull();
+	});
+
 	it('links the datasources and variables from the toolbar, carrying the way back to this flow', () => {
 		const { getByTestId } = setup();
 		expect(getByTestId('flow-datasources').getAttribute('href')).toBe('/admin/flows/datasources?flow=f1');
@@ -269,8 +334,20 @@ describe('flow editor page', () => {
 		expect(queryByTestId('flow-inspector')?.textContent ?? '').not.toContain('Delete flow');
 		const remove = getByRole('button', { name: 'Delete flow' });
 		expect(remove.className).toContain('text-danger');
+		const form = document.querySelector('form[action="?/delete"]') as HTMLFormElement;
+		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+
+		kit.confirm.mockResolvedValueOnce(false);
 		await fireEvent.click(remove);
-		expect(getByRole('dialog').textContent).toContain('Delete');
+		await tick();
+		// The title names the flow. The body says what the delete takes with it.
+		expect(kit.confirm).toHaveBeenCalledWith(`Delete flow ${fixtureFlow.name}?`, expect.stringContaining('run history'), { confirmLabel: 'Delete' });
+		expect(submit).not.toHaveBeenCalled();
+
+		kit.confirm.mockResolvedValueOnce(true);
+		await fireEvent.click(remove);
+		await tick();
+		expect(submit).toHaveBeenCalled();
 	});
 
 	it('names the save state beside the status, as the schema builder does', async () => {
@@ -332,13 +409,13 @@ describe('flow editor page', () => {
 		const { getByRole, getByLabelText } = setup();
 		const palette = getByLabelText('Palette', { selector: 'aside' });
 		const inspector = getByLabelText('Inspector', { selector: 'aside' });
-		expect(palette.className).toContain('hidden');
-		expect(palette.className).toContain('xl:block');
+		expect(palette.className).toContain('invisible');
+		expect(palette.className).toContain('xl:visible');
 		await fireEvent.click(getByRole('button', { name: 'Node palette' }));
-		expect(palette.className).not.toContain('hidden');
+		expect(palette.className).not.toContain('invisible');
 		await fireEvent.click(getByRole('button', { name: 'Inspector' }));
-		expect(inspector.className).not.toContain('hidden');
-		expect(palette.className).toContain('hidden');
+		expect(inspector.className).not.toContain('invisible');
+		expect(palette.className).toContain('invisible');
 	});
 
 	describe('an empty canvas offers three equal starts, none required', () => {
@@ -512,6 +589,71 @@ describe('flow editor page', () => {
 		expect(rows[0].querySelector('form[action="?/run"] input[name="run_id"]')?.getAttribute('value')).toBe('r1');
 	});
 
+	// The tab is a table of runs, named for what it lists.
+	it('names the runs table for its runs and pages past the first twenty', async () => {
+		const runs = { ok: true, value: { rows: [fixtureRun], limit: 20, offset: 20, total: 41, hasMore: true } };
+		const { getByRole, container } = setup(null, { runs });
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
+		expect(getByRole('region', { name: 'Runs' })).toBeTruthy();
+		const next = [...drawer.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+		expect(next).toContain('/admin/flows/f1?limit=20&offset=40');
+		expect(getByRole('tab', { name: /Runs/ }).textContent).toContain('41');
+	});
+
+	it('says the runs could not be read rather than that none were recorded', async () => {
+		const { getByRole, container } = setup(null, { runs: { ok: false, gate: { state: 'unavailable' } } });
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
+		expect(drawer.textContent).toContain('the runs could not be read');
+		expect(drawer.textContent).not.toContain('No runs recorded yet.');
+	});
+
+	it('says the node types could not be read rather than that none matches', () => {
+		const { getByTestId } = setup(null, { catalog: [], catalogGate: { state: 'error', message: 'The node types could not be read, so the palette has nothing to offer.' } });
+		expect(getByTestId('flow-catalog-unread').textContent).toContain('The node types could not be read');
+		expect(getByTestId('node-palette').textContent).toContain('could not be read');
+		expect(getByTestId('node-palette').textContent).not.toContain('No node type matches.');
+	});
+
+	// The export panel said Loading under its own error, so the reader could
+	// not tell the read had ended.
+	it('says the export could not be loaded and stops saying it is loading', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) =>
+				String(url).includes('/export')
+					? new Response('{"error":"down"}', { status: 503, headers: { 'content-type': 'application/json' } })
+					: new Response(JSON.stringify({ ok: true, errors: [] }), { status: 200, headers: { 'content-type': 'application/json' } }),
+			),
+		);
+		const { getByRole } = setup();
+		await pickOverflow(getByRole, 'Export');
+		await vi.waitFor(() => expect(document.body.textContent).toContain('The export could not be loaded.'));
+		expect(document.body.textContent).not.toContain('Loading the export.');
+		expect(document.body.querySelector('pre')).toBeNull();
+	});
+
+	// A page of runs is this editor at another address, and the draft survives it.
+	it('pages the runs with an unsaved draft and asks nothing', async () => {
+		const { container } = setup();
+		await fireEvent.input(container.querySelector('#flow-name') as HTMLInputElement, { target: { value: 'Renamed' } });
+		const cancel = vi.fn();
+		nav.guard?.({
+			cancel,
+			type: 'link',
+			to: { url: new URL('http://localhost/admin/flows/f1?limit=20&offset=20'), route: { id: '/(admin)/admin/flows/[id]' }, params: { id: 'f1' } },
+		});
+		await tick();
+		expect(cancel).not.toHaveBeenCalled();
+		expect(kit.confirm).not.toHaveBeenCalled();
+
+		nav.guard?.({ cancel, type: 'link', to: { url: new URL('http://localhost/admin/flows'), route: { id: '/(admin)/admin/flows' }, params: {} } });
+		await tick();
+		expect(cancel).toHaveBeenCalled();
+		expect(kit.confirm).toHaveBeenCalledWith(expect.stringContaining('Discard the changes'), expect.anything(), { confirmLabel: 'Discard' });
+	});
+
 	it('carries the in-product guide', async () => {
 		const { getByRole, container } = setup();
 		await fireEvent.click(getByRole('tab', { name: 'Guide' }));
@@ -520,7 +662,7 @@ describe('flow editor page', () => {
 	});
 
 	it('renders the not-enabled state when the engine answered 402', () => {
-		const { getByTestId } = setup(null, { locked: true, flow: null, catalog: [], runs: [] });
+		const { getByTestId } = setup(null, { locked: true, flow: null, catalog: [] });
 		expect(getByTestId('not-enabled')).toBeTruthy();
 	});
 
@@ -553,7 +695,7 @@ describe('flow editor page', () => {
 		const live = { ...fixtureFlow, status: 'active', version: 2 };
 		const { container, getByRole } = setup(null, {
 			flow: live,
-			versions: [{ flow_id: live.id, version: 2, checksum: 'x', created_by: 'a', created_at: live.updated_at }],
+			versions: { ok: true, value: [{ flow_id: live.id, version: 2, checksum: 'x', created_by: 'a', created_at: live.updated_at }] },
 		});
 		const publish = () => getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
 		expect(publish().disabled).toBe(true);
@@ -604,6 +746,80 @@ describe('flow editor page', () => {
 		expect(queryByTestId('run-failure')).toBeNull();
 	});
 
+	it('names the nodes this instance does not enable when a test run is refused with 402', async () => {
+		const refusal = {
+			error: 'payment_required',
+			plugin: 'flow',
+			feature: 'feature:example_feature',
+			upgrade_url: '',
+			ok: false,
+			errors: [{ node_id: 'orders', path: '/type', message: 'db.query needs example_feature' }],
+		};
+		fetchMock = vi.fn(async (url: string) => {
+			const refused = String(url).endsWith('/test');
+			return new Response(JSON.stringify(refused ? refusal : { ok: true, errors: [] }), {
+				status: refused ? 402 : 200,
+				headers: { 'content-type': 'application/json' },
+			});
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const { getByRole, getByTestId, container, queryByText } = setup(null, { flow: { ...fixtureFlow, status: 'active', version: 1 } });
+		await fireEvent.click(getByRole('button', { name: 'Test' }));
+		await vi.waitFor(() => expect(getByTestId('flow-problems')).toBeTruthy());
+		expect(container.textContent).toContain('One element uses what this instance does not enable: orders.');
+		expect(container.querySelector('[data-node-id="orders"]')?.className).toContain('border-danger');
+		expect(queryByText('payment_required')).toBeNull();
+	});
+
+	// The console renews the engine's short token only on a request its own
+	// server handles, so a test run sent straight to the engine can carry one
+	// that lapsed on a live session. Rerunning the loads renews it.
+	describe('a test run the engine answers with 401', () => {
+		function answeringTest(statuses: number[]) {
+			return vi.fn(async (url: string) => {
+				if (!String(url).endsWith('/test')) {
+					return new Response(JSON.stringify({ ok: true, errors: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+				}
+				const status = statuses.shift() ?? 200;
+				const body = status === 401 ? { error: 'unauthorized' } : fixtureRun;
+				return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+			});
+		}
+
+		it('renews the session and runs the test again, keeping the draft in place', async () => {
+			nav.invalidateAll.mockClear();
+			fetchMock = answeringTest([401]);
+			vi.stubGlobal('fetch', fetchMock);
+			const { getByRole, queryByText } = setup();
+			await fireEvent.click(getByRole('button', { name: 'Test' }));
+			await vi.waitFor(() => expect(fetchMock.mock.calls.filter((c) => String(c[0]).endsWith('/test'))).toHaveLength(2));
+			expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
+			await vi.waitFor(() => expect(queryByText('unauthorized')).toBeNull());
+			vi.unstubAllGlobals();
+		});
+
+		it('says to sign in again when the renewed run is refused too', async () => {
+			fetchMock = answeringTest([401, 401]);
+			vi.stubGlobal('fetch', fetchMock);
+			const { getByRole, container } = setup();
+			await fireEvent.click(getByRole('button', { name: 'Test' }));
+			await vi.waitFor(() => expect(container.textContent).toContain('Your session ended. Sign in again in another tab, then try again here.'));
+			expect(container.textContent).not.toContain('unauthorized');
+			vi.unstubAllGlobals();
+		});
+	});
+
+	it('says the versions could not be read, offers no rollback and never calls the draft unpublished', () => {
+		const live = { ...fixtureFlow, status: 'active', version: 2 };
+		const { getByTestId, queryByRole, getByRole } = setup(null, { flow: live, versions: { ok: false, gate: { state: 'unavailable' } } });
+		expect(getByTestId('versions-unread').textContent).toContain('The versions could not be read');
+		expect(queryByRole('button', { name: 'Roll back' })).toBeNull();
+		const publish = getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
+		expect(publish.disabled).toBe(false);
+		expect(publish.className).not.toContain('bg-brand');
+		expect(publish.parentElement?.textContent).toContain('this draft may already be live');
+	});
+
 	it('seeds the test trigger of a contributed trigger with its type alone and says where the payload keys go', () => {
 		const flow = { ...fixtureFlow, draft: { ...fixtureFlow.draft, trigger: { type: 'email.bounced', config: { template: 'welcome' } } } };
 		const { container } = setup(null, { flow });
@@ -630,7 +846,7 @@ describe('flow editor page', () => {
 		conversation_id: 'c1',
 		model: 'gpt-4.1',
 		tokens: 1234,
-		cost: 0.0031,
+		cost: '0.003100',
 	};
 
 	it('hides the Assistant tab when the catalog for a model answered 402', () => {
@@ -727,7 +943,7 @@ describe('flow editor page', () => {
 		const { getByTestId } = setup({
 			explain: {
 				subject: 'join',
-				answer: { answer: '## Join\n\nIt **joins** `orders` to shipments.\n\n<img src=x onerror="alert(1)">\n\n- left key\n- right key', model: 'm', tokens: 40, cost: 0.0002 },
+				answer: { answer: '## Join\n\nIt **joins** `orders` to shipments.\n\n<img src=x onerror="alert(1)">\n\n- left key\n- right key', model: 'm', tokens: 40, cost: '0.000200' },
 			},
 		});
 		const panel = getByTestId('assist-answer');
@@ -777,7 +993,7 @@ describe('flow editor refusal', () => {
 	it('renders a refusal inline with the node ids, and marks the nodes as problems', () => {
 		const form = {
 			error: '2 elements use what this instance does not enable: the trigger, orders.',
-			refusal: { nodeIds: ['trigger', 'orders'], limit: null, current: null },
+			refusal: { nodeIds: ['trigger', 'orders'], limit: null, current: null, upgradeUrl: '' },
 			errors: [
 				{ node_id: 'trigger', path: '/trigger/type', message: 'not enabled here' },
 				{ node_id: 'orders', path: '/type', message: 'not enabled here' },
@@ -818,14 +1034,14 @@ describe('flow editor role grants', () => {
 		[...getByRole('toolbar', { name: 'Flow editor' }).querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim());
 
 	it('draws save for a flow the caller may update and hides test, publish, rollback and delete', () => {
-		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'update'] }, versions: [version] });
+		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'update'] }, versions: { ok: true, value: [version] } });
 		expect(toolbarNames(getByRole)).toEqual(['More actions', 'Node palette', 'Inspector', 'Focus mode', 'Save']);
 		expect(queryByRole('button', { name: 'Delete flow' })).toBeNull();
 		expect(queryByRole('button', { name: 'Roll back' })).toBeNull();
 	});
 
 	it('draws publish, test and rollback for a flow the caller may activate', () => {
-		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'activate'] }, versions: [version] });
+		const { getByRole, queryByRole } = setup(null, { flow: { ...fixtureFlow, actions: ['read', 'activate'] }, versions: { ok: true, value: [version] } });
 		expect(toolbarNames(getByRole)).toEqual(['More actions', 'Node palette', 'Inspector', 'Focus mode', 'Test', 'Publish']);
 		expect(getByRole('button', { name: 'Roll back' })).toBeTruthy();
 		expect(queryByRole('button', { name: 'Save' })).toBeNull();
@@ -865,5 +1081,19 @@ describe('flow editor page with a visual editor in the build', () => {
 		await pickOverflow(getByRole, 'Shortcuts');
 		expect(queryByTestId('keyboard-hints')?.textContent).toContain('undo');
 		expect(queryByTestId('keyboard-hints')?.textContent).toContain('drag to pan');
+	});
+});
+
+describe('heading outline', () => {
+	// A collapsed side panel hides its header from xl up through the stylesheet,
+	// which the test document does not apply, so the test hides it the same way.
+	it('keeps the runs notice one level under the title with both side panels collapsed', async () => {
+		const { getByRole, container } = setup(null, { runs: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } });
+		await fireEvent.click(getByRole('button', { name: 'Collapse Palette' }));
+		await fireEvent.click(getByRole('button', { name: 'Collapse Inspector' }));
+		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
+		for (const el of container.querySelectorAll('.xl\\:hidden')) el.setAttribute('hidden', '');
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

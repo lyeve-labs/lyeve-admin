@@ -6,6 +6,7 @@
  * arrive in nanoseconds as the sampler records them. The page formats them
  * and never sends one back.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
 export const PROFILER_ROOT = '/api/admin/debug/profiler';
@@ -160,8 +161,12 @@ export function formatNs(ns: number): string {
 	return `${Math.round(ns)}ns`;
 }
 
-/** Bytes with a binary unit. */
-export function formatBytes(b: number): string {
+/**
+ * Bytes with a binary unit and a sign, for heap figures that can shrink:
+ * `-512 B`, `2 KiB`, `3.00 GiB`. The rest of the admin reads sizes through
+ * the shared byte formatter, which prints KB and never a negative.
+ */
+export function formatSignedBinaryBytes(b: number): string {
 	if (!Number.isFinite(b)) return '';
 	const abs = Math.abs(b);
 	if (abs >= 1024 ** 3) return `${(b / 1024 ** 3).toFixed(2)} GiB`;
@@ -171,7 +176,7 @@ export function formatBytes(b: number): string {
 }
 
 /** The badge a p95 earns: a second is red, a tenth amber, ten milliseconds green. */
-export function latencyTone(ns: number): 'danger' | 'warn' | 'success' | 'neutral' {
+export function latencyTone(ns: number): StatusTone {
 	if (ns >= 1e9) return 'danger';
 	if (ns >= 1e8) return 'warn';
 	if (ns <= 1e7) return 'success';

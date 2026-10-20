@@ -6,6 +6,8 @@ import {
 	importGate,
 	outcome,
 	outcomeTone,
+	previewImport,
+	startImport,
 	progress,
 	rejectionRate,
 	rollbackable,
@@ -101,7 +103,8 @@ describe('the gate', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(importGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(importGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(importGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(importGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(importGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as no imports having run', () => {
@@ -156,7 +159,7 @@ describe('mapping', () => {
 	});
 
 	it('guesses by name, ignoring case and separators, and leaves the rest unmapped', async () => {
-		const { mappingTargets, suggestMapping, mappingsFrom } = await import('./bulk-import');
+		const { mappingTargets, suggestMapping } = await import('./bulk-import');
 		const targets = mappingTargets([{ name: 'page_views', field_type: 'number' }, { name: 'summary' }]);
 		const chosen = suggestMapping(['Slug', 'Name', 'Page Views', 'Other'], targets);
 		expect(chosen).toEqual({
@@ -166,11 +169,6 @@ describe('mapping', () => {
 			page_views: 'Page Views',
 			summary: '',
 		});
-		expect(mappingsFrom(chosen, targets)).toEqual([
-			{ source_field: 'Slug', target_field: 'entry.slug', data_type: 'string' },
-			{ source_field: 'Name', target_field: 'entry.title', data_type: 'string' },
-			{ source_field: 'Page Views', target_field: 'page_views', data_type: 'number' },
-		]);
 	});
 
 	it('reads the format from a file name', async () => {
@@ -178,5 +176,79 @@ describe('mapping', () => {
 		expect(formatFromName('Export.JSONL')).toBe('ndjson');
 		expect(formatFromName('a.yml')).toBe('yaml');
 		expect(formatFromName('notes.txt')).toBeNull();
+	});
+});
+
+describe('a refused import call', () => {
+	function answer(status: number, body: unknown): typeof fetch {
+		return (async () =>
+			new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
+	}
+
+	async function refusal(status: number, body: unknown): Promise<ApiError> {
+		try {
+			await previewImport(answer(status, body), { source_url: 'https://example.com/a.csv' });
+		} catch (err) {
+			return err as ApiError;
+		}
+		throw new Error('the call did not fail');
+	}
+
+	it('shows a refusal written for the operator as it was sent', async () => {
+		expect((await refusal(400, { error: 'source_url must be http or https', code: 'bad_request' })).message).toBe('source_url must be http or https');
+	});
+
+	// The engine's refusals carry a code. A 4xx body without one, such as a
+	// proxy's, is not a sentence written for the operator.
+	it('says it in its own words when a refusal carries no code', async () => {
+		const err = await refusal(413, { error: 'client intended to send too large body' });
+		expect(err.message).toBe('The file is larger than the 50 MB an import takes. Split it and import the parts.');
+		expect((await refusal(400, { error: 'bad request from upstream' })).message).toBe('The engine refused the request.');
+	});
+
+	// A 5xx body can carry driver detail, and the outage sentence is the one
+	// that tells the operator what to do.
+	it('keeps the body of an outage off the page and says the engine did not answer', async () => {
+		const err = await refusal(503, { error: 'dial tcp 10.0.0.4:5432: connection refused' });
+		expect(err.message).not.toContain('10.0.0.4');
+		expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+	});
+
+	// The engine answers a start once it has stored the job and imports the
+	// rows after that, so its own 5xx means no job was made. A proxy's 502 or
+	// 504 can arrive after the job was made, so it claims only what is known.
+	describe('on a start', () => {
+		const UNCONFIRMED = 'The engine did not confirm the import. Check the entries before trying again.';
+		async function started(res: Response): Promise<ApiError> {
+			try {
+				await startImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv', content_type: 'posts', field_mappings: [], mode: 'insert' } as never);
+			} catch (err) {
+				return err as ApiError;
+			}
+			throw new Error('the call did not fail');
+		}
+
+		it('claims nothing about a proxy page or an uncoded 5xx', async () => {
+			const timeout = await started(new Response('<html>504 Gateway Time-out</html>', { status: 504 }));
+			expect(timeout.message).toBe(UNCONFIRMED);
+			const gateway = await started(new Response(JSON.stringify({ error: 'Bad Gateway' }), { status: 502 }));
+			expect(gateway.message).toBe(UNCONFIRMED);
+		});
+
+		it('says nothing was imported when the engine itself answered the 5xx', async () => {
+			const err = await started(new Response(JSON.stringify({ error: 'failed to create import job', code: 'service_unavailable' }), { status: 503 }));
+			expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+		});
+	});
+
+	it('says nothing was imported by a preview, which imports nothing, whoever answered', async () => {
+		const res = new Response('<html>504 Gateway Time-out</html>', { status: 504 });
+		const err = (await previewImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv' }).catch((e: unknown) => e)) as ApiError;
+		expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+	});
+
+	it('keeps the body of any other engine failure off the page', async () => {
+		const err = await refusal(500, { error: 'pq: relation "import_jobs" does not exist' });
+		expect(err.message).toBe('The engine could not finish the request. Nothing was imported.');
 	});
 });

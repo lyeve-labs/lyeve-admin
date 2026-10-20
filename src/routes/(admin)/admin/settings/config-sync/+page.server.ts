@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { error, fail, type RequestEvent } from '@sveltejs/kit';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import {
@@ -12,6 +12,7 @@ import {
 	parseBundle,
 	type SyncRequest,
 } from '$lib/api/config-sync';
+import { forbiddenText } from '$lib/api/gate';
 
 /**
  * Config sync has no read of its own: every route is a POST, and an export
@@ -20,10 +21,10 @@ import {
  * export or apply is the engine's answer to the request, and each action
  * renders a refusal the way every other page does.
  */
-export const load: PageServerLoad = async ({ parent }) => {
-	const { user } = await parent();
+export const load: PageServerLoad = async (event) => {
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
-		error(403, 'Requires super_admin role');
+		error(403, forbiddenText('configuration sync'));
 	}
 	return {};
 };

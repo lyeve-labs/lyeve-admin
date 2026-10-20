@@ -114,8 +114,11 @@ export function uptimeSince(since: string, now = new Date()): string {
  * Whether a transport looks used at all.
  *
  * An install that pushes over SSE and never opens a socket should read as
- * "not in use" rather than as a wall of zeros that looks like a fault.
+ * "not in use" rather than as a wall of zeros that looks like a fault. Only
+ * the accepted connections are the tenant's own. The plugin counts pushed
+ * events across the whole instance, so another tenant's traffic says nothing
+ * about this one.
  */
 export function inUse(m: StreamMetrics | null | undefined): boolean {
-	return !!m && (m.total_connections > 0 || m.events_dispatched > 0);
+	return !!m && m.total_connections > 0;
 }

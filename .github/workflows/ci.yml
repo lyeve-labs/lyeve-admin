@@ -3,6 +3,10 @@
 # The suite runs on every pull request into dev or main, and on every release:
 # release.yml calls it on the tag and refuses to publish an image unless it is
 # green. workflow_dispatch runs it against any other ref on demand.
+#
+# The suite with the visual editors in place runs only in release.yml. Fetching
+# the editors takes secrets that belong to the release environment, which
+# admits only a version tag, so a pull request cannot read them.
 
 name: ci
 
@@ -55,6 +59,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+
+      # The release workflow decides which image tags a release ref moves from
+      # this script alone, so its rules are tested before any tag reaches it.
+      - name: Image tag rules
+        run: bash .github/scripts/image-tags_test.sh
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

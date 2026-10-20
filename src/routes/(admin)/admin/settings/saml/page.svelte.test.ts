@@ -2,7 +2,32 @@
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+/*
+ * enhance hands each form's submit function over here, so a test can run the
+ * one behind a delete and read the question it asks.
+ */
+const forms = vi.hoisted(() => ({ submits: [] as { node: HTMLFormElement; submit: unknown }[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit?: unknown) => {
+		forms.submits.push({ node, submit });
+		return { destroy: () => {} };
+	},
+}));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
+
+/** The title of the question the first delete form on the page asks. */
+async function deleteTitle(): Promise<string> {
+	const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/delete' && f.node.isConnected);
+	const submit = entry?.submit as ((input: { cancel: () => void }) => Promise<unknown>) | undefined;
+	if (!submit) throw new Error('no delete form registered a submit function');
+	kit.confirm.mockClear();
+	await submit({ cancel: () => {} });
+	return String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? '');
+}
 
 import SamlPage from './+page.svelte';
 import type { SamlProvider } from '$lib/api/saml';
@@ -47,6 +72,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		hasMore: false,
 		gate: { state: 'ok' },
 		licensed: true,
+		user: { id: 'u1', email: 'root@b.test', roles: ['super_admin'] },
 		...over,
 	} as never,
 	form: form as never,
@@ -165,10 +191,129 @@ describe('the form', () => {
 		}
 	});
 
+	// The plugin turns these three on for every new provider whatever the
+	// form sends, so a create cannot offer them off.
+	it('shows the three signing switches on and fixed on a new provider', async () => {
+		const { container } = render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new provider/i }));
+		for (const id of ['saml-want-assertions-signed', 'saml-want-response-signed', 'saml-sign-authn']) {
+			const control = container.ownerDocument.getElementById(id);
+			expect(control?.hasAttribute('disabled'), id).toBe(true);
+			expect(control?.getAttribute('aria-checked'), id).toBe('true');
+		}
+		expect(said(container)).toContain('Edit it after creating to turn one off.');
+	});
+
 	it('shows the action error where the form is', () => {
 		const { container } = render(SamlPage, {
 			props: props({}, { error: 'The provider could not be created.' }),
 		});
 		expect(said(container)).toContain('The provider could not be created.');
+	});
+});
+
+describe('the role', () => {
+	it('shows an admin the providers and no control that only a super admin may use', () => {
+		const { container } = render(SamlPage, {
+			props: props({
+				user: { id: 'u2', email: 'admin@b.test', roles: ['admin'] },
+				providers: [provider({ sp_cert_next: 'X' })],
+			}),
+		});
+		expect(said(container)).toContain('Okta');
+		expect(said(container)).toContain('Only a super admin can add, change or remove');
+		expect(screen.queryByRole('button', { name: 'New provider' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Edit Okta' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Delete Okta' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Promote' })).toBeNull();
+	});
+});
+
+describe('the drawer', () => {
+	const drawerText = () => document.body.querySelector('form#saml-provider-form')?.textContent ?? '';
+
+	// The switches sat 16px apart, so each one's touch hit area took part of
+	// its neighbor's. An edit enables the first three and drops the hint that
+	// spaced the third, so both drawers have to space every switch.
+	const switchGroups = () =>
+		new Set(
+			[...document.body.querySelectorAll('form#saml-provider-form [role="switch"]')].map(
+				(s) => s.closest('label')?.parentElement,
+			),
+		);
+
+	it('spaces every switch for touch in the New provider drawer', async () => {
+		render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		expect(document.body.querySelectorAll('form#saml-provider-form [role="switch"]')).toHaveLength(5);
+		const groups = switchGroups();
+		expect(groups.size).toBe(1);
+		expect([...groups][0]?.className).toContain('coarse:gap-6');
+	});
+
+	it('spaces every switch for touch in the Edit drawer', async () => {
+		render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit Okta' }));
+		const switches = document.body.querySelectorAll('form#saml-provider-form [role="switch"]');
+		expect(switches).toHaveLength(5);
+		expect([...switches].filter((s) => (s as HTMLButtonElement).disabled)).toHaveLength(0);
+		const groups = switchGroups();
+		expect(groups.size).toBe(1);
+		expect([...groups][0]?.className).toContain('coarse:gap-6');
+	});
+
+	it('shows a refused save inside the open drawer', async () => {
+		const { rerender } = render(SamlPage, { props: props() });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		await rerender(props({}, { action: 'create', error: 'The provider could not be created.' }));
+		expect(drawerText()).toContain('The provider could not be created.');
+	});
+
+	it('leaves a newly opened create drawer clean after a failed delete', async () => {
+		const { container } = render(SamlPage, {
+			props: props({}, { action: 'delete', error: 'The provider could not be removed.' }),
+		});
+		expect(said(container)).toContain('The provider could not be removed.');
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		expect(drawerText()).not.toContain('could not be removed');
+	});
+
+	it('leaves a reopened drawer clean of the failure it showed before', async () => {
+		render(SamlPage, { props: props({}, { action: 'create', error: 'The provider could not be created.' }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
+		expect(drawerText()).not.toContain('could not be created');
+	});
+
+});
+
+describe('the pager', () => {
+	it('stays when nothing on this page matches the search', async () => {
+		const { container } = render(SamlPage, { props: props({ total: 60, hasMore: true }) });
+		await fireEvent.input(screen.getByPlaceholderText('Search providers'), { target: { value: 'nothing like it' } });
+		expect(said(container)).toContain('No provider matches');
+		expect(container.querySelector('a[href="/admin/settings/saml?limit=25&offset=25"]')).toBeTruthy();
+	});
+});
+
+describe('the delete', () => {
+	it('names the provider in the confirmation', async () => {
+		render(SamlPage, { props: props() });
+		expect(await deleteTitle()).toBe('Delete SAML provider Okta');
+	});
+});
+
+describe('the links on a provider row', () => {
+	// Metadata and Test sign-in are two short links on one line about 8px
+	// apart, so a finger had no target on either.
+	it('gives each link a touch hit area and spaces them so the areas stay apart', () => {
+		render(SamlPage, { props: props() });
+		const metadata = screen.getByRole('link', { name: 'Metadata' });
+		const signIn = screen.getByRole('link', { name: 'Test sign-in' });
+		for (const link of [metadata, signIn]) {
+			expect(link.className.split(/\s+/)).toEqual(expect.arrayContaining(['relative', 'hit-area']));
+		}
+		const between = metadata.nextElementSibling as HTMLElement;
+		expect(between.nextElementSibling).toBe(signIn);
+		expect(between.className.split(/\s+/)).toContain('coarse:mx-4');
 	});
 });

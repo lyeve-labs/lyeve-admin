@@ -1,5 +1,21 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { authedHeaders } from '$lib/server/authz';
+
+/**
+ * A many_to_many field whose links did not all reach the plugin. The entry
+ * itself was written, so the action says that and names the field instead
+ * of reporting the whole save as failed or as done.
+ */
+export class RelationWriteError extends Error {
+	constructor(
+		readonly field: string,
+		message: string,
+	) {
+		super(message);
+		this.name = 'RelationWriteError';
+	}
+}
+
 /**
  * The many_to_many side of a content entry, written through the admin store.
  *
@@ -35,7 +51,9 @@ export async function setRelations(
 	const res = await fetch(`${base}?field=${encodeURIComponent(fieldName)}&limit=500&offset=0`, {
 		headers,
 	});
-	if (!res.ok) throw new Error(`could not read the current ${fieldName} relations`);
+	if (!res.ok) {
+		throw new RelationWriteError(fieldName, `The links in ${fieldName} could not be read, so none were changed.`);
+	}
 	const body = await res.json();
 	const current = (Array.isArray(body) ? body : (body?.data ?? [])) as {
 		id: string;
@@ -45,7 +63,10 @@ export async function setRelations(
 	const wanted = new Set(ids);
 	const held = new Set(current.map((r) => r.target_id));
 
-	await Promise.all(
+	// Every response is read. The plugin refuses a link for a role, a missing
+	// target or an outage, and a refusal left unread is a save reported as done
+	// while the field still holds what it held.
+	const removed = await Promise.all(
 		current
 			.filter((r) => !wanted.has(r.target_id))
 			.map((r) =>
@@ -53,7 +74,7 @@ export async function setRelations(
 			),
 	);
 
-	await Promise.all(
+	const added = await Promise.all(
 		ids
 			.filter((id) => !held.has(id))
 			.map((id, i) =>
@@ -69,4 +90,37 @@ export async function setRelations(
 				}),
 			),
 	);
+
+	const notRemoved = removed.filter((r) => !r.ok).length;
+	const notAdded = added.filter((r) => !r.ok).length;
+	if (notRemoved + notAdded > 0) {
+		const parts = [
+			notAdded > 0 ? `${notAdded} ${notAdded === 1 ? 'link' : 'links'} could not be added` : '',
+			notRemoved > 0 ? `${notRemoved} ${notRemoved === 1 ? 'link' : 'links'} could not be removed` : '',
+		].filter(Boolean);
+		throw new RelationWriteError(fieldName, `In ${fieldName}, ${parts.join(' and ')}.`);
+	}
+}
+
+/**
+ * Reconcile every many_to_many field a form sent, one field at a time so a
+ * refusal in one does not stop the rest. Answers null when every link landed,
+ * and otherwise one sentence per field that did not.
+ */
+export async function setEntryRelations(
+	event: RequestEvent,
+	entryID: string,
+	byField: Record<string, string[]>,
+): Promise<string | null> {
+	const fields = Object.keys(byField);
+	const settled = await Promise.allSettled(
+		fields.map((field) => setRelations(event, entryID, field, byField[field])),
+	);
+	const failures = settled.flatMap((result, i) => {
+		if (result.status === 'fulfilled') return [];
+		return result.reason instanceof RelationWriteError
+			? [result.reason.message]
+			: [`The links in ${fields[i]} could not be saved.`];
+	});
+	return failures.length > 0 ? failures.join(' ') : null;
 }

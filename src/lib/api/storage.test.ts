@@ -47,6 +47,16 @@ describe('which provider receives uploads', () => {
 		expect(activeProvider(providers)?.id).toBe('b');
 	});
 
+	it('ranks a weighted provider by cost before priority, as the plugin does', () => {
+		const providers = [
+			provider({ id: 'first', priority: 1, cost_weight: 0.8 }),
+			provider({ id: 'cheap', priority: 9, cost_weight: 0.2 }),
+			provider({ id: 'unweighted', priority: 0, cost_weight: 0 }),
+		];
+		expect(activeProvider(providers)?.id).toBe('cheap');
+		expect(activeProvider([provider({ id: 'a', priority: 4, cost_weight: 0 }), provider({ id: 'b', priority: 2, cost_weight: 0 })])?.id).toBe('b');
+	});
+
 	it('skips a provider whose credentials will not decrypt', () => {
 		const providers = [
 			provider({ id: 'broken', priority: 1, credentials_unavailable: true }),
@@ -87,23 +97,22 @@ describe('providers that look fine and are not', () => {
 });
 
 describe('the credentials test', () => {
-	// The engine may answer under either of two field names, and reading only
-	// one treats a refusal as a pass.
-	it('reads both spellings of success', () => {
-		expect(testPassed({ success: true })).toBe(true);
-		expect(testPassed({ ok: true })).toBe(true);
+	// The plugin answers 200 either way, with healthy and an error that is
+	// empty on a pass.
+	it('passes a provider the plugin reports healthy', () => {
+		expect(testPassed({ provider_id: 's1', healthy: true, latency_ms: 12.5, error: '' })).toBe(true);
 	});
 
-	it('treats anything that is not an explicit success as a failure', () => {
-		expect(testPassed({ success: false })).toBe(false);
-		expect(testPassed({ message: 'fine' })).toBe(false);
+	it('treats anything that is not an explicit healthy as a failure', () => {
+		expect(testPassed({ healthy: false, latency_ms: 0, error: 'access denied' })).toBe(false);
+		expect(testPassed({ error: '' })).toBe(false);
 		expect(testPassed({})).toBe(false);
 		expect(testPassed(null)).toBe(false);
 	});
 
-	it('relays whichever field carries the reason', () => {
-		expect(testMessage({ message: 'access denied' })).toBe('access denied');
-		expect(testMessage({ error: '403' })).toBe('403');
+	it('relays the reason the plugin gives, and says when it gave none', () => {
+		expect(testMessage({ healthy: false, error: 'access denied' })).toBe('access denied');
+		expect(testMessage({ healthy: false, error: '' })).toContain('did not say why');
 		expect(testMessage({})).toContain('did not say why');
 	});
 });
@@ -127,7 +136,8 @@ describe('the gate', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(storageGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(storageGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(storageGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(storageGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(storageGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as uploads working', () => {

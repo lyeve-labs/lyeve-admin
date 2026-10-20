@@ -3,6 +3,8 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { listSchemaNames } from '$lib/api/search-settings';
+import { readError } from '$lib/server/read-error';
+import { GATE_OK, section } from '$lib/api/gate';
 import {
 	deleteCustomPage,
 	getCustomPage,
@@ -18,13 +20,19 @@ export const load: PageServerLoad = async (event) => {
 	if (!customization.entitled) redirect(303, '/admin/settings/customization');
 	const client = authedClient(event);
 	const [page, schemas] = await Promise.all([
-		getCustomPage(client, event.params.slug).catch(() => null),
-		Promise.resolve()
-			.then(() => listSchemaNames(client))
-			.catch((): string[] => []),
+		// Only the engine's 404 says the page does not exist. A refusal or an
+		// outage keeps a status of its own.
+		getCustomPage(client, event.params.slug).catch((err: unknown) =>
+			readError(err, 'No page has that address.'),
+		),
+		// The gate says why the list is missing, so a role refusal and an
+		// outage are not one failure.
+		section(
+			Promise.resolve().then(() => listSchemaNames(client)),
+			'The schemas could not be read, so no schema can be picked below. A block keeps the schemas it already names.',
+		),
 	]);
-	if (!page) error(404, 'No page has that address.');
-	return { customPage: page, schemas };
+	return { customPage: page, schemas: schemas.ok ? schemas.value : [], schemasGate: schemas.ok ? GATE_OK : schemas.gate };
 };
 
 export const actions: Actions = {

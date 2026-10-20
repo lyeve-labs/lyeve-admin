@@ -4,10 +4,12 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
+import { section, type Section } from '$lib/api/gate';
 import {
 	RECOMMENDATIONS_OK,
 	generateFeed,
 	isAlreadyRunning,
+	isUserId,
 	readAbStats,
 	recommendationsGate,
 	refreshAll,
@@ -16,6 +18,12 @@ import {
 	readTrending,
 	type TrendingItem,
 } from '$lib/api/recommendations';
+
+/** An account the preview can run for. */
+interface Reader {
+	id: string;
+	email: string;
+}
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins, user } = await event.parent();
@@ -29,15 +37,18 @@ export const load: PageServerLoad = async (event) => {
 			stats: null as AbStats | null,
 			gate: { state: 'absent' } as RecommendationsGate,
 			canRecompute,
-			trending: null as TrendingItem[] | null,
-			readers: [] as { id: string; email: string }[],
+			trending: { ok: false, gate: { state: 'absent' } } as Section<TrendingItem[]>,
+			readers: { ok: true, value: [] } as Section<Reader[]>,
 		};
 	}
 
 	const client = authedClient(event);
 	// The trending list is read beside the split: a list the reader cannot
 	// see is no reason to hide the split, and the reverse.
-	const trending = await readTrending(client).catch(() => null);
+	const trending = await section(
+		readTrending(client),
+		'The trending list could not be read. This is not a report that nothing is trending.',
+	);
 
 	/*
 	 * The accounts the preview can be run for.
@@ -50,12 +61,14 @@ export const load: PageServerLoad = async (event) => {
 	 * Only for the role that may run the preview. An admin who cannot generate a
 	 * feed has no reason to be handed a roster of accounts.
 	 */
-	const readers = canRecompute
-		? await client
-				.get<{ id: string; email: string }[]>('/api/admin/users?limit=200')
-				.then((rows) => (Array.isArray(rows) ? rows : []))
-				.catch(() => [])
-		: [];
+	const readers: Section<Reader[]> = canRecompute
+		? await section(
+				client
+					.get<Reader[]>('/api/admin/users?limit=200')
+					.then((rows) => (Array.isArray(rows) ? rows : [])),
+				'The accounts could not be read, so give the user id as it appears on the Users page.',
+			)
+		: { ok: true, value: [] };
 	try {
 		return {
 			stats: await readAbStats(client),
@@ -94,10 +107,11 @@ export const actions: Actions = {
 		} catch (err) {
 			if (isAlreadyRunning(err)) {
 				return fail(409, {
+					action: 'refresh',
 					error: 'A recompute is already running. Wait for it rather than starting a second.',
 				});
 			}
-			return fail(400, { error: actionError(err, 'The recompute could not be started.') });
+			return fail(400, { action: 'refresh', error: actionError(err, 'The recompute could not be started.') });
 		}
 	},
 
@@ -106,12 +120,15 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const userId = String(form.get('user_id') ?? '').trim();
-		if (!userId) return fail(400, { error: 'Name the user whose feed you want to see.' });
+		if (!userId) return fail(400, { action: 'preview', error: 'Name the user whose feed you want to see.' });
+		if (!isUserId(userId)) {
+			return fail(400, { action: 'preview', error: 'That is not a user id. Pick a reader by email, or paste the id from the Users page.' });
+		}
 		try {
 			const entries = await generateFeed(client, userId);
 			return { previewFor: userId, feed: entries ?? [] };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'That feed could not be generated.') });
+			return fail(400, { action: 'preview', error: actionError(err, 'That feed could not be generated.') });
 		}
 	},
 };

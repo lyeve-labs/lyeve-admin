@@ -1,7 +1,8 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { errorCodeOf } from '$lib/api/limits';
 import { authedClient, requireRole } from '$lib/server/authz';
+import { sessionTenant } from '$lib/server/session-refresh';
 import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
@@ -29,15 +30,23 @@ import {
 	type ReplaySet,
 	type RuleMethod,
 } from '$lib/api/request-capture';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { gateOf, type Gate } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 export const load: PageServerLoad = async (event) => {
-	const { plugins } = await event.parent();
+	const { plugins, user } = await event.parent();
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
+	// The plugin applies no tenant filter to a super admin's read that names
+	// none, so their list holds every tenant's requests.
+	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	// A replay set holds only captures the session's own tenant sent.
+	const ownTenant = sessionTenant(event);
 	const empty = {
+		superAdmin,
+		ownTenant,
 		captures: [] as Capture[],
 		total: null as number | null,
 		limit,
@@ -45,8 +54,10 @@ export const load: PageServerLoad = async (event) => {
 		hasMore: false,
 		rules: [] as CaptureRule[],
 		rulesRead: false,
+		rulesGate: null as Gate | null,
 		sets: [] as ReplaySet[],
 		setsRead: false,
+		setsGate: null as Gate | null,
 		licensed: null as boolean | null,
 	};
 
@@ -68,20 +79,33 @@ export const load: PageServerLoad = async (event) => {
 		gate = captureGate(err);
 	}
 	if (gate.state !== 'ok') return { ...empty, gate };
+	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// The rules and the sets are their own reads. Losing one says so in its
 	// section and never reads as having none.
 	const [rules, sets] = await Promise.all([
 		listCaptureRules(client)
-			.then((r) => ({ rows: r?.data ?? [], read: true, licensed: r?.licensed }))
-			.catch(() => ({ rows: [] as CaptureRule[], read: false, licensed: undefined })),
+			.then((r) => ({ rows: r?.data ?? [], read: true, licensed: r?.licensed, gate: null }))
+			.catch((err: unknown) => ({
+				rows: [] as CaptureRule[],
+				read: false,
+				licensed: undefined,
+				gate: gateOf(err, 'The capture rules could not be read. This is not a report that there are none.'),
+			})),
 		listReplaySets(client)
-			.then((r) => ({ rows: r?.data ?? [], read: true }))
-			.catch(() => ({ rows: [] as ReplaySet[], read: false })),
+			.then((r) => ({ rows: r?.data ?? [], read: true, gate: null }))
+			.catch((err: unknown) => ({
+				rows: [] as ReplaySet[],
+				read: false,
+				gate: gateOf(err, 'The replay sets could not be read. This is not a report that there are none.'),
+			})),
 	]);
 	if (licensed === null && typeof rules.licensed === 'boolean') licensed = rules.licensed;
 
 	return {
+		superAdmin,
+		ownTenant,
 		captures: page.rows,
 		total: page.total,
 		limit,
@@ -89,8 +113,10 @@ export const load: PageServerLoad = async (event) => {
 		hasMore: page.hasMore,
 		rules: rules.rows,
 		rulesRead: rules.read,
+		rulesGate: rules.gate as Gate | null,
 		sets: sets.rows,
 		setsRead: sets.read,
+		setsGate: sets.gate as Gate | null,
 		licensed,
 		gate,
 	};
@@ -101,7 +127,11 @@ function method(raw: FormDataEntryValue | null): RuleMethod | null {
 	return (RULE_METHODS as readonly string[]).includes(m) ? (m as RuleMethod) : null;
 }
 
-async function saveRule(event: Parameters<Actions[string]>[0], id: string | null) {
+/**
+ * Saves a rule from its drawer, or switches one off from its row. A failure
+ * names the drawer it came from, and a row's names none, so the page says it.
+ */
+async function saveRule(event: Parameters<Actions[string]>[0], id: string | null, drawer: 'rule' | null = 'rule') {
 	await requireRole(event, ['admin', 'super_admin']);
 	const client = authedClient(event);
 	const form = await event.request.formData();
@@ -110,17 +140,18 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 	if (!capturePatternIsSound(pattern)) {
 		return fail(400, {
 			error: 'A route is an absolute path such as /api/v1/orders/{id} or /api/v1/**. A segment may be * or a {name}, and ** may only end it.',
+			drawer,
 		});
 	}
 	const m = method(form.get('method'));
-	if (!m) return fail(400, { error: 'Choose a method, or every method.' });
+	if (!m) return fail(400, { error: 'Choose a method, or every method.', drawer });
 	const percent = Number(form.get('sample_percent'));
 	if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
-		return fail(400, { error: 'The sample is a percentage from 0 to 100.' });
+		return fail(400, { error: 'The sample is a percentage from 0 to 100.', drawer });
 	}
 	const retention = Math.floor(Number(form.get('retention_seconds')));
 	if (!Number.isFinite(retention) || retention < MIN_RETENTION_SECONDS || retention > MAX_RETENTION_SECONDS) {
-		return fail(400, { error: 'A capture is kept for at least an hour and at most 30 days.' });
+		return fail(400, { error: 'A capture is kept for at least an hour and at most 30 days.', drawer });
 	}
 
 	const body = {
@@ -134,7 +165,8 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 		if (id) await updateCaptureRule(client, id, body);
 		else await createCaptureRule(client, body);
 	} catch (err) {
-		return actionFailure(err, 'The rule could not be saved.');
+		const failed = actionFailure(err, 'The rule could not be saved.');
+		return fail(failed.status, { ...failed.data, drawer });
 	}
 	return { savedRule: pattern };
 }
@@ -148,8 +180,11 @@ export const actions: Actions = {
 
 	updateRule: async (event) => {
 		const form = await event.request.clone().formData();
-		if (!idOf(form)) return fail(400, { error: 'No rule was named.' });
-		return saveRule(event, idOf(form));
+		// A rule switched off from its row was not saved from the drawer, so
+		// its failure is the page's to report.
+		const fromRow = form.get('from') === 'row';
+		if (!idOf(form)) return fail(400, { error: 'No rule was named.', drawer: fromRow ? null : 'rule' });
+		return saveRule(event, idOf(form), fromRow ? null : 'rule');
 	},
 
 	deleteRule: async (event) => {
@@ -170,15 +205,16 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const ids = [...new Set(form.getAll('capture_id').map((v) => String(v).trim()).filter(Boolean))];
-		if (!name) return fail(400, { error: 'Name the set so a replay can say which one ran.' });
-		if (ids.length === 0) return fail(400, { error: 'Select at least one capture.' });
+		if (!name) return fail(400, { error: 'Name the set so a replay can say which one ran.', drawer: 'set' });
+		if (ids.length === 0) return fail(400, { error: 'Select at least one capture.', drawer: 'set' });
 		if (ids.length > MAX_SET_CAPTURES) {
-			return fail(400, { error: `A set holds at most ${MAX_SET_CAPTURES} captures, because a replay runs them in one request.` });
+			return fail(400, { error: `A set holds at most ${MAX_SET_CAPTURES} captures, because a replay runs them in one request.`, drawer: 'set' });
 		}
 		try {
 			await createReplaySet(authedClient(event), { name, capture_ids: ids });
 		} catch (err) {
-			return actionFailure(err, 'The replay set could not be created.');
+			const failed = actionFailure(err, 'The replay set could not be created.');
+			return fail(failed.status, { ...failed.data, drawer: 'set' });
 		}
 		return { savedSet: name };
 	},

@@ -61,6 +61,7 @@ export function categoryText(category: string | undefined): string {
 	return TEXT[category ?? ''] ?? 'text-muted';
 }
 
+// The visual editors the image build checks out beside the admin import this.
 export function categoryStripe(category: string | undefined): string {
 	return STRIPE[category ?? ''] ?? 'bg-muted';
 }

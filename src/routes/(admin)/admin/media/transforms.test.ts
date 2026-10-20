@@ -47,3 +47,16 @@ describe('image transforms and the focal point', () => {
 		expect(engine.patch).toHaveBeenLastCalledWith('/api/admin/media/m1', { focal_point: null });
 	});
 });
+
+describe('a write that names no file', () => {
+	it('answers a page-level failure, since no drawer belongs to it', async () => {
+		for (const action of ['update', 'publish', 'focal', 'transformUrl', 'describe'] as const) {
+			const out = (await actions[action](event({}))) as Failure;
+			expect(out.status, action).toBe(400);
+			expect(out.data, action).toEqual({ error: 'No file was named.' });
+		}
+		expect(engine.patch).not.toHaveBeenCalled();
+		expect(engine.post).not.toHaveBeenCalled();
+	});
+});
+

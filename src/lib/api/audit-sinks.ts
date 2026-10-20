@@ -5,6 +5,7 @@
  * The engine may refuse a write with 402. The page renders the refusal it
  * sends.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
 export const SINKS_URL = '/api/admin/audit-log/sinks';
@@ -97,7 +98,7 @@ export function lagText(s: Pick<AuditSink, 'pending_entries' | 'lag_seconds'>): 
 }
 
 /** The health of a sink as a tone: failing, behind, paused or fine. */
-export function sinkTone(s: Pick<AuditSink, 'enabled' | 'consecutive_failures' | 'pending_entries'>): 'danger' | 'warn' | 'neutral' | 'success' {
+export function sinkTone(s: Pick<AuditSink, 'enabled' | 'consecutive_failures' | 'pending_entries'>): StatusTone {
 	if (!s.enabled) return 'neutral';
 	if (s.consecutive_failures > 0) return 'danger';
 	if (s.pending_entries > 0) return 'warn';

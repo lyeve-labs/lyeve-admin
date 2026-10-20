@@ -59,7 +59,9 @@ export function instanceFrom(read: Read): Instance {
 		upgradeLink: (sent) => {
 			const served = linkOf(read()?.licensing, REL.upgrade);
 			const href = linkHref(sent) ?? served?.href;
-			return href ? { href, label: served?.label } : null;
+			if (!href) return null;
+			// The module's label names its own page, so it goes only with that page.
+			return href === served?.href ? { href, label: served.label } : { href };
 		},
 		supportLink: () => {
 			const served = linkOf(read()?.licensing, REL.support);

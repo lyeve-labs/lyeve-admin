@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
 
 import RecommendationsPage from './+page.svelte';
 import type { AbStats } from '$lib/api/recommendations';
+import { outlineSkips } from '$lib/test-outline';
 
 afterEach(cleanup);
 
@@ -30,6 +31,8 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		gate: { state: 'ok' },
 		licensed: true,
 		canRecompute: true,
+		trending: { ok: true, value: [] },
+		readers: { ok: true, value: [] },
 		...over,
 	} as never,
 	form: form as never,
@@ -49,6 +52,16 @@ describe('the gate', () => {
 		});
 		expect(said(container)).toContain('could not be read');
 		expect(said(container)).not.toContain('Nobody has been bucketed yet');
+	});
+});
+
+describe('the trending list', () => {
+	it('says a failed read failed rather than that nothing is trending', () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({ trending: { ok: false, gate: { state: 'forbidden' } } }),
+		});
+		expect(said(container)).toContain('Your role cannot open trending entries');
+		expect(said(container)).not.toContain('Nothing is trending yet');
 	});
 });
 
@@ -86,7 +99,7 @@ describe('the recompute', () => {
 	// operator looking for a fault that is not there.
 	it('shows an already running recompute as information, not a failure', () => {
 		const { container } = render(RecommendationsPage, {
-			props: props({}, { error: 'A recompute is already running. Wait for it rather than starting a second.' }),
+			props: props({}, { action: 'refresh', error: 'A recompute is already running. Wait for it rather than starting a second.' }),
 		});
 		expect(said(container)).toContain('already running');
 	});
@@ -141,5 +154,76 @@ describe('the per-reader preview', () => {
 		const field = container.querySelector('#rec-user')!.closest('[data-field]')!;
 		expect(field.lastElementChild!.contains(container.querySelector('#rec-user'))).toBe(true);
 		expect(said(container)).toContain('the Users page');
+	});
+
+	// The combobox posts the label it shows. Named user_id, it posted the
+	// picked reader's email, which the plugin refused as an invalid user ID,
+	// and a pasted id that matched no option was cleared to nothing.
+	it('posts the id field and never the combobox', () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({ readers: { ok: true, value: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] } }),
+		});
+		const posted = [...container.querySelectorAll('form[action="?/preview"] [name]')].map((el) => el.getAttribute('name'));
+		expect(posted).toEqual(['user_id']);
+		expect(container.querySelector('[name="user_id"]')!.getAttribute('role')).not.toBe('combobox');
+	});
+
+	it('fills the id field with the reader picked by email', async () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({ readers: { ok: true, value: [{ id: '24d6560b-540e-47b6-8957-59934db4021d', email: 'mira@example.com' }] } }),
+		});
+		const search = container.querySelector('#rec-reader') as HTMLInputElement;
+		await fireEvent.input(search, { target: { value: 'mira' } });
+		await fireEvent.keyDown(search, { key: 'ArrowDown' });
+		await fireEvent.keyDown(search, { key: 'Enter' });
+		expect((container.querySelector('[name="user_id"]') as HTMLInputElement).value).toBe(
+			'24d6560b-540e-47b6-8957-59934db4021d',
+		);
+	});
+
+	it('names the reader a preview was generated for by email', () => {
+		const id = '24d6560b-540e-47b6-8957-59934db4021d';
+		const { container } = render(RecommendationsPage, {
+			props: props(
+				{ readers: { ok: true, value: [{ id, email: 'mira@example.com' }] } },
+				{ previewFor: id, feed: [{ id: 'f1', user_id: id, content_id: 'c1', score: 0.5, source: 'trending', created_at: '' }] },
+			),
+		});
+		expect(said(container)).toContain('1 entry for mira@example.com');
+	});
+});
+
+describe('what the page says recommendations do', () => {
+	it('says what a reader gets, not how the plugin works', () => {
+		const { container } = render(RecommendationsPage, { props: props() });
+		const text = said(container);
+		expect(text).toContain('each reader gets');
+		expect(text).not.toContain('the plugin works out');
+	});
+});
+
+describe('the preview failure', () => {
+	it('shows a refused preview inside the preview form, not at the top of the page', () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({}, { action: 'preview', error: 'That is not a user id.' }),
+		});
+		const formText = container.querySelector('form#rec-preview-form')?.textContent ?? '';
+		expect(formText).toContain('That is not a user id.');
+		expect(said(container).split('That is not a user id.').length).toBe(2);
+	});
+});
+
+// A heading list that jumps from h1 to h3 reads to a screen reader as a
+// missing section.
+describe('heading outline', () => {
+	it('steps its headings down one level at a time', () => {
+		const { container } = render(RecommendationsPage, { props: props() });
+		expect(outlineSkips(container)).toEqual([]);
+	});
+
+	it('steps its headings down one level at a time while the feature is not enabled', () => {
+		const { container } = render(RecommendationsPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' }, stats: null }) });
+		expect(container.querySelector('[data-testid="not-enabled"]')).toBeTruthy();
+		expect(outlineSkips(container)).toEqual([]);
 	});
 });

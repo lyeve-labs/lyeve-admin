@@ -1,6 +1,6 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { Alert, Badge, Button, Drawer, EmptyState, PageShell, Pagination, Stat, Table } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Drawer, EmptyState, PageShell, Pagination, Stat, Table } from '@lyeve-labs/ui-kit';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { enhance } from '$app/forms';
 	import { submitter } from '$lib/forms.svelte';
 	import { ChevronRight, Plus, Server } from '@lucide/svelte';
@@ -20,8 +20,6 @@
 	const create = submitter(() => (open = false));
 </script>
 
-<PageTitle title="AI providers" />
-
 <PageShell title="AI providers" description="The models this tenant may call, and the keys they are called with." width="wide">
 	{#snippet actions()}
 		{#if canWrite}
@@ -31,7 +29,7 @@
 		{/if}
 	{/snippet}
 
-	<AiSection tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
+	<AiSection level={2} tab="providers" gate={data.gate} layoutGate={data.aiLayoutGate} noun="providers">
 		{#if data.dashboard}
 			<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
 				<Stat size="sm" mono label="Providers" value="{data.dashboard.enabled_providers}/{data.dashboard.total_providers}" sub="enabled" />
@@ -43,6 +41,7 @@
 
 		{#if data.providers.length === 0}
 			<EmptyState
+				level={2}
 				title="No providers yet"
 				description={data.isSuperAdmin
 					? 'Nothing is sent anywhere until a provider is added. Add one with your own key or point at a server on your network.'
@@ -127,13 +126,15 @@
 	</AiSection>
 </PageShell>
 
+<!-- A provider is created here and edited on its own page. The page holds
+     what a drawer cannot: the model list asked of the provider and the
+     capability check for one model, both answered by the provider itself,
+     beside the configuration they help fill in. -->
 {#if data.isSuperAdmin}
 	<Drawer bind:open title="New provider" description="A key is encrypted at rest and never shown again." onclose={() => (open = false)}>
 		<form id="provider-create" method="POST" action="?/create" use:enhance={create.enhance} class="flex flex-col gap-4">
+			<FormErrors message={form?.error} />
 			<ProviderForm id="new" superAdmin={data.isSuperAdmin} />
-			{#if form?.error}
-				<Alert tone="danger">{form.error}</Alert>
-			{/if}
 		</form>
 		{#snippet footer()}
 			<Button variant="secondary" onclick={() => (open = false)}>Cancel</Button>

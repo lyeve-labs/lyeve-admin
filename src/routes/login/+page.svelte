@@ -9,6 +9,8 @@
 	import type { CaptchaChallenge } from '$lib/captcha';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
+	import OrganizationField from '$lib/components/OrganizationField.svelte';
+	import { withOrganization } from '$lib/organization';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 
@@ -22,6 +24,7 @@
 		form && 'captcha' in form && form.captcha ? (form.captcha as CaptchaChallenge) : null
 	);
 	const email = $derived(form && 'email' in form && typeof form.email === 'string' ? form.email : '');
+	const typedOrganization = $derived(form && 'tenant' in form && typeof form.tenant === 'string' ? form.tenant : null);
 </script>
 
 <PageTitle title="Sign in" />
@@ -41,8 +44,7 @@
 				label="Authenticator code"
 				hint="Enter the 6-digit code from your authenticator app or a backup code."
 				placeholder="000000"
-				inputmode="numeric"
-				maxlength={10}
+				maxlength={16}
 				autocomplete="one-time-code"
 				required
 				autofocus
@@ -59,6 +61,8 @@
 		<form method="POST" use:enhance={signIn.enhance} class="space-y-5">
 			{#if form?.error}
 				<Alert tone="danger">{form.error}</Alert>
+			{:else if data.ended}
+				<Alert tone="warn">Your session ended. Sign in again to continue.</Alert>
 			{/if}
 
 			<Input
@@ -80,9 +84,13 @@
 				required
 			/>
 
-			<div class="flex justify-end">
-				<a href="/forgot-password" class="text-sm text-brand transition-colors hover:underline">Forgot password?</a>
-			</div>
+			<OrganizationField carried={data.carried} typed={typedOrganization} />
+
+			{#if data.passwordReset}
+				<div class="flex justify-end">
+					<a href={withOrganization('/forgot-password', data.carried)} class="relative hit-area text-sm text-brand transition-colors hover:underline">Forgot password?</a>
+				</div>
+			{/if}
 
 			{#if challenge}
 				<!-- A provider token is single use, so every answer from the engine
@@ -103,7 +111,9 @@
 			</Button>
 		</form>
 
-		<Button href="/login/magic-link" variant="ghost" size="sm" full class="mt-3">Email me a sign-in link</Button>
+		{#if data.magicLink}
+			<Button href={withOrganization('/login/magic-link', data.carried)} variant="ghost" size="sm" full class="mt-3">Email me a sign-in link</Button>
+		{/if}
 
 		{#if data.oauthProviders.length > 0 || data.samlProviders.length > 0}
 			<Divider class="my-5">or continue with</Divider>

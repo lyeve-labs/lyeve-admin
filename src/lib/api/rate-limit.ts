@@ -19,6 +19,7 @@
  * are close to their limit and when each window resets. It is a snapshot from
  * one process, which matters on more than one node.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
@@ -112,8 +113,14 @@ export async function listRules(
 	return client.get<ListEnvelope<RateRule>>(`${RULES_URL}?limit=${limit}&offset=${offset}${only}`);
 }
 
-export async function readStatus(client: HttpClient): Promise<ListEnvelope<LimiterState>> {
-	return client.get<ListEnvelope<LimiterState>>(STATUS_URL);
+/** The status route answers its buckets under their own key, not data. */
+export interface LimiterStatus {
+	buckets: LimiterState[] | null;
+	count: number;
+}
+
+export async function readStatus(client: HttpClient): Promise<LimiterStatus> {
+	return client.get<LimiterStatus>(STATUS_URL);
 }
 
 export async function readOverview(client: HttpClient): Promise<RateLimitOverview> {
@@ -144,6 +151,7 @@ export interface SaveRule {
 	rate: number;
 	burst: number;
 	enabled?: boolean;
+	/** An empty string clears the role. Null keeps the stored one on an edit. */
 	role?: string | null;
 	key_by?: KeyBy;
 }
@@ -175,7 +183,7 @@ export function scopeLabel(rule: RateRule): string {
 	return rule.tenant_id ? rule.tenant_id : 'Every tenant';
 }
 
-export function scopeTone(rule: RateRule): 'warn' | 'neutral' {
+export function scopeTone(rule: RateRule): StatusTone {
 	return rule.tenant_id ? 'neutral' : 'warn';
 }
 
@@ -216,18 +224,6 @@ export function blocksEverything(rule: RateRule): boolean {
 /** Callers with nothing left in their window. */
 export function exhausted(states: readonly LimiterState[]): LimiterState[] {
 	return states.filter((s) => s.remaining <= 0);
-}
-
-/**
- * How close a caller is to its limit, as a fraction of the burst.
- *
- * Against the burst rather than the rate, because the burst is the size of the
- * bucket and the rate is how fast it refills. A caller with two of fifty left
- * is nearly out. The rate does not say that.
- */
-export function headroom(state: LimiterState): number {
-	if (state.burst <= 0) return 0;
-	return Math.max(0, Math.min(1, state.remaining / state.burst));
 }
 
 /** A reset time as a countdown, which is what a person reading it wants. */

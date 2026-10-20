@@ -57,10 +57,18 @@ describe('AI settings page', () => {
 		expect(getByText(/thirty days/)).toBeTruthy();
 	});
 
-	it('tells a tenant admin where retention is set', () => {
-		const { getByText, queryByLabelText } = setup({ isSuperAdmin: false, instanceReadable: false });
+	it('tells a tenant admin the instance settings are for super admins and shows no default as a value', () => {
+		const { getByText, queryByLabelText, queryByText } = setup({ isSuperAdmin: false, instanceReadable: false });
 		expect(queryByLabelText('Retention')).toBeNull();
-		expect(getByText(/A super admin sets the window/)).toBeTruthy();
+		expect(getByText(/The instance settings are visible to super admins/)).toBeTruthy();
+		expect(queryByText('720h (default)')).toBeNull();
+		expect(queryByText('true (default)')).toBeNull();
+	});
+
+	it('shows no value when a super admin could not read the instance configuration', () => {
+		const { getByText, queryByText } = setup({ instanceReadable: false, instance: instance.map((s) => ({ ...s, editable: false })) });
+		expect(getByText(/could not be read/)).toBeTruthy();
+		expect(queryByText('720h (default)')).toBeNull();
 	});
 
 	it('paints the locked and the absent states with no switch', () => {

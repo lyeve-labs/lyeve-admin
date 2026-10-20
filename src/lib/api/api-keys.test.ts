@@ -24,9 +24,9 @@ describe('keyUsage', () => {
 		expect(usage).toEqual({ requests: 7 });
 	});
 
-	it('answers null when the read fails', async () => {
-		const get = vi.fn().mockRejectedValue(new Error('404'));
-		await expect(keyUsage(clientReturning(get), 'k1', '2026-09')).resolves.toBeNull();
+	it('rejects when the read fails, so the page can say the figure is unknown', async () => {
+		const get = vi.fn().mockRejectedValue(new Error('down'));
+		await expect(keyUsage(clientReturning(get), 'k1', '2026-09')).rejects.toThrow('down');
 	});
 });
 

@@ -6,6 +6,7 @@
  * sends.
  */
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { ListEnvelope } from './list';
 
 export const RELEASES_URL = '/api/admin/content/releases';
@@ -72,7 +73,7 @@ export const STATUS_LABELS: Readonly<Record<ReleaseStatus, string>> = {
 	canceled: 'Canceled',
 };
 
-export function statusTone(s: ReleaseStatus): 'success' | 'warn' | 'danger' | 'neutral' | 'brand' {
+export function statusTone(s: ReleaseStatus): StatusTone {
 	switch (s) {
 		case 'published':
 			return 'success';

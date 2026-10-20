@@ -3,7 +3,7 @@ import { error, fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { gateOf } from '$lib/api/gate';
+import { gateOf, type Gate, type Section } from '$lib/api/gate';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -28,20 +28,23 @@ import { parseBudget, parsePrice } from '$lib/cost/forms';
 const OPERATOR_ROLES = ['admin', 'super_admin'];
 
 /**
- * What the page renders. When the ledger's routes refuse this instance, every
- * read is null and the page shows only that the feature is not enabled, with
- * the link the refusal names. Otherwise a read the engine did not answer is
- * null on its own and the page says so in place.
+ * What the page renders. When the ledger's routes refuse this instance, the
+ * page shows only that the feature is not enabled, with the link the refusal
+ * names. Otherwise each read is its value or the gate that says why there is
+ * none, and the page draws that gate in place.
  */
 export type CostsPage = {
 	enabled: boolean;
 	/** Where the ledger is turned on, when a refusal names it. */
 	upgradeUrl: string;
-	summary: CostSummary | null;
-	dashboard: CostDashboard | null;
-	budgets: Budget[] | null;
-	prices: Price[] | null;
+	summary: Section<CostSummary>;
+	dashboard: Section<CostDashboard>;
+	budgets: Section<Budget[]>;
+	prices: Section<Price[]>;
 };
+
+/** What a read holds before it is made: the shell already says why the page is unavailable. */
+const UNREAD: Section<never> = { ok: false, gate: { state: 'absent' } };
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
@@ -51,10 +54,10 @@ export const load: PageServerLoad = async (event) => {
 	const page: CostsPage = {
 		enabled: true,
 		upgradeUrl: '',
-		summary: null,
-		dashboard: null,
-		budgets: null,
-		prices: null,
+		summary: UNREAD,
+		dashboard: UNREAD,
+		budgets: UNREAD,
+		prices: UNREAD,
 	};
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.multitenant)) return page;
@@ -62,18 +65,21 @@ export const load: PageServerLoad = async (event) => {
 	// The ledger's routes answer 402 on an instance that is not enabled for
 	// them. The page renders that answer rather than predicting it.
 	const refused = { upgradeUrl: null as string | null };
-	const read = <T>(pending: Promise<T>): Promise<T | null> =>
-		pending.catch((err: unknown) => {
-			const gate = gateOf(err, '');
-			if (gate.state === 'locked') refused.upgradeUrl = gate.upgradeUrl;
-			return null;
-		});
+	const read = <T>(pending: Promise<T>, failed: string): Promise<Section<T>> =>
+		pending.then(
+			(value): Section<T> => ({ ok: true, value }),
+			(err: unknown): Section<T> => {
+				const gate: Gate = gateOf(err, failed);
+				if (gate.state === 'locked') refused.upgradeUrl = gate.upgradeUrl;
+				return { ok: false, gate };
+			},
+		);
 	const client = authedClient(event);
 	const [summary, dashboard, budgets, prices] = await Promise.all([
-		read(getSummary(client, monthStart(new Date()))),
-		read(getDashboard(client)),
-		read(listBudgets(client)),
-		read(listPrices(client)),
+		read(getSummary(client, monthStart(new Date())), 'The split by resource could not be read.'),
+		read(getDashboard(client), "This month's costs could not be read."),
+		read(listBudgets(client), 'The budgets could not be read. This is not a report that there are none.'),
+		read(listPrices(client), 'The prices could not be read. No price is shown rather than a guess.'),
 	]);
 	if (refused.upgradeUrl !== null) return { ...page, enabled: false, upgradeUrl: refused.upgradeUrl };
 	return { ...page, summary, dashboard, budgets, prices };
@@ -91,11 +97,13 @@ export const actions: Actions = {
 	createBudget: async (event) => {
 		await requireRole(event, OPERATOR_ROLES);
 		const parsed = parseBudget(await event.request.formData());
-		if ('error' in parsed) return fail(400, { form: 'budget', error: parsed.error, locked: false });
+		// The drawer shows a failure tagged as its own, and the list shows the
+		// rest, so a failed delete never reads as a failure of a new budget.
+		if ('error' in parsed) return fail(400, { form: 'budget-new', error: parsed.error, locked: false });
 		try {
 			await createBudget(authedClient(event), parsed.budget);
 		} catch (err) {
-			return refusal('budget', err, 'Failed to create the budget.');
+			return refusal('budget-new', err, 'Failed to create the budget.');
 		}
 		return { form: 'budget', saved: true };
 	},

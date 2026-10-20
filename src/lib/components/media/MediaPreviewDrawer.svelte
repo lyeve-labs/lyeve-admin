@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		Alert,
 		Badge,
 		Button,
 		DescriptionList,
@@ -16,7 +15,6 @@
 	import { enhance } from '$app/forms';
 	import {
 		formatDimensions,
-		formatSize,
 		mediaFileUrl,
 		mediaKind,
 		mediaKindLabel,
@@ -27,9 +25,10 @@
 	import type { Refusal } from '$lib/api/refusal';
 	import FocalPointPicker from './FocalPointPicker.svelte';
 	import TransformUrlBuilder from './TransformUrlBuilder.svelte';
-	import { formatDateTime } from '$lib/format';
+	import { formatBytes, formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import ImageZoom from './ImageZoom.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
 
 	interface Props {
 		/** The item on show, or null while the drawer is shut. */
@@ -45,6 +44,8 @@
 		suggestion?: string;
 		/** Why the last save or suggestion failed. */
 		detailsError?: string;
+		/** Why the last delete of this item failed. The drawer stays open on a refusal. */
+		deleteError?: string;
 		/** Why the last focal point save failed, and whether one just landed. */
 		focalError?: string;
 		focalSaved?: boolean;
@@ -62,6 +63,7 @@
 		aiEnabled = false,
 		suggestion = '',
 		detailsError = '',
+		deleteError = '',
 		focalError = '',
 		focalSaved = false,
 		transform = null,
@@ -108,7 +110,7 @@
 		const rows = [
 			{ term: 'Name', value: item.filename },
 			{ term: 'Type', value: `${mediaKindLabel(kind)} (${item.content_type})` },
-			{ term: 'Size', value: formatSize(item.size) },
+			{ term: 'Size', value: formatBytes(item.size, 'MB') },
 		];
 		const dimensions = formatDimensions(item);
 		if (dimensions) rows.push({ term: 'Dimensions', value: dimensions });
@@ -118,7 +120,7 @@
 
 	async function askDelete() {
 		if (!item) return;
-		const ok = await confirm('Delete file', `Delete ${item.filename}? This cannot be undone.`, {
+		const ok = await confirm(`Delete ${item.filename}`, 'The file leaves the library, and any page that links to it stops loading it. This cannot be undone.', {
 			confirmLabel: 'Delete',
 		});
 		if (ok) ondelete(item);
@@ -169,6 +171,7 @@
 
 			<DescriptionList layout="stacked" items={facts} />
 
+			<FormErrors message={deleteError || undefined} />
 			<div class="flex flex-wrap gap-2">
 				<Button variant="secondary" size="sm" href={fileUrl} download={item.filename}>
 					<Download size={ICON.sm} /> Download
@@ -246,9 +249,7 @@
 				}}
 			>
 				<SectionHeading level={3}>Details</SectionHeading>
-				{#if detailsError}
-					<Alert tone="danger">{detailsError}</Alert>
-				{/if}
+				<FormErrors message={detailsError || undefined} />
 				<input type="hidden" name="id" value={item.id} />
 				<Textarea
 					id="media-alt"

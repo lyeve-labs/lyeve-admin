@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-vi.mock('$lib/server/authz', () => ({
+// The real session client, so every read goes through the event's fetch with
+// the session's headers.
+vi.mock('$lib/server/authz', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/authz')>()),
 	requireUser: vi.fn(async () => ({ id: 'u1' })),
-	authedClient: vi.fn(() => ({ delete: vi.fn() })),
 }));
-
-vi.mock('@lyeve-labs/client', () => ({ createClient: vi.fn(() => ({})) }));
 
 const rest = vi.hoisted(() => ({
 	getSchemas: vi.fn(async () => [{ name: 'posts', display_name: 'Posts' }]),
@@ -14,7 +14,9 @@ const rest = vi.hoisted(() => ({
 }));
 vi.mock('@lyeve-labs/client-rest', () => rest);
 
-import { load } from './+page.server';
+import { ApiError } from '@lyeve-labs/client';
+import { isHttpError, isRedirect } from '@sveltejs/kit';
+import { actions, load } from './+page.server';
 
 /**
  * The load's own return type is widened by the framework to include void, so
@@ -22,7 +24,8 @@ import { load } from './+page.server';
  * here is the one the page consumes.
  */
 type Loaded = {
-	items: unknown[];
+	items: { ok: true; value: { data: Record<string, unknown> }[] } | { ok: false; gate: { state: string } };
+	schemas: { ok: boolean };
 	limit: number;
 	offset: number;
 	total: number;
@@ -68,7 +71,7 @@ async function runLoad(query: string, body: unknown) {
 
 /** The `limit=` value of the single content listing request the load makes. */
 function requestedLimit(fetch: { mock: { calls: unknown[][] } }): number {
-	const requested = new URL(String(fetch.mock.calls[0][0]), 'http://localhost');
+	const requested = new URL(String((fetch.mock.calls[0] as unknown[])[0]), 'http://localhost');
 	return Number(requested.searchParams.get('limit'));
 }
 
@@ -89,7 +92,7 @@ describe('content listing reads the collection total from the envelope', () => {
 		});
 
 		expect(result.total).toBe(4000);
-		expect(result.items).toHaveLength(100);
+		expect(result.items.ok && result.items.value).toHaveLength(100);
 	});
 
 	it('keeps the envelope total on a later page', async () => {
@@ -112,8 +115,12 @@ describe('content listing reads the collection total from the envelope', () => {
 		expect(result.total).toBe(400);
 	});
 
-	it('reports an empty collection when the listing fails', async () => {
-		const fetch = vi.fn(async () => new Response('nope', { status: 503 }));
+	it.each([
+		[503, 'unavailable'],
+		[500, 'error'],
+		[403, 'forbidden'],
+	])('draws a gate, never an empty collection, when the listing answers %i', async (status, state) => {
+		const fetch = vi.fn(async () => new Response('nope', { status }));
 		const result = (await load({
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
@@ -121,8 +128,61 @@ describe('content listing reads the collection total from the envelope', () => {
 			url: new URL('http://localhost/admin/content/posts'),
 		} as never)) as unknown as Loaded;
 
-		expect(result.items).toEqual([]);
+		expect(result.items).toMatchObject({ ok: false, gate: { state } });
 		expect(result.total).toBe(0);
+	});
+
+	it('sends a page past the end back to the last page that holds rows', async () => {
+		const pending = load({
+			fetch: vi.fn(async () => new Response(JSON.stringify({ data: [], total_count: 120 }), { status: 200 })),
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			params: { schema: 'posts' },
+			url: new URL('http://localhost/admin/content/posts?limit=50&offset=500'),
+		} as never);
+
+		const thrown = await Promise.resolve(pending).catch((err: unknown) => err);
+		expect(isRedirect(thrown)).toBe(true);
+		expect((thrown as { location: string }).location).toBe('/admin/content/posts?limit=50&offset=100');
+	});
+});
+
+describe('content listing reads its collection', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('answers 404 only when the engine says the collection does not exist', async () => {
+		rest.getSchema.mockRejectedValueOnce(new ApiError(404, 'not found'));
+		const thrown = await runLoad('', { data: [] }).catch((err: unknown) => err);
+		expect(isHttpError(thrown) && thrown.status).toBe(404);
+	});
+
+	it('reports an outage as an outage, not as a missing collection', async () => {
+		rest.getSchema.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		const thrown = await runLoad('', { data: [] }).catch((err: unknown) => err);
+		expect(isHttpError(thrown) && thrown.status).toBe(503);
+	});
+
+	it('keeps the picker read apart from the entries read', async () => {
+		rest.getSchemas.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
+		const { result } = await runLoad('', { data: rows(2), total_count: 2 });
+		expect(result.schemas.ok).toBe(false);
+		expect(result.items.ok).toBe(true);
+	});
+
+	it('asks the listing for the status the URL names, and ignores one it does not know', async () => {
+		const { fetch, result } = await runLoad('?status=draft', { data: [], total_count: 0 });
+		expect(new URL(String((fetch.mock.calls[0] as unknown[])[0]), 'http://localhost').searchParams.get('status')).toBe('draft');
+		expect((result as unknown as { status: string | null }).status).toBe('draft');
+
+		const other = await runLoad('?status=famous', { data: [], total_count: 0 });
+		expect(new URL(String((other.fetch.mock.calls[0] as unknown[])[0]), 'http://localhost').searchParams.has('status')).toBe(false);
+	});
+
+	it('reads the listing as the session', async () => {
+		const { fetch } = await runLoad('', { data: [], total_count: 0 });
+		const init = (fetch.mock.calls[0] as unknown[])[1] as RequestInit;
+		expect(init.headers).toMatchObject({ Authorization: 'Bearer tok' });
 	});
 });
 
@@ -147,7 +207,7 @@ describe('content listing clamps the page size to the server maximum', () => {
 		const { fetch, result } = await runLoad('?limit=100', { data: rows(100), total_count: 4000 });
 
 		expect(requestedLimit(fetch)).toBe(100);
-		expect(result.items).toHaveLength(100);
+		expect(result.items.ok && result.items.value).toHaveLength(100);
 	});
 
 	it('asks for exactly 500 at the top of the range, never 501', async () => {
@@ -207,12 +267,55 @@ describe('content listing names linked entries', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 			params: { schema: 'posts' },
 			url: new URL('http://localhost/admin/content/posts'),
-		} as never)) as unknown as { items: { data: Record<string, unknown> }[] };
+		} as never)) as unknown as Loaded;
 
-		expect(result.items[0].data.author).toEqual({ id: 'a1', title: 'Ada Park' });
-		expect(result.items[1].data.author).toBe('missing');
+		if (!result.items.ok) throw new Error('the listing failed');
+		expect(result.items.value[0].data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(result.items.value[1].data.author).toBe('missing');
 		const authorReads = fetch.mock.calls.filter((c) => String(c[0]).includes('schema=author'));
 		expect(authorReads).toHaveLength(1);
+	});
+
+	it('reads a link stored under its key column, the way the console form writes it', async () => {
+		rest.getSchema.mockResolvedValueOnce({
+			name: 'posts',
+			display_name: 'Posts',
+			fields: [
+				{ name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'author' },
+				{ name: 'editor', field_type: 'relation', relation_to: 'author', relation_fk_name: 'edited_by' },
+			],
+		} as never);
+		const posts = {
+			data: [
+				{ ...rows(1)[0], body: { author_id: 'a1', edited_by: 'a1' } },
+				{ ...rows(1, 1)[0], body: { author: 'a1' } },
+				{ ...rows(1, 2)[0], body: { author_id: 'missing' } },
+				{ ...rows(1, 3)[0], body: { author_id: '', author: 'a1' } },
+				{ ...rows(1, 4)[0], body: { author_id: 'missing', author: { id: 'b2', title: 'Bo Lee' } } },
+			],
+			total_count: 5,
+		};
+		const authors = { data: [{ id: 'a1', title: 'Ada Park', created_at: '', updated_at: '' }], total_count: 1 };
+		const fetch = vi.fn(async (input: string | URL | Request) => {
+			const u = new URL(String(input), 'http://localhost');
+			const body = u.searchParams.get('schema') === 'author' ? authors : posts;
+			return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		});
+		const result = (await load({
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
+			params: { schema: 'posts' },
+			url: new URL('http://localhost/admin/content/posts'),
+		} as never)) as unknown as Loaded;
+
+		if (!result.items.ok) throw new Error('the listing failed');
+		const [byKey, byName, unknown, blankKey, carried] = result.items.value;
+		expect(byKey.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(byKey.data.editor).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(byName.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(unknown.data.author).toBe('missing');
+		expect(blankKey.data.author).toEqual({ id: 'a1', title: 'Ada Park' });
+		expect(carried.data.author).toEqual({ id: 'b2', title: 'Bo Lee' });
 	});
 
 	it('reads nothing more when no row links anywhere', async () => {
@@ -220,3 +323,53 @@ describe('content listing names linked entries', () => {
 		expect(fetch).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('deleting an entry', () => {
+	function json(body: unknown, status: number): Response {
+		return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+	}
+
+	function deleteEvent(answer: () => Promise<Response>, id = 'e/1') {
+		const calls: { method: string; path: string }[] = [];
+		const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+			calls.push({ method: init?.method ?? 'GET', path });
+			return answer();
+		}) as unknown as typeof globalThis.fetch;
+		const fd = new FormData();
+		fd.set('id', id);
+		const event = {
+			fetch,
+			cookies: mockCookies({ '__Host-sys_session': 'tok', '__Host-csrf': 'csrf' }),
+			params: { schema: 'posts' },
+			request: { formData: async () => fd },
+		} as never;
+		return { event, calls };
+	}
+
+	it('deletes the entry it names, with the id encoded', async () => {
+		const { event, calls } = deleteEvent(async () => new Response(null, { status: 204 }));
+		const out = await actions.delete(event);
+		expect(out).toEqual({ ok: true });
+		expect(calls).toEqual([{ method: 'DELETE', path: '/api/admin/content/e%2F1' }]);
+	});
+
+	it('relays the reason the plugin refused', async () => {
+		const { event } = deleteEvent(async () => json({ error: 'entry is referenced by another entry' }, 409));
+		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('entry is referenced by another entry');
+	});
+
+	it('relays the role refusal the engine sends', async () => {
+		const { event } = deleteEvent(async () => json({ error: 'insufficient permissions' }, 403));
+		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
+		expect(out.data.error).toBe('insufficient permissions');
+	});
+
+	it('keeps outage detail out of the message', async () => {
+		const { event } = deleteEvent(async () => json({ error: 'pq: connection refused' }, 503));
+		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
+		expect(out.data.error).toBe('Failed to delete entry');
+	});
+});
+

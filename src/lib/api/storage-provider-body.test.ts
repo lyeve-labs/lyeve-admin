@@ -22,6 +22,22 @@ describe('providerBodyFrom', () => {
 		});
 	});
 
+	it('sends an Azure endpoint, and leaves it out when the field is empty', () => {
+		const fields = { provider_type: 'azure_blob', name: 'Blob', bucket: 'c', access_key: 'acct', secret_key: 'k' };
+		const set = providerBodyFrom(form({ ...fields, endpoint: 'https://files.example.com' }), true);
+		expect(set).toMatchObject({ body: { endpoint: 'https://files.example.com' } });
+		const empty = providerBodyFrom(form(fields), true);
+		expect(empty).not.toHaveProperty('error');
+		expect((empty as { body: object }).body).not.toHaveProperty('endpoint');
+	});
+
+	// The plugin refuses a loopback or private endpoint, so the hint promises
+	// nothing that runs on one.
+	it('offers an Azure endpoint for a custom domain only', () => {
+		const endpoint = PROVIDER_FIELDS.azure_blob.find((f) => f.key === 'endpoint');
+		expect(endpoint?.hint).toBe("Optional. For a custom domain on a public address. Empty uses the account's default address.");
+	});
+
 	it('refuses a create missing a required field and names it', () => {
 		expect(providerBodyFrom(form({ provider_type: 's3', name: 'x', bucket: 'b', region: 'r', access_key: 'AK' }), true)).toEqual({ error: 'Secret access key is required.' });
 		expect(providerBodyFrom(form({ provider_type: 'nope', name: 'x' }), true)).toEqual({ error: 'Choose a provider type.' });
@@ -32,6 +48,11 @@ describe('providerBodyFrom', () => {
 		const r = providerBodyFrom(form({ provider_type: 's3', name: 'x', bucket: 'b', region: 'r' }), false);
 		expect('body' in r && r.body).toMatchObject({ bucket: 'b' });
 		expect('body' in r && 'secret_key' in r.body).toBe(false);
+	});
+
+	it('sends back the cost weight an edit carries, which the plugin would otherwise reset to zero', () => {
+		const r = providerBodyFrom(form({ provider_type: 'local', name: 'disk', endpoint: '/data', cost_weight: '0.4' }), false);
+		expect('body' in r && r.body.cost_weight).toBe(0.4);
 	});
 
 	it('lets only a local provider hand out unsigned URLs', () => {

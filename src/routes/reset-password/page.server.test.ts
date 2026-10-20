@@ -23,11 +23,34 @@ describe('reset-password load', () => {
 		expect(load({ url: new URL('http://admin.test/reset-password?token=t1') } as never)).toEqual({
 			token: 't1',
 			minLength: 12,
+			carried: '',
 		});
+	});
+
+	it('carries the organization its link names, and drops one the engine would not read', () => {
+		const named = load({ url: new URL('http://admin.test/reset-password?token=t1&tenant=acme') } as never) as { carried: string };
+		expect(named.carried).toBe('acme');
+		const malformed = load({ url: new URL('http://admin.test/reset-password?token=t1&tenant=Acme%20Co') } as never) as {
+			carried: string;
+		};
+		expect(malformed.carried).toBe('');
 	});
 });
 
 describe('reset-password action', () => {
+	// An outage says nothing about what the visitor typed, so it reads as the
+	// engine being away rather than as a bad address or an expired link.
+	it.each([
+		['answers 503', () => json({ error: 'dial tcp 10.0.0.4:5432: connection refused' }, 503)],
+		['answers 502', () => json({ error: 'bad gateway' }, 502)],
+		['does not answer', () => Promise.reject(new TypeError('fetch failed'))],
+	])('says the engine is unavailable when it %s', async (_case, answer) => {
+		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
+		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG }, fetch)) as { status: number; data: { error: string } };
+		expect(result.status).toBeGreaterThanOrEqual(500);
+		expect(result.data.error).toBe('Password reset is unavailable right now. Please try again shortly.');
+	});
+
 	beforeEach(() => resetRateLimitStore());
 
 	it('sets the new password with the token from the link', async () => {
@@ -52,6 +75,17 @@ describe('reset-password action', () => {
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
+	it('refuses a password over 72 bytes before spending the token', async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+		// 37 characters, 74 bytes in UTF-8.
+		const long = 'é'.repeat(37);
+		const result = (await submit({ token: 't1', password: long, confirm: long }, fetch)) as {
+			data: { error: string };
+		};
+		expect(result.data.error).toMatch(/at most 72 bytes/);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
 	it('refuses two passwords that differ', async () => {
 		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
 		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG + '!' }, fetch)) as {
@@ -59,6 +93,25 @@ describe('reset-password action', () => {
 		};
 		expect(result.data.error).toBe('The two passwords do not match.');
 		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	// The engine applies its password policy before it claims the token, so a
+	// refusal leaves the link valid. The reader keeps the form and sees the
+	// engine's own sentence, never the expired-link page.
+	it.each([
+		['AUTH_PASSWORD_TOO_COMMON', 'This password is too common. Please choose a more unique password.'],
+		['AUTH_PASSWORD_NEEDS_COMPLEXITY', 'Password must contain at least one uppercase letter, one lowercase letter, and one digit.'],
+		['AUTH_PASSWORD_TOO_SHORT', 'Password must be at least 16 characters.'],
+		['AUTH_PASSWORD_TOO_LONG', 'Password must be at most 72 bytes. A character outside ASCII takes two bytes or more.'],
+	])('keeps the form and shows the engine text for %s', async (code, error) => {
+		const fetch = vi.fn(async () => json({ error, code }, 422)) as unknown as typeof globalThis.fetch;
+		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG }, fetch)) as {
+			status: number;
+			data: Record<string, unknown>;
+		};
+		expect(result.status).toBe(422);
+		expect(result.data.error).toBe(error);
+		expect(result.data.expired).toBeUndefined();
 	});
 
 	it('reads a refused token as an expired link', async () => {

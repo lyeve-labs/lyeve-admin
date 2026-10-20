@@ -92,6 +92,12 @@ export interface FlowRun {
 	finished_at: string;
 	duration_ms: number;
 	steps?: RunStep[];
+	/**
+	 * The reader's own access does not cover what the run read, so the run's
+	 * input, output and error, and every step's, come back empty. The plugin
+	 * omits the field when nothing was withheld.
+	 */
+	withheld?: boolean;
 }
 
 export interface TestRequest {
@@ -486,7 +492,8 @@ export async function deleteVariable(client: HttpClient, key: string): Promise<v
  * a 422 uses, so the canvas can mark them the way it marks a validation
  * problem. `trigger` is the id of the trigger. The ceiling on flows arrives
  * with the limit and the count instead, so a page quotes the plugin's
- * numbers and holds none of its own.
+ * numbers and holds none of its own, and with the link where more are
+ * bought when the plugin names one.
  *
  * The body is read before the client sees the response, so every flow write
  * throws this one class whichever call made it. An ApiError still, so a
@@ -498,12 +505,15 @@ export class FlowRefusal extends ApiError {
 	readonly limit: number | null;
 	/** How many flows there are already, when the ceiling refusal says. */
 	readonly current: number | null;
-	constructor(errors: ValidationError[], limit: number | null = null, current: number | null = null) {
+	/** Where a license allowing more is bought, as the plugin sent it, or empty. */
+	readonly upgradeUrl: string;
+	constructor(errors: ValidationError[], limit: number | null = null, current: number | null = null, upgradeUrl = '') {
 		super(402, 'payment_required');
 		this.name = 'FlowRefusal';
 		this.errors = errors;
 		this.limit = limit;
 		this.current = current;
+		this.upgradeUrl = upgradeUrl;
 	}
 
 	/** The distinct node ids the errors name, in the order they were named. */
@@ -520,9 +530,10 @@ function count(value: unknown): number | null {
 export function refusalOf(status: number, text: string): FlowRefusal | null {
 	if (status !== 402) return null;
 	try {
-		const body = JSON.parse(text) as { errors?: unknown; limit?: unknown; current?: unknown };
+		const body = JSON.parse(text) as { errors?: unknown; limit?: unknown; current?: unknown; upgrade_url?: unknown };
 		const errors = Array.isArray(body.errors) ? (body.errors as ValidationError[]) : [];
-		return new FlowRefusal(errors, count(body.limit), count(body.current));
+		const upgradeUrl = typeof body.upgrade_url === 'string' ? body.upgrade_url.trim() : '';
+		return new FlowRefusal(errors, count(body.limit), count(body.current), upgradeUrl);
 	} catch {
 		return new FlowRefusal([]);
 	}

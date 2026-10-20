@@ -27,8 +27,12 @@ function items(count: number, from = 0) {
  * carries only what this page renders and is asserted against PageData once.
  */
 function data(overrides: Record<string, unknown> = {}): PageData {
+	// A test names its rows as an array. The load hands the page a read that
+	// succeeded, or the gate of one that failed.
+	const { items: rows, ...rest } = overrides;
+	const read = Array.isArray(rows) ? { ok: true, value: rows } : (rows ?? { ok: true, value: items(100) });
 	return {
-		schemas: [{ name: 'posts', display_name: 'Posts' }],
+		schemas: { ok: true, value: [{ name: 'posts', display_name: 'Posts' }] },
 		schemaDef: {
 			name: 'posts',
 			display_name: 'Posts',
@@ -36,12 +40,13 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 			with_draft_publish: false,
 			with_updated_at: false,
 		},
-		items: items(100),
 		activeSchema: 'posts',
+		status: null,
 		limit: 100,
 		offset: 0,
 		total: 4000,
-		...overrides,
+		...rest,
+		items: read,
 	} as unknown as PageData;
 }
 
@@ -49,7 +54,9 @@ function data(overrides: Record<string, unknown> = {}): PageData {
 // from the envelope total, stated once by Pagination.
 describe('content listing states the collection total', () => {
 	it('names the way back to Content', () => {
-		render(ContentListPage, { props: { data: data(), form: null } });
+		// Three rows, because the header is the subject. A hundred rows made this
+		// the slowest first render in the file, and it timed out on a busy machine.
+		render(ContentListPage, { props: { data: data({ items: items(3) }), form: null } });
 
 		// The sidebar cannot name this page: it marks Content, and Content is
 		// the collection index rather than this page.
@@ -70,6 +77,13 @@ describe('content listing states the collection total', () => {
 		vi.clearAllMocks();
 	});
 
+	it('gives the entry name, the only way into an entry, a touch-sized target', () => {
+		render(ContentListPage, { props: { data: data({ items: items(1) }), form: null } });
+		const link = document.querySelector('td[data-cell="truncate"] a') as HTMLAnchorElement;
+		expect(link.className).toContain('hit-area');
+		expect(link.className).toContain('relative');
+	});
+
 	it('reports the total, not the size of the page on screen', () => {
 		render(ContentListPage, { props: { data: data(), form: null } });
 
@@ -85,18 +99,19 @@ describe('content listing states the collection total', () => {
 		expect(screen.queryByText(/\d+\s+entries/)).toBeNull();
 	});
 
-	it('offers a page button per page of the collection, not just prev and next', () => {
+	it('offers a page link per page of the collection, not just prev and next', () => {
 		render(ContentListPage, { props: { data: data(), form: null } });
 
-		expect(screen.getByRole('button', { name: '40' })).toBeTruthy();
-		expect(screen.getByRole('button', { name: 'Next page' })).toBeTruthy();
+		expect(screen.getByRole('link', { name: '40' })).toBeTruthy();
+		expect(screen.getByRole('link', { name: 'Next page' })).toBeTruthy();
 	});
 
-	it('disables the previous button on the first page', () => {
-		render(ContentListPage, { props: { data: data(), form: null } });
+	it('disables the previous link on the first page', () => {
+		const { container } = render(ContentListPage, { props: { data: data(), form: null } });
 
-		const prev = screen.getByRole('button', { name: 'Previous page' }) as HTMLButtonElement;
-		expect(prev.disabled).toBe(true);
+		const prev = container.querySelector('[aria-label="Previous page"]');
+		expect(prev?.getAttribute('aria-disabled')).toBe('true');
+		expect(prev?.hasAttribute('href')).toBe(false);
 	});
 });
 
@@ -111,7 +126,7 @@ describe('content listing derives the page from the offset', () => {
 			props: { data: data({ offset: 150, items: items(100, 150) }), form: null },
 		});
 
-		const current = screen.getByRole('button', { current: 'page' });
+		const current = screen.getByRole('link', { current: 'page' });
 		expect(current.textContent?.trim()).toBe('2');
 	});
 
@@ -120,19 +135,16 @@ describe('content listing derives the page from the offset', () => {
 			props: { data: data({ offset: 3900, items: items(100, 3900) }), form: null },
 		});
 
-		const current = screen.getByRole('button', { current: 'page' });
+		const current = screen.getByRole('link', { current: 'page' });
 		expect(current.textContent?.trim()).toBe('40');
 	});
 
-	it('navigates by querystring so the page is linkable', async () => {
+	it('links each page by querystring, so a page turn works before the page hydrates', () => {
 		render(ContentListPage, {
 			props: { data: data({ offset: 150, items: items(100, 150) }), form: null },
 		});
 
-		await fireEvent.click(screen.getByRole('button', { name: '3' }));
-
-		expect(nav.goto).toHaveBeenCalledOnce();
-		const target = new URL(nav.goto.mock.calls[0][0], 'http://localhost');
+		const target = new URL(screen.getByRole('link', { name: '3' }).getAttribute('href') ?? '', 'http://localhost');
 		expect(target.pathname).toBe('/admin/content/posts');
 		expect(target.searchParams.get('offset')).toBe('200');
 		expect(target.searchParams.get('limit')).toBe('100');
@@ -205,5 +217,75 @@ describe('content listing row links', () => {
 		const { container } = render(ContentListPage, { props: { data: data(), form: null } });
 		const link = container.querySelector('tbody a[href^="/admin/content/posts/entry-0"]');
 		expect(link?.getAttribute('href')).toBe('/admin/content/posts/entry-0-0000-0000-0000');
+	});
+});
+
+describe('content listing reads', () => {
+	it('says the entries could not be read instead of calling the collection empty', () => {
+		render(ContentListPage, {
+			props: { data: data({ items: { ok: false, gate: { state: 'unavailable' } }, total: 0 }), form: null },
+		});
+
+		expect(screen.getByText(/entries could not be read/)).toBeTruthy();
+		expect(screen.queryByText('No entries yet')).toBeNull();
+		expect(screen.queryByRole('link', { name: /New entry/ })).toBeNull();
+	});
+
+	it('tells a role the listing refuses that it cannot open the entries', () => {
+		render(ContentListPage, {
+			props: { data: data({ items: { ok: false, gate: { state: 'forbidden' } }, total: 0 }), form: null },
+		});
+
+		expect(screen.getByText(/Your role cannot open entries/)).toBeTruthy();
+		expect(screen.queryByText('No entries yet')).toBeNull();
+	});
+
+	it('says the picker is missing when the collections could not be read', () => {
+		render(ContentListPage, {
+			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } } }), form: null },
+		});
+
+		expect(screen.getByText(/other collections could not be read/)).toBeTruthy();
+	});
+});
+
+describe('content listing status filter', () => {
+	const drafted = (overrides: Record<string, unknown> = {}) =>
+		data({
+			schemaDef: {
+				name: 'posts',
+				display_name: 'Posts',
+				fields: [{ name: 'title', field_type: 'string', system: false }],
+				with_draft_publish: true,
+			},
+			...overrides,
+		});
+
+	it('links each status and marks the current one', () => {
+		render(ContentListPage, { props: { data: drafted({ status: 'draft' }), form: null } });
+
+		const draft = screen.getByRole('link', { name: 'Draft' });
+		expect(draft.getAttribute('href')).toBe('/admin/content/posts?limit=100&status=draft');
+		expect(draft.getAttribute('aria-current')).toBe('page');
+		expect(screen.getByRole('link', { name: 'All' }).getAttribute('href')).toBe('/admin/content/posts?limit=100');
+	});
+
+	it('keeps the status on a page link', () => {
+		render(ContentListPage, { props: { data: drafted({ status: 'published' }), form: null } });
+
+		expect(screen.getByRole('link', { name: '2' }).getAttribute('href')).toContain('status=published');
+	});
+
+	it('names the empty subset and offers every entry back', () => {
+		render(ContentListPage, { props: { data: drafted({ status: 'archived', items: [], total: 0 }), form: null } });
+
+		expect(screen.getByText('No archived entries')).toBeTruthy();
+		expect(screen.queryByText('No entries yet')).toBeNull();
+	});
+
+	it('offers no status filter on a collection without draft and publish', () => {
+		render(ContentListPage, { props: { data: data(), form: null } });
+
+		expect(screen.queryByRole('link', { name: 'Draft' })).toBeNull();
 	});
 });

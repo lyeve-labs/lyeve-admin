@@ -38,6 +38,37 @@ describe('release load', () => {
 		expect(out.conflictsRead).toBe(true);
 	});
 
+	it('offers the entries the release does not hold yet', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.endsWith('/conflicts')) return { data: [] };
+			if (url.startsWith('/api/admin/content?')) {
+				return {
+					data: [
+						{ id: 'e1', title: 'Hello', slug: 'hello', schema: 'posts' },
+						{ id: 'e2', title: 'Pricing', slug: 'pricing', schema: 'pages', body: { text: 'x' } },
+					],
+					total_count: 2,
+				};
+			}
+			if (url === '/api/admin/content/e1') return { title: 'Hello', schema: 'posts', status: 'draft' };
+			return release;
+		});
+		const out = (await load(event())) as Record<string, unknown>;
+		expect(out.choices).toEqual([{ id: 'e2', title: 'Pricing', slug: 'pricing', schema: 'pages' }]);
+		expect(engine.get).toHaveBeenCalledWith('/api/admin/content?limit=200&offset=0');
+	});
+
+	it('offers no entries to a release that went out', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.endsWith('/conflicts')) return { data: [] };
+			if (url.startsWith('/api/admin/content/')) return { title: 'Hello', schema: 'posts', status: 'published' };
+			return { ...release, status: 'published' };
+		});
+		const out = (await load(event())) as Record<string, unknown>;
+		expect(out.choices).toBeNull();
+		expect(engine.get.mock.calls.some(([url]) => String(url).startsWith('/api/admin/content?'))).toBe(false);
+	});
+
 	it('answers 404 for a release that is not there', async () => {
 		engine.get.mockRejectedValue(new ApiError(404, 'release not found'));
 		await expect(load(event())).rejects.toMatchObject({ status: 404 });
@@ -74,3 +105,65 @@ describe('release actions', () => {
 		expect(engine.delete).toHaveBeenCalledWith('/api/admin/content/releases/r1/items/e1');
 	});
 });
+
+type Failure = { status: number; data: Record<string, unknown> };
+
+describe('release writes', () => {
+	it('saves the name and the description', async () => {
+		engine.put.mockResolvedValue(release);
+		expect(await actions.update(event({ name: ' Launch ', description: 'Spring' }))).toEqual({ saved: true });
+		expect(engine.put).toHaveBeenCalledWith('/api/admin/content/releases/r1', { name: 'Launch', description: 'Spring' });
+	});
+
+	// The drawers share one form result with the hidden forms, so each failure
+	// names the action that caused it.
+	it.each([
+		['update', () => actions.update(event({ name: 'Launch' })), 'put'],
+		['unschedule', () => actions.unschedule(event()), 'delete'],
+		['cancel', () => actions.cancel(event()), 'post'],
+		['delete', () => actions.delete(event()), 'delete'],
+	] as const)('names %s on a refusal and relays its reason', async (action, run, method) => {
+		engine[method].mockRejectedValue(new ApiError(409, 'the release is publishing'));
+		const out = (await run()) as Failure;
+		expect(out.data).toMatchObject({ action, error: 'the release is publishing' });
+	});
+
+	it.each([
+		['update', () => actions.update(event({ name: 'Launch' })), 'put', 'The release could not be saved.'],
+		['unschedule', () => actions.unschedule(event()), 'delete', 'The schedule could not be removed.'],
+		['cancel', () => actions.cancel(event()), 'post', 'The release could not be canceled.'],
+		['delete', () => actions.delete(event()), 'delete', 'The release could not be deleted.'],
+	] as const)('keeps outage detail out of %s', async (action, run, method, sentence) => {
+		engine[method].mockRejectedValue(new ApiError(503, 'pq: down'));
+		expect(((await run()) as Failure).data).toMatchObject({ action, error: sentence });
+	});
+
+	it('relays the role refusal the engine sends', async () => {
+		engine.post.mockRejectedValue(new ApiError(403, 'insufficient permissions'));
+		expect(((await actions.cancel(event())) as Failure).data).toMatchObject({ action: 'cancel', error: 'insufficient permissions' });
+	});
+
+	it('unschedules, cancels and deletes the release it names', async () => {
+		engine.delete.mockResolvedValue(release);
+		engine.post.mockResolvedValue(release);
+		expect(await actions.unschedule(event())).toEqual({ unscheduled: true });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/content/releases/r1/schedule');
+		expect(await actions.cancel(event())).toEqual({ canceled: true });
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/content/releases/r1/cancel', {});
+		await expect(actions.delete(event())).rejects.toMatchObject({ status: 303, location: '/admin/releases' });
+		expect(engine.delete).toHaveBeenCalledWith('/api/admin/content/releases/r1');
+	});
+
+	it('keeps a refused conflict read as its gate, never as no conflicts', async () => {
+		engine.get.mockImplementation(async (url: string) => {
+			if (url.endsWith('/conflicts')) throw new ApiError(403, 'forbidden');
+			if (url === '/api/admin/content/e1') return { title: 'Hello', schema: 'posts', status: 'draft' };
+			if (url.startsWith('/api/admin/content?')) return { data: [] };
+			return release;
+		});
+		const out = (await load(event())) as Record<string, unknown>;
+		expect(out.conflictsRead).toBe(false);
+		expect(out.conflictsGate).toEqual({ state: 'forbidden' });
+	});
+});
+

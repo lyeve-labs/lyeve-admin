@@ -1,14 +1,15 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { Alert, Button, Card, CopyField, Input, PageShell, Skeleton } from '@lyeve-labs/ui-kit';
+	import { Alert, Button, Card, CopyButton, CopyField, Input, PageShell, Skeleton } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { Shield, Copy, Check } from '@lucide/svelte';
+	import { Shield } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
-	import { copyText } from '$lib/clipboard';
 	import { tracked } from '$lib/forms.svelte';
 	import { ICON } from '$lib/icon';
+	import { passkeyFailure, provePasskey, type ProofOptions } from '$lib/passkey-proof';
+	import { tick } from 'svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -17,6 +18,7 @@
 	const QR_SIZE = 180;
 
 	const setup = tracked(() => {});
+	const prove = tracked(() => {});
 	const verify = tracked(() => async ({ update }) => update({ reset: false }));
 	const disable = tracked(() => {});
 
@@ -26,11 +28,35 @@
 	const secret = $derived(form && 'secret' in form ? (form.secret ?? '') : '');
 	const backupCodes = $derived(form && 'backupCodes' in form ? (form.backupCodes ?? []) : []);
 	const actionErrorText = $derived(form && 'error' in form ? form.error : undefined);
+	const proofSessionId = $derived(form && 'proofSessionId' in form ? (form.proofSessionId ?? '') : '');
+	const proofOptions = $derived(form && 'options' in form ? (form.options as ProofOptions) : undefined);
+
+	// The browser signs the challenge only on a click, so the passkey step has
+	// its own button. Its answer goes into the hidden fields and the setup
+	// form posts it.
+	let assertion = $state('');
+	let asking = $state(false);
+	let passkeyError = $state('');
+	let proofForm: HTMLFormElement | undefined = $state();
+
+	async function usePasskey() {
+		if (!proofOptions) return;
+		passkeyError = '';
+		asking = true;
+		try {
+			assertion = await provePasskey(proofOptions);
+			await tick();
+			proofForm?.requestSubmit();
+		} catch (e) {
+			passkeyError = passkeyFailure(e);
+		} finally {
+			asking = false;
+		}
+	}
 
 	let code = $state('');
 	let disableCode = $state('');
-	let clipboardError = $state('');
-	let copiedCodes = $state(false);
+	let replaceCode = $state('');
 	let qrDataUrl = $state('');
 
 	// Only the browser draws the code, so the generator is loaded here and
@@ -53,31 +79,24 @@
 		};
 	});
 
-	const mfaEnabled = $derived(data.mfaEnabled);
-
-	async function copyBackupCodes() {
-		if (!(await copyText(backupCodes.join('\n')))) {
-			clipboardError = 'Could not reach the clipboard. Write the codes down before leaving this page.';
-			return;
-		}
-		copiedCodes = true;
-		setTimeout(() => (copiedCodes = false), 2000);
-	}
+	const mfaEnabled = $derived(data.mfa.ok && data.mfa.value.enabled);
+	const hasPasskeys = $derived(data.mfa.ok && data.mfa.value.hasPasskeys);
+	const description = $derived(
+		!data.mfa.ok ? 'The state of this account could not be read.' : mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'
+	);
 </script>
-
-<PageTitle title="Two-factor authentication" />
 
 <PageShell
 	title="Two-factor authentication"
-	description={mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'}
+	{description}
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
-	<FormErrors message={actionErrorText || clipboardError || undefined} refused={formRefusal(form)} />
+	<FormErrors message={actionErrorText || undefined} refused={formRefusal(form)} />
 
 	{#if step === 'done'}
 		<Alert tone="success" title="Two-factor authentication is on">
-			Save these backup codes somewhere safe. They are not shown again.
+			Save these backup codes somewhere safe. They are not shown again. If the copy fails, write them down before you leave this page.
 		</Alert>
 		<Card>
 			<div class="flex flex-col gap-4">
@@ -88,18 +107,30 @@
 						</code>
 					{/each}
 				</div>
-				<div class="flex justify-end gap-3">
-					<Button variant="secondary" onclick={copyBackupCodes}>
-						{#if copiedCodes}
-							<Check size={ICON.sm} class="text-success" aria-hidden="true" />
-						{:else}
-							<Copy size={ICON.sm} aria-hidden="true" />
-						{/if}
-						Copy all codes
-					</Button>
+				<div class="flex items-center justify-end gap-3">
+					<CopyButton value={backupCodes.join('\n')} text="Copy all codes" />
 					<Button variant="primary" href="/admin/settings/mfa">Done</Button>
 				</div>
 			</div>
+		</Card>
+	{:else if step === 'proving'}
+		<Card>
+			<form method="POST" action="?/setup" use:enhance={setup.enhance} bind:this={proofForm} class="flex flex-col gap-4">
+				<input type="hidden" name="proof_session_id" value={proofSessionId} />
+				<input type="hidden" name="assertion" value={assertion} />
+				<p class="text-fg text-sm">
+					Confirm it is you with one of this account's passkeys. The authenticator app setup starts once the passkey answers.
+				</p>
+				{#if passkeyError}
+					<Alert tone="danger">{passkeyError}</Alert>
+				{/if}
+				<div class="flex justify-end gap-3">
+					<Button variant="secondary" href="/admin/settings/mfa">Cancel</Button>
+					<Button type="button" variant="primary" onclick={usePasskey} loading={asking || setup.pending}>
+						Use a passkey
+					</Button>
+				</div>
+			</form>
 		</Card>
 	{:else if step === 'confirming'}
 		<Card>
@@ -149,10 +180,84 @@
 				</div>
 			</form>
 		</Card>
+	{:else if !data.mfa.ok}
+		<GateNotice level={2} gate={data.mfa.gate} title="Two-factor authentication" absent="This engine does not serve two-factor authentication." />
+	{:else if hasPasskeys}
+		<Alert tone="success" title="Two-factor authentication is on">
+			This account has a passkey, so signing in takes a second factor. While a passkey is registered the engine does
+			not report whether an authenticator app is also set up.
+		</Alert>
+		<Card>
+			<div class="flex flex-col gap-4">
+				<p class="text-fg text-sm">
+					Set up an authenticator app as well. Confirm it is you first, with a passkey or with a code. If an app is already
+					set up, the new key replaces it once you verify a code.
+				</p>
+				<form method="POST" action="?/prove" use:enhance={prove.enhance} class="flex justify-end">
+					<Button type="submit" variant="secondary" loading={prove.pending}>
+						Confirm with a passkey
+					</Button>
+				</form>
+				<form method="POST" action="?/setup" use:enhance={setup.enhance} class="flex flex-col gap-4">
+					<Input
+						id="replace-code"
+						name="code"
+						label="Or a code"
+						hint="A current code from an authenticator app already set up, or a backup code."
+						bind:value={replaceCode}
+						autocomplete="one-time-code"
+					/>
+					<div class="flex justify-end">
+						<Button type="submit" variant="secondary" disabled={replaceCode.trim().length === 0} loading={setup.pending}>
+							<Shield size={ICON.sm} aria-hidden="true" />
+							Set up with this code
+						</Button>
+					</div>
+				</form>
+			</div>
+		</Card>
+		<Card>
+			<form method="POST" action="?/disable" use:enhance={disable.enhance} class="flex flex-col gap-4">
+				<Input
+					id="dis-code"
+					name="code"
+					label="Code"
+					hint="A current code from the authenticator app, or a backup code. This turns off the app only. Passkeys stay."
+					bind:value={disableCode}
+					autocomplete="one-time-code"
+				/>
+				<div class="flex justify-end">
+					<Button type="submit" variant="danger" disabled={disableCode.trim().length === 0} loading={disable.pending}>
+						Turn off the authenticator app
+					</Button>
+				</div>
+			</form>
+		</Card>
 	{:else if mfaEnabled}
 		<Alert tone="success" title="Two-factor authentication is on">
 			Signing in to this account takes a TOTP code.
 		</Alert>
+		<Card>
+			<form method="POST" action="?/setup" use:enhance={setup.enhance} class="flex flex-col gap-4">
+				<p class="text-fg text-sm">
+					Move to another authenticator app. The new key replaces the current one once you verify a code from it.
+				</p>
+				<Input
+					id="replace-code"
+					name="code"
+					label="Code"
+					hint="A current TOTP code, or a backup code."
+					bind:value={replaceCode}
+					autocomplete="one-time-code"
+				/>
+				<div class="flex justify-end">
+					<Button type="submit" variant="secondary" disabled={replaceCode.trim().length === 0} loading={setup.pending}>
+						<Shield size={ICON.sm} aria-hidden="true" />
+						Replace the authenticator app
+					</Button>
+				</div>
+			</form>
+		</Card>
 		<Card>
 			<form method="POST" action="?/disable" use:enhance={disable.enhance} class="flex flex-col gap-4">
 				<Input
@@ -162,7 +267,6 @@
 					hint="A current TOTP code, or a backup code."
 					bind:value={disableCode}
 					autocomplete="one-time-code"
-					inputmode="numeric"
 				/>
 				<div class="flex justify-end">
 					<Button type="submit" variant="danger" disabled={disableCode.trim().length === 0} loading={disable.pending}>

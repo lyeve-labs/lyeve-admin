@@ -5,7 +5,7 @@
  * every module reports, and shows any other as it arrived, so a state a module
  * adds later still reads as something rather than nothing.
  */
-export type LicenseTone = 'success' | 'warn' | 'danger' | 'neutral';
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 
 const NO_LICENSE = 'No license';
 
@@ -30,7 +30,7 @@ export function licenseStateLabel(state: string | null | undefined): string {
 }
 
 /** How loudly a state is shown: a grace period warns and an expired license alarms. */
-export function licenseTone(state: string | null | undefined): LicenseTone {
+export function licenseTone(state: string | null | undefined): Extract<StatusTone, 'success' | 'warn' | 'danger' | 'neutral'> {
 	switch (state) {
 		case 'active':
 			return 'success';

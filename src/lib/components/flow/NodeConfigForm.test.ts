@@ -324,3 +324,29 @@ describe('NodeConfigForm locked options and choice lists', () => {
 		expect(queryByTestId('option-locked-auth')).toBeNull();
 	});
 });
+
+describe('the datasource picker when the list is empty', () => {
+	const hintOf = (gate?: unknown) => {
+		const { container } = render(NodeConfigForm, {
+			props: { schema: sql.config_schema, value: {}, datasources: [], datasourcesGate: gate as never, onchange: vi.fn() },
+		});
+		const text = container.textContent ?? '';
+		cleanup();
+		return text;
+	};
+
+	// A failed read is not a tenant with no datasource.
+	it('says the datasources could not be read, and not that none exists', () => {
+		const text = hintOf({ state: 'unavailable' });
+		expect(text).toContain('The datasources could not be read. Type the name.');
+		expect(text).not.toContain('No datasource');
+	});
+
+	it('says a role that cannot list them so', () => {
+		expect(hintOf({ state: 'forbidden' })).toContain('Your role cannot list the datasources. Type the name.');
+	});
+
+	it('says none exists when the read answered with none', () => {
+		expect(hintOf({ state: 'ok' })).toContain('No datasource of a matching kind exists yet. Type the name.');
+	});
+});

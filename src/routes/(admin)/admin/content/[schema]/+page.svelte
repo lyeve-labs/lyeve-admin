@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Autocomplete,
@@ -10,16 +9,19 @@
 		PageShell,
 		Pagination,
 		SectionHeading,
+		SegmentedControl,
 		Table,
-		confirm as confirmDialog,
-		toast,
 	} from '@lyeve-labs/ui-kit';
 	import type { PageData, ActionData } from './$types';
 	import type { Schema, SchemaField } from '@lyeve-labs/client';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import { confirmed } from '$lib/forms.svelte';
 	import { listQuery } from '$lib/back';
+	import { pageHref, pageNumber } from '$lib/api/list';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { Plus, Trash2, Inbox } from '@lucide/svelte';
 	import { crumbsAfter } from '$lib/breadcrumb';
 	import FieldCell from '$lib/components/FieldCell.svelte';
@@ -29,7 +31,10 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	type EntryItem = PageData['items'][number];
+	// A failed read draws its gate instead of the table, so these are only
+	// ever rows the engine answered with.
+	const entries = $derived(data.items.ok ? data.items.value : []);
+	type EntryItem = (typeof entries)[number];
 
 	let userFields = $derived((data.schemaDef?.fields ?? []).filter((f: SchemaField) => !f.system));
 
@@ -52,27 +57,48 @@
 	 * labeled once.
 	 */
 	let schemaOptions = $derived(
-		data.schemas.map((s: Schema) => ({
+		(data.schemas.ok ? data.schemas.value : []).map((s: Schema) => ({
 			value: s.name,
 			label: s.display_name && s.display_name !== s.name ? `${s.display_name} (${s.name})` : s.name,
 		})),
 	);
 
 	// An offset need not sit on a page boundary: it arrives in the URL and a
-	// delete can leave a hand-edited one behind. Floor it onto the page that
-	// contains it rather than assuming offset / limit divides evenly.
-	let currentPage = $derived(Math.floor(data.offset / data.limit) + 1);
+	// delete can leave a hand-edited one behind. pageNumber floors it onto the
+	// page that contains it rather than assuming offset / limit divides evenly.
+	let currentPage = $derived(pageNumber(data.offset, data.limit));
 	// A row link carries the page it was opened from, so the entry's back link
 	// can return to it. The first page at the default size stays a clean path.
 	let rowQuery = $derived(listQuery(data.offset > 0 ? { limit: data.limit, offset: data.offset } : {}));
 
-	function goToPage(page: number) {
-		const offset = Math.max(0, (page - 1) * data.limit);
-		const params = new URLSearchParams({ limit: String(data.limit), offset: String(offset) });
-		// A querystring, so the page is linkable and the back button returns to
-		// the previous one.
-		goto(`/admin/content/${data.activeSchema}?${params}`, { noScroll: true, keepFocus: true });
+	// Page links rather than a callback, so a page turn works before the page
+	// hydrates. The status filter rides along, or a page turn would drop it.
+	const pageLink = $derived(
+		pageHref(`/admin/content/${data.activeSchema}`, data.limit, data.status ? { status: data.status } : {}),
+	);
+
+	type StatusChoice = 'all' | 'draft' | 'published' | 'archived';
+	const STATUS_LABELS: Record<StatusChoice, string> = {
+		all: 'All',
+		draft: 'Draft',
+		published: 'Published',
+		archived: 'Archived',
+	};
+
+	/** A status link keeps the page size and drops the offset: page three of one subset is nobody's page three in another. */
+	function statusHref(choice: StatusChoice): string {
+		const params = new URLSearchParams({ limit: String(data.limit) });
+		if (choice !== 'all') params.set('status', choice);
+		return `/admin/content/${data.activeSchema}?${params}`;
 	}
+
+	const statusOptions = $derived(
+		(Object.keys(STATUS_LABELS) as StatusChoice[]).map((value) => ({
+			value,
+			label: STATUS_LABELS[value],
+			href: statusHref(value),
+		})),
+	);
 
 	function openCollection(name: string) {
 		if (!name || name === data.activeSchema) return;
@@ -91,33 +117,20 @@
 	 * request is never made.
 	 */
 	function deleteEntry(item: EntryItem): SubmitFunction {
-		return async ({ cancel }) => {
+		return (input) => {
 			const title = entryTitle(item, userFields);
 			const named =
 				title.source === 'none' ? `the untitled entry ${shortId(item.id)}` : title.label;
-			const confirmed = await confirmDialog(`Delete ${named}?`, 'Its revisions and translations go with it.', {
+			return confirmed(`Delete ${named}?`, 'Its revisions and translations go with it.', {
 				confirmLabel: 'Delete',
-				detail: item.id
-			});
-			if (!confirmed) {
-				cancel();
-				return;
-			}
-			return async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toast.success(`Deleted ${named}`);
-			};
+				detail: item.id,
+				success: `Deleted ${named}`
+			})(input);
 		};
-	}
-
-	function formatDay(iso: string): string {
-		return formatDate(iso);
 	}
 
 	const back = { href: '/admin/content', label: 'Content' };
 </script>
-
-<PageTitle title={data.schemaDef.display_name || data.activeSchema} />
 
 <PageShell
 	title={data.schemaDef.display_name || data.activeSchema}
@@ -141,12 +154,14 @@
 	{/snippet}
 
 	{#snippet actions()}
-		<Button size="sm" href="/admin/content/{data.activeSchema}/new">
-			<Plus size={ICON.sm} /> New entry
-		</Button>
+		{#if data.items.ok}
+			<Button size="sm" href="/admin/content/{data.activeSchema}/new">
+				<Plus size={ICON.sm} /> New entry
+			</Button>
+		{/if}
 	{/snippet}
 
-	{#if data.schemas.length > 1}
+	{#if data.schemas.ok && data.schemas.value.length > 1}
 		<!-- A GET form, so submitting opens the collection without JavaScript.
 		     A search scales to any number of schemas, where a tab strip in one
 		     horizontal scroller stops being usable at a few dozen. -->
@@ -162,6 +177,8 @@
 				onchange={openCollection}
 			/>
 		</form>
+	{:else if !data.schemas.ok}
+		<p class="text-sm text-muted">The other collections could not be read, so the collection picker is not shown.</p>
 	{/if}
 
 	{#if form?.error}
@@ -173,7 +190,42 @@
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Entries</SectionHeading>
 
-		{#if data.items.length === 0}
+		<!-- The listing route filters by status and by nothing else, so the
+		     toolbar offers no search: a box that narrowed only the rows on
+		     screen would read as a search of the collection. -->
+		{#if data.schemaDef.with_draft_publish && data.items.ok}
+			<ListToolbar label="Filter entries">
+				{#snippet filters()}
+					<SegmentedControl
+						label="Status"
+						labelHidden
+						size="sm"
+						value={data.status ?? 'all'}
+						options={statusOptions}
+					/>
+				{/snippet}
+			</ListToolbar>
+		{/if}
+
+		{#if !data.items.ok}
+			<GateNotice
+				gate={data.items.gate}
+				title="Entries"
+				absent="This build does not serve content entries."
+			/>
+		{:else if entries.length === 0 && data.status}
+			<EmptyState
+				title="No {STATUS_LABELS[data.status].toLowerCase()} entries"
+				description="Pick another status, or All to see every entry."
+			>
+				{#snippet iconSnippet()}
+					<Inbox size={ICON.lg} />
+				{/snippet}
+				{#snippet action()}
+					<Button href={statusHref('all')} variant="secondary">Show every entry</Button>
+				{/snippet}
+			</EmptyState>
+		{:else if entries.length === 0}
 			<EmptyState title="No entries yet" description="Add the first entry to this collection.">
 				{#snippet iconSnippet()}
 					<Inbox size={ICON.lg} />
@@ -203,7 +255,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.items as item (item.id)}
+					{#each entries as item (item.id)}
 						{@const title = entryTitle(item, userFields)}
 						<tr>
 							<!-- Truncate rather than wrap: the kit's default breaks a cell
@@ -215,7 +267,7 @@
 								     not what they scan a page of rows by. -->
 								<a
 									href="/admin/content/{data.activeSchema}/{item.id}{rowQuery}"
-									class="font-medium text-fg transition-colors hover:text-brand"
+									class="relative hit-area font-medium text-fg transition-colors hover:text-brand"
 								>
 									{#if title.source === 'none'}
 										<span class="font-mono">{shortId(item.id)}</span>
@@ -250,9 +302,9 @@
 									</Badge>
 								</td>
 							{/if}
-							<td class="text-xs whitespace-nowrap text-faint">{formatDay(item.created_at)}</td>
+							<td class="text-xs whitespace-nowrap text-faint">{formatDate(item.created_at)}</td>
 							{#if data.schemaDef.with_updated_at}
-								<td class="text-xs whitespace-nowrap text-faint">{formatDay(item.updated_at)}</td>
+								<td class="text-xs whitespace-nowrap text-faint">{formatDate(item.updated_at)}</td>
 							{/if}
 							<td class="text-right">
 								<form
@@ -282,7 +334,12 @@
 				</tbody>
 			</Table>
 
-			<Pagination page={currentPage} total={data.total} perPage={data.limit} onchange={goToPage} />
+			<Pagination
+				page={currentPage}
+				total={data.total}
+				perPage={data.limit}
+				href={pageLink}
+			/>
 		{/if}
 	</section>
 </PageShell>

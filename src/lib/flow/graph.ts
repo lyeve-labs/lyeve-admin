@@ -265,6 +265,7 @@ export function updateNode(
 	return { ...def, nodes: def.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) };
 }
 
+// The visual editors the image build checks out beside the admin import this.
 export function updateNote(
 	def: FlowDefinition,
 	id: string,
@@ -276,6 +277,7 @@ export function updateNote(
 	};
 }
 
+// The visual editors the image build checks out beside the admin import this.
 export function moveNodes(
 	def: FlowDefinition,
 	ids: Iterable<string>,
@@ -300,6 +302,7 @@ export function moveNodes(
 	};
 }
 
+// The visual editors the image build checks out beside the admin import this.
 /** Nodes with no inbound edge. They start at once with the trigger payload. */
 export function rootNodes(def: FlowDefinition): FlowNode[] {
 	const fed = new Set(def.edges.filter((e) => e.from !== TRIGGER_ID).map((e) => e.to));

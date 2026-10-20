@@ -47,13 +47,15 @@ function run(over: Partial<ReplayRun> = {}): ReplayRun {
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		events: [row()],
-		runs: [],
 		total: 1,
 		limit: 50,
 		offset: 0,
 		gate: { state: 'ok' },
 		licensed: true,
 		...over,
+		runs: Array.isArray(over.runs)
+			? { ok: true, value: { rows: over.runs, total: over.runs.length } }
+			: (over.runs ?? { ok: true, value: { rows: [], total: 0 } }),
 	} as never,
 	form: form as never,
 });
@@ -74,7 +76,7 @@ describe('Events gate', () => {
 });
 
 describe('Events replay', () => {
-	// A replay posts every event in the window to its handler again and
+	// A replay publishes every event in the window again to every listener and
 	// nothing undoes that, so the destructive option is never the default.
 	it('rehearses by default', () => {
 		const { container } = render(EventsPage, { props: props() });
@@ -84,14 +86,32 @@ describe('Events replay', () => {
 
 	it('warns that a real replay cannot be taken back', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(said(container)).toContain('nothing undoes that');
+		expect(said(container)).toContain('Nothing undoes that.');
 	});
 
 	it('says plainly that a rehearsal posted nothing', () => {
 		const { container } = render(EventsPage, {
 			props: props({}, { started: 'r9', dryRun: true }),
 		});
-		expect(said(container)).toContain('Nothing was posted to a handler');
+		expect(said(container)).toContain('Rehearsed. Nothing was published.');
+	});
+
+	// The plugin publishes a replay through the same path as a live change,
+	// so every listener hears it. The handler is only the run's name, which
+	// decides what a later run under it skips.
+	it('says a replay reaches every listener and the handler is a run name', () => {
+		const { container, getByLabelText } = render(EventsPage, { props: props() });
+		const text = said(container);
+		expect(text).toContain('again to everything that listens');
+		expect(text).toContain('A later run under the same name skips the events that name already replayed.');
+		expect(text).not.toMatch(/to its handler|to a handler|Every handler/);
+		expect(getByLabelText('Run name').getAttribute('name')).toBe('handler');
+	});
+
+	it('names a run that was given no name as the shared one', () => {
+		const { container } = render(EventsPage, { props: props({ runs: [run({ handler: '' })] }) });
+		const cell = container.querySelector('tbody tr td:nth-child(2)');
+		expect(cell?.textContent?.trim()).toBe('Shared name');
 	});
 
 	it('marks a rehearsal in the run list so its counts are not misread', () => {
@@ -128,5 +148,40 @@ describe('Events log', () => {
 			props: props({ events: [row(), row({ id: 'e2', error: 'boom' })], total: 2 }),
 		});
 		expect(said(container)).toContain('Carrying an error');
+	});
+});
+
+describe('figures that cover one page or failed', () => {
+	// The engine counts no errors of its own, so the tile says it read one page.
+	it('says the error count covers this page only', () => {
+		const { container } = render(EventsPage, {
+			props: props({ events: [row(), row({ id: 'e2', error: 'boom' })], total: 900 }),
+		});
+		expect(said(container)).toContain('of the 2 on this page');
+	});
+
+	it('counts every replay rather than the rows the panel shows', () => {
+		const { container } = render(EventsPage, {
+			props: props({ runs: { ok: true, value: { rows: [run()], total: 37 } } }),
+		});
+		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
+		expect(tile?.nextElementSibling?.textContent?.trim()).toBe('37');
+	});
+
+	it('does not count zero replays when the run list failed', () => {
+		const { container } = render(EventsPage, {
+			props: props({ runs: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		const text = said(container);
+		expect(text).toContain('did not answer');
+		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
+		expect(tile?.nextElementSibling?.textContent?.trim()).not.toBe('0');
+	});
+});
+
+describe('the search box', () => {
+	it('is named for a screen reader', () => {
+		const { container } = render(EventsPage, { props: props() });
+		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Narrow this page');
 	});
 });

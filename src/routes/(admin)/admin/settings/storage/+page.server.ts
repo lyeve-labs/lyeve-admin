@@ -42,9 +42,8 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
-	// The test route can report success under either of two field names.
-	// Reading one of them treats a refusal as a pass, so both are read and the
-	// absence of an explicit success is not success.
+	// The test route answers 200 for a provider that failed its ping too, so
+	// only an explicit healthy in the body is a pass.
 	test: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
@@ -65,12 +64,12 @@ export const actions: Actions = {
 	create: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const parsed = providerBodyFrom(await event.request.formData(), true);
-		if ('error' in parsed) return fail(400, { providerError: parsed.error });
+		if ('error' in parsed) return fail(400, { action: 'create', providerError: parsed.error });
 		try {
 			const created = await createProvider(authedClient(event), parsed.body);
 			return { saved: created.name ?? parsed.body.name };
 		} catch (err) {
-			return fail(400, { providerError: actionError(err, 'The provider could not be created.') });
+			return fail(400, { action: 'create', providerError: actionError(err, 'The provider could not be created.') });
 		}
 	},
 
@@ -78,14 +77,14 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { providerError: 'No provider was named.' });
+		if (!id) return fail(400, { action: 'update', providerError: 'No provider was named.' });
 		const parsed = providerBodyFrom(form, false);
-		if ('error' in parsed) return fail(400, { providerError: parsed.error });
+		if ('error' in parsed) return fail(400, { action: 'update', providerError: parsed.error });
 		try {
 			await updateProvider(authedClient(event), id, parsed.body);
 			return { saved: parsed.body.name };
 		} catch (err) {
-			return fail(400, { providerError: actionError(err, 'The provider could not be saved.') });
+			return fail(400, { action: 'update', providerError: actionError(err, 'The provider could not be saved.') });
 		}
 	},
 

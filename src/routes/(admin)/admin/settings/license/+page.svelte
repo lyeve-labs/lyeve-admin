@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	/**
 	 * The license this instance runs on, as the license module reports it.
 	 *
@@ -27,7 +26,10 @@
 	const licensing = $derived(data.licensing ?? NO_LICENSING);
 
 	const status = $derived(ent?.state ?? '');
-	const none = $derived(unlicensed(status));
+	// Only a license that was read can be absent. An unread one says nothing
+	// about whether this instance holds a license, so its copy stays neutral.
+	const none = $derived(ent !== null && ent !== undefined && unlicensed(status));
+	const unread = $derived(ent === null || ent === undefined);
 	// The plan in the module's words, or as the license names it.
 	const plan = $derived(ent?.plan_label || ent?.plan || '');
 
@@ -45,12 +47,12 @@
 		return '';
 	});
 
-	const MEDALLION = {
+	const MEDALLION: Record<ReturnType<typeof licenseTone>, string> = {
 		success: 'bg-success/15 text-success',
 		warn: 'bg-warn/15 text-warn',
 		danger: 'bg-danger/15 text-danger',
 		neutral: 'bg-surface-2 text-muted',
-	} as const;
+	};
 	const tone = $derived(licenseTone(status));
 
 	// The source is the module's word for what renews the license, shown as it
@@ -82,8 +84,6 @@
 	// else, so the form is not offered to them.
 	const canRenew = $derived(data.user?.roles?.includes('super_admin') ?? false);
 </script>
-
-<PageTitle title="License" />
 
 <PageShell
 	title="License"
@@ -134,7 +134,7 @@
 				{/if}
 
 				{#if links.length > 0}
-					<ul class="flex flex-col gap-2 border-t border-line pt-4">
+					<ul class="flex flex-col gap-2 coarse:gap-5 border-t border-line pt-4">
 						{#each links as link (link.rel)}
 							{@const away = isExternalHref(link.href)}
 							<li>
@@ -161,7 +161,7 @@
 
 	{#if licensing.renew}
 		<section class="flex flex-col gap-4">
-			<SectionHeading>{none ? 'Add a license key' : 'Renew license'}</SectionHeading>
+			<SectionHeading>{none ? 'Add a license key' : unread ? 'License key' : 'Renew license'}</SectionHeading>
 			<Card>
 				{#if canRenew}
 					<form
@@ -182,7 +182,9 @@
 							label="License token or key"
 							hint={none
 								? 'Only needed for what a license grants. Paste the token or key you were issued.'
-								: 'Paste the license token or key you were issued.'}
+								: unread
+									? 'Paste the license token or key you were issued. It replaces any license this instance holds.'
+									: 'Paste the license token or key you were issued.'}
 							bind:value={licenseKey}
 							rows={3}
 							mono
@@ -191,7 +193,7 @@
 						<div class="flex justify-end">
 							<Button type="submit" variant="primary" disabled={!licenseKey.trim()}>
 								<Shield size={ICON.sm} aria-hidden="true" />
-								{none ? 'Activate license' : 'Renew license'}
+								{none ? 'Activate license' : unread ? 'Apply license' : 'Renew license'}
 							</Button>
 						</div>
 

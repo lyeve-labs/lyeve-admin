@@ -37,7 +37,7 @@ describe('tenant costs load', () => {
 	it('reads the ledger while its plugin runs', async () => {
 		const data = (await load(event())) as Loaded;
 		expect(data.enabled).toBe(true);
-		expect(data.summary).toEqual({ total: 1 });
+		expect(data.summary).toEqual({ ok: true, value: { total: 1 } });
 	});
 
 	it('asks nothing while the multitenant plugin does not run', async () => {
@@ -52,16 +52,16 @@ describe('tenant costs load', () => {
 		const data = (await load(event())) as Loaded;
 		expect(data.enabled).toBe(false);
 		expect(data.upgradeUrl).toBe('/admin/settings/license');
-		expect(data.summary).toBeNull();
-		expect(data.prices).toBeNull();
+		expect(data.summary).toMatchObject({ ok: false });
+		expect(data.prices).toMatchObject({ ok: false });
 	});
 
 	it('keeps a read that failed for another reason apart from a refusal', async () => {
 		api.getSummary.mockRejectedValue(new ApiError(503, 'unavailable'));
 		const data = (await load(event())) as Loaded;
 		expect(data.enabled).toBe(true);
-		expect(data.summary).toBeNull();
-		expect(data.budgets).toEqual([]);
+		expect(data.summary).toEqual({ ok: false, gate: { state: 'unavailable' } });
+		expect(data.budgets).toEqual({ ok: true, value: [] });
 	});
 
 	it('refuses a role below admin', async () => {

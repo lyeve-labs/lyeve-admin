@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PageTitle from '$lib/components/PageTitle.svelte';
 	import {
 		Alert,
 		Badge,
@@ -8,6 +7,7 @@
 		CheckboxGroup,
 		EmptyState,
 		Input,
+		MultiSelect,
 		NumberInput,
 		PageShell,
 		SectionHeading,
@@ -39,8 +39,10 @@
 		type WidgetWindow,
 	} from '$lib/api/custom-dashboard';
 	import { formatDateTime } from '$lib/format';
+	import { inSentence } from '$lib/api/gate';
 	import type { ResolvedWidget } from '$lib/api/custom-dashboard';
 	import type { PageData, ActionData } from './$types';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -63,7 +65,19 @@
 	const kinds = $derived(WIDGET_KINDS.filter((k) => widgetServed(k, data.plugins)));
 	const roleOptions = ROLE_CHOICES.map((r) => ({ value: r, label: r }));
 	const schemaOptions = $derived(data.schemas.map((s) => ({ value: s, label: s })));
-	const anySchema = $derived([{ value: '', label: 'Every schema' }, ...schemaOptions]);
+
+	/**
+	 * The schema options with the ones a widget already names added, so a
+	 * widget keeps its schemas on screen when the list could not be read.
+	 */
+	function withOwn(own: readonly (string | undefined)[]) {
+		const names = new Set(data.schemas);
+		const extra = own.filter((s): s is string => !!s && !names.has(s));
+		return [...schemaOptions, ...extra.map((s) => ({ value: s, label: s }))];
+	}
+	function anySchema(own: string | undefined) {
+		return [{ value: '', label: 'Every schema' }, ...withOwn([own])];
+	}
 	const widthOptions = (['third', 'half', 'full'] as WidgetWidth[]).map((w) => ({ value: w, label: WIDTH_LABEL[w] }));
 	const windowOptions = (['6h', '24h', '7d'] as WidgetWindow[]).map((w) => ({ value: w, label: w }));
 	const statusOptions = [
@@ -85,11 +99,6 @@
 	const full = $derived(widgets.length >= MAX_WIDGETS);
 	const wire = $derived(JSON.stringify(widgets.map(wireWidget)));
 	const preview = $derived((form as { preview?: ResolvedWidget[] } | null)?.preview ?? null);
-
-	/** A label as it reads mid-sentence: lower case, except an acronym such as API. */
-	function inSentence(label: string): string {
-		return /^[A-Z]{2}/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
-	}
 
 	function add(type: WidgetType) {
 		if (full) return;
@@ -137,10 +146,9 @@
 	};
 </script>
 
-<PageTitle title="Dashboard - Customization" />
-
 <PageShell
 	title="Dashboard"
+	documentTitle="Dashboard - Customization"
 	description="Compose the dashboard this tenant opens on, from widgets over data the admin already has. Each widget can be limited to roles."
 	width="wide"
 	back={{ href: '/admin/settings/customization', label: 'Customization' }}
@@ -168,6 +176,15 @@
 			This tenant shows the stock dashboard. Saving a layout replaces it. A reset brings it back.
 		{/if}
 	</p>
+
+	{#if data.schemasGate.state !== 'ok'}
+		<GateNotice
+			level={2}
+			gate={data.schemasGate}
+			title="The schema list"
+			absent="This instance serves no schema list, so no schema can be picked below."
+		/>
+	{/if}
 
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Widgets</SectionHeading>
@@ -216,20 +233,28 @@
 						</div>
 
 						{#if w.type === 'entry_counts'}
-							{#if schemaOptions.length === 0}
+							{#if data.schemasGate.state === 'ok' && schemaOptions.length === 0}
 								<p class="text-sm text-muted">This tenant has no schemas to count yet.</p>
 							{:else}
-								<CheckboxGroup label="Schemas" hint="Up to 12, in the order listed here." orientation="horizontal" options={schemaOptions} bind:value={w.schemas} />
+								<MultiSelect
+									id="widget-{w.id}-schemas"
+									label="Schemas"
+									placeholder="Pick schemas"
+									hint="Up to 12, in the order picked."
+									searchable
+									options={withOwn(w.schemas ?? [])}
+									bind:value={w.schemas}
+								/>
 							{/if}
 						{:else if w.type === 'latest_entries'}
 							<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
-								<Select id="widget-{w.id}-schema" label="Schema" options={anySchema} bind:value={w.schema} />
-								<Select id="widget-{w.id}-status" label="Status" options={statusOptions} bind:value={w.status} />
+								<Select id="widget-{w.id}-schema" label="Schema" searchable options={anySchema(w.schema)} bind:value={w.schema} />
+								<SegmentedControl label="Status" options={statusOptions} value={w.status ?? ''} onchange={(v) => (w.status = v as Widget['status'])} />
 								<NumberInput id="widget-{w.id}-limit" label="Entries" min={1} max={MAX_WIDGET_ROWS} bind:value={w.limit} />
 							</div>
 						{:else if w.type === 'status_breakdown'}
 							<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
-								<Select id="widget-{w.id}-schema" label="Schema" options={anySchema} bind:value={w.schema} />
+								<Select id="widget-{w.id}-schema" label="Schema" searchable options={anySchema(w.schema)} bind:value={w.schema} />
 							</div>
 						{:else if w.type === 'recent_activity'}
 							<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">

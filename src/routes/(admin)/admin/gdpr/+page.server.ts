@@ -1,12 +1,14 @@
 import type { PageServerLoad, Actions } from './$types';
 import { exportSubject, eraseSubject } from '@lyeve-labs/client-rest';
 import { fail, error } from '@sveltejs/kit';
-import { authedClient, requireRole } from '$lib/server/authz';
+import { authedClient, loadUser, requireRole } from '$lib/server/authz';
+import { actionError } from '$lib/server/action-error';
+import { forbiddenText } from '$lib/api/gate';
 
-export const load: PageServerLoad = async ({ parent }) => {
-	const { user } = await parent();
+export const load: PageServerLoad = async (event) => {
+	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
-		error(403, 'Requires super_admin role');
+		error(403, forbiddenText('privacy requests'));
 	}
 	return {};
 };
@@ -23,9 +25,8 @@ export const actions: Actions = {
 		try {
 			const result = await exportSubject(subject, client);
 			return { action: 'export', ok: true, subject, result };
-		} catch (e: unknown) {
-			const msg = e instanceof Error ? e.message : 'Export failed';
-			return fail(400, { action: 'export', error: msg });
+		} catch (err) {
+			return fail(400, { action: 'export', error: actionError(err, 'The export could not be made. Nothing was read for this subject.') });
 		}
 	},
 
@@ -47,9 +48,11 @@ export const actions: Actions = {
 		try {
 			const result = await eraseSubject(subject, client);
 			return { action: 'erase', ok: true, subject, result };
-		} catch (e: unknown) {
-			const msg = e instanceof Error ? e.message : 'Erasure failed';
-			return fail(400, { action: 'erase', error: msg });
+		} catch (err) {
+			return fail(400, {
+				action: 'erase',
+				error: actionError(err, 'The erasure was not attempted, so nothing was erased. Try again in a moment.'),
+			});
 		}
 	},
 };

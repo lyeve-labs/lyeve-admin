@@ -11,6 +11,7 @@
  * minutes rather than seconds. It answers 409 while one is already running,
  * which the screen has to report as "already running" and not as a failure.
  */
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 
@@ -36,7 +37,6 @@ export interface RefreshResult {
 
 /** Where one entry in a person's feed came from. */
 export const FEED_SOURCES = ['similar', 'trending', 'collaborative', 'random'] as const;
-export type FeedSource = (typeof FEED_SOURCES)[number];
 
 export interface FeedEntry {
 	id: string;
@@ -64,8 +64,19 @@ export async function refreshAll(client: HttpClient): Promise<RefreshResult> {
 	return client.post<RefreshResult>(REFRESH_URL, {});
 }
 
+/** Generates one reader's feed now. The plugin answers `{entries, total}`. */
 export async function generateFeed(client: HttpClient, userId: string): Promise<FeedEntry[]> {
-	return client.post<FeedEntry[]>(`${GENERATE_FEED_URL}/${encodeURIComponent(userId)}`, {});
+	const res = await client.post<unknown>(`${GENERATE_FEED_URL}/${encodeURIComponent(userId)}`, {});
+	if (Array.isArray(res)) return res as FeedEntry[];
+	const entries = res && typeof res === 'object' ? (res as { entries?: unknown }).entries : undefined;
+	return Array.isArray(entries) ? (entries as FeedEntry[]) : [];
+}
+
+const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Whether a value has the shape of a user id, which the engine issues as a UUID. */
+export function isUserId(value: string): boolean {
+	return USER_ID.test(value);
 }
 
 /**
@@ -94,7 +105,7 @@ export function sourceLabel(source: string): string {
  * Random picks are the control arm, so a feed made of them is not a broken
  * feed. It is the measurement, and marking it apart stops that reading.
  */
-export function sourceTone(source: string): 'brand' | 'neutral' {
+export function sourceTone(source: string): StatusTone {
 	return source === 'random' ? 'neutral' : 'brand';
 }
 

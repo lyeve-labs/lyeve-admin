@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -13,7 +13,7 @@ import {
 	type Device,
 	type DeviceGate,
 } from '$lib/api/devices';
-import { pageOf, pageWindow } from '$lib/api/list';
+import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -52,6 +52,10 @@ export const load: PageServerLoad = async (event) => {
 		hasMore = page.hasMore;
 	} catch (err) {
 		gate = deviceGate(err);
+	}
+	if (gate.state === 'ok') {
+		const back = pastEndOffset(devices.length, limit, offset, total);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
 	return { devices, total, limit, offset, hasMore, userAgent, gate };

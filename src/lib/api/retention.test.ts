@@ -5,8 +5,10 @@ import {
 	archivalLabel,
 	archivalTone,
 	deletionIsBlocked,
+	entriesDeleted,
 	holdIsUnbounded,
 	holdScope,
+	listPolicies,
 	policyIsCatchAll,
 	policyScope,
 	retentionGate,
@@ -123,11 +125,47 @@ describe('the gate', () => {
 	it('tells a 402, a 404 and any other failure apart', () => {
 		expect(retentionGate(new ApiError(402, 'payment required')).state).toBe('locked');
 		expect(retentionGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(retentionGate(new ApiError(503, 'unavailable')).state).toBe('error');
+		expect(retentionGate(new ApiError(500, 'internal error')).state).toBe('error');
+		expect(retentionGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
 	});
 
 	it('never reports a failed read as nothing being deleted', () => {
 		const gate = retentionGate(new Error('network'));
 		expect(gate.state === 'error' && gate.message).toContain('not a report that nothing is being deleted');
+	});
+});
+
+describe('an enforcement run', () => {
+	it('adds up the entries each policy deleted', () => {
+		const run = {
+			policies_processed: 2,
+			results: [
+				{ policy_id: 'p1', entries_deleted: 9 },
+				{ policy_id: 'p2', entries_deleted: 3, entries_archived: 3 },
+			],
+		};
+		expect(entriesDeleted(run)).toBe(12);
+	});
+
+	it('counts a run that processed nothing as none deleted', () => {
+		expect(entriesDeleted({ policies_processed: 0, results: null })).toBe(0);
+		expect(entriesDeleted({})).toBe(0);
+	});
+});
+
+describe('reading every policy', () => {
+	it('reads past the first page until the stated total', async () => {
+		const asked: string[] = [];
+		const client = {
+			get: async (url: string) => {
+				asked.push(url);
+				const offset = Number(new URL(url, 'http://x').searchParams.get('offset'));
+				const size = offset === 0 ? 500 : 20;
+				return { data: Array.from({ length: size }, (_, i) => ({ id: `p${offset + i}` })), total_count: 520 };
+			},
+		};
+		const all = await listPolicies(client as never);
+		expect(all.data).toHaveLength(520);
+		expect(asked).toEqual(['/api/admin/retention-policies?limit=500&offset=0', '/api/admin/retention-policies?limit=500&offset=500']);
 	});
 });

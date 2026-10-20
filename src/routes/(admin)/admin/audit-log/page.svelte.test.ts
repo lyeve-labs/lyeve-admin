@@ -66,8 +66,9 @@ function entries(count: number, from = 0) {
 }
 
 function data(overrides: Record<string, unknown> = {}) {
-	return {
+	const merged: Record<string, unknown> = {
 		entitlements,
+		user: { id: 'u1', roles: ['super_admin'] },
 		entries: entries(50),
 		total: 13043,
 		offset: 0,
@@ -77,6 +78,10 @@ function data(overrides: Record<string, unknown> = {}) {
 		actions: ['create.content'],
 		...overrides,
 	};
+	// The load hands the rows over as a read that answered, unless a case
+	// passes the failed read itself.
+	if (Array.isArray(merged.entries)) merged.entries = { ok: true, value: merged.entries };
+	return merged;
 }
 
 function pager(container: HTMLElement, label: string): HTMLAnchorElement | undefined {
@@ -212,6 +217,31 @@ describe('Audit log toolbar', () => {
 		expect(container.querySelector('[role="toolbar"]')?.textContent).toContain('All actions');
 	});
 
+	it('exports the filter in force and says how far an export goes', () => {
+		const { container } = render(AuditLogPage, {
+			props: {
+				data: data({
+					filter: { q: 'content', action: 'content.delete', from: '2026-01-01', to: '' },
+					exportNote: 'An export holds the entries the dates, action and resource type match, at most 100,000.',
+				}) as never,
+				form: null as never,
+			},
+		});
+		const exportForm = container.querySelector('form[action="/api/admin/audit-log/export"]') as HTMLFormElement;
+		const sent = new FormData(exportForm);
+		expect(sent.get('action')).toBe('content.delete');
+		expect(sent.get('from')).toBe('2026-01-01');
+		expect(sent.get('q')).toBe('content');
+		expect(sent.has('to')).toBe(false);
+		expect(container.textContent).toContain('at most 100,000');
+	});
+
+	it('names the two date filters for a screen reader', () => {
+		const { getByLabelText } = render(AuditLogPage, { props: { data: data() as never, form: null as never } });
+		expect(getByLabelText('From').id).toBe('audit-from');
+		expect(getByLabelText('To').id).toBe('audit-to');
+	});
+
 	it('carries the filter through the pager', () => {
 		const { container } = render(AuditLogPage, {
 			props: {
@@ -259,5 +289,65 @@ describe('Audit log regions', () => {
 		});
 
 		expect(headings(container)).toContain('Entries');
+	});
+});
+
+/*
+ * A failed read says so. The first-run state would tell the reader that
+ * nothing on this instance has ever been recorded, which is the one thing an
+ * audit log must never claim without having read it.
+ */
+describe('Audit log failed read', () => {
+	const failed = {
+		entries: { ok: false, gate: { state: 'error', message: 'The audit log could not be read. This is not a report that it is empty.' } },
+		total: null,
+		actions: [],
+	};
+
+	it('shows the failure in place of the first-run state', () => {
+		const { container } = render(AuditLogPage, { props: { data: data(failed) as never, form: null as never } });
+
+		expect(container.textContent).toContain('The audit log could not be read');
+		expect(container.textContent).not.toContain('No audit entries yet');
+		expect(container.querySelector('table')).toBeNull();
+	});
+
+	it('states no entry count it did not read', () => {
+		const { container } = render(AuditLogPage, { props: { data: data(failed) as never, form: null as never } });
+
+		expect(container.textContent).not.toContain('0 entries');
+	});
+
+	it('names the role refusal for an admin the engine refused', () => {
+		const { container } = render(AuditLogPage, {
+			props: { data: data({ ...failed, entries: { ok: false, gate: { state: 'forbidden' } } }) as never, form: null as never },
+		});
+
+		expect(container.textContent).toContain('Your role cannot open audit log');
+	});
+});
+
+/*
+ * The count and the rows are two answers. Once a past-end page has been
+ * corrected, the rows can still come back empty under a count above zero,
+ * and the first-run state would then contradict the count beside it.
+ */
+describe('Audit log empty page under a count', () => {
+	it('says the page is empty, not the log, and links to the first page', () => {
+		const { container } = render(AuditLogPage, {
+			props: { data: data({ entries: [], total: 120, offset: 100 }) as never, form: null as never },
+		});
+		expect(container.textContent).not.toContain('No audit entries yet');
+		expect(container.textContent).toContain('Nothing on this page');
+		expect(container.textContent).toContain('The log holds 120 entries');
+		const first = [...container.querySelectorAll('a')].find((a) => a.textContent?.includes('Go to the first page'));
+		expect(first?.getAttribute('href')).toBe('/admin/audit-log');
+	});
+
+	it('keeps the first-run state for a log that holds nothing', () => {
+		const { container } = render(AuditLogPage, {
+			props: { data: data({ entries: [], total: 0 }) as never, form: null as never },
+		});
+		expect(container.textContent).toContain('No audit entries yet');
 	});
 });

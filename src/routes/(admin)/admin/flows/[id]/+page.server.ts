@@ -1,16 +1,17 @@
 import type { Actions, PageServerLoad } from './$types';
-import { error, fail, redirect } from '@sveltejs/kit';
-import { ApiError, createClient } from '@lyeve-labs/client';
+import { error, fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import { ApiError } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
-import { authedClient, requireUser } from '$lib/server/authz';
+import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { flowAuthHeaders, readImportForm } from '$lib/server/flow-import';
+import { readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
 import { refusalFailure } from '$lib/server/flow-refusal';
 import { assistRefusal, catalogFor, refusalStatus } from '$lib/server/flow-assist';
 import { CatalogError, assistFlow, explainFlow, getLLMCatalog, type AssistProblem } from '$lib/api/assist';
 import { clearSessionCookie } from '$lib/server/session-cookie';
+import { readError } from '$lib/server/read-error';
 import {
 	ImportError,
 	FlowRefusal,
@@ -31,60 +32,80 @@ import {
 	rollbackFlow,
 	saveDraft,
 	validationErrors,
+	type ValidationError,
 	type Flow,
+	type FlowRun,
+	type FlowVersion,
 	deleteTemplate,
 	saveTemplate,
 } from '$lib/api/flows';
 import { emptyDefinition, type FlowDefinition, type SchemaOption } from '$lib/flow/types';
 import { normalizeDefinition } from '$lib/flow/graph';
 import type { HttpClient } from '@lyeve-labs/client';
-import { rowsOf } from '$lib/api/list';
+import { pageWindow, pastEndOffset, rowsOf, withOffset, type PagedList } from '$lib/api/list';
+import { GATE_OK, gateOf, section, type Gate, type Section } from '$lib/api/gate';
+import type { NodeSpec } from '$lib/flow/types';
 
-const RECENT_RUNS = 20;
+/** The runs tab pages through a flow's runs this many at a time. */
+const RUNS_PER_PAGE = 20;
 
-/**
- * The status a failed read answers with. Only a 404 means the flow is gone.
- * Anything else is the engine, the session or the network, and telling the
- * operator "not found" for a 503 sends them looking for a flow that exists.
- * The message is static so driver text never reaches the page.
- */
-function loadStatus(err: unknown): { status: number; message: string } {
-	if (err instanceof ApiError) {
-		if (err.status === 404) return { status: 404, message: 'Flow not found' };
-		if (err.status === 403) return { status: 403, message: 'Your role cannot read flows' };
-		if (err.status >= 400 && err.status < 600) return { status: err.status, message: 'The flow could not be read from the engine' };
-	}
-	return { status: 502, message: 'The flow could not be read from the engine' };
-}
+const LOCKED = {
+	locked: true as const,
+	flow: null,
+	catalog: [],
+	catalogGate: GATE_OK,
+	datasources: [],
+	datasourcesGate: GATE_OK,
+	variables: [],
+	variablesGate: GATE_OK,
+	schemas: [],
+	flows: [],
+	eventTypes: null,
+	runs: { ok: true, value: { rows: [], limit: RUNS_PER_PAGE, offset: 0, total: 0, hasMore: false } } as Section<PagedList<FlowRun>>,
+	versions: { ok: true, value: [] } as Section<FlowVersion[]>,
+	templates: [],
+	assistant: 'hidden' as const,
+};
 
-export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
-	const client = createClient(fetch, flowAuthHeaders({ cookies, url }));
+export const load: PageServerLoad = async (event) => {
+	const { fetch, cookies, params, url } = event;
+	const client = authedClient(event);
 
 	let flow: Flow;
 	try {
 		flow = await getFlow(client, params.id);
 	} catch (err) {
-		if (err instanceof ApiError && err.status === 402) {
-			return { locked: true as const, flow: null, catalog: [], datasources: [], variables: [], schemas: [], flows: [], eventTypes: null, runs: [], versions: [], templates: [], assistant: 'hidden' as const };
-		}
+		if (err instanceof ApiError && err.status === 402) return LOCKED;
 		// An expired session goes where the shell sends one, not to an error page.
 		if (err instanceof ApiError && err.status === 401) {
 			clearSessionCookie({ cookies, url });
 			redirect(302, '/login');
 		}
-		const { status, message } = loadStatus(err);
-		error(status, message);
+		readError(err, 'Flow not found');
 	}
 	if (!flow?.id) error(404, 'Flow not found');
 
+	// The runs tab pages by the address, so a page of runs is a link.
+	const { offset: runsOffset } = pageWindow(url, RUNS_PER_PAGE, RUNS_PER_PAGE);
+
 	// The catalog is the one read the editor cannot do without: the palette
-	// and every inspector form come from it. The rest degrade to empty.
+	// and every inspector form come from it, so a failed read keeps its gate
+	// and the editor says the node types could not be read. The rest degrade
+	// to empty.
 	let loaded;
 	try {
 		loaded = await Promise.all([
-			getCatalog(client).catch(() => []),
-			listDatasources(client).then((list) => list.rows).catch(() => []),
-			listVariables(client, 500, 0).catch(() => []),
+			getCatalog(client).then(
+				(catalog): { catalog: NodeSpec[]; gate: Gate } => ({ catalog, gate: GATE_OK }),
+				(err: unknown) => ({
+					catalog: [] as NodeSpec[],
+					gate: gateOf(err, 'The node types could not be read, so the palette has nothing to offer.'),
+				}),
+			),
+			// A failed read of the names is kept, so the node form and the
+			// inspector never say a tenant has none when they were not read.
+			section(listDatasources(client).then((list) => list.rows), 'The datasources could not be read.'),
+			section(listVariables(client, 500, 0), 'The variables could not be read.'),
 			// The pickers read the content schemas, the published flows and the
 			// event types. A failed read leaves each picker as free text, which
 			// is the escape it carries anyway. An engine without the event-types
@@ -96,21 +117,37 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 				if (err instanceof ApiError && err.status === 402) throw err;
 				return null;
 			}),
-			listRuns(client, flow.id, { limit: RECENT_RUNS, offset: 0 }).then((p) => p.rows).catch(() => []),
-			listVersions(client, flow.id).catch(() => []),
+			// One row past the page says whether another page follows when the
+			// plugin states no total.
+			section(
+				listRuns(client, flow.id, { limit: RUNS_PER_PAGE + 1, offset: runsOffset }).then(
+					(p): PagedList<FlowRun> => {
+						const rows = p.rows.slice(0, RUNS_PER_PAGE);
+						const hasMore = p.total === null ? p.rows.length > RUNS_PER_PAGE : runsOffset + rows.length < p.total;
+						return { rows, limit: RUNS_PER_PAGE, offset: runsOffset, total: p.total, hasMore };
+					},
+				),
+				'The runs could not be read. This is not a report that the flow never ran.',
+			),
+			section(listVersions(client, flow.id), 'The versions could not be read.'),
 			getTemplates(client).catch(() => []),
 			// The assistant's catalog decides whether the tab exists at all: a
 			// 402 there means the assistant is not enabled, and a tab that could
 			// only say so is better left out. Any other refusal is reported when
 			// the reader asks, not on every load.
-			getLLMCatalog(fetch, flowAuthHeaders({ cookies, url }))
+			getLLMCatalog(fetch, authedHeaders(event))
 				.then(() => 'ready' as const)
 				.catch((err: unknown) => (err instanceof CatalogError && err.status === 402 ? ('hidden' as const) : ('ready' as const))),
 		]);
 	} catch {
-		return { locked: true as const, flow: null, catalog: [], datasources: [], variables: [], schemas: [], flows: [], eventTypes: null, runs: [], versions: [], templates: [], assistant: 'hidden' as const };
+		return LOCKED;
 	}
-	const [catalog, datasources, variables, schemas, flows, eventTypes, runs, versions, templates, assistant] = loaded;
+	const [read, datasources, variables, schemas, flows, eventTypes, runs, versions, templates, assistant] = loaded;
+
+	if (runs.ok) {
+		const back = pastEndOffset(runs.value.rows.length, RUNS_PER_PAGE, runsOffset, runs.value.total);
+		if (back !== null) redirect(307, withOffset(url, back));
+	}
 
 	const schemaOptions: SchemaOption[] = schemas.map((s) => ({
 		name: s.name,
@@ -121,9 +158,12 @@ export const load: PageServerLoad = async ({ fetch, cookies, params, url }) => {
 	return {
 		locked: false as const,
 		flow: { ...flow, draft: normalizeDefinition(flow.draft ?? emptyDefinition(flow.name, flow.slug)) },
-		catalog,
-		datasources: datasources.map((d) => ({ id: d.id, name: d.name, kind: d.kind })),
-		variables: rowsOf(variables).map((v) => v.key),
+		catalog: read.catalog,
+		catalogGate: read.gate,
+		datasources: datasources.ok ? datasources.value.map((d) => ({ id: d.id, name: d.name, kind: d.kind })) : [],
+		datasourcesGate: datasources.ok ? GATE_OK : datasources.gate,
+		variables: variables.ok ? rowsOf(variables.value).map((v) => v.key) : [],
+		variablesGate: variables.ok ? GATE_OK : variables.gate,
 		schemas: schemaOptions,
 		flows,
 		eventTypes,
@@ -143,9 +183,33 @@ function definitionField(data: FormData): FlowDefinition | null {
 	}
 }
 
+/**
+ * An import's failure, tagged so the import drawer shows it and the notice
+ * above the canvas does not draw it a second time behind the open drawer.
+ */
+function importFailed<F extends ActionFailure<Record<string, unknown>>>(failure: F) {
+	return fail(failure.status, { ...(failure.data as F['data']), action: 'import' });
+}
+
+/**
+ * The sentence for a 409 the plugin answered in the validation shape: a slug
+ * another flow holds, or an HTTP path another flow answers.
+ */
+function conflictText(errors: ValidationError[]): string {
+	if (errors.some((e) => e.path === '/slug')) return 'Another flow already uses this slug. Choose another.';
+	if (errors.some((e) => e.path === '/config/path')) return 'Another flow already answers this HTTP path. Choose another path for the trigger.';
+	return 'This conflicts with another flow.';
+}
+
 function refused(err: unknown, fallback: string) {
 	if (err instanceof ApiError && err.status === 422) {
 		return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.message) });
+	}
+	// A conflict comes in the validation shape with no error key, so the list
+	// is read the same way and marks what it names on the canvas.
+	if (err instanceof ApiError && err.status === 409) {
+		const errors = validationErrors(err.message);
+		return fail(409, { error: conflictText(errors), errors });
 	}
 	if (err instanceof FlowRefusal) return refusalFailure(err);
 	if (err instanceof ApiError && err.status === 402) {
@@ -278,27 +342,27 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const body = await readImportForm(data);
-		if (!body) return fail(400, { error: 'Paste a definition or choose a file.' });
+		if (!body) return fail(400, { action: 'import', error: 'Paste a definition or choose a file.' });
 		let slug = String(data.get('slug') ?? '').trim();
 		try {
 			if (!slug) slug = (await getFlow(client, event.params.id)).slug;
-			const result = await importFlow(event.fetch, { ...body, mode: 'replace', slug }, flowAuthHeaders(event));
+			const result = await importFlow(event.fetch, { ...body, mode: 'replace', slug }, authedHeaders(event));
 			return {
 				reloaded: await reloaded(client, event.params.id, result),
 				unresolved: result.unresolved_datasources ?? [],
 			};
 		} catch (err) {
 			if (err instanceof ImportError && err.status === 422) {
-				return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.body) });
+				return fail(422, { action: 'import', error: 'The definition did not validate.', errors: validationErrors(err.body) });
 			}
-			if (err instanceof FlowRefusal) return refusalFailure(err);
+			if (err instanceof FlowRefusal) return importFailed(refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {
-				return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
+				return fail(402, { action: 'import', error: 'Flows are not enabled on this instance.', locked: true });
 			}
 			if (err instanceof ImportError) {
-				return fail(400, { error: err.status < 500 && err.message ? err.message : 'Import failed' });
+				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Import failed' });
 			}
-			return refused(err, 'Import failed');
+			return importFailed(refused(err, 'Import failed'));
 		}
 	},
 
