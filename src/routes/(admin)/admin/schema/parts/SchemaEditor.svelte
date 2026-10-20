@@ -215,6 +215,15 @@
 	}
 
 	// Derived field groupings, updated whenever the schema changes.
+	/**
+	 * What a system field's row says about it, from its own flags. The id is
+	 * required and indexed, and the key of an optional relation is indexed
+	 * but not required.
+	 */
+	function systemNote(field: { required?: boolean; indexed?: boolean }): string {
+		return ['system', field.required && 'required', field.indexed && 'indexed'].filter(Boolean).join(', ');
+	}
+
 	let topSysFields = $derived(schema.fields.filter((f) => f.system && !isTimestamp(f)));
 	let userFields = $derived(schema.fields.filter((f) => !f.system));
 	let bottomSysFields = $derived(schema.fields.filter((f) => f.system && isTimestamp(f)));
@@ -421,7 +430,7 @@
 
 	{#if topSysFields.length > 0}
 		{#each topSysFields as field (field.id ?? field.name)}
-			{@render lockedField(field.name, field.field_type, 'system, required, indexed')}
+			{@render lockedField(field.name, field.field_type, systemNote(field))}
 		{/each}
 	{:else}
 		{@render plannedField('id', 'uid', 'Generated UUID. Unique, indexed and not editable.', 'auto, system')}
