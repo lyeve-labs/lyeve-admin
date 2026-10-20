@@ -18,10 +18,9 @@
 # the scan then takes the newest published image.
 #
 # Each architecture is its own image with its own packages, so both are
-# scanned: the OS packages of the Node base image and the npm client it
-# carries. A CRITICAL or HIGH finding that has a fix fails the run. A finding
-# with no fix is in the report and does not fail it. The report, every
-# severity, is uploaded as an artifact.
+# scanned for the OS packages of its Alpine base. A CRITICAL or HIGH finding
+# that has a fix fails the run. A finding with no fix is in the report and
+# does not fail it. The report, every severity, is uploaded as an artifact.
 #
 # The server's own dependencies are bundled into build/ and leave no package
 # manifest behind, so trivy cannot see them. The audit in ci.yml covers those

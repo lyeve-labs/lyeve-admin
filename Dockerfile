@@ -61,18 +61,31 @@ RUN find build -name '*.map' -delete
 # to build that image.
 RUN node tools/check-server-bundle.mjs build
 
-# Stage 3: runtime
+# Stage 3: the runtime's root filesystem
+# The Node base image ships npm, npx, corepack and yarn in its own layers, and
+# deleting them in a layer above leaves their bytes in the image under
+# whiteouts, where a scanner that reads each layer still finds them. The
+# runtime is plain Alpine of the same release instead, with the node binary,
+# the libraries it links and the base image's node user and entrypoint, and
+# its packages upgraded to the release's current fixes.
+# alpine:3.24
+FROM alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runtime-root
+RUN apk upgrade --no-cache \
+ && apk add --no-cache libstdc++ \
+ && addgroup -g 1000 node \
+ && adduser -u 1000 -G node -s /bin/sh -D node
 # node:24-alpine
-FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS runtime
+COPY --from=node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f \
+     /usr/local/bin/node /usr/local/bin/docker-entrypoint.sh /usr/local/bin/
+
+# Stage 4: runtime
+# One layer holds the whole root filesystem, so the base packages the upgrade
+# replaced leave nothing behind either.
+FROM scratch AS runtime
+COPY --from=runtime-root / /
 WORKDIR /app
 
-# The runtime only runs node build/index.js, so the package managers the base
-# image bundles go. Their own dependencies carry advisories that nothing here
-# reaches, and every scan of the image would report them.
-RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
-      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
-      /usr/local/bin/yarn /usr/local/bin/yarnpkg
-
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV NODE_ENV=production
 # adapter-node honors PORT and ORIGIN at runtime.
 ENV PORT=3002
@@ -100,4 +113,5 @@ USER node
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1:3002/ || exit 1
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "build/index.js"]
