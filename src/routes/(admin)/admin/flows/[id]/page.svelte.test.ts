@@ -750,10 +750,10 @@ describe('flow editor page', () => {
 		const refusal = {
 			error: 'payment_required',
 			plugin: 'flow',
-			feature: 'feature:flow-pro',
+			feature: 'feature:example_feature',
 			upgrade_url: '',
 			ok: false,
-			errors: [{ node_id: 'orders', path: '/type', message: 'db.query needs flow-pro' }],
+			errors: [{ node_id: 'orders', path: '/type', message: 'db.query needs example_feature' }],
 		};
 		fetchMock = vi.fn(async (url: string) => {
 			const refused = String(url).endsWith('/test');

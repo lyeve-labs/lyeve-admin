@@ -135,10 +135,10 @@ describe('email trigger writes', () => {
 		expect(out.data).toEqual({ action: 'save', error: 'not an email address: b@example' });
 	});
 
-	// The plugin sells trigger saves with email-pro and gates the create and
+	// The plugin sells trigger saves as a capability and gates the create and
 	// the update, not the delete.
 	it('carries the license refusal of a save so the drawer can say what is missing', async () => {
-		const body = { error: 'payment_required', plugin: 'email', feature: 'feature:email-pro', upgrade_url: '' };
+		const body = { error: 'payment_required', plugin: 'email', feature: 'feature:example_feature', upgrade_url: '' };
 		for (const id of ['', 't1']) {
 			const { event } = write({ ...TRIGGER, id }, json(body, 402));
 			const out = (await actions.save(event)) as Failure;

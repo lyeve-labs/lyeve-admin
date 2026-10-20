@@ -12,7 +12,7 @@ const answering = (err: unknown) =>
 
 describe('whether the license allows trigger writes', () => {
 	it('reads a 402 naming a capability as a refusal', async () => {
-		const refused = await triggerWriteRefusal(answering(new ApiError(402, 'payment required', { feature: 'email-pro', plugin: 'email' })));
+		const refused = await triggerWriteRefusal(answering(new ApiError(402, 'payment required', { feature: 'feature:example_feature', plugin: 'email' })));
 		expect(refused?.kind).toBe('feature');
 	});
 
