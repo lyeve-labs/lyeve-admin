@@ -5,9 +5,9 @@
 FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS deps
 WORKDIR /app
 
-# Install pnpm directly: the Node base image does not bundle corepack.
-# The version is the one package.json names in packageManager, so the image
-# installs with the same pnpm, and the same policies, as a checkout does.
+# Install pnpm with npm at the version package.json names in packageManager,
+# so the image installs with the same pnpm, and the same policies, as a
+# checkout does.
 RUN npm install -g pnpm@11.25.0
 
 # pnpm-workspace.yaml carries the dependency overrides since pnpm 10 moved
