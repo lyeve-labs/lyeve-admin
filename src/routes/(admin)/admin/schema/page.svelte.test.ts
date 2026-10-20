@@ -29,6 +29,13 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
+// Each case renders the whole page, and the first one in the file also pays
+// for warming the worker: about 430 ms run alone against 100 ms for the next,
+// and 1.2 to 1.8 s in a full suite. On a machine busy with other work the
+// first case took 5.9 s and failed at the 5 s default. Fifteen seconds is
+// about eight times a full-suite run and still ends a case that hangs.
+vi.setConfig({ testTimeout: 15_000 });
+
 /**
  * The page reads only the entitlements, the schema list and the row counts, so
  * the fixture carries those and is asserted against PageData once.
