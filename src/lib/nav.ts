@@ -156,6 +156,7 @@ const PAGE_PLUGIN: Readonly<Record<string, PluginName>> = {
 	'webhooks-incoming': PLUGIN.webhook,
 	releases: PLUGIN.content,
 	'content-history': PLUGIN.content,
+	'content-activity': PLUGIN.content,
 	'api-keys': PLUGIN.apikey,
 	permissions: PLUGIN.permissions,
 	jobs: PLUGIN.cron,
@@ -460,6 +461,16 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 					label: 'Audit log',
 					href: '/admin/audit-log',
 					icon: ScrollText,
+					match: 'prefix' as const,
+				},
+				// Who changed which entry, beside the audit trail it narrows. It
+				// sits outside /admin/content so it never takes the address of a
+				// content type with the same name.
+				{
+					id: 'content-activity',
+					label: 'Content activity',
+					href: '/admin/content-activity',
+					icon: History,
 					match: 'prefix' as const,
 				},
 				// Connection counts are the calling tenant's. The per-tenant

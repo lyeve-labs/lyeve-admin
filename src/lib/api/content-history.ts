@@ -107,19 +107,87 @@ export interface ActivityRow {
 	tenant_id?: string;
 	schema_name: string;
 	entry_id: string;
+	/** The entry's title when the change was recorded, null when the plugin has none. */
+	entry_title?: string | null;
+	/** Whether the entry is still there to open. */
+	entry_exists?: boolean;
 	action: string;
 	source: string;
 	/** The names of the fields the change touched. */
 	fields: string[] | null;
 	actor_id: string;
-	/** The version history recorded for the change, when it recorded one. */
-	revision_num?: number;
+	/** The account's email, null when the plugin cannot name it. */
+	actor_email?: string | null;
+	/**
+	 * What made the change: a person, a person through an admin token, or an
+	 * API key. Null on a row written before the field existed and absent from
+	 * an older engine, and either is a person. A row with no actor id is the
+	 * unknown one.
+	 */
+	actor_kind?: 'user' | 'admin_token' | 'api_key' | null;
+	/** The version history recorded for the change, null when it recorded none. */
+	revision_num?: number | null;
 	created_at: string;
 }
 
-/** The filters the activity routes take, by their query names. */
+/** The filters the activity page keeps in its address, by the routes' query names. */
 export const ACTIVITY_FILTERS = ['schema', 'entry_id', 'actor', 'action', 'source', 'from', 'to'] as const;
 export type ActivityFilter = Record<(typeof ACTIVITY_FILTERS)[number], string>;
+
+/**
+ * The actions the content plugin records, with the words the console shows
+ * for each. A hard delete is `deleted`. Rows written before it existed
+ * record a delete as `archived`. A row may carry an action this list does
+ * not know, and it shows as sent.
+ */
+export const ACTION_LABELS: Readonly<Record<string, string>> = {
+	created: 'Created',
+	updated: 'Updated',
+	published: 'Published',
+	unpublished: 'Unpublished',
+	archived: 'Archived',
+	deleted: 'Deleted',
+	rollback: 'Restored',
+	scheduled_publish: 'Scheduled publish',
+	scheduled_unpublish: 'Scheduled unpublish',
+};
+
+export function actionLabel(action: string): string {
+	return ACTION_LABELS[action] ?? action;
+}
+
+/** The actions the filter always offers. */
+export const ACTIVITY_ACTIONS = [
+	'created',
+	'updated',
+	'published',
+	'unpublished',
+	'archived',
+	'deleted',
+	'rollback',
+	'scheduled_publish',
+	'scheduled_unpublish',
+] as const;
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The filter in the page's address. A date that is not a day is dropped, and reversed dates are swapped. */
+export function readActivityFilter(url: URL): ActivityFilter {
+	const text = (key: string) => (url.searchParams.get(key) ?? '').trim();
+	const day = (key: string) => (DAY.test(text(key)) ? text(key) : '');
+	let from = day('from');
+	let to = day('to');
+	if (from && to && from > to) [from, to] = [to, from];
+	return {
+		schema: text('schema'),
+		entry_id: text('entry_id'),
+		actor: text('actor'),
+		action: text('action'),
+		source: text('source'),
+		from,
+		to,
+	};
+}
 
 /** A body that is not an object reads as an empty one, so a missing key is a default rather than a throw. */
 function record(value: unknown): Record<string, unknown> {
@@ -206,8 +274,8 @@ export async function deleteTypeHistory(client: HttpClient, schema: string): Pro
 
 /**
  * One page of activity. `tenant` is set only for a super admin, and moves
- * the read to the cross-tenant route, where an empty value means every
- * tenant.
+ * the read to the cross-tenant route, which takes it as `tenant_id`. An empty
+ * value means every tenant.
  */
 export function listActivity(
 	client: HttpClient,
@@ -217,8 +285,18 @@ export function listActivity(
 	tenant?: string,
 ): Promise<ListEnvelope<ActivityRow> | ActivityRow[]> {
 	const params = new URLSearchParams();
-	for (const key of ACTIVITY_FILTERS) if (filter[key]) params.set(key, filter[key]);
-	if (tenant) params.set('tenant', tenant);
+	for (const key of ['schema', 'entry_id', 'actor', 'action', 'source'] as const) {
+		if (filter[key]) params.set(key, filter[key]);
+	}
+	// The page picks days. The route takes times, and `to` keeps the chosen
+	// day whole by asking for everything before the next one.
+	if (filter.from) params.set('from', `${filter.from}T00:00:00Z`);
+	if (filter.to) {
+		const next = new Date(`${filter.to}T00:00:00Z`);
+		next.setUTCDate(next.getUTCDate() + 1);
+		params.set('to', `${next.toISOString().slice(0, 10)}T00:00:00Z`);
+	}
+	if (tenant) params.set('tenant_id', tenant);
 	params.set('limit', String(limit));
 	params.set('offset', String(offset));
 	const base = tenant === undefined ? ACTIVITY_URL : ACTIVITY_ALL_URL;
