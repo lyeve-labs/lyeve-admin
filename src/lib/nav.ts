@@ -155,6 +155,7 @@ const PAGE_PLUGIN: Readonly<Record<string, PluginName>> = {
 	webhooks: PLUGIN.webhook,
 	'webhooks-incoming': PLUGIN.webhook,
 	releases: PLUGIN.content,
+	'content-history': PLUGIN.content,
 	'api-keys': PLUGIN.apikey,
 	permissions: PLUGIN.permissions,
 	jobs: PLUGIN.cron,
@@ -551,6 +552,14 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		href: '/admin/settings/rate-limits/tenant',
 		icon: Gauge,
 	};
+	// Which content types keep versions and for how long. The content plugin
+	// serves the settings to an admin and a super admin.
+	const contentHistory: NavNode = {
+		id: 'content-history',
+		label: 'Content history',
+		href: '/admin/settings/content-history',
+		icon: History,
+	};
 	const settings: NavNode[] = superAdmin
 		? [
 				// One entry, because there is one place mail is configured: the
@@ -623,9 +632,10 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 				customization,
 				captcha,
 				signIn,
+				contentHistory,
 		  ]
 		: operator
-			? [customization, captcha, signIn, tenantRateLimits]
+			? [customization, captcha, signIn, tenantRateLimits, contentHistory]
 			: [];
 
 	const tree: NavTree = [
