@@ -61,7 +61,6 @@ on:
 permissions:
   contents: read
   packages: write
-  id-token: write   # for sigstore/cosign keyless signing if added later
 
 env:
   REGISTRY: ghcr.io
