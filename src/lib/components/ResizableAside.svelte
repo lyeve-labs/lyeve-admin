@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button, SectionHeading } from '@lyeve-labs/ui-kit';
 	import { Lock, LockOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from '@lucide/svelte';
-	import { untrack, type Snippet } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import { clampWidth, readAside, writeAside } from '$lib/aside';
 	import { ICON } from '$lib/icon';
 
@@ -212,6 +212,21 @@
 		remember();
 	}
 
+	let strip: HTMLElement | undefined = $state();
+	let controls: HTMLElement | undefined = $state();
+
+	/**
+	 * Folds or opens the aside from its own control. The fold hides the
+	 * control that was pressed, so once the markup carries the new state focus
+	 * moves to the control that undoes it. Left where it was, a keyboard reader
+	 * lands on the page body and the next Tab starts from the top.
+	 */
+	async function fold(next: boolean) {
+		open = next;
+		await tick();
+		(next ? controls : strip)?.querySelector<HTMLElement>('[aria-expanded]')?.focus();
+	}
+
 	function toggleLock() {
 		locked = !locked;
 		remember();
@@ -262,8 +277,8 @@
 >
 	{#if collapsible}
 		<!-- The strip: the name read down the edge and the one control that brings the aside back. -->
-		<div class="h-full flex-col items-center gap-2 py-1 {folded ? `hidden ${at.strip}` : 'hidden'}" data-testid="{id}-strip">
-			<Button variant="ghost" size="sm" aria-label="Expand {label}" aria-expanded={false} hint={false} onclick={() => (open = true)}>
+		<div bind:this={strip} class="h-full flex-col items-center gap-2 py-1 {folded ? `hidden ${at.strip}` : 'hidden'}" data-testid="{id}-strip">
+			<Button variant="ghost" size="sm" aria-label="Expand {label}" aria-expanded={false} hint={false} onclick={() => fold(true)}>
 				<Expand size={ICON.sm} />
 			</Button>
 			<span class="text-xs font-medium uppercase tracking-wide text-faint [writing-mode:vertical-rl]">{label}</span>
@@ -273,7 +288,7 @@
 	<div class="relative flex h-full min-h-0 flex-1 flex-col {folded ? at.hidden : ''}">
 		<div class="flex h-9 shrink-0 items-center justify-between border-b border-line pl-3 pr-1">
 			<SectionHeading level={2} variant="eyebrow" actions={meta}>{label}</SectionHeading>
-			<div class="hidden items-center {at.flex}">
+			<div bind:this={controls} class="hidden items-center {at.flex}">
 				<Button
 					variant="ghost"
 					size="sm"
@@ -285,7 +300,7 @@
 					{#if locked}<Lock size={ICON.sm} />{:else}<LockOpen size={ICON.sm} />{/if}
 				</Button>
 				{#if collapsible}
-					<Button variant="ghost" size="sm" aria-label="Collapse {label}" aria-expanded={true} hint={false} onclick={() => (open = false)}>
+					<Button variant="ghost" size="sm" aria-label="Collapse {label}" aria-expanded={true} hint={false} onclick={() => fold(false)}>
 						<Collapse size={ICON.sm} />
 					</Button>
 				{/if}

@@ -148,6 +148,25 @@ describe('ResizableAside', () => {
 		expect(getByText('body')).toBeTruthy();
 	});
 
+	it('moves focus to the control that undoes a fold, each time, and leaves it alone when the page folds it', async () => {
+		const { getByRole, rerender } = setup({ collapsible: true });
+		for (let i = 0; i < 4; i++) {
+			const collapse = getByRole('button', { name: 'Collapse Things' });
+			collapse.focus();
+			await fireEvent.click(collapse);
+			await tick();
+			expect(document.activeElement).toBe(getByRole('button', { name: 'Expand Things' }));
+			await fireEvent.click(document.activeElement as HTMLElement);
+			await tick();
+			expect(document.activeElement).toBe(getByRole('button', { name: 'Collapse Things' }));
+		}
+
+		(document.activeElement as HTMLElement).blur();
+		await rerender({ open: false });
+		await tick();
+		expect(document.activeElement).toBe(document.body);
+	});
+
 	it('stacks in the page flow under the breakpoint and docks at its width above it', () => {
 		const { aside, handle } = setup({ breakpoint: 'md', class: 'max-h-2/5' });
 		expect(aside.className).toMatch(/(^|\s)flex(\s|$)/);
