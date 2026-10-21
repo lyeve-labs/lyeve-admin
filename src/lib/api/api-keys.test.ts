@@ -10,6 +10,8 @@ import {
 	parseLimits,
 	privilegedExpiryBounds,
 	scopesOf,
+	USAGE_IDS_BUDGET,
+	usageIdBatches,
 } from './api-keys';
 
 function clientReturning(get: ReturnType<typeof vi.fn>): HttpClient {
@@ -17,7 +19,7 @@ function clientReturning(get: ReturnType<typeof vi.fn>): HttpClient {
 }
 
 describe('keysUsage', () => {
-	it('reads every key on the page from the usage plugin in one request', async () => {
+	it('reads a page that fits one URL in one request', async () => {
 		const get = vi.fn().mockResolvedValue([{ api_key_id: 'k1', requests: 7 }]);
 		const usage = await keysUsage<{ requests: number }>(clientReturning(get), ['k1', 'k2'], '2026-09');
 		expect(get).toHaveBeenCalledTimes(1);
@@ -28,6 +30,35 @@ describe('keysUsage', () => {
 	it('rejects when the read fails, so the page can say the figures are unknown', async () => {
 		const get = vi.fn().mockRejectedValue(new Error('down'));
 		await expect(keysUsage(clientReturning(get), ['k1'], '2026-09')).rejects.toThrow('down');
+	});
+
+	// The most a page asks for is 500 keys, and their ids in one URL run to
+	// about 19.5 KB, past the 8 KB request line nginx accepts by default.
+	it('splits a full page of ids into reads that each fit an 8 KB request line', async () => {
+		const ids = Array.from({ length: 500 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+		const get = vi.fn().mockImplementation(async (path: string) => {
+			const batch = new URL(path, 'http://x').searchParams.get('ids')!.split(',');
+			return batch.map((id) => ({ api_key_id: id }));
+		});
+		const usage = await keysUsage<{ api_key_id: string }>(clientReturning(get), ids, '2026-09');
+		const paths = get.mock.calls.map(([path]) => path as string);
+		expect(paths.length).toBeGreaterThan(1);
+		for (const path of paths) expect(`GET ${path} HTTP/1.1`.length).toBeLessThan(8192);
+		expect(usage.map((u) => u.api_key_id)).toEqual(ids);
+	});
+});
+
+describe('usageIdBatches', () => {
+	it('keeps every id once and in order, each batch within the budget', () => {
+		const ids = Array.from({ length: 400 }, (_, i) => `id-${i}`);
+		const batches = usageIdBatches(ids, 100);
+		expect(batches.flat()).toEqual(ids);
+		for (const b of batches) expect(new URLSearchParams({ ids: b.join(',') }).toString().length - 'ids='.length).toBeLessThanOrEqual(100);
+	});
+	it('answers one batch for a page that fits and none for no ids', () => {
+		expect(usageIdBatches(['k1', 'k2'])).toEqual([['k1', 'k2']]);
+		expect(usageIdBatches([])).toEqual([]);
+		expect(USAGE_IDS_BUDGET).toBeLessThan(8192);
 	});
 });
 

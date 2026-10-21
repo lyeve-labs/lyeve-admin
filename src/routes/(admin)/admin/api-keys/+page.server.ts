@@ -56,10 +56,11 @@ export const load: PageServerLoad = async (event) => {
 	const keys: Section<APIKey[]> = read.ok ? { ok: true, value: rows } : read;
 	const total = read.ok ? Math.max(totalOf(read.value), offset + rows.length) : 0;
 
-	// One usage read for the whole page. A 404 is an engine without usage
-	// metering, and the cells say nothing. Any other failure leaves every
-	// figure unknown, which the cells say rather than showing no use. A key
-	// the plugin leaves out of its answer is one it does not count.
+	// One usage read for the page, split only where the ids outgrow a URL. A
+	// 404 is an engine without usage metering, and the cells say nothing. Any
+	// other failure leaves every figure unknown, which the cells say rather
+	// than showing no use. A key the plugin leaves out of its answer is one it
+	// does not count.
 	const month = new Date().toISOString().slice(0, 7);
 	const usageMap: Record<string, UsageSummary> = {};
 	let usageUnknown: string[] = [];
