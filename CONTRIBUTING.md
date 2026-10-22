@@ -4,6 +4,10 @@ This guide is short. The git hooks and CI enforce the rest.
 
 ## Quick start
 
+The toolchain is Node 26 and pnpm, at the versions `mise.toml` pins. pnpm is
+the only package manager: an install through any other one stops before it
+starts, because pnpm enforces the supply-chain policies this repository sets.
+
 ```sh
 pnpm install                       # installs deps and the commitlint and svelte-check hooks
 git checkout dev && git pull

@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1: install dependencies
-# node:24-alpine
-FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS deps
+# node:26.12.1-alpine
+FROM node@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS deps
 WORKDIR /app
 
 # Install pnpm with npm at the version package.json names in packageManager,
@@ -23,8 +23,8 @@ COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: build
-# node:24-alpine
-FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS builder
+# node:26.12.1-alpine
+FROM node@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS builder
 WORKDIR /app
 
 RUN npm install -g pnpm@11.25.0
@@ -62,7 +62,7 @@ RUN find build -name '*.map' -delete
 RUN node tools/check-server-bundle.mjs build
 
 # Stage 3: the runtime's root filesystem
-# The Node base image ships npm, npx, corepack and yarn in its own layers, and
+# The Node base image ships npm and npx in its own layers, and
 # deleting them in a layer above leaves their bytes in the image under
 # whiteouts, where a scanner that reads each layer still finds them. The
 # runtime is plain Alpine of the same release instead, with the node binary,
@@ -71,11 +71,11 @@ RUN node tools/check-server-bundle.mjs build
 # alpine:3.24
 FROM alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runtime-root
 RUN apk upgrade --no-cache \
- && apk add --no-cache libstdc++ \
+ && apk add --no-cache libatomic libstdc++ \
  && addgroup -g 1000 node \
  && adduser -u 1000 -G node -s /bin/sh -D node
-# node:24-alpine
-COPY --from=node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f \
+# node:26.12.1-alpine
+COPY --from=node@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 \
      /usr/local/bin/node /usr/local/bin/docker-entrypoint.sh /usr/local/bin/
 
 # Stage 4: runtime
