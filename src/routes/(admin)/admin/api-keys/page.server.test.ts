@@ -55,6 +55,41 @@ describe('API keys load', () => {
 		expect(none.usageUnknown).toEqual([]);
 	});
 
+	it('reads the usage of every key on the page in one request', async () => {
+		const page = [key, { ...key, id: 'k2' }, { ...key, id: 'k3' }];
+		const calls: string[] = [];
+		const answer = (path: string) => {
+			calls.push(path);
+			if (path.startsWith('/api/admin/api-keys?')) return json({ data: page, total_count: 3 });
+			if (path.startsWith('/api/admin/usage/api-keys?')) {
+				return json([
+					{ api_key_id: 'k1', requests: 5 },
+					{ api_key_id: 'k3', requests: 9 },
+				]);
+			}
+			return json([]);
+		};
+		const out = (await load(event(answer))) as Loaded;
+		const usageCalls = calls.filter((p) => p.startsWith('/api/admin/usage'));
+		expect(usageCalls).toHaveLength(1);
+		expect(new URL(usageCalls[0], 'http://x').searchParams.get('ids')).toBe('k1,k2,k3');
+		expect(out.usageMap.k1?.requests).toBe(5);
+		expect(out.usageMap.k3?.requests).toBe(9);
+		expect(out.usageMap.k2).toBeUndefined();
+		expect(out.usageUnknown).toEqual([]);
+	});
+
+	it('reads no usage for an empty page', async () => {
+		const calls: string[] = [];
+		const answer = (path: string) => {
+			calls.push(path);
+			if (path.startsWith('/api/admin/api-keys?')) return json({ data: [], total_count: 0 });
+			return json([]);
+		};
+		await load(event(answer));
+		expect(calls.filter((p) => p.startsWith('/api/admin/usage'))).toEqual([]);
+	});
+
 	it('says when the schemas or the route catalog could not be read', async () => {
 		const answer = (path: string) => {
 			if (path.startsWith('/api/admin/api-keys?')) return json({ data: [key], total_count: 1 });

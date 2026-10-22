@@ -45,6 +45,9 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 		gate: { state: 'ok' },
 		schema: { ok: true, value: { roots: ROOTS, refused: null } },
 		persisted: { ok: true, value: [] },
+		persistedTotal: 0,
+		limit: 50,
+		offset: 0,
 		...over,
 	} as never,
 	form: form as never,
@@ -153,14 +156,17 @@ describe('the endpoint table', () => {
 describe('a persisted query list past one page', () => {
 	const query = { query_hash: 'abc123def456', operation_name: 'Landing', query: '{ x }', description: '', enabled: true };
 
-	it('says how many it cannot show', () => {
+	it('pages through the rest rather than leaving them out', () => {
 		const { container } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] }, persistedTotal: 340 }) });
-		expect(container.textContent).toContain('Showing the first 1 of 340 persisted queries');
+		const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+		expect(hrefs).toContain('/admin/settings/graphql?limit=50&offset=50');
+		expect(container.textContent).not.toContain('Showing the first');
 	});
 
-	it('says nothing when the list is whole', () => {
+	it('offers no other page when the list is whole', () => {
 		const { container } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] }, persistedTotal: 1 }) });
-		expect(container.textContent).not.toContain('Showing the first');
+		const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href') ?? '');
+		expect(hrefs.filter((h) => h.includes('offset='))).toEqual([]);
 	});
 });
 

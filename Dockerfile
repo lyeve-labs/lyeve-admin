@@ -109,9 +109,10 @@ USER node
 
 # 127.0.0.1, not localhost: adapter-node binds IPv4 only, and localhost
 # resolves to ::1 first in this image, so the probe would be refused while the
-# server is serving.
+# server is serving. /readyz answers 503 while the engine cannot be reached,
+# which the root page does not: it answers 200 either way.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:3002/ || exit 1
+    CMD wget -qO- http://127.0.0.1:3002/readyz || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "build/index.js"]
