@@ -6,7 +6,7 @@
 	"type": "module",
 	"packageManager": "pnpm@11.25.0",
 	"engines": {
-		"node": ">=24"
+		"node": ">=26"
 	},
 	"scripts": {
 		"dev": "vite dev",
@@ -19,7 +19,7 @@
 		"test:watch": "vitest",
 		"commitlint": "commitlint --edit",
 		"prepare": "node scripts/setup-hooks.mjs",
-		"preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if(!ua.startsWith('pnpm')){console.error('This repo is pnpm only: pnpm enforces supply-chain policies the alternative ignores. Run: corepack enable && pnpm install');process.exit(1)}\""
+		"preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if(!ua.startsWith('pnpm')){console.error('This repo is pnpm only: pnpm enforces supply-chain policies the alternative ignores. Install pnpm 11, then run: pnpm install');process.exit(1)}\""
 	},
 	"devDependencies": {
 		"@commitlint/cli": "^21.2.3",
