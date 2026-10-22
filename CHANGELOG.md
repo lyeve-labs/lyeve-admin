@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [0.22.0] - 2026-10-26
+
+### Security
+
+- The console image's runtime is now plain Alpine 3.24 with its packages upgraded, which brings zlib 1.3.2-r1 and the fix for CVE-2026-85091. The image is a single layer, so npm, npx, corepack and yarn are gone from its bytes as well as from the running container, and a scanner that reads each layer no longer reports their advisories. The entrypoint, command, user, port and health check are unchanged.
+- The release workflow no longer grants every job a token for keyless signing, which nothing used.
+
+### Fixed
+
+- Device sign-in: an account that lost its admin role after the approval page loaded sees that it cannot approve, instead of being asked to check a password that was right. A refused approval that carries no reason says the approval was refused.
+- Folding or opening the schema list, the API reference side list or a flow editor panel from its own button keeps keyboard focus on the button that undoes it, so the next Tab no longer starts from the top of the page.
+- Schema builder: a system field shows "required" only when it is, so the key of an optional relation no longer reads as required.
+- API keys: the page reads the usage of every key it lists in one request instead of one request per key, so a page of 500 keys asks the engine 4 times instead of 503. This needs the usage plugin release that serves the combined read.
+- GraphQL settings: the persisted query list pages through every query, 50 at a time, instead of showing the first 200 and saying the rest could not be reached.
+- The pool health view gives up on an engine that does not answer within five seconds and says the engine is unreachable.
+
+### Changed
+
+- The console serves a readiness probe at `/readyz`, which answers 200 while the engine answers and 503 while it cannot be reached, with no session and no detail. The image's health check requests it, so a console that cannot reach its engine reads as unhealthy.
+
 ## [0.21.0] - 2026-10-20
 
 ### Added
