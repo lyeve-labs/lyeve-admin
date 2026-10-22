@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The console image's runtime is now plain Alpine 3.24 with its packages upgraded, which brings zlib 1.3.2-r1 and the fix for CVE-2026-85091. The image is a single layer, so npm, npx, corepack and yarn are gone from its bytes as well as from the running container, and a scanner that reads each layer no longer reports their advisories. The entrypoint, command, user, port and health check are unchanged.
 - The release workflow no longer grants every job a token for keyless signing, which nothing used.
+- The console builds and runs on Node 26.12.1, the October 2026 Node.js security release, and its development tools moved past every advisory `pnpm audit` reported. The runtime image adds libatomic, which the Node 26 binary needs.
 
 ### Fixed
 
