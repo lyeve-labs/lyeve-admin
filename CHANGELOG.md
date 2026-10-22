@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.22.0] - 2026-10-26
 
+### Added
+
+- Content history settings, under Settings, turn history on for every content type, some of them or none, and set how long versions and the activity log are kept. An entry whose type keeps no history says so where its versions would be listed. A content activity page lists who changed which entry, with the action, where the change came from, the fields it touched and the version it made, narrowed by type, action, source and dates, and a super admin reads every tenant's activity there. These need the engine release that serves them.
+
 ### Security
 
 - The console image's runtime is now plain Alpine 3.24 with its packages upgraded, which brings zlib 1.3.2-r1 and the fix for CVE-2026-85091. The image is a single layer, so npm, npx, corepack and yarn are gone from its bytes as well as from the running container, and a scanner that reads each layer no longer reports their advisories. The entrypoint, command, user, port and health check are unchanged.
