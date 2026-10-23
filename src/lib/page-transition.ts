@@ -1,29 +1,36 @@
 import type { OnNavigate } from '@sveltejs/kit';
 
 /**
- * Fades the page on a route change. Pass it to SvelteKit's onNavigate.
+ * Set on the element that fades in after a route change. app.css gives `a`
+ * and `b` two keyframes of the same fade, and each change sets the value the
+ * element does not have yet, so a change during a fade starts it over.
+ */
+export const ENTERING = 'data-page-entering';
+
+const inFrame = (routeId: string | null | undefined) => routeId?.startsWith('/(admin)') ?? false;
+
+/**
+ * Fades the new page in on a route change. Pass it to SvelteKit's onNavigate.
  *
- * The browser snapshots the old and the new page, and app.css fades the new
- * one in over the old.
+ * SvelteKit calls it just before it swaps the page in, in the same task, so
+ * the marked element is still transparent at the first frame that shows the
+ * new page. Inside the console's frame only the content region fades, and the
+ * sidebar and the header hold still. A change that enters or leaves the frame
+ * fades the whole body.
+ *
+ * Nothing asks the browser for a view transition. In desktop Chrome on Intel
+ * graphics a view transition's snapshot came out white: the content region
+ * flashed white while it had a snapshot of its own, and the whole page did
+ * once only the root had one.
  *
  * A change of query alone, such as a filter or a page of results, keeps the
- * reader in place and does not fade. Under reduced motion the kit's stylesheet
- * finishes the transition in 1ms, so it is not checked here. In a browser
- * without view transitions, the page swaps as it always did.
+ * reader in place and does not fade. Under reduced motion the kit's
+ * stylesheet shortens the fade to 1ms.
  */
-export function fadeRouteChange(navigation: OnNavigate): Promise<void> | undefined {
-	if (typeof document === 'undefined' || !document.startViewTransition) return;
+export function fadeRouteChange(navigation: OnNavigate): void {
+	if (typeof document === 'undefined') return;
 	if (navigation.from?.url.pathname === navigation.to?.url.pathname) return;
-
-	return new Promise((resolve) => {
-		const transition = document.startViewTransition(async () => {
-			resolve();
-			await navigation.complete;
-		});
-		// A navigation that fails or gives way to another ends its fade early.
-		// That is not an error worth reporting.
-		transition.ready.catch(() => {});
-		transition.updateCallbackDone.catch(() => {});
-		transition.finished.catch(() => {});
-	});
+	const frame = inFrame(navigation.from?.route.id) && inFrame(navigation.to?.route.id);
+	const target = (frame && document.getElementById('content')) || document.body;
+	target.setAttribute(ENTERING, target.getAttribute(ENTERING) === 'a' ? 'b' : 'a');
 }

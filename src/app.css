@@ -89,24 +89,28 @@
 }
 
 /*
- * A route change fades the new page in over the old one, which holds still
- * underneath. src/lib/page-transition.ts starts it. Only what differs between
- * the two pages changes, so the sidebar and the header hold still. Normal
- * blending keeps what the two share from brightening halfway through, which
- * the browser's own additive blend would do.
+ * A route change fades the new page in. src/lib/page-transition.ts marks the
+ * content region, or the body when the change enters or leaves the console's
+ * frame, just before SvelteKit swaps the page in. The mark alternates between
+ * a and b, so a change during a fade starts it over, and the fade holds
+ * nothing once it ends.
  *
- * The content region carries no view-transition-name. A named region gets a
- * snapshot of its own, and in desktop Chrome the content region's came out
+ * No view transition runs, so the browser takes no snapshot of either page.
+ * In desktop Chrome on Intel graphics a view transition's snapshot came out
  * white, which flashed the dark theme white between pages.
  */
-::view-transition-old(root) {
-	animation: none;
+[data-page-entering='a'] {
+	animation: page-in-a var(--duration-base) var(--ease-enter) backwards;
 }
-::view-transition-new(root) {
-	animation: page-in var(--duration-base) var(--ease-enter) both;
-	mix-blend-mode: normal;
+[data-page-entering='b'] {
+	animation: page-in-b var(--duration-base) var(--ease-enter) backwards;
 }
-@keyframes page-in {
+@keyframes page-in-a {
+	from {
+		opacity: 0;
+	}
+}
+@keyframes page-in-b {
 	from {
 		opacity: 0;
 	}
