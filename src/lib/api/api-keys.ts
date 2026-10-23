@@ -116,13 +116,47 @@ export function limitsOf(key: APIKey): KeyLimits {
 }
 
 /**
- * One key's metered usage for a billing period (YYYY-MM). The usage plugin
- * meters requests and owns the count a key's monthly limit is enforced
- * against, so the read goes there. A failed read rejects, and the caller tells
- * an engine without the plugin from a figure that could not be read.
+ * The longest ids value, encoded, that one usage read carries. nginx refuses
+ * a request line over 8 KB by default and Cloudflare a URL over 16 KB, and a
+ * page of 500 keys names about 19.5 KB of ids, so a page splits its ids into
+ * reads that each stay well under the smaller limit.
  */
-export function keyUsage<T>(client: HttpClient, id: string, period: string): Promise<T> {
-	return client.get<T>(`/api/admin/usage/api-key/${encodeURIComponent(id)}?period=${encodeURIComponent(period)}`);
+export const USAGE_IDS_BUDGET = 6144;
+
+/** Splits ids into batches whose encoded, comma-joined length fits budget. */
+export function usageIdBatches(ids: readonly string[], budget = USAGE_IDS_BUDGET): string[][] {
+	const comma = encodeURIComponent(',').length;
+	const batches: string[][] = [];
+	let batch: string[] = [];
+	let size = 0;
+	for (const id of ids) {
+		const cost = encodeURIComponent(id).length;
+		if (batch.length > 0 && size + comma + cost > budget) {
+			batches.push(batch);
+			batch = [];
+			size = 0;
+		}
+		size += (batch.length > 0 ? comma : 0) + cost;
+		batch.push(id);
+	}
+	if (batch.length > 0) batches.push(batch);
+	return batches;
+}
+
+/**
+ * The metered usage of every key in ids for a billing period (YYYY-MM), read
+ * in as few requests as the URL limit allows. The usage plugin meters
+ * requests and owns the count a key's monthly limit is enforced against, so
+ * the read goes there. It answers a row for each key it counts and leaves the
+ * rest out. A failed read rejects, and the caller tells an engine without the
+ * route from a figure that could not be read.
+ */
+export async function keysUsage<T>(client: HttpClient, ids: readonly string[], period: string): Promise<T[]> {
+	const reads = usageIdBatches(ids).map((batch) => {
+		const query = new URLSearchParams({ ids: batch.join(','), period });
+		return client.get<T[]>(`/api/admin/usage/api-keys?${query}`);
+	});
+	return (await Promise.all(reads)).flat();
 }
 
 /** Roles a key may hold only with an expiry. */

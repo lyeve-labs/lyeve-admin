@@ -10,7 +10,7 @@ goes through the engine's API. The engine is
 | **Status** | Stable |
 | **License** | MIT |
 | **Framework** | SvelteKit 2 with Svelte 5 runes |
-| **Toolchain** | Node and pnpm, at the versions `mise.toml` pins |
+| **Toolchain** | Node 26 and pnpm only, at the versions `mise.toml` pins |
 | **Image** | `ghcr.io/lyeve-labs/lyeve-admin` |
 | **UI kit** | `@lyeve-labs/ui-kit` |
 | **API client** | `@lyeve-labs/client`, `@lyeve-labs/client-rest` |

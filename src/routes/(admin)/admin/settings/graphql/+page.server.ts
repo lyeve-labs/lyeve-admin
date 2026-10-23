@@ -1,10 +1,11 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { section, type Section } from '$lib/api/gate';
+import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import {
 	GRAPHQL_OK,
 	deletePersisted,
@@ -19,6 +20,10 @@ import {
 
 type Schema = { roots: SchemaRoots | null; refused: string | null };
 
+/** The persisted queries a page shows, and the most the plugin answers at once. */
+const PERSISTED_PAGE = 50;
+const PERSISTED_PAGE_MAX = 200;
+
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
 	// The shell says why the page is unavailable while its plugin does not run.
@@ -29,6 +34,8 @@ export const load: PageServerLoad = async (event) => {
 			schema: { ok: false, gate: absent } as Section<Schema>,
 			persisted: { ok: false, gate: absent } as Section<PersistedQuery[]>,
 			persistedTotal: 0,
+			limit: PERSISTED_PAGE,
+			offset: 0,
 		};
 	}
 
@@ -36,12 +43,13 @@ export const load: PageServerLoad = async (event) => {
 	// The schema and the allowlist are read apart: an instance that refuses
 	// introspection still keeps an allowlist, and the reverse.
 	// The plugin answers at most 200 a page and says how many it holds, so the
-	// total is kept to say what the list leaves out.
+	// list pages by that total.
+	const { limit, offset } = pageWindow(event.url, PERSISTED_PAGE, PERSISTED_PAGE_MAX);
 	let persistedTotal = 0;
 	const [schema, persisted] = await Promise.all([
 		section(introspect(client), 'The schema could not be read. This is not a report that it is empty.'),
 		section(
-			listPersisted(client).then((r) => {
+			listPersisted(client, limit, offset).then((r) => {
 				persistedTotal = r.total;
 				return r.data;
 			}),
@@ -50,7 +58,11 @@ export const load: PageServerLoad = async (event) => {
 	]);
 	// Both refused is the plugin's answer as a whole, so the page says it once.
 	const gate: GraphqlGate = !schema.ok && !persisted.ok ? schema.gate : GRAPHQL_OK;
-	return { gate, schema, persisted, persistedTotal };
+	if (persisted.ok) {
+		const back = pastEndOffset(persisted.value.length, limit, offset, persistedTotal);
+		if (back !== null) redirect(307, withOffset(event.url, back));
+	}
+	return { gate, schema, persisted, persistedTotal, limit, offset };
 };
 
 const hashOf = async (event: Parameters<Actions[string]>[0]) => String((await event.request.formData()).get('hash') ?? '').trim();

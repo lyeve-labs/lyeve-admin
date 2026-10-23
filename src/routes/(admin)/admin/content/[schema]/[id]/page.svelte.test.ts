@@ -216,3 +216,42 @@ describe('content entry editor, revision count', () => {
 		expect(sent.get('rev_num')).toBe('1');
 	});
 });
+
+describe('content entry editor, history off', () => {
+	it('says history is off for the type and points an administrator at the settings', () => {
+		render(EntryPage, { props: { data: data({ historyEnabled: false, canManageHistory: true }), form: null } });
+		const off = screen.getByTestId('history-off');
+		expect(off.textContent).toContain('History is off for this type.');
+		expect(screen.getByRole('link', { name: 'Turn it on in settings' }).getAttribute('href')).toBe(
+			'/admin/settings/content-history',
+		);
+		expect(screen.queryByRole('button', { name: /history/i })).toBeNull();
+	});
+
+	it('offers no settings link to a role that cannot change them', () => {
+		render(EntryPage, { props: { data: data({ historyEnabled: false, canManageHistory: false }), form: null } });
+		expect(screen.getByTestId('history-off').textContent).toContain('History is off for this type.');
+		expect(screen.queryByRole('link', { name: 'Turn it on in settings' })).toBeNull();
+	});
+
+	it('keeps the stored versions when history was turned off after they were written', () => {
+		render(EntryPage, {
+			props: { data: data({ historyEnabled: false, canManageHistory: true, revisions: [revision(2)], revisionTotal: 1 }), form: null },
+		});
+		expect(screen.queryByTestId('history-off')).toBeNull();
+		expect(screen.getByRole('button', { name: /history \(1\)/i })).toBeTruthy();
+	});
+
+	it('reads an engine that does not say as one that keeps history, as before', () => {
+		render(EntryPage, { props: { data: data({ historyEnabled: null, canManageHistory: true }), form: null } });
+		expect(screen.queryByTestId('history-off')).toBeNull();
+	});
+
+	it('does not call history off when the list could not be read', () => {
+		render(EntryPage, {
+			props: { data: data({ historyEnabled: null, revisionsFailed: true, canManageHistory: true }), form: null },
+		});
+		expect(screen.queryByTestId('history-off')).toBeNull();
+		expect(screen.getByText('The revision history could not be read.')).toBeTruthy();
+	});
+});

@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 const ALLOWED: Record<string, Set<string>> = {
 	'+page.server.ts': new Set(['load', 'actions', 'prerender', 'ssr', 'csr', 'trailingSlash', 'config', 'entries']),
 	'+layout.server.ts': new Set(['load', 'prerender', 'ssr', 'csr', 'trailingSlash', 'config']),
+	'+server.ts': new Set(['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'fallback', 'prerender', 'trailingSlash', 'config', 'entries']),
 };
 
 /** Runtime export names of a module: declarations, lists, default and star. Types are erased and do not count. */
@@ -41,11 +42,13 @@ describe('page and layout server modules', () => {
 
 	it('export only what SvelteKit reads', () => {
 		const offenders: string[] = [];
-		for (const file of files) {
+		// An endpoint is read the same way, except that a name with a leading
+		// underscore is left alone. The production build refuses any other.
+		for (const file of [...files, ...globSync('src/routes/**/+server.ts')]) {
 			const kind = file.slice(file.lastIndexOf('/') + 1);
 			const allowed = ALLOWED[kind];
 			for (const name of runtimeExports(readFileSync(file, 'utf8'))) {
-				if (!allowed.has(name)) offenders.push(`${file}: ${name}`);
+				if (!allowed.has(name) && !(kind === '+server.ts' && name.startsWith('_'))) offenders.push(`${file}: ${name}`);
 			}
 		}
 		expect(offenders).toEqual([]);

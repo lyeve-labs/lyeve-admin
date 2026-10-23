@@ -105,6 +105,11 @@
 	let hiddenOlder = $derived(data.revisionWindow?.hiddenOlder ?? 0);
 	let windowDays = $derived(data.revisionWindow?.windowDays ?? null);
 	let olderHidden = $derived(hiddenOlder > 0 && windowDays !== null);
+	// The type keeps no history and none is stored. An engine that does not
+	// say reads as today, where every entry keeps history.
+	let historyOff = $derived(
+		data.historyEnabled === false && !data.revisionsFailed && revisions.length === 0 && hiddenOlder === 0,
+	);
 	// One read lists at most the engine's page ceiling. Past it, the count is
 	// the plugin's total and the older revisions open one at a time by number.
 	let revisionTotal = $derived(Math.max(data.revisionTotal ?? 0, revisions.length));
@@ -204,6 +209,14 @@
 				{/if}
 				{#if data.revisionsFailed}
 					<span class="text-xs text-muted">The revision history could not be read.</span>
+				{/if}
+				{#if historyOff}
+					<span class="text-xs text-muted" data-testid="history-off">
+						History is off for this type.
+						{#if data.canManageHistory}
+							<a href="/admin/settings/content-history" class="underline hover:text-fg">Turn it on in settings</a>
+						{/if}
+					</span>
 				{/if}
 				<div class="flex flex-col items-end gap-1 text-xs text-faint">
 					<span class="flex items-center gap-1">

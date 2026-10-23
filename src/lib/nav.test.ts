@@ -82,6 +82,7 @@ describe('adminNav role gate', () => {
 		expect(ids(tree)).toContain('insight');
 		expect(ids(find(tree, 'insight').children ?? [])).toEqual([
 			'audit-log',
+			'content-activity',
 			'realtime',
 			'events',
 			'data-export',
@@ -100,17 +101,18 @@ describe('adminNav role gate', () => {
 		// caller's tenant.
 		expect(ids(find(tree, 'operations').children ?? [])).toEqual(['plugins', 'ai', 'tenant-usage', 'tenant-costs']);
 		// Customizing the tenant's admin, its captcha, how its provider
-		// accounts sign in and its own rate limits are the tenant admin's, so
-		// they are the settings entries an admin reaches.
+		// accounts sign in, its own rate limits and its content history are the
+		// tenant admin's, so they are the settings entries an admin reaches.
 		expect(ids(find(tree, 'settings').children ?? [])).toEqual([
 			'customization',
 			'captcha',
 			'sign-in',
 			'tenant-rate-limits',
+			'content-history',
 		]);
 	});
 
-	it('gives a super admin every section and all sixty eight destinations', () => {
+	it('gives a super admin every section and all seventy destinations', () => {
 		const tree = adminNav(SUPER);
 		expect(ids(tree)).toEqual([
 			'dashboard',
@@ -126,7 +128,7 @@ describe('adminNav role gate', () => {
 			'insight',
 			'settings',
 		]);
-		expect(labels(tree)).toHaveLength(68);
+		expect(labels(tree)).toHaveLength(70);
 		expect(ids(find(tree, 'settings').children ?? [])).toEqual([
 			'email',
 			'recommendations',
@@ -144,6 +146,7 @@ describe('adminNav role gate', () => {
 			'customization',
 			'captcha',
 			'sign-in',
+			'content-history',
 		]);
 		expect(ids(find(tree, 'access').children ?? [])).toEqual([
 			'users',
@@ -411,6 +414,11 @@ describe('adminSection', () => {
 		expect(adminSection('/admin/settings/license', tree)).toBe('Settings / License');
 	});
 
+	it('names content activity from its own row, not the content one', () => {
+		expect(adminSection('/admin/content-activity', tree)).toBe('Insight / Content activity');
+		expect(adminSection('/admin/content-activity', adminNav(['admin']))).toBe('Insight / Content activity');
+	});
+
 	it('names a section from its own entry', () => {
 		expect(adminSection('/admin/settings', tree)).toBe('Settings');
 	});
@@ -471,6 +479,7 @@ describe('pagePlugin', () => {
 		expect(pagePlugin('/admin/settings/mfa')).toBe('mfa');
 		expect(pagePlugin('/admin/settings/devices')).toBe('device-fingerprint');
 		expect(pagePlugin('/admin/pages/launch')).toBe('multitenant');
+		expect(pagePlugin('/admin/content-activity')).toBe('content');
 	});
 
 	it('names the same plugin whoever reads, because the role gate is the page\'s own', () => {
@@ -490,6 +499,7 @@ describe('pageLabel', () => {
 		expect(pageLabel('/admin/flows/abc')).toBe('Flows');
 		expect(pageLabel('/admin/settings/mfa')).toBe('Two-factor authentication');
 		expect(pageLabel('/admin/tenants/usage')).toBe('Quotas and usage');
+		expect(pageLabel('/admin/content-activity')).toBe('Content activity');
 	});
 });
 

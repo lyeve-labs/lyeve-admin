@@ -12,7 +12,7 @@
 		SectionHeading,
 		Table,
 	} from '@lyeve-labs/ui-kit';
-	import { ArrowDown, ArrowUp, CalendarClock, Database, Inbox, LayoutGrid, Plus } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, CalendarClock, Database, History, Inbox, LayoutGrid, Plus } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { planSchemaRelations } from '$lib/relations';
@@ -164,11 +164,14 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<!-- Releases are served by the same plugin, so a role it refuses here
-		     is refused there too. -->
+		<!-- Releases and activity are served by the same plugin, so a role it
+		     refuses here is refused there too. -->
 		{#if data.schemas.ok || data.schemas.gate.state !== 'forbidden'}
 			<Button variant="ghost" size="sm" href="/admin/releases">
 				<CalendarClock size={ICON.sm} /> Releases
+			</Button>
+			<Button variant="ghost" size="sm" href="/admin/content-activity">
+				<History size={ICON.sm} /> Activity
 			</Button>
 		{/if}
 		<Button variant="secondary" size="sm" href="/admin/schema">

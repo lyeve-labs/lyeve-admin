@@ -155,6 +155,8 @@ const PAGE_PLUGIN: Readonly<Record<string, PluginName>> = {
 	webhooks: PLUGIN.webhook,
 	'webhooks-incoming': PLUGIN.webhook,
 	releases: PLUGIN.content,
+	'content-history': PLUGIN.content,
+	'content-activity': PLUGIN.content,
 	'api-keys': PLUGIN.apikey,
 	permissions: PLUGIN.permissions,
 	jobs: PLUGIN.cron,
@@ -461,6 +463,16 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 					icon: ScrollText,
 					match: 'prefix' as const,
 				},
+				// Who changed which entry, beside the audit trail it narrows. It
+				// sits outside /admin/content so it never takes the address of a
+				// content type with the same name.
+				{
+					id: 'content-activity',
+					label: 'Content activity',
+					href: '/admin/content-activity',
+					icon: History,
+					match: 'prefix' as const,
+				},
 				// Connection counts are the calling tenant's. The per-tenant
 				// roster inside is the super admin's and the page asks for it
 				// only on their behalf.
@@ -551,6 +563,14 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		href: '/admin/settings/rate-limits/tenant',
 		icon: Gauge,
 	};
+	// Which content types keep versions and for how long. The content plugin
+	// serves the settings to an admin and a super admin.
+	const contentHistory: NavNode = {
+		id: 'content-history',
+		label: 'Content history',
+		href: '/admin/settings/content-history',
+		icon: History,
+	};
 	const settings: NavNode[] = superAdmin
 		? [
 				// One entry, because there is one place mail is configured: the
@@ -623,9 +643,10 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 				customization,
 				captcha,
 				signIn,
+				contentHistory,
 		  ]
 		: operator
-			? [customization, captcha, signIn, tenantRateLimits]
+			? [customization, captcha, signIn, tenantRateLimits, contentHistory]
 			: [];
 
 	const tree: NavTree = [

@@ -2,7 +2,7 @@
 #
 # Triggered when a `vX.Y.Z` tag is pushed. Builds a multi-arch Docker image
 # (linux/amd64 + linux/arm64) and pushes it to GHCR with three tags:
-#   - vX.Y.Z       (immutable, exact version)
+#   - X.Y.Z        (immutable, exact version, the git tag without its v)
 #   - X.Y          (rolling, latest patch in the X.Y minor line)
 #   - latest       (most recent release)
 #
@@ -61,7 +61,6 @@ on:
 permissions:
   contents: read
   packages: write
-  id-token: write   # for sigstore/cosign keyless signing if added later
 
 env:
   REGISTRY: ghcr.io
@@ -102,9 +101,9 @@ jobs:
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: 24
+          node-version: 26.12.1
           cache: pnpm
 
       - name: Install dependencies

@@ -89,37 +89,30 @@
 }
 
 /*
- * A route change fades the page. src/lib/page-transition.ts starts it and
- * marks the document while it runs. Inside the console's frame only the
- * content region fades, and the sidebar and the header swap in place. A page
- * with no frame, such as sign-in, fades whole. The exit runs a rung faster
- * than the entrance, on the kit's clock.
+ * A route change fades the new page in. src/lib/page-transition.ts marks the
+ * content region, or the body when the change enters or leaves the console's
+ * frame, just before SvelteKit swaps the page in. The mark alternates between
+ * a and b, so a change during a fade starts it over, and the fade holds
+ * nothing once it ends.
+ *
+ * No view transition runs, so the browser takes no snapshot of either page.
+ * In desktop Chrome on Intel graphics a view transition's snapshot came out
+ * white, which flashed the dark theme white between pages.
  */
-:root[data-page-fading] #content {
-	view-transition-name: page;
+[data-page-entering='a'] {
+	animation: page-in-a var(--duration-base) var(--ease-enter) backwards;
 }
-::view-transition-old(root),
-::view-transition-old(page) {
-	animation: page-out var(--duration-fast) var(--ease-exit) both;
+[data-page-entering='b'] {
+	animation: page-in-b var(--duration-base) var(--ease-enter) backwards;
 }
-::view-transition-new(root),
-::view-transition-new(page) {
-	animation: page-in var(--duration-base) var(--ease-enter) both;
-}
-:root:has(#content)::view-transition-old(root),
-:root:has(#content)::view-transition-new(root),
-::view-transition-group(page) {
-	animation: none;
-}
-@keyframes page-out {
-	to {
+@keyframes page-in-a {
+	from {
 		opacity: 0;
 	}
 }
-@keyframes page-in {
+@keyframes page-in-b {
 	from {
 		opacity: 0;
-		transform: translateY(4px);
 	}
 }
 

@@ -234,6 +234,24 @@ describe('admin/device actions', () => {
 		expect(result.data).toEqual({ stepUp: { error: message, field: '', needsMfa: false } });
 	});
 
+	it('shows the forbidden view when the engine refuses an account that lost its admin role', async () => {
+		const fetch = engine(['editor'], {
+			'/api/admin/auth/device/WDJB-MJHT/approve': () => json({ error: 'insufficient permissions' }, 403),
+		});
+		const result = (await actions.approve(actionEvent('WDJB-MJHT', fetch))) as { status: number; data: unknown };
+		expect(result.status).toBe(403);
+		expect(result.data).toEqual({ outcome: 'forbidden' });
+	});
+
+	it('names the approval when a refused confirmation carries no sentence', async () => {
+		const fetch = engine(['admin'], {
+			'/api/admin/auth/device/WDJB-MJHT/approve': () => json({ error: '' }, 403),
+		});
+		const result = (await actions.approve(actionEvent('WDJB-MJHT', fetch))) as { status: number; data: { stepUp: { error: string } } };
+		expect(result.status).toBe(400);
+		expect(result.data.stepUp.error).toBe('The engine refused to approve this sign-in. The request is still open.');
+	});
+
 	it('reports a locked account on the form', async () => {
 		const fetch = engine(['admin'], {
 			'/api/admin/auth/device/WDJB-MJHT/approve': () => json({ error: 'Too many failed password attempts. Try again later.' }, 429),

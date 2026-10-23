@@ -35,8 +35,8 @@ describe('the plugin calls', () => {
 
 		await introspect(client);
 		expect(post).toHaveBeenCalledWith('/api/v1/graphql', { query: ROOTS_QUERY, operationName: 'Roots' });
-		expect((await listPersisted(client)).total).toBe(1);
-		expect(get).toHaveBeenCalledWith('/api/admin/graphql/persisted-queries?limit=200');
+		expect((await listPersisted(client, 50, 100)).total).toBe(1);
+		expect(get).toHaveBeenCalledWith('/api/admin/graphql/persisted-queries?limit=50&offset=100');
 		await togglePersisted(client, 'a/b');
 		expect(patch).toHaveBeenCalledWith('/api/admin/graphql/persisted-queries/a%2Fb/toggle', {});
 	});

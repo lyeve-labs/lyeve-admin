@@ -24,6 +24,8 @@ type Loaded = {
 	revisions: { revision_num: number }[];
 	revisionTotal: number;
 	revisionWindow: { hiddenOlder: number; windowDays: number | null };
+	historyEnabled: boolean | null;
+	canManageHistory: boolean;
 };
 
 const REFUSED = new ApiError(402, 'payment_required', {
@@ -84,6 +86,28 @@ describe('the revision window', () => {
 	it('reads a plugin that sends neither field as one with nothing hidden', async () => {
 		const out = await loadWith({ data: [], total_count: 0 });
 		expect(out.revisionWindow).toEqual({ hiddenOlder: 0, windowDays: null });
+	});
+});
+
+describe('whether the type keeps history', () => {
+	it('carries history off with an empty list', async () => {
+		const out = await loadWith({ data: [], total_count: 0, history_enabled: false });
+		expect(out.historyEnabled).toBe(false);
+		expect(out.revisions).toEqual([]);
+	});
+
+	it('carries history on', async () => {
+		const out = await loadWith({ data: [], total_count: 0, history_enabled: true });
+		expect(out.historyEnabled).toBe(true);
+	});
+
+	it('reads an engine that does not say as unknown, never as off', async () => {
+		expect((await loadWith({ data: [], total_count: 0 })).historyEnabled).toBeNull();
+		expect((await loadWith([])).historyEnabled).toBeNull();
+	});
+
+	it('points an admin at the history settings', async () => {
+		expect((await loadWith({ data: [] })).canManageHistory).toBe(true);
 	});
 });
 

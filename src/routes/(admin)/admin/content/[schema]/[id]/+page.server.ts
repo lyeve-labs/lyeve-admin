@@ -125,9 +125,21 @@ type RevisionList = {
 	total: number;
 	/** The read failed, so the empty list says nothing about the entry's history. */
 	failed: boolean;
+	/**
+	 * Whether the entry's type keeps history. Null when the plugin did not
+	 * say, which an engine older than the setting never does.
+	 */
+	historyEnabled: boolean | null;
 };
 
-const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDays: null, total: 0, failed: true };
+const REVISIONS_FAILED: RevisionList = {
+	revisions: [],
+	hiddenOlder: 0,
+	windowDays: null,
+	total: 0,
+	failed: true,
+	historyEnabled: null,
+};
 
 /**
  * Fetch the entry's revisions.
@@ -141,7 +153,13 @@ const REVISIONS_FAILED: RevisionList = { revisions: [], hiddenOlder: 0, windowDa
 /** The revisions as the endpoint answers them: the envelope, or a bare array from an older engine. */
 type RevisionBody =
 	| Record<string, unknown>[]
-	| { data?: Record<string, unknown>[]; total_count?: unknown; hidden_older?: unknown; window_days?: unknown }
+	| {
+			data?: Record<string, unknown>[];
+			total_count?: unknown;
+			hidden_older?: unknown;
+			window_days?: unknown;
+			history_enabled?: unknown;
+	  }
 	| null;
 
 /**
@@ -160,12 +178,14 @@ async function listRevisions(client: HttpClient, id: string): Promise<RevisionLi
 		const hidden = Array.isArray(body) ? 0 : Number(body?.hidden_older ?? 0);
 		const days = Array.isArray(body) ? null : body?.window_days;
 		const counted = Array.isArray(body) ? NaN : Number(body?.total_count);
+		const enabled = Array.isArray(body) ? undefined : body?.history_enabled;
 		return {
 			revisions: rows.map(toEditorRevision),
 			total: Number.isInteger(counted) && counted > rows.length ? counted : rows.length,
 			hiddenOlder: Number.isInteger(hidden) && hidden > 0 ? hidden : 0,
 			windowDays: typeof days === 'number' && days > 0 ? days : null,
 			failed: false,
+			historyEnabled: typeof enabled === 'boolean' ? enabled : null,
 		};
 	} catch {
 		return REVISIONS_FAILED;
@@ -372,7 +392,8 @@ export const load: PageServerLoad = async (event) => {
 		? await Promise.resolve().then(() => listMediaChoices(client)).catch(() => null)
 		: [];
 
-	const { revisions, hiddenOlder, windowDays, total: revisionTotal, failed: revisionsFailed } = revisionList;
+	const { revisions, hiddenOlder, windowDays, total: revisionTotal, failed: revisionsFailed, historyEnabled } =
+		revisionList;
 	return {
 		schemaDef,
 		item,
@@ -381,6 +402,9 @@ export const load: PageServerLoad = async (event) => {
 		revisionTotal,
 		revisionsFailed,
 		revisionWindow: { hiddenOlder, windowDays },
+		historyEnabled,
+		// The history settings take an admin, so only an admin is pointed there.
+		canManageHistory: (user?.roles ?? []).some((role) => role === 'admin' || role === 'super_admin'),
 		localization,
 		review,
 		mediaChoices,

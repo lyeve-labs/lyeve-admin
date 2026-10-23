@@ -53,6 +53,7 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	graphql: 'The schema generated from your content types, where it answers, and the allowed queries.',
 	'message-broker': 'Where content events are published, and whether they are arriving.',
 	storage: 'Where uploads are written, and which provider receives them.',
+	'content-history': 'Which content types keep their versions, for how long, and the record of who changed what.',
 	residency: "The regions this instance runs in, and which tenant's data sits in each.",
 	gdpr: 'Every piece of personal data held for one subject, exported or erased.',
 	pii: 'What is redacted from responses and logs, and who has read it unmasked.',
@@ -87,7 +88,7 @@ const GROUPS: readonly { id: string; label: string; description: string; ids: re
 		description: 'Where data lives, how long it is kept, and what an auditor asks for.',
 		// Retention is a tab of the audit log, beside the entries the policies
 		// delete and the holds protect.
-		ids: ['storage', 'residency', 'gdpr', 'pii'],
+		ids: ['storage', 'content-history', 'residency', 'gdpr', 'pii'],
 	},
 	{
 		id: 'instance',
