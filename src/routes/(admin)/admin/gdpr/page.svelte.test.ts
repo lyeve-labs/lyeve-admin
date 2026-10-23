@@ -4,6 +4,7 @@ import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+vi.mock('$app/state', () => ({ page: { url: new URL('http://admin/admin/gdpr') } }));
 
 import GdprPage from './+page.svelte';
 
@@ -13,6 +14,7 @@ const said = (c: HTMLElement) => (c.textContent ?? '').replace(/\s+/g, ' ');
 
 function erased(errors: string[] | undefined, extra: Record<string, unknown> = {}) {
 	return {
+		data: { stepUp: null } as never,
 		form: {
 			action: 'erase',
 			ok: true,
@@ -79,8 +81,71 @@ describe('the export download under a finger', () => {
 	// under a finger as a Button does.
 	it('grows the Download JSON link to the control size', () => {
 		const { getByRole } = render(GdprPage, {
-			props: { form: { action: 'export', ok: true, subject: 'jane@example.com', result: { identifier: 'jane@example.com', plugins: {}, errors: [], summary: { total_records: 0, plugins_with_data: 0, plugins_queried: 1 } } } as never },
+			props: { data: { stepUp: null } as never, form: { action: 'export', ok: true, subject: 'jane@example.com', result: { identifier: 'jane@example.com', plugins: {}, errors: [], summary: { total_records: 0, plugins_with_data: 0, plugins_queried: 1 } } } as never },
 		});
 		expect(getByRole('link', { name: /Download JSON/ }).classList.contains('coarse:min-h-control')).toBe(true);
+	});
+});
+
+describe('what a person proves before exporting', () => {
+	const stepUp = (factors: string[], form: unknown = null) => ({
+		data: { stepUp: { ok: true, value: { factors } } } as never,
+		form: form as never,
+	});
+
+	it('ticks the stored factors and says what each one asks', () => {
+		const { container } = render(GdprPage, { props: stepUp(['password', 'email']) });
+		const ticked = [...container.querySelectorAll('input[name="factors"]:checked')].map((i) => (i as HTMLInputElement).value);
+		expect(ticked).toEqual(['password', 'email']);
+		expect(said(container)).toContain('Someone without two-factor authentication set up cannot export while this is ticked.');
+		expect(said(container)).toContain('With nothing ticked, being signed in is enough.');
+	});
+
+	it('ticks nothing when no step is required', () => {
+		const { container } = render(GdprPage, { props: stepUp([]) });
+		expect(container.querySelectorAll('input[name="factors"]:checked')).toHaveLength(0);
+	});
+
+	it('leaves the setting out while its routes do not answer', () => {
+		const { container } = render(GdprPage, { props: { data: { stepUp: null } as never, form: null as never } });
+		expect(said(container)).not.toContain('Before a person exports their own data');
+	});
+
+	it('draws a failed read as a failure with a way to try again', () => {
+		const { container, getByRole } = render(GdprPage, {
+			props: { data: { stepUp: { ok: false, gate: { state: 'unavailable' } } } as never, form: null as never },
+		});
+		expect(said(container)).toContain('could not be read');
+		expect(getByRole('link', { name: /try again/i })).toBeTruthy();
+		expect(container.querySelector('input[name="factors"]')).toBeNull();
+	});
+
+	it('confirms a save', () => {
+		const { container } = render(GdprPage, { props: stepUp(['code'], { action: 'stepUp', ok: true }) });
+		expect(said(container)).toContain('Saved. The next export on every tenant asks for this.');
+	});
+
+	it('says why the section is empty while its plugin is stopped', () => {
+		const { container, getByTestId } = render(GdprPage, {
+			props: { data: { stepUp: { ok: false, stopped: { state: 'not-built' } } } as never, form: null as never },
+		});
+		expect(getByTestId('not-running').dataset.plugin).toBe('analytics');
+		expect(container.querySelector('input[name="factors"]')).toBeNull();
+	});
+
+	it('shows a license refusal on save with its way forward', () => {
+		const refused = { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' };
+		const { container } = render(GdprPage, {
+			props: stepUp(['code'], { action: 'stepUp', error: 'This needs example-feature.', refused }),
+		});
+		expect(container.querySelector('form[action="?/stepUp"] [data-testid="refusal-notice"]')).not.toBeNull();
+	});
+
+	it('keeps a refused save on screen', () => {
+		const { container } = render(GdprPage, {
+			props: stepUp(['email'], { action: 'stepUp', error: 'This install cannot send mail, so an emailed code cannot be required.' }),
+		});
+		expect(said(container)).toContain('This install cannot send mail');
+		expect(said(container)).not.toContain('Saved.');
 	});
 });

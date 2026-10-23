@@ -40,18 +40,32 @@ export const NO_TENANT_READ = { ok: false, noTenant: true } as const;
 /** What one read answers, before the page knows whether the session names a tenant. */
 export type SettingRead<T> = Setting<T> | typeof NO_TENANT_READ;
 
+/** A failed read as a setting: hidden on a 404, otherwise kept as a gate. */
+function failedRead(err: unknown, failed: string): Setting<never> {
+	if (isRedirect(err) || isHttpError(err)) throw err;
+	if (err instanceof ApiError && err.status === 404) return null;
+	return { ok: false, gate: gateOf(err, failed) };
+}
+
 /**
- * Await a setting's read. A 404 hides the setting, a 400 says the session
- * names no tenant, and any other failure is kept as a gate.
+ * Await a tenant setting's read. A 404 hides the setting, a 400 says the
+ * session names no tenant, and any other failure is kept as a gate.
  */
 export async function setting<T>(read: Promise<T>, failed: string): Promise<SettingRead<T>> {
 	try {
 		return { ok: true, value: await read };
 	} catch (err) {
-		if (isRedirect(err) || isHttpError(err)) throw err;
-		if (err instanceof ApiError && err.status === 404) return null;
 		if (err instanceof ApiError && err.status === 400) return NO_TENANT_READ;
-		return { ok: false, gate: gateOf(err, failed) };
+		return failedRead(err, failed);
+	}
+}
+
+/** Await an install setting's read. No tenant is involved, so a 400 is a failure like any other. */
+export async function installSetting<T>(read: Promise<T>, failed: string): Promise<Setting<T>> {
+	try {
+		return { ok: true, value: await read };
+	} catch (err) {
+		return failedRead(err, failed);
 	}
 }
 
