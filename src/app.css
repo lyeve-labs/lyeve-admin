@@ -89,37 +89,26 @@
 }
 
 /*
- * A route change fades the page. src/lib/page-transition.ts starts it and
- * marks the document while it runs. Inside the console's frame only the
- * content region fades, and the sidebar and the header swap in place. A page
- * with no frame, such as sign-in, fades whole. The exit runs a rung faster
- * than the entrance, on the kit's clock.
+ * A route change fades the new page in over the old one, which holds still
+ * underneath. src/lib/page-transition.ts starts it. Only what differs between
+ * the two pages changes, so the sidebar and the header hold still. Normal
+ * blending keeps what the two share from brightening halfway through, which
+ * the browser's own additive blend would do.
+ *
+ * The content region carries no view-transition-name. A named region gets a
+ * snapshot of its own, and in desktop Chrome the content region's came out
+ * white, which flashed the dark theme white between pages.
  */
-:root[data-page-fading] #content {
-	view-transition-name: page;
-}
-::view-transition-old(root),
-::view-transition-old(page) {
-	animation: page-out var(--duration-fast) var(--ease-exit) both;
-}
-::view-transition-new(root),
-::view-transition-new(page) {
-	animation: page-in var(--duration-base) var(--ease-enter) both;
-}
-:root:has(#content)::view-transition-old(root),
-:root:has(#content)::view-transition-new(root),
-::view-transition-group(page) {
+::view-transition-old(root) {
 	animation: none;
 }
-@keyframes page-out {
-	to {
-		opacity: 0;
-	}
+::view-transition-new(root) {
+	animation: page-in var(--duration-base) var(--ease-enter) both;
+	mix-blend-mode: normal;
 }
 @keyframes page-in {
 	from {
 		opacity: 0;
-		transform: translateY(4px);
 	}
 }
 

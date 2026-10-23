@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OnNavigate } from '@sveltejs/kit';
-import { FADING, fadeRouteChange } from './page-transition';
+import { fadeRouteChange } from './page-transition';
 
 function navigation(from: string, to: string, complete: Promise<void> = Promise.resolve()) {
 	return {
@@ -13,23 +13,19 @@ function navigation(from: string, to: string, complete: Promise<void> = Promise.
 	} as unknown as OnNavigate;
 }
 
-/** A browser with view transitions. The test ends each transition by hand. */
-function browser({ reducedMotion = false } = {}) {
-	const attrs = new Set<string>();
-	const finishers: Array<() => void> = [];
+/**
+ * A browser with view transitions. Each of a transition's three promises
+ * settles with its update, as in a real one, where all three reject when the
+ * update fails. Each is a promise of its own, so each needs its own catch.
+ */
+function browser() {
 	const startViewTransition = vi.fn((update: () => Promise<void>) => {
-		const finished = new Promise<void>((r) => finishers.push(r));
-		return { ready: Promise.resolve(), updateCallbackDone: update(), finished };
+		const done = update();
+		const settle = () => done.then(() => undefined);
+		return { ready: settle(), updateCallbackDone: settle(), finished: settle() };
 	});
-	vi.stubGlobal('document', {
-		startViewTransition,
-		documentElement: {
-			setAttribute: (name: string) => attrs.add(name),
-			removeAttribute: (name: string) => attrs.delete(name),
-		},
-	});
-	vi.stubGlobal('window', { matchMedia: () => ({ matches: reducedMotion }) });
-	return { startViewTransition, attrs, finish: (i: number) => finishers[i]() };
+	vi.stubGlobal('document', { startViewTransition, documentElement: {} });
+	return { startViewTransition };
 }
 
 afterEach(() => {
@@ -39,30 +35,8 @@ afterEach(() => {
 describe('fadeRouteChange', () => {
 	it('fades a change of page and lets the navigation go on once the snapshot is taken', async () => {
 		const b = browser();
-		const pending = fadeRouteChange(navigation('/dashboard', '/billing'));
+		await expect(fadeRouteChange(navigation('/dashboard', '/billing'))).resolves.toBeUndefined();
 		expect(b.startViewTransition).toHaveBeenCalledOnce();
-		await expect(pending).resolves.toBeUndefined();
-		b.finish(0);
-		await vi.waitFor(() => expect(b.attrs.has(FADING)).toBe(false));
-	});
-
-	it('marks the document while the fade runs and clears it after', async () => {
-		const b = browser();
-		await fadeRouteChange(navigation('/dashboard', '/billing'));
-		expect(b.attrs.has(FADING)).toBe(true);
-		b.finish(0);
-		await vi.waitFor(() => expect(b.attrs.has(FADING)).toBe(false));
-	});
-
-	it('keeps the mark until the last of two overlapping fades ends', async () => {
-		const b = browser();
-		await fadeRouteChange(navigation('/a', '/b'));
-		await fadeRouteChange(navigation('/b', '/c'));
-		b.finish(0);
-		await new Promise((r) => setTimeout(r, 0));
-		expect(b.attrs.has(FADING)).toBe(true);
-		b.finish(1);
-		await vi.waitFor(() => expect(b.attrs.has(FADING)).toBe(false));
 	});
 
 	it('leaves a change of query alone', () => {
@@ -75,14 +49,12 @@ describe('fadeRouteChange', () => {
 	// under reduced motion, so the admin starts the transition either way and
 	// never asks the media query itself.
 	it('starts the transition under reduced motion too, without reading the preference', async () => {
-		const b = browser({ reducedMotion: true });
+		const b = browser();
 		const matchMedia = vi.fn(() => ({ matches: true }));
 		vi.stubGlobal('window', { matchMedia });
 		await fadeRouteChange(navigation('/dashboard', '/billing'));
 		expect(b.startViewTransition).toHaveBeenCalledOnce();
 		expect(matchMedia).not.toHaveBeenCalled();
-		b.finish(0);
-		await vi.waitFor(() => expect(b.attrs.has(FADING)).toBe(false));
 	});
 
 	it('swaps without a fade in a browser that has no view transitions', () => {
@@ -91,14 +63,34 @@ describe('fadeRouteChange', () => {
 	});
 
 	it('reports nothing when the navigation fails mid-fade', async () => {
-		const b = browser();
+		browser();
 		const failed = Promise.reject(new Error('navigation aborted'));
 		failed.catch(() => {});
 		await fadeRouteChange(navigation('/dashboard', '/billing', failed));
-		b.finish(0);
 		// An unhandled rejection from the transition fails the run on this tick.
 		await new Promise((r) => setTimeout(r, 0));
-		await vi.waitFor(() => expect(b.attrs.has(FADING)).toBe(false));
+	});
+});
+
+describe('the route fade in app.css', () => {
+	const css = readFileSync(fileURLToPath(new URL('../app.css', import.meta.url)), 'utf8');
+	const rule = (selector: string) => {
+		const at = css.indexOf(`${selector} {`);
+		return at < 0 ? '' : css.slice(at, css.indexOf('}', at));
+	};
+
+	// A named region gets a snapshot of its own, and in Chrome the content
+	// region's came out white, which flashed the dark theme white between pages.
+	it('gives the content region no snapshot of its own', () => {
+		expect(css).not.toMatch(/#content[^{}]*\{[^}]*view-transition-name/);
+	});
+
+	// The old page holds still under the new one, so what the two share, such
+	// as the sidebar, would brighten under an additive blend.
+	it('fades the new page in over the old one with normal blending', () => {
+		expect(rule('::view-transition-old(root)')).toMatch(/animation:\s*none/);
+		expect(rule('::view-transition-new(root)')).toMatch(/animation:\s*page-in/);
+		expect(rule('::view-transition-new(root)')).toMatch(/mix-blend-mode:\s*normal/);
 	});
 });
 

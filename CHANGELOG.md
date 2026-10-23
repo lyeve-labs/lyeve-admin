@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Moving to another page no longer flashes the content area white for a frame in the dark theme. The new page now fades in over the old one as a whole, and the sidebar and the header still hold still.
 - Device sign-in: an account that lost its admin role after the approval page loaded sees that it cannot approve, instead of being asked to check a password that was right. A refused approval that carries no reason says the approval was refused.
 - Folding or opening the schema list, the API reference side list or a flow editor panel from its own button keeps keyboard focus on the button that undoes it, so the next Tab no longer starts from the top of the page.
 - Schema builder: a system field shows "required" only when it is, so the key of an optional relation no longer reads as required.
