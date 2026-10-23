@@ -15,7 +15,7 @@ function said(c: HTMLElement): string {
 }
 
 const props = (data: Record<string, unknown>, form: unknown = null) => ({
-	data: { noTenant: false, formErasure: { ok: true, value: { mode: 'auto' } }, ...data } as never,
+	data: { noTenant: false, formErasure: { ok: true, value: { mode: 'auto' } }, exportSections: null, exportRoles: null, ...data } as never,
 	form: form as never,
 });
 
@@ -73,5 +73,109 @@ describe('privacy settings: form submissions on erasure', () => {
 		});
 		expect(said(container)).toContain('The choice could not be saved.');
 		expect(said(container)).not.toContain('Saved.');
+	});
+});
+
+const sections = {
+	ok: true,
+	value: {
+		sections: [
+			{ section: 'engine', offered: true },
+			{ section: 'analytics', offered: false },
+			{ section: 'some-new-part', offered: true },
+		],
+		excluded: ['analytics', 'media'],
+	},
+};
+
+describe('privacy settings: what a person may include', () => {
+	it('ticks the offered sections and names each in plain words', () => {
+		const { container } = render(PrivacyPage, { props: props({ exportSections: sections }) });
+		const ticked = [...container.querySelectorAll('input[name="offered"]:checked')].map((i) => (i as HTMLInputElement).value);
+		expect(ticked).toEqual(['engine', 'some-new-part']);
+		expect(said(container)).toContain('Account');
+		expect(said(container)).toContain('Content, uploads and activity');
+		expect(said(container)).toContain('Some new part');
+	});
+
+	it('says which left-out sections are not available now and posts them to stay left out', () => {
+		const { container } = render(PrivacyPage, { props: props({ exportSections: sections }) });
+		expect(said(container)).toContain('Also left out: Media.');
+		const form = container.querySelector('form[action="?/sections"]') as HTMLFormElement;
+		expect(new FormData(form).getAll('kept')).toEqual(['media']);
+		expect(new FormData(form).getAll('available')).toEqual(['engine', 'analytics', 'some-new-part']);
+	});
+
+	it('draws a failed read as a failure, not as nothing offered', () => {
+		const { container } = render(PrivacyPage, {
+			props: props({ exportSections: { ok: false, gate: { state: 'unavailable' } } }),
+		});
+		expect(said(container)).toContain('could not be read');
+		expect(container.querySelector('input[name="offered"]')).toBeNull();
+	});
+});
+
+describe('privacy settings: who may export', () => {
+	it('shows every role as chosen when the stored list is empty, and offers no role list', () => {
+		const { container } = render(PrivacyPage, { props: props({ exportRoles: { ok: true, value: { roles: [] } } }) });
+		const scope = container.querySelector('input[name="scope"]') as HTMLInputElement;
+		expect(scope.value).toBe('every');
+		expect(container.querySelector('input[name="roles"]')).toBeNull();
+		expect(said(container)).toContain('Admins and super admins can always export.');
+	});
+
+	it("offers the user editor's roles less the two that always export, and keeps a custom one already chosen", () => {
+		const { container } = render(PrivacyPage, {
+			props: props({ exportRoles: { ok: true, value: { roles: ['editor', 'auditor', 'admin'] } } }),
+		});
+		const offered = [...container.querySelectorAll('input[name="roles"]')].map((i) => (i as HTMLInputElement).value);
+		expect(offered).toEqual(['viewer', 'editor', 'auditor']);
+		const ticked = [...container.querySelectorAll('input[name="roles"]:checked')].map((i) => (i as HTMLInputElement).value);
+		expect(ticked).toEqual(['editor', 'auditor']);
+	});
+
+	it('reads a list naming only admin as chosen roles with none ticked', () => {
+		const { container } = render(PrivacyPage, { props: props({ exportRoles: { ok: true, value: { roles: ['admin'] } } }) });
+		expect((container.querySelector('input[name="scope"]') as HTMLInputElement).value).toBe('chosen');
+		expect(container.querySelectorAll('input[name="roles"]:checked')).toHaveLength(0);
+	});
+
+	it('confirms a save on its own card only', () => {
+		const { container } = render(PrivacyPage, {
+			props: props({ exportRoles: { ok: true, value: { roles: [] } } }, { action: 'roles', saved: true }),
+		});
+		expect(said(container)).toContain('Saved. The next export follows this choice.');
+		expect(said(container)).not.toContain('Saved. The next erasure');
+	});
+
+	it('shows a license refusal on save with its way forward, on the card that saved', () => {
+		const refused = { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' };
+		const { container } = render(PrivacyPage, {
+			props: props(
+				{ exportSections: sections, exportRoles: { ok: true, value: { roles: [] } } },
+				{ action: 'roles', error: 'This needs example-feature.', refused },
+			),
+		});
+		const rolesForm = container.querySelector('form[action="?/roles"]') as HTMLFormElement;
+		expect(rolesForm.querySelector('[data-testid="refusal-notice"]')).not.toBeNull();
+		expect(container.querySelector('form[action="?/sections"] [data-testid="refusal-notice"]')).toBeNull();
+	});
+
+	it('says once why both export cards are missing while their plugin is stopped', () => {
+		const stopped = { ok: false, stopped: { state: 'not-started', reason: '' } };
+		const { container } = render(PrivacyPage, { props: props({ exportSections: stopped, exportRoles: stopped }) });
+		const notices = [...container.querySelectorAll('[data-testid="not-running"]')] as HTMLElement[];
+		expect(notices).toHaveLength(1);
+		expect(notices[0].dataset.plugin).toBe('analytics');
+		expect(container.querySelector('form[action="?/sections"]')).toBeNull();
+		expect(container.querySelector('form[action="?/roles"]')).toBeNull();
+	});
+
+	it('shows the page when only the export settings answer', () => {
+		const { container } = render(PrivacyPage, {
+			props: props({ formErasure: null, exportRoles: { ok: true, value: { roles: [] } } }),
+		});
+		expect(said(container)).not.toContain('None of these settings apply');
+		expect(said(container)).not.toContain('Form submissions on erasure');
 	});
 });

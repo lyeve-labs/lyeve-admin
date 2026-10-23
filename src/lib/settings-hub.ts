@@ -57,7 +57,7 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	residency: "The regions this instance runs in, and which tenant's data sits in each.",
 	gdpr: 'Every piece of personal data held for one subject, exported or erased.',
 	pii: 'What is redacted from responses and logs, and who has read it unmasked.',
-	privacy: "What an erasure does with this tenant's form submissions.",
+	privacy: "What an erasure does with this tenant's form submissions, and what people may take when they export their own data.",
 	license: 'The license this instance runs on, and where a new key is activated.',
 	configuration: 'Every setting the engine reads, and the layer each value came from.',
 	'config-sync': 'Export this configuration as one bundle, and compare, dry run and apply a bundle from another instance.',

@@ -327,6 +327,7 @@ describe('adminNav plugin gate', () => {
 
 	it('lists privacy while a plugin serving one of its settings runs', () => {
 		expect(present(adminNav(ADMIN, { plugins: named(['schema']) }))).toContain('privacy');
+		expect(present(adminNav(ADMIN, { plugins: named(['analytics']) }))).toContain('privacy');
 		expect(present(adminNav(ADMIN, { plugins: named([]) }))).not.toContain('privacy');
 	});
 
