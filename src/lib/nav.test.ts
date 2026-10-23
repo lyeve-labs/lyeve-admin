@@ -101,18 +101,20 @@ describe('adminNav role gate', () => {
 		// caller's tenant.
 		expect(ids(find(tree, 'operations').children ?? [])).toEqual(['plugins', 'ai', 'tenant-usage', 'tenant-costs']);
 		// Customizing the tenant's admin, its captcha, how its provider
-		// accounts sign in, its own rate limits and its content history are the
-		// tenant admin's, so they are the settings entries an admin reaches.
+		// accounts sign in, its own rate limits, its content history and its
+		// privacy settings are the tenant admin's, so they are the settings
+		// entries an admin reaches.
 		expect(ids(find(tree, 'settings').children ?? [])).toEqual([
 			'customization',
 			'captcha',
 			'sign-in',
 			'tenant-rate-limits',
 			'content-history',
+			'privacy',
 		]);
 	});
 
-	it('gives a super admin every section and all seventy destinations', () => {
+	it('gives a super admin every section and all seventy-one destinations', () => {
 		const tree = adminNav(SUPER);
 		expect(ids(tree)).toEqual([
 			'dashboard',
@@ -128,7 +130,7 @@ describe('adminNav role gate', () => {
 			'insight',
 			'settings',
 		]);
-		expect(labels(tree)).toHaveLength(70);
+		expect(labels(tree)).toHaveLength(71);
 		expect(ids(find(tree, 'settings').children ?? [])).toEqual([
 			'email',
 			'recommendations',
@@ -147,6 +149,7 @@ describe('adminNav role gate', () => {
 			'captcha',
 			'sign-in',
 			'content-history',
+			'privacy',
 		]);
 		expect(ids(find(tree, 'access').children ?? [])).toEqual([
 			'users',
@@ -320,6 +323,11 @@ describe('adminNav plugin gate', () => {
 
 	it('keeps privacy requests, which the engine serves itself', () => {
 		expect(present(adminNav(SUPER, { plugins: named([]) }))).toContain('gdpr');
+	});
+
+	it('lists privacy while a plugin serving one of its settings runs', () => {
+		expect(present(adminNav(ADMIN, { plugins: named(['schema']) }))).toContain('privacy');
+		expect(present(adminNav(ADMIN, { plugins: named([]) }))).not.toContain('privacy');
 	});
 
 	it('lists customization only while the multitenant plugin runs and lets this tenant use it', () => {

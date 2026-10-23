@@ -121,6 +121,7 @@ import {
 	History,
 	ShieldQuestion,
 	LockKeyhole,
+	UserLock,
 } from '@lucide/svelte';
 import { PLUGIN, type PluginName } from '$lib/plugin-names';
 import { runs, UNNAMED, type PluginSet } from '$lib/plugins';
@@ -200,6 +201,12 @@ const PAGE_PLUGIN: Readonly<Record<string, PluginName>> = {
 	// has to let this tenant use it: adminNav reads that answer beside this.
 	customization: PLUGIN.multitenant,
 };
+
+/**
+ * The plugins that serve the privacy page's settings. The page belongs to none
+ * of them alone, so it is listed while any one runs.
+ */
+const PRIVACY_PLUGINS: readonly PluginName[] = [PLUGIN.schema];
 
 /**
  * Pages that belong to a plugin and have no sidebar row, by path. The account
@@ -571,6 +578,15 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		href: '/admin/settings/content-history',
 		icon: History,
 	};
+	// What a tenant's erasures do with its form submissions. Each setting on
+	// the page is served by its own plugin, so the entry is listed while any
+	// of them runs, and the page leaves out the ones that do not answer.
+	const privacy: NavNode = {
+		id: 'privacy',
+		label: 'Privacy',
+		href: '/admin/settings/privacy',
+		icon: UserLock,
+	};
 	const settings: NavNode[] = superAdmin
 		? [
 				// One entry, because there is one place mail is configured: the
@@ -644,9 +660,10 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 				captcha,
 				signIn,
 				contentHistory,
+				privacy,
 		  ]
 		: operator
-			? [customization, captcha, signIn, tenantRateLimits, contentHistory]
+			? [customization, captcha, signIn, tenantRateLimits, contentHistory, privacy]
 			: [];
 
 	const tree: NavTree = [
@@ -675,6 +692,7 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		const plugin = PAGE_PLUGIN[id];
 		if (plugin !== undefined && !runs(plugins, plugin)) return false;
 		if (id === 'license') return licenseModule;
+		if (id === 'privacy') return PRIVACY_PLUGINS.some((p) => runs(plugins, p));
 		return id !== 'customization' || customizable;
 	});
 }
