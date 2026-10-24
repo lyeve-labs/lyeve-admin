@@ -469,3 +469,21 @@ describe('admin shell sign out', () => {
 		expect(submit!.textContent).toContain('Sign out');
 	});
 });
+
+// SvelteKit takes each preload setting from the nearest element above a link.
+// Without the sidebar's own, the first visit to a page waited for the page's
+// code and then its data, while a later visit waited for the data alone. The
+// page's links keep the hover preload the body sets.
+describe('admin shell code preload', () => {
+	it('gives every sidebar link the viewport code preload, and the page none', async () => {
+		await mount(SUPER);
+
+		const links = [...document.querySelectorAll('nav[aria-label="Admin sections"] a')];
+		expect(links.length).toBeGreaterThan(0);
+		for (const a of links) {
+			const setting = a.closest('[data-sveltekit-preload-code]')?.getAttribute('data-sveltekit-preload-code');
+			expect(setting, a.textContent?.trim()).toBe('viewport');
+		}
+		expect(screen.getByTestId('page').closest('[data-sveltekit-preload-code]')).toBeNull();
+	});
+});
