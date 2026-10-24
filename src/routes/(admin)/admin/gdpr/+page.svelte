@@ -32,6 +32,8 @@
 	 */
 	interface HeldErasure extends DsarEraseResult {
 		holds?: { id: string; reason?: string }[];
+		complete?: boolean;
+		failed?: string[];
 	}
 
 	const eraseResult = $derived(
@@ -43,6 +45,13 @@
 	// A plugin that failed to erase still holds the subject's data. The rows
 	// erased elsewhere do not make the request complete.
 	const eraseFailures = $derived(eraseResult?.errors ?? []);
+	// An unfinished answer that names no failed part kept rows under an
+	// address another account in the tenant also holds. A repeat erases
+	// nothing more, so the page offers no retry. An engine that predates the
+	// complete flag never sends false, and keeps the branches below.
+	const eraseKeptShared = $derived(
+		eraseResult?.complete === false && (eraseResult.failed ?? []).length === 0
+	);
 
 	const exportJson = $derived(exportResult ? JSON.stringify(exportResult, null, 2) : '');
 	const exportHref = $derived(
@@ -210,6 +219,16 @@
 						<li>{hold.reason || hold.id}</li>
 					{/each}
 				</ul>
+			</Alert>
+		{:else if eraseResult && eraseKeptShared}
+			<!-- Stays until dismissed: records are still held, and the reader has to know why. -->
+			<Alert tone="warn" title="Erasure kept some records">
+				<p>
+					Erased <span class="font-medium">{eraseResult.total_rows}</span>
+					{eraseResult.total_rows === 1 ? 'row' : 'rows'} for
+					<span class="font-mono text-xs">{eraseResult.identifier}</span>. Some records were kept,
+					because they cannot be told apart from another account's data in this tenant.
+				</p>
 			</Alert>
 		{:else if eraseResult && eraseFailures.length > 0}
 			<!-- Stays until dismissed: data is still held, and the reader has to act on it. -->
