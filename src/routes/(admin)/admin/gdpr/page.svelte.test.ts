@@ -67,6 +67,45 @@ describe('Privacy request erasure outcome', () => {
 		expect(items).toEqual(['Litigation 42', 'h2']);
 	});
 
+	// An address another account in the tenant also holds keeps its rows.
+	// The engine answers unfinished and names no failed part, and a repeat
+	// erases nothing more, so the page offers neither.
+	it('says records were kept when the answer is unfinished and names no failed part', async () => {
+		vi.useFakeTimers();
+		try {
+			const { container } = render(GdprPage, {
+				props: erased(['not finished: rows kept under a shared address'], { total_rows: 3, complete: false }),
+			});
+			await vi.advanceTimersByTimeAsync(60_000);
+			await tick();
+			const text = said(container);
+			expect(text).toContain('Erasure kept some records');
+			expect(text).toContain("cannot be told apart from another account's data in this tenant");
+			expect(text).toContain('Erased 3 rows');
+			expect(text).not.toContain('Erasure complete');
+			expect(text).not.toContain('Erasure incomplete');
+			expect(text).not.toContain('the part that failed');
+			expect(text).not.toContain('Run the erasure again');
+			expect(container.querySelectorAll('li')).toHaveLength(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('still calls an unfinished erasure that names its failed parts incomplete', () => {
+		const { container } = render(GdprPage, {
+			props: erased(['not finished: forms', 'repeat the request to finish the erasure'], {
+				complete: false,
+				failed: ['forms'],
+			}),
+		});
+		const text = said(container);
+		expect(text).toContain('Erasure incomplete');
+		expect(text).toContain("The engine's log names the part that failed.");
+		expect(text).toContain('Run the erasure again once the cause is fixed.');
+		expect(text).not.toContain('Erasure kept some records');
+	});
+
 	it('calls an erasure with no failures complete', () => {
 		const { container } = render(GdprPage, { props: erased([]) });
 		expect(said(container)).toContain('Erasure complete');
