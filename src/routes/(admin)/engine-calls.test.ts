@@ -14,7 +14,7 @@ import { actions as users } from './admin/users/+page.server';
 
 const admin = { id: 'u1', email: 'a@b.test', roles: ['super_admin'], tenant_id: 'default' };
 
-/** An instance on the free plan, as a development engine answers. */
+/** An instance with no license, as a development engine answers. */
 const ENTITLEMENTS = { plan: 'free', state: 'active', features: [], withheld: [], tenant_quota: 0 };
 
 /** The plugins whose reads the shell makes: the schema's migration count and the tenant's frame. */

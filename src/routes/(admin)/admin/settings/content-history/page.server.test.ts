@@ -117,7 +117,7 @@ describe('content history load', () => {
 		});
 	});
 
-	it('says whether the license reads versions past the free window', async () => {
+	it('says whether the license reads versions past the read window', async () => {
 		routeReads(SETTINGS);
 		expect(((await load(loadEvent())) as Loaded).readsOlder).toBe(false);
 		expect(((await load(loadEvent(['content-pro']))) as Loaded).readsOlder).toBe(true);
