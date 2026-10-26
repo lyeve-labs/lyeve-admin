@@ -22,10 +22,10 @@
 	import { formatBytes, formatCount, formatDateTime, formatPercent } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import {
-		FREE_READ_DAYS,
 		HISTORY_READ_FEATURE,
 		MAX_KEEP_DAYS,
 		MAX_KEEP_VERSIONS,
+		READ_WINDOW_DAYS,
 		type HistoryMode,
 		type PruneResult,
 		type SettingField,
@@ -133,9 +133,9 @@
 		return out;
 	});
 
-	// Versions past the free window are kept but need the capability to read.
+	// Versions past the read window are kept but need the capability to read.
 	const olderNote = $derived(
-		!data.readsOlder && mode !== 'off' && (daysLimit === 'none' || keepDays > FREE_READ_DAYS),
+		!data.readsOlder && mode !== 'off' && (daysLimit === 'none' || keepDays > READ_WINDOW_DAYS),
 	);
 
 	const actionName = $derived((form as { action?: string } | null)?.action ?? '');
@@ -271,7 +271,7 @@
 						</p>
 						{#if olderNote}
 							<Alert tone="brand">
-								Versions older than {FREE_READ_DAYS} days are kept, and reading them needs a license with the
+								Versions older than {READ_WINDOW_DAYS} days are kept, and reading them needs a license with the
 								{HISTORY_READ_FEATURE} feature.
 							</Alert>
 						{/if}
