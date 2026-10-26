@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
+import { getMe } from '@lyeve-labs/client-rest';
 import { authedClient, sessionUser } from '$lib/server/authz';
 import { clearSessionCookie, sessionToken } from '$lib/server/session-cookie';
 import {
@@ -114,6 +115,21 @@ function stepUpOf(form: FormData): { step: 'password' | 'mfa_code'; stepUp?: Dev
 		: { step: 'password', missing: 'Enter your current password.' };
 }
 
+/** What the form says when the engine refuses an approval without a sentence. */
+const APPROVAL_REFUSED = 'The engine refused to approve this sign-in. The request is still open.';
+
+/**
+ * Whether the session's account may still approve. An account that cannot be
+ * read counts as one that may, so the refusal is read as the confirmation's.
+ */
+async function stillApprover(client: ReturnType<typeof authedClient>): Promise<boolean> {
+	try {
+		return canApprove((await getMe(client)).roles);
+	} catch {
+		return true;
+	}
+}
+
 /** Approves or denies the code the form carries, and reports the outcome. */
 async function decide(event: Parameters<Actions[string]>[0], approve: boolean) {
 	const form = await event.request.formData();
@@ -134,11 +150,17 @@ async function decide(event: Parameters<Actions[string]>[0], approve: boolean) {
 		if (e instanceof ApiError) {
 			// A refused confirmation leaves the request open: say so on the form
 			// and keep the card on screen.
+			// The engine also answers 403 to an account that lost its admin role
+			// after the page loaded, which no confirmation can fix.
+			if (approve && e.status === 403 && !(await stillApprover(client))) {
+				return fail(403, { outcome: 'forbidden' as DeviceOutcome });
+			}
 			if (approve && isStepUpRefusal(e.status)) {
 				const r = describeRefusal(e.status, e.message, step.step);
 				const field = r.fields.password ?? r.fields.mfa_code ?? '';
+				const error = e.message.trim() ? r.error : APPROVAL_REFUSED;
 				return fail(e.status === 429 ? 429 : 400, {
-					stepUp: { error: field ? '' : r.error, field, needsMfa: !!r.needsMfa || step.step === 'mfa_code' },
+					stepUp: { error: field ? '' : error, field, needsMfa: !!r.needsMfa || step.step === 'mfa_code' },
 				});
 			}
 			const { view, refusal } = refusalView(e);

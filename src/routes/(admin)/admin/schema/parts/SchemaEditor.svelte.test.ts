@@ -65,6 +65,18 @@ describe('SchemaEditor', () => {
 		expect(props.schema.fields[3].relation_type).toBe('belongs_to');
 	});
 
+	it('marks a system field required only when it is, as an optional relation key is not', () => {
+		const schema = posts();
+		schema.fields.push(
+			{ id: 'f-author', name: 'author', field_type: 'relation', relation_to: 'authors', relation_type: 'belongs_to', required: false, unique: false, indexed: false },
+			{ id: 'f-author-id', name: 'author_id', field_type: 'uid', required: false, unique: false, indexed: true, system: true },
+		);
+		setup({ schema, saved: structuredClone(schema) });
+		const noteOf = (name: string) => screen.getByText(name, { selector: 'span.text-brand' }).nextElementSibling?.textContent;
+		expect(noteOf('id')).toBe('system, required, indexed');
+		expect(noteOf('author_id')).toBe('system, indexed');
+	});
+
 	it('removes a user field and offers no remove on a system one', async () => {
 		const { props } = setup();
 		expect(screen.queryByRole('button', { name: 'Remove field id' })).toBeNull();

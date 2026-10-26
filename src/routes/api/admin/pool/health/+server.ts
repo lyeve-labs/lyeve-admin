@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { engineFetch } from '$lib/server/engine';
+import { engineFetch, POOL_HEALTH_TIMEOUT_MS } from '$lib/server/engine';
 import { sessionToken } from '$lib/server/session-cookie';
 
 /**
@@ -13,7 +13,10 @@ export const GET: RequestHandler = async (event) => {
 	if (!token) error(401, 'Not authenticated');
 
 	try {
-		const res = await engineFetch(event, '/api/admin/pool/health', { token });
+		const res = await engineFetch(event, '/api/admin/pool/health', {
+			token,
+			signal: AbortSignal.timeout(POOL_HEALTH_TIMEOUT_MS),
+		});
 		return json(await res.json(), { status: res.status });
 	} catch {
 		error(502, 'Engine unreachable');

@@ -78,10 +78,10 @@ export function loginRedirect(pathname: string, search: string): string {
 
 /**
  * Whether a refused approval is about the confirmation rather than the code.
- * The page offers the approve form only to an approver, so a 403 from the
- * approval is the engine refusing the confirmation, whatever its wording, and
- * a 429 is a locked account. Those are answered on the form, the engine's own
- * sentence included, and the request stays open.
+ * Once the page has checked that the account is still an approver, a 403
+ * from the approval is the engine refusing the confirmation, whatever its
+ * wording, and a 429 is a locked account. Those are answered on the form, the
+ * engine's own sentence included, and the request stays open.
  */
 export function isStepUpRefusal(status: number): boolean {
 	return status === 403 || status === 429;

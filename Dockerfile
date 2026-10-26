@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1: install dependencies
-# node:24-alpine
-FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS deps
+# node:26.12.1-alpine
+FROM node@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS deps
 WORKDIR /app
 
-# Install pnpm directly: the Node base image does not bundle corepack.
-# The version is the one package.json names in packageManager, so the image
-# installs with the same pnpm, and the same policies, as a checkout does.
+# Install pnpm with npm at the version package.json names in packageManager,
+# so the image installs with the same pnpm, and the same policies, as a
+# checkout does.
 RUN npm install -g pnpm@11.25.0
 
 # pnpm-workspace.yaml carries the dependency overrides since pnpm 10 moved
@@ -23,8 +23,8 @@ COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: build
-# node:24-alpine
-FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS builder
+# node:26.12.1-alpine
+FROM node@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS builder
 WORKDIR /app
 
 RUN npm install -g pnpm@11.25.0
@@ -61,18 +61,31 @@ RUN find build -name '*.map' -delete
 # to build that image.
 RUN node tools/check-server-bundle.mjs build
 
-# Stage 3: runtime
-# node:24-alpine
-FROM node@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS runtime
+# Stage 3: the runtime's root filesystem
+# The Node base image ships npm and npx in its own layers, and
+# deleting them in a layer above leaves their bytes in the image under
+# whiteouts, where a scanner that reads each layer still finds them. The
+# runtime is plain Alpine of the same release instead, with the node binary,
+# the libraries it links and the base image's node user and entrypoint, and
+# its packages upgraded to the release's current fixes.
+# alpine:3.24
+FROM alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runtime-root
+RUN apk upgrade --no-cache \
+ && apk add --no-cache libatomic libstdc++ \
+ && addgroup -g 1000 node \
+ && adduser -u 1000 -G node -s /bin/sh -D node
+# node:26.12.1-alpine
+COPY --from=node@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 \
+     /usr/local/bin/node /usr/local/bin/docker-entrypoint.sh /usr/local/bin/
+
+# Stage 4: runtime
+# One layer holds the whole root filesystem, so the base packages the upgrade
+# replaced leave nothing behind either.
+FROM scratch AS runtime
+COPY --from=runtime-root / /
 WORKDIR /app
 
-# The runtime only runs node build/index.js, so the package managers the base
-# image bundles go. Their own dependencies carry advisories that nothing here
-# reaches, and every scan of the image would report them.
-RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
-      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
-      /usr/local/bin/yarn /usr/local/bin/yarnpkg
-
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV NODE_ENV=production
 # adapter-node honors PORT and ORIGIN at runtime.
 ENV PORT=3002
@@ -96,8 +109,10 @@ USER node
 
 # 127.0.0.1, not localhost: adapter-node binds IPv4 only, and localhost
 # resolves to ::1 first in this image, so the probe would be refused while the
-# server is serving.
+# server is serving. /readyz answers 503 while the engine cannot be reached,
+# which the root page does not: it answers 200 either way.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:3002/ || exit 1
+    CMD wget -qO- http://127.0.0.1:3002/readyz || exit 1
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "build/index.js"]

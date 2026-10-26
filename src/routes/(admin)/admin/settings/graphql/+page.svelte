@@ -8,6 +8,7 @@
 		EmptyState,
 		Input,
 		PageShell,
+		Pagination,
 		SectionHeading,
 		Table,
 		Textarea,
@@ -22,6 +23,7 @@
 	import { GRAPHQL_HTTP, GRAPHQL_WS, type PersistedQuery, type RootField } from '$lib/api/graphql';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
+	import { pageHref, pageNumber } from '$lib/api/list';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -209,12 +211,6 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
-				{#if data.persistedTotal > persisted.length}
-					<p class="text-xs text-muted">
-						Showing the first {persisted.length} of {data.persistedTotal} persisted queries. The rest still answer by
-						hash, but this page cannot show, switch off or delete them.
-					</p>
-				{/if}
 				<Table label="Persisted queries">
 					<thead>
 						<tr>
@@ -262,6 +258,14 @@
 						{/each}
 					</tbody>
 				</Table>
+				<Pagination
+					page={pageNumber(data.offset, data.limit)}
+					perPage={data.limit}
+					count={persisted.length}
+					total={data.persistedTotal}
+					noun="persisted queries"
+					href={pageHref('/admin/settings/graphql', data.limit)}
+				/>
 			{/if}
 		</section>
 	{/if}
