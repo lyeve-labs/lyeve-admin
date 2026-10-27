@@ -1,6 +1,6 @@
 /**
  * A tenant's privacy settings: what an erasure does with the tenant's form
- * submissions.
+ * submissions, and what a person may take when they export their own data.
  *
  * Each setting belongs to the plugin that serves its routes, and a page shows
  * one only while those routes answer. An engine older than a setting answers
@@ -70,4 +70,73 @@ export async function readFormErasure(client: HttpClient): Promise<FormErasure> 
 
 export async function saveFormErasure(client: HttpClient, mode: FormErasureMode): Promise<FormErasure> {
 	return client.put<FormErasure>(FORM_ERASURE_URL, { mode });
+}
+
+/**
+ * The self-service export: the sections a person may include when they
+ * export their own data, and the roles that may export. A section is the data
+ * one part of the instance keeps, or the account itself. Only what the tenant
+ * leaves out is stored, so a section that appears later is offered until
+ * someone leaves it out too.
+ */
+export const EXPORT_SECTIONS_URL = '/api/admin/analytics/gdpr/export-sections';
+export const EXPORT_ROLES_URL = '/api/admin/analytics/gdpr/export-roles';
+
+/** The most roles, and the longest role name, the export roles route takes. */
+export const MAX_EXPORT_ROLES = 64;
+export const MAX_ROLE_LENGTH = 64;
+
+/** The roles that may always export, whatever the tenant chooses. */
+export const ALWAYS_EXPORT: readonly string[] = ['admin', 'super_admin'];
+
+export interface ExportSections {
+	/** Every section an export can hold now, and whether the tenant offers it. */
+	sections: { section: string; offered: boolean }[];
+	/** What the tenant left out, which may name a section that is not available now. */
+	excluded: string[];
+}
+
+export async function readExportSections(client: HttpClient): Promise<ExportSections> {
+	return client.get<ExportSections>(EXPORT_SECTIONS_URL);
+}
+
+export async function saveExportSections(client: HttpClient, excluded: string[]): Promise<ExportSections> {
+	return client.put<ExportSections>(EXPORT_SECTIONS_URL, { excluded });
+}
+
+export async function readExportRoles(client: HttpClient): Promise<{ roles: string[] }> {
+	return client.get<{ roles: string[] }>(EXPORT_ROLES_URL);
+}
+
+export async function saveExportRoles(client: HttpClient, roles: string[]): Promise<{ roles: string[] }> {
+	return client.put<{ roles: string[] }>(EXPORT_ROLES_URL, { roles });
+}
+
+/** What a section holds, in the words a tenant admin reads. */
+const SECTION_TEXT: Readonly<Record<string, { label: string; description?: string }>> = {
+	engine: { label: 'Account', description: 'The account itself, with its email address and roles.' },
+	analytics: {
+		label: 'Content, uploads and activity',
+		description: 'The entries they created, the files they uploaded and the record of what they did.',
+	},
+	schema: { label: 'Form submissions and comments', description: 'Submissions and comments that hold their address.' },
+	ai: { label: 'AI requests' },
+	email: { label: 'Email' },
+	flow: { label: 'Flow runs' },
+	'magic-link': { label: 'Sign-in links' },
+	mfa: { label: 'Two-factor authentication' },
+	'device-fingerprint': { label: 'Trusted devices' },
+	media: { label: 'Media' },
+	storage: { label: 'Stored files' },
+	'request-capture': { label: 'Captured requests' },
+	audit: { label: 'Audit trail' },
+	oauth: { label: 'Linked sign-in accounts' },
+};
+
+/** A section as an option. A section this console does not know is named from its own name. */
+export function sectionOption(section: string): { value: string; label: string; description?: string } {
+	const known = SECTION_TEXT[section];
+	if (known) return { value: section, ...known };
+	const words = section.replace(/[-_]+/g, ' ').trim();
+	return { value: section, label: words ? words[0].toUpperCase() + words.slice(1) : section };
 }

@@ -206,7 +206,7 @@ const PAGE_PLUGIN: Readonly<Record<string, PluginName>> = {
  * The plugins that serve the privacy page's settings. The page belongs to none
  * of them alone, so it is listed while any one runs.
  */
-const PRIVACY_PLUGINS: readonly PluginName[] = [PLUGIN.schema];
+const PRIVACY_PLUGINS: readonly PluginName[] = [PLUGIN.schema, PLUGIN.productAnalytics];
 
 /**
  * Pages that belong to a plugin and have no sidebar row, by path. The account
@@ -578,7 +578,8 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		href: '/admin/settings/content-history',
 		icon: History,
 	};
-	// What a tenant's erasures do with its form submissions. Each setting on
+	// What a tenant's erasures do with its form submissions, and what a
+	// person may take in an export of their own data. Each setting on
 	// the page is served by its own plugin, so the entry is listed while any
 	// of them runs, and the page leaves out the ones that do not answer.
 	const privacy: NavNode = {
