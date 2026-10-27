@@ -5,8 +5,12 @@ import { engineFetch } from '$lib/server/engine';
 import { sessionToken } from '$lib/server/session-cookie';
 
 /**
- * Proxies POST /api/admin/debug/profiler/profile/{type} to the profiler
- * plugin and hands the pprof bytes back as the download it already labels.
+ * Proxies a pprof export to the profiler plugin and hands the bytes back as
+ * the download it already labels.
+ *
+ * It lives under the page rather than under /api/, because a proxy serving
+ * the console and the engine on one address sends every /api/ path to the
+ * engine, which refuses the form body.
  *
  * A pprof export is a file, not a page, so it is not a load, and the browser
  * cannot read the httpOnly session cookie to send it as a bearer. This route

@@ -227,13 +227,24 @@ describe('Audit log toolbar', () => {
 				form: null as never,
 			},
 		});
-		const exportForm = container.querySelector('form[action="/api/admin/audit-log/export"]') as HTMLFormElement;
+		const exportForm = container.querySelector('form[action="/admin/audit-log/export"]') as HTMLFormElement;
 		const sent = new FormData(exportForm);
 		expect(sent.get('action')).toBe('content.delete');
 		expect(sent.get('from')).toBe('2026-01-01');
 		expect(sent.get('q')).toBe('content');
 		expect(sent.has('to')).toBe(false);
 		expect(container.textContent).toContain('at most 100,000');
+	});
+
+	// A proxy in front of the console and the engine sends every /api/ path to
+	// the engine, so the console's download routes have to live outside it.
+	it('posts both exports to the console, never to an engine path', () => {
+		const { container } = render(AuditLogPage, { props: { data: data() as never, form: null as never } });
+		const actions = [...container.querySelectorAll('form[method="POST"]')]
+			.map((f) => f.getAttribute('action') ?? '')
+			.filter((a) => a.includes('export'));
+		expect(actions).toEqual(['/admin/audit-log/export', '/admin/audit-log/export-all']);
+		for (const action of actions) expect(action.startsWith('/api/')).toBe(false);
 	});
 
 	it('names the two date filters for a screen reader', () => {
