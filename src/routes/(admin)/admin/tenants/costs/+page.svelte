@@ -27,6 +27,7 @@
 	import { submitter } from '$lib/forms.svelte';
 	import { BUDGET_PERIODS, RESOURCE_TYPES, type Price, type ResourceType, costShares } from '$lib/api/cost';
 	import { formatDate, formatDateTime, NO_VALUE } from '$lib/format';
+	import { lastDay } from '$lib/cost/forms';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -314,7 +315,7 @@
 									<td data-cell="nowrap" class="font-mono text-xs">{money(budget.amount, budget.currency)}</td>
 									<td data-cell="nowrap" class="font-mono text-xs">{budget.current_spend}</td>
 									<td data-cell="nowrap" class="text-xs text-muted">
-										{formatDate(budget.period_start)} to {formatDate(budget.period_end)}
+										{formatDate(budget.period_start)} to {formatDate(lastDay(budget.period_end))}
 									</td>
 									<td data-cell="nowrap" class="text-xs text-muted">{budget.alert_thresholds.map((t) => `${t}%`).join(', ') || NO_VALUE}</td>
 									<td data-cell="nowrap" class="text-right">
