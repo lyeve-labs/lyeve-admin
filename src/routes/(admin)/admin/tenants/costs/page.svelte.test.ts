@@ -47,7 +47,7 @@ const budgets = [
 		alert_thresholds: [50, 80, 100],
 		current_spend: '9.00',
 		period_start: '2026-09-01T00:00:00Z',
-		period_end: '2026-09-30T23:59:59Z',
+		period_end: '2026-10-01T00:00:00Z',
 	},
 ];
 
@@ -85,6 +85,7 @@ describe('tenant costs page', () => {
 		expect(screen.getByTestId('cost-dashboard')).toBeTruthy();
 		expect(screen.getByRole('list', { name: 'Budgets at risk' }).textContent).toContain('Storage cap');
 		expect(screen.getByTestId('budget-row').textContent).toContain('50%, 80%, 100%');
+		expect(screen.getByTestId('budget-row').textContent).toContain('2026-09-01 to 2026-09-30');
 		expect(screen.getByRole('button', { name: 'Delete Storage cap' })).toBeTruthy();
 		expect(screen.getByText('Set by this tenant')).toBeTruthy();
 		expect(screen.getByRole('button', { name: /Use default/ })).toBeTruthy();
