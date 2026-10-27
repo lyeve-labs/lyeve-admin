@@ -10,6 +10,7 @@
 		PageShell,
 		SearchInput,
 		SectionHeading,
+		Select,
 		Stat,
 		Table,
 		Textarea,
@@ -96,6 +97,34 @@
 
 	const EMAIL_NAME_ID = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
 
+	// A template fills the settings a vendor usually takes. What names the
+	// customer's own account with the vendor stays theirs to paste.
+	let templateKey = $state('');
+	let certHint = $state('');
+	const templates = $derived(data.templates ?? []);
+	const templateOptions = $derived([
+		{ value: '', label: 'None' },
+		...templates.map((t) => ({ value: t.key, label: t.name })),
+	]);
+	const chosenTemplate = $derived(templates.find((t) => t.key === templateKey));
+
+	function applyTemplate(key: string) {
+		templateKey = key;
+		const config = templates.find((t) => t.key === key)?.config;
+		certHint = config?.idp_cert_hint ?? '';
+		if (!config) return;
+		if (config.entity_id) entityId = config.entity_id;
+		if (config.sso_url) ssoUrl = config.sso_url;
+		if (config.slo_url) sloUrl = config.slo_url;
+		nameIdFormat = config.name_id_format || EMAIL_NAME_ID;
+		if (config.attributes_mapping) {
+			attributes = Object.entries(config.attributes_mapping)
+				.map(([k, v]) => `${k}=${v}`)
+				.join('\n');
+		}
+		encryptAssertions = config.encrypt_assertions ?? false;
+	}
+
 	function openCreate() {
 		editing = null;
 		name = '';
@@ -110,6 +139,8 @@
 		signAuthnRequests = true;
 		encryptAssertions = false;
 		enabled = true;
+		templateKey = '';
+		certHint = '';
 		openedOver = form;
 		open = true;
 	}
@@ -401,6 +432,16 @@
 			<!-- A refused save keeps the drawer open, so the reason has to be in
 			     it and not behind the panel on the page. -->
 			<FormErrors message={drawerError} />
+			{#if !editing && templates.length > 0}
+				<Select
+					id="saml-template"
+					label="Start from"
+					value={templateKey}
+					options={templateOptions}
+					onvaluechange={applyTemplate}
+					hint={chosenTemplate?.description || 'Fills the settings this provider usually takes. Its entity ID, sign-on URL and certificate still come from your account with it.'}
+				/>
+			{/if}
 			<Input
 				id="saml-name"
 				name="name"
@@ -438,7 +479,7 @@
 				label="Their signing certificate"
 				hint={editing
 					? 'Leave empty to keep the stored certificate. Paste a new one to replace it.'
-					: 'PEM from the identity provider. Every assertion is verified against this.'}
+					: certHint || 'PEM from the identity provider. Every assertion is verified against this.'}
 				rows={6}
 				bind:value={idpCert}
 			/>

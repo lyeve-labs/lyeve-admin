@@ -8,6 +8,7 @@ import {
 	SAML_OK,
 	createProvider,
 	deleteProvider,
+	getTemplate,
 	listProviders,
 	listTemplates,
 	prepareCert,
@@ -76,10 +77,15 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
-	// Templates fill a new provider's protocol settings. Losing them costs the
+	// Templates fill a new provider's protocol settings. The list names them
+	// and each one's own read carries the settings. Losing them costs the
 	// shortcut, never the list, which is what an operator came to read.
 	const templates =
-		gate.state === 'ok' ? await listTemplates(client).catch((): SamlTemplate[] => []) : [];
+		gate.state === 'ok'
+			? await listTemplates(client)
+					.then((list) => Promise.all(list.map((t) => getTemplate(client, t.key))))
+					.catch((): SamlTemplate[] => [])
+			: [];
 
 	return { providers, templates, total, limit, offset, hasMore, gate };
 };
