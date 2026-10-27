@@ -50,6 +50,13 @@ describe('the import wizard', () => {
 		);
 	});
 
+	it('names the accepted formats in a short line instead of the raw extension list', () => {
+		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
+		const text = document.body.textContent ?? '';
+		expect(text).toContain('CSV, JSON, NDJSON, JSONL, YAML, or XLSX');
+		expect(text).not.toContain('.csv,.json');
+	});
+
 	it('writes the chosen file size in the unit the rest of the admin uses', async () => {
 		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
 		const input = document.getElementById('import-file') as HTMLInputElement;
