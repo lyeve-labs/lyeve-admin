@@ -1,12 +1,50 @@
 <script lang="ts">
-	import { Alert, Button, Card, Input, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
-	import type { ActionData } from './$types';
+	import { Alert, Button, Card, CheckboxGroup, Input, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
+	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import { Download, Trash2, FileJson } from '@lucide/svelte';
 	import type { DsarExportResult, DsarEraseResult } from '@lyeve-labs/client-rest';
+	import GateNotice from '$lib/components/GateNotice.svelte';
+	import FormErrors from '$lib/components/FormErrors.svelte';
+	import NotRunning from '$lib/components/NotRunning.svelte';
+	import { PLUGIN } from '$lib/plugin-names';
+	import { formRefusal } from '$lib/api/refusal';
 	import { ICON } from '$lib/icon';
+	import { tracked } from '$lib/forms.svelte';
+	import type { StepUpFactor } from '$lib/api/export-step-up';
 
-	let { form }: { form: ActionData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	const FACTOR_OPTIONS: { value: StepUpFactor; label: string; description: string }[] = [
+		{
+			value: 'password',
+			label: 'Their password',
+			description:
+				'They type their password again. Someone who signs in only through an identity provider has no password here, and cannot export while this is ticked.',
+		},
+		{
+			value: 'code',
+			label: 'A code from their authenticator app',
+			description: 'Someone without two-factor authentication set up cannot export while this is ticked.',
+		},
+		{
+			value: 'email',
+			label: 'A code sent to their email address',
+			description: 'A one-time code is mailed to the address on the account. The install has to be able to send mail.',
+		},
+	];
+
+	// The factors start from what is stored and follow a save.
+	let factors = $state<string[]>([]);
+	$effect(() => {
+		if (data.stepUp?.ok) factors = [...data.stepUp.value.factors];
+	});
+	const stepUpResult = $derived(
+		form?.action === 'stepUp' ? { ...(form as { ok?: boolean; error?: string }), refused: formRefusal(form) } : null,
+	);
+	const saveStepUp = tracked(() => async ({ update }) => {
+		await update({ reset: false });
+	});
 
 	let exportSubject = $state('');
 	let eraseSubject = $state('');
@@ -237,4 +275,51 @@
 			</Alert>
 		{/if}
 	</section>
+
+	{#if data.stepUp}
+		<section class="flex flex-col gap-4" aria-label="Before a person exports their own data">
+			<div class="flex flex-col gap-1">
+				<SectionHeading level={2}>Before a person exports their own data</SectionHeading>
+				<p class="text-sm text-muted">
+					A signed-in person can download a copy of their own data. This decides what they prove first, on every
+					tenant of this install.
+				</p>
+			</div>
+			{#if 'stopped' in data.stepUp}
+				<!-- Only a super admin opens this page, and may read the plugin list. -->
+				<NotRunning
+					title="What a person proves before exporting"
+					plugin={PLUGIN.productAnalytics}
+					reason={data.stepUp.stopped}
+					operator
+				/>
+			{:else if !data.stepUp.ok}
+				<GateNotice
+					gate={data.stepUp.gate}
+					title="What a person proves before exporting"
+					absent="This install asks nothing more before a person exports their own data."
+				/>
+			{:else}
+				<Card>
+					<form method="POST" action="?/stepUp" use:enhance={saveStepUp.enhance} class="flex flex-col gap-4">
+						<CheckboxGroup
+							name="factors"
+							label="What a person proves first"
+							hint="Every ticked step is required. With nothing ticked, being signed in is enough."
+							options={FACTOR_OPTIONS}
+							bind:value={factors}
+						/>
+						{#if stepUpResult?.error}
+							<FormErrors message={stepUpResult.error} refused={stepUpResult.refused} />
+						{:else if stepUpResult?.ok}
+							<Alert tone="success" autoDismiss>Saved. The next export on every tenant asks for this.</Alert>
+						{/if}
+						<div class="flex justify-end">
+							<Button type="submit" variant="primary" loading={saveStepUp.pending}>Save</Button>
+						</div>
+					</form>
+				</Card>
+			{/if}
+		</section>
+	{/if}
 </PageShell>
