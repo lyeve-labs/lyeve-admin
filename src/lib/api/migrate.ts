@@ -13,6 +13,13 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 
+/**
+ * The name the shell's load reads the count under. A write that queues or runs
+ * DDL invalidates it, because SvelteKit keeps the shell's data across a
+ * client-side navigation and would otherwise show the count from before.
+ */
+export const MIGRATIONS_DEPENDENCY = 'app:migrations';
+
 /** What GET /api/admin/migrate answers with. */
 interface PendingResponse {
 	pending?: number | null;

@@ -15,7 +15,7 @@
 	import type { ActionData, PageData } from './$types';
 	import type { DryRunStatement } from './+page.server';
 	import { enhance } from '$app/forms';
-	import { beforeNavigate, goto } from '$app/navigation';
+	import { beforeNavigate, goto, invalidate } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { tick, untrack } from 'svelte';
 	import type { Schema } from '@lyeve-labs/client';
@@ -35,6 +35,7 @@
 		Upload,
 	} from '@lucide/svelte';
 	import { tableName } from '$lib/relations';
+	import { MIGRATIONS_DEPENDENCY } from '$lib/api/migrate';
 	import {
 		canonical,
 		changesOf,
@@ -342,6 +343,8 @@
 				else schemas = [...schemas, stored];
 				open(stored);
 				toast.success(`Saved ${stored.display_name || stored.name}`);
+				// A save that removes a field queues its drop, and the header counts the queue.
+				void invalidate(MIGRATIONS_DEPENDENCY);
 			} else if (result.type === 'failure') {
 				const d = (result.data ?? {}) as { error?: string; renamed?: { from: string; to: string }[] };
 				saveError = d.error ?? 'The schema could not be saved.';
@@ -412,6 +415,8 @@
 				schemas = schemas.filter((s) => s.name !== name);
 				open(null);
 				toast.success(`Deleted ${name}`);
+				// The last definition's delete clears its table's queued rows from the log.
+				void invalidate(MIGRATIONS_DEPENDENCY);
 			} else if (result.type === 'failure') {
 				saveError = String((result.data as { error?: string })?.error ?? 'The schema could not be deleted.');
 			}

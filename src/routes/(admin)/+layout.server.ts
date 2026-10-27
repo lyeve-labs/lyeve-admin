@@ -2,7 +2,7 @@ import { authedClient, loadUser } from '$lib/server/authz';
 import type { LayoutServerLoad } from './$types';
 import { getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
 import { NO_ENTITLEMENTS, type LicenseEntitlements } from '$lib/entitlements';
-import { pendingMigrations } from '$lib/api/migrate';
+import { MIGRATIONS_DEPENDENCY, pendingMigrations } from '$lib/api/migrate';
 import { getCustomization, NO_CUSTOMIZATION, type Customization } from '$lib/api/customization';
 import { brandOf } from '$lib/brand';
 import { NO_LICENSING, readLicensing } from '$lib/api/license';
@@ -83,6 +83,7 @@ export const load: LayoutServerLoad = async (event) => {
 	 * request per page load and a control they would be refused.
 	 */
 	const canMigrate = user.roles.some((role) => MIGRATOR_ROLES.includes(role));
+	if (canMigrate) event.depends(MIGRATIONS_DEPENDENCY);
 	const [migrations, customization, licensing] = await Promise.all([
 		canMigrate && !notRunning(plugins, PLUGIN.schema)
 			? // An engine that does not answer leaves the count unknown, which the
