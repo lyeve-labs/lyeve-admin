@@ -175,3 +175,74 @@ describe('SchemaEditor', () => {
 		expect(screen.getByRole('button', { name: 'curl', description: /^Copy a curl request for POST / })).toBeTruthy();
 	});
 });
+
+/*
+ * The headings are a row of their own above the field rows, so each heading
+ * stands over its column only when every row lays out the same fixed widths
+ * after the name. jsdom draws no layout, so the case compares the width each
+ * row gives its columns, in order.
+ */
+describe('SchemaEditor column headings', () => {
+	/** The fixed width of each cell after the stretching name, sr-only labels skipped. */
+	function widths(cells: Element[]): string[] {
+		const after = cells.slice(cells.findIndex((c) => c.classList.contains('flex-1')) + 1);
+		return after
+			.filter((c) => !c.classList.contains('sr-only'))
+			.map((c) => [...c.classList].find((k) => /^(@xl:)?w-/.test(k))?.replace('@xl:', '') ?? 'none');
+	}
+
+	function header(): HTMLElement {
+		return screen.getByText('Field', { selector: 'span' }).parentElement as HTMLElement;
+	}
+
+	/** The cells of the editable row for one field, the name input first. */
+	function fieldRow(name: string): Element[] {
+		const input = screen.getByDisplayValue(name);
+		const cells = input.closest('.flex-wrap') as HTMLElement;
+		return [...cells.children];
+	}
+
+	function lockedRow(name: string): Element[] {
+		const row = screen.getByText(name, { selector: 'span.text-brand' }).closest('.rounded-lg') as HTMLElement;
+		return [...row.children];
+	}
+
+	it('names every column a field row has, the translation box included', () => {
+		setup();
+		const names = [...header().children].map((c) => c.textContent?.trim()).filter(Boolean);
+		expect(names).toEqual(['Field', 'Type', 'Req', 'Idx', 'i18n']);
+	});
+
+	it('gives the headings, a system row and a field row the same columns', () => {
+		setup();
+		const heads = widths([...header().children]);
+		expect(widths(fieldRow('title'))).toEqual(heads);
+		expect(widths(lockedRow('id'))).toEqual(heads);
+	});
+
+	/*
+	 * The editor sits beside the navigation and the schema list, so a window
+	 * wide enough for the sm: breakpoint can leave the editor too narrow for
+	 * one line of columns. The rows then wrap under headings that stayed on one
+	 * line. The headings and the rows' fixed widths have to follow the width of
+	 * the list they sit in, through one container breakpoint.
+	 */
+	it('switches the headings and the row columns on the list width, not the window', () => {
+		setup();
+		const head = header();
+		expect(head.parentElement?.classList.contains('@container')).toBe(true);
+		expect(head.classList.contains('@xl:flex')).toBe(true);
+		const variants = [...fieldRow('title'), ...lockedRow('id')]
+			.flatMap((c) => [...c.classList])
+			.filter((k) => /^[a-z@0-9]+:(w-|block|hidden|justify-)/.test(k))
+			.map((k) => k.split(':')[0]);
+		expect(variants.length).toBeGreaterThan(0);
+		expect(new Set(variants)).toEqual(new Set(['@xl']));
+	});
+
+	it('keeps the columns in place for a reader who cannot remove a field', () => {
+		setup({ canWrite: false });
+		const heads = widths([...header().children]);
+		expect(widths(fieldRow('title'))).toEqual(heads);
+	});
+});
