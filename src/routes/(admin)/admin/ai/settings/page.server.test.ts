@@ -9,7 +9,7 @@ type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 describe('admin/ai/settings load', () => {
 	it('reads the retention window from the instance configuration for a super admin', async () => {
 		const { event } = loadEvent(
-			{ '/api/admin/config': () => json({ settings: [{ key: 'ai_transcript_retention', source: 'admin', value: '168h', editable: true }] }) },
+			{ '/api/admin/config': () => json({ settings: [{ key: 'AI_TRANSCRIPT_RETENTION', source: 'admin', value: '168h', editable: true }] }) },
 			{ path }
 		);
 		const out = (await load(event)) as Loaded;
