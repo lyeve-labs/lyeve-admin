@@ -12,7 +12,8 @@ vi.mock('$app/forms', () => ({
 		return { destroy() {} };
 	},
 }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}) }));
+const nav = vi.hoisted(() => ({ invalidate: vi.fn(async (_dep: string) => {}) }));
+vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}), invalidate: nav.invalidate }));
 const state = vi.hoisted(() => ({ page: { url: new URL('http://localhost/admin/schema') } }));
 vi.mock('$app/state', () => state);
 vi.mock('$lib/canvas/schema', () => ({ SchemaCanvas: null, hasSchemaCanvas: false }));
@@ -28,6 +29,7 @@ import SchemaPage from './+page.svelte';
 afterEach(cleanup);
 beforeEach(() => {
 	forms.handlers.clear();
+	nav.invalidate.mockClear();
 	kit.confirm.mockReset();
 	kit.confirm.mockResolvedValue(false);
 	// The page submits its hidden forms itself. The test plays each round
@@ -130,6 +132,45 @@ describe('schema history', () => {
 		await submit({ formData: new FormData(), cancel() {} } as never);
 
 		expect(await screen.findByText('The queued changes could not be applied.')).toBeTruthy();
+	});
+});
+
+/*
+ * The header's pending count is the shell's data, which SvelteKit keeps across
+ * a client-side navigation. A save can queue a drop and an apply runs them, so
+ * each has to tell the shell to read the count again.
+ */
+describe('the header count after a write', () => {
+	it('reads the count again after a save', async () => {
+		render(SchemaPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+		const stored = data().schemas[0];
+
+		await play('?/save', { type: 'success', data: { saved: stored } });
+
+		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
+	});
+
+	it('reads the count again after the queued changes are applied', async () => {
+		render(SchemaPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+		await fireEvent.click(screen.getByRole('button', { name: /History/ }));
+		await play('?/history', { type: 'success', data: { name: 'posts', entries: [], pending: 1, limit: 200 } });
+
+		await play('?/applyPending', { type: 'success', data: { applied: 1 } });
+
+		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
+	});
+
+	it('reads the count again after an apply that failed part way', async () => {
+		render(SchemaPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+		await fireEvent.click(screen.getByRole('button', { name: /History/ }));
+		await play('?/history', { type: 'success', data: { name: 'posts', entries: [], pending: 2, limit: 200 } });
+
+		await play('?/applyPending', { type: 'failure', data: { error: 'The queued changes could not be applied.' } });
+
+		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
 	});
 });
 

@@ -70,6 +70,7 @@ function request(fetch: typeof globalThis.fetch, method = 'GET', body?: FormData
 	const event = () =>
 		({
 			fetch,
+			depends: vi.fn(),
 			cookies: jar,
 			url,
 			request: req,
