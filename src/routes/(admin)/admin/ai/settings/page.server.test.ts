@@ -9,7 +9,7 @@ type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 describe('admin/ai/settings load', () => {
 	it('reads the retention window from the instance configuration for a super admin', async () => {
 		const { event } = loadEvent(
-			{ '/api/admin/config': () => json({ settings: [{ key: 'ai_transcript_retention', source: 'admin', value: '168h', editable: true }] }) },
+			{ '/api/admin/config': () => json({ settings: [{ key: 'AI_TRANSCRIPT_RETENTION', source: 'admin', value: '168h', editable: true }] }) },
 			{ path }
 		);
 		const out = (await load(event)) as Loaded;
@@ -17,6 +17,26 @@ describe('admin/ai/settings load', () => {
 		expect(out.instance).toEqual([
 			{ key: 'ai_transcript_retention', value: '168h', source: 'admin', editable: true },
 			{ key: 'ai_transcripts_enabled', value: 'true', source: 'default', editable: false },
+		]);
+	});
+
+	it('finds the stored values under the upper-case names the engine lists them by', async () => {
+		const { event } = loadEvent(
+			{
+				'/api/admin/config': () =>
+					json({
+						settings: [
+							{ key: 'AI_TRANSCRIPT_RETENTION', source: 'admin', value: '48h', editable: true },
+							{ key: 'AI_TRANSCRIPTS_ENABLED', source: 'admin', value: 'false', editable: true },
+						],
+					}),
+			},
+			{ path }
+		);
+		const out = (await load(event)) as Loaded;
+		expect(out.instance).toEqual([
+			{ key: 'ai_transcript_retention', value: '48h', source: 'admin', editable: true },
+			{ key: 'ai_transcripts_enabled', value: 'false', source: 'admin', editable: true },
 		]);
 	});
 
