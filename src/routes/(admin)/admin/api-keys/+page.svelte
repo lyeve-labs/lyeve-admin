@@ -37,6 +37,7 @@
 		MAX_PRIVILEGED_KEY_DAYS,
 		isPrivilegedKey,
 		keyExpiryProblem,
+		keyRoleProblem,
 		keyScopeProblem,
 		limitOrderProblem,
 		limitsOf,
@@ -113,7 +114,7 @@
 	const refused = $derived(formRefusal(createFailure));
 	const limitRefused = $derived(formRefusal(limitFailure));
 	const pageRefused = $derived(formRefusal(pageFailure));
-	let createRoles = $state<string[]>(['editor']);
+	let createRoles = $state<string[]>(['viewer']);
 	let createAccess = $state(defaultAccess());
 	const createScopes = $derived(accessScopes(createAccess));
 	let createExpires = $state('');
@@ -123,6 +124,7 @@
 	const bounds = $derived(privilegedExpiryBounds());
 	const expiryProblem = $derived(keyExpiryProblem(createRoles, createExpires));
 	const scopeProblem = $derived(keyScopeProblem(createRoles, createScopes));
+	const roleProblem = $derived(keyRoleProblem(createRoles, createScopes));
 	// A privileged key with no expiry keeps working. The page counts those so
 	// they get replaced rather than forgotten.
 	const neverExpiring = $derived(keys.filter((k) => k.enabled && !k.expires_at && isPrivilegedKey(k.roles)).length);
@@ -134,7 +136,7 @@
 		createOpenedOver = form;
 		createName = '';
 		createLimits = { ...NO_LIMITS };
-		createRoles = ['editor'];
+		createRoles = ['viewer'];
 		createAccess = defaultAccess();
 		createExpires = '';
 		showCreate = true;
@@ -424,7 +426,7 @@
 				error={errors.name}
 			/>
 
-			<CheckboxGroup name="roles" label="Roles" options={ROLE_OPTIONS} bind:value={createRoles} />
+			<CheckboxGroup name="roles" label="Roles" options={ROLE_OPTIONS} bind:value={createRoles} error={errors.roles ?? (roleProblem || undefined)} />
 
 			<KeyAccess
 				bind:access={createAccess}
@@ -455,7 +457,7 @@
 		</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (showCreate = false)}>Cancel</Button>
-		<Button variant="primary" type="submit" form="key-form" disabled={!createName.trim() || !!expiryProblem || !!scopeProblem || accessProblem(createAccess) || !!limitOrderProblem(createLimits)} loading={create.pending}>Create</Button>
+		<Button variant="primary" type="submit" form="key-form" disabled={!createName.trim() || !!expiryProblem || !!scopeProblem || !!roleProblem || accessProblem(createAccess) || !!limitOrderProblem(createLimits)} loading={create.pending}>Create</Button>
 	{/snippet}
 </Drawer>
 

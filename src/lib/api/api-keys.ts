@@ -209,6 +209,21 @@ export function keyScopeProblem(roles: readonly string[], scopes: readonly strin
 	return 'Choose at least one scope. A key without one is refused every route.';
 }
 
+/** Roles the engine lets write content, beside the scope that names the write. */
+const WRITING_ROLES = ['editor', 'admin', 'super_admin'];
+
+/**
+ * What is wrong with the roles chosen for a key, or '' when nothing is. The
+ * engine refuses a content write to a key without a writing role, whatever
+ * its scopes say, so a key that names a write needs one.
+ */
+export function keyRoleProblem(roles: readonly string[], scopes: readonly string[]): string {
+	if (roles.some((r) => WRITING_ROLES.includes(r))) return '';
+	const writes = scopes.some((s) => /^content(\.[^:]+)?:/.test(s) && !s.endsWith(':read'));
+	if (!writes) return '';
+	return 'Writing content needs the editor role. Tick editor, or leave create, update and delete off.';
+}
+
 /**
  * The scopes a listed key holds. The engine sends them with every key, and
  * the published APIKey type does not declare the field, so a key that

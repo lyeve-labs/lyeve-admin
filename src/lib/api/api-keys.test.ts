@@ -3,6 +3,7 @@ import type { HttpClient } from '@lyeve-labs/client';
 import {
 	isPrivilegedKey,
 	keyExpiryProblem,
+	keyRoleProblem,
 	keyScopeProblem,
 	keysUsage,
 	limitOrderProblem,
@@ -88,6 +89,19 @@ describe('key scopes', () => {
 		{ roles: [], scopes: [], problem: true },
 	])('roles $roles with scopes $scopes: problem $problem', ({ roles, scopes, problem }) => {
 		expect(keyScopeProblem(roles, scopes) !== '').toBe(problem);
+	});
+});
+
+describe('key roles', () => {
+	it.each([
+		{ roles: ['viewer'], scopes: ['content:read'], problem: false },
+		{ roles: ['viewer'], scopes: ['content:create'], problem: true },
+		{ roles: [], scopes: ['content.posts:delete'], problem: true },
+		{ roles: ['viewer'], scopes: ['flows.sync:create'], problem: false },
+		{ roles: ['editor'], scopes: ['content:update'], problem: false },
+		{ roles: ['admin'], scopes: ['content.posts:create'], problem: false },
+	])('roles $roles with scopes $scopes: problem $problem', ({ roles, scopes, problem }) => {
+		expect(keyRoleProblem(roles, scopes) !== '').toBe(problem);
 	});
 });
 

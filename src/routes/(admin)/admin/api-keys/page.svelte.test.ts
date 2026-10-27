@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
@@ -123,6 +123,25 @@ describe('API keys page', () => {
 		await fireEvent.click(getByRole('button', { name: /Schema catalog/ }));
 		await fireEvent.click(getByLabelText(/Discover content types/));
 		expect(sent('scopes')).toEqual(['content:read', 'schemas:read']);
+	});
+
+	it('starts a new key with the reading role, never editor', async () => {
+		const { getAllByRole } = setup([key({})]);
+		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		const ticked = [...document.body.querySelectorAll<HTMLInputElement>('input[name="roles"]')]
+			.filter((i) => i.checked)
+			.map((i) => i.value);
+		expect(ticked).toEqual(['viewer']);
+	});
+
+	it('asks for a writing role on the Roles field when a write is ticked', async () => {
+		const { getAllByRole, getByRole } = setup([key({})]);
+		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		const every = getByRole('group', { name: 'Actions on every schema' });
+		await fireEvent.click(within(every).getByRole('checkbox', { name: 'Create' }));
+		const roles = getByRole('group', { name: 'Roles' });
+		expect(roles.textContent).toContain('needs the editor role');
+		expect((getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
 	it('holds a key to the schemas and actions ticked for each', async () => {

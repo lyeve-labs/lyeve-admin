@@ -68,7 +68,7 @@
 	let editing = $state<User | null>(null);
 	let email = $state('');
 	let password = $state('');
-	let roles = $state<string[]>(['editor']);
+	let roles = $state<string[]>(['viewer']);
 	let tenant = $state('');
 	// A tenant is chosen only on an install with several. With one, the engine
 	// resolves it on its own.
@@ -83,7 +83,7 @@
 		editing = null;
 		email = '';
 		password = '';
-		roles = ['editor'];
+		roles = ['viewer'];
 		tenant = '';
 		open = true;
 	}
