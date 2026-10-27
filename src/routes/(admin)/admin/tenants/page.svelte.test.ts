@@ -2,7 +2,22 @@
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+// enhance keeps each form's submit handler, so a case can run the one a
+// delete would run and read the question it asks.
+const forms = vi.hoisted(() => ({
+	submits: new Map<HTMLFormElement, (input: unknown) => unknown>(),
+	confirm: vi.fn(async () => false),
+}));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit: (input: unknown) => unknown) => {
+		forms.submits.set(node, submit);
+		return { destroy: () => forms.submits.delete(node) };
+	},
+}));
+vi.mock('@lyeve-labs/ui-kit', async (original) => ({
+	...(await original<typeof import('@lyeve-labs/ui-kit')>()),
+	confirm: forms.confirm,
+}));
 
 import TenantsPage from './+page.svelte';
 
@@ -198,6 +213,21 @@ describe('the tenant drawer and the failures of other actions', () => {
 		expect(drawerText()).toContain('Failed to create tenant');
 		const outside = container.textContent?.replace(drawerText(), '') ?? '';
 		expect(outside).not.toContain('Failed to create tenant');
+	});
+});
+
+describe('the tenant delete question', () => {
+	it('says the rows and users go and the stored files stay with the storage backend', async () => {
+		const { getByRole } = render(TenantsPage, { props: props({ tenants: tenants(1) }) });
+		const form = getByRole('button', { name: 'Delete Tenant 0' }).closest('form');
+		const submit = form && forms.submits.get(form);
+		expect(submit).toBeTruthy();
+		await submit?.({ cancel: vi.fn() });
+		expect(forms.confirm).toHaveBeenCalledWith(
+			'Delete Tenant 0?',
+			"Every row and user scoped to it goes with it. Its stored files stay in the storage backend until the backend's own lifecycle rules remove them.",
+			{ confirmLabel: 'Delete' },
+		);
 	});
 });
 
