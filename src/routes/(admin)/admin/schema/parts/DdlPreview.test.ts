@@ -50,6 +50,30 @@ describe('DdlPreview', () => {
 		expect(screen.getByText('No DDL changes. The table already matches this definition.')).toBeTruthy();
 	});
 
+	/*
+	 * A save runs each rename through its own route before the definition, so
+	 * the engine is asked about the rest only. The rename is still the change a
+	 * reader most needs to see, and "No DDL changes" called it harmless.
+	 */
+	it('names a rename in the read-only preview when nothing else changes', () => {
+		setup({ change: { ...none, renames: [{ from: 'title', to: 'headline' }] } });
+		const dialog = screen.getByRole('dialog', { name: 'Preview DDL' });
+		expect(dialog.textContent).toContain('Renames title to headline.');
+		expect(dialog.textContent).not.toContain('No DDL changes');
+	});
+
+	it('names each rename beside the statements for the rest of the definition', () => {
+		setup({
+			change: { ...none, renames: [{ from: 'title', to: 'headline' }, { from: 'body', to: 'content' }] },
+			statements: [{ description: 'add column _posts.slug', sql: 'ALTER TABLE t ADD slug' }],
+		});
+		const dialog = screen.getByRole('dialog', { name: 'Preview DDL' });
+		expect(dialog.textContent).toContain('Renames title to headline.');
+		expect(dialog.textContent).toContain('Renames body to content.');
+		expect(screen.getAllByTestId('ddl-statement')).toHaveLength(1);
+		expect(dialog.textContent).toContain('The renames run first. Then:');
+	});
+
 	it('asks before a save that drops a column, and never calls an unread count zero', async () => {
 		const { onsave } = setup({
 			risk: true,
