@@ -98,7 +98,7 @@
 	// name and no row behind it, so a field reading the row opens blank.
 	let providerName = $state('');
 	let username = $state('');
-	let useTLS = $state(true);
+	let useTLS = $state(false);
 	let apiBaseUrl = $state('');
 	let apiMethod = $state('POST');
 	let apiPath = $state('');
@@ -123,7 +123,7 @@
 		host = '';
 		port = '587';
 		username = '';
-		useTLS = true;
+		useTLS = false;
 		apiBaseUrl = '';
 		apiMethod = 'POST';
 		apiPath = '';
@@ -516,7 +516,7 @@
 				<PasswordInput id="ep-password" name="password" label="Password" hint={passwordKept ? keptHint : 'Encrypted at rest.'} autocomplete="off" />
 				<div>
 					<input type="hidden" name="use_tls" value={useTLS ? 'true' : 'false'} />
-					<Toggle id="ep-use-tls" label="TLS" hint="STARTTLS on the connection." bind:checked={useTLS} />
+					<Toggle id="ep-use-tls" label="Implicit TLS" hint="For port 465. Off, the connection upgrades with STARTTLS when the server offers it." bind:checked={useTLS} />
 				</div>
 			</div>
 		{/if}
