@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- Served by SvelteKit when no error page of the console's own can render,
+     such as when the root layout failed. It is plain HTML with no script,
+     because nothing of the app may have loaded, and the response carries no
+     nonce for one. The colors are the console's ink and paper. -->
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Something went wrong</title>
+		<style>
+			:root {
+				color-scheme: dark light;
+				--bg: #0b1422;
+				--fg: #e6e8ee;
+				--muted: #9aa1ad;
+				--line: #1e2d40;
+				--line-strong: #616d80;
+			}
+			@media (prefers-color-scheme: light) {
+				:root {
+					--bg: #f6f7f9;
+					--fg: #111827;
+					--muted: #525866;
+					--line: #d6d9e0;
+					--line-strong: #767d8e;
+				}
+			}
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 24px 16px;
+				box-sizing: border-box;
+				background: var(--bg);
+				color: var(--fg);
+				font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+				line-height: 1.5;
+			}
+			main {
+				max-width: 448px;
+				text-align: center;
+			}
+			.status {
+				display: inline-block;
+				padding: 2px 8px;
+				border: 1px solid var(--line);
+				border-radius: 999px;
+				font-size: 12px;
+				color: var(--muted);
+			}
+			h1 {
+				margin: 12px 0 8px;
+				font-size: 20px;
+			}
+			p {
+				margin: 0 0 20px;
+				color: var(--muted);
+				font-size: 14px;
+			}
+			a {
+				display: inline-block;
+				margin: 0 4px;
+				padding: 6px 14px;
+				border: 1px solid var(--line-strong);
+				border-radius: 6px;
+				color: var(--fg);
+				text-decoration: none;
+				font-size: 14px;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<span class="status">%sveltekit.status%</span>
+			<h1>Something went wrong</h1>
+			<p>The request did not complete. Try again, or go back to the dashboard.</p>
+			<a href="">Try again</a>
+			<a href="/admin">Dashboard</a>
+		</main>
+	</body>
+</html>
