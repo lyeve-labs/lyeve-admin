@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 
-const nav = vi.hoisted(() => ({ invalidateAll: vi.fn(async () => {}) }));
+const nav = vi.hoisted(() => ({ invalidateAll: vi.fn(async () => {}), invalidate: vi.fn(async (_dep: string) => {}) }));
 vi.mock('$app/navigation', () => nav);
 
 /*
@@ -32,6 +32,7 @@ const queue = [
 beforeEach(() => {
 	forms.submits = [];
 	nav.invalidateAll.mockClear();
+	nav.invalidate.mockClear();
 });
 
 afterEach(() => {
@@ -110,10 +111,10 @@ describe('DbStatus', () => {
 		expect(forms.submits).toHaveLength(1);
 	});
 
-	// Without JavaScript this is the whole mechanism: a POST to a real action,
-	// carrying the page to come back to.
+	// The write is a form action, and the post carries the page to come back to
+	// and the queue the dialog listed, which the action checks before applying.
 	it('applies through the form action rather than a fetch', async () => {
-		render(DbStatus, { props: { pending: 1, redirectTo: '/admin/media?limit=25' } });
+		render(DbStatus, { props: { pending: 3, items: queue, redirectTo: '/admin/media?limit=25' } });
 		await fireEvent.click(screen.getByTestId('db-status'));
 
 		const form = document.querySelector('form');
@@ -122,6 +123,19 @@ describe('DbStatus', () => {
 
 		const back = form?.querySelector('input[name="redirectTo"]') as HTMLInputElement;
 		expect(back.value).toBe('/admin/media?limit=25');
+		const expected = form?.querySelector('input[name="expected"]') as HTMLInputElement;
+		expect(JSON.parse(expected.value)).toEqual(queue.map((item) => item.description));
+	});
+
+	// A queue that moved since the list was read is refused, and the list is read again.
+	it('reads the queue again when the action says it changed', async () => {
+		render(DbStatus, { props: { pending: 1, items: queue.slice(0, 1), redirectTo: '/admin' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
+
+		await submit({ type: 'failure', status: 409, data: { error: 'The queue changed since it was listed. Review it again.' } });
+
+		await waitFor(() => expect(screen.getByText('The queue changed since it was listed. Review it again.')).toBeTruthy());
+		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
 	});
 
 	it('names the failure rather than falling silent', async () => {

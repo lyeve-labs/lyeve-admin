@@ -17,18 +17,17 @@
 	 * The chip only opens the confirmation. The queue holds every tenant's
 	 * pending drops on the tables they share, and a dropped column takes its
 	 * data with it, so nothing runs until the reader has seen each statement.
-	 * A `fetch` call in this script would put a read outside `load` and a write
-	 * outside an action, cost a second round trip after hydration on every page,
-	 * and leave the failure of a write with nowhere to be reported to a reader
-	 * whose JavaScript never ran.
+	 * The form carries the descriptions it listed, and the action refuses the
+	 * apply when the queue no longer matches them, so a drop queued after the
+	 * list was read never runs unseen.
 	 */
 	import { Badge, Button, Modal } from '@lyeve-labs/ui-kit';
 	import { CircleAlert, CircleCheck, CircleHelp } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidate, invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import type { PendingStatement } from '$lib/api/migrate';
+	import { MIGRATIONS_DEPENDENCY, type PendingStatement } from '$lib/api/migrate';
 
 	interface Props {
 		/** Migrations waiting to be applied, or null when the engine did not answer. */
@@ -60,6 +59,8 @@
 			if (result.type === 'failure') {
 				const message = result.data?.error;
 				error = typeof message === 'string' && message ? message : 'Migration failed';
+				// The queue moved since it was listed, so the list is read again.
+				if (result.status === 409) await invalidate(MIGRATIONS_DEPENDENCY);
 				return;
 			}
 			if (result.type === 'error') {
@@ -67,10 +68,10 @@
 				return;
 			}
 			/*
-			 * Success redirects, because a submission without JavaScript has to
-			 * land somewhere. Following it here would reload the document for a
-			 * number the shell can refresh on its own, so the shell's data is
-			 * invalidated instead and the reader keeps their place.
+			 * The action answers success with a redirect. Following it would
+			 * reload the document for a number the shell can refresh on its own,
+			 * so the shell's data is invalidated instead and the reader keeps
+			 * their place.
 			 */
 			await invalidateAll();
 		};
@@ -121,6 +122,7 @@
 	</Button>
 	<Modal
 		bind:open={confirming}
+		size="lg"
 		title="Apply {pending} pending migration{pending === 1 ? '' : 's'}"
 		description="Every statement queued for every tenant runs now. A dropped column cannot be brought back."
 	>
@@ -141,6 +143,7 @@
 		</ul>
 		<form id="db-status-apply" method="POST" action="/admin?/applyMigrations" use:enhance={applying}>
 			<input type="hidden" name="redirectTo" value={redirectTo} />
+			<input type="hidden" name="expected" value={JSON.stringify(items.map((item) => item.description))} />
 		</form>
 		{#snippet footer()}
 			<Button variant="secondary" onclick={() => (confirming = false)}>Cancel</Button>
