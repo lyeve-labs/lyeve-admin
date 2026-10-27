@@ -31,6 +31,17 @@
 	);
 	const importChanges = $derived((importPlan?.schemas ?? []).filter((s) => s.action !== 'unchanged').length);
 
+	// The engine keys a rename by the name it ends with, "<schema>" or
+	// "<schema>.<field>", and writes "<from> -> <to>" as the value. The line
+	// names the field's schema once, in front of the name it came with.
+	const importRenames = $derived(
+		Object.entries(importRenamed).map(([key, line]) => {
+			const [from, to] = line.split(' -> ');
+			const dot = key.indexOf('.');
+			return { key, from: (dot < 0 ? '' : key.slice(0, dot + 1)) + from, to };
+		}),
+	);
+
 	export function show() {
 		importPlan = null;
 		importNotes = [];
@@ -166,12 +177,12 @@
 						</li>
 					{/each}
 				</ul>
-				{#if Object.keys(importRenamed).length > 0}
+				{#if importRenames.length > 0}
 					<div>
 						<p class="mb-1 text-xs text-muted">Renamed to fit the engine's names</p>
 						<ul class="space-y-0.5 text-xs text-muted">
-							{#each Object.entries(importRenamed) as [from, to] (from)}
-								<li><span class="font-mono">{from}</span> to <span class="font-mono">{to}</span></li>
+							{#each importRenames as r (r.key)}
+								<li><span class="font-mono">{r.from}</span> to <span class="font-mono">{r.to}</span></li>
 							{/each}
 						</ul>
 					</div>
