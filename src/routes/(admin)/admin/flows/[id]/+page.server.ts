@@ -46,6 +46,12 @@ import { pageWindow, pastEndOffset, rowsOf, withOffset, type PagedList } from '$
 import { GATE_OK, gateOf, section, type Gate, type Section } from '$lib/api/gate';
 import type { NodeSpec } from '$lib/flow/types';
 
+/**
+ * The page renders in the browser only. Its flow editor then never
+ * enters the server build, and the server answers with the page's data alone.
+ */
+export const ssr = false;
+
 /** The runs tab pages through a flow's runs this many at a time. */
 const RUNS_PER_PAGE = 20;
 
