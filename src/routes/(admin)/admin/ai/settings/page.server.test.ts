@@ -20,6 +20,26 @@ describe('admin/ai/settings load', () => {
 		]);
 	});
 
+	it('finds the stored values under the upper-case names the engine lists them by', async () => {
+		const { event } = loadEvent(
+			{
+				'/api/admin/config': () =>
+					json({
+						settings: [
+							{ key: 'AI_TRANSCRIPT_RETENTION', source: 'admin', value: '48h', editable: true },
+							{ key: 'AI_TRANSCRIPTS_ENABLED', source: 'admin', value: 'false', editable: true },
+						],
+					}),
+			},
+			{ path }
+		);
+		const out = (await load(event)) as Loaded;
+		expect(out.instance).toEqual([
+			{ key: 'ai_transcript_retention', value: '48h', source: 'admin', editable: true },
+			{ key: 'ai_transcripts_enabled', value: 'false', source: 'admin', editable: true },
+		]);
+	});
+
 	it('shows the defaults, named as such, when the configuration cannot be read or the role cannot ask', async () => {
 		const refusedRead = loadEvent({ '/api/admin/config': () => refused(500, 'boom') }, { path });
 		const a = (await load(refusedRead.event)) as Loaded;
