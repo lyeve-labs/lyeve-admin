@@ -112,11 +112,16 @@
 		templateKey = key;
 		const config = templates.find((t) => t.key === key)?.config;
 		certHint = config?.idp_cert_hint ?? '';
+		// The settings a template fills start from a new provider's again, so
+		// None or another template leaves nothing of the last one behind.
+		nameIdFormat = EMAIL_NAME_ID;
+		attributes = 'email=email\nroles=groups';
+		encryptAssertions = false;
 		if (!config) return;
 		if (config.entity_id) entityId = config.entity_id;
 		if (config.sso_url) ssoUrl = config.sso_url;
 		if (config.slo_url) sloUrl = config.slo_url;
-		nameIdFormat = config.name_id_format || EMAIL_NAME_ID;
+		if (config.name_id_format) nameIdFormat = config.name_id_format;
 		if (config.attributes_mapping) {
 			attributes = Object.entries(config.attributes_mapping)
 				.map(([k, v]) => `${k}=${v}`)

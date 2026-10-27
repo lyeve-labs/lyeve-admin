@@ -41,7 +41,6 @@ describe('SAML load', () => {
 		expect(out.templates).toEqual([okta]);
 	});
 
-
 	it('sends a page past the end back to the last page that holds providers', async () => {
 		await expect(load(event({ data: [], total_count: 30 }, '?offset=75&limit=25'))).rejects.toMatchObject({
 			status: 307,
