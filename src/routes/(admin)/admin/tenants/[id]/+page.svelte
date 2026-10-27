@@ -84,7 +84,7 @@
 	let memberOpen = $state(false);
 	let editingMember = $state<TenantMember | null>(null);
 	let memberEmail = $state('');
-	let memberRoles = $state<string[]>(['editor']);
+	let memberRoles = $state<string[]>(['viewer']);
 	let savingMember = $state(false);
 
 	/*
@@ -108,7 +108,7 @@
 		openedOver = form;
 		editingMember = null;
 		memberEmail = '';
-		memberRoles = ['editor'];
+		memberRoles = ['viewer'];
 		memberOpen = true;
 	}
 
