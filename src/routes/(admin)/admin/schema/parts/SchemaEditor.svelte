@@ -239,11 +239,11 @@
 			<span class="text-sm font-medium text-brand">{name}</span>
 			<span class="ms-2 text-xs text-faint">{note}</span>
 		</span>
-		<span class="shrink-0 sm:w-36"><Badge>{type}</Badge></span>
-		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-8 shrink-0 sm:block"></span>
+		<span class="shrink-0 @xl:w-36"><Badge>{type}</Badge></span>
+		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-8 shrink-0 @xl:block"></span>
 	</div>
 {/snippet}
 
@@ -256,11 +256,11 @@
 			<span class="ms-2 text-xs text-faint italic">{role}</span>
 			<p class="mt-0.5 text-xs text-faint">{note}</p>
 		</div>
-		<span class="shrink-0 sm:w-36"><Badge>{type}</Badge></span>
-		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-8 shrink-0 sm:block"></span>
+		<span class="shrink-0 @xl:w-36"><Badge>{type}</Badge></span>
+		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-8 shrink-0 @xl:block"></span>
 	</div>
 {/snippet}
 
@@ -415,15 +415,17 @@
 		</div>
 	{/if}
 
-<div class="space-y-2">
+<div class="@container space-y-2">
 	<!-- The Req and Idx boxes in the rows below are named by these two
 	     headings, so each box repeats the heading and adds its field. -->
 	<!-- The column labels line up with the row's fixed widths, which
-	     only hold from sm: up. Below it the row wraps and each box
-	     carries its own short label instead. -->
+	     only hold once this list is 36rem wide. The list shares the window
+	     with the navigation and the schema list, so the breakpoint reads
+	     its own width rather than the window's. Below it the row wraps and
+	     each box carries its own short label instead. -->
 	<!-- The transparent border stands in for the rows' own, so the columns
 	     start at the same offset. -->
-	<div class="hidden items-center gap-3 border border-transparent px-3 text-xs text-faint sm:flex">
+	<div class="hidden items-center gap-3 border border-transparent px-3 text-xs text-faint @xl:flex">
 		<span class="w-3.5 shrink-0"></span>
 		<span class="flex-1">Field</span>
 		<span class="w-36 shrink-0">Type</span>
@@ -478,8 +480,8 @@
 						class="w-36 shrink-0"
 					/>
 
-					<div class="flex shrink-0 items-center gap-1.5 sm:w-10 sm:justify-center" title={inert.required ?? undefined}>
-						<span class="text-xs text-faint sm:hidden" aria-hidden="true">Req</span>
+					<div class="flex shrink-0 items-center gap-1.5 @xl:w-10 @xl:justify-center" title={inert.required ?? undefined}>
+						<span class="text-xs text-faint @xl:hidden" aria-hidden="true">Req</span>
 						<Checkbox
 							size="sm"
 							label="Required, {fieldLabel(field)}"
@@ -489,8 +491,8 @@
 							onchange={(checked) => (field.required = checked)}
 						/>
 					</div>
-					<div class="flex shrink-0 items-center gap-1.5 sm:w-10 sm:justify-center" title={inert.indexed ?? undefined}>
-						<span class="text-xs text-faint sm:hidden" aria-hidden="true">Idx</span>
+					<div class="flex shrink-0 items-center gap-1.5 @xl:w-10 @xl:justify-center" title={inert.indexed ?? undefined}>
+						<span class="text-xs text-faint @xl:hidden" aria-hidden="true">Idx</span>
 						<Checkbox
 							size="sm"
 							label="Indexed, {fieldLabel(field)}"
@@ -507,10 +509,10 @@
 					     and says why: hiding it would leave somebody looking
 					     for a control the engine does have. -->
 					<div
-						class="flex shrink-0 items-center gap-1.5 sm:w-10 sm:justify-center"
+						class="flex shrink-0 items-center gap-1.5 @xl:w-10 @xl:justify-center"
 						title={localizableProblem(field) ?? 'Translated per locale.'}
 					>
-						<span class="text-xs text-faint sm:hidden" aria-hidden="true">i18n</span>
+						<span class="text-xs text-faint @xl:hidden" aria-hidden="true">i18n</span>
 						<Checkbox
 							size="sm"
 							label="Translated per locale, {fieldLabel(field)}"
@@ -531,7 +533,7 @@
 					</button>
 					{:else}
 					<!-- Holds the remove button's column, so the boxes stay under their headings. -->
-					<span class="hidden w-8 shrink-0 sm:block"></span>
+					<span class="hidden w-8 shrink-0 @xl:block"></span>
 					{/if}
 				</div>
 			</div>

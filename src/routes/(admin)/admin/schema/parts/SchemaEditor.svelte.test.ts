@@ -188,7 +188,7 @@ describe('SchemaEditor column headings', () => {
 		const after = cells.slice(cells.findIndex((c) => c.classList.contains('flex-1')) + 1);
 		return after
 			.filter((c) => !c.classList.contains('sr-only'))
-			.map((c) => [...c.classList].find((k) => /^(sm:)?w-/.test(k))?.replace('sm:', '') ?? 'none');
+			.map((c) => [...c.classList].find((k) => /^(@xl:)?w-/.test(k))?.replace('@xl:', '') ?? 'none');
 	}
 
 	function header(): HTMLElement {
@@ -218,6 +218,26 @@ describe('SchemaEditor column headings', () => {
 		const heads = widths([...header().children]);
 		expect(widths(fieldRow('title'))).toEqual(heads);
 		expect(widths(lockedRow('id'))).toEqual(heads);
+	});
+
+	/*
+	 * The editor sits beside the navigation and the schema list, so a window
+	 * wide enough for the sm: breakpoint can leave the editor too narrow for
+	 * one line of columns. The rows then wrap under headings that stayed on one
+	 * line. The headings and the rows' fixed widths have to follow the width of
+	 * the list they sit in, through one container breakpoint.
+	 */
+	it('switches the headings and the row columns on the list width, not the window', () => {
+		setup();
+		const head = header();
+		expect(head.parentElement?.classList.contains('@container')).toBe(true);
+		expect(head.classList.contains('@xl:flex')).toBe(true);
+		const variants = [...fieldRow('title'), ...lockedRow('id')]
+			.flatMap((c) => [...c.classList])
+			.filter((k) => /^[a-z@0-9]+:(w-|block|hidden|justify-)/.test(k))
+			.map((k) => k.split(':')[0]);
+		expect(variants.length).toBeGreaterThan(0);
+		expect(new Set(variants)).toEqual(new Set(['@xl']));
 	});
 
 	it('keeps the columns in place for a reader who cannot remove a field', () => {
