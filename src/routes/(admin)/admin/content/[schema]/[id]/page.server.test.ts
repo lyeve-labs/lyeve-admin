@@ -626,3 +626,32 @@ describe('content editor load, releases', () => {
 		expect(releases).toMatchObject({ failed: false, holding: ['r1'] });
 	});
 });
+
+describe('content editor load, mentions', () => {
+	// The engine mails only accounts of the entry's own tenant and refuses a
+	// comment that mentions anyone else, the first super admin included, who
+	// belongs to no tenant. The directory a super admin reads holds them all.
+	it('offers to mention only accounts of the entry\'s tenant, and still names every author', async () => {
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('/api/admin/users')) {
+				return json([
+					{ id: 'setup', email: 'setup@test.invalid', tenant_id: '' },
+					{ id: 'ana', email: 'ana@test.invalid', tenant_id: 't1' },
+					{ id: 'bo', email: 'bo@test.invalid', tenant_id: 't2' },
+				]);
+			}
+			if (path.includes('/comments')) return json({ data: [] });
+			if (path.includes('/revisions')) return json([]);
+			if (path.includes('/api/admin/content?')) return json({ data: [] });
+			return json({ ...entry, tenant_id: 't1' });
+		}) as unknown as typeof globalThis.fetch;
+		const out = (await load({
+			fetch: fetchFn,
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none }),
+		} as never)) as { comments: { people: { id: string }[]; mentionable: { id: string }[] } };
+		expect(out.comments.mentionable.map((p) => p.id)).toEqual(['ana']);
+		expect(out.comments.people.map((p) => p.id)).toEqual(['setup', 'ana', 'bo']);
+	});
+});

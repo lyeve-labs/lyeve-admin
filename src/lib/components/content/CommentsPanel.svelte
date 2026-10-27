@@ -24,15 +24,17 @@
 
 	interface Props {
 		threads: EntryComment[];
-		/** Accounts a comment can mention. Empty when the caller may not list them. */
+		/** Accounts the directory names, so an author reads by email. */
 		people: Person[];
+		/** Accounts a comment can mention. Empty when the caller may not list them. */
+		mentionable: Person[];
 		/** The thread read failed. Never drawn as an empty list. */
 		unavailable?: boolean;
 		error?: string;
 		refused?: Refusal | null;
 	}
 
-	let { threads, people, unavailable = false, error = undefined, refused = null }: Props = $props();
+	let { threads, people, mentionable, unavailable = false, error = undefined, refused = null }: Props = $props();
 
 	let view = $state<'open' | 'resolved' | 'all'>('open');
 	const VIEWS = [
@@ -43,7 +45,7 @@
 	const shown = $derived(threads.filter((t) => view === 'all' || (view === 'resolved') === t.resolved));
 	const openCount = $derived(threads.filter((t) => !t.resolved).length);
 
-	const options = $derived(people.map((p) => ({ value: p.id, label: p.email })));
+	const options = $derived(mentionable.map((p) => ({ value: p.id, label: p.email })));
 	const who = (id: string) => people.find((p) => p.id === id)?.email ?? 'Someone';
 
 	let body = $state('');
