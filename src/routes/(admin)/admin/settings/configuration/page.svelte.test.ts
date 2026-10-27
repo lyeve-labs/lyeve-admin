@@ -53,6 +53,18 @@ describe('the configuration page', () => {
 		expect(secret.textContent).toContain('Stored, not shown.');
 	});
 
+	it('offers no save for a setting the engine reads only at start, and says how to set it', () => {
+		const atStart = { key: 'refresh_token_ttl_secs', source: 'default', editable: false, read_at_start: true };
+		render(ConfigurationPage, {
+			props: props({ provenance: { ok: true, value: { settings: [atStart], counts: {}, suppressed: [] } } }),
+		});
+		expect(screen.queryByLabelText('refresh_token_ttl_secs')).toBeNull();
+		expect(document.body.textContent).toContain(
+			'Read only when the engine starts. Set it with an environment variable or in the configuration file, then restart.'
+		);
+		expect(document.body.textContent).not.toContain('The engine is using it now.');
+	});
+
 	it('shows a refused save under the setting it belongs to only', () => {
 		render(ConfigurationPage, { props: props({}, { key: 'jwt_expiry_secs', error: 'jwt_expiry_secs must be at least 60' }) });
 		expect(row('jwt_expiry_secs').textContent).toContain('jwt_expiry_secs must be at least 60');

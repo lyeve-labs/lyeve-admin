@@ -43,6 +43,9 @@
 
 	// Why a setting cannot be edited here, in the operator's terms.
 	function pinnedBy(setting: ConfigSetting): string {
+		if (setting.read_at_start) {
+			return 'Read only when the engine starts. Set it with an environment variable or in the configuration file, then restart.';
+		}
 		if (setting.source === 'env') return 'Set by an environment variable, which always wins.';
 		if (setting.source === 'file') {
 			return setting.origin

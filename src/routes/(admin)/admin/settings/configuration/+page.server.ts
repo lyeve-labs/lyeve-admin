@@ -19,6 +19,8 @@ export interface ConfigSetting {
 	description?: string;
 	/** What applies when no layer sets it. */
 	default?: string;
+	/** Read once when the engine starts, so a value saved here would never apply. */
+	read_at_start?: boolean;
 }
 
 interface ConfigProvenance {
