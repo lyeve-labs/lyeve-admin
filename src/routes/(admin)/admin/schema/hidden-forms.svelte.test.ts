@@ -162,6 +162,16 @@ describe('the header count after a write', () => {
 		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
 	});
 
+	// Deleting the last definition of a table clears its queued rows from the log.
+	it('reads the count again after a delete', async () => {
+		render(SchemaPage, { props: { data: data(), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+
+		await play('?/delete', { type: 'success', data: { deleted: 'posts' } });
+
+		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
+	});
+
 	it('reads the count again after an apply that failed part way', async () => {
 		render(SchemaPage, { props: { data: data(), form: null } });
 		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));

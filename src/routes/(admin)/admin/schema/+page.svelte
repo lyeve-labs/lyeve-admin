@@ -415,6 +415,8 @@
 				schemas = schemas.filter((s) => s.name !== name);
 				open(null);
 				toast.success(`Deleted ${name}`);
+				// The last definition's delete clears its table's queued rows from the log.
+				void invalidate(MIGRATIONS_DEPENDENCY);
 			} else if (result.type === 'failure') {
 				saveError = String((result.data as { error?: string })?.error ?? 'The schema could not be deleted.');
 			}
