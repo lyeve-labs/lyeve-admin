@@ -1,14 +1,31 @@
 // @vitest-environment jsdom
-import { render, cleanup } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SubmitFunction } from '@sveltejs/kit';
 
 vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}) }));
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+const forms = vi.hoisted(() => ({ submits: [] as SubmitFunction[] }));
+vi.mock('$app/forms', () => ({
+	enhance: (_form: HTMLFormElement, submit: SubmitFunction) => {
+		forms.submits.push(submit);
+		return { destroy: () => {} };
+	},
+}));
+const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
+vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
+	...(await importOriginal<Record<string, unknown>>()),
+	confirm: kit.confirm,
+}));
 
 import EventsPage from './+page.svelte';
 import type { EventRow, ReplayRun } from '$lib/api/events';
 
 afterEach(cleanup);
+beforeEach(() => {
+	forms.submits = [];
+	kit.confirm.mockReset();
+	kit.confirm.mockResolvedValue(false);
+});
 
 function said(container: HTMLElement): string {
 	return (container.textContent ?? '').replace(/\s+/g, ' ');
@@ -127,6 +144,56 @@ describe('Events replay', () => {
 			props: props({ runs: [run({ status: 'running', replayed: 1, skipped: 1, total_events: 4 })] }),
 		});
 		expect(said(container)).toContain('50% of 4');
+	});
+});
+
+describe('starting a replay', () => {
+	type Input = Parameters<SubmitFunction>[0];
+
+	async function press(cancel = vi.fn()) {
+		const after = await forms.submits[0]({ cancel } as unknown as Input);
+		return { cancel, after };
+	}
+
+	async function fill(getByLabelText: (label: string) => HTMLElement, name: string) {
+		await fireEvent.input(getByLabelText('Run name'), { target: { value: name } });
+	}
+
+	it('asks before a real replay and names the window and the run', async () => {
+		const { getByLabelText, getByRole } = render(EventsPage, { props: props() });
+		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse first, posting nothing' }));
+		await fill(getByLabelText, 'backfill-oct');
+		const { cancel } = await press();
+		expect(kit.confirm).toHaveBeenCalledTimes(1);
+		const [question] = kit.confirm.mock.calls[0] as unknown as [string];
+		expect(question).toContain('backfill-oct');
+		expect(question).toMatch(/^Replay every event since /);
+		expect(cancel).toHaveBeenCalled();
+	});
+
+	it('names the shared run when no run name was given', async () => {
+		const { getByRole } = render(EventsPage, { props: props() });
+		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse first, posting nothing' }));
+		await press();
+		const [question] = kit.confirm.mock.calls[0] as unknown as [string];
+		expect(question).toContain('the shared name');
+	});
+
+	it('rehearses without asking, because a rehearsal publishes nothing', async () => {
+		render(EventsPage, { props: props() });
+		const { cancel } = await press();
+		expect(kit.confirm).not.toHaveBeenCalled();
+		expect(cancel).not.toHaveBeenCalled();
+	});
+
+	// The run name decides which events a later run skips, so a rehearsal
+	// followed by the real run has to go under the same name.
+	it('keeps the run name once a run is answered', async () => {
+		render(EventsPage, { props: props() });
+		const { after } = await press();
+		const update = vi.fn(async () => {});
+		await (after as unknown as (o: { update: typeof update }) => Promise<void>)({ update });
+		expect(update).toHaveBeenCalledWith({ reset: false });
 	});
 });
 
