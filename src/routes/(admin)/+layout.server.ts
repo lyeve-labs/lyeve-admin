@@ -2,7 +2,7 @@ import { authedClient, loadUser } from '$lib/server/authz';
 import type { LayoutServerLoad } from './$types';
 import { getEntitlements, getPluginStatus, type PluginStatusReport } from '@lyeve-labs/client-rest';
 import { NO_ENTITLEMENTS, type LicenseEntitlements } from '$lib/entitlements';
-import { MIGRATIONS_DEPENDENCY, pendingMigrations } from '$lib/api/migrate';
+import { MIGRATIONS_DEPENDENCY, pendingMigrations, type PendingStatement } from '$lib/api/migrate';
 import { getCustomization, NO_CUSTOMIZATION, type Customization } from '$lib/api/customization';
 import { brandOf } from '$lib/brand';
 import { NO_LICENSING, readLicensing } from '$lib/api/license';
@@ -20,11 +20,11 @@ const MIGRATOR_ROLES = ['super_admin'];
 const OPERATOR_ROLES = ['admin', 'super_admin'];
 
 /**
- * What the shell knows about the DDL log: the count, null inside it when the
- * engine did not answer, and null instead of it for a session that could not
- * apply a migration anyway.
+ * What the shell knows about the DDL log: the count and the statements, the
+ * count null inside it when the engine did not answer, and null instead of it
+ * for a session that could not apply a migration anyway.
  */
-export type MigrationStatus = { pending: number | null } | null;
+export type MigrationStatus = { pending: number | null; items: PendingStatement[] } | null;
 
 export const load: LayoutServerLoad = async (event) => {
 	// Only an engine that says the session is over ends it here. One that
@@ -90,8 +90,8 @@ export const load: LayoutServerLoad = async (event) => {
 				// chip says out loud. Reading a failure as zero would paint it green
 				// and claim the database is in step with schemas nobody checked.
 				pendingMigrations(authed)
-					.then((pending): MigrationStatus => ({ pending }))
-					.catch((): MigrationStatus => ({ pending: null }))
+					.then((read): MigrationStatus => read)
+					.catch((): MigrationStatus => ({ pending: null, items: [] }))
 			: Promise.resolve<MigrationStatus>(null),
 		// The tenant's own frame: name, logo, accent, menu and pages. A failed
 		// read is the stock admin, never a broken one.

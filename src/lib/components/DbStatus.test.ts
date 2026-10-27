@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 
-const nav = vi.hoisted(() => ({ invalidateAll: vi.fn(async () => {}) }));
+const nav = vi.hoisted(() => ({ invalidateAll: vi.fn(async () => {}), invalidate: vi.fn(async (_dep: string) => {}) }));
 vi.mock('$app/navigation', () => nav);
 
 /*
@@ -22,9 +22,17 @@ vi.mock('$app/forms', () => ({
 
 import DbStatus from './DbStatus.svelte';
 
+/** Queued statements, in the shape the engine lists them. */
+const queue = [
+	{ schema_name: 'posts', description: 'drop column _posts.title' },
+	{ schema_name: 'posts', description: 'clear column _posts.body for tenant acme' },
+	{ schema_name: 'pages', description: 'add column _pages.slug' },
+];
+
 beforeEach(() => {
 	forms.submits = [];
 	nav.invalidateAll.mockClear();
+	nav.invalidate.mockClear();
 });
 
 afterEach(() => {
@@ -75,13 +83,39 @@ describe('DbStatus', () => {
 
 		const button = screen.getByTestId('db-status');
 		expect(button.textContent).toContain('3 pending');
-		expect(button.getAttribute('type')).toBe('submit');
 	});
 
-	// Without JavaScript this is the whole mechanism: a POST to a real action,
-	// carrying the page to come back to.
-	it('applies through the form action rather than a fetch', () => {
-		render(DbStatus, { props: { pending: 1, redirectTo: '/admin/media?limit=25' } });
+	/*
+	 * The queue holds every tenant's pending drops on the tables they share, and
+	 * a dropped column takes its data with it. One click on a header chip that
+	 * reads as a status badge applied all of it.
+	 */
+	it('asks before applying, naming every queued statement', async () => {
+		render(DbStatus, { props: { pending: 3, items: queue, redirectTo: '/admin' } });
+
+		const chip = screen.getByTestId('db-status');
+		expect(chip.getAttribute('type')).toBe('button');
+		expect(document.querySelector('form')).toBeNull();
+
+		await fireEvent.click(chip);
+
+		const dialog = screen.getByRole('dialog');
+		for (const item of queue) expect(within(dialog).getByText(item.description)).toBeTruthy();
+		const drop = within(dialog).getByText('drop column _posts.title').closest('li') as HTMLElement;
+		expect(within(drop).getByText('Destroys data')).toBeTruthy();
+		const clear = within(dialog).getByText('clear column _posts.body for tenant acme').closest('li') as HTMLElement;
+		expect(within(clear).getByText('Destroys data')).toBeTruthy();
+		const add = within(dialog).getByText('add column _pages.slug').closest('li') as HTMLElement;
+		expect(within(add).queryByText('Destroys data')).toBeNull();
+		expect(within(dialog).getByRole('button', { name: /apply/i }).getAttribute('type')).toBe('submit');
+		expect(forms.submits).toHaveLength(1);
+	});
+
+	// The write is a form action, and the post carries the page to come back to
+	// and the queue the dialog listed, which the action checks before applying.
+	it('applies through the form action rather than a fetch', async () => {
+		render(DbStatus, { props: { pending: 3, items: queue, redirectTo: '/admin/media?limit=25' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
 
 		const form = document.querySelector('form');
 		expect(form?.getAttribute('method')).toBe('POST');
@@ -89,10 +123,24 @@ describe('DbStatus', () => {
 
 		const back = form?.querySelector('input[name="redirectTo"]') as HTMLInputElement;
 		expect(back.value).toBe('/admin/media?limit=25');
+		const expected = form?.querySelector('input[name="expected"]') as HTMLInputElement;
+		expect(JSON.parse(expected.value)).toEqual(queue.map((item) => item.description));
+	});
+
+	// A queue that moved since the list was read is refused, and the list is read again.
+	it('reads the queue again when the action says it changed', async () => {
+		render(DbStatus, { props: { pending: 1, items: queue.slice(0, 1), redirectTo: '/admin' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
+
+		await submit({ type: 'failure', status: 409, data: { error: 'The queue changed since it was listed. Review it again.' } });
+
+		await waitFor(() => expect(screen.getByText('The queue changed since it was listed. Review it again.')).toBeTruthy());
+		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
 	});
 
 	it('names the failure rather than falling silent', async () => {
 		render(DbStatus, { props: { pending: 1, redirectTo: '/admin' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
 
 		await submit({ type: 'failure', status: 400, data: { error: 'migration 059 failed' } });
 
@@ -102,6 +150,7 @@ describe('DbStatus', () => {
 
 	it('falls back to a message of its own when the action names none', async () => {
 		render(DbStatus, { props: { pending: 1, redirectTo: '/admin' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
 
 		await submit({ type: 'failure', status: 400, data: {} });
 
@@ -110,6 +159,7 @@ describe('DbStatus', () => {
 
 	it('reports a request that never arrived', async () => {
 		render(DbStatus, { props: { pending: 1, redirectTo: '/admin' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
 
 		await submit({ type: 'error', error: new Error('offline') });
 
@@ -120,6 +170,7 @@ describe('DbStatus', () => {
 	// somewhere. Here the count is refreshed in place instead.
 	it('refreshes the shell rather than following the redirect', async () => {
 		render(DbStatus, { props: { pending: 2, redirectTo: '/admin/schema' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
 
 		await submit({ type: 'redirect', status: 303, location: '/admin/schema' });
 

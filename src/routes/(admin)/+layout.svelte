@@ -209,7 +209,7 @@
 		<!-- Absent for a session that cannot apply a migration: the engine refuses
 		     the write to anyone but an admin, so the control is not offered. -->
 		{#if data.migrations}
-			<DbStatus pending={data.migrations.pending} redirectTo={here} />
+			<DbStatus pending={data.migrations.pending} items={data.migrations.items} redirectTo={here} />
 		{/if}
 		<ThemeToggle />
 		<AccountMenu name={data.user.email} secondary={data.user.roles.join(', ')}>

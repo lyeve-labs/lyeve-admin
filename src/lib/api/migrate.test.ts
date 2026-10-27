@@ -14,12 +14,12 @@ describe('pendingMigrations', () => {
 	it('reads the count off the engine answer', async () => {
 		const c = client({ pending: 4 });
 
-		expect(await pendingMigrations(c)).toBe(4);
+		expect((await pendingMigrations(c)).pending).toBe(4);
 		expect(c.get).toHaveBeenCalledWith('/api/admin/migrate');
 	});
 
 	it('carries zero through as zero', async () => {
-		expect(await pendingMigrations(client({ pending: 0 }))).toBe(0);
+		expect((await pendingMigrations(client({ pending: 0 }))).pending).toBe(0);
 	});
 
 	/*
@@ -27,10 +27,19 @@ describe('pendingMigrations', () => {
 	 * database matches the schemas, which is a claim about an answer nobody got.
 	 */
 	it('reports an unreadable count as unknown', async () => {
-		expect(await pendingMigrations(client({}))).toBeNull();
-		expect(await pendingMigrations(client(null))).toBeNull();
-		expect(await pendingMigrations(client({ pending: '2' }))).toBeNull();
-		expect(await pendingMigrations(client({ pending: Number.NaN }))).toBeNull();
+		expect((await pendingMigrations(client({}))).pending).toBeNull();
+		expect((await pendingMigrations(client(null))).pending).toBeNull();
+		expect((await pendingMigrations(client({ pending: '2' }))).pending).toBeNull();
+		expect((await pendingMigrations(client({ pending: Number.NaN }))).pending).toBeNull();
+	});
+
+	// The header asks before it applies, and it can only ask about what it read.
+	it('reads the queued statements, keeping only well-formed ones', async () => {
+		const drop = { schema_name: 'posts', description: 'drop column _posts.title' };
+		const read = await pendingMigrations(client({ pending: 1, items: [drop, { schema_name: 3 }, null] }));
+
+		expect(read.items).toEqual([drop]);
+		expect((await pendingMigrations(client({ pending: 0 }))).items).toEqual([]);
 	});
 
 	it('lets a refusal reach the caller, who decides what it means', async () => {

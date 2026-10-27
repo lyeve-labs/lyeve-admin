@@ -20,9 +20,22 @@ import type { HttpClient } from '@lyeve-labs/client';
  */
 export const MIGRATIONS_DEPENDENCY = 'app:migrations';
 
+/** One statement waiting in the DDL log, as GET /api/admin/migrate lists it. */
+export interface PendingStatement {
+	schema_name: string;
+	description: string;
+}
+
 /** What GET /api/admin/migrate answers with. */
 interface PendingResponse {
 	pending?: number | null;
+	items?: unknown;
+}
+
+/** The queue: how many statements wait, and which. */
+export interface PendingMigrations {
+	pending: number | null;
+	items: PendingStatement[];
 }
 
 /** What POST /api/admin/migrate/apply answers with. */
@@ -41,10 +54,19 @@ function count(value: unknown): number | null {
 	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-/** Migrations written to the DDL log and not yet applied. Throws if the engine refuses. */
-export async function pendingMigrations(client: HttpClient): Promise<number | null> {
+function isStatement(value: unknown): value is PendingStatement {
+	const item = value as PendingStatement | null;
+	return typeof item?.schema_name === 'string' && typeof item?.description === 'string';
+}
+
+/**
+ * Migrations written to the DDL log and not yet applied, with the statements
+ * themselves so an apply can name what it runs. Throws if the engine refuses.
+ */
+export async function pendingMigrations(client: HttpClient): Promise<PendingMigrations> {
 	const res = await client.get<PendingResponse | null>('/api/admin/migrate');
-	return count(res?.pending);
+	const items = Array.isArray(res?.items) ? res.items.filter(isStatement) : [];
+	return { pending: count(res?.pending), items };
 }
 
 /**

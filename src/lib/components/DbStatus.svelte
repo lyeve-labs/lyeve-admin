@@ -10,40 +10,57 @@
 	 * belongs in the header beside the other instance-wide controls, and it has
 	 * to survive the sidebar being put away.
 	 *
-	 * It reads nothing and writes nothing. The count arrives as a prop from the
-	 * shell's own load, and applying is a form posted to the dashboard's action.
-	 * A `fetch` call in this script would put a read outside `load` and a write
-	 * outside an action, cost a second round trip after hydration on every page,
-	 * and leave the failure of a write with nowhere to be reported to a reader
-	 * whose JavaScript never ran.
+	 * It reads nothing and writes nothing. The count and the queued statements
+	 * arrive as props from the shell's own load, and applying is a form posted to
+	 * the dashboard's action.
+	 *
+	 * The chip only opens the confirmation. The queue holds every tenant's
+	 * pending drops on the tables they share, and a dropped column takes its
+	 * data with it, so nothing runs until the reader has seen each statement.
+	 * The form carries the descriptions it listed, and the action refuses the
+	 * apply when the queue no longer matches them, so a drop queued after the
+	 * list was read never runs unseen.
 	 */
-	import { Button } from '@lyeve-labs/ui-kit';
+	import { Badge, Button, Modal } from '@lyeve-labs/ui-kit';
 	import { CircleAlert, CircleCheck, CircleHelp } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidate, invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import { MIGRATIONS_DEPENDENCY, type PendingStatement } from '$lib/api/migrate';
 
 	interface Props {
 		/** Migrations waiting to be applied, or null when the engine did not answer. */
 		pending: number | null;
+		/** The statements waiting, as the engine listed them. */
+		items?: PendingStatement[];
 		/** Where the reader is, so a submission without JavaScript comes back here. */
 		redirectTo: string;
 	}
 
-	let { pending, redirectTo }: Props = $props();
+	let { pending, items = [], redirectTo }: Props = $props();
 
+	let confirming = $state(false);
 	let syncing = $state(false);
 	let error = $state('');
+
+	// The engine queues only what removes data: a column, a key or a table
+	// dropped, or a column cleared for one tenant. Each is marked by its own
+	// description, so a statement the engine queues later for another reason
+	// is not called destructive by default.
+	const destroys = (item: PendingStatement) => /^(drop|clear) /i.test(item.description);
 
 	const applying: SubmitFunction = () => {
 		syncing = true;
 		error = '';
 		return async ({ result }) => {
 			syncing = false;
+			confirming = false;
 			if (result.type === 'failure') {
 				const message = result.data?.error;
 				error = typeof message === 'string' && message ? message : 'Migration failed';
+				// The queue moved since it was listed, so the list is read again.
+				if (result.status === 409) await invalidate(MIGRATIONS_DEPENDENCY);
 				return;
 			}
 			if (result.type === 'error') {
@@ -51,10 +68,10 @@
 				return;
 			}
 			/*
-			 * Success redirects, because a submission without JavaScript has to
-			 * land somewhere. Following it here would reload the document for a
-			 * number the shell can refresh on its own, so the shell's data is
-			 * invalidated instead and the reader keeps their place.
+			 * The action answers success with a redirect. Following it would
+			 * reload the document for a number the shell can refresh on its own,
+			 * so the shell's data is invalidated instead and the reader keeps
+			 * their place.
 			 */
 			await invalidateAll();
 		};
@@ -88,24 +105,53 @@
 	</span>
 {:else}
 	<!-- Pending work, so the control that clears it is the thing on screen
-	     rather than a label pointing at one somewhere else. `contents` keeps the
-	     form out of the header's layout, so the button keeps its place in the
-	     header. -->
-	<form method="POST" action="/admin?/applyMigrations" use:enhance={applying} class="contents">
-		<input type="hidden" name="redirectTo" value={redirectTo} />
-		<Button
-			variant="outline"
-			size="sm"
-			type="submit"
-			data-testid="db-status"
-			loading={syncing}
-			title={error || `${pending} migration${pending === 1 ? '' : 's'} waiting to be applied`}
-		>
-			<CircleAlert size={ICON.sm} class="shrink-0 text-warn" aria-hidden="true" />
-			<span class="text-warn">{pending} pending</span>
-			<span class="text-warn {words}">migration{pending === 1 ? '' : 's'}</span>
-		</Button>
-	</form>
+	     rather than a label pointing at one somewhere else. It opens the list
+	     of what would run, and the apply is posted from there. -->
+	<Button
+		variant="outline"
+		size="sm"
+		type="button"
+		data-testid="db-status"
+		loading={syncing}
+		title={error || `${pending} migration${pending === 1 ? '' : 's'} waiting to be applied`}
+		onclick={() => (confirming = true)}
+	>
+		<CircleAlert size={ICON.sm} class="shrink-0 text-warn" aria-hidden="true" />
+		<span class="text-warn">{pending} pending</span>
+		<span class="text-warn {words}">migration{pending === 1 ? '' : 's'}</span>
+	</Button>
+	<Modal
+		bind:open={confirming}
+		size="lg"
+		title="Apply {pending} pending migration{pending === 1 ? '' : 's'}"
+		description="Every statement queued for every tenant runs now. A dropped column cannot be brought back."
+	>
+		<ul class="flex flex-col gap-2 text-sm" data-testid="db-status-queue">
+			{#each items as item, i (i)}
+				<li class="flex items-start justify-between gap-3">
+					<span class="min-w-0">
+						<span class="block font-mono break-all text-fg">{item.description}</span>
+						<span class="block text-xs text-faint">{item.schema_name}</span>
+					</span>
+					{#if destroys(item)}
+						<Badge tone="danger" size="sm">Destroys data</Badge>
+					{/if}
+				</li>
+			{:else}
+				<li class="text-faint">The instance listed no statements.</li>
+			{/each}
+		</ul>
+		<form id="db-status-apply" method="POST" action="/admin?/applyMigrations" use:enhance={applying}>
+			<input type="hidden" name="redirectTo" value={redirectTo} />
+			<input type="hidden" name="expected" value={JSON.stringify(items.map((item) => item.description))} />
+		</form>
+		{#snippet footer()}
+			<Button variant="secondary" onclick={() => (confirming = false)}>Cancel</Button>
+			<Button variant="danger" type="submit" form="db-status-apply" loading={syncing}>
+				Apply {pending} migration{pending === 1 ? '' : 's'}
+			</Button>
+		{/snippet}
+	</Modal>
 {/if}
 {#if error}
 	<span class="text-xs text-danger" role="status">{error}</span>

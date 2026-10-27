@@ -247,7 +247,7 @@ describe('the console frame', () => {
 			expect(depends).toHaveBeenCalledWith('app:migrations');
 
 			expect(seen.some((u) => u.includes('/api/admin/migrate'))).toBe(true);
-			expect(result!.migrations).toEqual({ pending: 3 });
+			expect(result!.migrations).toEqual({ pending: 3, items: [] });
 		});
 
 		it('leaves the count unknown when the engine does not answer', async () => {
@@ -257,7 +257,7 @@ describe('the console frame', () => {
 
 			const result = await load({ fetch, depends: vi.fn(), cookies } as never);
 
-			expect(result!.migrations).toEqual({ pending: null });
+			expect(result!.migrations).toEqual({ pending: null, items: [] });
 			expect(result!.user).toBeDefined();
 		});
 
