@@ -119,8 +119,9 @@
 					other file value is fixed here.
 				</p>
 				<p>
-					<span class="font-medium text-fg">This page</span> saves what neither of those sets, and the
-					engine uses it at once, without a restart. A setting nobody sets takes the engine's default.
+					<span class="font-medium text-fg">This page</span> saves what neither of those sets. The
+					engine uses it at once, without a restart, except a setting it reads when it starts, which
+					applies at the next restart. A setting nobody sets takes the engine's default.
 				</p>
 			</div>
 		</Card>
@@ -188,6 +189,9 @@
 									</p>
 
 									{#if setting.editable}
+										{#if setting.read_at_start}
+											<p class="mt-1 text-xs text-faint">Read when the engine starts. A saved value applies at the next restart.</p>
+										{/if}
 										<div class="mt-2">
 											<SettingRow
 												id="set-{setting.key}"
@@ -195,7 +199,9 @@
 												label={setting.key}
 												value={setting.value}
 												secret={setting.secret}
-												saved="Saved. The engine is using it now."
+												saved={setting.read_at_start
+													? 'Saved. It applies when the engine next restarts.'
+													: 'Saved. The engine is using it now.'}
 												{result}
 											/>
 										</div>
