@@ -107,11 +107,22 @@ describe('API keys page', () => {
 	const sent = (name: string) =>
 		[...document.body.querySelectorAll<HTMLInputElement>(`input[type="hidden"][name="${name}"]`)].map((i) => i.value);
 
-	it('starts a new key able to read every schema and discover them', async () => {
-		const { getAllByRole } = setup([key({})]);
+	// The catalog grant sits in a folded section, so a key never carries it
+	// unless the reader opened the section and chose it.
+	it('starts a new key able to read every schema, with the catalog folded and off', async () => {
+		const { getAllByRole, getByRole } = setup([key({})]);
 		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
-		expect(sent('scopes')).toEqual(['content:read', 'schemas:read']);
+		expect(getByRole('button', { name: /Schema catalog/ }).getAttribute('aria-expanded')).toBe('false');
+		expect(sent('scopes')).toEqual(['content:read']);
 		expect(sent('schemas')).toEqual([]);
+	});
+
+	it('grants the schema catalog once the reader ticks it', async () => {
+		const { getAllByRole, getByRole, getByLabelText } = setup([key({})]);
+		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		await fireEvent.click(getByRole('button', { name: /Schema catalog/ }));
+		await fireEvent.click(getByLabelText(/Discover content types/));
+		expect(sent('scopes')).toEqual(['content:read', 'schemas:read']);
 	});
 
 	it('holds a key to the schemas and actions ticked for each', async () => {
@@ -120,7 +131,7 @@ describe('API keys page', () => {
 		await fireEvent.click(getByRole('radio', { name: 'Chosen schemas' }));
 		await fireEvent.click(getByLabelText('Read posts'));
 		await fireEvent.click(getByLabelText('Create posts'));
-		expect(sent('scopes')).toEqual(['content.posts:read', 'content.posts:create', 'schemas:read']);
+		expect(sent('scopes')).toEqual(['content.posts:read', 'content.posts:create']);
 		expect(sent('schemas')).toEqual(['posts']);
 	});
 

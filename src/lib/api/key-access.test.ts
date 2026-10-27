@@ -51,8 +51,8 @@ describe('groupCatalog', () => {
 });
 
 describe('accessScopes', () => {
-	it('starts a key able to read every schema and discover them', () => {
-		expect(accessScopes(defaultAccess())).toEqual(['content:read', 'schemas:read']);
+	it('starts a key able to read every schema, without the schema catalog', () => {
+		expect(accessScopes(defaultAccess())).toEqual(['content:read']);
 		expect(accessSchemas(defaultAccess())).toEqual([]);
 	});
 
