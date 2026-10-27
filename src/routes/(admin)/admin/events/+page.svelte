@@ -14,8 +14,10 @@
 		Stat,
 		Table,
 		Pagination,
+		confirm,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { browserOffset } from '$lib/utils/wall-clock';
 	import { invalidateAll } from '$app/navigation';
 	import { History, RefreshCw, Rss, Search } from '@lucide/svelte';
@@ -50,6 +52,32 @@
 	const sinceOffset = $derived(browserOffset(since));
 	let handler = $state('');
 	let starting = $state(false);
+
+	/**
+	 * A rehearsal publishes nothing, so it goes straight through. A real run
+	 * asks first, naming the window and the run, because nothing undoes it.
+	 * The form keeps its values after the answer: the run name decides what a
+	 * later run skips, so the real run after a rehearsal has to carry it.
+	 */
+	const replay: SubmitFunction = async ({ cancel }) => {
+		if (!dryRun) {
+			const name = handler.trim() ? `the run name ${handler.trim()}` : 'the shared name';
+			const ok = await confirm(
+				`Replay every event since ${since.replace('T', ' ')} under ${name}?`,
+				'Each event is published again to every webhook, flow, the message broker, realtime clients and email triggers. Nothing undoes that.',
+				{ confirmLabel: 'Replay' },
+			);
+			if (!ok) {
+				cancel();
+				return;
+			}
+		}
+		starting = true;
+		return async ({ update }) => {
+			starting = false;
+			await update({ reset: false });
+		};
+	};
 
 	const pool = $derived(failedFirst ? failedOnly(data.events) : data.events);
 	const visible = $derived(
@@ -120,13 +148,7 @@
 				<form
 					method="post"
 					action="?/replay"
-					use:enhance={() => {
-						starting = true;
-						return async ({ update }) => {
-							starting = false;
-							await update();
-						};
-					}}
+					use:enhance={replay}
 					class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
 				>
 					<DateTimePicker name="since" label="Replay from" bind:value={since} required />
