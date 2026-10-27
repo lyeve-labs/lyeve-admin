@@ -128,7 +128,7 @@
 	function rollback(j: ImportJob): SubmitFunction {
 		return confirmed(
 			`Roll back the import of ${j.source_name}?`,
-			`The ${formatCount(j.inserted_rows)} entries it created are deleted, with any edits made to them since. Entries it updated keep the imported values. The history of the import stays.`,
+			`The ${formatCount(j.inserted_rows)} ${j.inserted_rows === 1 ? 'entry it created is deleted, with any edits made to it' : 'entries it created are deleted, with any edits made to them'} since. Entries it updated keep the imported values. The history of the import stays.`,
 			{ confirmLabel: 'Roll back', success: 'Import rolled back' },
 		);
 	}
