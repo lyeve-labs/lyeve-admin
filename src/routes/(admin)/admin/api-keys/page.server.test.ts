@@ -169,3 +169,26 @@ describe('API keys revoke and delete', () => {
 		expect(calls).toEqual([]);
 	});
 });
+
+// A form posted without a script never sees the Roles field's warning, so
+// the action is what stops a write the engine would refuse the key.
+describe('API keys create', () => {
+	it('refuses a content write on a key without a writing role, and names the roles field', async () => {
+		const { actions } = await import('./+page.server');
+		const calls: string[] = [];
+		const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+			const path = String(url);
+			if (path.startsWith('/api/admin/auth/me')) return json({ id: 'u1', email: 'a@b.co', roles: ['super_admin'] });
+			calls.push(`${init?.method ?? 'GET'} ${path}`);
+			return json({ raw_key: 'k', name: 'svc' });
+		}) as unknown as typeof globalThis.fetch;
+		const form = new FormData();
+		form.set('name', 'svc');
+		form.set('roles', 'viewer');
+		form.set('scopes', 'content:create');
+		const url = new URL('http://localhost/admin/api-keys');
+		const out = await actions.create({ fetch, cookies, url, request: new Request(url, { method: 'POST', body: form }) } as never);
+		expect(out).toMatchObject({ status: 400, data: { action: 'create', fields: { roles: expect.stringContaining('editor') } } });
+		expect(calls).toEqual([]);
+	});
+});
