@@ -242,7 +242,8 @@
 		<span class="shrink-0 sm:w-36"><Badge>{type}</Badge></span>
 		<span class="hidden w-10 shrink-0 sm:block"></span>
 		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-5 shrink-0 sm:block"></span>
+		<span class="hidden w-10 shrink-0 sm:block"></span>
+		<span class="hidden w-8 shrink-0 sm:block"></span>
 	</div>
 {/snippet}
 
@@ -258,7 +259,8 @@
 		<span class="shrink-0 sm:w-36"><Badge>{type}</Badge></span>
 		<span class="hidden w-10 shrink-0 sm:block"></span>
 		<span class="hidden w-10 shrink-0 sm:block"></span>
-		<span class="hidden w-5 shrink-0 sm:block"></span>
+		<span class="hidden w-10 shrink-0 sm:block"></span>
+		<span class="hidden w-8 shrink-0 sm:block"></span>
 	</div>
 {/snippet}
 
@@ -419,13 +421,16 @@
 	<!-- The column labels line up with the row's fixed widths, which
 	     only hold from sm: up. Below it the row wraps and each box
 	     carries its own short label instead. -->
-	<div class="hidden items-center gap-3 px-3 text-xs text-faint sm:flex">
+	<!-- The transparent border stands in for the rows' own, so the columns
+	     start at the same offset. -->
+	<div class="hidden items-center gap-3 border border-transparent px-3 text-xs text-faint sm:flex">
 		<span class="w-3.5 shrink-0"></span>
 		<span class="flex-1">Field</span>
 		<span class="w-36 shrink-0">Type</span>
 		<span class="w-10 shrink-0 text-center">Req</span>
 		<span class="w-10 shrink-0 text-center">Idx</span>
-		<span class="w-5 shrink-0"></span>
+		<span class="w-10 shrink-0 text-center" title="Translated per locale">i18n</span>
+		<span class="w-8 shrink-0"></span>
 	</div>
 
 	{#if topSysFields.length > 0}
@@ -524,6 +529,9 @@
 					>
 						<Trash2 size={ICON.sm} />
 					</button>
+					{:else}
+					<!-- Holds the remove button's column, so the boxes stay under their headings. -->
+					<span class="hidden w-8 shrink-0 sm:block"></span>
 					{/if}
 				</div>
 			</div>

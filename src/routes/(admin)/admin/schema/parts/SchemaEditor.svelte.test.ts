@@ -175,3 +175,54 @@ describe('SchemaEditor', () => {
 		expect(screen.getByRole('button', { name: 'curl', description: /^Copy a curl request for POST / })).toBeTruthy();
 	});
 });
+
+/*
+ * The headings are a row of their own above the field rows, so each heading
+ * stands over its column only when every row lays out the same fixed widths
+ * after the name. jsdom draws no layout, so the case compares the width each
+ * row gives its columns, in order.
+ */
+describe('SchemaEditor column headings', () => {
+	/** The fixed width of each cell after the stretching name, sr-only labels skipped. */
+	function widths(cells: Element[]): string[] {
+		const after = cells.slice(cells.findIndex((c) => c.classList.contains('flex-1')) + 1);
+		return after
+			.filter((c) => !c.classList.contains('sr-only'))
+			.map((c) => [...c.classList].find((k) => /^(sm:)?w-/.test(k))?.replace('sm:', '') ?? 'none');
+	}
+
+	function header(): HTMLElement {
+		return screen.getByText('Field', { selector: 'span' }).parentElement as HTMLElement;
+	}
+
+	/** The cells of the editable row for one field, the name input first. */
+	function fieldRow(name: string): Element[] {
+		const input = screen.getByDisplayValue(name);
+		const cells = input.closest('.flex-wrap') as HTMLElement;
+		return [...cells.children];
+	}
+
+	function lockedRow(name: string): Element[] {
+		const row = screen.getByText(name, { selector: 'span.text-brand' }).closest('.rounded-lg') as HTMLElement;
+		return [...row.children];
+	}
+
+	it('names every column a field row has, the translation box included', () => {
+		setup();
+		const names = [...header().children].map((c) => c.textContent?.trim()).filter(Boolean);
+		expect(names).toEqual(['Field', 'Type', 'Req', 'Idx', 'i18n']);
+	});
+
+	it('gives the headings, a system row and a field row the same columns', () => {
+		setup();
+		const heads = widths([...header().children]);
+		expect(widths(fieldRow('title'))).toEqual(heads);
+		expect(widths(lockedRow('id'))).toEqual(heads);
+	});
+
+	it('keeps the columns in place for a reader who cannot remove a field', () => {
+		setup({ canWrite: false });
+		const heads = widths([...header().children]);
+		expect(widths(fieldRow('title'))).toEqual(heads);
+	});
+});
