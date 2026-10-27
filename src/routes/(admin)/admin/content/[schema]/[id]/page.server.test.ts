@@ -155,6 +155,23 @@ describe('content editor load, the entry read', () => {
 		).catch((err: unknown) => err);
 	}
 
+	// The load starts every read at once. When the entry read fails, the load
+	// throws its own error, and a read derived from the entry that nobody
+	// awaits by then rejects with no handler: a server-side unhandled
+	// rejection on every missing entry.
+	it('leaves no read unsettled when the entry read fails', async () => {
+		const unhandled: unknown[] = [];
+		const note = (reason: unknown) => unhandled.push(reason);
+		process.on('unhandledRejection', note);
+		try {
+			await entryAnswering(404);
+			await new Promise((resolve) => setImmediate(resolve));
+		} finally {
+			process.off('unhandledRejection', note);
+		}
+		expect(unhandled).toEqual([]);
+	});
+
 	it('answers 404 when the engine says the entry does not exist', async () => {
 		const thrown = await entryAnswering(404);
 		expect(isHttpError(thrown) && thrown.status).toBe(404);

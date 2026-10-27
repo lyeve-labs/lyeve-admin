@@ -385,6 +385,10 @@ export const load: PageServerLoad = async (event) => {
 	const people = listPeople(client);
 
 	const entry = getEntry(client, params.id);
+	// Caught where it starts: when the entry read fails the load throws before
+	// the comments ever read the tenant, and a rejection nobody holds by then
+	// is an unhandled one. The entry's own failure is reported below.
+	const tenant = entry.then((e) => e.tenant_id).catch(() => '');
 
 	const [schemaDef, item, revisionList, localization, review, comments, releases] = await Promise.all([
 		getSchema(params.schema, client).catch((err: unknown): Schema => readError(err, `Schema "${params.schema}" not found`)),
@@ -394,7 +398,7 @@ export const load: PageServerLoad = async (event) => {
 		loadReview(client, params.id, runs(plugins, PLUGIN.review), user).then(async (r) =>
 			r ? { ...r, people: await people } : null,
 		),
-		loadComments(client, params.id, people, entry.then((e) => e.tenant_id)).catch(() => null),
+		loadComments(client, params.id, people, tenant).catch(() => null),
 		loadReleases(client, params.id).catch(() => null),
 	]);
 
