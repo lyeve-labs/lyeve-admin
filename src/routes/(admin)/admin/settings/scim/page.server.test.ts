@@ -20,6 +20,34 @@ function event(body: unknown, search: string) {
 }
 
 describe('SCIM load', () => {
+	function read(saml: Response, running = ['scim', 'saml']) {
+		const fetch = vi.fn(async (url: string) =>
+			String(url).startsWith('/api/admin/saml-providers') ? saml.clone() : json({ data: [], total_count: 0 }),
+		);
+		return {
+			fetch,
+			url: new URL('http://admin/admin/settings/scim'),
+			parent: async () => ({ plugins: { state: 'named', running, withheld: [] } }),
+		} as never;
+	}
+
+	it('offers the SAML providers a connection can be linked to', async () => {
+		const out = (await load(read(json({ data: [{ id: 's1', name: 'okta' }], total_count: 1 })))) as { saml: unknown };
+		expect(out.saml).toEqual({ state: 'ok', providers: [{ id: 's1', name: 'okta' }] });
+	});
+
+	it('offers no link when SAML does not run or is not enabled', async () => {
+		const off = (await load(read(json({}), ['scim']))) as { saml: unknown };
+		expect(off.saml).toEqual({ state: 'off' });
+		const locked = (await load(read(json({ error: 'not enabled' }, 402)))) as { saml: unknown };
+		expect(locked.saml).toEqual({ state: 'off' });
+	});
+
+	it('says the SAML providers could not be read when the read fails', async () => {
+		const out = (await load(read(json({ error: 'down' }, 503)))) as { saml: unknown };
+		expect(out.saml).toEqual({ state: 'failed' });
+	});
+
 	it('sends a page past the end back to the last page that holds connections', async () => {
 		await expect(load(event({ data: [], total_count: 3 }, '?offset=50&limit=25'))).rejects.toMatchObject({
 			status: 307,
@@ -71,6 +99,12 @@ describe('SCIM writes', () => {
 				body: { name: 'Okta', bearer_token: TOKEN, deprovision_on_delete: true, deprovision_action: 'disable' },
 			},
 		]);
+	});
+
+	it('links the connection to the chosen SAML provider', async () => {
+		const { event, calls } = write({ ...CONNECTION, saml_provider_id: 's1' });
+		expect(await actions.create(event)).toEqual({ saved: 'Okta' });
+		expect(calls[0].body).toMatchObject({ saml_provider_id: 's1' });
 	});
 
 	it.each([
