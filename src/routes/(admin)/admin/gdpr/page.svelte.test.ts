@@ -108,9 +108,9 @@ describe('Privacy request erasure outcome', () => {
 		expect(text).not.toContain('Erasure kept some records');
 	});
 
-	it('calls an erasure with no failures complete', () => {
+	it('calls an erasure with no failures complete', async () => {
 		const { container } = render(GdprPage, { props: erased([]) });
-		expect(said(container)).toContain('Erasure complete');
+		await vi.waitFor(() => expect(said(container)).toContain('Erasure complete'));
 		expect(said(container)).toContain('Erased 12 rows');
 	});
 });
@@ -159,9 +159,9 @@ describe('what a person proves before exporting', () => {
 		expect(container.querySelector('input[name="factors"]')).toBeNull();
 	});
 
-	it('confirms a save', () => {
+	it('confirms a save', async () => {
 		const { container } = render(GdprPage, { props: stepUp(['code'], { action: 'stepUp', ok: true }) });
-		expect(said(container)).toContain('Saved. The next export on every tenant asks for this.');
+		await vi.waitFor(() => expect(said(container)).toContain('Saved. The next export on every tenant asks for this.'));
 	});
 
 	it('says why the section is empty while its plugin is stopped', () => {

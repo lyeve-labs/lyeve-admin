@@ -115,13 +115,12 @@ describe('the recompute', () => {
 		expect(said(container)).toContain('already running');
 	});
 
-	it('reports what a finished recompute actually did', () => {
+	it('reports what a finished recompute actually did', async () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({}, { refreshed: true, pairs: 120, trending: 30, feeds: 400, ms: 125_000 }),
 		});
-		const text = said(container);
-		expect(text).toContain('2m 5s');
-		expect(text).toContain('120 similarity pairs');
+		await vi.waitFor(() => expect(said(container)).toContain('2m 5s'));
+		expect(said(container)).toContain('120 similarity pairs');
 	});
 
 	it('hides the recompute from a role that may not run one', () => {

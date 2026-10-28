@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 import { fixtureDefaultPrompt, fixturePrompt, fixtureSettings } from '$lib/components/ai/fixtures';
@@ -48,12 +48,13 @@ describe('AI prompt page', () => {
 		expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
 	});
 
-	it('reports a save and a restore', () => {
+	it('reports a save and a restore', async () => {
 		const saved = setup({}, { scope: 'save', version: 3 });
-		expect(saved.getByRole('status').textContent).toContain('Saved as version 3.');
+		const region = (c: HTMLElement) => c.querySelector('[aria-live="polite"]');
+		await waitFor(() => expect(region(saved.container)?.textContent).toContain('Saved as version 3.'));
 		cleanup();
 		const restored = setup({}, { scope: 'restore', version: 3, from: 1 });
-		expect(restored.getByRole('status').textContent).toContain('Version 1 is current again, saved as version 3.');
+		await waitFor(() => expect(region(restored.container)?.textContent).toContain('Version 1 is current again, saved as version 3.'));
 	});
 
 	// A reload that hands back the same text in force is not a new version.

@@ -215,12 +215,12 @@ describe('reviews page', () => {
 		expect((document.querySelector('input[name="publish_on_approve"]') as HTMLInputElement).value).toBe('true');
 	});
 
-	it('reports the refusal and the outcome', () => {
+	it('reports the refusal and the outcome', async () => {
 		render(ReviewsPage, { props: { data: data(), form: { error: 'Stage 2 needs a name.' } as never } });
 		expect(screen.getByText('Stage 2 needs a name.')).toBeTruthy();
 		cleanup();
 		render(ReviewsPage, { props: { data: data(), form: { created: true } as never } });
-		expect(screen.getByText('Definition created.')).toBeTruthy();
+		expect(await screen.findByText('Definition created.')).toBeTruthy();
 	});
 });
 

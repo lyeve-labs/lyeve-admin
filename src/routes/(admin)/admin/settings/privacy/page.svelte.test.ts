@@ -62,9 +62,9 @@ describe('privacy settings: form submissions on erasure', () => {
 		expect(said(container)).not.toContain('None of these settings apply');
 	});
 
-	it('confirms a save with a confirmation that clears itself', () => {
+	it('confirms a save with a confirmation that clears itself', async () => {
 		const { container } = render(PrivacyPage, { props: props({}, { action: 'erasure', saved: true }) });
-		expect(said(container)).toContain('Saved. The next erasure in this tenant follows this choice.');
+		await vi.waitFor(() => expect(said(container)).toContain('Saved. The next erasure in this tenant follows this choice.'));
 	});
 
 	it('shows a failed save on the form that made it', () => {
@@ -140,11 +140,11 @@ describe('privacy settings: who may export', () => {
 		expect(container.querySelectorAll('input[name="roles"]:checked')).toHaveLength(0);
 	});
 
-	it('confirms a save on its own card only', () => {
+	it('confirms a save on its own card only', async () => {
 		const { container } = render(PrivacyPage, {
 			props: props({ exportRoles: { ok: true, value: { roles: [] } } }, { action: 'roles', saved: true }),
 		});
-		expect(said(container)).toContain('Saved. The next export follows this choice.');
+		await vi.waitFor(() => expect(said(container)).toContain('Saved. The next export follows this choice.'));
 		expect(said(container)).not.toContain('Saved. The next erasure');
 	});
 

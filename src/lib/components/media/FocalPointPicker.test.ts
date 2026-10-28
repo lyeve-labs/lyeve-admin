@@ -67,8 +67,8 @@ describe('FocalPointPicker', () => {
 		expect(queryByText(/Focal point saved/)).toBeNull();
 	});
 
-	it('confirms a save', () => {
-		const { getByText } = setup({ saved: true });
-		expect(getByText(/Focal point saved/)).toBeTruthy();
+	it('confirms a save', async () => {
+		const { findByText } = setup({ saved: true });
+		expect(await findByText(/Focal point saved/)).toBeTruthy();
 	});
 });
