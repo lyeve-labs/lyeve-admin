@@ -130,14 +130,14 @@ describe('tenant costs page', () => {
 		expect(screen.getByTestId('cost-dashboard')).toBeTruthy();
 	});
 
-	it('reports the feed run and a refusal on the form it came from', () => {
+	it('reports the feed run and a refusal on the form it came from', async () => {
 		render(CostsPage, {
 			props: {
 				data: data(),
 				form: { form: 'aggregate', saved: true, result: { tenant_id: 't', entries_saved: 3, budget_events: 1, anomalies: 0 } } as never,
 			},
 		});
-		expect(screen.getByText('The feed ran')).toBeTruthy();
+		expect(await screen.findByText('The feed ran')).toBeTruthy();
 		expect(screen.getByText(/3 cost lines written, 1 budget events published/)).toBeTruthy();
 		cleanup();
 		render(CostsPage, {

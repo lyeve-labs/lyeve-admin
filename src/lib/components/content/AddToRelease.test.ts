@@ -66,8 +66,8 @@ describe('AddToRelease', () => {
 		expect(screen.getAllByText(/Content releases/).length).toBeGreaterThan(0);
 	});
 
-	it('confirms an add', () => {
+	it('confirms an add', async () => {
 		render(AddToRelease, { props: { releases, holding: [], added: true } });
-		expect(screen.getByText('Added to the release.')).toBeTruthy();
+		expect(await screen.findByText('Added to the release.')).toBeTruthy();
 	});
 });

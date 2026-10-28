@@ -639,7 +639,7 @@ describe('schema builder presets', () => {
 		expect(screen.getByText('Save a preset from a URL or a file')).toBeTruthy();
 	});
 
-	it('names the schemas a preset created once they are in the list', () => {
+	it('names the schemas a preset created once they are in the list', async () => {
 		render(SchemaPage, {
 			props: {
 				data: data({ presets }),
@@ -647,7 +647,7 @@ describe('schema builder presets', () => {
 			},
 		});
 
-		expect(screen.getByText('Preset created')).toBeTruthy();
+		expect(await screen.findByText('Preset created')).toBeTruthy();
 		expect(screen.getByText(/2 schemas are in the list now: notes, note_tags/)).toBeTruthy();
 	});
 });

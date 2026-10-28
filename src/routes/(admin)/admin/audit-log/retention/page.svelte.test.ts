@@ -179,15 +179,15 @@ describe('Retention holds that could not be read', () => {
 });
 
 describe('the outcome of an enforcement run', () => {
-	it('says how many entries were deleted across how many policies', () => {
+	it('says how many entries were deleted across how many policies', async () => {
 		const { container } = render(RetentionPage, { props: props(['super_admin'], {}, { enforced: true, deleted: 12, policies: 2 }) });
-		expect(container.textContent).toContain('Retention enforced across 2 policies.');
+		await vi.waitFor(() => expect(container.textContent).toContain('Retention enforced across 2 policies.'));
 		expect(container.textContent).toContain('12 entries were deleted.');
 	});
 
-	it('speaks of one policy and one entry in the singular', () => {
+	it('speaks of one policy and one entry in the singular', async () => {
 		const { container } = render(RetentionPage, { props: props(['super_admin'], {}, { enforced: true, deleted: 1, policies: 1 }) });
-		expect(container.textContent).toContain('across 1 policy.');
+		await vi.waitFor(() => expect(container.textContent).toContain('across 1 policy.'));
 		expect(container.textContent).toContain('1 entry was deleted.');
 	});
 });
