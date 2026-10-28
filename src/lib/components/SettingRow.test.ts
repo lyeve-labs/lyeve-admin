@@ -1,9 +1,19 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
+import { tick } from 'svelte';
 import SettingRow from './SettingRow.svelte';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+// enhance hands back the row's submit function, so a test can hold a save in
+// flight and then finish it.
+const forms = vi.hoisted(() => ({ submit: null as SubmitFunction | null }));
+vi.mock('$app/forms', () => ({
+	enhance: (_el: HTMLFormElement, fn?: SubmitFunction) => {
+		if (fn) forms.submit = fn;
+		return { destroy() {} };
+	},
+}));
 
 afterEach(cleanup);
 
@@ -73,5 +83,33 @@ describe('SettingRow', () => {
 		expect(view.getByTestId('setting-saved-SMTP_HOST')).toBe(live);
 		expect(live.textContent).toBe('Saved.');
 		expect(view.container.querySelector('[role="status"]')).toBeNull();
+		// The region is the message a sighted reader sees, so nothing hides it
+		// from a screen reader and nothing repeats it.
+		expect(live.hasAttribute('aria-hidden')).toBe(false);
+		expect(live.className).toContain('empty:sr-only');
+		expect(view.getAllByText('Saved.')).toHaveLength(1);
+	});
+
+	/*
+	 * A second save of the same row leaves the same sentence in place, and a
+	 * region whose text does not change says nothing. It empties while the save
+	 * is in flight, so the sentence arrives again.
+	 */
+	it('announces a second save of the same row again', async () => {
+		const view = render(SettingRow, { props: { ...base, value: 'x', result: { key: 'SMTP_HOST', success: true } } });
+		const live = view.getByTestId('setting-saved-SMTP_HOST');
+		expect(live.textContent).toBe('Saved.');
+
+		const finish = (await forms.submit!({} as never)) as (arg: {
+			result: ActionResult;
+			update: () => Promise<void>;
+		}) => Promise<void>;
+		await tick();
+		expect(live.textContent).toBe('');
+
+		await finish({ result: { type: 'success', status: 200 }, update: async () => {} });
+		await view.rerender({ result: { key: 'SMTP_HOST', success: true } });
+		expect(view.getByTestId('setting-saved-SMTP_HOST')).toBe(live);
+		expect(live.textContent).toBe('Saved.');
 	});
 });

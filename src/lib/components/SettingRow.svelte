@@ -94,14 +94,11 @@
 </form>
 {#if mine && result?.error}
 	<p class="mt-2 text-xs text-danger" role="alert">{result.error}</p>
-{:else if mine && result?.success}
-	<p class="mt-2 text-xs text-success" aria-hidden="true">{saved}</p>
 {/if}
-<!-- A screen reader announces a region only when text arrives in one already
-     on the page, so this stays mounted and empty until the row saves. It is
-     hidden from sight because a parent's flex gap would space out an empty
-     box, and the visible copy above is hidden from screen readers so the
-     outcome is not read twice. A div because Orca drops a quick insertion into
-     a paragraph, and no status role because Orca reads a status bar as chrome
-     and says nothing. -->
-<div class="sr-only" aria-live="polite" aria-atomic="true" data-testid="setting-saved-{name}">{mine && result?.success && !sending ? saved : ''}</div>
+<!-- One element is both the message and the live region, on the page and
+     empty until the row saves, because a screen reader announces a region
+     only when text arrives in one already there. Empty, it is visually hidden
+     and adds no gap to a parent's flex column. A div because in Firefox Orca
+     drops a quick insertion into a paragraph, and no status role because Orca
+     reads a status bar as chrome and says nothing. -->
+<div class="mt-2 text-xs text-success empty:sr-only" aria-live="polite" aria-atomic="true" data-testid="setting-saved-{name}">{#if mine && result?.success && !sending}{saved}{/if}</div>
