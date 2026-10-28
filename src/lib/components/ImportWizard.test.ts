@@ -215,6 +215,29 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		expect(document.body.textContent).not.toContain('network error');
 	});
 
+	it('reads out a dry run that every row passes', async () => {
+		const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				if (url.endsWith('/preview')) {
+					return json({ source_format: 'csv', source_name: 'orders.csv', columns: ['placed_at'], rows: [], total_rows: 1, errors: [], export: false, schemas: {} });
+				}
+				return json({ total_rows: 1, valid_rows: 1, error_rows: 0, errors: [] });
+			}),
+		);
+		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'From a web address' }));
+		await fireEvent.input(document.getElementById('import-url') as HTMLInputElement, {
+			target: { value: 'https://example.com/orders.csv' },
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Read the file' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Dry run' }));
+		const region = (await screen.findByText(/Every row passes\./)).closest('[aria-live="polite"]');
+		expect(region?.getAttribute('aria-atomic')).toBe('true');
+		expect(region?.textContent).toContain('Every row passes.');
+	});
+
 	// The console renews the engine's short token only on a request its own
 	// server handles, so a request sent straight to the engine can carry one
 	// that lapsed on a live session. Rerunning the loads renews it, and the

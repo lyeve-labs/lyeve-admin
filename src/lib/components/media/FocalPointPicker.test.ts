@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -7,6 +8,13 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
 import FocalPointPicker from './FocalPointPicker.svelte';
 
 afterEach(cleanup);
+
+// A confirmation takes its text two frames after it mounts, so a test that
+// says one is absent looks only after those frames have passed.
+async function twoFrames(): Promise<void> {
+	await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+	await tick();
+}
 
 function setup(props: Record<string, unknown> = {}) {
 	const result = render(FocalPointPicker, {
@@ -61,9 +69,10 @@ describe('FocalPointPicker', () => {
 		expect([sent.get('id'), sent.get('clear')]).toEqual(['m1', 'true']);
 	});
 
-	it('shows a failed save and not the confirmation', () => {
-		const { getByText, queryByText } = setup({ error: 'The point could not be saved.', saved: true });
-		expect(getByText('The point could not be saved.')).toBeTruthy();
+	it('shows a failed save and not the confirmation', async () => {
+		const { findByText, queryByText } = setup({ error: 'The point could not be saved.', saved: true });
+		expect(await findByText('The point could not be saved.')).toBeTruthy();
+		await twoFrames();
 		expect(queryByText(/Focal point saved/)).toBeNull();
 	});
 

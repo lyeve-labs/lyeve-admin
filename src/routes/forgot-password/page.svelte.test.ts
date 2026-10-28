@@ -13,6 +13,16 @@ describe('Forgot password page', () => {
 		expect(getByRole('button', { name: /email me a reset link/i })).toBeTruthy();
 	});
 
+	// The confirmation replaces the form and stays, so it is read out as it
+	// arrives rather than only when the reader finds it.
+	it('reads out that the link is on its way', async () => {
+		const { findByText } = render(ForgotPage, { props: { form: { sent: true, email: 'a@b.co' }, data: { carried: '' } } as never });
+
+		const region = (await findByText(/If an account exists for a@b.co/)).closest('[aria-live="polite"]');
+		expect(region?.getAttribute('aria-atomic')).toBe('true');
+		expect(region?.textContent).toContain('a reset link is on its way');
+	});
+
 	it('keeps the address and states the refusal', () => {
 		const { container } = render(ForgotPage, {
 			props: { form: { error: 'Enter a valid email address.', email: 'nope' }, data: { carried: '' } } as never,

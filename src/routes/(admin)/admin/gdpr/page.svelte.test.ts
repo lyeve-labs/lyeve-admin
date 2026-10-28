@@ -10,6 +10,13 @@ import GdprPage from './+page.svelte';
 
 afterEach(cleanup);
 
+// A confirmation takes its text two frames after it mounts, so a test that
+// says one is absent looks only after those frames have passed.
+async function twoFrames(): Promise<void> {
+	await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+	await tick();
+}
+
 const said = (c: HTMLElement) => (c.textContent ?? '').replace(/\s+/g, ' ');
 
 function erased(errors: string[] | undefined, extra: Record<string, unknown> = {}) {
@@ -31,8 +38,10 @@ const ERASERS_FAILED = 'one or more erasers failed';
 // green "complete" that clears itself would close the request on data that
 // is still held.
 describe('Privacy request erasure outcome', () => {
-	it('calls an erasure with failures incomplete and says where to look', () => {
-		const { container } = render(GdprPage, { props: erased([ERASERS_FAILED]) });
+	it('calls an erasure with failures incomplete and says where to look', async () => {
+		const { container, findByText } = render(GdprPage, { props: erased([ERASERS_FAILED]) });
+		await findByText('Erasure incomplete');
+		await twoFrames();
 		const text = said(container);
 		expect(text).toContain('Erasure incomplete');
 		expect(text).not.toContain('Erasure complete');
@@ -56,10 +65,12 @@ describe('Privacy request erasure outcome', () => {
 
 	// A legal hold stops the erasure before anything is erased. The engine
 	// answers with no rows and no errors and names the holds.
-	it('says a held erasure erased nothing and names the holds', () => {
-		const { container } = render(GdprPage, {
+	it('says a held erasure erased nothing and names the holds', async () => {
+		const { container, findByText } = render(GdprPage, {
 			props: erased([], { total_rows: 0, holds: [{ id: 'h1', reason: 'Litigation 42' }, { id: 'h2' }] }),
 		});
+		await findByText('Erasure held');
+		await twoFrames();
 		const text = said(container);
 		expect(text).toContain('Erasure held');
 		expect(text).not.toContain('Erasure complete');
@@ -180,11 +191,12 @@ describe('what a person proves before exporting', () => {
 		expect(container.querySelector('form[action="?/stepUp"] [data-testid="refusal-notice"]')).not.toBeNull();
 	});
 
-	it('keeps a refused save on screen', () => {
+	it('keeps a refused save on screen', async () => {
 		const { container } = render(GdprPage, {
 			props: stepUp(['email'], { action: 'stepUp', error: 'This install cannot send mail, so an emailed code cannot be required.' }),
 		});
-		expect(said(container)).toContain('This install cannot send mail');
+		await vi.waitFor(() => expect(said(container)).toContain('This install cannot send mail'));
+		await twoFrames();
 		expect(said(container)).not.toContain('Saved.');
 	});
 });

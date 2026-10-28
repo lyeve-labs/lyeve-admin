@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, cleanup, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
@@ -9,6 +10,13 @@ import PrivacyPage from './+page.svelte';
 import { NO_TENANT } from '$lib/api/privacy';
 
 afterEach(cleanup);
+
+// A confirmation takes its text two frames after it mounts, so a test that
+// says one is absent looks only after those frames have passed.
+async function twoFrames(): Promise<void> {
+	await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+	await tick();
+}
 
 function said(c: HTMLElement): string {
 	return (c.textContent ?? '').replace(/\s+/g, ' ');
@@ -67,11 +75,12 @@ describe('privacy settings: form submissions on erasure', () => {
 		await vi.waitFor(() => expect(said(container)).toContain('Saved. The next erasure in this tenant follows this choice.'));
 	});
 
-	it('shows a failed save on the form that made it', () => {
+	it('shows a failed save on the form that made it', async () => {
 		const { container } = render(PrivacyPage, {
 			props: props({}, { action: 'erasure', error: 'The choice could not be saved.' }),
 		});
-		expect(said(container)).toContain('The choice could not be saved.');
+		await vi.waitFor(() => expect(said(container)).toContain('The choice could not be saved.'));
+		await twoFrames();
 		expect(said(container)).not.toContain('Saved.');
 	});
 });
