@@ -364,7 +364,7 @@ const PAGE_CAP = /\b(?:[\w-]+:)*(?:max-w-[\w.[\]%/-]+|mx-auto|w-screen)\b/g;
  * and the ellipsis.
  */
 const ICON_GLYPH =
-  /[←-⇿➔-➿■-◿•‣…‹›«»×☑✅❌✓-✘]/;
+  /[←-⇿➔-➿■-◿•‣\u2026‹›«»×☑✅❌✓-✘]/;
 
 /** A role that is not what the kit's Button renders. */
 const NON_BUTTON_ROLE = /^(?:switch|tab|menuitem|menuitemcheckbox|menuitemradio|option|checkbox|radio|img|presentation|none|status|alert)$/;
