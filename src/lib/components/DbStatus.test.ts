@@ -214,6 +214,18 @@ describe('DbStatus', () => {
 		await waitFor(() => expect(live.textContent).toBe('migration 059 failed'));
 	});
 
+	// Focus returns to the chip after the dialog leaves, and Firefox reads the
+	// chip's title as its description, so a title holding the failure makes a
+	// screen reader say it a second time.
+	it('keeps the failure out of the chip it returns focus to', async () => {
+		render(DbStatus, { props: { pending: 2, redirectTo: '/admin' } });
+		await fireEvent.click(screen.getByTestId('db-status'));
+		await submit({ type: 'failure', status: 409, data: { error: 'The queue changed since it was listed. Review it again.' } });
+
+		await waitFor(() => expect(screen.getByTestId('db-status-live').textContent).toBe('The queue changed since it was listed. Review it again.'));
+		expect(screen.getByTestId('db-status').getAttribute('title')).toBe('2 migrations waiting to be applied');
+	});
+
 	// The action redirects so that a submission without JavaScript lands
 	// somewhere. Here the count is refreshed in place instead.
 	it('refreshes the shell rather than following the redirect', async () => {
