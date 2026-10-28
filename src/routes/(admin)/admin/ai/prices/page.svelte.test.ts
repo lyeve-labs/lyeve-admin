@@ -64,7 +64,28 @@ describe('AI prices page', () => {
 
 	it('matches a saved result to its row', () => {
 		const saved = setup({}, { key: 'openai/gpt-4o', saved: true });
-		expect(saved.getByRole('status').textContent).toContain('Saved.');
+		expect(saved.container.querySelector('tbody tr')?.textContent).toContain('Saved.');
+	});
+
+	/*
+	 * Orca speaks none of a region marked as a status, and a new price's row
+	 * arrives holding its "Saved.", so the sentence is spoken from a region
+	 * that was on the page and empty before the save.
+	 */
+	it('announces a save from a live region mounted empty', async () => {
+		const view = setup();
+		const live = view.getByTestId('price-saved');
+		expect(live.tagName).toBe('DIV');
+		expect(live.getAttribute('aria-live')).toBe('polite');
+		expect(live.getAttribute('aria-atomic')).toBe('true');
+		expect(live.hasAttribute('role')).toBe(false);
+		expect(live.textContent).toBe('');
+
+		await view.rerender({ form: { key: 'openai/gpt-4o', saved: true } } as never);
+
+		expect(view.getByTestId('price-saved')).toBe(live);
+		expect(live.textContent).toBe('Saved.');
+		expect(view.container.querySelector('[role="status"]')).toBeNull();
 	});
 
 	it('shows a failed delete on the page and not in the drawer opened after it', async () => {

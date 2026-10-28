@@ -154,5 +154,13 @@
 	</Modal>
 {/if}
 {#if error}
-	<span class="text-xs text-danger" role="status">{error}</span>
+	<span class="text-xs text-danger" aria-hidden="true">{error}</span>
 {/if}
+<!-- A screen reader announces a region only when text arrives in one already
+     on the page, so this stays mounted and empty until a sync fails. It is
+     hidden from sight because the header's gap would show an empty box, and
+     the visible copy above is hidden from screen readers so the failure is not
+     read twice. A div because Orca drops a quick insertion into a paragraph,
+     and no status role because Orca reads a status bar as chrome and says
+     nothing. -->
+<div class="sr-only" aria-live="polite" aria-atomic="true" data-testid="db-status-live">{error}</div>

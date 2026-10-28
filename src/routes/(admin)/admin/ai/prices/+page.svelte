@@ -108,6 +108,13 @@
 		{/if}
 	{/snippet}
 
+	<!-- The row's "Saved." arrives with a new row, and a screen reader announces
+	     a region only when text arrives in one already on the page, so the
+	     sentence is spoken from here and the row's copy is for sight. Empty
+	     while a save is in flight, so a second save is heard as well. A div
+	     because Orca drops a quick insertion into a paragraph, and no status
+	     role because Orca reads a status bar as chrome and says nothing. -->
+	<div class="sr-only" aria-live="polite" aria-atomic="true" data-testid="price-saved">{form && 'saved' in form && form.saved && !save.pending ? 'Saved.' : ''}</div>
 	<AiSection level={2} tab="prices" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prices">
 		<FormErrors message={pageFailure} />
 
@@ -153,7 +160,7 @@
 							<td data-cell="nowrap" class="text-muted">
 								{formatDateTime(p.updated_at)}
 								{#if mine && form && 'saved' in form}
-									<span class="block text-xs text-success" role="status">Saved.</span>
+									<span class="block text-xs text-success" aria-hidden="true">Saved.</span>
 								{/if}
 							</td>
 							{#if data.isSuperAdmin}

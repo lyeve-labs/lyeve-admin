@@ -47,6 +47,9 @@ async function submit(result: ActionResult): Promise<void> {
 	await done({ result });
 }
 
+/** The sighted copy of a sentence, leaving out the live region that repeats it for a screen reader. */
+const shown = (text: string) => screen.getByText(text, { ignore: '[aria-live], script, style' });
+
 describe('DbStatus', () => {
 	// A read belongs in `load` and a write in a form action, so the script here
 	// makes no call of its own.
@@ -134,7 +137,7 @@ describe('DbStatus', () => {
 
 		await submit({ type: 'failure', status: 409, data: { error: 'The queue changed since it was listed. Review it again.' } });
 
-		await waitFor(() => expect(screen.getByText('The queue changed since it was listed. Review it again.')).toBeTruthy());
+		await waitFor(() => expect(shown('The queue changed since it was listed. Review it again.')).toBeTruthy());
 		expect(nav.invalidate).toHaveBeenCalledWith('app:migrations');
 	});
 
@@ -144,7 +147,7 @@ describe('DbStatus', () => {
 
 		await submit({ type: 'failure', status: 400, data: { error: 'migration 059 failed' } });
 
-		await waitFor(() => expect(screen.getByText('migration 059 failed')).toBeTruthy());
+		await waitFor(() => expect(shown('migration 059 failed')).toBeTruthy());
 		expect(nav.invalidateAll).not.toHaveBeenCalled();
 	});
 
@@ -154,7 +157,7 @@ describe('DbStatus', () => {
 
 		await submit({ type: 'failure', status: 400, data: {} });
 
-		await waitFor(() => expect(screen.getByText('Migration failed')).toBeTruthy());
+		await waitFor(() => expect(shown('Migration failed')).toBeTruthy());
 	});
 
 	it('reports a request that never arrived', async () => {
@@ -163,7 +166,29 @@ describe('DbStatus', () => {
 
 		await submit({ type: 'error', error: new Error('offline') });
 
-		await waitFor(() => expect(screen.getByText('Network error')).toBeTruthy());
+		await waitFor(() => expect(shown('Network error')).toBeTruthy());
+	});
+
+	/*
+	 * Orca speaks none of a region marked as a status, and no screen reader
+	 * announces a region that arrives holding its text, so the failure lands
+	 * in a region that was on the page and empty before the apply.
+	 */
+	it('announces a failed sync from a live region mounted empty', async () => {
+		render(DbStatus, { props: { pending: 1, redirectTo: '/admin' } });
+		const live = screen.getByTestId('db-status-live');
+		expect(live.tagName).toBe('DIV');
+		expect(live.getAttribute('aria-live')).toBe('polite');
+		expect(live.getAttribute('aria-atomic')).toBe('true');
+		expect(live.hasAttribute('role')).toBe(false);
+		expect(live.textContent).toBe('');
+
+		await fireEvent.click(screen.getByTestId('db-status'));
+		await submit({ type: 'failure', status: 400, data: { error: 'migration 059 failed' } });
+
+		await waitFor(() => expect(live.textContent).toBe('migration 059 failed'));
+		expect(screen.getByTestId('db-status-live')).toBe(live);
+		expect(document.querySelector('[role="status"]')).toBeNull();
 	});
 
 	// The action redirects so that a submission without JavaScript lands

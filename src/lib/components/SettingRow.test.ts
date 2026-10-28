@@ -53,4 +53,25 @@ describe('SettingRow', () => {
 		});
 		expect(other.container.textContent).not.toContain('refused');
 	});
+
+	/*
+	 * Orca speaks none of a region marked as a status, and no screen reader
+	 * announces a region that arrives holding its text, so the outcome lands
+	 * in a region that was on the page and empty before the save.
+	 */
+	it('announces its own save from a live region mounted empty', async () => {
+		const view = render(SettingRow, { props: { ...base, value: 'x' } });
+		const live = view.getByTestId('setting-saved-SMTP_HOST');
+		expect(live.tagName).toBe('DIV');
+		expect(live.getAttribute('aria-live')).toBe('polite');
+		expect(live.getAttribute('aria-atomic')).toBe('true');
+		expect(live.hasAttribute('role')).toBe(false);
+		expect(live.textContent).toBe('');
+
+		await view.rerender({ result: { key: 'SMTP_HOST', success: true } });
+
+		expect(view.getByTestId('setting-saved-SMTP_HOST')).toBe(live);
+		expect(live.textContent).toBe('Saved.');
+		expect(view.container.querySelector('[role="status"]')).toBeNull();
+	});
 });
