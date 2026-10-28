@@ -118,7 +118,7 @@
 		type="button"
 		data-testid="db-status"
 		loading={syncing}
-		title={error || `${pending} migration${pending === 1 ? '' : 's'} waiting to be applied`}
+		title="{pending} migration{pending === 1 ? '' : 's'} waiting to be applied"
 		onclick={() => (confirming = true)}
 	>
 		<CircleAlert size={ICON.sm} class="shrink-0 text-warn" aria-hidden="true" />
