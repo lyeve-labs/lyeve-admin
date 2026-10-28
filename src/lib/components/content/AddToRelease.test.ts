@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
@@ -7,6 +8,13 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 import AddToRelease from './AddToRelease.svelte';
 
 afterEach(cleanup);
+
+// A confirmation takes its text two frames after it mounts, so a test that
+// says one is absent looks only after those frames have passed.
+async function twoFrames(): Promise<void> {
+	await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+	await tick();
+}
 
 const releases = [{ id: 'r1', name: 'Launch', status: 'draft' as const }];
 
@@ -52,9 +60,10 @@ describe('AddToRelease', () => {
 		expect(screen.getByRole('link', { name: 'Spring' }).getAttribute('href')).toBe('/admin/releases/r2');
 	});
 
-	it('shows a refused add and not the confirmation', () => {
+	it('shows a refused add and not the confirmation', async () => {
 		render(AddToRelease, { props: { releases, holding: [], error: 'release r1 is already published', added: true } });
-		expect(screen.getByText('release r1 is already published')).toBeTruthy();
+		expect(await screen.findByText('release r1 is already published')).toBeTruthy();
+		await twoFrames();
 		expect(screen.queryByText('Added to the release.')).toBeNull();
 	});
 
