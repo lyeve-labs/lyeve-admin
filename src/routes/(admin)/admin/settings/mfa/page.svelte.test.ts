@@ -200,7 +200,7 @@ describe('two-factor authentication page', () => {
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 		const { getByRole } = setup(false, { step: 'done', backupCodes: ['a1', 'b2'] });
 		const copy = getByRole('button', { name: 'Copy all codes' });
-		const status = copy.parentElement!.querySelector('[role="status"]')!;
+		const status = copy.parentElement!.querySelector('[aria-live="polite"]')!;
 
 		await fireEvent.click(copy);
 		await vi.advanceTimersByTimeAsync(0);

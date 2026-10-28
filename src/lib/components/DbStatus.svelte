@@ -28,6 +28,7 @@
 	import { invalidate, invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { MIGRATIONS_DEPENDENCY, type PendingStatement } from '$lib/api/migrate';
+	import { overlayClosed } from '$lib/overlay';
 
 	interface Props {
 		/** Migrations waiting to be applied, or null when the engine did not answer. */
@@ -56,14 +57,18 @@
 		return async ({ result }) => {
 			syncing = false;
 			confirming = false;
+			// The failure is said once the dialog has left, so the focus moving
+			// back to the chip does not cut the announcement off.
 			if (result.type === 'failure') {
 				const message = result.data?.error;
+				await overlayClosed();
 				error = typeof message === 'string' && message ? message : 'Migration failed';
 				// The queue moved since it was listed, so the list is read again.
 				if (result.status === 409) await invalidate(MIGRATIONS_DEPENDENCY);
 				return;
 			}
 			if (result.type === 'error') {
+				await overlayClosed();
 				error = 'Network error';
 				return;
 			}
@@ -153,6 +158,10 @@
 		{/snippet}
 	</Modal>
 {/if}
-{#if error}
-	<span class="text-xs text-danger" role="status">{error}</span>
-{/if}
+<!-- One element is both the message and the live region, on the page and
+     empty until a sync fails, because a screen reader announces a region only
+     when text arrives in one already there. Empty, it is visually hidden and
+     adds no gap to the header. A div because in Firefox Orca drops a quick
+     insertion into a paragraph, and no status role because Orca reads a
+     status bar as chrome and says nothing. -->
+<div class="text-xs text-danger empty:sr-only" aria-live="polite" aria-atomic="true" data-testid="db-status-live">{#if error}{error}{/if}</div>

@@ -166,6 +166,54 @@ describe('DbStatus', () => {
 		await waitFor(() => expect(screen.getByText('Network error')).toBeTruthy());
 	});
 
+	/*
+	 * Orca speaks none of a region marked as a status, and no screen reader
+	 * announces a region that arrives holding its text, so the failure lands
+	 * in a region that was on the page and empty before the apply.
+	 */
+	it('announces a failed sync from a live region mounted empty', async () => {
+		render(DbStatus, { props: { pending: 1, redirectTo: '/admin' } });
+		const live = screen.getByTestId('db-status-live');
+		expect(live.tagName).toBe('DIV');
+		expect(live.getAttribute('aria-live')).toBe('polite');
+		expect(live.getAttribute('aria-atomic')).toBe('true');
+		expect(live.hasAttribute('role')).toBe(false);
+		expect(live.textContent).toBe('');
+
+		await fireEvent.click(screen.getByTestId('db-status'));
+		await submit({ type: 'failure', status: 400, data: { error: 'migration 059 failed' } });
+
+		await waitFor(() => expect(live.textContent).toBe('migration 059 failed'));
+		expect(screen.getByTestId('db-status-live')).toBe(live);
+		// The region is the message a sighted reader sees, so nothing hides it
+		// from a screen reader and nothing repeats it.
+		expect(live.hasAttribute('aria-hidden')).toBe(false);
+		expect(live.className).toContain('empty:sr-only');
+		expect(screen.getAllByText('migration 059 failed')).toHaveLength(1);
+		expect(document.querySelector('[role="status"]')).toBeNull();
+	});
+
+	// Focus returns to the chip when the dialog's exit ends, and Orca in Chrome
+	// can drop a sentence that arrives during the exit in favor of that move.
+	it('says the failure only once the closing dialog has left', async () => {
+		render(DbStatus, { props: { pending: 1, redirectTo: '/admin' } });
+		const live = screen.getByTestId('db-status-live');
+		await fireEvent.click(screen.getByTestId('db-status'));
+		// jsdom plays no exit, so a leaving dialog is stood in by hand.
+		const leaving = document.createElement('div');
+		leaving.setAttribute('aria-modal', 'true');
+		leaving.setAttribute('inert', '');
+		document.body.append(leaving);
+
+		const done = submit({ type: 'failure', status: 400, data: { error: 'migration 059 failed' } });
+		await new Promise((r) => setTimeout(r, 10));
+		expect(live.textContent).toBe('');
+
+		leaving.remove();
+		await done;
+		await waitFor(() => expect(live.textContent).toBe('migration 059 failed'));
+	});
+
 	// The action redirects so that a submission without JavaScript lands
 	// somewhere. Here the count is refreshed in place instead.
 	it('refreshes the shell rather than following the redirect', async () => {

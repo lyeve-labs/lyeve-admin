@@ -13,6 +13,7 @@
 	 * into a page that could not save the nine others.
 	 */
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Button, Input, PasswordInput } from '@lyeve-labs/ui-kit';
 	import { KeyRound } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
@@ -51,9 +52,23 @@
 
 	const dirty = $derived(secret ? draft.length > 0 : draft !== (value ?? ''));
 	const mine = $derived(result?.key === name);
+
+	// Cleared for the round trip so a second save of the same row changes the
+	// live region's text, and a screen reader hears it again.
+	let sending = $state(false);
+	const submit: SubmitFunction = () => {
+		sending = true;
+		return async ({ update }) => {
+			try {
+				await update();
+			} finally {
+				sending = false;
+			}
+		};
+	};
 </script>
 
-<form method="POST" {action} use:enhance class="flex flex-wrap items-start gap-2">
+<form method="POST" {action} use:enhance={submit} class="flex flex-wrap items-start gap-2">
 	<input type="hidden" name="key" value={name} />
 	<input type="hidden" name="secret" value={secret ? 'true' : 'false'} />
 	{#if secret}
@@ -79,6 +94,11 @@
 </form>
 {#if mine && result?.error}
 	<p class="mt-2 text-xs text-danger" role="alert">{result.error}</p>
-{:else if mine && result?.success}
-	<p class="mt-2 text-xs text-success" role="status">{saved}</p>
 {/if}
+<!-- One element is both the message and the live region, on the page and
+     empty until the row saves, because a screen reader announces a region
+     only when text arrives in one already there. Empty, it is visually hidden
+     and adds no gap to a parent's flex column. A div because in Firefox Orca
+     drops a quick insertion into a paragraph, and no status role because Orca
+     reads a status bar as chrome and says nothing. -->
+<div class="mt-2 text-xs text-success empty:sr-only" aria-live="polite" aria-atomic="true" data-testid="setting-saved-{name}">{#if mine && result?.success && !sending}{saved}{/if}</div>
