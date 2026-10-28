@@ -22,7 +22,7 @@
 <AuthShell title="Sign in with an email link" description="We will email you a link that signs you in.">
 	{#if form && 'sent' in form && form.sent}
 		<div class="space-y-5">
-			<Alert tone="success">
+			<Alert tone="success" announce>
 				If an account exists for {form.email}, a sign-in link is on its way. It works once and expires
 				in a few minutes.
 			</Alert>

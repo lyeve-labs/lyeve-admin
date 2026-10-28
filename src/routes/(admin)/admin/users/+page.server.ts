@@ -110,7 +110,9 @@ export const actions: Actions = {
 		// slug against its roster.
 		const target = tenant ? authedClient(event, { 'X-Tenant-ID': tenant }) : client;
 		try {
-			await createUser(email, password, roles.length ? roles : ['editor'], target);
+			// The engine makes an account sent no role an editor, so the least
+			// privileged role is named instead.
+			await createUser(email, password, roles.length ? roles : ['viewer'], target);
 			return { ok: true };
 		} catch (err) {
 			const full = seatRefusal(err);

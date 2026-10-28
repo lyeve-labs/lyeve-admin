@@ -67,7 +67,7 @@
 	let eventType = $state('');
 	let resourceType = $state('');
 	let days = $state('365');
-	let archival = $state(true);
+	let archival = $state(false);
 	let storage = $state('');
 	let pathPrefix = $state('');
 
@@ -83,7 +83,7 @@
 		eventType = '';
 		resourceType = '';
 		days = '365';
-		archival = true;
+		archival = false;
 		storage = '';
 		pathPrefix = '';
 		setAside = form;
@@ -105,7 +105,7 @@
 		eventType = '';
 		resourceType = '';
 		days = String(source.retention_days ?? 365);
-		archival = source.archival_enabled ?? true;
+		archival = source.archival_enabled ?? false;
 		storage = source.archival_storage ?? '';
 		pathPrefix = source.archival_path_prefix ?? '';
 		setAside = form;
@@ -434,7 +434,7 @@
 			<Toggle
 				id="ret-archival"
 				label="Archive before deleting"
-				hint="Off means the entries are gone. With a compliance obligation that is a different thing entirely."
+				hint="Off deletes the matching entries when the policy is enforced, as the API does when archival_enabled is omitted. Turn it on to write them to storage first."
 				bind:checked={archival}
 			/>
 			<Input

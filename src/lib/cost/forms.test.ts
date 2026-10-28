@@ -8,7 +8,7 @@ function form(fields: Record<string, string>): FormData {
 }
 
 describe('parseBudget', () => {
-	it('builds the request the ledger takes, with the window as whole days in UTC', () => {
+	it('builds the request the ledger takes, with the window ending at the first instant after the last day', () => {
 		const parsed = parseBudget(
 			form({ name: 'Storage cap', amount: '10.50', period: 'monthly', resource_type: 'storage', currency: 'usd', alert_thresholds: '50, 90', period_start: '2026-09-01', period_end: '2026-09-30' }),
 		);
@@ -21,7 +21,7 @@ describe('parseBudget', () => {
 				currency: 'USD',
 				alert_thresholds: [50, 90],
 				period_start: '2026-09-01T00:00:00.000Z',
-				period_end: '2026-09-30T23:59:59.000Z',
+				period_end: '2026-10-01T00:00:00.000Z',
 			},
 		});
 	});

@@ -185,23 +185,31 @@
 	{/snippet}
 
 	{#snippet nav({ rail })}
-		<!-- min-h-0 so the nav's own overflow-y-auto has something to scroll
-		     against: without it the sections past the fold are unreachable. -->
-		<SidebarNav
-			items={navItems}
-			activePath={page.url.pathname}
-			label="Admin sections"
-			storageKey="lyeve-admin-nav"
-			collapsed={rail}
-			class="min-h-0 w-full flex-1 px-inline"
-		/>
+		<!-- The code behind each sidebar link downloads once the link is on
+		     screen after a navigation, so the first visit to a page waits only
+		     for its data, as every later visit does. Links inside a page keep the
+		     hover preload, because a page with many links would queue their
+		     downloads ahead of the next click. The wrapper draws no box of its
+		     own. -->
+		<div class="contents" data-sveltekit-preload-code="viewport">
+			<!-- min-h-0 so the nav's own overflow-y-auto has something to scroll
+			     against: without it the sections past the fold are unreachable. -->
+			<SidebarNav
+				items={navItems}
+				activePath={page.url.pathname}
+				label="Admin sections"
+				storageKey="lyeve-admin-nav"
+				collapsed={rail}
+				class="min-h-0 w-full flex-1 px-inline"
+			/>
+		</div>
 	{/snippet}
 
 	{#snippet headerActions()}
 		<!-- Absent for a session that cannot apply a migration: the engine refuses
 		     the write to anyone but an admin, so the control is not offered. -->
 		{#if data.migrations}
-			<DbStatus pending={data.migrations.pending} redirectTo={here} />
+			<DbStatus pending={data.migrations.pending} items={data.migrations.items} redirectTo={here} />
 		{/if}
 		<ThemeToggle />
 		<AccountMenu name={data.user.email} secondary={data.user.roles.join(', ')}>

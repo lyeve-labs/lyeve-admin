@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
-import { actions, load } from './+page.server';
+import { actions, load, ssr } from './+page.server';
 import { signedIn } from '$lib/server/test-support/signed-in';
 
 function json(body: unknown, status = 200): Response {
@@ -79,6 +79,12 @@ const schemaRoutes: Record<string, Route> = {
 	'/stats': () => json({ rows: 3 }),
 	'/api/admin/schemas': () => json([{ name: 'posts', display_name: 'Posts', fields: [] }]),
 };
+
+describe('admin/schema rendering', () => {
+	it('renders in the browser only, so the server build carries no schema diagram', () => {
+		expect(ssr).toBe(false);
+	});
+});
 
 describe('admin/schema load', () => {
 	it('reads the presets beside the schemas', async () => {

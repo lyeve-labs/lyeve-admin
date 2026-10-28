@@ -451,6 +451,7 @@
 -->
 <Drawer bind:open title={editing.id ? `Edit ${editing.name}` : 'New rule'}>
 	<form
+		id="pii-rule-form"
 		method="POST"
 		action={editing.id ? '?/update' : '?/create'}
 		use:enhance={() => async ({ result, update }) => {
@@ -515,11 +516,6 @@
 			hint="A new rule starts off. Turning it on changes every response from the next request."
 			bind:checked={editing.enabled}
 		/>
-
-		{#snippet footer()}
-			<Button variant="secondary" onclick={() => (open = false)}>Cancel</Button>
-			<Button variant="primary" type="submit">{editing.id ? 'Save' : 'Create'}</Button>
-		{/snippet}
 	</form>
 
 	<div class="mt-6 flex flex-col gap-3 border-t border-line pt-4">
@@ -571,4 +567,11 @@
 			{/if}
 		{/if}
 	</div>
+
+	<!-- A snippet is a prop of the drawer only as its direct child, so the
+	     footer sits here and names the rule form it submits. -->
+	{#snippet footer()}
+		<Button variant="secondary" onclick={() => (open = false)}>Cancel</Button>
+		<Button variant="primary" type="submit" form="pii-rule-form">{editing.id ? 'Save' : 'Create'}</Button>
+	{/snippet}
 </Drawer>

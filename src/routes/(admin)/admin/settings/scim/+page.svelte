@@ -11,6 +11,7 @@
 		RadioGroup,
 		SearchInput,
 		SectionHeading,
+		Select,
 		Stat,
 		Table,
 		Toggle,
@@ -80,6 +81,11 @@
 	let name = $state('');
 	let token = $state('');
 	let action = $state('disable');
+	let samlProvider = $state('');
+	const samlOptions = $derived([
+		{ value: '', label: 'None' },
+		...(data.saml?.state === 'ok' ? data.saml.providers.map((p) => ({ value: p.id, label: p.name })) : []),
+	]);
 
 	// One rotation panel at a time, keyed by the connection it belongs to. The
 	// token is write-only, so this is a field with no current value to show.
@@ -90,6 +96,7 @@
 		name = '';
 		token = '';
 		action = 'disable';
+		samlProvider = '';
 		openedOver = form;
 		creating = true;
 	}
@@ -302,6 +309,20 @@
 				bind:value={token}
 				required
 			/>
+			<!-- The engine has no way to change the link later, so the hint says
+			     what changing it takes. -->
+			{#if data.saml?.state === 'ok'}
+				<Select
+					id="scim-saml"
+					name="saml_provider_id"
+					label="SAML provider"
+					bind:value={samlProvider}
+					options={samlOptions}
+					hint="Sign-in through this provider uses this connection's attribute mapping. The link is set when the connection is created. To change it, create a new connection and remove this one."
+				/>
+			{:else if data.saml?.state === 'failed'}
+				<Alert tone="warn">The SAML providers could not be read, so none can be linked now. Reload the page to try again.</Alert>
+			{/if}
 			<RadioGroup
 				name="deprovision_action"
 				label="When the directory removes somebody"

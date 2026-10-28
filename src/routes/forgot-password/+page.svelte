@@ -22,7 +22,7 @@
 <AuthShell title="Reset your password" description="We will email you a link to choose a new one.">
 	{#if form && 'sent' in form && form.sent}
 		<div class="space-y-5">
-			<Alert tone="success">
+			<Alert tone="success" announce>
 				If an account exists for {form.email}, a reset link is on its way. It works once and expires in
 				an hour.
 			</Alert>

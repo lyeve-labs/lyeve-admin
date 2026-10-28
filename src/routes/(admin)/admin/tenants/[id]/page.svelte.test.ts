@@ -63,6 +63,14 @@ describe('the member drawer and the failures of other actions', () => {
 		expect(drawerText()).not.toContain('could not be removed');
 	});
 
+	it('starts a new member with the reading role', async () => {
+		render(TenantPage, { props: props() });
+		await fireEvent.click(screen.getByRole('button', { name: /new member/i }));
+		const form = document.body.querySelector('form#member-form') as HTMLFormElement;
+		const ticked = [...form.querySelectorAll<HTMLInputElement>('input[name="roles"]')].filter((i) => i.checked).map((i) => i.value);
+		expect(ticked).toEqual(['viewer']);
+	});
+
 	it('shows a failed grant inside the open drawer, first in its form', async () => {
 		const { rerender } = render(TenantPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: /new member/i }));

@@ -47,7 +47,7 @@ vi.setConfig({ testTimeout: 15_000 });
 /** The kit's copy control: the frame that holds the button, its tooltip and its live region. */
 function copyFrame(button: HTMLElement): HTMLElement {
 	let node = button.parentElement;
-	while (node && !node.querySelector(':scope > [role="status"]')) node = node.parentElement;
+	while (node && !node.querySelector(':scope > [aria-live="polite"]')) node = node.parentElement;
 	return node!;
 }
 
@@ -239,7 +239,7 @@ describe('schema builder relation panel', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /This collection's API/ }));
 		vi.useFakeTimers();
 		const copy = screen.getByRole('button', { name: 'curl', description: 'Copy a curl request for POST /api/v1/content/posts' });
-		const status = copyFrame(copy).querySelector('[role="status"]')!;
+		const status = copyFrame(copy).querySelector('[aria-live="polite"]')!;
 
 		await fireEvent.click(copy);
 		await vi.advanceTimersByTimeAsync(0);
@@ -639,7 +639,7 @@ describe('schema builder presets', () => {
 		expect(screen.getByText('Save a preset from a URL or a file')).toBeTruthy();
 	});
 
-	it('names the schemas a preset created once they are in the list', () => {
+	it('names the schemas a preset created once they are in the list', async () => {
 		render(SchemaPage, {
 			props: {
 				data: data({ presets }),
@@ -647,7 +647,7 @@ describe('schema builder presets', () => {
 			},
 		});
 
-		expect(screen.getByText('Preset created')).toBeTruthy();
+		expect(await screen.findByText('Preset created')).toBeTruthy();
 		expect(screen.getByText(/2 schemas are in the list now: notes, note_tags/)).toBeTruthy();
 	});
 });

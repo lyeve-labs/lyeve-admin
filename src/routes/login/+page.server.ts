@@ -47,16 +47,35 @@ async function providerNames(
 }
 
 /**
- * Whether a plugin's public sign-in route is mounted. The recovery routes take
- * POST only, so a GET answers 405 while the plugin runs and 404 when it does
- * not, and asks the plugin for nothing. Only a definite 404 hides the link: any
- * other answer, or none, leaves it, because the form reports a refusal anyway.
+ * Whether a plugin's public sign-in route is mounted, for an engine that keeps
+ * no list of them. The recovery routes take POST only, so a GET answers 405
+ * while the plugin runs and 404 when it does not, and asks the plugin for
+ * nothing. Only a definite 404 hides the link: any other answer, or none,
+ * leaves it, because the form reports a refusal anyway.
  */
 async function routeMounted(fetch: typeof globalThis.fetch, url: string): Promise<boolean> {
 	try {
 		return (await fetch(url)).status !== 404;
 	} catch {
 		return true;
+	}
+}
+
+/**
+ * The public sign-in routes the engine's plugins mounted, as `METHOD path`, or
+ * null when this engine keeps no such list. The engine counts every refused
+ * request as a failed one, so asking each route with a request it refuses made
+ * each visit to this page read as failures on the dashboard.
+ */
+async function signInRoutes(fetch: typeof globalThis.fetch): Promise<Set<string> | null> {
+	try {
+		const res = await fetch('/api/admin/auth/sign-in-routes');
+		if (!res.ok) return null;
+		const body = (await res.json()) as { routes?: { method?: string; path?: string }[] } | null;
+		if (!Array.isArray(body?.routes)) return null;
+		return new Set(body.routes.map((r) => `${r.method} ${r.path}`));
+	} catch {
+		return null;
 	}
 }
 
@@ -82,11 +101,15 @@ export const load: PageServerLoad = async (event) => {
 	// refuse, so a non-ok response means no button and never an error on the
 	// form: somebody with a password must still be able to get in when SSO is
 	// unavailable.
+	// A route the engine's list leaves out is not asked at all.
+	const mounted = await signInRoutes(fetch);
+	const providers = (url: string) => (!mounted || mounted.has(`GET ${url}`) ? providerNames(fetch, url) : []);
+	const recovery = (url: string) => (mounted ? mounted.has(`POST ${url}`) : routeMounted(fetch, url));
 	const [oauthProviders, samlProviders, passwordReset, magicLink] = await Promise.all([
-		providerNames(fetch, '/api/admin/auth/oauth-providers'),
-		providerNames(fetch, '/api/admin/auth/saml-providers'),
-		routeMounted(fetch, '/api/admin/auth/password-reset/request'),
-		routeMounted(fetch, '/api/admin/auth/magic-link/request'),
+		providers('/api/admin/auth/oauth-providers'),
+		providers('/api/admin/auth/saml-providers'),
+		recovery('/api/admin/auth/password-reset/request'),
+		recovery('/api/admin/auth/magic-link/request'),
 	]);
 
 	return {

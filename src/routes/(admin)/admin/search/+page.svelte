@@ -182,7 +182,7 @@
 						<MultiSelect
 							id="public-schemas"
 							label="Anyone may search"
-							hint="Published entries of a picked schema answer on your site's own host with no credential: title, slug, tags and a snippet, never the stored body."
+							hint="Published entries of a picked schema answer on your site's own host with no credential: title, slug, tags and a snippet. A query matches every field, and the snippet can quote any of them, so pick only schemas whose fields may all be public."
 							placeholder="Pick schemas"
 							searchable
 							options={data.schemas.value.map((n) => ({ value: n, label: n }))}

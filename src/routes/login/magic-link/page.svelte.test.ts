@@ -13,10 +13,12 @@ describe('Magic link request page', () => {
 		expect(getByRole('button', { name: /email me a link/i })).toBeTruthy();
 	});
 
-	it('confirms without saying whether the address has an account', () => {
-		const { container } = render(MagicLinkPage, { props: { form: { sent: true, email: 'a@b.co' }, data: { carried: '' } } as never });
+	it('confirms without saying whether the address has an account, and reads it out', async () => {
+		const { container, findByText } = render(MagicLinkPage, { props: { form: { sent: true, email: 'a@b.co' }, data: { carried: '' } } as never });
 
-		expect(container.textContent).toContain('If an account exists for a@b.co');
+		const region = (await findByText(/If an account exists for a@b.co/)).closest('[aria-live="polite"]');
+		expect(region?.getAttribute('aria-atomic')).toBe('true');
+		expect(region?.textContent).toContain('a sign-in link is on its way');
 		expect(container.querySelector('#email')).toBeNull();
 	});
 

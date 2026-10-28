@@ -7,6 +7,7 @@ import { actionError, actionFailure } from '$lib/server/action-error';
 import {
 	createKey,
 	keyExpiryProblem,
+	keyRoleProblem,
 	keyScopeProblem,
 	keysUsage,
 	listKeys,
@@ -160,6 +161,15 @@ export const actions: Actions = {
 				action: 'create',
 				error: 'Check the highlighted fields.',
 				fields: { scopes: scopeProblem },
+			});
+		}
+
+		const roleProblem = keyRoleProblem(roles, scopes);
+		if (roleProblem) {
+			return fail(400, {
+				action: 'create',
+				error: 'Check the highlighted fields.',
+				fields: { roles: roleProblem },
 			});
 		}
 

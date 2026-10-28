@@ -74,12 +74,23 @@ describe('the split', () => {
 		expect(said(container)).toContain('Nobody has been bucketed yet');
 	});
 
+	// A feed request puts nobody in a group. Only the request for the
+	// reader's group does, so a card that pointed at the feed sent a developer
+	// to a call that never fills it.
+	it('names the request that puts a reader in a group', () => {
+		const { container } = render(RecommendationsPage, {
+			props: props({ stats: stats({ total_users: 0, recommendation_pct: 0, random_pct: 0 }) }),
+		});
+		expect(said(container)).toContain('a request signed in as that reader asks for its group');
+		expect(said(container)).not.toContain('asked for a feed');
+	});
+
 	it('explains that the control arm is what the rest is measured against', () => {
 		const { container } = render(RecommendationsPage, { props: props() });
 		expect(said(container)).toContain('measured against');
 	});
 
-	it('warns when the arms are too far apart to be a hash', () => {
+	it('warns when the arms are too far apart to be chance', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({ stats: stats({ recommendation_pct: 99, random_pct: 1 }) }),
 		});
@@ -104,13 +115,12 @@ describe('the recompute', () => {
 		expect(said(container)).toContain('already running');
 	});
 
-	it('reports what a finished recompute actually did', () => {
+	it('reports what a finished recompute actually did', async () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({}, { refreshed: true, pairs: 120, trending: 30, feeds: 400, ms: 125_000 }),
 		});
-		const text = said(container);
-		expect(text).toContain('2m 5s');
-		expect(text).toContain('120 similarity pairs');
+		await vi.waitFor(() => expect(said(container)).toContain('2m 5s'));
+		expect(said(container)).toContain('120 similarity pairs');
 	});
 
 	it('hides the recompute from a role that may not run one', () => {

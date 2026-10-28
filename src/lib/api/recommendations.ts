@@ -112,10 +112,10 @@ export function sourceTone(source: string): StatusTone {
 /**
  * Whether the split is far enough from its intent to be worth saying.
  *
- * Assignment is by hash, so the arms are never exactly even and a few points
- * of drift is normal. Ten points is not: at that distance the control arm is
- * either too small to measure against or large enough that a real share of
- * users are getting random content.
+ * Each reader is assigned at random, so the arms are never exactly even and
+ * a few points of drift is normal. Ten points is not: at that distance the
+ * control arm is either too small to measure against or large enough that a
+ * real share of users are getting random content.
  */
 export const SPLIT_DRIFT_LIMIT = 10;
 

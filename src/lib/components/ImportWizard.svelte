@@ -568,7 +568,7 @@
 					reasons, so they can be downloaded, fixed and imported again.
 				</p>
 			{:else}
-				<Alert tone="success">Every row passes. {mode === 'upsert' ? 'Rows the key finds are updated.' : ''}</Alert>
+				<Alert tone="success" announce>Every row passes. {mode === 'upsert' ? 'Rows the key finds are updated.' : ''}</Alert>
 			{/if}
 			<p class="flex items-center gap-2 text-xs text-muted">
 				<Badge tone="neutral">{mode === 'upsert' ? 'Create and update' : 'Create only'}</Badge>

@@ -49,10 +49,10 @@ describe('audit sinks page', () => {
 		expect(container.textContent).toContain('Nothing receives the audit log');
 	});
 
-	it('shows a generated secret once, after the create', () => {
+	it('shows a generated secret once, after the create', async () => {
 		const { container } = setup({ sinks: [sink] }, { created: 'Hook', secret: 'whsec_once' });
 		expect(document.body.textContent).toContain('It is not shown again');
-		expect(container.textContent).toContain('Hook is streaming the audit log');
+		await vi.waitFor(() => expect(container.textContent).toContain('Hook is streaming the audit log'));
 	});
 
 	it('renders a refused delete as the refusal notice', () => {

@@ -17,9 +17,32 @@ import {
 	type ScimProvider,
 } from '$lib/api/scim';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { listProviders as listSamlProviders, samlGate } from '$lib/api/saml';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
+
+/**
+ * The SAML providers a new connection can be linked to. Off when SAML does
+ * not run or is not enabled here, so the form offers no link it cannot make,
+ * and failed when the read did not answer, so an outage never reads as none.
+ */
+export type SamlLink =
+	| { state: 'ok'; providers: { id: string; name: string }[] }
+	| { state: 'off' }
+	| { state: 'failed' };
+
+const SAML_OFF_STATES = new Set(['absent', 'locked', 'full', 'forbidden']);
+
+async function samlLink(event: Parameters<PageServerLoad>[0], plugins: Parameters<typeof notRunning>[0]): Promise<SamlLink> {
+	if (notRunning(plugins, PLUGIN.saml)) return { state: 'off' };
+	try {
+		const page = await listSamlProviders(authedClient(event), MAX_LIMIT, 0);
+		return { state: 'ok', providers: (page.data ?? []).map((p) => ({ id: p.id, name: p.name })) };
+	} catch (err) {
+		return SAML_OFF_STATES.has(samlGate(err).state) ? { state: 'off' } : { state: 'failed' };
+	}
+}
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -34,6 +57,7 @@ export const load: PageServerLoad = async (event) => {
 			offset,
 			hasMore: false,
 			gate: { state: 'absent' } as ScimGate,
+			saml: { state: 'off' } as SamlLink,
 		};
 	}
 
@@ -55,7 +79,8 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
-	return { providers, total, limit, offset, hasMore, gate };
+	const saml = gate.state === 'ok' ? await samlLink(event, plugins) : ({ state: 'off' } as SamlLink);
+	return { providers, total, limit, offset, hasMore, gate, saml };
 };
 
 export const actions: Actions = {
@@ -76,6 +101,7 @@ export const actions: Actions = {
 			});
 		}
 		if (!action) return fail(400, { action: 'create', error: 'Choose what happens to a deprovisioned account.' });
+		const samlProvider = String(form.get('saml_provider_id') ?? '').trim();
 
 		try {
 			await createProvider(client, {
@@ -83,6 +109,7 @@ export const actions: Actions = {
 				bearer_token: token,
 				deprovision_on_delete: form.get('deprovision_on_delete') === 'true',
 				deprovision_action: action,
+				...(samlProvider ? { saml_provider_id: samlProvider } : {}),
 			});
 		} catch (err) {
 			return fail(400, { action: 'create', error: actionError(err, 'The connection could not be created.') });

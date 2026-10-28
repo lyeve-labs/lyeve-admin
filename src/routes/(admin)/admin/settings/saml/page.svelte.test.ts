@@ -191,6 +191,47 @@ describe('the form', () => {
 		}
 	});
 
+	it('fills a new provider from the template chosen', async () => {
+		const okta = {
+			key: 'okta',
+			name: 'Okta',
+			description: 'Okta SAML 2.0.',
+			config: {
+				entity_id: '',
+				sso_url: '',
+				idp_cert_hint: 'Download the certificate from the Okta app.',
+				name_id_format: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+				encrypt_assertions: true,
+				attributes_mapping: { email: 'mail', roles: 'groups' },
+			},
+		};
+		render(SamlPage, { props: props({ templates: [okta] }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /new provider/i })[0]);
+		await fireEvent.click(screen.getByRole('combobox', { name: /Start from/ }));
+		await fireEvent.click(screen.getByRole('option', { name: 'Okta' }));
+		expect((screen.getByLabelText(/^NameID format/) as HTMLInputElement).value).toBe(okta.config.name_id_format);
+		expect((screen.getByLabelText(/^Attribute mapping/) as HTMLTextAreaElement).value).toBe('email=mail\nroles=groups');
+		expect((document.querySelector('input[name="encrypt_assertions"]') as HTMLInputElement).value).toBe('true');
+		expect(document.body.textContent).toContain('Download the certificate from the Okta app.');
+	});
+
+	it('clears the last template when None is chosen after it', async () => {
+		const okta = {
+			key: 'okta',
+			name: 'Okta',
+			config: { name_id_format: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent', encrypt_assertions: true, attributes_mapping: { email: 'mail' } },
+		};
+		render(SamlPage, { props: props({ templates: [okta] }) });
+		await fireEvent.click(screen.getAllByRole('button', { name: /new provider/i })[0]);
+		await fireEvent.click(screen.getByRole('combobox', { name: /Start from/ }));
+		await fireEvent.click(screen.getByRole('option', { name: 'Okta' }));
+		await fireEvent.click(screen.getByRole('combobox', { name: /Start from/ }));
+		await fireEvent.click(screen.getByRole('option', { name: 'None' }));
+		expect((screen.getByLabelText(/^NameID format/) as HTMLInputElement).value).toBe('urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress');
+		expect((screen.getByLabelText(/^Attribute mapping/) as HTMLTextAreaElement).value).toBe('email=email\nroles=groups');
+		expect((document.querySelector('input[name="encrypt_assertions"]') as HTMLInputElement).value).toBe('false');
+	});
+
 	// The plugin turns these three on for every new provider whatever the
 	// form sends, so a create cannot offer them off.
 	it('shows the three signing switches on and fixed on a new provider', async () => {

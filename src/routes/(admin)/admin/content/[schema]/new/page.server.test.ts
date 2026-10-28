@@ -7,10 +7,11 @@ const client = vi.hoisted(() => ({
 
 // Reads and writes share one session client, as they do in the load and the
 // action. Writes land in `client` and reads in `reads`.
-vi.mock('$lib/server/authz', () => ({
+// The strip is the real one, so a test sees what reaches the engine.
+vi.mock('$lib/server/authz', async (importActual) => ({
 	requireUser: vi.fn(async () => ({ id: 'u1' })),
 	authedClient: vi.fn(() => ({ post: client.post, get: reads.get })),
-	stripProtectedFields: (d: Record<string, unknown>) => d,
+	stripProtectedFields: (await importActual<typeof import('$lib/server/authz')>()).stripProtectedFields,
 }));
 
 /** actionError relays a 4xx reason only when the throw is the client's own
@@ -107,6 +108,20 @@ describe('creating a content entry', () => {
 		await create({ title: 'Contact', active: false });
 		const body = client.post.mock.calls[0][1] as { body: Record<string, unknown> };
 		expect(body.body.active).toBe(false);
+	});
+
+	it('keeps the value of a field the schema names status', async () => {
+		// An order's state is an ordinary field. The entry's own status is not
+		// in the body, so the name guards nothing there.
+		await create({ title: 'Order 7', status: 'shipped', system: 'north', created_by: 'Ana' });
+		const body = client.post.mock.calls[0][1] as { body: Record<string, unknown> };
+		expect(body.body).toEqual({ title: 'Order 7', status: 'shipped', system: 'north', created_by: 'Ana' });
+	});
+
+	it('leaves out the columns the engine writes itself', async () => {
+		await create({ title: 'Order 7', id: 'x', _status: 'published', tenant_id: 't2', created_at: 't' });
+		const body = client.post.mock.calls[0][1] as { body: Record<string, unknown> };
+		expect(body.body).toEqual({ title: 'Order 7' });
 	});
 
 	it('names no status, so the store opens the entry as a draft', async () => {

@@ -1,6 +1,6 @@
 {
 	"name": "@lyeve/admin",
-	"version": "0.22.0",
+	"version": "0.23.0",
 	"private": true,
 	"license": "MIT",
 	"type": "module",
@@ -48,7 +48,7 @@
 		"@lucide/svelte": "^1.47.0",
 		"@lyeve-labs/client": "^0.5.0",
 		"@lyeve-labs/client-rest": "^0.3.0",
-		"@lyeve-labs/ui-kit": "^0.40.0",
+		"@lyeve-labs/ui-kit": "^0.44.0",
 		"@tiptap/core": "^3.31.3",
 		"@tiptap/extension-link": "^3.31.3",
 		"@tiptap/extension-underline": "^3.31.3",

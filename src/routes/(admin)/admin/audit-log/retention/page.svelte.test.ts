@@ -127,6 +127,16 @@ describe('Retention drawers', () => {
 		const form = document.getElementById('policy-form') as HTMLFormElement;
 		expect(form.textContent).toContain('A retention window is a whole number of days');
 	});
+
+	// The engine stores a policy that does not mention archival with it off,
+	// and the form starts from the same default.
+	it('starts a new policy with archival off, as the engine does', async () => {
+		const { getAllByRole } = render(RetentionPage, { props: props(['super_admin']) });
+		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
+		const form = document.getElementById('policy-form') as HTMLFormElement;
+		const archival = form.querySelector('input[name="archival_enabled"]') as HTMLInputElement;
+		expect(archival.value).toBe('false');
+	});
 });
 
 describe('Retention failures stay where they were made', () => {
@@ -169,15 +179,15 @@ describe('Retention holds that could not be read', () => {
 });
 
 describe('the outcome of an enforcement run', () => {
-	it('says how many entries were deleted across how many policies', () => {
+	it('says how many entries were deleted across how many policies', async () => {
 		const { container } = render(RetentionPage, { props: props(['super_admin'], {}, { enforced: true, deleted: 12, policies: 2 }) });
-		expect(container.textContent).toContain('Retention enforced across 2 policies.');
+		await vi.waitFor(() => expect(container.textContent).toContain('Retention enforced across 2 policies.'));
 		expect(container.textContent).toContain('12 entries were deleted.');
 	});
 
-	it('speaks of one policy and one entry in the singular', () => {
+	it('speaks of one policy and one entry in the singular', async () => {
 		const { container } = render(RetentionPage, { props: props(['super_admin'], {}, { enforced: true, deleted: 1, policies: 1 }) });
-		expect(container.textContent).toContain('across 1 policy.');
+		await vi.waitFor(() => expect(container.textContent).toContain('across 1 policy.'));
 		expect(container.textContent).toContain('1 entry was deleted.');
 	});
 });
