@@ -294,6 +294,82 @@ describe('admin/schema save action', () => {
 		expect(out.data.renamed).toEqual([{ from: 'title', to: 'headline' }]);
 	});
 
+	it('names the version it opened on the first write, and each version a rename answered on the next', async () => {
+		const { event, calls } = formEvent(
+			{
+				'/fields/title/rename': () => json({ schema: 'posts', old_field: 'title', new_field: 'headline', version: 'v2' }),
+				'/fields/body/rename': () => json({ schema: 'posts', old_field: 'body', new_field: 'text', version: 'v3' }),
+				'/api/admin/schemas': () => json({ ...posts, version: 'v4' }),
+			},
+			{
+				schema: JSON.stringify(posts),
+				original: 'posts',
+				version: 'v1',
+				renames: JSON.stringify([
+					{ from: 'title', to: 'headline' },
+					{ from: 'body', to: 'text' },
+				]),
+			},
+		);
+		const out = await actions.save(event);
+		expect(out).toEqual({ scope: 'save', saved: { ...posts, version: 'v4' } });
+		const writes = calls.filter((c) => c.init?.method === 'PUT' || c.init?.method === 'POST');
+		expect(writes.map((c) => new Headers(c.init?.headers).get('If-Match'))).toEqual(['"v1"', '"v2"', '"v3"']);
+	});
+
+	it('says the content type changed since it was opened, in its own words, when the engine refuses the version', async () => {
+		const { event } = formEvent(
+			{
+				'/fields/title/rename': () => json({ version: 'v2' }),
+				'/api/admin/schemas': () => json({ error: 'the schema changed since the version this write was sent with', code: 'SCHEMA_VERSION_MISMATCH' }, 412),
+			},
+			{ schema: JSON.stringify(posts), original: 'posts', version: 'v1', renames: JSON.stringify([{ from: 'title', to: 'headline' }]) },
+		);
+		const out = (await actions.save(event)) as { status: number; data: { error: string; stale: boolean; version: string; renamed: unknown[] } };
+		expect(out.status).toBe(412);
+		expect(out.data.stale).toBe(true);
+		expect(out.data.error).toBe(
+			'This content type changed since it was opened, so the save was refused. Reload it to see what it holds now, then make the change again. The renames went through: title to headline.',
+		);
+		expect(out.data.version).toBe('v2');
+		expect(out.data.renamed).toEqual([{ from: 'title', to: 'headline' }]);
+	});
+
+	it('stops at a rename the engine refuses for the version, before the definition is sent', async () => {
+		const { event, calls } = formEvent(
+			{
+				'/fields/title/rename': () => json({ error: 'the schema changed', code: 'SCHEMA_VERSION_MISMATCH' }, 412),
+				'/api/admin/schemas': () => json(posts),
+			},
+			{ schema: JSON.stringify(posts), original: 'posts', version: 'v1', renames: JSON.stringify([{ from: 'title', to: 'headline' }]) },
+		);
+		const out = (await actions.save(event)) as { status: number; data: { error: string; stale: boolean } };
+		expect(out.status).toBe(412);
+		expect(out.data.stale).toBe(true);
+		expect(out.data.error).toBe('This content type changed since it was opened, so the save was refused. Reload it to see what it holds now, then make the change again.');
+		expect(calls.filter((c) => c.init?.method === 'POST')).toEqual([]);
+	});
+
+	it('creates a new content type only, never over one of the same name', async () => {
+		const { event, calls } = formEvent({ '/api/admin/schemas': () => json({ ...posts, version: 'v1' }) }, { schema: JSON.stringify(posts), original: '', renames: '[]' });
+		const out = await actions.save(event);
+		expect(out).toEqual({ scope: 'save', saved: { ...posts, version: 'v1' } });
+		const post = calls.find((c) => c.init?.method === 'POST');
+		expect(new Headers(post?.init?.headers).get('If-None-Match')).toBe('*');
+		expect(new Headers(post?.init?.headers).get('If-Match')).toBeNull();
+	});
+
+	it('says a content type of that name exists when the engine refuses the create', async () => {
+		const { event } = formEvent(
+			{ '/api/admin/schemas': () => json({ error: 'a schema of this name exists', code: 'SCHEMA_EXISTS' }, 412) },
+			{ schema: JSON.stringify(posts), original: '', renames: '[]' },
+		);
+		const out = (await actions.save(event)) as { status: number; data: { error: string; stale: boolean } };
+		expect(out.status).toBe(412);
+		expect(out.data.error).toBe('A content type named posts already exists. Open it from the list, or give this one another machine name.');
+		expect(out.data.stale).toBe(false);
+	});
+
 	it('refuses a machine name edited in the definition of a saved schema', async () => {
 		const { event, calls } = formEvent({}, { schema: JSON.stringify(posts), original: 'articles', renames: '[]' });
 		const out = (await actions.save(event)) as { status: number };
