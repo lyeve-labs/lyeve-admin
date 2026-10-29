@@ -42,6 +42,7 @@
 		probeHealth,
 		probeTarget,
 		probeTone,
+		runGoingOnText,
 		type Probe,
 		type ProbeType,
 	} from '$lib/api/synthetic';
@@ -212,9 +213,10 @@
 				await update();
 				if (result.type === 'success') {
 					const out = result.data as
-						| { status?: string | null; ms?: number; failed?: number; regions?: number }
+						| { status?: string | null; ms?: number; failed?: number; regions?: number; running?: string; already?: boolean }
 						| undefined;
-					if (out?.status === 'fail') {
+					if (out?.running) toast.info(runGoingOnText(p.name, out.already === true));
+					else if (out?.status === 'fail') {
 						const where = (out.regions ?? 0) > 1 ? ` in ${out.failed} of ${out.regions} regions` : '';
 						toast.error(`${p.name} failed${where}`);
 					} else if (out?.status === 'pass') toast.success(`${p.name} passed in ${out.ms ?? 0} ms`);
