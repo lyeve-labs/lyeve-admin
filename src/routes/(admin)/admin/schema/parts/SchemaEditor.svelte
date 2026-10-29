@@ -3,7 +3,7 @@
 	import type { FieldType, Schema, SchemaField, TransportMode, TransportName } from '@lyeve-labs/client';
 	import { dndzone, type DndEvent } from 'svelte-dnd-action';
 	import type { Action } from 'svelte/action';
-	import { BookOpen, Code, GripVertical, Link2, Pencil, Plus, Trash2, TriangleAlert } from '@lucide/svelte';
+	import { BookOpen, Code, GripVertical, Link2, Pencil, Plus, RefreshCw, Trash2, TriangleAlert } from '@lucide/svelte';
 	import { collectionRoutes } from '$lib/api/collection-api';
 	import { curlFor } from '$lib/api/request-preview';
 	import { RELATION_KINDS, planRelation, planSchemaRelations, tableName, type RelationType } from '$lib/relations';
@@ -31,6 +31,8 @@
 		isNewSchema,
 		dirty,
 		saveError,
+		onreload,
+		reloading = false,
 		problems,
 		isSuperAdmin,
 		ddl,
@@ -44,6 +46,9 @@
 		isNewSchema: boolean;
 		dirty: boolean;
 		saveError: string;
+		/** Set when the failed save can be fixed by opening the content type again. */
+		onreload?: () => void;
+		reloading?: boolean;
 		problems: Problem[];
 		isSuperAdmin: boolean;
 		ddl: DdlHistory;
@@ -273,7 +278,16 @@
 	<div aria-live="assertive" aria-atomic="true">
 		{#if saveError}
 			<div data-testid="save-error">
-				<Alert tone="danger">{saveError}</Alert>
+				<Alert tone="danger">
+					<p>{saveError}</p>
+					{#if onreload}
+						<div class="mt-3">
+							<Button variant="secondary" size="sm" loading={reloading} onclick={onreload}>
+								<RefreshCw size={ICON.sm} aria-hidden="true" /> Reload
+							</Button>
+						</div>
+					{/if}
+				</Alert>
 			</div>
 		{/if}
 	</div>
