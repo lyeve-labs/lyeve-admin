@@ -13,7 +13,7 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { toChannels, type AlertChannels } from './alert-channels';
-import type { HttpClient } from '@lyeve-labs/client';
+import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import { rowsOf, type ListEnvelope } from './list';
 
@@ -196,10 +196,40 @@ export async function deleteProbe(client: HttpClient, id: string): Promise<void>
 	await client.delete(`${PROBES_URL}/${encodeURIComponent(id)}`);
 }
 
+/**
+ * How long Run now waits for its answer. A run that fails in several regions
+ * can take half a minute, and the engine answers no request after about 30
+ * seconds, so the wait ends a little past that rather than at the client's
+ * default.
+ */
+const RUN_NOW_WAIT_MS = 35_000;
+
 /** Runs a probe now. The answer is one result per region it is watched from. */
 export async function runProbeNow(client: HttpClient, id: string): Promise<ProbeResult[]> {
-	const res = await client.post<unknown>(`${PROBES_URL}/${encodeURIComponent(id)}/run`, {});
+	const res = await client.post<unknown>(`${PROBES_URL}/${encodeURIComponent(id)}/run`, {}, {
+		signal: AbortSignal.timeout(RUN_NOW_WAIT_MS),
+	});
 	return Array.isArray(res) ? (res as ProbeResult[]) : [];
+}
+
+/**
+ * Whether Run now ended with no answer at all: the wait ran out or the
+ * connection dropped. The run goes on without its caller and records its
+ * results, so this is not a failure.
+ */
+export function runOutlastedTheWait(err: unknown): boolean {
+	return err instanceof TypeError || (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError'));
+}
+
+/** Whether the engine refused Run now because a run of the probe is going. */
+export function runAlreadyGoing(err: unknown): boolean {
+	return err instanceof ApiError && err.status === 409;
+}
+
+/** What Run now says when the run is still going, its own or an earlier one. */
+export function runGoingOnText(name: string, already: boolean): string {
+	const first = already ? `A run of ${name} is already going.` : `${name} is still running.`;
+	return `${first} Its results appear in the list when it ends.`;
 }
 
 /** How one run went across its regions. */

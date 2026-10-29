@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
 	everyLabel,
 	intervalHint,
 	listOpenAlerts,
 	readProbeLimits,
+	runAlreadyGoing,
+	runGoingOnText,
 	runOutcome,
+	runOutlastedTheWait,
 	runProbeNow,
 	probeHealth,
 	probeTarget,
@@ -173,6 +176,40 @@ describe('a run now', () => {
 
 	it('says nothing passed when no result was recorded', () => {
 		expect(runOutcome([]).status).toBeNull();
+	});
+
+	// A run that fails in several regions outlasts the client's default wait,
+	// so Run now names a wait of its own that ends past the engine's.
+	it('waits past the default for a long run', async () => {
+		const post = vi.fn(async () => []);
+		await runProbeNow({ post } as never, 'p1');
+		expect(post).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1/run', {}, {
+			signal: expect.any(AbortSignal),
+		});
+	});
+
+	it('reads a request that got no answer as a run still going', () => {
+		expect(runOutlastedTheWait(new DOMException('The operation timed out.', 'TimeoutError'))).toBe(true);
+		expect(runOutlastedTheWait(new DOMException('This operation was aborted', 'AbortError'))).toBe(true);
+		expect(runOutlastedTheWait(new TypeError('fetch failed'))).toBe(true);
+		expect(runOutlastedTheWait(new ApiError(503, 'down', {}))).toBe(false);
+		expect(runOutlastedTheWait(new ApiError(409, 'busy', {}))).toBe(false);
+		expect(runOutlastedTheWait(new SyntaxError('Unexpected token'))).toBe(false);
+	});
+
+	it('reads a conflict as a run of the probe already going', () => {
+		expect(runAlreadyGoing(new ApiError(409, 'busy', {}))).toBe(true);
+		expect(runAlreadyGoing(new ApiError(503, 'down', {}))).toBe(false);
+		expect(runAlreadyGoing(new TypeError('fetch failed'))).toBe(false);
+	});
+
+	it('says where the results of a run still going appear', () => {
+		expect(runGoingOnText('Homepage', false)).toBe(
+			'Homepage is still running. Its results appear in the list when it ends.',
+		);
+		expect(runGoingOnText('Homepage', true)).toBe(
+			'A run of Homepage is already going. Its results appear in the list when it ends.',
+		);
 	});
 });
 
