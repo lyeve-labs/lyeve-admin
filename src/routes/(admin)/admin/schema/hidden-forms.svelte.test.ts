@@ -12,8 +12,8 @@ vi.mock('$app/forms', () => ({
 		return { destroy() {} };
 	},
 }));
-const nav = vi.hoisted(() => ({ invalidate: vi.fn(async (_dep: string) => {}) }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}), invalidateAll: vi.fn(async () => {}), invalidate: nav.invalidate }));
+const nav = vi.hoisted(() => ({ invalidate: vi.fn(async (_dep: string) => {}), invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn(async () => {}), invalidateAll: nav.invalidateAll, invalidate: nav.invalidate }));
 const state = vi.hoisted(() => ({ page: { url: new URL('http://localhost/admin/schema') } }));
 vi.mock('$app/state', () => state);
 vi.mock('$lib/canvas/schema', () => ({ SchemaCanvas: null, hasSchemaCanvas: false }));
@@ -30,6 +30,7 @@ afterEach(cleanup);
 beforeEach(() => {
 	forms.handlers.clear();
 	nav.invalidate.mockClear();
+	nav.invalidateAll.mockReset();
 	kit.confirm.mockReset();
 	kit.confirm.mockResolvedValue(false);
 	// The page submits its hidden forms itself. The test plays each round
@@ -196,5 +197,43 @@ describe('schema import failure', () => {
 		expect(form.getAttribute('action')).toBe('?/import');
 		const firstField = form.querySelector('#import-source, [id^="import-source"]') as HTMLElement;
 		expect(message.compareDocumentPosition(firstField) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+});
+
+describe('a content type that changed since it was opened', () => {
+	const versioned = (version: string, fields: { name: string }[]) => ({
+		name: 'posts',
+		display_name: 'Posts',
+		version,
+		fields: fields.map((f) => ({ ...f, field_type: 'text', required: false, unique: false, indexed: false })),
+	});
+	const sentVersion = () => (document.querySelector('form[action="?/save"] input[name="version"]') as HTMLInputElement).value;
+
+	it('sends the version it opened, and takes the one a rename stored', async () => {
+		render(SchemaPage, { props: { data: data({ schemas: [versioned('v1', [{ name: 'title' }])] }), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+		expect(sentVersion()).toBe('v1');
+
+		await play('?/save', { type: 'failure', data: { error: 'The field could not be saved.', renamed: [{ from: 'title', to: 'headline' }], version: 'v2' } });
+
+		await waitFor(() => expect(sentVersion()).toBe('v2'));
+		expect(screen.queryByRole('button', { name: 'Reload' })).toBeNull();
+	});
+
+	it('offers to reload it, and opens it as the engine holds it now', async () => {
+		const view = render(SchemaPage, { props: { data: data({ schemas: [versioned('v1', [{ name: 'title' }])] }), form: null } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Posts' }));
+		nav.invalidateAll.mockImplementation(async () => {
+			await view.rerender({ data: data({ schemas: [versioned('v2', [{ name: 'title' }, { name: 'summary' }])] }), form: null });
+		});
+
+		await play('?/save', { type: 'failure', data: { error: 'This content type changed since it was opened.', stale: true, renamed: [] } });
+		expect(await screen.findByText('This content type changed since it was opened.')).toBeTruthy();
+		await fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+
+		await waitFor(() => expect(sentVersion()).toBe('v2'));
+		expect(nav.invalidateAll).toHaveBeenCalledOnce();
+		expect(screen.getByDisplayValue('summary')).toBeTruthy();
+		expect(screen.queryByTestId('save-error')).toBeNull();
 	});
 });
