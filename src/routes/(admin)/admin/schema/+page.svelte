@@ -15,7 +15,7 @@
 	import type { ActionData, PageData } from './$types';
 	import type { DryRunStatement } from './+page.server';
 	import { enhance } from '$app/forms';
-	import { beforeNavigate, goto, invalidate } from '$app/navigation';
+	import { beforeNavigate, goto, invalidate, invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { tick, untrack } from 'svelte';
 	import type { Schema } from '@lyeve-labs/client';
@@ -149,7 +149,7 @@
 	 * schema has no saved side and is dirty until it is.
 	 */
 	let selected = $state<Schema | null>(null);
-	let saved = $state<Schema | null>(null);
+	let saved = $state<(Schema & { version?: string }) | null>(null);
 	const isNewSchema = $derived(selected !== null && saved === null);
 	const dirty = $derived(selected !== null && (saved === null || canonical(selected) !== canonical(saved)));
 
@@ -163,6 +163,8 @@
 	let listShown = $state(false);
 	const listFolded = $derived(selected !== null && !listShown);
 	let saveError = $state('');
+	/** The last save was refused because the content type changed since it was opened. */
+	let stale = $state(false);
 
 	/**
 	 * The undo stack for the schema on screen. Rebuilt whenever another schema
@@ -217,6 +219,7 @@
 		selected = s ? cloneSchema(s) : null;
 		saved = s && asSaved ? JSON.parse(JSON.stringify(selected)) : null;
 		saveError = '';
+		stale = false;
 		// Below lg the fold hides the list button just pressed, and focus would
 		// drop to the page. It moves to the button that shows the list again.
 		const fromRail = document.getElementById('schema-rail')?.contains(document.activeElement) ?? false;
@@ -331,6 +334,7 @@
 	const submitSave: SubmitFunction = () => {
 		saving = true;
 		saveError = '';
+		stale = false;
 		return async ({ result }) => {
 			saving = false;
 			// The confirmation belongs to the save that asked for it, whatever the
@@ -346,21 +350,47 @@
 				// A save that removes a field queues its drop, and the header counts the queue.
 				void invalidate(MIGRATIONS_DEPENDENCY);
 			} else if (result.type === 'failure') {
-				const d = (result.data ?? {}) as { error?: string; renamed?: { from: string; to: string }[] };
+				const d = (result.data ?? {}) as { error?: string; renamed?: { from: string; to: string }[]; version?: string; stale?: boolean };
 				saveError = d.error ?? 'The schema could not be saved.';
+				stale = d.stale === true;
 				// A rename the engine already ran is part of the saved side now, or
-				// the next save would ask it to rename a column that has moved.
+				// the next save would ask it to rename a column that has moved. The
+				// version it stored is the one the next save names.
 				if (saved && d.renamed?.length) {
 					for (const r of d.renamed) {
 						const f = saved.fields.find((x) => x.name === r.from);
 						if (f) f.name = r.to;
 					}
+					if (d.version) saved.version = d.version;
 				}
 			} else if (result.type === 'error') {
 				saveError = 'The admin could not reach the engine. Nothing was saved.';
 			}
 		};
 	};
+
+	/**
+	 * Opens the content type again as the engine holds it now, after a save
+	 * was refused because someone changed it since it was opened. The edits on
+	 * screen are dropped, which is what the operator asked for.
+	 */
+	let reloading = $state(false);
+	async function reloadSchema() {
+		const name = saved?.name;
+		if (!name || reloading) return;
+		reloading = true;
+		try {
+			await invalidateAll();
+		} finally {
+			reloading = false;
+		}
+		const fresh = data.loadGate ? undefined : (data.schemas ?? []).find((s) => s.name === name);
+		if (fresh) {
+			open(fresh);
+			return;
+		}
+		saveError = data.loadGate ? 'The content type could not be read again. Try the reload again.' : `The content type ${name} no longer exists.`;
+	}
 
 	// The preview result, for the read-only dialog and for the save that asked.
 	let ddlPreview = $state<DryRunStatement[] | null>(null);
@@ -530,6 +560,8 @@
 			{isNewSchema}
 			{dirty}
 			{saveError}
+			onreload={stale ? reloadSchema : undefined}
+			{reloading}
 			{problems}
 			{isSuperAdmin}
 			{ddl}
@@ -547,6 +579,7 @@
 			<form method="POST" action="?/save" use:enhance={submitSave} bind:this={saveForm} class="hidden">
 				<input type="hidden" name="schema" value={schemaJSON} />
 				<input type="hidden" name="original" value={saved?.name ?? ''} />
+				<input type="hidden" name="version" value={saved?.version ?? ''} />
 				<input type="hidden" name="renames" value={renamesJSON} />
 			</form>
 			<form method="POST" action="?/preview" use:enhance={submitPreview} bind:this={previewForm} class="hidden">
