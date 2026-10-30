@@ -3,11 +3,16 @@ import { createClient } from '@lyeve-labs/client';
 import { requestPasswordReset } from '$lib/api/password-reset';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
-import { organizationFromForm, organizationFromUrl } from '$lib/organization';
+import { organizationFromUrl } from '$lib/organization';
+import { askedOrganization, asksOrganization } from '$lib/server/sign-in-organization';
 import type { Actions, PageServerLoad } from './$types';
 
-// A link that names the organization fills the field in, and the reader can change or clear it.
-export const load: PageServerLoad = ({ url }) => ({ carried: organizationFromUrl(url) });
+// A link that names the organization fills the field in, and the reader can
+// change or clear it. A console that does not ask for one carries none on.
+export const load: PageServerLoad = ({ url }) => {
+	const organization = asksOrganization();
+	return { organization, carried: organization ? organizationFromUrl(url) : '' };
+};
 
 export const actions: Actions = {
 	default: async (event) => {
@@ -20,7 +25,7 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '').trim();
 		const typed = String(form.get('tenant') ?? '').trim();
 		if (!email) return fail(400, { error: 'Enter the email address you sign in with.', email, tenant: typed });
-		const organization = organizationFromForm(form);
+		const organization = askedOrganization(form);
 		if (!organization.ok) return fail(400, { error: organization.error, email, tenant: typed });
 
 		try {

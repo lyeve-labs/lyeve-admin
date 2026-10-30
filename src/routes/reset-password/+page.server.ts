@@ -6,6 +6,7 @@ import { actionError } from '$lib/server/action-error';
 import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { organizationFromUrl } from '$lib/organization';
+import { asksOrganization } from '$lib/server/sign-in-organization';
 import type { Actions, PageServerLoad } from './$types';
 
 const EXPIRED = 'This reset link is invalid or has expired. Request a new one.';
@@ -17,13 +18,14 @@ function apiCode(e: ApiError): string {
 
 // The token is read here and only spent by the submit, so a mail scanner that
 // opens the link leaves it usable. The token already names the account, so
-// this page never asks for an organization. One the link carries goes on to
-// the sign-in and new-link pages, so they do not ask either.
+// this page never asks for an organization. While the console asks for one,
+// one the link carries goes on to the sign-in and new-link pages, so they do
+// not ask either.
 export const load: PageServerLoad = ({ url }) => {
 	return {
 		token: url.searchParams.get('token') ?? '',
 		minLength: RESET_MIN_PASSWORD_LENGTH,
-		carried: organizationFromUrl(url),
+		carried: asksOrganization() ? organizationFromUrl(url) : '',
 	};
 };
 

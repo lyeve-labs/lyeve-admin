@@ -13,7 +13,7 @@ const providerLinks = (links: HTMLElement[]) =>
 const props = (extra: Record<string, unknown> = {}) =>
 	({
 		form: null,
-		data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: '' },
+		data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, organization: true, carried: '' },
 		...extra,
 	}) as never;
 
@@ -245,6 +245,16 @@ describe('Login page after a session ended', () => {
 		expect(container.textContent).toContain("Leave this empty unless your organization's identity provider created your account.");
 	});
 
+	it('asks for no organization when the console is not set to', () => {
+		const { container } = render(LoginPage, {
+			props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, organization: false, carried: '' } } as never,
+		});
+
+		expect(container.querySelector('[name="tenant"]')).toBeNull();
+		expect(container.textContent).not.toContain('Organization (optional)');
+		expect(container.querySelector('a[href="/forgot-password"]')).not.toBeNull();
+	});
+
 	it('keeps the organization a refused sign-in named', () => {
 		const { container } = render(LoginPage, {
 			props: props({ form: { error: 'Invalid email or password.', tenant: 'acme' } }),
@@ -254,7 +264,7 @@ describe('Login page after a session ended', () => {
 	});
 
 	it('shows the organization its link named, in a field the reader sees', () => {
-		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, organization: true, carried: 'acme' } } as never });
 
 		const field = container.querySelector('#tenant') as HTMLInputElement;
 		expect(field.type).toBe('text');
@@ -267,7 +277,7 @@ describe('Login page after a session ended', () => {
 	});
 
 	it('submits what the field shows after the reader changes or clears it', async () => {
-		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+		const { container } = render(LoginPage, { props: { form: null, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, organization: true, carried: 'acme' } } as never });
 		const field = container.querySelector('#tenant') as HTMLInputElement;
 		const posted = () => new FormData(field.form as HTMLFormElement).get('tenant');
 
@@ -279,7 +289,7 @@ describe('Login page after a session ended', () => {
 	});
 
 	it('keeps an organization the reader cleared when the form comes back refused', () => {
-		const { container } = render(LoginPage, { props: { form: { error: 'x', tenant: '' }, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, carried: 'acme' } } as never });
+		const { container } = render(LoginPage, { props: { form: { error: 'x', tenant: '' }, data: { oauthProviders: [], samlProviders: [], passwordReset: true, magicLink: true, organization: true, carried: 'acme' } } as never });
 
 		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('');
 	});

@@ -49,7 +49,9 @@
 				autofocus
 			/>
 
-			<OrganizationField carried={data.carried} {typed} />
+			{#if data.organization}
+				<OrganizationField carried={data.carried} {typed} />
+			{/if}
 
 			<Button type="submit" variant="primary" full loading={send.pending}>Email me a link</Button>
 

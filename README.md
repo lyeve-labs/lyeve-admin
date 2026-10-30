@@ -83,6 +83,7 @@ engine logged on its first start, and create the first super admin.
 | `CORE_INTERNAL_URL` | no | Where the console's server reaches the engine. Set it when the console and the engine run on different hosts. It sends both `/api/admin` and `/api/v1` calls here, so point it at the proxy in front of the engine. |
 | `CORE_API_INTERNAL_URL` | yes | Where the API reference page sends the calls you try, the engine's content API or the proxy in front of it. The console refuses to start without it. |
 | `ADMIN_CONSOLE_KEY` | no | The same secret as `ADMIN_CONSOLE_KEY` on the engine, 32 characters or more. With it, sign-in limits count each person rather than the console. Behind a proxy, also set `ADDRESS_HEADER=x-forwarded-for` and `XFF_DEPTH` to the number of proxies. |
+| `SIGN_IN_ORGANIZATION` | no | Set to `true` to show the Organization field on the sign-in, password reset and email link pages. Turn it on when the console serves more than one organization on an address that names none, so an account an identity provider created, or one with a membership in another organization, can name where it signs in. Off by default. |
 | `PORT` | no | Defaults to `3002`. |
 | `BODY_SIZE_LIMIT` | no | The largest request the console accepts. The image sets `10M`, enough for a settings bundle or a schema import. |
 
