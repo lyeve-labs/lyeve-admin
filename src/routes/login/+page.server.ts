@@ -10,7 +10,8 @@ import { clearSessionCookie, setRefreshCookie, setSessionCookie, sessionToken } 
 import { adminReturnPath } from '$lib/server/local-path';
 import { LANDING } from '$lib/landing';
 import { challengeFrom } from '$lib/captcha';
-import { organizationFromForm, organizationFromUrl } from '$lib/organization';
+import { organizationFromUrl } from '$lib/organization';
+import { askedOrganization, asksOrganization } from '$lib/server/sign-in-organization';
 
 const SIGN_IN_UNAVAILABLE = 'Sign-in is unavailable right now. Please try again shortly.';
 
@@ -112,14 +113,17 @@ export const load: PageServerLoad = async (event) => {
 		recovery('/api/admin/auth/magic-link/request'),
 	]);
 
+	// A link that names the organization fills the field in, and the reader can
+	// change or clear it. A console that does not ask for one carries none on.
+	const organization = asksOrganization();
 	return {
 		oauthProviders,
 		samlProviders,
 		passwordReset,
 		magicLink,
 		ended: event.url?.searchParams.has('ended') === true,
-		// A link that names the organization fills the field in, and the reader can change or clear it.
-		carried: organizationFromUrl(event.url),
+		organization,
+		carried: organization ? organizationFromUrl(event.url) : '',
 	};
 };
 
@@ -164,7 +168,7 @@ export const actions: Actions = {
 		// Only the shape is checked. Whether the organization exists is never
 		// asked, and a wrong one is refused by the engine exactly as a wrong
 		// password is.
-		const organization = organizationFromForm(form);
+		const organization = askedOrganization(form);
 		if (!organization.ok) return fail(400, { error: organization.error, tenant: typed });
 
 		// The captcha plugin reads the token from the login body itself, so it

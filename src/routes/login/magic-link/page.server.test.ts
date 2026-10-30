@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { actions, load } from './+page.server';
 import { resetRateLimitStore } from '$lib/server/rate-limit';
 
@@ -67,7 +67,11 @@ describe('login/magic-link action', () => {
 });
 
 describe('organization on the request', () => {
-	beforeEach(() => resetRateLimitStore());
+	beforeEach(() => {
+		resetRateLimitStore();
+		vi.stubEnv('SIGN_IN_ORGANIZATION', 'true');
+	});
+	afterEach(() => vi.unstubAllEnvs());
 
 	function sentBody(fetch: typeof globalThis.fetch): unknown {
 		const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
@@ -80,6 +84,14 @@ describe('organization on the request', () => {
 		const result = await submit({ email: 'a@b.co', tenant: ' Acme ' }, fetch);
 		expect(result).toEqual({ sent: true, email: 'a@b.co' });
 		expect(sentBody(fetch)).toEqual({ email: 'a@b.co', tenant: 'acme' });
+	});
+
+	it('sends no organization while the console does not ask for one', async () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', '');
+		const fetch = vi.fn(async () => json({ message: 'sent' })) as unknown as typeof globalThis.fetch;
+		const result = await submit({ email: 'a@b.co', tenant: 'acme corp' }, fetch);
+		expect(result).toEqual({ sent: true, email: 'a@b.co' });
+		expect(sentBody(fetch)).toEqual({ email: 'a@b.co' });
 	});
 
 	it('answers an organization the same way whatever the engine holds', async () => {
@@ -104,7 +116,13 @@ describe('organization on the request', () => {
 	});
 
 	it('follows a link that names the organization', () => {
-		expect(load({ url: new URL('http://admin.test/x?tenant=acme') } as never)).toEqual({ carried: 'acme' });
-		expect(load({ url: new URL('http://admin.test/x') } as never)).toEqual({ carried: '' });
+		vi.stubEnv('SIGN_IN_ORGANIZATION', 'true');
+		expect(load({ url: new URL('http://admin.test/x?tenant=acme') } as never)).toEqual({ organization: true, carried: 'acme' });
+		expect(load({ url: new URL('http://admin.test/x') } as never)).toEqual({ organization: true, carried: '' });
+	});
+
+	it('asks for no organization and carries none on unless the console is set to', () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', '');
+		expect(load({ url: new URL('http://admin.test/x?tenant=acme') } as never)).toEqual({ organization: false, carried: '' });
 	});
 });
