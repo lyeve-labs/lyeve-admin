@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { load, actions } from './+page.server';
 import { resetRateLimitStore } from '$lib/server/rate-limit';
@@ -678,7 +678,11 @@ describe('a sign-in the engine challenges', () => {
 });
 
 describe('naming the organization at sign-in', () => {
-	beforeEach(() => resetRateLimitStore());
+	beforeEach(() => {
+		resetRateLimitStore();
+		vi.stubEnv('SIGN_IN_ORGANIZATION', 'true');
+	});
+	afterEach(() => vi.unstubAllEnvs());
 
 	function submit(fields: Record<string, string>, fetch: typeof globalThis.fetch) {
 		const formData = new FormData();
@@ -697,6 +701,18 @@ describe('naming the organization at sign-in', () => {
 
 		const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
 		expect(JSON.parse(String(init.body))).toEqual({ email: 'a@b.co', password: 'right', tenant: 'acme' });
+	});
+
+	it('sends no organization while the console does not ask for one', async () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', '');
+		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
+			json({ user: { id: 'u1' }, token: 'session' })
+		) as unknown as typeof globalThis.fetch;
+
+		await catchRedirect(() => submit({ email: 'a@b.co', password: 'right', tenant: 'acme corp' }, fetch));
+
+		const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body))).toEqual({ email: 'a@b.co', password: 'right' });
 	});
 
 	it('reads a refusal with an organization named as a wrong password, and keeps the name', async () => {
@@ -722,8 +738,16 @@ describe('naming the organization at sign-in', () => {
 	});
 
 	it('follows a link that names the organization', async () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', 'true');
 		const fetch = vi.fn(async () => json([])) as unknown as typeof globalThis.fetch;
 		const result = await load({ fetch, cookies: mockCookies(), url: new URL('http://admin.test/login?tenant=acme') } as never);
-		expect(result).toMatchObject({ carried: 'acme' });
+		expect(result).toMatchObject({ organization: true, carried: 'acme' });
+	});
+
+	it('asks for no organization and carries none on unless the console is set to', async () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', '');
+		const fetch = vi.fn(async () => json([])) as unknown as typeof globalThis.fetch;
+		const result = await load({ fetch, cookies: mockCookies(), url: new URL('http://admin.test/login?tenant=acme') } as never);
+		expect(result).toMatchObject({ organization: false, carried: '' });
 	});
 });
