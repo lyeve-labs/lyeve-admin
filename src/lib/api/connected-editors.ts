@@ -1,0 +1,201 @@
+/**
+ * The admin routes of the plugin that lets a browser edit pages through a
+ * signed connection.
+ *
+ * A person approves a connection with the code the browser shows, and the
+ * approval asks for their password or MFA code again, because a connection
+ * lasts months. Every route reads the person from the session and the tenant
+ * from the request, so nothing here names either. A waiting request is never
+ * listed: anyone can start one, so only the person holding its code brings it
+ * up.
+ */
+import { ApiError, type HttpClient } from '@lyeve-labs/client';
+import { gateOf, type Gate } from './gate';
+
+export const CONNECTIONS_URL = '/api/admin/sites/connections';
+export const SETTINGS_URL = '/api/admin/sites/settings';
+
+/** The lifetimes a connection may have, in days. */
+export const LIFETIMES = [30, 90, 180] as const;
+
+/** One connection that was approved once, as the list sends it. The key itself never leaves the engine. */
+export interface Connection {
+	id: string;
+	approver_email: string;
+	/** The first 8 bytes of SHA-256 over the raw public key, as four groups of four hex digits. */
+	fingerprint: string;
+	/** The name the browser gave itself. Reported by the requester, unchecked. */
+	label: string;
+	/** The origin the request carried. Reported by the requester, unchecked. */
+	origin: string;
+	approved_at: string | null;
+	last_used_at: string | null;
+	expires_at: string | null;
+	status: string;
+}
+
+export interface ConnectionList {
+	data: Connection[];
+	total: number;
+}
+
+/** A waiting request, as the approve drawer shows it before anyone decides. */
+export interface ConnectionRequest {
+	fingerprint: string;
+	label: string;
+	origin: string;
+	requested_at: string;
+	code_expires_at: string;
+	/** When a connection approved now at the tenant's lifetime would end. */
+	would_expire_at: string;
+	/** The longest lifetime the tenant allows, in days. */
+	lifetime_days: number;
+	/** The address or IPv6 /64 the request came from: the one field its sender cannot choose. */
+	requester_network: string;
+	approver_address: string;
+	same_network: boolean;
+}
+
+/** The confirmation an approval carries: the password, or the MFA code for an account that has one. */
+export type ApproveStepUp = { password: string } | { mfa_code: string };
+
+export type ApproveBody = { fingerprint: string; lifetime_days: number } & ApproveStepUp;
+
+export interface Settings {
+	allowed: boolean;
+	lifetime_days: number;
+	show_schemas: string[];
+	writes_per_minute: number;
+	/** The most writes a minute the operator lets a tenant allow one connection. */
+	max_writes_per_minute: number;
+	/** Set when a save shortened the lifetime. */
+	note?: string;
+}
+
+/** A settings change names only what it changes, so two owners editing different fields both keep theirs. */
+export type SettingsPatch = Partial<Pick<Settings, 'allowed' | 'lifetime_days' | 'show_schemas' | 'writes_per_minute'>>;
+
+const code = (c: string) => `${CONNECTIONS_URL}/requests/${encodeURIComponent(c)}`;
+
+export function listConnections(client: HttpClient, limit: number, offset: number): Promise<ConnectionList> {
+	return client.get<ConnectionList>(`${CONNECTIONS_URL}?limit=${limit}&offset=${offset}`);
+}
+
+export function getRequest(client: HttpClient, userCode: string): Promise<ConnectionRequest> {
+	return client.get<ConnectionRequest>(code(userCode));
+}
+
+export function approveRequest(
+	client: HttpClient,
+	userCode: string,
+	body: ApproveBody,
+): Promise<{ status: string; expires_at: string }> {
+	return client.post(`${code(userCode)}/approve`, body);
+}
+
+export function declineRequest(client: HttpClient, userCode: string): Promise<{ status: string }> {
+	return client.post(`${code(userCode)}/decline`, {});
+}
+
+/** Revoking twice answers the same, so a second owner's revoke is not an error. */
+export function revokeConnection(client: HttpClient, id: string): Promise<{ status: string }> {
+	return client.post(`${CONNECTIONS_URL}/${encodeURIComponent(id)}/revoke`, {});
+}
+
+/** Ends every current connection of the tenant and declines every waiting request. Owners only. */
+export function revokeAllConnections(client: HttpClient): Promise<{ revoked: number; declined: number }> {
+	return client.post(`${CONNECTIONS_URL}/revoke-all`, {});
+}
+
+export function getSettings(client: HttpClient): Promise<Settings> {
+	return client.get<Settings>(SETTINGS_URL);
+}
+
+export function saveSettings(client: HttpClient, patch: SettingsPatch): Promise<Settings> {
+	return client.put<Settings>(SETTINGS_URL, patch);
+}
+
+/** The engine's refusal of a tenant an operator withheld the plugin from. */
+export const WITHHELD = 'TENANT_FEATURE_WITHHELD';
+
+/** The code a refusal carries, or an empty string for an answer that carries none. */
+export function refusalCode(err: unknown): string {
+	if (!(err instanceof ApiError)) return '';
+	const body = err.body as { code?: unknown } | undefined;
+	return typeof body?.code === 'string' ? body.code : '';
+}
+
+/** The field a refused settings value names. */
+export function refusedField(err: unknown): string {
+	if (!(err instanceof ApiError)) return '';
+	const body = err.body as { field?: unknown } | undefined;
+	return typeof body?.field === 'string' ? body.field : '';
+}
+
+/** A gate, plus a tenant the operator withheld the plugin from, which no role or retry changes. */
+export type ConnectionsGate = Gate | { state: 'withheld' };
+
+/** What a refused read on this page means. */
+export function connectionsGate(err: unknown): ConnectionsGate {
+	if (err instanceof ApiError && err.status === 403 && refusalCode(err) === WITHHELD) return { state: 'withheld' };
+	return gateOf(err, 'The connections could not be loaded.');
+}
+
+/** Schemas a page may show: the builder's own and the engine's are never offered. */
+export function showable(names: readonly string[]): string[] {
+	return names.filter((n) => !n.startsWith('lyeve_site_') && !n.startsWith('sys_'));
+}
+
+/** The lifetimes a person may pick when the tenant allows at most `max` days. */
+export function lifetimesUpTo(max: number): number[] {
+	return LIFETIMES.filter((d) => d <= max);
+}
+
+/** The name a browser gave, cut for a table cell or a drawer line. The full text goes in a title. */
+export function shortLabel(label: string, max = 60): string {
+	const chars = Array.from(label);
+	return chars.length > max ? `${chars.slice(0, max - 3).join('')}...` : label;
+}
+
+/** The status word a reader sees for a connection, and the tone of its dot. */
+export function statusOf(status: string): { label: string; tone: 'success' | 'neutral' | 'danger' | 'warn' } {
+	switch (status) {
+		case 'approved':
+			return { label: 'Active', tone: 'success' };
+		case 'expired':
+			return { label: 'Expired', tone: 'neutral' };
+		case 'revoked':
+			return { label: 'Revoked', tone: 'danger' };
+		case 'declined':
+			return { label: 'Declined', tone: 'neutral' };
+		case 'pending':
+			return { label: 'Waiting', tone: 'warn' };
+		default:
+			return { label: status, tone: 'neutral' };
+	}
+}
+
+/** Who approved a connection, as the Person column shows it. */
+export function personOf(c: Pick<Connection, 'approver_email'>): string {
+	return c.approver_email?.trim() ? c.approver_email : 'Removed person';
+}
+
+/** The sentences the drawer shows, one per outcome the engine can answer. */
+export const SAID = {
+	malformed: 'A code is eight letters and digits from the editor, such as K7F3-A2M9.',
+	unknown: 'No waiting request has this code.',
+	expired: 'This request ran out. Connect again from the editor.',
+	decided: 'This request was already approved or declined.',
+	keyChanged: 'The key changed since you opened this request. Look the code up again.',
+	lifetime: "This engine's owner shortened how long a connection may last. Choose again.",
+	stepUpMissing: 'Enter your password or your MFA code.',
+	approvalUnavailable: 'Approval is unavailable on this engine.',
+	checkUnavailable: 'The engine could not check your answer, so nothing was approved. Try again in a moment.',
+	withheld: 'An administrator of this instance withheld connected editors from this tenant, so nothing was changed.',
+	lookupOutage: 'The engine or its database did not answer, so the request could not be read. Try again in a moment.',
+	approveOutage: 'The engine or its database did not answer, so nothing was approved. Try again in a moment.',
+	declineOutage: 'The engine or its database did not answer, so nothing was declined. Try again in a moment.',
+	revokeOutage: 'The engine or its database did not answer, so nothing was revoked. Try again in a moment.',
+	revokeAllFailed: 'The connections could not be revoked.',
+	settingOutage: 'The engine or its database did not answer, so the setting was not saved. Try again in a moment.',
+} as const;

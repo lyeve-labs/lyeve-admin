@@ -216,6 +216,7 @@ const PRIVACY_PLUGINS: readonly PluginName[] = [PLUGIN.schema, PLUGIN.productAna
 const UNLISTED_PAGES: readonly { href: string; label: string; plugin: PluginName }[] = [
 	{ href: '/admin/settings/mfa', label: 'Two-factor authentication', plugin: PLUGIN.mfa },
 	{ href: '/admin/settings/devices', label: 'Trusted devices', plugin: PLUGIN.deviceFingerprint },
+	{ href: '/admin/settings/connected-editors', label: 'Connected editors', plugin: PLUGIN.siteBuilder },
 	{ href: '/admin/pages', label: 'Pages', plugin: PLUGIN.multitenant },
 ];
 
