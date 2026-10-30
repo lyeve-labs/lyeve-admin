@@ -35,6 +35,7 @@ const PAGES = [
 	'plugins/[name]',
 	'schema',
 	'search',
+	'settings/connected-editors',
 	'settings/oauth',
 	'settings/permissions',
 	'tenants',

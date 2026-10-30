@@ -644,7 +644,7 @@
 				{#if drawer?.approvalUnavailable}
 					<Alert tone="warn">{SAID.approvalUnavailable}</Alert>
 				{:else}
-					<StepUpField id="connected-editors" {mfa} bind:value={secret} error={drawer?.stepUp?.field} />
+					<StepUpField id="connected-editors-step-up" {mfa} bind:value={secret} error={drawer?.stepUp?.field} />
 				{/if}
 
 				{#if drawer?.checkUnavailable}

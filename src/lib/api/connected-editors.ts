@@ -10,6 +10,7 @@
  * up.
  */
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
+import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { gateOf, type Gate } from './gate';
 
 export const CONNECTIONS_URL = '/api/admin/sites/connections';
@@ -158,7 +159,7 @@ export function shortLabel(label: string, max = 60): string {
 }
 
 /** The status word a reader sees for a connection, and the tone of its dot. */
-export function statusOf(status: string): { label: string; tone: 'success' | 'neutral' | 'danger' | 'warn' } {
+export function statusOf(status: string): { label: string; tone: StatusTone } {
 	switch (status) {
 		case 'approved':
 			return { label: 'Active', tone: 'success' };

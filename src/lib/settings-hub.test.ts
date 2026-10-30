@@ -40,6 +40,13 @@ describe('settings hub', () => {
 		expect(groups[0].entries.map((e) => e.href)).toEqual(['/admin/settings/account', '/admin/settings/mfa']);
 	});
 
+	it('lists connected editors only while its plugin runs', () => {
+		const hrefs = (connectedEditors: boolean) =>
+			settingsHub(adminNav(['editor']), { twoFactor: false, trustedDevices: false, connectedEditors })[0].entries.map((e) => e.href);
+		expect(hrefs(true)).toContain('/admin/settings/connected-editors');
+		expect(hrefs(false)).not.toContain('/admin/settings/connected-editors');
+	});
+
 	it('offers a reader only the instance pages their sidebar offers', () => {
 		const editor = settingsHub(adminNav(['editor']), { twoFactor: true, trustedDevices: false });
 		expect(editor.map((g) => g.id)).toEqual(['account', 'apis']);
