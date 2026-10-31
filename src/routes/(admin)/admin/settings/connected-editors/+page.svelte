@@ -493,7 +493,7 @@
 
 							{#if data.schemasFailed}
 								<Alert tone="danger">
-									<p>The schemas could not be read, so the ones pages may show cannot be changed now.</p>
+									<p>The schemas could not be read, so pages keep showing the ones saved before.</p>
 									<div class="mt-3">
 										<Button variant="secondary" size="sm" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>
 											<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again

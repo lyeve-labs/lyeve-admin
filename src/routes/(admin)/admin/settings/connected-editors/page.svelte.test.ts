@@ -505,7 +505,7 @@ describe('the settings card', () => {
 
 	it('draws a failed schema list as a failure, never as none to offer', () => {
 		render(Page, { props: props({ schemas: [], schemasFailed: true }) });
-		expect(said()).toContain('The schemas could not be read, so the ones pages may show cannot be changed now.');
+		expect(said()).toContain('The schemas could not be read, so pages keep showing the ones saved before.');
 		expect(said()).toContain('Try again');
 		expect(said()).not.toContain('Create a schema');
 		// Nothing offered, so a Save clears no stored schema.
