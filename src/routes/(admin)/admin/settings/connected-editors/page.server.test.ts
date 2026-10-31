@@ -368,11 +368,17 @@ describe('setting', () => {
 
 	it.each([
 		[{ field: 'allowed', allowed: 'off' }, { allowed: false }],
-		[{ field: 'lifetime_days', lifetime_days: '30' }, { lifetime_days: 30 }],
-		[{ field: 'writes_per_minute', writes_per_minute: '60' }, { writes_per_minute: 60 }],
-		[{ field: 'show_schemas', show_schemas: ['posts', 'products'] }, { show_schemas: ['posts', 'products'] }],
-		[{ field: 'show_schemas' }, { show_schemas: [] }],
-	])('saves only the one field it names', async (fields, body) => {
+		[
+			{ field: 'limits', lifetime_days: '30', writes_per_minute: '60', schemas_offered: '1', show_schemas: ['posts', 'products'] },
+			{ lifetime_days: 30, writes_per_minute: 60, show_schemas: ['posts', 'products'] },
+		],
+		[
+			{ field: 'limits', lifetime_days: '90', writes_per_minute: '120', schemas_offered: '1' },
+			{ lifetime_days: 90, writes_per_minute: 120, show_schemas: [] },
+		],
+		// A form whose schema list failed to load leaves the schemas as they are.
+		[{ field: 'limits', lifetime_days: '180', writes_per_minute: '10' }, { lifetime_days: 180, writes_per_minute: 10 }],
+	])('saves the switch alone and the other settings together', async (fields, body) => {
 		const { event, calls } = act(fields, { [`PUT ${BASE}/settings`]: json(SETTINGS) });
 		expect(await actions.setting(event)).toMatchObject({ saved: { field: fields.field } });
 		expect(calls).toEqual([{ method: 'PUT', path: `${BASE}/settings`, body }]);
@@ -380,7 +386,7 @@ describe('setting', () => {
 
 	it('lands a refused value on the field the engine names', async () => {
 		const { event } = act(
-			{ field: 'writes_per_minute', writes_per_minute: '100000' },
+			{ field: 'limits', lifetime_days: '90', writes_per_minute: '100000' },
 			{ [`PUT ${BASE}/settings`]: json({ error: 'Writes must be between 1 and 120 a minute.', code: 'settings_invalid', field: 'writes_per_minute' }, 422) },
 		);
 		expect(((await actions.setting(event)) as Failure).data.settingError).toEqual({
@@ -390,10 +396,10 @@ describe('setting', () => {
 	});
 
 	it('refuses a lifetime the engine does not offer without asking it', async () => {
-		const { event, calls } = act({ field: 'lifetime_days', lifetime_days: '45' }, {});
+		const { event, calls } = act({ field: 'limits', lifetime_days: '45', writes_per_minute: '60' }, {});
 		expect(((await actions.setting(event)) as Failure).data.settingError).toEqual({
 			field: 'lifetime_days',
-			message: 'Lasts must be 30, 90 or 180 days.',
+			message: 'Choose 30, 90 or 180 days.',
 		});
 		expect(calls).toEqual([]);
 	});

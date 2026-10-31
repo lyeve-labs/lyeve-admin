@@ -183,16 +183,16 @@ export function personOf(c: Pick<Connection, 'approver_email'>): string {
 
 /** The sentences the drawer shows, one per outcome the engine can answer. */
 export const SAID = {
-	malformed: 'A code is eight letters and digits from the editor, such as K7F3-A2M9.',
+	malformed: 'A code is eight letters and digits from the builder, such as K7F3-A2M9.',
 	unknown: 'No waiting request has this code.',
-	expired: 'This request ran out. Connect again from the editor.',
+	expired: 'This request ran out. Connect again from the builder.',
 	decided: 'This request was already approved or declined.',
 	keyChanged: 'The key changed since you opened this request. Look the code up again.',
-	lifetime: "This engine's owner shortened how long a connection may last. Choose again.",
+	lifetime: 'An administrator of this engine shortened how long a connection may last. Choose again.',
 	stepUpMissing: 'Enter your password or your MFA code.',
 	approvalUnavailable: 'Approval is unavailable on this engine.',
 	checkUnavailable: 'The engine could not check your answer, so nothing was approved. Try again in a moment.',
-	withheld: 'An administrator of this instance withheld connected editors from this tenant, so nothing was changed.',
+	withheld: 'An administrator of this engine withheld builder connections from this tenant, so nothing was changed.',
 	lookupOutage: 'The engine or its database did not answer, so the request could not be read. Try again in a moment.',
 	approveOutage: 'The engine or its database did not answer, so nothing was approved. Try again in a moment.',
 	declineOutage: 'The engine or its database did not answer, so nothing was declined. Try again in a moment.',

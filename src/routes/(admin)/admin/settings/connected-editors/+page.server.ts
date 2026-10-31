@@ -176,19 +176,22 @@ function setting(form: FormData): { field: string; patch?: SettingsPatch; error?
 			if (v !== 'on' && v !== 'off') return { field, error: 'Choose On or Off.' };
 			return { field, patch: { allowed: v === 'on' } };
 		}
-		case 'lifetime_days': {
-			const v = Number(form.get('lifetime_days'));
-			if (!(LIFETIMES as readonly number[]).includes(v)) return { field, error: 'Lasts must be 30, 90 or 180 days.' };
-			return { field, patch: { lifetime_days: v } };
-		}
-		case 'writes_per_minute': {
+		// Everything but the switch saves together. A refusal names the field it lands on.
+		case 'limits': {
+			const lifetime = Number(form.get('lifetime_days'));
+			if (!(LIFETIMES as readonly number[]).includes(lifetime)) {
+				return { field: 'lifetime_days', error: 'Choose 30, 90 or 180 days.' };
+			}
 			const raw = String(form.get('writes_per_minute') ?? '').trim();
-			const v = Number(raw);
-			if (!raw || !Number.isInteger(v)) return { field, error: 'Writes must be a whole number a minute.' };
-			return { field, patch: { writes_per_minute: v } };
+			const writes = Number(raw);
+			if (!raw || !Number.isInteger(writes)) {
+				return { field: 'writes_per_minute', error: 'Writes must be a whole number a minute.' };
+			}
+			const patch: SettingsPatch = { lifetime_days: lifetime, writes_per_minute: writes };
+			// A form whose schema list failed to load offered none, and must not clear them.
+			if (form.get('schemas_offered')) patch.show_schemas = form.getAll('show_schemas').map(String).filter(Boolean);
+			return { field, patch };
 		}
-		case 'show_schemas':
-			return { field, patch: { show_schemas: form.getAll('show_schemas').map(String).filter(Boolean) } };
 		default:
 			return { field: '', error: 'No setting was named.' };
 	}

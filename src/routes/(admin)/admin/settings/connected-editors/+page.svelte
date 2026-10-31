@@ -23,6 +23,7 @@
 		SegmentedControl,
 		Skeleton,
 		Table,
+		Toggle,
 		confirm,
 	} from '@lyeve-labs/ui-kit';
 	import { Link2, RefreshCw } from '@lucide/svelte';
@@ -191,7 +192,7 @@
 	};
 
 	const revokeAll = tracked(
-		confirmed('Revoke every editor connection on this tenant?', 'Every connected browser stops editing at once.', {
+		confirmed('Revoke every builder connection on this tenant?', 'Every connected browser stops editing at once.', {
 			confirmLabel: 'Revoke all',
 			cancelLabel: 'Cancel',
 		}),
@@ -199,7 +200,7 @@
 
 	function revokeOne(c: Connection): SubmitFunction {
 		return confirmed(
-			`Revoke ${personOf(c)}'s editor connection?`,
+			`Revoke ${personOf(c)}'s builder connection?`,
 			'That browser stops editing at once.',
 			{ confirmLabel: 'Revoke' },
 		);
@@ -216,26 +217,25 @@
 	const settingError = $derived(answer.settingError ?? null);
 	const savedField = $derived(answer.saved?.field ?? '');
 
-	let allowedPick = $derived(settings?.allowed ? 'on' : 'off');
+	let allowedOn = $derived(settings?.allowed ?? false);
 	let lifetimeSetting = $derived(String(settings?.lifetime_days ?? 90));
 	let writes = $derived(settings?.writes_per_minute ?? 120);
 	// A schema allowed earlier and deleted since is not offered, so the next save drops it.
 	let shown = $derived((settings?.show_schemas ?? []).filter((s) => data.schemas.includes(s)));
 
 	let allowedForm = $state<HTMLFormElement | null>(null);
-	let lifetimeForm = $state<HTMLFormElement | null>(null);
 	const saveAllowed = tracked(() => {});
-	const saveLifetime = tracked(() => {});
-	const saveSchemas = tracked(() => {});
-	const saveWrites = tracked(() => {});
+	const saveLimits = tracked(() => {});
 
-	async function allowedChanged(v: string) {
-		if (v === 'off' && settings?.allowed) {
+	// The switch applies at once, so it sits in a card of its own. Everything
+	// else in the settings saves together under one Save.
+	async function allowedChanged(on: boolean) {
+		if (!on && settings?.allowed) {
 			const ok = await confirm('Turn off the site builder?', 'Every connected browser stops saving at once.', {
 				confirmLabel: 'Turn off',
 			});
 			if (!ok) {
-				allowedPick = 'on';
+				allowedOn = true;
 				return;
 			}
 		}
@@ -243,16 +243,16 @@
 		allowedForm?.requestSubmit();
 	}
 
-	async function lifetimeChanged() {
-		await tick();
-		lifetimeForm?.requestSubmit();
-	}
-
 	function errorOn(field: string): string | undefined {
 		return settingError?.field === field ? settingError.message : undefined;
 	}
 
 	const schemaOptions = $derived(data.schemas.map((s) => ({ value: s, label: s })));
+
+	/** Why Approve cannot be pressed, said beside it. Approval being unavailable has its own alert above. */
+	const approveBlocked = $derived(
+		!request ? 'Enter the code from the builder to find its request.' : !online ? 'You are offline.' : '',
+	);
 </script>
 
 {#snippet keyDetail()}
@@ -276,7 +276,7 @@
 {/snippet}
 
 <PageShell
-	title="Connected editors"
+	title="Builder connections"
 	description="Browsers you allowed to edit pages from the site builder, and a way to revoke them."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
@@ -288,11 +288,11 @@
 	{#if data.gate.state === 'withheld'}
 		<NotEnabled
 			level={2}
-			title="Connected editors"
-			description="An administrator of this instance withheld connected editors from this tenant. Ask them to make it available again."
+			title="Builder connections"
+			description="An administrator of this engine withheld builder connections from this tenant. Ask them to make them available again."
 		/>
 	{:else if data.gate.state !== 'ok'}
-		<GateNotice level={2} gate={data.gate} title="Connected editors" absent="Connected editors are not available on this engine." />
+		<GateNotice level={2} gate={data.gate} title="Builder connections" absent="Builder connections are not available on this engine." />
 	{:else}
 		{#if answer.approved}
 			<Alert tone="success" autoDismiss>Approved. That browser can edit pages now.</Alert>
@@ -350,7 +350,7 @@
 			{:else if data.connections.length === 0}
 				<EmptyState
 					level={2}
-					title="No editor connections yet"
+					title="No builder connections yet"
 					description="A person connects from the site builder, then approves here with the code it shows."
 				>
 					{#snippet iconSnippet()}
@@ -358,7 +358,7 @@
 					{/snippet}
 				</EmptyState>
 			{:else}
-				<Table label="Connected editors">
+				<Table label="Builder connections">
 					<thead>
 						<tr>
 							<th scope="col">Person</th>
@@ -446,56 +446,57 @@
 					</Card>
 				{:else if settings}
 					<Card>
-						<div class="flex flex-col gap-6">
+						<form bind:this={allowedForm} method="POST" action="?/setting" use:enhance={saveAllowed.enhance} class="flex flex-col gap-4">
+							<input type="hidden" name="field" value="allowed" />
+							<input type="hidden" name="allowed" value={allowedOn ? 'on' : 'off'} />
 							{#if !settings.allowed}
 								<Alert tone="warn">The site builder is off. Connected browsers cannot save.</Alert>
 							{/if}
-							{#if answer.saved}
+							{#if savedField === 'allowed'}
+								<Alert tone="success" autoDismiss>Saved.</Alert>
+							{/if}
+							<Toggle
+								label="Allow the site builder"
+								hint="Applies at once. When it is off, connected browsers cannot save."
+								bind:checked={allowedOn}
+								disabled={saveAllowed.pending || !online}
+								onchange={allowedChanged}
+							/>
+							{#if errorOn('allowed')}
+								<Alert tone="danger">{errorOn('allowed')}</Alert>
+							{/if}
+						</form>
+					</Card>
+
+					<Card>
+						<form method="POST" action="?/setting" use:enhance={saveLimits.enhance} class="flex flex-col items-start gap-6">
+							<input type="hidden" name="field" value="limits" />
+							{#if savedField === 'limits'}
 								<Alert tone="success" autoDismiss>Saved.</Alert>
 							{/if}
 							{#if answer.saved?.settings.note}
 								<Alert tone="brand">{answer.saved.settings.note}</Alert>
 							{/if}
 
-							<form bind:this={allowedForm} method="POST" action="?/setting" use:enhance={saveAllowed.enhance}>
-								<input type="hidden" name="field" value="allowed" />
-								<SegmentedControl
-									label="Allowed"
-									name="allowed"
-									bind:value={allowedPick}
-									options={[
-										{ value: 'on', label: 'On' },
-										{ value: 'off', label: 'Off' },
-									]}
-									disabled={saveAllowed.pending || !online}
-									error={errorOn('allowed')}
-									onchange={allowedChanged}
-								/>
-							</form>
+							<SegmentedControl
+								label="Valid for"
+								name="lifetime_days"
+								bind:value={lifetimeSetting}
+								options={[
+									{ value: '30', label: '30 days' },
+									{ value: '90', label: '90 days' },
+									{ value: '180', label: '180 days' },
+								]}
+								hint="For connections approved from now on."
+								error={errorOn('lifetime_days')}
+							/>
 
-							<form bind:this={lifetimeForm} method="POST" action="?/setting" use:enhance={saveLifetime.enhance}>
-								<input type="hidden" name="field" value="lifetime_days" />
-								<SegmentedControl
-									label="Lasts"
-									name="lifetime_days"
-									bind:value={lifetimeSetting}
-									options={[
-										{ value: '30', label: '30 days' },
-										{ value: '90', label: '90 days' },
-										{ value: '180', label: '180 days' },
-									]}
-									hint="For connections approved from now on."
-									disabled={saveLifetime.pending || !online}
-									error={errorOn('lifetime_days')}
-									onchange={lifetimeChanged}
-								/>
-							</form>
-
-							<form method="POST" action="?/setting" use:enhance={saveSchemas.enhance} class="flex flex-col items-start gap-3">
-								<input type="hidden" name="field" value="show_schemas" />
-								{#if data.schemas.length === 0}
-									<p class="text-sm text-muted">No schema of yours can be shown on pages yet.</p>
-								{:else if data.schemas.length <= 12}
+							{#if data.schemas.length === 0}
+								<p class="text-sm text-muted">Create a schema to show its entries on pages.</p>
+							{:else}
+								<!-- Only a form that offered the schemas saves them, so a schema list that failed to load clears nothing. -->
+								<input type="hidden" name="schemas_offered" value="1" />
+								{#if data.schemas.length <= 12}
 									<CheckboxGroup
 										label="Pages may show"
 										name="show_schemas"
@@ -519,34 +520,25 @@
 										<input type="hidden" name="show_schemas" value={name} />
 									{/each}
 								{/if}
-								{#if data.schemas.length > 0}
-									<Button variant="secondary" size="sm" type="submit" loading={saveSchemas.pending} disabled={!online}>
-										Save
-									</Button>
-								{/if}
-							</form>
+							{/if}
 
-							<form method="POST" action="?/setting" use:enhance={saveWrites.enhance} class="flex flex-col items-start gap-3">
-								<input type="hidden" name="field" value="writes_per_minute" />
-								<NumberInput
-									id="writes-per-minute"
-									name="writes_per_minute"
-									label="Writes a minute for each connection"
-									bind:value={writes}
-									min={1}
-									max={settings.max_writes_per_minute}
-									hint="Each engine replica counts on its own."
-									error={errorOn('writes_per_minute')}
-								/>
-								<Button variant="secondary" size="sm" type="submit" loading={saveWrites.pending} disabled={!online}>
-									Save
-								</Button>
-							</form>
+							<NumberInput
+								id="writes-per-minute"
+								name="writes_per_minute"
+								label="Writes a minute for each connection"
+								bind:value={writes}
+								min={1}
+								max={settings.max_writes_per_minute}
+								hint="Past this, the builder waits a moment and saves again."
+								error={errorOn('writes_per_minute')}
+							/>
 
 							{#if settingError && !['allowed', 'lifetime_days', 'show_schemas', 'writes_per_minute'].includes(settingError.field)}
 								<Alert tone="danger">{settingError.message}</Alert>
 							{/if}
-						</div>
+
+							<Button variant="primary" type="submit" loading={saveLimits.pending} disabled={!online}>Save</Button>
+						</form>
 					</Card>
 				{/if}
 			</section>
@@ -634,7 +626,7 @@
 				/>
 
 				<SegmentedControl
-					label="Lasts"
+					label="Valid for"
 					name="lifetime_days"
 					value={lifetime}
 					options={lifetimes.map((d) => ({ value: String(d), label: `${d} days` }))}
@@ -658,7 +650,11 @@
 					</Alert>
 				{/if}
 
-				<div class="flex justify-end gap-2">
+				<div class="flex flex-wrap items-center justify-end gap-2">
+					{#if approveBlocked}
+						<span id="approve-blocked" class="text-sm text-muted">{approveBlocked}</span>
+					{/if}
+					<Button variant="ghost" onclick={close}>Cancel</Button>
 					<Button
 						variant="secondary"
 						type="submit"
@@ -669,14 +665,22 @@
 					>
 						Decline
 					</Button>
-					<Button variant="primary" type="submit" loading={pending === 'approve'} disabled={!approveReady}>
+					<Button
+						variant="primary"
+						type="submit"
+						loading={pending === 'approve'}
+						disabled={!approveReady}
+						aria-describedby={approveBlocked ? 'approve-blocked' : undefined}
+					>
 						Approve
 					</Button>
 				</div>
 			</form>
 		{:else}
-			<div class="flex justify-end">
-				<Button variant="primary" type="button" disabled>Approve</Button>
+			<div class="flex flex-wrap items-center justify-end gap-2">
+				<span id="approve-blocked" class="text-sm text-muted">{approveBlocked}</span>
+				<Button variant="ghost" onclick={close}>Cancel</Button>
+				<Button variant="primary" type="button" disabled aria-describedby="approve-blocked">Approve</Button>
 			</div>
 		{/if}
 	</div>

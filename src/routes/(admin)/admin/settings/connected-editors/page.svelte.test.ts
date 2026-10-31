@@ -102,7 +102,7 @@ async function frames() {
 describe('the list', () => {
 	it('shows the first-run words when no connection exists', () => {
 		render(Page, { props: props({ connections: [], total: 0 }) });
-		expect(said()).toContain('No editor connections yet');
+		expect(said()).toContain('No builder connections yet');
 		expect(said()).toContain('A person connects from the site builder, then approves here with the code it shows.');
 	});
 
@@ -150,16 +150,16 @@ describe('the gates', () => {
 		[{ state: 'error', message: 'The connections could not be loaded.' }, 'The connections could not be loaded.'],
 		[
 			{ state: 'unavailable' },
-			'The engine or its database did not answer, so connected editors could not be read. Nothing was changed. Try again in a moment.',
+			'The engine or its database did not answer, so builder connections could not be read. Nothing was changed. Try again in a moment.',
 		],
 		[{ state: 'busy' }, 'Too many requests'],
-		[{ state: 'absent' }, 'Connected editors are not available on this engine.'],
-		[{ state: 'forbidden' }, 'Your role cannot open connected editors.'],
-		[{ state: 'withheld' }, 'withheld connected editors from this tenant'],
+		[{ state: 'absent' }, 'Builder connections are not available on this engine.'],
+		[{ state: 'forbidden' }, 'Your role cannot open builder connections.'],
+		[{ state: 'withheld' }, 'withheld builder connections from this tenant'],
 	])('draws a refused read as its gate, never as an empty list', (gate, words) => {
 		render(Page, { props: props({ gate, connections: [] }) });
 		expect(said()).toContain(words);
-		expect(said()).not.toContain('No editor connections yet');
+		expect(said()).not.toContain('No builder connections yet');
 	});
 
 	it('offers Try again on a gate a retry can change', () => {
@@ -179,7 +179,7 @@ describe('revoking', () => {
 		const cancel = vi.fn();
 		await (forms.submits.get('?/revoke') as Submit)({ cancel, action: new URL('http://a/?/revoke') });
 		expect(kit.confirm).toHaveBeenCalledWith(
-			"Revoke tom@example.com's editor connection?",
+			"Revoke tom@example.com's builder connection?",
 			'That browser stops editing at once.',
 			{ confirmLabel: 'Revoke' },
 		);
@@ -220,7 +220,7 @@ describe('revoke all', () => {
 		const cancel = vi.fn();
 		await (forms.submits.get('?/revokeAll') as Submit)({ cancel, action: new URL('http://a/?/revokeAll') });
 		expect(kit.confirm).toHaveBeenCalledWith(
-			'Revoke every editor connection on this tenant?',
+			'Revoke every builder connection on this tenant?',
 			'Every connected browser stops editing at once.',
 			{ confirmLabel: 'Revoke all', cancelLabel: 'Cancel' },
 		);
@@ -266,6 +266,32 @@ describe('the approve drawer', () => {
 		);
 		expect(approve().disabled).toBe(true);
 		await waitFor(() => expect(document.activeElement?.id).toBe('connected-editors-code'));
+	});
+
+	it('says beside a disabled Approve what it waits for', async () => {
+		render(Page, { props: props({ openApprove: true }) });
+		await tick();
+		const reason = 'Enter the code from the builder to find its request.';
+		expect(said()).toContain(reason);
+		expect(document.getElementById(approve().getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason);
+		cleanup();
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
+		await tick();
+		expect(approve().getAttribute('aria-describedby')).toBeNull();
+		window.dispatchEvent(new Event('offline'));
+		await tick();
+		expect(approve().disabled).toBe(true);
+		expect(document.getElementById(approve().getAttribute('aria-describedby') ?? '')?.textContent).toBe('You are offline.');
+		window.dispatchEvent(new Event('online'));
+	});
+
+	it('closes on Cancel without deciding anything', async () => {
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
+		await tick();
+		const cancel = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Cancel') as HTMLButtonElement;
+		expect(cancel.getAttribute('type')).toBe('button');
+		await fireEvent.click(cancel);
+		await waitFor(() => expect(said()).not.toContain('3FA2:9C11:5B07:E48D'));
 	});
 
 	it('shows the request a lookup found and lets the person approve', async () => {
@@ -331,7 +357,7 @@ describe('the approve drawer', () => {
 	it('asks for the lifetime again after an owner shortened it', async () => {
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', lifetimeChanged: true, request: { ...REQUEST, lifetime_days: 30 } } }) });
 		await tick();
-		expect(said()).toContain("This engine's owner shortened how long a connection may last. Choose again.");
+		expect(said()).toContain(SAID.lifetime);
 	});
 
 	it('puts a refused confirmation on the field', async () => {
@@ -418,10 +444,26 @@ describe('the settings card', () => {
 		expect(live).toBe(false);
 	});
 
-	it('asks before it turns the builder off', async () => {
+	const allowSwitch = () => document.querySelector('[role="switch"]') as HTMLButtonElement;
+
+	it('switches the builder with a Toggle that applies at once', async () => {
+		const submit = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(() => {});
+		render(Page, { props: props({ settings: { ok: true, value: { ...SETTINGS, allowed: false } } }) });
+		expect(allowSwitch().getAttribute('aria-label')).toBe('Allow the site builder');
+		expect(allowSwitch().getAttribute('aria-checked')).toBe('false');
+		await fireEvent.click(allowSwitch());
+		await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+		const form = submit.mock.contexts[0] as HTMLFormElement;
+		expect(new FormData(form).get('allowed')).toBe('on');
+		// Turning it on asks nothing.
+		expect(kit.confirm).not.toHaveBeenCalled();
+		submit.mockRestore();
+	});
+
+	it('asks before it turns the builder off, and stays on when the person says no', async () => {
+		const submit = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(() => {});
 		render(Page, { props: props() });
-		const off = [...document.querySelectorAll('[role="radio"]')].find((r) => r.textContent?.includes('Off')) as HTMLElement;
-		await fireEvent.click(off);
+		await fireEvent.click(allowSwitch());
 		await waitFor(() =>
 			expect(kit.confirm).toHaveBeenCalledWith(
 				'Turn off the site builder?',
@@ -429,12 +471,39 @@ describe('the settings card', () => {
 				{ confirmLabel: 'Turn off' },
 			),
 		);
+		await tick();
+		expect(allowSwitch().getAttribute('aria-checked')).toBe('true');
+		expect(submit).not.toHaveBeenCalled();
+		submit.mockRestore();
 	});
 
-	it('says a lifetime applies to connections approved from now on', () => {
+	it('saves the other settings together under one Save', () => {
 		render(Page, { props: props() });
+		const cards = [...document.querySelectorAll('form[action="?/setting"]')];
+		expect(cards).toHaveLength(2);
+		const limits = cards.find((f) => f.querySelector('input[name="field"][value="limits"]')) as HTMLFormElement;
+		expect(limits.querySelector('[name="lifetime_days"]')).not.toBeNull();
+		expect(limits.querySelector('#writes-per-minute')).not.toBeNull();
+		expect(limits.querySelector('input[name="schemas_offered"]')).not.toBeNull();
+		const saves = [...limits.querySelectorAll('button[type="submit"]')].map((b) => b.textContent?.trim());
+		expect(saves).toEqual(['Save']);
+		// The switch saves itself, so its card has no Save at all.
+		const allowed = cards.find((f) => f !== limits) as HTMLFormElement;
+		expect(allowed.querySelector('button[type="submit"]')).toBeNull();
+	});
+
+	it('names the lifetime and the write limit in plain words', () => {
+		render(Page, { props: props() });
+		expect(said()).toContain('Valid for');
+		expect(said()).not.toContain('Lasts');
 		expect(said()).toContain('For connections approved from now on.');
-		expect(said()).toContain('Each engine replica counts on its own.');
+		expect(said()).toContain('Past this, the builder waits a moment and saves again.');
+	});
+
+	it('says how to offer a schema when there is none', () => {
+		render(Page, { props: props({ schemas: [] }) });
+		expect(said()).toContain('Create a schema to show its entries on pages.');
+		expect(document.querySelector('input[name="schemas_offered"]')).toBeNull();
 	});
 
 	it('drops a schema that no longer exists', () => {
@@ -445,7 +514,7 @@ describe('the settings card', () => {
 	});
 
 	it('says a setting saved, and lets the words clear themselves', async () => {
-		render(Page, { props: props({}, { saved: { field: 'writes_per_minute', settings: SETTINGS } }) });
+		render(Page, { props: props({}, { saved: { field: 'limits', settings: SETTINGS } }) });
 		await frames();
 		expect(said()).toContain('Saved.');
 	});
