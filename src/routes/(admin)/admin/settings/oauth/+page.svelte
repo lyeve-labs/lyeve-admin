@@ -80,7 +80,7 @@
 	let scopes = $state('');
 	let rolesClaim = $state('');
 	let defaultRoles = $state('');
-	let enabled = $state(true);
+	let enabled = $state(false);
 
 	function openCreate() {
 		editing = null;
@@ -91,7 +91,7 @@
 		scopes = 'openid, email, profile';
 		rolesClaim = 'roles';
 		defaultRoles = 'editor';
-		enabled = true;
+		enabled = false;
 		openedOver = form;
 		open = true;
 	}
