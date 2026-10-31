@@ -66,6 +66,7 @@ export const load: PageServerLoad = async (event) => {
 			mfaEnrolled: false,
 			settings: null as Section<Settings> | null,
 			schemas: [] as string[],
+			schemasFailed: false,
 		};
 	}
 
@@ -79,7 +80,13 @@ export const load: PageServerLoad = async (event) => {
 	// The settings route answers owners only, so nobody else asks and no 403
 	// from it reaches the page.
 	const settings = owner ? section(getSettings(client), 'The site builder settings could not be read.') : null;
-	const schemas = owner ? listSchemaNames(client).catch(() => [] as string[]) : Promise.resolve([] as string[]);
+	// A failed schema read is said as a failure, never offered as no schemas.
+	const schemas = owner
+		? listSchemaNames(client).then(
+				(names) => ({ names, failed: false }),
+				() => ({ names: [] as string[], failed: true }),
+			)
+		: Promise.resolve({ names: [] as string[], failed: false });
 
 	let connections: Connection[] = [];
 	let total: number | null = null;
@@ -98,6 +105,7 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
+	const schemaList = await schemas;
 	return {
 		...base,
 		connections,
@@ -106,7 +114,8 @@ export const load: PageServerLoad = async (event) => {
 		gate,
 		mfaEnrolled: await mfa,
 		settings: settings ? await settings : null,
-		schemas: showable(await schemas),
+		schemas: showable(schemaList.names),
+		schemasFailed: schemaList.failed,
 	};
 };
 

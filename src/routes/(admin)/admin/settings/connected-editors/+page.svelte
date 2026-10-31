@@ -2,7 +2,7 @@
 	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { navigating } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import {
 		Alert,
@@ -289,7 +289,7 @@
 		<NotEnabled
 			level={2}
 			title="Builder connections"
-			description="An administrator of this engine withheld builder connections from this tenant. Ask them to make them available again."
+			description="An administrator of this engine withheld builder connections from this tenant. Ask them to make builder connections available again."
 		/>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice level={2} gate={data.gate} title="Builder connections" absent="Builder connections are not available on this engine." />
@@ -491,7 +491,16 @@
 								error={errorOn('lifetime_days')}
 							/>
 
-							{#if data.schemas.length === 0}
+							{#if data.schemasFailed}
+								<Alert tone="danger">
+									<p>The schemas could not be read, so the ones pages may show cannot be changed now.</p>
+									<div class="mt-3">
+										<Button variant="secondary" size="sm" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>
+											<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again
+										</Button>
+									</div>
+								</Alert>
+							{:else if data.schemas.length === 0}
 								<p class="text-sm text-muted">Create a schema to show its entries on pages.</p>
 							{:else}
 								<!-- Only a form that offered the schemas saves them, so a schema list that failed to load clears nothing. -->

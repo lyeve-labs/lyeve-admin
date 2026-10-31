@@ -86,6 +86,7 @@ describe('connected editors load', () => {
 		expect(out.connections).toEqual([CONNECTION]);
 		expect(out.settings).toEqual({ ok: true, value: SETTINGS });
 		expect(out.schemas).toEqual(['posts', 'products']);
+		expect(out.schemasFailed).toBe(false);
 		expect(out.owner).toBe(true);
 		expect(calls.map((c) => c.path)).toContain(`${BASE}/connections?limit=50&offset=0`);
 	});
@@ -111,6 +112,13 @@ describe('connected editors load', () => {
 		const out = (await load(event)) as { gate: unknown; connections: unknown[] };
 		expect(out.gate).toEqual(gate);
 		expect(out.connections).toEqual([]);
+	});
+
+	it('says the schema list failed rather than reading it as empty', async () => {
+		const { event } = loadEvent({ ...LISTED, 'GET /api/admin/schemas': refusal(503, 'store_unavailable') });
+		const out = (await load(event)) as { schemas: unknown; schemasFailed: unknown };
+		expect(out.schemas).toEqual([]);
+		expect(out.schemasFailed).toBe(true);
 	});
 
 	it('keeps a refused settings read beside a list that answered', async () => {

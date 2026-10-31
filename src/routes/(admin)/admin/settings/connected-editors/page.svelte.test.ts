@@ -155,7 +155,10 @@ describe('the gates', () => {
 		[{ state: 'busy' }, 'Too many requests'],
 		[{ state: 'absent' }, 'Builder connections are not available on this engine.'],
 		[{ state: 'forbidden' }, 'Your role cannot open builder connections.'],
-		[{ state: 'withheld' }, 'withheld builder connections from this tenant'],
+		[
+			{ state: 'withheld' },
+			'An administrator of this engine withheld builder connections from this tenant. Ask them to make builder connections available again.',
+		],
 	])('draws a refused read as its gate, never as an empty list', (gate, words) => {
 		render(Page, { props: props({ gate, connections: [] }) });
 		expect(said()).toContain(words);
@@ -498,6 +501,15 @@ describe('the settings card', () => {
 		expect(said()).not.toContain('Lasts');
 		expect(said()).toContain('For connections approved from now on.');
 		expect(said()).toContain('Past this, the builder waits a moment and saves again.');
+	});
+
+	it('draws a failed schema list as a failure, never as none to offer', () => {
+		render(Page, { props: props({ schemas: [], schemasFailed: true }) });
+		expect(said()).toContain('The schemas could not be read, so the ones pages may show cannot be changed now.');
+		expect(said()).toContain('Try again');
+		expect(said()).not.toContain('Create a schema');
+		// Nothing offered, so a Save clears no stored schema.
+		expect(document.querySelector('input[name="schemas_offered"]')).toBeNull();
 	});
 
 	it('says how to offer a schema when there is none', () => {
