@@ -50,6 +50,15 @@ describe('OAuth providers page', () => {
 		expect(queryByRole('button', { name: 'New provider' })).toBeNull();
 	});
 
+	it('opens a new provider with Enabled off, and an edit with the provider\'s own value', async () => {
+		const { getByRole } = setup([provider('google')]);
+		const enabledField = () => document.body.querySelector<HTMLInputElement>('form#provider-form input[name="enabled"]')?.value;
+		await fireEvent.click(getByRole('button', { name: 'New provider' }));
+		expect(enabledField()).toBe('false');
+		await fireEvent.click(getByRole('button', { name: 'Edit google' }));
+		expect(enabledField()).toBe('true');
+	});
+
 	const drawerText = () => document.body.querySelector('form#provider-form')?.textContent ?? '';
 
 	it('shows a refused save inside the open drawer', async () => {
