@@ -256,10 +256,10 @@ describe('approve', () => {
 	});
 
 	it('lands a lockout on the field with its own words, never the busy ones', async () => {
-		const { event } = approveWith(refusal(429, 'step_up_refused', 'Too many wrong answers. Try again later.'));
+		const { event } = approveWith(refusal(429, 'step_up_refused', 'Too many wrong answers. Wait 15 minutes, then try again.'));
 		const out = (await actions.approve(event)) as Failure;
 		expect(out.status).toBe(429);
-		expect(out.data.drawer).toMatchObject({ stepUp: { field: 'Too many wrong answers. Try again later.' } });
+		expect(out.data.drawer).toMatchObject({ stepUp: { field: 'Too many wrong answers. Wait 15 minutes, then try again.' } });
 	});
 
 	it('says approval is unavailable on an engine without the step-up', async () => {
