@@ -10,10 +10,11 @@ vi.mock('$app/environment', () => env);
 import { handle } from './hooks.server';
 import { resetSetupGateCache } from '$lib/server/setup-gate';
 import { authedHeaders } from '$lib/server/authz';
+import { actions as magicLink } from './routes/auth/magic-link/verify/+page.server';
 // SvelteKit's own request cookie jar, so a cookie set in handle is read back
 // the way a load reads it.
 // @ts-expect-error SvelteKit ships this module without type declarations.
-import { get_cookies } from '../node_modules/@sveltejs/kit/src/runtime/server/cookie.js';
+import { add_cookies_to_headers, get_cookies } from '../node_modules/@sveltejs/kit/src/runtime/server/cookie.js';
 
 // helpers
 
@@ -34,7 +35,7 @@ function stubEvent(path = '/', fetch = engineAnswering({ setup_required: false }
 		fetch,
 		url: new URL(`http://localhost${path}`),
 		request: new Request('http://localhost/'),
-		cookies: { get: (name: string) => (name === 'sys_session' ? session : undefined) } as never,
+		cookies: { get: (name: string) => (name === 'sys_session' ? session : undefined), set: () => {} } as never,
 		locals: {},
 		params: {},
 		route: { id: null },
@@ -216,5 +217,138 @@ describe('a session close to expiry is renewed before the page loads', () => {
 
 		expect(fetch).toHaveBeenCalledWith('/api/admin/auth/refresh', expect.anything());
 		expect(seen).toBe(`Bearer ${renewed}`);
+	});
+});
+
+/** The cookies SvelteKit has set during a request, as one Set-Cookie line each. */
+interface Jar {
+	cookies: unknown;
+	new_cookies: Map<string, { name: string; value: string; options: { maxAge?: number } }>;
+	get_cookie_header(destination: URL, header: string | null): string;
+	set_trailing_slash(mode: string): void;
+}
+
+function setCookieLines(jar: Jar): string[] {
+	const headers = new Headers();
+	add_cookies_to_headers(headers, jar.new_cookies.values());
+	return headers.getSetCookie();
+}
+
+/**
+ * The engine's double-submit check on a write, as its CSRF middleware reads
+ * it: with a session cookie present, the CSRF cookie (prefixed name first) and
+ * the X-CSRF-Token header are both set and equal.
+ */
+function engineAcceptsWrite(cookieHeader: string, headers: Record<string, string>): boolean {
+	const sent = new Map(
+		cookieHeader
+			.split(';')
+			.map((pair) => pair.trim().split('='))
+			.filter(([name]) => name)
+			.map(([name, ...value]) => [name, value.join('=')])
+	);
+	if (!sent.get('__Host-sys_session') && !sent.get('sys_session')) return true;
+	const cookie = sent.get('__Host-csrf') || sent.get('csrf');
+	const header = headers['X-CSRF-Token']?.trim();
+	return !!cookie && !!header && cookie === header;
+}
+
+/**
+ * One console request through handle whose load sends a write to the engine.
+ * Returns what the engine would read: the cookie header SvelteKit forwards on
+ * a same-origin call, and the headers the console sets.
+ */
+async function consoleWrite(url: URL, cookieHeader: string) {
+	resetSetupGateCache();
+	const jar = get_cookies(new Request(url, { headers: { cookie: cookieHeader } }), url) as Jar;
+	jar.set_trailing_slash('never');
+	const event = { ...stubEvent(url.pathname), url, request: new Request(url), cookies: jar.cookies, getClientAddress: () => '203.0.113.7' };
+	let sent = { cookie: '', headers: {} as Record<string, string> };
+	const resolve = vi.fn(async (e: unknown) => {
+		const write = new URL('/api/admin/schemas/posts', url);
+		sent = { cookie: jar.get_cookie_header(write, null), headers: authedHeaders(e as never) };
+		return new Response('ok');
+	});
+	await handle({ event: event as never, resolve });
+	return { ...sent, setCookie: setCookieLines(jar) };
+}
+
+const part = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
+const sessionJwt = () => `${part({ alg: 'HS256' })}.${part({ sub: 'u', exp: Math.floor(Date.now() / 1000) + 900 })}.s`;
+
+describe('a session the engine opened without a CSRF cookie', () => {
+	it('can write after a sign-in by emailed link', async () => {
+		// The sign-in itself, through the console's own action and cookie jar.
+		const signInUrl = new URL('http://localhost/auth/magic-link/verify');
+		const signIn = get_cookies(new Request(signInUrl), signInUrl) as Jar;
+		signIn.set_trailing_slash('never');
+		const form = new FormData();
+		form.set('token', 'link-token');
+		const engine = vi.fn(async () =>
+			new Response(JSON.stringify({ access_token: sessionJwt(), user_id: 'u1', email: 'a@b.co' }), {
+				status: 200,
+				headers: { 'content-type': 'application/json' },
+			})
+		);
+		await expect(
+			magicLink.verify({
+				url: signInUrl,
+				cookies: signIn.cookies,
+				fetch: engine,
+				request: { formData: () => Promise.resolve(form) },
+				getClientAddress: () => '203.0.113.7',
+			} as never)
+		).rejects.toMatchObject({ status: 303 });
+
+		// The browser's next request carries what the sign-in left it.
+		const kept = [...signIn.new_cookies.values()].filter((c) => c.options.maxAge !== 0);
+		expect(kept.map((c) => c.name)).toEqual(['sys_session']);
+		const browser = kept.map((c) => `${c.name}=${c.value}`).join('; ');
+
+		const sent = await consoleWrite(new URL('http://localhost/admin/schema'), browser);
+
+		expect(sent.headers['X-CSRF-Token']).toMatch(/^[A-Za-z0-9_-]{43}$/);
+		expect(engineAcceptsWrite(sent.cookie, sent.headers)).toBe(true);
+		// The browser keeps the token for its own writes, readable by the page.
+		expect(sent.setCookie).toEqual([
+			`csrf=${sent.headers['X-CSRF-Token']}; Max-Age=86400; Path=/; SameSite=Strict`,
+		]);
+	});
+
+	it('can write after an OAuth or SAML sign-in, which sets only the session cookie', async () => {
+		const sent = await consoleWrite(new URL('https://admin.example.com/admin'), `__Host-sys_session=${sessionJwt()}`);
+
+		expect(engineAcceptsWrite(sent.cookie, sent.headers)).toBe(true);
+		expect(sent.setCookie).toEqual([
+			`__Host-csrf=${sent.headers['X-CSRF-Token']}; Max-Age=86400; Path=/; Secure; SameSite=Strict`,
+		]);
+	});
+
+	it('keeps the CSRF cookie the engine set', async () => {
+		const sent = await consoleWrite(
+			new URL('https://admin.example.com/admin'),
+			`__Host-sys_session=${sessionJwt()}; __Host-csrf=engine-token`
+		);
+
+		expect(sent.headers['X-CSRF-Token']).toBe('engine-token');
+		expect(engineAcceptsWrite(sent.cookie, sent.headers)).toBe(true);
+		expect(sent.setCookie).toEqual([]);
+	});
+
+	it('sets no CSRF cookie without a session', async () => {
+		resetSetupGateCache();
+		const url = new URL('https://admin.example.com/login');
+		const jar = get_cookies(new Request(url), url) as Jar;
+		jar.set_trailing_slash('never');
+		const event = { ...stubEvent('/login'), url, cookies: jar.cookies };
+		await handle({ event: event as never, resolve: stubResolve() });
+		expect(setCookieLines(jar)).toEqual([]);
+	});
+
+	it('mints a different token for each session', async () => {
+		const url = new URL('https://admin.example.com/admin');
+		const one = await consoleWrite(url, `__Host-sys_session=${sessionJwt()}`);
+		const two = await consoleWrite(url, `__Host-sys_session=${sessionJwt()}`);
+		expect(one.headers['X-CSRF-Token']).not.toBe(two.headers['X-CSRF-Token']);
 	});
 });
