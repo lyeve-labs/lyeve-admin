@@ -142,8 +142,11 @@ export const CSRF_COOKIE_INSECURE = 'csrf';
  * guess and as hard to plant. It is 32 random bytes, as the engine's are,
  * under the engine's name and attributes: readable by the page that echoes
  * it, host-only and SameSite=Strict, and over HTTPS Secure behind the
- * `__Host-` prefix, which no other host can set. A cookie already present is
- * never replaced, and nothing in the request chooses the value.
+ * `__Host-` prefix, which no other host can set. It mints only when the name
+ * it reads first is missing, and it never overwrites a cookie. Over HTTPS
+ * that name is `__Host-csrf`, so behind an engine whose secure-cookie setting
+ * is off it adds `__Host-csrf` beside the engine's `csrf`, and every reader
+ * takes `__Host-csrf` first. Nothing in the request chooses the value.
  */
 export function ensureCsrfCookie(event: SessionEvent): void {
 	if (!sessionToken(event)) return;
