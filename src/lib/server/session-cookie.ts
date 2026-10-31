@@ -160,3 +160,16 @@ export function ensureCsrfCookie(event: SessionEvent): void {
 		maxAge: 86400,
 	});
 }
+
+/**
+ * Clears the CSRF cookie at sign-out under both names. The engine clears its
+ * own only when the call reaches it, and only under the name its secure-cookie
+ * setting gives it, which need not be the one the console minted.
+ */
+export function clearCsrfCookie(event: SessionEvent): void {
+	const attrs = (secure: boolean) => ({ path: '/', httpOnly: false, secure, sameSite: 'strict' }) as const;
+	const secure = isSecure(event);
+	event.cookies.delete(secure ? CSRF_COOKIE : CSRF_COOKIE_INSECURE, attrs(secure));
+	const other = secure ? CSRF_COOKIE_INSECURE : CSRF_COOKIE;
+	if (event.cookies.get(other)) event.cookies.delete(other, attrs(other === CSRF_COOKIE));
+}
