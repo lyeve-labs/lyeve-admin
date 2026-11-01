@@ -45,5 +45,5 @@ export function readError(err: unknown, notFound: string): never {
 		if (err.status === 429) error(429, BUSY.body);
 	}
 	if (isOutage(err)) error(503, OUTAGE.title);
-	error(502, 'The engine could not return this record.');
+	error(502, 'Could not load this record.');
 }

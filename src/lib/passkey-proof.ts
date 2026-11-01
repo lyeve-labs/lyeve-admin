@@ -81,7 +81,7 @@ export class PasskeyUnavailable extends Error {}
 export function passkeyFailure(e: unknown): string {
 	if (e instanceof PasskeyUnavailable) return 'This browser cannot use a passkey. Enter a code instead.';
 	if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
-		return 'The passkey did not answer, or the request was canceled. Try again, or enter a code instead.';
+		return 'The passkey request timed out or was canceled. Try again, or enter a code instead.';
 	}
-	return 'The passkey could not be used. Try again, or enter a code instead.';
+	return 'Could not use the passkey. Try again, or enter a code instead.';
 }

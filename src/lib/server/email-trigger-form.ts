@@ -19,6 +19,6 @@ export function readTriggerForm(data: FormData): { input: EmailTriggerInput } | 
 	if (!input.name) return { error: 'Name the trigger.' };
 	if (!input.event) return { error: 'Choose the event it sends on.' };
 	if (!input.template_key) return { error: 'Choose the template it sends.' };
-	if (input.to_static.length === 0 && !input.to_field) return { error: 'Give at least one recipient, a fixed address or a field of the record.' };
+	if (input.to_static.length === 0 && !input.to_field) return { error: 'Add at least one recipient: a fixed address or a field of the record.' };
 	return { input };
 }

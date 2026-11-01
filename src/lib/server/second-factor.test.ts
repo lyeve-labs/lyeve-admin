@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import { secondFactorFailure } from './second-factor';
 
-const UNCHECKED = 'The engine did not answer, so the code was not checked. Try again in a moment.';
+const UNCHECKED = 'Could not check the code. Try again in a moment.';
 
 // The engine's error body: a sentence, a code and the request's id.
 function refused(status: number, code: string, error: string): ApiError {
@@ -16,13 +16,13 @@ describe('secondFactorFailure', () => {
 	])('reads a %i, %s, as an invalid code', (status) => {
 		expect(
 			secondFactorFailure(refused(status, 'AUTH_MFA_INVALID_CODE', 'The provided verification code is invalid.'))
-		).toEqual({ status: 400, error: 'Invalid code.' });
+		).toEqual({ status: 400, error: 'That code did not match. Try again.' });
 	});
 
 	it.each([
 		['AUTH_CHALLENGE_EXPIRED', 'a challenge that expired or was already used', 'The MFA challenge has expired. Please log in again.'],
 		['UNAUTHORIZED', 'an account disabled since the password step', 'Authentication is required to access this resource.'],
-		['AUTH_INVALID_CREDENTIALS', 'an account no longer in the tenant', 'Invalid email or password.'],
+		['AUTH_INVALID_CREDENTIALS', 'an account no longer in the tenant', 'Incorrect email or password.'],
 	])('sends a 401 %s, %s, back to sign in again', (code, _case, error) => {
 		expect(secondFactorFailure(refused(401, code, error))).toEqual({
 			status: 401,
@@ -45,7 +45,7 @@ describe('secondFactorFailure', () => {
 		const failed = secondFactorFailure(refused(401, 'AUTH_MFA_NOT_CONFIGURED', 'Multi-factor authentication is not configured for this account.'));
 		expect(failed).toEqual({
 			status: 401,
-			error: 'This account has no authenticator app to check the code against. Ask an administrator to restore your access.',
+			error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',
 			restart: true,
 		});
 		expect(failed.error).not.toMatch(/expired|sign in again/i);

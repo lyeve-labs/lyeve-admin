@@ -16,7 +16,7 @@ function formatOf(value: string): ExportFormat | null {
 /** The export configuration the form describes, or why it cannot run. */
 export function exportConfigFrom(form: FormData): { config: ExportConfig } | { error: string } {
 	const format = formatOf(String(form.get('format') ?? ''));
-	if (!format) return { error: 'Choose a format the plugin can write.' };
+	if (!format) return { error: 'Choose a format.' };
 
 	const schemas = form
 		.getAll('schemas')
@@ -28,7 +28,7 @@ export function exportConfigFrom(form: FormData): { config: ExportConfig } | { e
 		.filter((s): s is (typeof STATUSES)[number] => (STATUSES as readonly string[]).includes(s));
 	const template = String(form.get('template') ?? '');
 	if (format === 'template' && !template.trim()) {
-		return { error: 'A custom template export needs the template it renders.' };
+		return { error: 'Enter the template for a custom template export.' };
 	}
 
 	return {

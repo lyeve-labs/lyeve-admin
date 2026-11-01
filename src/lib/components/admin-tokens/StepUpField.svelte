@@ -30,7 +30,7 @@
 		inputmode="numeric"
 		autocomplete="one-time-code"
 		required
-		hint="The current code from your authenticator app, to confirm it is you."
+		hint="Enter the current code from your authenticator app to confirm it is you."
 		{error}
 	/>
 {:else}
@@ -41,7 +41,7 @@
 		bind:value
 		autocomplete="current-password"
 		required
-		hint="Your own sign-in password, to confirm it is you."
+		hint="Enter your sign-in password to confirm it is you."
 		{error}
 	/>
 {/if}

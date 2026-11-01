@@ -54,7 +54,7 @@
 			max={bounds.max}
 			placeholder="Choose a day"
 			required
-			hint="The token stops working at the end of this day, your time. The latest day is {bounds.max}, inside the {MAX_TOKEN_DAYS} days a token may live."
+			hint="The token stops working at the end of this day, in your time zone. Tokens last at most {MAX_TOKEN_DAYS} days, so the latest day is {bounds.max}."
 			error={error ?? (day ? problem || undefined : undefined)}
 		/>
 		<input type="hidden" name="expires_at" value={endOfDayRFC3339(day)} />

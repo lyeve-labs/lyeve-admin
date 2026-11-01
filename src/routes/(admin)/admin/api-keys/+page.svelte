@@ -164,8 +164,8 @@
 	 */
 	function deleteKey(name: string): SubmitFunction {
 		return confirmed(
-			`Delete API key ${name}`,
-			'Anything signing with it stops working, and the key leaves the list.',
+			`Delete API key ${name}?`,
+			'Anything that uses this key stops working, and the key is removed from the list. This cannot be undone.',
 			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
 		);
 	}
@@ -180,7 +180,7 @@
 	function revokeKey(name: string): SubmitFunction {
 		return confirmed(
 			`Revoke key ${name}?`,
-			'Anything signing with it stops working at once. The key stays listed and cannot be used again.',
+			'Anything that uses this key stops working immediately. The key stays in the list and cannot be used again.',
 			{ confirmLabel: 'Revoke', success: `Revoked ${name}` },
 		);
 	}
@@ -207,7 +207,7 @@
 
 <PageShell
 	title="API keys"
-	description="Machine-to-machine credentials, each held to the schemas, routes and request limits you give it."
+	description="Create machine-to-machine credentials, each limited to the schemas, routes and request limits you choose."
 	width="wide"
 >
 	{#snippet actions()}
@@ -219,8 +219,8 @@
 	{/snippet}
 
 	<p class="text-sm text-muted">
-		Automation that calls the admin API, such as a deploy script creating schemas, takes an
-		<a href="/admin/admin-tokens" class="text-brand hover:underline">admin token</a> instead: scoped grants, an expiry and a request log.
+		For automation that calls the admin API, such as a deploy script that creates schemas, use an
+		<a href="/admin/admin-tokens" class="text-brand hover:underline">admin token</a> instead. It has scoped grants, an expiry and a request log.
 	</p>
 
 	<FormErrors message={pageFailure?.error} refused={pageRefused} />
@@ -230,7 +230,7 @@
 	<h2 class="sr-only">Keys</h2>
 
 	{#if !data.keys.ok}
-		<GateNotice gate={data.keys.gate} title="API keys" absent="This engine does not serve API keys." />
+		<GateNotice gate={data.keys.gate} title="API keys" absent="API keys are not included in this build." />
 	{:else if keys.length === 0}
 		<EmptyState
 			title="No API keys yet"
@@ -268,8 +268,8 @@
 
 		{#if visible.length === 0}
 			<EmptyState
-				title="No key on this page matches"
-				description="Clear the search, or turn the page: the box narrows what is on screen."
+				title="No keys on this page match these filters"
+				description="Clear the search or the status filter, or go to the next page."
 			/>
 		{:else}
 		<Table label="API keys">
@@ -351,7 +351,7 @@
 							{:else if u}
 								<span class="text-xs text-faint">{u.requests} req</span>
 							{:else if data.usageUnknown.includes(key.id)}
-								<span class="text-xs text-faint">Unknown, the usage could not be read</span>
+								<span class="text-xs text-faint">Could not load usage</span>
 							{:else}
 								<span class="text-xs text-faint">None</span>
 							{/if}

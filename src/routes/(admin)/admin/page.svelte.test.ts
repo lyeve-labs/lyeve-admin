@@ -173,7 +173,7 @@ describe('dashboard tiles', () => {
 		const { container } = render(DashboardPage, {
 			props: { data: data({ schemas: { ok: true, value: [] }, isAdmin: false, superAdmin: false }), form: null },
 		});
-		expect(container.textContent).toContain('An admin makes the first content type.');
+		expect(container.textContent).toContain('Ask an admin to create one.');
 		expect(container.querySelector('a[href="/admin/schema"]')).toBeNull();
 	});
 
@@ -183,12 +183,12 @@ describe('dashboard tiles', () => {
 		});
 
 		const text = container.textContent ?? '';
-		expect(text).toContain('The recent entries could not be read.');
-		expect(text).toContain('The audit log could not be read.');
-		expect(text).toContain('The dead letter queue could not be read.');
-		expect(text).toContain('The log could not be read.');
+		expect(text).toContain('Could not load recent entries. Reload the page to try again.');
+		expect(text).toContain('Could not load the audit log. Reload the page to try again.');
+		expect(text).toContain('Could not load the dead letter queue. Reload the page to try again.');
+		expect(text).toContain('Could not load the log. Reload the page to try again.');
 		expect(text).not.toContain('No entries yet.');
-		expect(text).not.toContain('No delivery is waiting');
+		expect(text).not.toContain('No deliveries are waiting');
 	});
 
 	it('says each list is empty when its read answered with nothing', () => {
@@ -196,9 +196,9 @@ describe('dashboard tiles', () => {
 
 		const text = container.textContent ?? '';
 		expect(text).toContain('No entries yet.');
-		expect(text).toContain('Nothing recorded yet.');
-		expect(text).toContain('No delivery is waiting in the dead letter queue.');
-		expect(text).toContain('No error has been logged in the last 24 hours.');
+		expect(text).toContain('No audit entries yet.');
+		expect(text).toContain('No deliveries are waiting in the dead letter queue.');
+		expect(text).toContain('No errors logged in the last 24 hours.');
 	});
 
 	it('links each recent entry to its editor', () => {
@@ -272,7 +272,7 @@ describe('needs attention', () => {
 	it('does not call the instance quiet when the security report could not be read', () => {
 		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, controlFailures: null }), form: null } });
 
-		expect(container.textContent).toContain('Nothing needs attention in what could be read.');
+		expect(container.textContent).toContain('Nothing needs attention in what loaded.');
 	});
 
 	it('does not call the instance quiet when a tile could not be read', () => {
@@ -280,7 +280,7 @@ describe('needs attention', () => {
 
 		const text = container.textContent ?? '';
 		expect(text).not.toContain('Nothing needs attention in the last 24 hours.');
-		expect(text).toContain('Nothing needs attention in what could be read.');
+		expect(text).toContain('Nothing needs attention in what loaded.');
 	});
 
 	it('lists each item with its link', () => {
@@ -343,8 +343,8 @@ describe('traffic', () => {
 		});
 
 		const text = container.textContent ?? '';
-		expect(text).toContain('The trend could not be read.');
-		expect(text).toContain('No request in the window.');
+		expect(text).toContain('Could not load the trend. Reload the page to try again.');
+		expect(text).toContain('No requests in this window.');
 	});
 
 	it('is absent when nothing about traffic could be read', () => {
@@ -363,7 +363,7 @@ describe('the chosen home page', () => {
 
 	it('says the chosen home page no longer exists when the engine has none by that name', () => {
 		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'absent' } } }), form: null } });
-		expect(document.body.textContent).toContain('The home page chosen in customization, welcome, was not found.');
+		expect(document.body.textContent).toContain('The home page set in Customization, welcome, no longer exists.');
 	});
 
 	it('says nothing when the tenant chose no home page', () => {
@@ -377,7 +377,7 @@ describe('the missing home page for each role', () => {
 
 	it('tells an admin where to choose another', () => {
 		render(DashboardPage, { props: { data: data({ ...missing, isAdmin: true }), form: null } });
-		expect(document.body.textContent).toContain('Choose another one there.');
+		expect(document.body.textContent).toContain('Choose another one in Customization.');
 	});
 
 	// The plugin answers 404 for a page hidden from the reader's role as well
@@ -400,7 +400,7 @@ describe('the missing home page for each role', () => {
 describe('a composed dashboard that could not be read', () => {
 	it('says the stock dashboard stands in for it, with a way to try again', () => {
 		render(DashboardPage, { props: { data: data({ layoutUnread: true }), form: null } });
-		expect(document.body.textContent).toContain("This tenant's own dashboard could not be read, so the standard one is shown.");
+		expect(document.body.textContent).toContain("Could not load this tenant's own dashboard. Showing the standard one.");
 		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin');
 	});
 

@@ -57,7 +57,7 @@ describe('admin tokens page', () => {
 	it('explains what a token is for when there is none, and offers one', () => {
 		const { getByText, getAllByRole } = setup();
 		expect(getByText('No admin tokens yet')).toBeTruthy();
-		expect(getByText(/call the admin API with only the grants you give it/)).toBeTruthy();
+		expect(getByText(/call the admin API with only the grants you choose/)).toBeTruthy();
 		expect(getAllByRole('button', { name: /New token/ }).length).toBeGreaterThan(0);
 	});
 
@@ -129,7 +129,7 @@ describe('admin tokens page', () => {
 	it('says in the create form that the tenants could not be read', async () => {
 		const { getAllByRole } = setup({ tokens: [token({})], total: 1, tenants: { ok: false, gate: { state: 'unavailable' } } });
 		await fireEvent.click(getAllByRole('button', { name: /New token/ })[0]);
-		expect(document.body.textContent).toContain('Tenants could not be read');
+		expect(document.body.textContent).toContain('Could not load the tenants');
 	});
 
 	it('offers the five statuses as chips', () => {

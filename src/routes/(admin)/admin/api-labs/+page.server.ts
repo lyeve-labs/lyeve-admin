@@ -62,7 +62,7 @@ async function readGroups(client: HttpClient): Promise<{ groups: EndpointGroup[]
 }
 
 /** What the gRPC tab says when the listener's status could not be read. */
-const GRPC_FAILED = 'The gRPC listener status could not be read. This is not a report that the plugin is absent.';
+const GRPC_FAILED = 'Could not load the gRPC listener status.';
 
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
@@ -131,7 +131,7 @@ async function send(
 	if (body !== undefined) headers['Content-Type'] = contentType;
 
 	if (!isSameOriginPath(path)) {
-		return { error: 'That path does not address this instance, so it was not sent.' };
+		return { error: 'That path is not on this instance. The request was not sent.' };
 	}
 
 	const started = Date.now();
@@ -143,8 +143,8 @@ async function send(
 		// The runtime's own words for a failed connection can name an internal
 		// address, so none of them are shown.
 		const msg = err instanceof Error && err.name === 'TimeoutError'
-			? `The request did not answer within ${TIMEOUT_MS / 1000} seconds.`
-			: 'The request could not be sent to the engine. Try again in a moment.';
+			? `The request timed out after ${TIMEOUT_MS / 1000} seconds.`
+			: 'Could not send the request. Try again in a moment.';
 		return { error: msg };
 	}
 
@@ -177,7 +177,7 @@ export const actions: Actions = {
 		const { groups } = await readGroups(authedClient(event));
 		const ep = findEndpoint(groups, id);
 		if (!ep) {
-			return fail(400, { error: 'That is not an endpoint this instance documents.' });
+			return fail(400, { error: 'Choose an endpoint from the list.' });
 		}
 
 		const values: Record<string, string> = {};
@@ -188,20 +188,20 @@ export const actions: Actions = {
 		const path = buildPath(ep, values);
 		if (path === null) {
 			return fail(400, {
-				error: 'Fill every path parameter. A path still carrying {name} is sent literally and answers 404 for the wrong reason.',
+				error: 'Fill in every path parameter. A placeholder such as {name} left in the path returns a misleading 404.',
 			});
 		}
 
 		const raw = String(form.get('body') ?? '').trim();
 		if (byteLength(raw) > MAX_BODY_BYTES) {
-			return fail(400, { error: 'That body is larger than a lab will send. Upload files from the media screens.' });
+			return fail(400, { error: 'The body can be at most 256 KB. Upload files from the media screens.' });
 		}
 		const sendBody = raw && ep.method !== 'GET' ? raw : undefined;
 		if (sendBody) {
 			try {
 				JSON.parse(sendBody);
 			} catch (err) {
-				return fail(400, { error: `The body is not valid JSON: ${(err as Error).message}` });
+				return fail(400, { error: `Fix the JSON in the body: ${(err as Error).message}` });
 			}
 		}
 
@@ -213,9 +213,9 @@ export const actions: Actions = {
 	graphql: async (event) => {
 		const form = await event.request.formData();
 		const document = String(form.get('document') ?? '').trim();
-		if (!document) return fail(400, { error: 'Write a query or a mutation to send.' });
+		if (!document) return fail(400, { error: 'Enter a query or mutation to send.' });
 		if (byteLength(document) > MAX_BODY_BYTES) {
-			return fail(400, { error: 'That document is larger than a lab will send.' });
+			return fail(400, { error: 'The document can be at most 256 KB.' });
 		}
 
 		const vars = parseVariables(String(form.get('variables') ?? ''));
@@ -241,14 +241,14 @@ export const actions: Actions = {
 
 		const grpc = await readGrpcRoutes(authedClient(event));
 		if (!grpc.routes.includes(route)) {
-			return fail(400, { error: 'That is not a route this listener transcodes.' });
+			return fail(400, { error: 'Choose a route from the list.' });
 		}
 
 		const params: Record<string, string> = {};
 		for (const name of grpcRouteParams(route)) {
 			const v = String(form.get(`g_${name}`) ?? '').trim();
 			if (!v) {
-				return fail(400, { error: `Fill ${name}. A path still carrying {${name}} answers 404 for the wrong reason.` });
+				return fail(400, { error: `Fill in ${name}. A placeholder left in the path returns a misleading 404.` });
 			}
 			params[name] = v;
 		}
@@ -257,12 +257,12 @@ export const actions: Actions = {
 		const raw = String(form.get('body') ?? '').trim();
 		if (raw && grpcRouteTakesBody(route)) {
 			if (byteLength(raw) > MAX_BODY_BYTES) {
-				return fail(400, { error: 'That body is larger than a lab will send.' });
+				return fail(400, { error: 'The body can be at most 256 KB.' });
 			}
 			try {
 				payload.body = JSON.parse(raw);
 			} catch (err) {
-				return fail(400, { error: `The body is not valid JSON: ${(err as Error).message}` });
+				return fail(400, { error: `Fix the JSON in the body: ${(err as Error).message}` });
 			}
 		}
 
@@ -280,7 +280,7 @@ export const actions: Actions = {
 		try {
 			invoked = JSON.parse(out.result.body) as GrpcInvokeResult;
 		} catch {
-			return fail(502, { error: 'The invoke route answered something that is not an invoke result.' });
+			return fail(502, { error: 'The call returned a response this page cannot read.' });
 		}
 		return { grpc: labResultFromInvoke(invoked), grpcRoute: route };
 	},

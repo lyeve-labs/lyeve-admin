@@ -99,9 +99,9 @@
 		<p id="key-access-label" class="text-sm font-medium text-fg">Access</p>
 		<p class="text-xs text-muted">
 			{#if privileged}
-				A key with the admin or super admin role is judged by its role, and these choices do not narrow it.
+				A key with the admin or super admin role gets the access of its role. These choices do not limit it.
 			{:else}
-				The key reaches only what is chosen here. Access rules for its roles still apply, and creating, updating or deleting content needs the editor role too.
+				The key can reach only what you choose here. Access rules for its roles still apply, and creating, updating or deleting content also needs the editor role.
 			{/if}
 		</p>
 		{#if error}
@@ -135,9 +135,9 @@
 						onchange={(v) => (access = { ...access, contentActions: v as typeof access.contentActions })}
 					/>
 				{:else if schemasFailed}
-					<Alert tone="warn">The schemas could not be read, so none can be chosen now. Reload the page to try again.</Alert>
+					<Alert tone="warn">Could not load the schemas, so you cannot choose any right now. Reload the page to try again.</Alert>
 				{:else if schemas.length === 0}
-					<p class="text-xs text-faint">This instance has no schemas yet.</p>
+					<p class="text-xs text-faint">No schemas yet.</p>
 				{:else}
 					{#if schemas.length > 8}
 						<label for="key-schema-search" class="sr-only">Narrow the schemas</label>
@@ -178,7 +178,7 @@
 							{/each}
 						</tbody>
 					</Table>
-					<p class="text-xs text-muted">Every schema left unticked is refused on the content routes.</p>
+					<p class="text-xs text-muted">The key cannot reach an unticked schema on the content routes.</p>
 				{/if}
 			</div>
 		</Collapsible>
@@ -198,7 +198,7 @@
 	</div>
 
 	{#if catalogFailed}
-		<Alert tone="warn">The engine's route catalog could not be read, so no other resource can be granted now. Reload the page to try again.</Alert>
+		<Alert tone="warn">Could not load the route catalog, so you cannot grant other resources right now. Reload the page to try again.</Alert>
 	{/if}
 
 	{#each groups as g (g.resource)}
@@ -208,7 +208,7 @@
 				<div class="flex flex-col gap-3 pt-2">
 					{#if access.contentMode === 'chosen' && READS_EVERY_SCHEMA.has(g.resource)}
 						<Alert tone="warn">
-							{g.label} reads every schema, whichever schemas are chosen above. Leave it off for a key held to some schemas.
+							{g.label} reads every schema, whatever you chose above. Leave it off for a key limited to some schemas.
 						</Alert>
 					{/if}
 					<CheckboxGroup
@@ -226,7 +226,7 @@
 							value={st.names}
 							oninput={(e: Event) => setResource(g.resource, { names: (e.currentTarget as HTMLInputElement).value })}
 							placeholder="Leave blank for all"
-							hint="Comma-separated values of {g.nameParam} in the routes below. The key is refused every other one."
+							hint="Comma-separated values of {g.nameParam} in the routes below. The key cannot use any other value."
 							error={namesProblem(st.names) || undefined}
 						/>
 					{/if}

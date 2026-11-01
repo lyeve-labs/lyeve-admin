@@ -14,7 +14,7 @@
      other screen takes rather than centering itself in a viewport it does not
      own. -->
 <PageShell
-	title="This page could not be opened"
+	title="Could not open this page"
 	documentTitle={status === 404
 		? 'Not found'
 		: status === 401 || status === 402 || status === 403

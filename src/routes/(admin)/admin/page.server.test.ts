@@ -119,7 +119,7 @@ describe('admin dashboard applyMigrations action', () => {
 		const result = (await actions.applyMigrations(event)) as { status: number; data: { error: string } };
 
 		expect(result.status).toBe(409);
-		expect(result.data.error).toBe('The queue changed since it was listed. Review it again.');
+		expect(result.data.error).toBe('Someone changed the migration queue after you opened it. Review it again.');
 		expect(seen.some((r) => r.url.includes('/api/admin/migrate/apply'))).toBe(false);
 	});
 
@@ -682,7 +682,7 @@ describe('attentionOf', () => {
 			['danger', '/admin/settings/security'],
 			['warn', '/admin/logs?level=ERROR'],
 		]);
-		expect(items[1].text).toBe('2 security controls are configured but not enforcing.');
+		expect(items[1].text).toBe('2 security controls are configured but not in effect.');
 		expect(attentionOf({ ...quiet, controlFailures: 0 }, '24h')).toEqual([]);
 		expect(attentionOf({ ...quiet, controlFailures: null }, '24h')).toEqual([]);
 	});

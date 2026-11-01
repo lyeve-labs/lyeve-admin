@@ -37,7 +37,7 @@ describe('Reset password page', () => {
 
 	it('offers a new link for an expired one instead of the form', () => {
 		const { getByRole, container } = render(ResetPage, {
-			props: props('t1', { error: 'This reset link is invalid or has expired. Request a new one.', expired: true }),
+			props: props('t1', { error: 'This reset link no longer works. Request a new one.', expired: true }),
 		});
 
 		expect(container.querySelector('#password')).toBeNull();
@@ -46,7 +46,7 @@ describe('Reset password page', () => {
 
 	it('never asks for an organization and carries the one its link named', () => {
 		const { getByRole, container } = render(ResetPage, {
-			props: props('t1', { error: 'This reset link is invalid or has expired. Request a new one.', expired: true }, 'acme'),
+			props: props('t1', { error: 'This reset link no longer works. Request a new one.', expired: true }, 'acme'),
 		});
 
 		expect(container.querySelector('input[name="tenant"]')).toBeNull();

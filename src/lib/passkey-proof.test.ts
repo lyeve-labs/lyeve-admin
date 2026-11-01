@@ -21,7 +21,7 @@ describe('passkey proof encoding', () => {
 describe('passkey failures', () => {
 	it('names each failure in the console words', () => {
 		expect(passkeyFailure(new PasskeyUnavailable())).toBe('This browser cannot use a passkey. Enter a code instead.');
-		expect(passkeyFailure(new DOMException('x', 'NotAllowedError'))).toMatch(/did not answer/);
-		expect(passkeyFailure(new Error('boom'))).toBe('The passkey could not be used. Try again, or enter a code instead.');
+		expect(passkeyFailure(new DOMException('x', 'NotAllowedError'))).toMatch(/timed out or was canceled/);
+		expect(passkeyFailure(new Error('boom'))).toBe('Could not use the passkey. Try again, or enter a code instead.');
 	});
 });

@@ -273,7 +273,7 @@
 		<!-- A failed read is not an empty install. The engine's own pages stay,
 		     and this says why the plugin pages are missing. -->
 		<Banner tone="warn">
-			The engine did not say which plugins run, so the sidebar lists only its own pages. Reload the page to ask again.
+			Could not load the list of running plugins, so the sidebar shows only the built-in pages. Reload the page to try again.
 		</Banner>
 	{/if}
 	{#if gated}

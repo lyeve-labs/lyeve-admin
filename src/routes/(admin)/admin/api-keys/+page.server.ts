@@ -40,14 +40,14 @@ export interface UsageSummary {
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const user = await loadUser(event);
-	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
+	if (!user.roles.includes('super_admin')) error(403, 'This page needs the super_admin role.');
 	const client = authedClient(event);
 	// The endpoint pages at fifty, so a read that names no window shows the
 	// first fifty keys as every key the instance has.
 	const { limit, offset } = pageWindow(url, 50, 500);
 	const read = await section(
 		listKeys(client, limit, offset),
-		'The API keys could not be read. This is not a report that there are none.'
+		'Could not load the API keys.'
 	);
 	const rows = read.ok ? rowsOf(read.value) : [];
 	if (read.ok) {
@@ -72,7 +72,7 @@ export const load: PageServerLoad = async (event) => {
 				rows.map((k) => k.id),
 				month,
 			),
-			'The usage could not be read.',
+			'Could not load the usage.',
 		);
 		if (usage.ok) {
 			for (const u of Array.isArray(usage.value) ? usage.value : []) usageMap[u.api_key_id] = u;
@@ -86,8 +86,8 @@ export const load: PageServerLoad = async (event) => {
 	// route narrows the drawer. A failed read narrows it too, and the drawer
 	// says which part could not be read.
 	const [catalogRead, schemaRead] = await Promise.all([
-		section(fetchKeyScopeCatalog(client), 'The route catalog could not be read.'),
-		section(listSchemaNames(client), 'The schemas could not be read.'),
+		section(fetchKeyScopeCatalog(client), 'Could not load the route catalog.'),
+		section(listSchemaNames(client), 'Could not load the schemas.'),
 	]);
 	const catalog = catalogRead.ok ? catalogRead.value : null;
 	const schemaNames = schemaRead.ok ? schemaRead.value : [];
@@ -138,7 +138,7 @@ export const actions: Actions = {
 			return fail(400, {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { name: 'Name is required' },
+				fields: { name: 'Enter a name.' },
 			});
 		}
 		const parsedLimits = parseLimits(data);
@@ -186,7 +186,7 @@ export const actions: Actions = {
 			});
 			return { created: true, raw_key: result.raw_key, key_name: result.name };
 		} catch (err) {
-			return failed('create', err, 'Failed to create API key');
+			return failed('create', err, 'Could not create the API key. Try again.');
 		}
 	},
 
@@ -194,7 +194,7 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const data = await event.request.formData();
 		const id = String(data.get('id') ?? '');
-		if (!id) return fail(400, { action: 'limit', error: 'No key was named.' });
+		if (!id) return fail(400, { action: 'limit', error: 'This form is missing its key. Reload the page and try again.' });
 		const parsed = parseLimits(data);
 		if ('fields' in parsed) {
 			return fail(400, { action: 'limit', error: 'Check the highlighted fields.', fields: parsed.fields });
@@ -202,7 +202,7 @@ export const actions: Actions = {
 		try {
 			await setLimits(authedClient(event), id, parsed.limits);
 		} catch (err) {
-			return failed('limit', err, 'The request limits could not be saved.');
+			return failed('limit', err, 'Could not save the request limits. Try again.');
 		}
 		return { limited: id };
 	},
@@ -216,7 +216,7 @@ export const actions: Actions = {
 		try {
 			await revokeAPIKey(id, client);
 		} catch (err) {
-			return fail(400, { action: 'revoke', error: actionError(err, 'Failed to revoke API key') });
+			return fail(400, { action: 'revoke', error: actionError(err, 'Could not revoke the API key. Try again.') });
 		}
 	},
 
@@ -229,7 +229,7 @@ export const actions: Actions = {
 		try {
 			await deleteAPIKey(id, client);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete API key') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the API key. Try again.') });
 		}
 	}
 };

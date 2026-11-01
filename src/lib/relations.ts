@@ -62,28 +62,28 @@ export const RELATION_KINDS: RelationKind[] = [
 		label: 'Belongs to one',
 		cardinality: 'many to one',
 		storage: 'this schema',
-		blurb: 'Adds the key column here. The only kind that does.',
+		blurb: 'Adds the key column to this schema. No other kind does.',
 	},
 	{
 		type: 'has_one',
 		label: 'Has one',
 		cardinality: 'one to one',
 		storage: 'the other schema',
-		blurb: 'Reads a key the other schema holds. Adds nothing here.',
+		blurb: 'Uses a key column on the other schema. Adds no column here.',
 	},
 	{
 		type: 'has_many',
 		label: 'Has many',
 		cardinality: 'one to many',
 		storage: 'the other schema',
-		blurb: 'Reads a key the other schema holds. Adds nothing here.',
+		blurb: 'Uses a key column on the other schema. Adds no column here.',
 	},
 	{
 		type: 'many_to_many',
 		label: 'Has and belongs to many',
 		cardinality: 'many to many',
 		storage: 'a pivot table',
-		blurb: 'Builds a join table. Neither schema gains a column.',
+		blurb: 'Creates a join table. Neither schema gets a new column.',
 	},
 ];
 
@@ -175,7 +175,7 @@ export function planRelation(
 					: `Optional, so deleting one ${there} row leaves the ${here} rows behind and sets their ${col} to NULL.`,
 			],
 			reads: `${thisTable}.${col}`,
-			flags: `Req makes ${col} NOT NULL and turns the delete into a cascade. Idx is already on: the foreign key gets its own index.`,
+			flags: `Req makes ${col} NOT NULL and turns the delete into a cascade. Idx is already on, because the foreign key gets its own index.`,
 			requires: null,
 			problem: null,
 		};
@@ -196,7 +196,7 @@ export function planRelation(
 				`Both sides cascade: deleting a row deletes its pairings, never the row it was paired with.`,
 			],
 			reads: pivot,
-			flags: 'Neither applies. There is no column here to require or index; the pivot carries its own keys.',
+			flags: 'Neither applies. There is no column here to require or index, because the pivot table has its own keys.',
 			requires: null,
 			// Both sides of a self-pair derive the same key column, so the pivot
 			// would need two columns of one name. The save path refuses it too.
@@ -223,7 +223,7 @@ export function planRelation(
 		kind,
 		sentence: many
 			? `Each ${here} row has many ${there} rows.`
-			: `Each ${here} row has one ${there} row. Nothing enforces the one: if several ${there} rows point here, the first is read.`,
+			: `Each ${here} row has one ${there} row. Only one is expected, but nothing enforces it. If several ${there} rows point here, the first one is used.`,
 		creates: [],
 		reads: `${thatTable}.${column}`,
 		flags: `Neither applies. The key is ${thatTable}.${column}, and Req and Idx on it belong to ${there}.`,
@@ -231,7 +231,7 @@ export function planRelation(
 		problem: target
 			? satisfied
 				? null
-				: `${there} has no field named ${requires.field}, so ${thatTable}.${column} does not exist and this relation resolves to ${many ? 'an empty list' : 'nothing'}.`
+				: `${there} has no field named ${requires.field}, so ${thatTable}.${column} does not exist and this relation returns ${many ? 'an empty list' : 'nothing'}.`
 			: `${field.relation_to} is not a schema in this tenant.`,
 	};
 }
