@@ -458,6 +458,18 @@ describe('admin/tenants update, toggle and delete', () => {
 		expect(result).toEqual({ status: 400, data: { action: 'delete', error: 'Could not delete the tenant. Try again.' } });
 	});
 
+	it('names the direction of a toggle that failed', async () => {
+		const outage = () => json({ error: 'pq: connection refused' }, 503);
+		expect(await actions.toggle(writeEvent({ id: 't1', enabled: 'true' }, outage))).toEqual({
+			status: 400,
+			data: { action: 'toggle', error: 'Could not disable the tenant. Try again.' },
+		});
+		expect(await actions.toggle(writeEvent({ id: 't1', enabled: 'false' }, outage))).toEqual({
+			status: 400,
+			data: { action: 'toggle', error: 'Could not enable the tenant. Try again.' },
+		});
+	});
+
 	it('deletes a tenant the engine accepts', async () => {
 		const event = writeEvent({ id: 't1' }, () => new Response(null, { status: 204 }));
 		expect(await actions.delete(event)).toBeUndefined();

@@ -154,7 +154,7 @@ export const actions: Actions = {
 		try {
 			await updateTenant(id, { enabled: !enabled }, client);
 		} catch (err) {
-			return fail(400, { action: 'toggle', error: actionError(err, enabled ? 'Could not enable the tenant. Try again.' : 'Could not disable the tenant. Try again.') });
+			return fail(400, { action: 'toggle', error: actionError(err, enabled ? 'Could not disable the tenant. Try again.' : 'Could not enable the tenant. Try again.') });
 		}
 	},
 
