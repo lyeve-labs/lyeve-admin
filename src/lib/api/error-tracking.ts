@@ -149,7 +149,7 @@ export const ERROR_OK: ErrorGate = GATE_OK;
 
 /** What a refused error tracking read means, read the way every plugin's is. */
 export function errorGate(err: unknown): ErrorGate {
-	return gateOf(err, 'The errors could not be read. This is not a report that none have happened.');
+	return gateOf(err, 'Could not load errors.');
 }
 
 export async function listAlerts(

@@ -28,7 +28,7 @@ describe('webhook writes the engine refuses', () => {
 		);
 		const out = (await actions.create(event({ name: 'n', url: 'https://x.example.com' }))) as Failure;
 		expect(out.status).toBe(402);
-		expect(out.data.error).toContain('7 of 7 items are in use');
+		expect(out.data.error).toContain("You're using 7 of 7 items");
 		expect(out.data.refused).toMatchObject({ kind: 'cap', cap: 'example.items', limit: 7, current: 7 });
 	});
 

@@ -22,7 +22,7 @@ describe('readRoots', () => {
 
 	it('reports a refused introspection rather than an empty schema', () => {
 		expect(readRoots({ errors: [{ message: 'introspection is disabled' }] })).toEqual({ roots: null, refused: 'introspection is disabled' });
-		expect(readRoots({}).refused).toBe('The schema was not returned.');
+		expect(readRoots({}).refused).toBe('Could not load the GraphQL schema.');
 	});
 });
 

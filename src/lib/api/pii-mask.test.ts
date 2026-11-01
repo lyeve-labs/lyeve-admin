@@ -23,7 +23,7 @@ describe('piiGate', () => {
 
 	it('says a failed read is not a report that nothing is masked', () => {
 		const gate = piiGate(new Error('down'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that nothing is masked');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the masking settings.');
 	});
 });
 

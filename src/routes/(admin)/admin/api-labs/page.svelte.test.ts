@@ -87,7 +87,7 @@ describe('the answer', () => {
 		const { container } = render(LabsPage, {
 			props: props({}, { rest: result({ status: 402, statusText: 'Payment Required' }) }),
 		});
-		expect(said(container)).toContain('Nothing about the request is wrong');
+		expect(said(container)).toContain('Changing the request does not help');
 	});
 
 	it('says a body is empty rather than rendering nothing', () => {

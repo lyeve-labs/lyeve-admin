@@ -341,7 +341,7 @@ describe('Tenants refusals', () => {
 
 		const notice = drawer.querySelector('[data-testid="refusal-notice"]') as HTMLElement;
 		expect(notice.textContent).toContain('No more tenants on this instance');
-		expect(notice.textContent).toContain('This instance allows no more tenants. A license that allows more lifts the limit.');
+		expect(notice.textContent).toContain('This instance is at its limit for tenants. A license that allows more lifts the limit.');
 		expect(notice.textContent).not.toContain('This is not enabled on this instance');
 		expect(notice.querySelector(`a[href="${PLAN}"]`)?.textContent?.trim()).toBe('View the plan');
 	});

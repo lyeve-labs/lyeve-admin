@@ -115,6 +115,6 @@ describe('the gate sorts a refusal by what it means', () => {
 
 	it('never reports a failed read as a healthy broker', () => {
 		const gate = brokerGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that it is healthy');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the broker status.');
 	});
 });

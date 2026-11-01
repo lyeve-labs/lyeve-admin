@@ -177,7 +177,7 @@ describe('API keys page', () => {
 		await fireEvent.click(getByRole('button', { name: /Flows/ }));
 		const names = document.body.querySelector<HTMLInputElement>('#key-names-flows')!;
 		await fireEvent.input(names, { target: { value: 'order sync' } });
-		expect(document.body.textContent).toContain('"order sync" cannot name an endpoint.');
+		expect(document.body.textContent).toContain('"order sync" is not an endpoint name.');
 	});
 
 	it('edits a key\'s limits in a drawer with all three windows', async () => {

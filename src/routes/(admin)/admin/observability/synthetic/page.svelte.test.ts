@@ -174,14 +174,14 @@ describe('the form', () => {
 			props: props({ limits: { probes: { limit: 3, current: 1 }, minIntervalSeconds: 300 } }),
 		});
 		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
-		expect(said(document.body)).toContain('At least 300. A probe is this instance calling itself.');
+		expect(said(document.body)).toContain('At least 300. Each probe sends a request to this instance.');
 		expect(said(document.body)).not.toContain('At least 30.');
 	});
 
 	it('names no floor when the plugin did not say', async () => {
 		render(SyntheticPage, { props: props({ limits: null }) });
 		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
-		expect(said(document.body)).toContain('A probe is this instance calling itself.');
+		expect(said(document.body)).toContain('Each probe sends a request to this instance.');
 		expect(said(document.body)).not.toMatch(/At least \d+\. A probe/);
 	});
 

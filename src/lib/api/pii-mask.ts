@@ -85,7 +85,7 @@ export const PII_OK: PiiGate = GATE_OK;
 
 /** What a refused masking read means, read the way every plugin's is. */
 export function piiGate(err: unknown): PiiGate {
-	return gateOf(err, 'Masking could not be read. This is not a report that nothing is masked.');
+	return gateOf(err, 'Could not load the masking settings.');
 }
 
 export async function getRules(client: HttpClient): Promise<RuleCatalog> {

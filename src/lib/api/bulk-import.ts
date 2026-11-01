@@ -16,6 +16,7 @@ import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import { csrfHeaders } from './csrf';
+import { OUTAGE } from '../outage';
 
 export const IMPORTS_URL = '/api/admin/imports';
 
@@ -49,7 +50,7 @@ export const IMPORT_OK: ImportGate = GATE_OK;
 
 /** What a refused imports read means, read the way every plugin's is. */
 export function importGate(err: unknown): ImportGate {
-	return gateOf(err, 'The imports could not be read. This is not a report that none have run.');
+	return gateOf(err, 'Could not load imports.');
 }
 
 /** The plugin names its rows `jobs`, not `data`. */
@@ -419,13 +420,13 @@ async function postImport<T>(fetchFn: typeof fetch, path: string, body: unknown)
 function importFailure(status: number, starts: boolean, engineSaid: boolean): string {
 	if (status === 413) return 'The file is larger than the 50 MB an import takes. Split it and import the parts.';
 	if (status >= 500 && starts && !engineSaid) {
-		return 'The engine did not confirm the import. Check the entries before trying again.';
+		return 'Could not confirm whether the import started. Check the entries before you try again.';
 	}
 	if (status === 502 || status === 503 || status === 504) {
-		return 'The engine or its database did not answer. Nothing was imported. Try again in a moment.';
+		return `${OUTAGE.title}. Nothing was imported. Try again in a moment.`;
 	}
-	if (status >= 500) return 'The engine could not finish the request. Nothing was imported.';
-	return 'The engine refused the request.';
+	if (status >= 500) return 'Could not complete the request. Nothing was imported. Try again.';
+	return 'The request was refused.';
 }
 
 export function previewImport(fetchFn: typeof fetch, body: SourceInput & { content_type?: string }) {
@@ -453,9 +454,9 @@ export interface MappingTarget {
 
 /** The entry's own columns, which every schema's entries have. */
 export const ENTRY_TARGETS: readonly MappingTarget[] = [
-	{ value: 'entry.slug', label: 'Entry slug', hint: 'Its address. Made from the title when not mapped.', dataType: 'string' },
-	{ value: 'entry.title', label: 'Entry title', hint: 'Shown in the content list. Taken from a title field when not mapped.', dataType: 'string' },
-	{ value: 'entry.status', label: 'Entry status', hint: 'draft, published or archived. Draft when not mapped.', dataType: 'string' },
+	{ value: 'entry.slug', label: 'Entry slug', hint: "The entry's address. If not mapped, it is made from the title.", dataType: 'string' },
+	{ value: 'entry.title', label: 'Entry title', hint: 'Shown in the content list. If not mapped, it is taken from a title field.', dataType: 'string' },
+	{ value: 'entry.status', label: 'Entry status', hint: 'draft, published or archived. If not mapped, every entry is a draft.', dataType: 'string' },
 ];
 
 /** The data type a mapping coerces a column to, from the field it fills. */
@@ -560,7 +561,7 @@ export function outcome(job: ImportJob): ImportOutcome {
 export const OUTCOME_LABELS: Readonly<Record<ImportOutcome, string>> = {
 	clean: 'Every row imported',
 	partial: 'Finished with rows rejected',
-	nothing: 'Finished having imported nothing',
+	nothing: 'Finished with nothing imported',
 	running: 'Running',
 	stopped: 'Stopped',
 	rolled_back: 'Rolled back',

@@ -167,13 +167,13 @@ const DIALECT_NAME: Record<Dialect, string> = {
  */
 export function noSuggestionText(dialect: Dialect, read: AnalysisRead): string {
 	if (dialect === 'mssql') {
-		return 'SQL Server suggested no index. Its missing-index views are also empty on an instance that runs another database.';
+		return 'SQL Server suggested no index. If this instance runs another database, this list is always empty.';
 	}
 	const name = DIALECT_NAME[dialect];
 	const source = PLAN_SOURCE[dialect];
 	const plans = read.plansRead ?? 0;
 	if (plans > 0) {
-		return `Nothing to suggest in the ${plans === 1 ? 'plan' : `${plans} plans`} the analyzer read.`;
+		return `No suggestions from the ${plans === 1 ? 'plan' : `${plans} plans`} analyzed.`;
 	}
 	switch (read.noPlansReason) {
 		case 'other_dialect':
@@ -187,7 +187,7 @@ export function noSuggestionText(dialect: Dialect, read: AnalysisRead): string {
 		case 'source_unreadable':
 			return `No plans were read. The check for ${source} failed, so it is not known whether plans can be read.`;
 		case 'none_captured':
-			return `No plans were read yet. ${source} is there, and none of the recent slow requests captured a plan.`;
+			return `No plans were read yet. ${source} is available, but none of the recent slow requests captured a plan.`;
 		default:
 			return 'No plans were read, so there is nothing to suggest.';
 	}

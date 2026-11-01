@@ -96,7 +96,7 @@ export const AB_OK: AbGate = GATE_OK;
 
 /** What a refused experiments read means, read the way every plugin's is. */
 export function abGate(err: unknown): AbGate {
-	return gateOf(err, 'The experiments could not be read. This is not a report that none are running.');
+	return gateOf(err, 'Could not load experiments.');
 }
 
 export async function listExperiments(
@@ -294,7 +294,7 @@ export function verdict(results: ExperimentResults | null): string {
 	const seen = totalSample(results);
 	if (seen === 0) return 'Nobody has been exposed to this experiment yet';
 	if (!results.significant) {
-		return 'Not conclusive yet. This is not a tie: the difference so far could be chance.';
+		return 'Not conclusive yet. The difference so far could be chance.';
 	}
 	if (!results.winner) {
 		return 'The difference is significant, but no variant was named the winner.';

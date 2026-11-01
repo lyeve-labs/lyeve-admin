@@ -59,7 +59,7 @@ export interface SaveCaptchaSettings {
 }
 
 export function captchaSettingsGate(err: unknown): Gate {
-	return gateOf(err, 'The captcha settings could not be read. This is not a report that none are set.');
+	return gateOf(err, 'Could not load the captcha settings.');
 }
 
 export async function readCaptchaSettings(client: HttpClient): Promise<CaptchaSettings> {

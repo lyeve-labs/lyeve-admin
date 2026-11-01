@@ -204,7 +204,7 @@ export function buildReference(doc: OpenAPIDocument, catalog: EndpointGroup[]): 
 			const p = e.params?.find((x) => x.name === 'schema' && x.in === 'path');
 			if (p) {
 				p.description = count
-					? `Collection name. This instance has ${count} ${count === 1 ? 'collection' : 'collections'}; see Schema builder.`
+					? `Collection name. This instance has ${count} ${count === 1 ? 'collection' : 'collections'}. See the Schema builder.`
 					: 'Collection name, as listed by GET /api/v1/schemas.';
 				delete p.values;
 			}

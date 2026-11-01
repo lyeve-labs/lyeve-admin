@@ -53,7 +53,7 @@ export const RECOMMENDATIONS_OK: RecommendationsGate = GATE_OK;
 
 /** What a refused recommendations read means, read the way every plugin's is. */
 export function recommendationsGate(err: unknown): RecommendationsGate {
-	return gateOf(err, 'The split could not be read. This is not a report that nobody is being recommended to.');
+	return gateOf(err, 'Could not load the recommendation split.');
 }
 
 export async function readAbStats(client: HttpClient): Promise<AbStats> {

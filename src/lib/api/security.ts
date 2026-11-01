@@ -55,5 +55,5 @@ export const CONTROL_SUMMARY: Record<string, string> = {
 	quota: 'Caps what a tenant may store and send.',
 	waf: 'Blocks injection patterns in paths, headers, cookies and bodies.',
 	mfa: 'Asks for a second factor at login.',
-	'session-anomaly': 'Locks out repeated failed logins and flags sessions that change shape.',
+	'session-anomaly': 'Locks out repeated failed logins and flags sessions whose device fingerprint changes.',
 };

@@ -95,7 +95,7 @@ describe('the services', () => {
 		});
 		const text = said(container);
 		expect(text).toContain('1 service is registered on the server but unknown');
-		expect(text).toContain('health was never told about it');
+		expect(text).toContain('not reported to health checks');
 	});
 
 	it('says nothing of the sort when every service is declared', () => {
@@ -122,7 +122,7 @@ describe('the listeners', () => {
 		const { container } = render(GrpcPage, {
 			props: props({ status: status({ reflection: true }) }),
 		});
-		expect(said(container)).toContain('enumerate every service');
+		expect(said(container)).toContain('list every service and message');
 	});
 
 	it('offers the REST paths for a caller with no gRPC client', () => {

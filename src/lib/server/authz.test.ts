@@ -377,7 +377,7 @@ describe('requireUser', () => {
 			const err = await refusedWith(402, { error: 'cap_exceeded', cap: 'admin.seats', limit: 5, current: 5, upgrade_url: '' });
 			expect(err.status).toBe(402);
 			expect(err.body?.message).toContain('Every admin seat is taken.');
-			expect(err.body?.message).toContain('5 of 5 are in use');
+			expect(err.body?.message).toContain("You're using 5 of 5");
 		});
 
 		it('throws 402 with the seat sentence when the body names nothing', async () => {

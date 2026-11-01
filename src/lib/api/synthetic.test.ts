@@ -127,7 +127,7 @@ describe('the gate sorts a refusal by what it means', () => {
 	// outcome a monitoring page can produce.
 	it('never reports a failed read as everything passing', () => {
 		const gate = syntheticGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that everything is passing');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load probes.');
 	});
 });
 
@@ -189,9 +189,9 @@ describe('the probe limits', () => {
 
 	it('puts the floor in the hint only when it is known', () => {
 		expect(intervalHint({ probes: { limit: 0, current: 0 }, minIntervalSeconds: 15 })).toBe(
-			'At least 15. A probe is this instance calling itself.',
+			'At least 15. Each probe sends a request to this instance.',
 		);
-		expect(intervalHint(null)).toBe('A probe is this instance calling itself.');
+		expect(intervalHint(null)).toBe('Each probe sends a request to this instance.');
 	});
 });
 

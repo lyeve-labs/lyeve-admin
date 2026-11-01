@@ -49,7 +49,7 @@ describe('trying an endpoint', () => {
 			tryEvent({ method: 'POST', path: '/api/admin/tenants', acknowledge: 'on' }, fetch),
 		)) as Failure;
 		expect(out.status).toBe(422);
-		expect(out.data.tryError).toContain("super admin's");
+		expect(out.data.tryError).toContain('Only a super admin can send');
 		expect(fetch).not.toHaveBeenCalled();
 	});
 

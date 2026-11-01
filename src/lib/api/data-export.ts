@@ -136,7 +136,7 @@ export const EXPORT_OK: ExportGate = GATE_OK;
 
 /** What a refused export read means, read the way every plugin's is. */
 export function exportGate(err: unknown): ExportGate {
-	return gateOf(err, 'Exports could not be read. This is not a report that none have run.');
+	return gateOf(err, 'Could not load exports.');
 }
 
 export async function listJobs(

@@ -61,7 +61,7 @@ export const EVENTS_OK: EventsGate = GATE_OK;
 
 /** What a refused event log read means, read the way every plugin's is. */
 export function eventsGate(err: unknown): EventsGate {
-	return gateOf(err, 'The event log could not be read. This is not a report that nothing was published.');
+	return gateOf(err, 'Could not load the event log.');
 }
 
 export async function listEvents(

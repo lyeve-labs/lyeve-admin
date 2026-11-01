@@ -201,6 +201,6 @@ describe('the gate sorts a refusal by what it means', () => {
 
 	it('never reports a failed read as every tenant being placed', () => {
 		const gate = residencyGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that every tenant is placed');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the residency report.');
 	});
 });
