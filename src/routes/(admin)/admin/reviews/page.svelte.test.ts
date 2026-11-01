@@ -161,7 +161,7 @@ describe('reviews page', () => {
 		render(ReviewsPage, {
 			props: { data: data({ operator: false, definitions: [], entriesNamed: false }), form: null },
 		});
-		expect(screen.getByText(/Entries, definitions and stages are listed by ID/)).toBeTruthy();
+		expect(screen.getByText(/Entries, definitions and stages show by ID/)).toBeTruthy();
 		const row = screen.getByTestId('assignment-row');
 		expect(row.textContent).toContain('e1e1e1e1');
 		expect(row.querySelector('a')).toBeNull();
@@ -180,13 +180,13 @@ describe('reviews page', () => {
 		expect(screen.getByText(/review assignments could not be read/)).toBeTruthy();
 		expect(screen.getByText('The review definitions could not be read.')).toBeTruthy();
 		expect(screen.queryByText('Nothing under review')).toBeNull();
-		expect(screen.queryByText('No definition yet')).toBeNull();
+		expect(screen.queryByText('No definitions yet')).toBeNull();
 		expect(screen.queryByRole('button', { name: /New definition/ })).toBeNull();
 	});
 
 	it('says when the rules refuse the assignment list', () => {
 		render(ReviewsPage, { props: { data: data({ assignments: { ok: false, gate: { state: 'forbidden' } } }), form: null } });
-		expect(screen.getByText('You may not list reviews')).toBeTruthy();
+		expect(screen.getByText('You cannot see reviews')).toBeTruthy();
 	});
 
 	it('serializes the drawer stages in order into one field', async () => {
@@ -341,18 +341,18 @@ describe('reviews page, failures and unread stages', () => {
 		render(ReviewsPage, {
 			props: { data: data({ definitions: [{ ...definition, stages: null }] }), form: null },
 		});
-		expect(screen.getByText('Stages could not be read')).toBeTruthy();
+		expect(screen.getByText('Could not load stages. Reload the page to try again.')).toBeTruthy();
 	});
 
 	it('keeps a failed delete out of the New definition drawer', async () => {
 		render(ReviewsPage, {
-			props: { data: data(), form: { action: 'delete', error: 'Failed to delete the definition.' } as never },
+			props: { data: data(), form: { action: 'delete', error: 'Could not delete the definition. Try again.' } as never },
 		});
-		expect(screen.getAllByText('Failed to delete the definition.')).toHaveLength(1);
+		expect(screen.getAllByText('Could not delete the definition. Try again.')).toHaveLength(1);
 		await fireEvent.click(screen.getAllByRole('button', { name: /New definition/ })[0]);
 		const drawerForm = document.querySelector('form#definition-form') as HTMLFormElement;
-		expect(drawerForm.textContent).not.toContain('Failed to delete the definition.');
-		expect(screen.getAllByText('Failed to delete the definition.')).toHaveLength(1);
+		expect(drawerForm.textContent).not.toContain('Could not delete the definition. Try again.');
+		expect(screen.getAllByText('Could not delete the definition. Try again.')).toHaveLength(1);
 	});
 });
 

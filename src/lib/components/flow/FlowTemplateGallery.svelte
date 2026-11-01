@@ -34,7 +34,7 @@
 		return async ({ result, update, formElement }) => {
 			templateSaving = false;
 			if (result.type === 'failure') {
-				templateError = String((result.data as { templateError?: string })?.templateError ?? 'The template could not be saved.');
+				templateError = String((result.data as { templateError?: string })?.templateError ?? 'Could not save the template. Try again.');
 				return;
 			}
 			if (result.type === 'success') {
@@ -46,7 +46,7 @@
 		};
 	};
 	async function deleteTemplate(id: string, name: string) {
-		const ok = await confirm(`Delete the template ${name}?`, 'Flows already started from it keep what they have.', { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete the template ${name}?`, 'Flows you already started from it do not change.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		templateDeleteId = id;
 		await tick();
@@ -62,13 +62,13 @@
 		{#if canUpdate}
 			<Collapsible label="Save a template">
 				<div class="flex flex-col gap-4 pt-2">
-					<p class="text-sm text-muted">A saved template is listed here beside the built-in ones. It is named by its slug. Saving the same slug again replaces it, so reading the URL again refreshes it.</p>
+					<p class="text-sm text-muted">Saved templates appear here beside the built-in ones, under their slug. Saving a template with the same slug replaces it, so saving from the same URL again updates it.</p>
 					<form method="POST" action="?/saveTemplate" use:enhance={templateSave}>
 						<input type="hidden" name="document" value={flowDocument} />
 						<Button variant="secondary" type="submit" loading={templateSaving}>Save this flow as a template</Button>
 					</form>
 					<form method="POST" action="?/saveTemplate" enctype="multipart/form-data" use:enhance={templateSave} class="flex flex-col gap-4">
-						<Input id="template-url" name="url" type="url" label="URL" placeholder="https://example.com/flows/welcome.yaml" hint="Read over http or https. Private and loopback addresses are refused." />
+						<Input id="template-url" name="url" type="url" label="URL" placeholder="https://example.com/flows/welcome.yaml" hint="An http or https address. Private and loopback addresses are not allowed." />
 						<FileInput id="template-file" name="file" label="Or a file" accept=".json,.yaml,.yml,application/json,application/yaml" />
 						<Textarea id="template-document" name="document" label="Or paste the definition" rows={6} class="[&_textarea]:text-xs" mono />
 						<div class="flex justify-end">
@@ -82,7 +82,7 @@
 			</Collapsible>
 		{/if}
 		{#if templates.length === 0}
-			<EmptyState title="No templates" description="The engine offered none. Start from the palette or import a definition instead." />
+			<EmptyState title="No templates" description="Start from the palette or import a definition instead." />
 		{:else}
 			<div class="grid gap-3 sm:grid-cols-2" data-testid="template-gallery">
 				{#each templates as t (t.id)}

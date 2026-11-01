@@ -30,7 +30,7 @@ describe('refusalFailure', () => {
 		];
 		const result = refusalFailure(new FlowRefusal(errors)) as unknown as Failure;
 		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'rows'], limit: null, current: null, upgradeUrl: '' });
-		expect(result.data.error).toBe('2 elements use what this instance does not enable: the trigger, rows.');
+		expect(result.data.error).toBe('2 elements use a feature the license on this instance does not include: the trigger, rows.');
 		expect(result.data.errors).toEqual(errors);
 	});
 

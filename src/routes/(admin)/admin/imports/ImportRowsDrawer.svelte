@@ -62,7 +62,7 @@
 		<GateNotice
 			gate={read.gate}
 			title="this import"
-			absent="That import no longer exists. It may have been removed since the history was read."
+			absent="This import no longer exists. Reload the page."
 		/>
 	{:else if detail}
 		<div class="flex flex-col gap-5">
@@ -100,8 +100,8 @@
 					</Table>
 					{#if detail.rejectedTotal > detail.rejected.length}
 						<p class="text-xs text-muted">
-							The first {formatCount(detail.rejected.length)} of {formatCount(detail.rejectedTotal)}. The
-							download has them all.
+							Showing the first {formatCount(detail.rejected.length)} of {formatCount(detail.rejectedTotal)}.
+							Download all to see every row.
 						</p>
 					{/if}
 				{/if}

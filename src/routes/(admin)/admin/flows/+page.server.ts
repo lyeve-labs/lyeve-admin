@@ -85,13 +85,13 @@ export const load: PageServerLoad = async (event) => {
 /** The 422 shape, surfaced as a form failure the page can list. */
 function validationFailure(err: unknown, fallback: string) {
 	if (err instanceof ApiError && err.status === 422) {
-		return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.message) });
+		return fail(422, { error: 'Fix the problems in the definition.', errors: validationErrors(err.message) });
 	}
 	if (err instanceof ImportError && err.status === 422) {
-		return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.body) });
+		return fail(422, { error: 'Fix the problems in the definition.', errors: validationErrors(err.body) });
 	}
 	if (err instanceof FlowRefusal) return refusalFailure(err);
-	if (isLocked(err)) return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
+	if (isLocked(err)) return fail(402, { error: 'The license on this instance does not include flows.', locked: true });
 	if (err instanceof ApiError && err.status === 403) return forbiddenFailure(err);
 	return fail(400, { error: actionError(err, fallback) });
 }
@@ -112,7 +112,7 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const name = String(data.get('name') ?? '').trim();
 		const slug = String(data.get('slug') ?? '').trim();
-		if (!name || !slug) return fail(400, { action: 'create', error: 'Name and slug are required.' });
+		if (!name || !slug) return fail(400, { action: 'create', error: 'Enter a name and a slug.' });
 
 		// A name and a slug, nothing else: the flow starts empty and the editor
 		// offers the palette, the templates and an import once it is open.
@@ -125,7 +125,7 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 409) {
 				return fail(409, { action: 'create', error: 'Another flow already uses this slug. Choose another.', field: 'slug' });
 			}
-			return tagged('create', validationFailure(err, 'Failed to create flow'));
+			return tagged('create', validationFailure(err, 'Could not create the flow. Try again.'));
 		}
 		redirect(303, `/admin/flows/${encodeURIComponent(created.id)}`);
 	},
@@ -139,7 +139,7 @@ export const actions: Actions = {
 			await deleteFlow(client, id);
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 403) return tagged('delete', forbiddenFailure(err));
-			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete flow') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the flow. Try again.') });
 		}
 	},
 
@@ -151,7 +151,7 @@ export const actions: Actions = {
 
 		const body = await readImportForm(data);
 		if (!body) return fail(400, { action: 'import', error: 'Paste a definition or choose a file.' });
-		if (mode === 'replace' && !slug) return fail(400, { action: 'import', error: 'Replace needs the slug of the flow to replace.' });
+		if (mode === 'replace' && !slug) return fail(400, { action: 'import', error: 'Enter the slug of the flow to replace.' });
 
 		let result: ImportResult;
 		try {
@@ -159,13 +159,13 @@ export const actions: Actions = {
 		} catch (err) {
 			if (err instanceof FlowRefusal) return tagged('import', refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {
-				return fail(402, { action: 'import', error: 'Flows are not enabled on this instance.', locked: true });
+				return fail(402, { action: 'import', error: 'The license on this instance does not include flows.', locked: true });
 			}
 			if (err instanceof ImportError) {
-				if (err.status === 422) return tagged('import', validationFailure(err, 'Import failed'));
-				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Import failed' });
+				if (err.status === 422) return tagged('import', validationFailure(err, 'Could not import the flow. Try again.'));
+				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Could not import the flow. Try again.' });
 			}
-			return fail(400, { action: 'import', error: 'Import failed' });
+			return fail(400, { action: 'import', error: 'Could not import the flow. Try again.' });
 		}
 		const unresolved = result.unresolved_datasources ?? [];
 		if (unresolved.length > 0) {

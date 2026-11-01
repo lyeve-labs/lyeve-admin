@@ -62,7 +62,7 @@ describe('CodeEditor', () => {
 	it('shows the panel states and a retry', async () => {
 		const onretry = vi.fn();
 		const { getByTestId, getByRole, rerender } = setup('', { tables: { status: 'loading', tables: [] } });
-		expect(getByTestId('tables-panel').textContent).toContain('Reading the schema');
+		expect(getByTestId('tables-panel').textContent).toContain('Loading tables');
 		await rerender({ id: 'sql', label: 'SQL', value: '', language: 'sql', oninput: vi.fn(), onretry, tables: { status: 'error', tables: [], message: 'refused' } });
 		expect(getByTestId('tables-panel').textContent).toContain('refused');
 		await fireEvent.click(getByRole('button', { name: 'Retry' }));

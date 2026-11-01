@@ -61,7 +61,7 @@
 	const problems = $derived(draft?.draft.problems ?? []);
 	const acceptReason = $derived.by(() => {
 		if (!draft) return '';
-		if (!draft.draft.definition) return 'The assistant produced no definition to accept. Ask again.';
+		if (!draft.draft.definition) return 'The assistant did not return a flow. Ask again.';
 		if (problems.length > 0) {
 			return `The draft has ${problems.length} problem${problems.length === 1 ? '' : 's'}. Ask the assistant to fix ${problems.length === 1 ? 'it' : 'them'} before accepting.`;
 		}
@@ -110,7 +110,7 @@
 			label={conversationId ? 'Refine the draft' : 'Describe the flow'}
 			hint={conversationId
 				? 'A follow-up refines the same draft. Nothing is saved until you accept it and save.'
-				: 'What it starts on, what it reads, and what it does. The flow on the canvas is sent with it.'}
+				: 'Say what starts the flow, what it reads and what it does. The flow on the canvas is sent with your request.'}
 			rows={5}
 			disabled={gated}
 			bind:value={prompt}
@@ -142,7 +142,7 @@
 				{/snippet}
 			</Alert>
 		{:else if status === 'unavailable'}
-			<Alert tone="warn" title="The assistant is not available on this engine">
+			<Alert tone="warn" title="The assistant is not available">
 				{#snippet children()}{message}{/snippet}
 			</Alert>
 		{:else if status === 'error'}
@@ -189,7 +189,7 @@
 							{/each}
 						</ul>
 					{:else}
-						<p class="text-xs text-success">The validator accepts this draft.</p>
+						<p class="text-xs text-success">This draft has no problems.</p>
 					{/if}
 					<div class="flex flex-wrap gap-2">
 						<Button variant="primary" size="sm" disabled={acceptReason !== ''} title={acceptReason || 'Put the draft on the canvas'} onclick={onaccept}>
@@ -210,7 +210,7 @@
 
 		{#if !busy && !draft && !answer && status === 'idle'}
 			<p class="text-sm text-muted" data-testid="assist-empty">
-				Describe a flow and the assistant drafts it against this engine's node catalog, or select a node and ask about it. The flow, the catalog and the prompt go to the provider configured for this tenant. Nothing else does.
+				Describe a flow and the assistant drafts it from the node types available here, or select a node and ask about it. Your prompt, the flow and the list of node types are sent to the AI provider set for this tenant, and nothing else is.
 			</p>
 		{/if}
 	</div>

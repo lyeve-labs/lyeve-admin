@@ -22,7 +22,7 @@ describe('NodeConfigForm', () => {
 		// A picker with nothing loaded is a plain field that says why.
 		const sort = getByLabelText('sort') as HTMLInputElement;
 		expect(sort.tagName).toBe('INPUT');
-		expect(container.textContent).toContain('The schema is not in the list');
+		expect(container.textContent).toContain('This schema is not in the list');
 		// A free map renders as a key and value editor.
 		expect(getByLabelText('New key')).toBeTruthy();
 	});
@@ -267,9 +267,9 @@ describe('NodeConfigForm flow and event pickers', () => {
 		const custom = getByLabelText('Hook value') as HTMLInputElement;
 		expect(custom.value).toBe('example:after_close');
 		expect(custom.placeholder).toBe('plugin:after_something');
-		expect(container.textContent).not.toContain('lowercase');
+		expect(container.textContent).not.toContain('lower case');
 		await rerender({ schema: event.config_schema, value: { kind: 'system', name: 'Example' }, events: fixtureEventTypes.system, onchange });
-		expect(container.textContent).toContain('lowercase');
+		expect(container.textContent).toContain('lower case');
 	});
 
 	it('takes a typed hook name when the engine listed none', async () => {
@@ -277,7 +277,7 @@ describe('NodeConfigForm flow and event pickers', () => {
 		const { container, getByLabelText } = render(NodeConfigForm, {
 			props: { schema: event.config_schema, value: { kind: 'system' }, events: [], onchange },
 		});
-		expect(container.textContent).toContain('The engine listed no hooks');
+		expect(container.textContent).toContain('No hooks to choose from');
 		await fireEvent.input(getByLabelText(/^Hook/), { target: { value: 'flow.run_failed' } });
 		expect(onchange).toHaveBeenLastCalledWith({ kind: 'system', name: 'flow.run_failed' });
 	});
@@ -338,15 +338,15 @@ describe('the datasource picker when the list is empty', () => {
 	// A failed read is not a tenant with no datasource.
 	it('says the datasources could not be read, and not that none exists', () => {
 		const text = hintOf({ state: 'unavailable' });
-		expect(text).toContain('The datasources could not be read. Type the name.');
+		expect(text).toContain('Could not load datasources. Type the name.');
 		expect(text).not.toContain('No datasource');
 	});
 
 	it('says a role that cannot list them so', () => {
-		expect(hintOf({ state: 'forbidden' })).toContain('Your role cannot list the datasources. Type the name.');
+		expect(hintOf({ state: 'forbidden' })).toContain('Your role cannot list datasources. Type the name.');
 	});
 
 	it('says none exists when the read answered with none', () => {
-		expect(hintOf({ state: 'ok' })).toContain('No datasource of a matching kind exists yet. Type the name.');
+		expect(hintOf({ state: 'ok' })).toContain('No datasource of this kind yet. Type the name.');
 	});
 });

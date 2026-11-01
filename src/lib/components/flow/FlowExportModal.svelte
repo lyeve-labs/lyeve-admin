@@ -33,7 +33,7 @@
 			const body = await load(next);
 			text = next === 'json' ? JSON.stringify(JSON.parse(body), null, 2) : body;
 		} catch {
-			error = 'The export could not be loaded. Save the draft and try again.';
+			error = 'Could not load the export. Save the draft and try again.';
 		} finally {
 			loading = false;
 		}
@@ -65,7 +65,7 @@
 					/>
 					<CopyButton value={text} label="Copy" />
 				</div>
-				<p class="text-xs text-muted">The saved draft, secrets stripped. Datasources are named, not carried.</p>
+				<p class="text-xs text-muted">This is the saved draft without its secrets. Datasources appear by name only, without their settings.</p>
 				{#if error}
 					<Alert tone="danger">
 						{#snippet children()}{error}{/snippet}

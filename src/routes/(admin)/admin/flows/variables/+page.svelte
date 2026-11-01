@@ -76,7 +76,7 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(v: Variable) {
-		const ok = await confirm(`Delete variable vars.${v.key}?`, 'Expressions that read it will fail.', { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete variable vars.${v.key}?`, 'Expressions that use it will fail.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteKey = v.key;
 		await tick();
@@ -95,7 +95,7 @@
 	<PageShell
 		title="Variables"
 		documentTitle="Variables - Flows"
-		description="Per-tenant values every flow can read as vars.<key>. A secret is stored encrypted, never shown again, and never written to a run record."
+		description="Set per-tenant values that every flow can use as vars.<key>. A secret is stored encrypted, never shown again and never written to a run record."
 		width="wide"
 		back={flowBack(page.url)}
 	>
@@ -109,7 +109,7 @@
 		{/snippet}
 
 		{#if data.gate.state !== 'ok'}
-			<GateNotice level={2} gate={data.gate} title="flow variables" absent="The flow plugin does not serve variables on this instance." />
+			<GateNotice level={2} gate={data.gate} title="flow variables" absent="Flow variables are not included in this build." />
 		{/if}
 
 		<FormErrors message={pageFailure} />
@@ -137,9 +137,9 @@
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.variables.length === 0 && data.q}
-			<EmptyState level={2} title="No variables match" description="No key, and no value that is not secret, holds that text." />
+			<EmptyState level={2} title="No variables match" description="No variables match this search. Secret values are not searched." />
 		{:else if data.variables.length === 0}
-			<EmptyState level={2} title="No variables yet" description="Expressions read one as vars.<key>.">
+			<EmptyState level={2} title="No variables yet" description="Create a variable to use it in expressions as vars.<key>.">
 				{#snippet iconSnippet()}<VariableIcon size={ICON.lg} />{/snippet}
 				{#snippet action()}
 					<Button variant="secondary" onclick={openCreate}>
@@ -214,7 +214,7 @@
 					id="variable-value"
 					name="value"
 					label={editing?.is_secret ? 'New value' : 'Value'}
-					hint={editing?.is_secret ? 'Secrets are write-only. Blank keeps the stored value.' : undefined}
+					hint={editing?.is_secret ? 'Secrets cannot be read back. Leave blank to keep the stored value.' : undefined}
 					bind:value
 				/>
 			{:else}
@@ -236,6 +236,6 @@
 	</form>
 {:else}
 	<PageShell title="Flows" documentTitle="Variables - Flows" width="wide">
-		<NotEnabled level={2} title="Flows" description="Variables belong to the flow plugin, and the engine refused its routes." />
+		<NotEnabled level={2} title="Flows" description="The license on this instance does not include flows." />
 	</PageShell>
 {/if}

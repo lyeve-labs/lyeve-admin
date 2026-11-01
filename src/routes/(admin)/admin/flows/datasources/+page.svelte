@@ -179,7 +179,7 @@
 		keepSecret
 			? 'Stored and never shown. Leave every secret field empty to keep it.'
 			: schemeChanged
-				? 'The scheme changed, so its secret is needed.'
+				? 'Enter the secret for the new scheme.'
 				: 'Encrypted at rest.'
 	);
 
@@ -200,12 +200,12 @@
 
 	// What each TLS mode tells the driver, keyed by the value the driver takes.
 	const SSL_SAYS: Record<string, string> = {
-		require: 'Encrypts the connection and refuses a server that will not.',
-		prefer: 'Encrypts when the server offers it, and connects in the clear when it does not.',
-		disable: 'Connects in the clear.',
+		require: 'Encrypts the connection, and fails when the server does not support encryption.',
+		prefer: 'Encrypts when the server supports it, and connects without encryption when it does not.',
+		disable: 'Connects without encryption.',
 		true: 'Encrypts the connection and checks the server certificate.',
-		'skip-verify': 'Encrypts the connection without checking whose certificate it is. Use it only for a server you trust on its address alone.',
-		false: 'Connects in the clear.',
+		'skip-verify': 'Encrypts the connection without checking the server certificate. Use it only for a server you trust by its address alone.',
+		false: 'Connects without encryption.',
 	};
 	const sslChoices = $derived(sslOptions.map((m) => ({ ...m, description: SSL_SAYS[m.value] })));
 
@@ -226,7 +226,7 @@
 	async function askDelete(ds: Datasource) {
 		const ok = await confirm(
 			`Delete datasource ${ds.name}?`,
-			'A flow that names it will fail at that node until you create it again.',
+			'Flows that use it fail at that node until you create it again.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
@@ -255,7 +255,7 @@
 	<PageShell
 		title="Datasources"
 		documentTitle="Datasources - Flows"
-		description="Stored, encrypted connections a flow refers to by name: an external database, an HTTP base with headers, or a Google service account."
+		description="Store the encrypted connections your flows use by name, such as an external database, an HTTP API or a Google service account."
 		width="wide"
 		back={flowBack(page.url)}
 	>
@@ -287,25 +287,25 @@
 				</span>
 				<div class="min-w-0 flex-1">
 					<p class="text-sm text-muted">
-						Slack, Discord and Telegram are reached from a flow. The
-						<code class="font-mono text-xs">chat.notify</code> node posts a message shaped for
-						the service, through an HTTP datasource whose base URL is the incoming webhook, or
-						the bot API with the chat id on the datasource. The
-						<code class="font-mono text-xs">chat-notify</code> template starts from a created
-						record and is the shortest way to a first message.
+						To post to Slack, Discord or Telegram, use the
+						<code class="font-mono text-xs">chat.notify</code> node in a flow. It sends through an
+						HTTP datasource whose base URL is the service's incoming webhook, or its bot API with
+						the chat id set on the datasource. The
+						<code class="font-mono text-xs">chat-notify</code> template posts a message when a
+						record is created, and is the quickest way to start.
 					</p>
 					<p class="mt-2 text-xs text-faint">
-						<code class="font-mono">EVENT_BUS</code> names the engine's message bus and never a
-						chat service: <code class="font-mono">discord</code>,
-						<code class="font-mono">slack</code> and <code class="font-mono">telegram</code> there
-						stop the engine from starting.
+						<code class="font-mono">EVENT_BUS</code> sets the engine's message bus, not a chat
+						service. Setting it to <code class="font-mono">discord</code>,
+						<code class="font-mono">slack</code> or <code class="font-mono">telegram</code> stops
+						the engine from starting.
 					</p>
 				</div>
 			</div>
 		</Card>
 
 		{#if data.gate.state !== 'ok'}
-			<GateNotice level={2} gate={data.gate} title="datasources" absent="The flow plugin does not serve datasources on this instance." />
+			<GateNotice level={2} gate={data.gate} title="datasources" absent="Datasources are not included in this build." />
 		{/if}
 
 		{#if pageFailure?.refused}
@@ -326,12 +326,12 @@
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if !available && data.datasources.length === 0}
-			<NotEnabled level={2} title="Datasources" description="A flow that uses one is refused when it is saved." />
+			<NotEnabled level={2} title="Datasources" description="A flow that uses a datasource cannot be saved." />
 		{:else if data.datasources.length === 0}
 			<EmptyState
 				level={2}
 				title="No datasources yet"
-				description="A db.query, http.request or sheets node names one of these."
+				description="Create a datasource to use it in a db.query, http.request or sheets node."
 			>
 				{#snippet iconSnippet()}<Database size={ICON.lg} />{/snippet}
 				{#snippet action()}
@@ -428,7 +428,7 @@
 				id="ds-name"
 				name="name"
 				label="Name"
-				hint="How a node refers to it: lower case letters, digits, dashes and underscores, starting with a letter."
+				hint="Nodes use this name to refer to the datasource. Use lower case letters, digits, dashes and underscores, starting with a letter."
 				error={saveFailure?.nameError || undefined}
 				value={editing?.name ?? ''}
 				required
@@ -463,7 +463,7 @@
 				<RadioGroup
 					name="ssl"
 					label="TLS"
-					hint="What the driver is told about the connection's encryption."
+					hint="How the connection is encrypted."
 					options={sslChoices}
 					value={ssl ?? ''}
 					onchange={(v) => (ssl = v)}
@@ -479,7 +479,7 @@
 					name="chat_id"
 					label="Chat id (optional)"
 					placeholder="@channel or a numeric id"
-					hint="For a Telegram bot API base: the chat a chat.notify node posts to unless the node names one."
+					hint="For a Telegram bot API base. A chat.notify node posts to this chat unless the node sets its own."
 					bind:value={chatId}
 				/>
 				{#if editing?.has_secret}
@@ -488,8 +488,8 @@
 					     plain header turned secret carries its value into that half,
 					     so the switch replaces them as typing does. -->
 					<p class="text-xs text-muted" data-testid="secret-rule">
-						The stored secrets are never shown, the secret headers included. Leave every secret field empty to keep
-						all of them. Typing a secret, or turning Secret on for a header, replaces all of them, so type every secret this
+						Stored secrets, including secret headers, are never shown. Leave every secret field empty to keep
+						them all. If you type a secret or turn on Secret for a header, all stored secrets are replaced, so enter every secret this
 						datasource needs.
 					</p>
 				{/if}
@@ -583,7 +583,7 @@
 				<Toggle
 					id="ds-allow-private"
 					label="Allow private addresses"
-					hint={superAdmin ? 'Off refuses hosts that resolve to a private range.' : `Off refuses hosts that resolve to a private range. ${GRANT_HINT}`}
+					hint={superAdmin ? 'When on, hosts that resolve to a private address range are allowed.' : `When on, hosts that resolve to a private address range are allowed. ${GRANT_HINT}`}
 					disabled={!superAdmin}
 					bind:checked={allowPrivate}
 				/>
@@ -600,6 +600,6 @@
 	</form>
 {:else}
 	<PageShell title="Flows" documentTitle="Datasources - Flows" width="wide">
-		<NotEnabled level={2} title="Flows" description="Datasources belong to the flow plugin, and the engine refused its routes." />
+		<NotEnabled level={2} title="Flows" description="The license on this instance does not include flows." />
 	</PageShell>
 {/if}

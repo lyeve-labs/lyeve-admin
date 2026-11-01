@@ -75,9 +75,9 @@ export function writeButtons(state: {
 			hint: !publishable
 				? refusal
 				: live && !dirty
-					? 'The live version is this draft'
+					? 'This draft is already live'
 					: unknown
-						? 'The versions could not be read, so this draft may already be live'
+						? 'Could not load versions. This draft may already be live'
 						: 'Save and publish',
 		},
 	};

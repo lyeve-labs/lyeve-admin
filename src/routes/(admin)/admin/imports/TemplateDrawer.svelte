@@ -67,7 +67,7 @@
 		const out: FieldMapping[] = [];
 		for (const r of rows) {
 			if (!r.source.trim() && !r.target) continue;
-			if (!r.source.trim() || !r.target) return 'Every row names a column in the file and the field it fills.';
+			if (!r.source.trim() || !r.target) return 'Give every row a column in the file and the field it fills.';
 			const fields = transformFields(r.transform);
 			if (typeof fields === 'string') return `${r.source}: ${fields}`;
 			const dataType = templateTargets.find((t) => t.value === r.target)?.dataType;
@@ -123,14 +123,14 @@
 				name="content_type"
 				label="Content type"
 				searchable
-				hint={schemas === null ? 'The content types could not be read, so none can be chosen. Close this and try again in a moment.' : undefined}
+				hint={schemas === null ? 'Could not load content types. Reload the page to try again.' : undefined}
 				bind:value={templateType}
 				options={(schemas ?? []).map((x) => ({ value: x.name, label: x.name }))}
 			/>
 			<RadioGroup
 				label="When an entry already exists"
 				name="mode"
-				hint="The key field decides which entry a row is."
+				hint="The key field matches each row to an existing entry."
 				bind:value={templateMode}
 				options={[
 					{ value: 'create', label: 'Create only', description: 'Leave an entry the key finds alone and report the row as skipped.' },
@@ -142,7 +142,7 @@
 					id="template-key"
 					name="upsert_key"
 					label="Key field"
-					hint="The field that finds the entry a row updates."
+					hint="The field that matches a row to the entry it updates."
 					searchable
 					bind:value={templateKey}
 					options={[

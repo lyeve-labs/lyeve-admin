@@ -235,7 +235,7 @@ describe('flows list page', () => {
 			data,
 			form: {
 				action: 'create',
-				error: 'The definition did not validate.',
+				error: 'Fix the problems in the definition.',
 				errors: [
 					{ node_id: 'join', path: '/config/left_key', message: 'required' },
 					{ path: '/settings/timeout', message: 'not a duration' },
@@ -243,7 +243,7 @@ describe('flows list page', () => {
 			},
 		} as never);
 		const drawer = container.ownerDocument.querySelector('#flow-create-form') as HTMLElement;
-		expect(drawer.textContent).toContain('The definition did not validate.');
+		expect(drawer.textContent).toContain('Fix the problems in the definition.');
 		expect(drawer.textContent).toContain('join /config/left_key: required');
 		expect(drawer.textContent).toContain('/settings/timeout: not a duration');
 		expect(drawer.textContent).not.toContain('undefined');
@@ -262,14 +262,14 @@ describe('flows list page', () => {
 
 	// The drawers and the row's delete share one form result.
 	it('shows a failed delete on the page and not in a drawer opened after it', async () => {
-		const { container, getAllByText, getByText } = setup({ flows: [fixtureFlow] }, licensed, { action: 'delete', error: 'Failed to delete flow' });
-		expect(container.textContent).toContain('Failed to delete flow');
+		const { container, getAllByText, getByText } = setup({ flows: [fixtureFlow] }, licensed, { action: 'delete', error: 'Could not delete the flow. Try again.' });
+		expect(container.textContent).toContain('Could not delete the flow. Try again.');
 
 		await fireEvent.click(getAllByText('New flow')[0]);
-		expect((container.ownerDocument.querySelector('#flow-create-form') as HTMLElement).textContent).not.toContain('Failed to delete flow');
+		expect((container.ownerDocument.querySelector('#flow-create-form') as HTMLElement).textContent).not.toContain('Could not delete the flow. Try again.');
 
 		await fireEvent.click(getByText('Import'));
-		expect((container.ownerDocument.querySelector('#flow-import-form') as HTMLElement).textContent).not.toContain('Failed to delete flow');
+		expect((container.ownerDocument.querySelector('#flow-import-form') as HTMLElement).textContent).not.toContain('Could not delete the flow. Try again.');
 	});
 
 	it('keeps a failed import out of the page behind the drawer', () => {

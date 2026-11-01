@@ -92,7 +92,7 @@ describe('variables page', () => {
 		const value = form.querySelector('[name="value"]') as HTMLInputElement;
 		expect(value.value).toBe('');
 		expect(value.type).toBe('password');
-		expect(form.textContent).toContain('write-only');
+		expect(form.textContent).toContain('cannot be read back');
 	});
 
 	it('closes the drawer once the write is saved', () => {
@@ -108,16 +108,16 @@ describe('variables page', () => {
 	});
 
 	it('shows a failed delete on the page', () => {
-		const { container } = setup(variables, { action: 'delete', error: 'Failed to delete variable' });
-		expect(container.textContent).toContain('Failed to delete variable');
+		const { container } = setup(variables, { action: 'delete', error: 'Could not delete the variable. Try again.' });
+		expect(container.textContent).toContain('Could not delete the variable. Try again.');
 	});
 
 	// The drawer and the delete share one form result.
 	it('keeps a failed delete out of the drawer opened after it', async () => {
-		const { container, getAllByText } = setup(variables, { action: 'delete', error: 'Failed to delete variable' });
+		const { container, getAllByText } = setup(variables, { action: 'delete', error: 'Could not delete the variable. Try again.' });
 		await fireEvent.click(getAllByText('New variable')[0]);
 		const drawer = container.ownerDocument.querySelector('#variable-form') as HTMLElement;
-		expect(drawer.textContent).not.toContain('Failed to delete variable');
+		expect(drawer.textContent).not.toContain('Could not delete the variable. Try again.');
 	});
 
 	it('shows a failed save inside the open drawer', async () => {

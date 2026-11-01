@@ -107,7 +107,7 @@
 
 	async function askDelete(wh: IncomingWebhook) {
 		const ok = await confirmDialog(
-			`Delete incoming webhook ${wh.name}`,
+			`Delete incoming webhook ${wh.name}?`,
 			'External services can no longer send payloads to this endpoint.',
 			{ confirmLabel: 'Delete' }
 		);
@@ -137,7 +137,7 @@
 
 <PageShell
 	title="Incoming webhooks"
-	description="Public HTTP endpoints that accept payloads from external services and create content records."
+	description="Create public endpoints that turn payloads from external services into content records."
 	width="wide"
 >
 	{#snippet actions()}
@@ -153,12 +153,12 @@
 	<FormErrors message={(pageForm as Failure)?.error || undefined} refused={formRefusal(pageForm)} />
 
 	{#if data.incomingWebhooks.ok && !isSuperAdmin}
-		<Alert tone="brand">Your role reads incoming webhooks. Creating, changing or deleting one takes a super admin.</Alert>
+		<Alert tone="brand">You can view incoming webhooks. Only a super admin can create, change or delete them.</Alert>
 	{/if}
 
 	{#if data.incomingWebhooks.ok && isSuperAdmin && held}
 		<Alert tone="warn">
-			The license on this instance does not include creating or changing incoming webhooks. Deleting one stays open.
+			The license on this instance does not include creating or changing incoming webhooks. You can still delete them.
 		</Alert>
 	{/if}
 
@@ -167,13 +167,13 @@
 			level={2}
 			gate={data.incomingWebhooks.gate}
 			title="Incoming webhooks"
-			absent="The webhook plugin is not part of this build, so no external service can send payloads here."
+			absent="Incoming webhooks are not included in this build."
 		/>
 	{:else if data.incomingWebhooks.value.length === 0}
 		<EmptyState
 			level={2}
-			title="No incoming webhooks"
-			description="Create one to receive payloads from external services."
+			title="No incoming webhooks yet"
+			description="Create an incoming webhook to receive payloads from external services."
 		>
 			{#snippet iconSnippet()}<ArrowDownToLine size={ICON.lg} />{/snippet}
 			{#snippet action()}
@@ -197,7 +197,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState level={2} title="No incoming webhook matches" description="Clear the search or widen the status to see every endpoint." />
+			<EmptyState level={2} title="No incoming webhooks match these filters" description="Clear the search or widen the status to see every endpoint." />
 		{:else}
 		<div class="flex flex-col gap-3">
 			{#each visible as wh (wh.id)}
@@ -282,7 +282,7 @@
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input id="incoming-name" name="name" label="Name" required bind:value={name} placeholder="Stripe events" />
 		{#if !data.schemas.ok}
-			<p class="text-xs text-muted">The schemas could not be read, so only the one this endpoint already names is listed.</p>
+			<p class="text-xs text-muted">Could not load schemas. Only the one this endpoint already uses is listed.</p>
 		{/if}
 		<Select
 			id="incoming-schema"
@@ -298,7 +298,7 @@
 			id="incoming-secret"
 			name="secret"
 			label={editing ? 'New signing secret' : 'Signing secret'}
-			hint={editing ? 'Leave blank to keep current' : 'Leave blank to disable signature verification'}
+			hint={editing ? 'Leave blank to keep the current secret.' : 'Leave blank to disable signature verification'}
 			bind:value={secret}
 		/>
 		<Textarea
@@ -306,7 +306,7 @@
 			name="field_map"
 			label="Field map"
 			required
-			hint="JSON map of external key to schema field. At least one mapping is required. The engine rejects an empty map."
+			hint="A JSON map of external keys to schema fields. Add at least one mapping."
 			rows={4}
 			bind:value={fieldMap}
 			mono
