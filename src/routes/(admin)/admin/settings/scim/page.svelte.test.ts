@@ -81,8 +81,8 @@ describe('the gate', () => {
 		const { container } = render(ScimPage, {
 			props: props({ gate: { state: 'absent' }, providers: [] }),
 		});
-		expect(said(container)).toContain('not part of this build');
-		expect(said(container)).not.toContain('No directory is connected');
+		expect(said(container)).toContain('not included in this build');
+		expect(said(container)).not.toContain('No connections yet');
 	});
 
 	it('reports a failed read as a failure, not as an empty list', () => {
@@ -90,7 +90,7 @@ describe('the gate', () => {
 			props: props({ gate: { state: 'error', message: 'The connections could not be read.' }, providers: [] }),
 		});
 		expect(said(container)).toContain('could not be read');
-		expect(said(container)).not.toContain('No directory is connected');
+		expect(said(container)).not.toContain('No connections yet');
 	});
 });
 
@@ -160,7 +160,7 @@ describe('the connection form', () => {
 		const { container } = render(ScimPage, { props: props({ saml: { state: 'failed' } }) });
 		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
 		const dialog = container.ownerDocument.querySelector('[role="dialog"]') as HTMLElement;
-		expect(said(dialog)).toContain('The SAML providers could not be read');
+		expect(said(dialog)).toContain('Could not load the SAML providers');
 		expect(dialog.querySelector('[name="saml_provider_id"]')).toBeNull();
 	});
 
@@ -174,14 +174,14 @@ describe('the connection form', () => {
 	it('warns that rotating breaks provisioning until the directory is updated', async () => {
 		const { container } = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
-		expect(said(container)).toContain('stops working the moment this one is stored');
+		expect(said(container)).toContain('stops working as soon as the new one is saved');
 	});
 });
 
 describe('the empty state', () => {
 	it('says what a connection is for rather than that a read failed', () => {
 		const { container } = render(ScimPage, { props: props({ providers: [] }) });
-		expect(said(container)).toContain('No directory is connected');
+		expect(said(container)).toContain('No connections yet');
 	});
 });
 
@@ -205,37 +205,37 @@ describe('the drawers', () => {
 	it('shows a refused create inside the open drawer', async () => {
 		const { rerender } = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
-		await rerender(props({}, { action: 'create', error: 'The connection could not be created.' }));
-		expect(createText()).toContain('The connection could not be created.');
+		await rerender(props({}, { action: 'create', error: 'Could not create the connection. Try again.' }));
+		expect(createText()).toContain('Could not create the connection. Try again.');
 	});
 
 	it('shows a refused rotation inside the open drawer', async () => {
 		const { rerender } = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
-		await rerender(props({}, { action: 'rotate', error: 'The token could not be rotated.' }));
-		expect(rotateText()).toContain('The token could not be rotated.');
+		await rerender(props({}, { action: 'rotate', error: 'Could not rotate the token. Try again.' }));
+		expect(rotateText()).toContain('Could not rotate the token. Try again.');
 	});
 
 	it('leaves a newly opened create drawer clean after a failed delete', async () => {
 		const { container } = render(ScimPage, {
-			props: props({}, { action: 'delete', error: 'The connection could not be removed.' }),
+			props: props({}, { action: 'delete', error: 'Could not delete the connection. Try again.' }),
 		});
-		expect(said(container)).toContain('The connection could not be removed.');
+		expect(said(container)).toContain('Could not delete the connection. Try again.');
 		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
-		expect(createText()).not.toContain('could not be removed');
+		expect(createText()).not.toContain('Could not delete');
 	});
 
 	it('keeps a failed create out of the rotate drawer, and a failed rotation out of the create drawer', async () => {
 		const { rerender } = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));
-		await rerender(props({}, { action: 'create', error: 'The connection could not be created.' }));
-		expect(rotateText()).not.toContain('could not be created');
+		await rerender(props({}, { action: 'create', error: 'Could not create the connection. Try again.' }));
+		expect(rotateText()).not.toContain('Could not create');
 		cleanup();
 
 		const second = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
-		await second.rerender(props({}, { action: 'rotate', error: 'The token could not be rotated.' }));
-		expect(createText()).not.toContain('could not be rotated');
+		await second.rerender(props({}, { action: 'rotate', error: 'Could not rotate the token. Try again.' }));
+		expect(createText()).not.toContain('Could not rotate');
 	});
 
 	it('offers the deprovision choice as radios that say deleting cannot be undone', async () => {
@@ -256,7 +256,7 @@ describe('the search', () => {
 		expect(said(container)).toContain('Okta');
 		expect(said(container)).not.toContain('Azure AD');
 		await fireEvent.input(screen.getByPlaceholderText('Connection name on this page'), { target: { value: 'nothing like it' } });
-		expect(said(container)).toContain('No connection on this page matches');
+		expect(said(container)).toContain('No connections match this search');
 		expect(container.querySelector('a[href="/admin/settings/scim?limit=25&offset=25"]')).toBeTruthy();
 	});
 });
@@ -264,7 +264,7 @@ describe('the search', () => {
 describe('the delete', () => {
 	it('names the connection in the confirmation', async () => {
 		render(ScimPage, { props: props() });
-		expect(await deleteTitle()).toBe('Delete SCIM connection Azure AD');
+		expect(await deleteTitle()).toBe('Delete SCIM connection Azure AD?');
 	});
 });
 
@@ -287,7 +287,7 @@ describe('the removal switch', () => {
 		render(ScimPage, { props: props({}) });
 		await fireEvent.click(screen.getAllByRole('button', { name: /new connection/i })[0]);
 		const hint = document.body.textContent ?? '';
-		expect(hint).toContain('a directory that deletes the person');
+		expect(hint).toContain('When a directory deletes a person');
 		expect(hint).toContain('mark the person inactive');
 		expect(hint).toContain('always disables the account');
 	});

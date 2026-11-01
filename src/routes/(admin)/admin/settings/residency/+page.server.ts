@@ -64,7 +64,7 @@ export const load: PageServerLoad = async (event) => {
 		gate.state === 'ok'
 			? await section(
 					readReport(client),
-					'The residency report could not be read. This is not a report that every tenant is placed.',
+					'Could not load the residency report.',
 				)
 			: null;
 
@@ -99,11 +99,11 @@ export const actions: Actions = {
 		if (!slugIsSound(slug)) {
 			return fail(400, {
 				action: 'create',
-				error: 'A region slug is lower case letters, digits and hyphens, starting with a letter. It is copied onto every assignment, so it cannot be renamed later.',
+				error: 'Enter a slug of lowercase letters, digits and hyphens that starts with a letter. You cannot change it later.',
 			});
 		}
-		if (!displayName) return fail(400, { action: 'create', error: 'Give the region a name a person can read.' });
-		if (!provider) return fail(400, { action: 'create', error: 'Name who runs it: aws, gcp, azure, on-prem.' });
+		if (!displayName) return fail(400, { action: 'create', error: 'Enter a name for the region.' });
+		if (!provider) return fail(400, { action: 'create', error: 'Enter where it runs, such as aws, gcp, azure or on-prem.' });
 
 		// The plugin's create takes no enabled field, refuses a body that
 		// names one, and opens every new region. A region asked for closed is
@@ -118,7 +118,7 @@ export const actions: Actions = {
 				is_default: form.get('is_default') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { action: 'create', error: actionError(err, 'The region could not be created.') });
+			return fail(400, { action: 'create', error: actionError(err, 'Could not create the region. Try again.') });
 		}
 		if (form.get('enabled') !== 'true') {
 			try {
@@ -126,7 +126,7 @@ export const actions: Actions = {
 			} catch {
 				return fail(400, {
 					action: 'close',
-					error: `Region ${displayName} was created but could not be closed, so it is listed to clients, used for nearest-region routing and still takes new tenants. Edit it and turn off Accepting new tenants.`,
+					error: `Region ${displayName} was created, but it is still accepting new tenants. Clients can see it and are routed to it as their nearest region. Edit it and turn off Accepting new tenants.`,
 				});
 			}
 		}
@@ -138,11 +138,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'update', error: 'No region was named.' });
+		if (!id) return fail(400, { action: 'update', error: 'This form is missing its region. Reload the page and try again.' });
 
 		const displayName = String(form.get('display_name') ?? '').trim();
 		const provider = String(form.get('provider') ?? '').trim();
-		if (!displayName) return fail(400, { action: 'update', error: 'Give the region a name a person can read.' });
+		if (!displayName) return fail(400, { action: 'update', error: 'Enter a name for the region.' });
 
 		// The slug is deliberately not sent. It is denormalized onto every
 		// tenant assignment and onto the report, so changing it here would
@@ -156,7 +156,7 @@ export const actions: Actions = {
 				is_default: form.get('is_default') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { action: 'update', error: actionError(err, 'The region could not be saved.') });
+			return fail(400, { action: 'update', error: actionError(err, 'Could not save the region. Try again.') });
 		}
 		return { saved: displayName };
 	},
@@ -166,11 +166,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'No region was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its region. Reload the page and try again.' });
 		try {
 			await deleteRegion(client, id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'The region could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the region. Try again.') });
 		}
 		return { removed: id };
 	},

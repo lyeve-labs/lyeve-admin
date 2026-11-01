@@ -81,7 +81,7 @@ export const load: PageServerLoad = async (event) => {
 		gate.state === 'ok'
 			? await section(
 					readStatus(client).then((r) => r.buckets ?? []),
-					'The live counters could not be read. This is not a report that nobody is being throttled.',
+					'Could not load the live counters.',
 				)
 			: { ok: false, gate };
 
@@ -113,17 +113,17 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	if (!endpointIsSound(endpoint)) {
 		return fail(400, {
 			action: 'rule',
-			error: 'An endpoint is "*" for every request, or a method and a path such as GET /api/v1/content/{schema}. A segment may be a {name} placeholder and the last one may be *.',
+			error: 'Enter * for every request, or a method and a path, such as GET /api/v1/content/{schema}. A segment can be a {name} placeholder, and the last one can be *.',
 		});
 	}
 
 	const rate = num(form.get('rate'));
 	const burst = Math.floor(num(form.get('burst')));
 	if (!Number.isFinite(rate) || rate <= 0) {
-		return fail(400, { action: 'rule', error: 'The rate is requests per second and must be more than zero.' });
+		return fail(400, { action: 'rule', error: 'Enter a rate above zero, in requests per second.' });
 	}
 	if (!Number.isFinite(burst) || burst < 1) {
-		return fail(400, { action: 'rule', error: 'The burst is a number of requests and must be at least one.' });
+		return fail(400, { action: 'rule', error: 'Enter a burst of at least one request.' });
 	}
 
 	const role = String(form.get('role') ?? '').trim();
@@ -160,7 +160,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		return fail(400, { action: 'rule', error: actionError(err, 'The rule could not be saved.') });
+		return fail(400, { action: 'rule', error: actionError(err, 'Could not save the rule. Try again.') });
 	}
 	return { saved: endpoint };
 }
@@ -171,7 +171,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'rule', error: 'No rule was named.' });
+		if (!id) return fail(400, { action: 'rule', error: 'This form is missing its rule. Reload the page and try again.' });
 		return save(event, id);
 	},
 
@@ -180,11 +180,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'No rule was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its rule. Reload the page and try again.' });
 		try {
 			await deleteRule(client, id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'The rule could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the rule. Try again.') });
 		}
 		return { removed: id };
 	},
@@ -196,15 +196,15 @@ export const actions: Actions = {
 		const rate = num(form.get('rate'));
 		const burst = Math.floor(num(form.get('burst')));
 		if (!Number.isFinite(rate) || rate <= 0) {
-			return fail(400, { action: 'global', error: 'The rate is requests per second and must be more than zero.' });
+			return fail(400, { action: 'global', error: 'Enter a rate above zero, in requests per second.' });
 		}
 		if (!Number.isFinite(burst) || burst < 1) {
-			return fail(400, { action: 'global', error: 'The burst must be at least one request.' });
+			return fail(400, { action: 'global', error: 'Enter a burst of at least one request.' });
 		}
 		try {
 			await updateGlobal(client, { rate, burst, enabled: form.get('enabled') === 'true' });
 		} catch (err) {
-			return fail(400, { action: 'global', error: actionError(err, 'The global limit could not be saved.') });
+			return fail(400, { action: 'global', error: actionError(err, 'Could not save the global limit. Try again.') });
 		}
 		return { savedGlobal: true };
 	},
@@ -216,15 +216,15 @@ export const actions: Actions = {
 		const name = String(form.get('name') ?? '');
 		const requests = Math.floor(num(form.get('requests')));
 		const minutes = num(form.get('window_minutes'));
-		if (!name) return fail(400, { action: 'protection', error: 'No protection was named.' });
+		if (!name) return fail(400, { action: 'protection', error: 'This form is missing its protection. Reload the page and try again.' });
 		if (!Number.isFinite(requests) || requests < 1 || requests > 100000) {
 			return fail(400, {
 				action: 'protection',
-				error: 'Requests must be between 1 and 100000. Zero would lock every caller out of signing in.',
+				error: 'Enter between 1 and 100000 requests. Zero would lock everyone out of signing in.',
 			});
 		}
 		if (!Number.isFinite(minutes) || minutes <= 0 || minutes > MAX_WINDOW_MINUTES) {
-			return fail(400, { action: 'protection', error: 'The window is in minutes, more than zero and at most a day.' });
+			return fail(400, { action: 'protection', error: 'Enter a window of more than zero minutes and at most a day.' });
 		}
 		try {
 			await setProtection(client, {
@@ -233,7 +233,7 @@ export const actions: Actions = {
 				window_seconds: Math.max(1, Math.round(minutes * 60)),
 			});
 		} catch (err) {
-			return fail(400, { action: 'protection', error: actionError(err, 'The protection could not be saved.') });
+			return fail(400, { action: 'protection', error: actionError(err, 'Could not save the protection. Try again.') });
 		}
 		return { savedProtection: name };
 	},
@@ -243,11 +243,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '');
-		if (!name) return fail(400, { action: 'resetProtection', error: 'No protection was named.' });
+		if (!name) return fail(400, { action: 'resetProtection', error: 'This form is missing its protection. Reload the page and try again.' });
 		try {
 			await resetProtection(client, name);
 		} catch (err) {
-			return fail(400, { action: 'resetProtection', error: actionError(err, 'The protection could not be reset.') });
+			return fail(400, { action: 'resetProtection', error: actionError(err, 'Could not reset the protection. Try again.') });
 		}
 		return { resetProtection: name };
 	},

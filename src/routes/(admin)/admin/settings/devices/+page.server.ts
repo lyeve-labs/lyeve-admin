@@ -70,12 +70,12 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const label = String(form.get('label') ?? '').trim();
 		if (!label) {
-			return fail(400, { error: 'Name this device, or you will not know which one it was.' });
+			return fail(400, { error: 'Enter a name for this device.' });
 		}
 		try {
 			await trustThisDevice(client, label);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'This device could not be trusted.') });
+			return fail(400, { error: actionError(err, 'Could not trust this device. Try again.') });
 		}
 		return { trusted: label };
 	},
@@ -84,11 +84,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No device was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its device. Reload the page and try again.' });
 		try {
 			await untrustDevice(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The device could not be removed.') });
+			return fail(400, { error: actionError(err, 'Could not forget this device. Try again.') });
 		}
 		return { removed: id };
 	},

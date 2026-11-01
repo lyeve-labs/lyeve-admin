@@ -81,7 +81,7 @@ describe('the gate', () => {
 		const { container } = render(ResidencyPage, {
 			props: props({ permitted: false, regions: [], report: null }),
 		});
-		expect(said(container)).toContain("super admin's to read");
+		expect(said(container)).toContain('Only a super admin can see regions and the residency report');
 	});
 });
 
@@ -94,13 +94,13 @@ describe('the report', () => {
 				report: null,
 				reportGate: {
 					state: 'error',
-					message: 'The residency report could not be read. This is not a report that every tenant is placed.',
+					message: 'Could not load the residency report.',
 				},
 			}),
 		});
 		const text = said(container);
-		expect(text).toContain('not a report that every tenant is placed');
-		expect(text).not.toContain('Nothing to report yet');
+		expect(text).toContain('Could not load the residency report.');
+		expect(text).not.toContain('No tenants assigned yet');
 	});
 
 	it('says a refused report is a role refusal, not an outage', () => {
@@ -110,7 +110,7 @@ describe('the report', () => {
 		const text = said(container);
 		expect(text).toContain('Your role cannot open the residency report.');
 		expect(text).not.toContain('did not answer');
-		expect(text).not.toContain('Nothing to report yet');
+		expect(text).not.toContain('No tenants assigned yet');
 	});
 
 	it('calls an unplaced tenant unaccounted for, not defaulted', () => {
@@ -126,7 +126,7 @@ describe('the report', () => {
 		const { container } = render(ResidencyPage, { props: props({ report: stranded }) });
 		const text = said(container);
 		expect(text).toContain('3 tenants have no region assigned');
-		expect(text).toContain('not a default placement');
+		expect(text).toContain('They are not in a default region');
 	});
 
 	it('warns that a truncated report is not an audit', () => {
@@ -148,7 +148,7 @@ describe('the report', () => {
 		const { container } = render(ResidencyPage, {
 			props: props({ report: report({ summary: null, tenant_regions: [] }) }),
 		});
-		expect(said(container)).toContain('Nothing to report yet');
+		expect(said(container)).toContain('No tenants assigned yet');
 	});
 
 	it('names where each tenant sits and whether it has a replica', () => {
@@ -176,7 +176,7 @@ describe('regions', () => {
 
 	it('says a region has to exist before a tenant can be placed', () => {
 		const { container } = render(ResidencyPage, { props: props({ regions: [] }) });
-		expect(said(container)).toContain('before a tenant can be placed');
+		expect(said(container)).toContain('Create a region before you place a tenant in it');
 	});
 });
 
@@ -194,12 +194,12 @@ describe('Data residency region drawer', () => {
 describe('Data residency failures stay where they were made', () => {
 	it('shows a failed delete on the page and opens the region drawer clean', async () => {
 		const { getByRole, container } = render(ResidencyPage, {
-			props: props({}, { action: 'delete', error: 'The region could not be removed.' }),
+			props: props({}, { action: 'delete', error: 'Could not delete the region. Try again.' }),
 		});
-		expect(said(container)).toContain('The region could not be removed.');
+		expect(said(container)).toContain('Could not delete the region. Try again.');
 		await fireEvent.click(getByRole('button', { name: /new region/i }));
 		const form = document.getElementById('region-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('could not be removed');
+		expect(form.textContent).not.toContain('Could not delete');
 	});
 });
 

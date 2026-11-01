@@ -88,8 +88,8 @@ describe('region writes', () => {
 		);
 		const out = (await actions.create(event)) as Failure;
 		expect(out.data.action).toBe('close');
-		expect(out.data.error).toContain('was created but could not be closed');
-		expect(out.data.error).toContain('listed to clients, used for nearest-region routing and still takes new tenants');
+		expect(out.data.error).toContain('was created, but it is still accepting new tenants');
+		expect(out.data.error).toContain('Clients can see it and are routed to it as their nearest region');
 		expect(out.data.error.endsWith('Edit it and turn off Accepting new tenants.')).toBe(true);
 	});
 
@@ -100,9 +100,9 @@ describe('region writes', () => {
 	});
 
 	it.each([
-		[{ slug: 'EU West' }, 'A region slug is lower case letters'],
-		[{ display_name: ' ' }, 'Give the region a name a person can read.'],
-		[{ provider: '' }, 'Name who runs it'],
+		[{ slug: 'EU West' }, 'Enter a slug of lowercase letters'],
+		[{ display_name: ' ' }, 'Enter a name for the region.'],
+		[{ provider: '' }, 'Enter where it runs'],
 	])('refuses %o before it creates anything', async (over, sentence) => {
 		const { event, calls } = engine({ ...REGION, ...over });
 		const out = (await actions.create(event)) as Failure;
@@ -127,7 +127,7 @@ describe('region writes', () => {
 
 	it.each(['update', 'delete'] as const)('names nothing to %s without a request', async (name) => {
 		const { event, calls } = engine({ display_name: 'EU West' });
-		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'No region was named.' });
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'This form is missing its region. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -138,9 +138,9 @@ describe('region writes', () => {
 	});
 
 	it.each([
-		['create', 'The region could not be created.'],
-		['update', 'The region could not be saved.'],
-		['delete', 'The region could not be removed.'],
+		['create', 'Could not create the region. Try again.'],
+		['update', 'Could not save the region. Try again.'],
+		['delete', 'Could not delete the region. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = engine({ id: 'r1', ...REGION }, { reply: OUTAGE });
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });

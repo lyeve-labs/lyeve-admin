@@ -49,7 +49,7 @@ describe('the gate', () => {
 
 	it('explains the refusal to an admin who may not read it', () => {
 		const { container } = render(GrpcPage, { props: props({ permitted: false, status: null }) });
-		expect(said(container)).toContain("super admin's to read");
+		expect(said(container)).toContain('Only a super admin can see the gRPC status');
 	});
 
 	it('reports a failed read as a failure, not as a healthy listener', () => {
@@ -68,7 +68,7 @@ describe('why nothing is listening', () => {
 			props: props({ status: status({ degraded: true, listening: false, address: '' }) }),
 		});
 		const text = said(container);
-		expect(text).toContain('Nothing is wrong with the port');
+		expect(text).toContain('The port is not the problem');
 	});
 
 	it('points at the start-up log when it is enabled and still down', () => {
@@ -94,13 +94,13 @@ describe('the services', () => {
 			}),
 		});
 		const text = said(container);
-		expect(text).toContain('1 service is registered on the server but unknown');
+		expect(text).toContain('1 service is registered on the server but missing from the health service');
 		expect(text).toContain('health was never told about it');
 	});
 
 	it('says nothing of the sort when every service is declared', () => {
 		const { container } = render(GrpcPage, { props: props() });
-		expect(said(container)).not.toContain('unknown to the health protocol');
+		expect(said(container)).not.toContain('missing from the health service');
 	});
 });
 

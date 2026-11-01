@@ -93,11 +93,11 @@ export const actions: Actions = {
 		const token = String(form.get('bearer_token') ?? '');
 		const action = deprovisionAction(String(form.get('deprovision_action') ?? 'disable'));
 
-		if (!name) return fail(400, { action: 'create', error: 'Name the connection so it can be told from the others.' });
+		if (!name) return fail(400, { action: 'create', error: 'Enter a name for the connection.' });
 		if (token.length < MIN_TOKEN_LENGTH) {
 			return fail(400, {
 				action: 'create',
-				error: `The token is the whole authentication for a route that creates and deletes accounts. Use at least ${MIN_TOKEN_LENGTH} characters.`,
+				error: `Enter a token of at least ${MIN_TOKEN_LENGTH} characters. It is the only thing protecting a route that creates and deletes accounts.`,
 			});
 		}
 		if (!action) return fail(400, { action: 'create', error: 'Choose what happens to a deprovisioned account.' });
@@ -112,7 +112,7 @@ export const actions: Actions = {
 				...(samlProvider ? { saml_provider_id: samlProvider } : {}),
 			});
 		} catch (err) {
-			return fail(400, { action: 'create', error: actionError(err, 'The connection could not be created.') });
+			return fail(400, { action: 'create', error: actionError(err, 'Could not create the connection. Try again.') });
 		}
 		return { saved: name };
 	},
@@ -123,17 +123,17 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const token = String(form.get('new_token') ?? '');
-		if (!id) return fail(400, { action: 'rotate', error: 'No connection was named.' });
+		if (!id) return fail(400, { action: 'rotate', error: 'This form is missing its connection. Reload the page and try again.' });
 		if (token.length < MIN_TOKEN_LENGTH) {
 			return fail(400, {
 				action: 'rotate',
-				error: `Use at least ${MIN_TOKEN_LENGTH} characters. The old token stops working the moment this one is stored.`,
+				error: `Enter a token of at least ${MIN_TOKEN_LENGTH} characters. The old token stops working as soon as the new one is saved.`,
 			});
 		}
 		try {
 			await rotateToken(client, id, token);
 		} catch (err) {
-			return fail(400, { action: 'rotate', error: actionError(err, 'The token could not be rotated.') });
+			return fail(400, { action: 'rotate', error: actionError(err, 'Could not rotate the token. Try again.') });
 		}
 		return { rotated: id };
 	},
@@ -143,11 +143,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'No connection was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its connection. Reload the page and try again.' });
 		try {
 			await deleteProvider(client, id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'The connection could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the connection. Try again.') });
 		}
 		return { removed: id };
 	},

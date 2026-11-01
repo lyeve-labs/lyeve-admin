@@ -41,7 +41,7 @@
 
 <PageShell
 	title="Security"
-	description="What is protecting this instance right now, and what turns on the rest. Read from the running engine, not from configuration."
+	description="See which controls protect this instance right now, and how to turn on the rest. The status comes from the running engine, not from configuration."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -50,7 +50,7 @@
 			level={2}
 			gate={data.report.gate}
 			title="Security"
-			absent="This engine does not report its controls. Its boot log lists the same controls."
+			absent="The security report is not included in this build. You can find the same controls in the engine's boot log."
 		/>
 	{:else}
 		{@const report = data.report.value}
@@ -59,7 +59,7 @@
 				{report.failures === 1
 					? 'One control is switched on and not in the request path.'
 					: `${report.failures} controls are switched on and not in the request path.`}
-				That is the case to fix first: it reads as protected and is not.
+				Fix this first, because the instance looks protected and is not.
 			</Alert>
 		{/if}
 
@@ -76,7 +76,7 @@
 			{#if controls.length === 0}
 				<EmptyState
 					title="No controls reported"
-					description="The engine answered without a security report. It is built from what the instance can see about itself, so an empty one usually means a plugin that supplies it is not running."
+					description="The security report is empty. This usually means a plugin that supplies it is not running."
 				/>
 			{:else}
 				<Card pad="none">

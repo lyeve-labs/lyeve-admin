@@ -44,18 +44,18 @@ describe('the protection drawer', () => {
 	});
 
 	it('shows its failure first in its form', () => {
-		const { component } = render(ProtectionDrawer, { props: { error: 'The protection could not be saved.' } });
+		const { component } = render(ProtectionDrawer, { props: { error: 'Could not save the protection. Try again.' } });
 		component.openProtection(protection);
 		flushSync();
-		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The protection could not be saved.');
+		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('Could not save the protection. Try again.');
 	});
 
 	it('shows a failure that arrives while it is open', async () => {
 		const { component, rerender } = render(ProtectionDrawer, { props: { error: '' } });
 		component.openProtection(protection);
 		flushSync();
-		expect(form()?.textContent).not.toContain('The protection could not be saved.');
-		await rerender({ error: 'The protection could not be saved.' });
-		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The protection could not be saved.');
+		expect(form()?.textContent).not.toContain('Could not save the protection. Try again.');
+		await rerender({ error: 'Could not save the protection. Try again.' });
+		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('Could not save the protection. Try again.');
 	});
 });

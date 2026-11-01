@@ -131,7 +131,7 @@
 
 	function removeRule(r: RateRule): SubmitFunction {
 		return confirmed(
-			`Delete rule ${r.endpoint}`,
+			`Delete rule ${r.endpoint}?`,
 			r.enforced
 				? 'That endpoint stops being limited by it immediately.'
 				: 'The rule is not being enforced, so nothing changes for callers.',
@@ -150,7 +150,7 @@
 
 <PageShell
 	title="Rate limits"
-	description="Every limit a request passes through, and who is close to one right now."
+	description="See each rate limit and who is close to reaching one."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -175,7 +175,7 @@
 			level={2}
 			gate={data.gate}
 			title="Rate limits"
-			absent="The rate limit plugin is not part of this build, so no endpoint is throttled."
+			absent="Rate limiting is not included in this build."
 		/>
 	{:else}
 		{#if formError}
@@ -183,8 +183,7 @@
 		{/if}
 		{#if !overview}
 			<Alert tone="warn">
-				The global limit, the protections and whether custom rules are enabled could not be read.
-				The custom rules below are shown, but whether they are enforced is unknown.
+				Could not load the global limit, the protections or whether custom rules are enabled. The custom rules below are listed, but whether they are enforced is unknown. Reload the page to try again.
 			</Alert>
 		{/if}
 
@@ -248,7 +247,7 @@
 						{:else}
 							<tr>
 								<td colspan="5" class="text-xs text-muted">
-									The global limit is missing. The engine seeds it when it starts.
+									The global limit is missing. It is created each time the engine starts.
 								</td>
 							</tr>
 						{/if}
@@ -265,9 +264,9 @@
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Sign-in and reset protections</SectionHeading>
 				<p class="text-xs text-muted">
-					Built in and enforced on every install.
+					These are built in and enforced on every install.
 					{#if customEnabled === false}
-						Changing one is not enabled on this instance.
+						Changing them needs a license this instance does not have.
 					{/if}
 				</p>
 				<Table label="Protections">
@@ -334,7 +333,7 @@
 			{#if customEnabled === false}
 				<NotEnabled
 					title="Custom rate limits"
-					description="Limit an endpoint pattern, a tenant or a role on its own, count by address or by signed-in account, and change the built-in sign-in and reset limits."
+					description="Set limits for an endpoint, a tenant or a role, counted by address or by signed-in account. You can also change the built-in sign-in and reset limits."
 				/>
 				{#if data.rules.length > 0}
 					<!-- Rules stay stored while the capability is off and apply again
@@ -343,9 +342,7 @@
 					     live. -->
 					<Alert tone="warn">
 						{stored}
-						{stored === 1 ? 'stored rule is' : 'stored rules are'} not enforced on
-						this instance. They apply again when custom rules are enabled, and deleting one is
-						allowed either way.
+						{stored === 1 ? 'saved rule is' : 'saved rules are'} not enforced on this instance. They apply again when custom rules are enabled. You can still delete them.
 					</Alert>
 				{/if}
 			{/if}
@@ -355,15 +352,14 @@
 				     the rate says. -->
 				<Alert tone="danger">
 					{blocking.length}
-					{blocking.length === 1 ? 'rule blocks' : 'rules block'} every request, not just excess
-					ones: a burst or a rate of zero leaves the first request with no token to take.
+					{blocking.length === 1 ? 'rule blocks' : 'rules block'} every request, not only the excess. A burst or rate of zero refuses even the first request.
 				</Alert>
 			{/if}
 
 			{#if data.rules.length === 0}
 				{#if customEnabled !== false}
 					<EmptyState
-						title="No custom rule is configured"
+						title="No custom rules yet"
 						description="Only the global limit and the protections above apply."
 					>
 						{#snippet iconSnippet()}
@@ -415,7 +411,7 @@
 								<td data-cell="nowrap">
 									<div class="flex items-center justify-end gap-1">
 										{#if !canChange(r)}
-											<span class="text-xs text-muted">Only a super admin changes a rule for every tenant.</span>
+											<span class="text-xs text-muted">Only a super admin can change a rule for every tenant.</span>
 										{/if}
 										{#if customEnabled === true && canChange(r)}
 											<Button
@@ -472,8 +468,7 @@
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Engine limits</SectionHeading>
 				<p class="text-xs text-muted">
-					Set in the engine's environment and read when it starts, so they are shown here and
-					changed there, followed by a restart. A request passes these as well as everything above.
+					These come from the engine's environment. Change them there, then restart the engine. Every request is checked against these as well as the limits above.
 				</p>
 				<Table label="Engine limits">
 					<thead>
@@ -510,11 +505,11 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Right now</SectionHeading>
 			{#if !data.status.ok}
-				<GateNotice gate={data.status.gate} title="Live counters" absent="The rate-limit plugin is not part of this build." />
+				<GateNotice gate={data.status.gate} title="Live counters" absent="Rate limiting is not included in this build." />
 			{:else if live.length === 0}
 				<EmptyState
 					title="Nobody is near a limit"
-					description="No caller has spent enough of a window for the limiter to be tracking it."
+					description="A caller appears here once they use enough of a window to be tracked."
 				>
 					{#snippet iconSnippet()}
 						<Gauge size={ICON.lg} />
@@ -549,8 +544,7 @@
 					</tbody>
 				</Table>
 				<p class="text-xs text-muted">
-					A snapshot from the process that answered this request. On more than one node each
-					keeps its own counters unless the distributed store is configured.
+					This is a snapshot from one engine process. With more than one node, each node counts on its own unless the distributed store is configured.
 				</p>
 			{/if}
 		</section>

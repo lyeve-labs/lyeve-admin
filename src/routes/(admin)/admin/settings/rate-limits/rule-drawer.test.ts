@@ -96,7 +96,7 @@ describe('the rule drawer', () => {
 		expect(tenant.disabled).toBe(false);
 		expect(tenant.required).toBe(true);
 		expect(field('tenant_id')).toBe('acme');
-		expect(form()?.textContent).toContain('A rule cannot move to every tenant on an edit');
+		expect(form()?.textContent).toContain('To apply it to every tenant, delete it and create it again');
 		expect(form()?.textContent).not.toContain('Leave empty to keep the rule on every tenant');
 	});
 
@@ -112,18 +112,18 @@ describe('the rule drawer', () => {
 	});
 
 	it('shows its failure first in its form', () => {
-		const { component } = setup({ error: 'The rule could not be saved.' });
+		const { component } = setup({ error: 'Could not save the rule. Try again.' });
 		component.openCreate();
 		flushSync();
-		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The rule could not be saved.');
+		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('Could not save the rule. Try again.');
 	});
 
 	it('shows a failure that arrives while it is open', async () => {
 		const { component, rerender } = setup();
 		component.openCreate();
 		flushSync();
-		expect(form()?.textContent).not.toContain('The rule could not be saved.');
-		await rerender({ error: 'The rule could not be saved.', routes: [], superAdmin: true });
-		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('The rule could not be saved.');
+		expect(form()?.textContent).not.toContain('Could not save the rule. Try again.');
+		await rerender({ error: 'Could not save the rule. Try again.', routes: [], superAdmin: true });
+		expect(form()?.firstElementChild?.firstElementChild?.textContent).toContain('Could not save the rule. Try again.');
 	});
 });

@@ -26,7 +26,7 @@
 		globalOpen = true;
 	}
 
-	const saveGlobalSubmit = tracked(closing(() => (globalOpen = false), 'Saved the global limit'));
+	const saveGlobalSubmit = tracked(closing(() => (globalOpen = false), 'Global limit saved.'));
 </script>
 
 <Drawer bind:open={globalOpen} title="Global limit">

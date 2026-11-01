@@ -54,7 +54,7 @@ describe('PII masking gate', () => {
 		const { container } = render(PiiPage, {
 			props: props({ gate: { state: 'absent' }, rules: null, entries: [] }),
 		});
-		expect(said(container)).toContain('served as they are stored');
+		expect(said(container)).toContain('Responses are not masked');
 	});
 });
 
@@ -69,7 +69,7 @@ describe('PII masking rules', () => {
 		const { container } = render(PiiPage, {
 			props: props({ rules: { presets: [], mask_tags: {} } }),
 		});
-		expect(said(container)).toContain('nothing is being redacted');
+		expect(said(container)).toContain('Nothing is being masked');
 	});
 
 	it('names each mask style a field can ask for', () => {
@@ -83,7 +83,7 @@ describe('PII masking access log', () => {
 		// The rules answer "is anything being masked at all", so losing the
 		// log must not hide them.
 		const { container } = render(PiiPage, { props: props({ logFailed: true }) });
-		expect(said(container)).toContain('masking is still running');
+		expect(said(container)).toContain('Masking is still running');
 		expect(said(container)).toContain('EMAIL');
 	});
 
@@ -100,7 +100,7 @@ describe('PII masking access log', () => {
 
 	it('reads an empty log as nobody having looked', () => {
 		const { container } = render(PiiPage, { props: props({ entries: [], total: 0 }) });
-		expect(said(container)).toContain('Nobody has read unmasked data');
+		expect(said(container)).toContain('No unmasked reads yet');
 	});
 
 	it('summarizes what is read most, which rows alone never answer', () => {
@@ -257,20 +257,20 @@ describe('PII unmasked reads pager', () => {
 describe('PII failures stay where they were made', () => {
 	it('shows a failed delete on the page and opens the rule drawer clean', async () => {
 		const { getAllByRole, container } = render(PiiPage, {
-			props: props({}, { action: 'delete', error: 'The rule could not be deleted.' }),
+			props: props({}, { action: 'delete', error: 'Could not delete the rule. Try again.' }),
 		});
-		expect(said(container)).toContain('The rule could not be deleted.');
+		expect(said(container)).toContain('Could not delete the rule. Try again.');
 		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
 		const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
-		expect(form.textContent).not.toContain('could not be deleted');
+		expect(form.textContent).not.toContain('Could not delete');
 	});
 
 	it('reports a failed dry run under the sample, not as a failed save', async () => {
 		const { getAllByRole } = render(PiiPage, {
-			props: props({}, { action: 'test', error: 'The pattern could not be run.' }),
+			props: props({}, { action: 'test', error: 'Could not run the pattern. Try again.' }),
 		});
 		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
 		const save = document.querySelector('form[action="?/create"]') as HTMLFormElement;
-		expect(save.textContent).not.toContain('could not be run');
+		expect(save.textContent).not.toContain('Could not run');
 	});
 });
