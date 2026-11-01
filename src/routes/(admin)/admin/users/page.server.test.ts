@@ -652,7 +652,7 @@ describe('deleting an account', () => {
 
 	it('keeps outage detail off the page', async () => {
 		const { run } = remove(() => Promise.reject(new TypeError('fetch failed')));
-		expect(await run()).toEqual({ status: 400, data: { action: 'delete', error: 'Failed to delete user' } });
+		expect(await run()).toEqual({ status: 400, data: { action: 'delete', error: 'Could not delete the user. Try again.' } });
 	});
 
 	it('holds the delete to a super admin', async () => {

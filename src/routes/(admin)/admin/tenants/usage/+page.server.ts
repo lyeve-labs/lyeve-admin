@@ -25,10 +25,10 @@ import { rowsOf, pageWindow, pastEndOffset, statedTotal, totalOf, withOffset } f
 import { listPeople } from '$lib/server/people';
 
 /** What the page says in place of a requests read that failed. */
-const REQUESTS_FAILED = 'The requests could not be read. This is not a report that nobody is waiting.';
+const REQUESTS_FAILED = 'Could not load the requests for more quota.';
 
 /** What the page says in place of a usage read that failed. */
-const USAGE_FAILED = 'What each tenant used could not be read. This is not a report that nothing was used.';
+const USAGE_FAILED = 'Could not load usage per tenant.';
 
 /** A read the page did not make, said the same way a refusal would be. */
 const UNREAD: Section<never> = { ok: false, gate: { state: 'absent' } };
@@ -138,14 +138,14 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const decision = String(form.get('decision') ?? '');
-		if (!id) return fail(400, { action: 'review', error: 'No request was named.' });
+		if (!id) return fail(400, { action: 'review', error: 'This form is missing its request. Reload the page and try again.' });
 		if (decision !== 'approve' && decision !== 'deny') {
-			return fail(400, { action: 'review', error: 'A review is either an approval or a denial.' });
+			return fail(400, { action: 'review', error: 'Choose approve or deny.' });
 		}
 		try {
 			await reviewRequest(client, id, decision === 'approve');
 		} catch (err) {
-			return tagged('review', actionFailure(err, 'The request could not be reviewed.'));
+			return tagged('review', actionFailure(err, 'Could not review the request. Try again.'));
 		}
 		return { reviewed: id };
 	},
@@ -160,7 +160,7 @@ export const actions: Actions = {
 		try {
 			await upsertQuota(authedClient(event), tenant, quotaFrom(form));
 		} catch (err) {
-			return tagged('quota', actionFailure(err, 'The quota could not be saved.'));
+			return tagged('quota', actionFailure(err, 'Could not save the quota. Try again.'));
 		}
 		return { quotaSaved: tenant };
 	},
@@ -169,11 +169,11 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const form = await event.request.formData();
 		const tenant = String(form.get('tenant_id') ?? '').trim();
-		if (!tenant) return fail(400, { action: 'clearQuota', error: 'No tenant was named.' });
+		if (!tenant) return fail(400, { action: 'clearQuota', error: 'This form is missing its tenant. Reload the page and try again.' });
 		try {
 			await deleteQuota(authedClient(event), tenant);
 		} catch (err) {
-			return tagged('clearQuota', actionFailure(err, 'The quota could not be removed.'));
+			return tagged('clearQuota', actionFailure(err, 'Could not delete the quota. Try again.'));
 		}
 		return { quotaCleared: tenant };
 	},

@@ -104,8 +104,8 @@
 	 */
 	function deleteAccount(email: string): SubmitFunction {
 		return confirmed(
-			`Delete user ${email}`,
-			'Their sessions end at once and their audit trail stays.',
+			`Delete user ${email}?`,
+			'Their sessions end immediately and their audit trail is kept. This cannot be undone.',
 			{ confirmLabel: 'Delete', success: `Deleted ${email}` },
 		);
 	}
@@ -186,7 +186,7 @@
 
 <PageShell
 	title="Users"
-	description="Admin accounts on this instance. Super admins only."
+	description="Manage the admin accounts on this instance. Only super admins can use this page."
 	width="wide"
 >
 	{#snippet actions()}
@@ -204,7 +204,7 @@
 	<h2 class="sr-only">Accounts</h2>
 
 	{#if !data.users.ok}
-		<GateNotice gate={data.users.gate} title="Users" absent="This engine does not serve the accounts list." />
+		<GateNotice gate={data.users.gate} title="Users" absent="The accounts list needs a newer version of the engine." />
 	{:else if rows.length === 0}
 		<EmptyState
 			title="No users yet"
@@ -232,8 +232,8 @@
 
 		{#if visible.length === 0}
 			<EmptyState
-				title="No account on this page matches"
-				description="Clear the search, or turn the page: the box narrows what is on screen."
+				title="No users match this search"
+				description="The search covers this page only. Clear it or go to another page."
 			/>
 		{:else}
 			<Table label="Users">
@@ -356,15 +356,15 @@
 				bind:value={password}
 				required
 				autocomplete="new-password"
-				hint="The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
+				hint="The password policy applies. By default it needs at least 12 characters, with upper case, lower case and a digit, and no common passwords."
 				error={errors.password}
 			/>
 			{#if !data.tenants.ok}
 				<!-- Without the roster the form cannot offer the choice. Saying so
 				     here keeps a refusal for a missing tenant from reading as a
 				     fault in the fields the operator filled in. -->
-				<Alert tone="warn" title="Tenants could not be read">
-					This form cannot name the tenant a new account belongs to. On an install with several tenants the engine refuses the account. Reload the page to try again.
+				<Alert tone="warn" title="Could not load the tenants">
+					You cannot choose a tenant for this account, and an install with several tenants refuses an account without one. Reload the page to try again.
 				</Alert>
 			{:else if tenants.length > 1}
 				<input type="hidden" name="tenant_required" value="1" />
@@ -402,7 +402,7 @@
 <Drawer
 	bind:open={passwordOpen}
 	title={passwordFor ? `Set password for ${passwordFor.email}` : 'Set password'}
-	description="The user is signed out of every session once it is saved."
+	description="Saving signs the user out of every session."
 >
 	<form
 		method="POST"

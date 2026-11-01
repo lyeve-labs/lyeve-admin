@@ -56,11 +56,11 @@ describe('tenant detail reads that failed', () => {
 describe('the member drawer and the failures of other actions', () => {
 	it('leaves a newly opened member drawer clean after a failed removal', async () => {
 		const { container } = render(TenantPage, {
-			props: props({}, { action: 'revoke', memberError: 'The membership could not be removed.' }),
+			props: props({}, { action: 'revoke', memberError: 'Could not remove the membership. Try again.' }),
 		});
-		expect(container.textContent).toContain('The membership could not be removed.');
+		expect(container.textContent).toContain('Could not remove the membership. Try again.');
 		await fireEvent.click(screen.getByRole('button', { name: /new member/i }));
-		expect(drawerText()).not.toContain('could not be removed');
+		expect(drawerText()).not.toContain('Could not remove the membership');
 	});
 
 	it('starts a new member with the reading role', async () => {
@@ -182,7 +182,7 @@ describe('the home row of a super admin', () => {
 			props: props({ members: { ok: true, value: [lost] }, homeSuperAdmins: null }),
 		});
 		expect(container.textContent).toContain(
-			'The accounts could not be read, so this page cannot say whether a home member signs in here without super admin.',
+			'Could not load the accounts. Reload the page to see whether a home member signs in here without super admin.',
 		);
 	});
 
@@ -194,7 +194,7 @@ describe('the home row of a super admin', () => {
 		});
 		const row = edit('lost@example.com').closest('tr') as HTMLElement;
 		expect(row.textContent).not.toContain('managed on the Users page');
-		expect(row.textContent).toContain('Neither this page nor the Users page changes this home membership.');
+		expect(row.textContent).toContain('This home membership cannot be changed here or on the Users page.');
 		expect(container.textContent).not.toContain('managed on the Users page');
 	});
 

@@ -27,10 +27,10 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 
 /** What the page says for a list read that failed for no reason it can name. */
-const LIST_FAILED = 'The tenants could not be read. This is not a report that there are none.';
+const LIST_FAILED = 'Could not load the tenants.';
 
 /** What the page says when it cannot tell whether a tenant may be created. */
-const PROVISIONING_FAILED = 'Whether this instance may create tenants could not be read.';
+const PROVISIONING_FAILED = 'Could not check whether new tenants can be created.';
 
 /** The plan the plugin stores for a tenant created with none. */
 const DEFAULT_PLAN = 'free';
@@ -48,7 +48,7 @@ function createFailure(err: unknown) {
 	}
 	const refused = tenantRefusal(err);
 	if (refused) return fail(402, { action: 'create', error: refusalText(refused), refused });
-	return fail(400, { action: 'create', error: actionError(err, 'Failed to create tenant') });
+	return fail(400, { action: 'create', error: actionError(err, 'Could not create the tenant. Try again.') });
 }
 
 export const load: PageServerLoad = async (event) => {
@@ -140,7 +140,7 @@ export const actions: Actions = {
 			// emptied field sends the plan a create with none is given.
 			await updateTenant(id, { name, plan: plan || DEFAULT_PLAN }, client);
 		} catch (err) {
-			return fail(400, { action: 'update', error: actionError(err, 'Failed to update tenant') });
+			return fail(400, { action: 'update', error: actionError(err, 'Could not save the tenant. Try again.') });
 		}
 	},
 
@@ -154,7 +154,7 @@ export const actions: Actions = {
 		try {
 			await updateTenant(id, { enabled: !enabled }, client);
 		} catch (err) {
-			return fail(400, { action: 'toggle', error: actionError(err, 'Failed to toggle tenant') });
+			return fail(400, { action: 'toggle', error: actionError(err, enabled ? 'Could not enable the tenant. Try again.' : 'Could not disable the tenant. Try again.') });
 		}
 	},
 
@@ -167,7 +167,7 @@ export const actions: Actions = {
 		try {
 			await deleteTenant(id, client);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete tenant') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the tenant. Try again.') });
 		}
 	},
 };

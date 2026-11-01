@@ -45,7 +45,7 @@ export const load: PageServerLoad = async (event) => {
 		gate.state === 'ok'
 			? await section(
 					listHolds(client).then((h) => rowsOf(h)),
-					'The holds could not be read, so the policies above cannot be trusted to describe what is actually being deleted.'
+					'Could not load the legal holds.'
 				)
 			: { ok: false, gate };
 
@@ -60,14 +60,14 @@ export const actions: Actions = {
 
 		const days = Number(form.get('retention_days'));
 		if (!Number.isFinite(days) || days < 0 || !Number.isInteger(days)) {
-			return fail(400, { action: 'createPolicy' as const, error: 'A retention window is a whole number of days, and cannot be negative.' });
+			return fail(400, { action: 'createPolicy' as const, error: 'Enter a whole number of days, 0 or more.' });
 		}
 		const archival = form.get('archival_enabled') === 'true';
 		const storage = String(form.get('archival_storage') ?? '').trim();
 		if (archival && !storage) {
 			return fail(400, {
 				action: 'createPolicy' as const,
-				error: 'Archival is on but no storage backend is named, so there is nowhere to archive to and the entries would be deleted outright.',
+				error: 'Enter a storage backend to archive to, or turn archiving off.',
 			});
 		}
 
@@ -81,7 +81,7 @@ export const actions: Actions = {
 				archival_path_prefix: String(form.get('archival_path_prefix') ?? '').trim(),
 			});
 		} catch (err) {
-			return fail(400, { action: 'createPolicy' as const, error: actionError(err, 'The policy could not be created.') });
+			return fail(400, { action: 'createPolicy' as const, error: actionError(err, 'Could not create the policy. Try again.') });
 		}
 		return { saved: 'policy' };
 	},
@@ -91,11 +91,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'deletePolicy' as const, error: 'No policy was named.' });
+		if (!id) return fail(400, { action: 'deletePolicy' as const, error: 'This form is missing its policy. Reload the page and try again.' });
 		try {
 			await deletePolicy(client, id);
 		} catch (err) {
-			return fail(400, { action: 'deletePolicy' as const, error: actionError(err, 'The policy could not be removed.') });
+			return fail(400, { action: 'deletePolicy' as const, error: actionError(err, 'Could not delete the policy. Try again.') });
 		}
 		return { removed: id };
 	},
@@ -106,7 +106,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		if (!name) {
-			return fail(400, { action: 'createHold' as const, error: 'Name the hold. Somebody has to be able to tell later what it was for.' });
+			return fail(400, { action: 'createHold' as const, error: 'Enter a name for the hold.' });
 		}
 		try {
 			await createHold(client, {
@@ -118,7 +118,7 @@ export const actions: Actions = {
 				filter_tenant_id: String(form.get('filter_tenant_id') ?? '').trim(),
 			});
 		} catch (err) {
-			return fail(400, { action: 'createHold' as const, error: actionError(err, 'The hold could not be created.') });
+			return fail(400, { action: 'createHold' as const, error: actionError(err, 'Could not create the hold. Try again.') });
 		}
 		return { saved: name };
 	},
@@ -128,11 +128,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'releaseHold' as const, error: 'No hold was named.' });
+		if (!id) return fail(400, { action: 'releaseHold' as const, error: 'This form is missing its hold. Reload the page and try again.' });
 		try {
 			await releaseHold(client, id);
 		} catch (err) {
-			return fail(400, { action: 'releaseHold' as const, error: actionError(err, 'The hold could not be released.') });
+			return fail(400, { action: 'releaseHold' as const, error: actionError(err, 'Could not release the hold. Try again.') });
 		}
 		return { released: id };
 	},
@@ -150,7 +150,7 @@ export const actions: Actions = {
 				archiveFailed: archiveFailures(run),
 			};
 		} catch (err) {
-			return fail(400, { action: 'enforce' as const, error: actionError(err, 'Retention could not be enforced.') });
+			return fail(400, { action: 'enforce' as const, error: actionError(err, 'Could not enforce retention. Try again.') });
 		}
 	},
 };

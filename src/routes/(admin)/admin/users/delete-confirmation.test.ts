@@ -99,7 +99,7 @@ describe('Users delete confirmation', () => {
 		expect(title).toContain('user1@b.co');
 		// "This cannot be undone" is true of every delete here, so it tells the
 		// reader nothing about the one in front of them.
-		expect(message).toBe('Their sessions end at once and their audit trail stays.');
+		expect(message).toBe('Their sessions end immediately and their audit trail is kept. This cannot be undone.');
 	});
 
 	it('never sends the request when the question is declined', async () => {

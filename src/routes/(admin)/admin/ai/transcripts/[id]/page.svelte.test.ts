@@ -66,7 +66,7 @@ describe('AI transcript page', () => {
 
 	it('paints the no-provider state and no messages', () => {
 		const { getByText, queryByRole } = setup({ gate: { state: 'no_provider' }, transcript: null });
-		expect(getByText('AI has nothing to answer through')).toBeTruthy();
+		expect(getByText('No AI provider is available')).toBeTruthy();
 		expect(queryByRole('list', { name: 'Messages' })).toBeNull();
 	});
 });

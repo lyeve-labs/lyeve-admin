@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ cookies, params, url, fetch }) => {
 		if (res.status === 404) error(404, 'Transcript not found');
 		if (res.status === 402) error(402, 'AI is not enabled on this instance');
 		if (res.status === 403) error(403, 'Your role cannot export transcripts');
-		error(502, 'The transcript could not be exported');
+		error(502, 'Could not export the transcript. Try again.');
 	}
 	const headers = new Headers();
 	headers.set('Content-Type', res.headers.get('content-type') ?? (format === 'markdown' ? 'text/markdown; charset=utf-8' : 'application/json; charset=utf-8'));

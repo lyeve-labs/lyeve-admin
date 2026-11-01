@@ -18,7 +18,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			sinks = await listSinks(authedClient(event));
 		} catch (err) {
-			gate = gateOf(err, 'Streaming destinations could not be read. This is not a report that there are none.');
+			gate = gateOf(err, 'Could not load the streaming destinations.');
 		}
 	}
 	return { sinks, gate };
@@ -63,7 +63,7 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const kind = text(form, 'kind');
-		if (!isSinkKind(kind)) return fail(400, { action: 'create', error: 'Pick where the log is sent.' });
+		if (!isSinkKind(kind)) return fail(400, { action: 'create', error: 'Choose a destination.' });
 		const body = common(form);
 		const refused = missing('create', body);
 		if (refused) return refused;
@@ -85,7 +85,7 @@ export const actions: Actions = {
 			// A secret the plugin generated is in this answer and nowhere else.
 			return { created: created.name, secret: created.secret ?? '' };
 		} catch (err) {
-			return failure('create', err, 'The destination could not be created.');
+			return failure('create', err, 'Could not create the destination. Try again.');
 		}
 	},
 
@@ -93,7 +93,7 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const id = text(form, 'id');
-		if (!id) return fail(400, { action: 'update', error: 'No destination was named.' });
+		if (!id) return fail(400, { action: 'update', error: 'This form is missing its destination. Reload the page and try again.' });
 		const body = common(form);
 		const refused = missing('update', body);
 		if (refused) return refused;
@@ -101,7 +101,7 @@ export const actions: Actions = {
 		try {
 			await updateSink(authedClient(event), id, { ...body, ...(secret ? { secret } : {}) });
 		} catch (err) {
-			return failure('update', err, 'The destination could not be saved.');
+			return failure('update', err, 'Could not save the destination. Try again.');
 		}
 		return { saved: body.name };
 	},
@@ -110,11 +110,11 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const id = text(form, 'id');
-		if (!id) return fail(400, { action: 'delete', error: 'No destination was named.' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its destination. Reload the page and try again.' });
 		try {
 			await deleteSink(authedClient(event), id);
 		} catch (err) {
-			return failure('delete', err, 'The destination could not be deleted.');
+			return failure('delete', err, 'Could not delete the destination. Try again.');
 		}
 		return { deleted: true };
 	},
@@ -123,12 +123,12 @@ export const actions: Actions = {
 		await requireRole(event, ADMINS);
 		const form = await event.request.formData();
 		const id = text(form, 'id');
-		if (!id) return fail(400, { action: 'test', error: 'No destination was named.' });
+		if (!id) return fail(400, { action: 'test', error: 'This form is missing its destination. Reload the page and try again.' });
 		try {
 			const res = await testSink(authedClient(event), id);
 			return { tested: id, delivered: res.delivered, testError: res.error ?? '' };
 		} catch (err) {
-			return failure('test', err, 'The test could not be sent.');
+			return failure('test', err, 'Could not send the test. Try again.');
 		}
 	},
 };

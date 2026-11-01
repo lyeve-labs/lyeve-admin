@@ -142,8 +142,8 @@
 
 	function removePolicy(p: RetentionPolicy): SubmitFunction {
 		return confirmed(
-			`Delete the policy covering ${policyScope(p)}`,
-			'Entries it covered stop being deleted, so the audit log grows without limit until another policy covers them.',
+			`Delete the policy covering ${policyScope(p)}?`,
+			'Entries it covered are no longer deleted, and the audit log grows until another policy covers them.',
 			{ confirmLabel: 'Delete', success: 'Policy deleted' },
 		);
 	}
@@ -155,7 +155,7 @@
 	function release(h: LegalHold): SubmitFunction {
 		return confirmed(
 			`Release ${h.name}?`,
-			'Entries this hold protected become deletable. Where a retention policy already covers them, the next enforcement run removes them for good.',
+			'Entries this hold protected can be deleted again. If a retention policy covers them, the next enforcement run deletes them permanently.',
 			{ confirmLabel: 'Release', success: `Released ${h.name}` },
 		);
 	}
@@ -163,7 +163,7 @@
 	/** Deletes. Not a dry run, and nothing undoes it. */
 	const enforce = confirmed(
 		'Enforce retention now?',
-		'Every audit entry past its retention window and not covered by a hold is deleted. This is not a dry run and nothing undoes it.',
+		'Every audit entry past its retention window and not under a legal hold is deleted. This cannot be undone.',
 		{ confirmLabel: 'Delete them' },
 	);
 
@@ -174,7 +174,7 @@
 <PageShell
 	title="Audit log"
 	documentTitle="Retention and holds - Audit log"
-	description="How long entries are kept, and what is being held back from deletion."
+	description="Choose how long audit entries are kept, and hold entries back from deletion."
 	width="wide"
 >
 	{#snippet actions()}
@@ -197,7 +197,7 @@
 			level={2}
 			gate={data.gate}
 			title="Retention"
-			absent="Audit retention is not part of this build, so entries are kept indefinitely."
+			absent="Audit retention is not included in this build. Entries are kept indefinitely."
 		/>
 	{:else}
 		{#if rowError}
@@ -229,9 +229,8 @@
 			     every policy, so an auditor asking "is this gone after ninety
 			     days" is told yes by the policy and no by reality. -->
 			<Alert tone="warn">
-				A legal hold covers every audit entry, so none of the policies below is deleting
-				anything. That is what a hold is for, and it is easy to leave on after the matter it
-				was raised for has closed.
+				A legal hold covers every audit entry, so none of the policies below deletes anything.
+				Release the hold once the matter it was raised for has closed.
 			</Alert>
 		{/if}
 
@@ -239,8 +238,8 @@
 			<SectionHeading level={2}>Policies</SectionHeading>
 			{#if data.policies.length === 0}
 				<EmptyState
-					title="No retention policy"
-					description="Audit entries are kept forever, which is a storage decision as much as a compliance one."
+					title="No retention policies yet"
+					description="Audit entries are kept forever. Create a policy to delete them after a set time."
 				>
 					{#snippet iconSnippet()}
 						<ScrollText size={ICON.lg} />
@@ -321,11 +320,11 @@
 				<GateNotice
 					gate={data.holds.gate}
 					title="Legal holds"
-					absent="Legal holds are not part of this build."
+					absent="Legal holds are not included in this build."
 				/>
 			{:else if live.length === 0}
 				<EmptyState
-					title="Nothing is held"
+					title="No legal holds yet"
 					description="Every entry is deleted on the schedule its policy sets."
 				>
 					{#snippet iconSnippet()}
@@ -434,7 +433,7 @@
 			<Toggle
 				id="ret-archival"
 				label="Archive before deleting"
-				hint="Off deletes the matching entries when the policy is enforced, as the API does when archival_enabled is omitted. Turn it on to write them to storage first."
+				hint="When on, matching entries are written to storage before they are deleted. When off, they are deleted without an archive."
 				bind:checked={archival}
 			/>
 			<Input
@@ -471,7 +470,7 @@
 				id="hold-description"
 				name="description"
 				label="Why it was raised"
-				hint="Read later by somebody deciding whether it can be released."
+				hint="Explain why, for whoever later decides whether to release it."
 				rows={3}
 				bind:value={holdDescription}
 			/>

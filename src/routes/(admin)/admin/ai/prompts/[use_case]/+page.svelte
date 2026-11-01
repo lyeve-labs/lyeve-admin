@@ -60,7 +60,7 @@
 								label="System prompt"
 								rows={10}
 								bind:value={body}
-								hint="Saving writes version {nextVersion}, which every call under this use case runs from then on. The guardrail below is appended to it and cannot be removed."
+								hint="Saving creates version {nextVersion}, and every request for this use case uses it from then on. The guardrail below is always added to the end and cannot be removed."
 							/>
 							{#if form?.scope === 'save' && form.error}
 								<Alert tone="danger">{form.error}</Alert>
@@ -83,7 +83,7 @@
 				{#if form?.scope === 'restore' && form.error}
 					<Alert tone="danger">{form.error}</Alert>
 				{:else if form?.scope === 'restore' && 'version' in form}
-					<Alert tone="success" autoDismiss>Version {form.from} is current again, saved as version {form.version}.</Alert>
+					<Alert tone="success" autoDismiss>Version {form.from} restored as version {form.version}.</Alert>
 				{/if}
 				<Table label="Versions">
 					<thead>
@@ -147,8 +147,8 @@
 					</tbody>
 				</Table>
 				<p class="text-xs text-faint">
-					Making an older version current saves its text as a new version. The shipped default is version 0 and is
-					never a row. Nothing here is deleted.
+					Restoring an older version saves a copy of its text as a new version. No version is ever deleted. The
+					shipped default is version 0.
 				</p>
 			</section>
 		{/if}

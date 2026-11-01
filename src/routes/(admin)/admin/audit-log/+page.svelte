@@ -71,7 +71,7 @@
 			await update();
 			pruning = false;
 			if (result.type === 'failure') {
-				error = ((result.data as Record<string, unknown>)?.error as string) ?? 'Prune failed.';
+				error = ((result.data as Record<string, unknown>)?.error as string) ?? 'Could not prune the audit log. Try again.';
 			}
 		};
 	};
@@ -110,8 +110,7 @@
 {#snippet pruneBody()}
 	<div class="flex flex-col gap-3">
 		<p class="text-sm text-muted">
-			The audit log is the record of what was changed and by whom. Pruned entries cannot be recovered or
-			exported afterwards.
+			Entries older than this date are deleted. They cannot be recovered or exported afterwards.
 		</p>
 		<DatePicker
 			id="prune-older-than"
@@ -211,7 +210,7 @@
 			<GateNotice
 				gate={data.entries.gate}
 				title="Audit log"
-				absent="The audit plugin is not in this build, so there is no audit log to read."
+				absent="The audit log is not included in this build."
 			/>
 		{:else if data.entries.value.length === 0 && (data.total ?? 0) > 0}
 			<!-- The count and the rows were read apart, so a page can come back
@@ -219,7 +218,7 @@
 			<EmptyState
 				iconSnippet={emptyIcon}
 				title="Nothing on this page"
-				description={`The log holds ${data.total} ${data.total === 1 ? 'entry' : 'entries'}, but this page came back empty. Entries may have been pruned since the count was taken.`}
+				description={`The audit log has ${data.total} ${data.total === 1 ? 'entry' : 'entries'}, but none are on this page. Some may have been pruned since you opened it.`}
 			>
 				{#snippet action()}
 					<Button variant="secondary" href={pageHref(0)}>Go to the first page</Button>
@@ -229,7 +228,7 @@
 			<EmptyState
 				iconSnippet={emptyIcon}
 				title="No audit entries match"
-				description="Widen the dates, clear the action, or search another exact name: the engine matches whole values."
+				description="Search matches whole values only. Try the exact name, widen the dates or clear the action."
 			/>
 		{:else if data.entries.value.length === 0}
 			<EmptyState

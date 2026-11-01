@@ -149,7 +149,7 @@
 	let deleteId = $state('');
 
 	async function askDelete(id: string, label: string) {
-		const ok = await confirmDialog(`Delete budget ${label}`, `Delete ${label}? Its threshold history goes with it.`, {
+		const ok = await confirmDialog(`Delete budget ${label}?`, 'Its threshold history is deleted too.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
@@ -172,7 +172,7 @@
 
 <PageShell
 	title="Tenant costs"
-	description="What this tenant's usage costs: the ledger the feed fills every hour from the usage and AI meters, the prices it applies, and the budgets held against it."
+	description="See what this tenant's usage costs, set prices and track budgets. Costs are updated every hour from the usage and AI meters."
 	width="wide"
 	{back}
 >
@@ -185,7 +185,7 @@
 					variant="secondary"
 					size="sm"
 					loading={submitting === 'aggregate'}
-					title="Run the feed for this tenant now"
+					title="Update this tenant's costs now"
 				>
 					<RefreshCw size={ICON.sm} /> Aggregate now
 				</Button>
@@ -203,13 +203,13 @@
 		<NotEnabled
 			level={2}
 			title="Tenant costs"
-			description="The ledger the feed fills every hour from the usage and AI meters, the prices it applies and the budgets held against it."
+			description="See what each tenant's usage costs, set prices and track budgets."
 			url={data.upgradeUrl}
 		/>
 	{:else}
 		<div class="flex flex-col gap-6">
 			{#if aggregated}
-				<Alert tone="success" title="The feed ran" autoDismiss>
+				<Alert tone="success" title="Costs updated" autoDismiss>
 					{aggregated.entries_saved} cost lines written, {aggregated.budget_events} budget events published,
 					{aggregated.anomalies} anomalies opened.
 				</Alert>
@@ -263,7 +263,7 @@
 									<p class="text-xs text-faint">From {summary.entry_count} cost {summary.entry_count === 1 ? 'line' : 'lines'} since the first of the month.</p>
 								</div>
 							{:else if !data.summary.ok}
-								<GateNotice gate={data.summary.gate} title="the split by resource" absent="This instance does not serve the split by resource." />
+								<GateNotice gate={data.summary.gate} title="the split by resource" absent="The split by resource is not included in this build." />
 							{/if}
 						</div>
 					</Card>
@@ -281,7 +281,7 @@
 						</ul>
 					{/if}
 				{:else if !data.dashboard.ok}
-					<GateNotice gate={data.dashboard.gate} title="this month's costs" absent="This instance does not serve the cost ledger." />
+					<GateNotice gate={data.dashboard.gate} title="this month's costs" absent="The cost ledger is not included in this build." />
 				{/if}
 			</section>
 
@@ -335,8 +335,8 @@
 					</Table>
 				{:else if budgets}
 					<EmptyState
-						title="No budget yet"
-						description="A budget caps spend over a monthly, quarterly or annual window, for one resource or all of them, and publishes an event when a threshold is crossed."
+						title="No budgets yet"
+						description="Create a budget to cap spend over a month, quarter or year, for one resource or all of them. An event is published when spend crosses a threshold."
 					>
 						{#snippet iconSnippet()}<Coins size={ICON.lg} />{/snippet}
 						{#snippet action()}
@@ -346,15 +346,15 @@
 						{/snippet}
 					</EmptyState>
 				{:else if !data.budgets.ok}
-					<GateNotice gate={data.budgets.gate} title="the budgets" absent="This instance does not serve cost budgets." />
+					<GateNotice gate={data.budgets.gate} title="the budgets" absent="Cost budgets are not included in this build." />
 				{/if}
 			</section>
 
 			<section class="flex flex-col gap-4" aria-label="Prices">
 				<SectionHeading level={2}>Prices</SectionHeading>
 				<p class="text-sm text-muted">
-					What a block of units costs, per resource type. The built-in figures are placeholders to
-					replace, not a tariff. A zero on AI means the AI plugin's own per-call estimate is the amount.
+					Set what a block of units costs for each resource type. The built-in figures are placeholders,
+					not real prices, so replace them. A price of zero for AI uses the AI plugin's own per-call estimate.
 				</p>
 				{#if failure?.form === 'price'}
 					<Alert tone={failure.locked ? 'warn' : 'danger'}>{failure.message}</Alert>
@@ -362,7 +362,7 @@
 					<Alert tone="success" autoDismiss>Price saved.</Alert>
 				{/if}
 				{#if !data.prices.ok}
-					<GateNotice gate={data.prices.gate} title="the prices" absent="This instance does not serve cost prices." />
+					<GateNotice gate={data.prices.gate} title="the prices" absent="Cost prices are not included in this build." />
 				{:else}
 				<div class="grid gap-3 xl:grid-cols-2" data-testid="cost-prices">
 					{#each RESOURCE_TYPES as resource (resource)}
@@ -422,7 +422,7 @@
 												variant="ghost"
 												size="sm"
 												formaction="?/resetPrice"
-												title="Drop this tenant's price so the default applies"
+												title="Remove this tenant's price and use the default"
 											>
 												<RotateCcw size={ICON.sm} /> Use default
 											</Button>
