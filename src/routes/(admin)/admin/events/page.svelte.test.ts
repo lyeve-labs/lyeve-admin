@@ -161,7 +161,7 @@ describe('starting a replay', () => {
 
 	it('asks before a real replay and names the window and the run', async () => {
 		const { getByLabelText, getByRole } = render(EventsPage, { props: props() });
-		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse first, posting nothing' }));
+		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse without publishing' }));
 		await fill(getByLabelText, 'backfill-oct');
 		const { cancel } = await press();
 		expect(kit.confirm).toHaveBeenCalledTimes(1);
@@ -173,7 +173,7 @@ describe('starting a replay', () => {
 
 	it('names the shared run when no run name was given', async () => {
 		const { getByRole } = render(EventsPage, { props: props() });
-		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse first, posting nothing' }));
+		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse without publishing' }));
 		await press();
 		const [question] = kit.confirm.mock.calls[0] as unknown as [string];
 		expect(question).toContain('the shared name');
@@ -214,7 +214,7 @@ describe('Events log', () => {
 		const { container } = render(EventsPage, {
 			props: props({ events: [row(), row({ id: 'e2', error: 'boom' })], total: 2 }),
 		});
-		expect(said(container)).toContain('Carrying an error');
+		expect(said(container)).toContain('With errors');
 	});
 });
 

@@ -48,8 +48,8 @@
 			bind:value={triggerJSON}
 			mono
 		/>
-		<Toggle id="test-live" label="Live side effects" hint="Writes and outgoing calls take effect instead of running as dry runs." bind:checked={live} />
-		<Select id="test-until" label="Until node" options={nodeOptions} placeholder="Run to the end" searchable bind:value={untilNode} />
+		<Toggle id="test-live" label="Allow side effects" hint="Writes and outgoing calls take effect instead of running as dry runs." bind:checked={live} />
+		<Select id="test-until" label="Stop after node" options={nodeOptions} placeholder="Run to the end" searchable bind:value={untilNode} />
 		{#if error}
 			<Alert tone="danger">
 				{#snippet children()}{error}{/snippet}

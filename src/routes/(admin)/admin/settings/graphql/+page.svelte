@@ -108,7 +108,7 @@
 		/>
 	{:else}
 		<section class="flex flex-col gap-3">
-			<SectionHeading level={2}>Where it answers</SectionHeading>
+			<SectionHeading level={2}>Endpoints</SectionHeading>
 			<Table label="GraphQL endpoints">
 				<tbody>
 					<tr>

@@ -103,8 +103,8 @@
 		<p class="text-muted">
 			Run test executes the draft on the canvas, not the published version, with the trigger JSON
 			from the Test tab. A node with side effects (writes, HTTP calls other than GET, email, events)
-			runs in dry-run mode and reports what it would have done instead of doing it. Switch on live
-			side effects to let those nodes act. Until node stops the run after the node you name, so you
+			runs in dry-run mode and reports what it would have done instead of doing it. Switch on Allow
+			side effects to let those nodes act. Stop after node ends the run after the node you name, so you
 			can inspect an intermediate output. A test run is recorded like any other, marked as a test.
 			Live runs come from the trigger, or from Run on a published flow.
 		</p>

@@ -175,7 +175,7 @@
 	<DescriptionList items={facts} />
 
 	<section class="flex flex-col gap-4">
-		<SectionHeading level={2}>What this tenant may use</SectionHeading>
+		<SectionHeading level={2}>Features</SectionHeading>
 		{#if !data.choices.ok}
 			<GateNotice
 				gate={data.choices.gate}

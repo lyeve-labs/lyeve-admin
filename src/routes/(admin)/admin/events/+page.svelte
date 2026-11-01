@@ -128,7 +128,7 @@
 			<Stat
 				size="sm"
 				mono
-				label="Carrying an error"
+				label="With errors"
 				value={failures}
 				sub={`of the ${data.events.length} on this page`}
 				tone={failures > 0 ? 'danger' : undefined}
@@ -166,7 +166,7 @@
 					</Button>
 				</form>
 				<div class="mt-3">
-					<Checkbox bind:checked={dryRun} label="Rehearse first, posting nothing" />
+					<Checkbox bind:checked={dryRun} label="Rehearse without publishing" />
 					<p class="mt-1 text-xs text-muted">
 						A replay publishes every event in the window again to everything that listens:
 						webhooks, flows, the message broker, realtime clients and email triggers. This
@@ -253,7 +253,7 @@
 						/>
 					{/snippet}
 					{#snippet filters()}
-						<Checkbox bind:checked={failedFirst} label="Only those carrying an error" />
+						<Checkbox bind:checked={failedFirst} label="Only events with errors" />
 					{/snippet}
 				</ListToolbar>
 

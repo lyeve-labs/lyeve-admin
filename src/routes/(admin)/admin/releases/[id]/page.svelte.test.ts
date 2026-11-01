@@ -128,7 +128,7 @@ describe('confirmed release actions', () => {
 	it('offers the two item actions as a segmented control', async () => {
 		const { getByRole } = setup({ choices: [] });
 		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
-		const group = getByRole('radiogroup', { name: 'When the release goes out' });
+		const group = getByRole('radiogroup', { name: 'When the release publishes' });
 		expect(group.querySelectorAll('[role="radio"], input[type="radio"]').length).toBe(2);
 	});
 });
