@@ -47,6 +47,6 @@ describe('admin/ai/transcripts/[id] recap', () => {
 		const empty = actionEvent({ [`/transcripts/${id}/recap`]: () => refused(422, 'transcript has no messages to recap') }, new FormData(), { path, params });
 		expect(await actions.recap(empty.event)).toMatchObject({ status: 422, data: { error: 'The transcript has no messages to recap.' } });
 		const none = actionEvent({ [`/transcripts/${id}/recap`]: () => refused(503, 'no enabled AI provider configured') }, new FormData(), { path, params });
-		expect(await actions.recap(none.event)).toMatchObject({ status: 400, data: { error: expect.stringContaining('No enabled AI provider') } });
+		expect(await actions.recap(none.event)).toMatchObject({ status: 400, data: { error: expect.stringContaining('No AI provider is enabled') } });
 	});
 });

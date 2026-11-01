@@ -101,7 +101,7 @@ describe('confirming with a passkey', () => {
 		});
 		const { getByRole, findByText } = setup(true, proving, true);
 		await fireEvent.click(getByRole('button', { name: /Use a passkey/ }));
-		expect(await findByText(/The passkey did not answer, or the request was canceled/)).toBeTruthy();
+		expect(await findByText(/The passkey request timed out or was canceled/)).toBeTruthy();
 	});
 
 	it('says so when the browser has no passkey support', async () => {

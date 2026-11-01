@@ -147,7 +147,7 @@ describe('running a probe now', () => {
 		engine.post.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.run(actionEvent({ id: 'p1' }))) as unknown as Failure;
 		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('The probe could not be run.');
+		expect(out.data.error).toBe('Could not run the probe. Try again.');
 	});
 });
 
