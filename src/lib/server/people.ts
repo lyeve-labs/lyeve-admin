@@ -1,7 +1,10 @@
 import type { HttpClient } from '@lyeve-labs/client';
 
-/** An account as a column names it and a picker offers it. */
-export type Person = { id: string; email: string };
+/**
+ * An account as a column names it and a picker offers it. The tenant is empty
+ * for an account that belongs to none, such as the first super admin.
+ */
+export type Person = { id: string; email: string; tenant_id: string };
 
 /** How many accounts one read asks for. The engine answers no total. */
 export const PEOPLE_LIMIT = 200;
@@ -24,8 +27,10 @@ export async function listPeople(client: HttpClient): Promise<Person[]> {
 	const out: Person[] = [];
 	for (const row of rows) {
 		if (!row || typeof row !== 'object') continue;
-		const { id, email } = row as { id?: unknown; email?: unknown };
-		if (typeof id === 'string' && id && typeof email === 'string' && email) out.push({ id, email });
+		const { id, email, tenant_id } = row as { id?: unknown; email?: unknown; tenant_id?: unknown };
+		if (typeof id === 'string' && id && typeof email === 'string' && email) {
+			out.push({ id, email, tenant_id: typeof tenant_id === 'string' ? tenant_id : '' });
+		}
 	}
 	return out;
 }

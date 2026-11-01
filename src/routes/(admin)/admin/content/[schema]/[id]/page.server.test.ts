@@ -155,6 +155,23 @@ describe('content editor load, the entry read', () => {
 		).catch((err: unknown) => err);
 	}
 
+	// The load starts every read at once. When the entry read fails, the load
+	// throws its own error, and a read derived from the entry that nobody
+	// awaits by then rejects with no handler: a server-side unhandled
+	// rejection on every missing entry.
+	it('leaves no read unsettled when the entry read fails', async () => {
+		const unhandled: unknown[] = [];
+		const note = (reason: unknown) => unhandled.push(reason);
+		process.on('unhandledRejection', note);
+		try {
+			await entryAnswering(404);
+			await new Promise((resolve) => setImmediate(resolve));
+		} finally {
+			process.off('unhandledRejection', note);
+		}
+		expect(unhandled).toEqual([]);
+	});
+
 	it('answers 404 when the engine says the entry does not exist', async () => {
 		const thrown = await entryAnswering(404);
 		expect(isHttpError(thrown) && thrown.status).toBe(404);
@@ -624,5 +641,34 @@ describe('content editor load, releases', () => {
 	it('reads a release that holds the entry as holding it', async () => {
 		const releases = await releasesWith(() => json({ id: 'r1', name: 'Spring', status: 'draft', items: [{ entry_id: 'e1' }] }));
 		expect(releases).toMatchObject({ failed: false, holding: ['r1'] });
+	});
+});
+
+describe('content editor load, mentions', () => {
+	// The engine mails only accounts of the entry's own tenant and refuses a
+	// comment that mentions anyone else, the first super admin included, who
+	// belongs to no tenant. The directory a super admin reads holds them all.
+	it('offers to mention only accounts of the entry\'s tenant, and still names every author', async () => {
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('/api/admin/users')) {
+				return json([
+					{ id: 'setup', email: 'setup@test.invalid', tenant_id: '' },
+					{ id: 'ana', email: 'ana@test.invalid', tenant_id: 't1' },
+					{ id: 'bo', email: 'bo@test.invalid', tenant_id: 't2' },
+				]);
+			}
+			if (path.includes('/comments')) return json({ data: [] });
+			if (path.includes('/revisions')) return json([]);
+			if (path.includes('/api/admin/content?')) return json({ data: [] });
+			return json({ ...entry, tenant_id: 't1' });
+		}) as unknown as typeof globalThis.fetch;
+		const out = (await load({
+			fetch: fetchFn,
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none }),
+		} as never)) as { comments: { people: { id: string }[]; mentionable: { id: string }[] } };
+		expect(out.comments.mentionable.map((p) => p.id)).toEqual(['ana']);
+		expect(out.comments.people.map((p) => p.id)).toEqual(['setup', 'ana', 'bo']);
 	});
 });

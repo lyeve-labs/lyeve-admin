@@ -395,11 +395,16 @@ async function postImport<T>(fetchFn: typeof fetch, path: string, body: unknown)
 		// The engine's refusals carry a code, and their sentence is written for
 		// the operator and shown as sent. A 5xx body can carry driver detail,
 		// and an uncoded 4xx is not the engine's, so the status picks the
-		// sentence for both. An ApiError keeps
+		// sentence for both. A 413 is the console's own too: the engine names
+		// the request limit, the encoded file plus its envelope, and the reader
+		// knows the file limit the drawer states. An ApiError keeps
 		// the body, so a license refusal renders through RefusalNotice with
 		// what the plugin sent.
 		const engineSaid = typeof j.code === 'string' && j.code !== '';
-		const said = res.status < 500 && engineSaid && j.error ? j.error : importFailure(res.status, path === '', engineSaid);
+		const said =
+			res.status < 500 && res.status !== 413 && engineSaid && j.error
+				? j.error
+				: importFailure(res.status, path === '', engineSaid);
 		throw new ApiError(res.status, said, j);
 	}
 	return (await res.json()) as T;

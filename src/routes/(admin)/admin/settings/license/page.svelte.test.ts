@@ -242,8 +242,8 @@ describe('License page renewal', () => {
 		expect(getByText('the key was refused')).toBeTruthy();
 	});
 
-	it('confirms a license that applied', () => {
-		const { getByText } = mount({ form: { success: true, plan: 'example', state: 'active', features: [] } });
-		expect(getByText(/License applied/)).toBeTruthy();
+	it('confirms a license that applied', async () => {
+		const { findByText } = mount({ form: { success: true, plan: 'example', state: 'active', features: [] } });
+		expect(await findByText(/License applied/)).toBeTruthy();
 	});
 });

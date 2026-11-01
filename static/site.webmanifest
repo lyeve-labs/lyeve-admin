@@ -1,7 +1,7 @@
 {
   "name": "LyEve",
   "short_name": "LyEve",
-  "description": "LyEve - All under your control",
+  "description": "Self-hosted headless CMS in Go. The engine is MIT licensed and free to run on your own servers.",
   "icons": [
     { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" },

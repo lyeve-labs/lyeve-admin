@@ -16,11 +16,23 @@ function dayStart(value: string): string | null {
 	return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-/** The end of a calendar day, so a budget that ends "today" covers today. */
-function dayEnd(value: string): string | null {
+/**
+ * The first instant after a calendar day. A budget's window ends there, the
+ * way each monthly cost line ends at the next month's first instant, so a
+ * budget whose last day is the month's last day counts that month's line.
+ */
+function dayAfter(value: string): string | null {
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-	const d = new Date(`${value}T23:59:59Z`);
-	return Number.isNaN(d.getTime()) ? null : d.toISOString();
+	const d = new Date(`${value}T00:00:00Z`);
+	if (Number.isNaN(d.getTime())) return null;
+	d.setUTCDate(d.getUTCDate() + 1);
+	return d.toISOString();
+}
+
+/** The last day a budget window covers, from the end the engine stores. */
+export function lastDay(periodEnd: string): string {
+	const end = Date.parse(periodEnd);
+	return Number.isNaN(end) ? periodEnd : new Date(end - 1).toISOString();
 }
 
 /**
@@ -47,7 +59,7 @@ export function parseBudget(form: FormData): { budget: BudgetInput } | { error: 
 		return { error: 'Alert thresholds are whole percentages, comma separated, such as 50, 80, 100.' };
 	}
 	const period_start = dayStart(String(form.get('period_start') ?? ''));
-	const period_end = dayEnd(String(form.get('period_end') ?? ''));
+	const period_end = dayAfter(String(form.get('period_end') ?? ''));
 	if (!period_start || !period_end) return { error: 'Pick the first and last day of the budget window.' };
 	if (period_end <= period_start) return { error: 'The window ends before it starts.' };
 	return {

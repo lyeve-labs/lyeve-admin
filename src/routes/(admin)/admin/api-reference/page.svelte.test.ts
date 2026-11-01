@@ -51,7 +51,7 @@ const groups: EndpointGroup[] = [
 /** The kit's copy control: the frame that holds the button, its tooltip and its live region. */
 function copyFrame(button: HTMLElement): HTMLElement {
 	let node = button.parentElement;
-	while (node && !node.querySelector(':scope > [role="status"]')) node = node.parentElement;
+	while (node && !node.querySelector(':scope > [aria-live="polite"]')) node = node.parentElement;
 	return node!;
 }
 
@@ -171,7 +171,7 @@ describe('api reference rows', () => {
 		vi.useFakeTimers();
 		setup();
 		const copy = screen.getByRole('button', { name: 'Copy the path /api/admin/media' });
-		const status = copyFrame(copy).querySelector('[role="status"]')!;
+		const status = copyFrame(copy).querySelector('[aria-live="polite"]')!;
 
 		await fireEvent.click(copy);
 		await vi.advanceTimersByTimeAsync(0);

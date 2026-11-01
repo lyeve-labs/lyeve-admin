@@ -120,9 +120,13 @@ export interface KeyAccess {
 	resources: Record<string, { actions: string[]; names: string }>;
 }
 
-/** What a new key starts with: read every schema, and discover them. */
+/**
+ * What a new key starts with: read every schema. Discovering the schemas is
+ * left off, because its box sits in a folded section and a grant the reader
+ * never saw is not one they chose.
+ */
 export function defaultAccess(): KeyAccess {
-	return { contentMode: 'all', contentActions: ['read'], perSchema: {}, discoverSchemas: true, resources: {} };
+	return { contentMode: 'all', contentActions: ['read'], perSchema: {}, discoverSchemas: false, resources: {} };
 }
 
 /**

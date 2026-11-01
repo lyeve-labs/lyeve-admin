@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
-import { actions, load } from './+page.server';
+import { actions, load, ssr } from './+page.server';
 import { forbiddenText } from '$lib/api/gate';
 import { BUSY, OUTAGE } from '$lib/outage';
 import { blockedFlow, fixtureCatalog, fixtureEventTypes, fixtureFlow, fixtureRun, fixtureTemplates, joinFlow, missingTypeErrors, withLocked } from '$lib/flow/fixtures';
@@ -90,6 +90,12 @@ function actionEvent(form: FormData, routes: Record<string, Route> = everything)
 }
 
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
+
+describe('admin/flows/[id] rendering', () => {
+	it('renders in the browser only, so the server build carries no flow editor', () => {
+		expect(ssr).toBe(false);
+	});
+});
 
 describe('admin/flows/[id] load', () => {
 	// A failed read of the names is not a tenant with none, so the node form

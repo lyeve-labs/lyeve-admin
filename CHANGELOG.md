@@ -4,6 +4,59 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [0.23.0] - 2026-11-02
+
+### Added
+
+- A Privacy page under Settings, open to a tenant admin and a super admin, holds the tenant's privacy settings. It sets what an erasure does with the tenant's form submissions: decide for each submission, always clear the person's values, or always delete the submission. It also sets which sections a person may include in an export of their own data, and whether every role may export or only the roles ticked. Admins and super admins may always export.
+- The Privacy requests page, which only a super admin opens, chooses what a person proves before exporting their own data: the password, a code from an authenticator app, a code sent by email, any of them or none. Every ticked step is required.
+- These settings need the schema and analytics plugin releases that serve them. While a plugin serving a setting is stopped, the page says why, and a read that fails is drawn as a failure with a retry.
+- The header's pending migration chip opens a dialog that lists each queued statement with its schema and marks every drop or clear as destroying data. Nothing runs until the reader confirms. Before, one click applied every queued statement, every tenant's queued column drops on shared tables included. If the queue changes after the dialog opens, the apply is refused and the dialog shows the new queue.
+
+### Changed
+
+- A new API key, a new user and a new tenant member start with the viewer role, and a user saved with no role ticked gets viewer. Before, each started as an editor. A key whose scopes name a content write without a writing role is refused on its Roles field, because the engine refuses that write whatever the scopes say.
+- A new API key starts with schema discovery off. Before, every key made in the console could list the content types and their fields, because the box started ticked in a folded section.
+- A real event replay asks first, naming the window and the run name. A rehearsal still runs straight away, and the form keeps its values, so a rehearsal and the run after it carry the same name.
+- The sign-in page reads the engine's list of sign-in routes once to decide which recovery links and single sign-on providers to offer. Before, it sent each route a request the engine refused, and each refusal raised the failure rate on the dashboard. An engine without the list is asked the old way.
+- The configuration page notes that a saved value for a setting the engine reads while starting applies at the next restart, and confirms the save with that sentence.
+- Every icon, the browser tab included, is the same rounded tile, so the mark stays visible on a light tab under a dark system theme. The install manifest describes the app with the brand descriptor.
+- The sidebar loads the code of each page it links to once the link is on screen, so a first visit to a page waits for its data alone.
+- The flow page and the schema builder draw their editors in the browser only. Both load and draw as before.
+- The console refuses to install on Node below 26.
+
+### Fixed
+
+- Behind a proxy that sends every `/api/` path to the engine, the audit log exports and the profiler's pprof exports download again. Their forms post to console paths now, where the engine used to answer 415.
+- The SMTP provider form starts with its TLS switch off and labels it Implicit TLS, with a hint that names port 465 and says the connection upgrades with STARTTLS when it is off. Before, a provider saved with the defaults opened a TLS connection to port 587 and failed every send.
+- The AI settings tab shows the stored transcript settings and their source. Before, it showed the 720 hour default after a saved change took effect.
+- The AI provider form's Priority hint says a higher number is tried first, as the AI feature orders providers.
+- The PII masking rule drawer shows its Create and Save buttons again, so New rule, Edit and Duplicate can save.
+- The SAML New provider drawer offers the provider templates in a Start from select, and choosing one fills the NameID format, the attribute mapping, the encryption switch and any URL the template names. Choosing None or another template clears the last template's settings.
+- The SCIM New connection form links the connection to a SAML provider, so SAML sign-in through that provider uses the connection's attribute mapping. The link is set only when the connection is created.
+- A content entry keeps the values of a field named `status`, `system`, `created_by` or `updated_by` on create and on every edit. Before, the form dropped them, and a required field with one of those names could not be saved.
+- The Mention picker in content comments offers only accounts of the entry's tenant. Before, a super admin was offered every account on the instance, and picking one from another tenant refused the whole comment.
+- A new audit retention policy starts with archival off, as the API stores a policy that does not mention it. Before, the same policy archived when made in the console and deleted outright when made through the API.
+- A cost budget covers its last day in full. Before, a budget for a whole month ended a second before that month's cost line and never counted it.
+- The tenant delete question says the stored files stay until the storage backend's own lifecycle rules remove them. Before, it said every file went with the tenant.
+- An erasure that kept records under an address another account in the tenant also holds shows its own warning, which says the kept records cannot be told apart from that account's data. Before, it read as a failed part and offered a retry that erased nothing.
+- The pending migration count in the header updates after a schema save, a delete or an apply, without a page load.
+- The schema DDL preview lists each field rename the save runs first. Before, a preview whose only change was a rename said "No DDL changes".
+- The schema builder's column headings line up with their columns, and the columns switch to their narrow layout by the width of the field list rather than the window.
+- The schema import drawer shows each rename once, from the old name to the new.
+- An import refused for its size names the 50 MB file limit the drawer states.
+- The import wizard's drop zone names the accepted formats in a short line that stays inside its border.
+- An import rollback of one entry is confirmed in the singular.
+- The recommendations page says a reader joins a group the first time a request signed in as that reader asks for its group, and that each reader's group is picked at random.
+- When the console cannot render an error page of its own, it serves a page in its own words that names the status and offers Try again and the dashboard. Before, the reader got the framework's bare 500 page.
+- A saved setting, a saved AI price and a failed migration sync are announced to screen readers.
+- Opening an entry that cannot be read no longer leaves an unhandled error on the server.
+- Toasts, copy confirmations and saved outcomes are read out by the Orca screen reader in Chrome and Firefox. Before, they carried a status role, which Orca does not speak.
+- A screen reader says why the flow editor refused a connection. Before, the reason only showed in a floating panel.
+- A screen reader reads out the notices that a password reset link or an email sign-in link was sent, that the password changed, and that every row of an import dry run passes. Before, these stayed on screen without being announced.
+- A tab strip placed low on a long page no longer scrolls the page down to it when it appears.
+- The public search card on the Search page says what a picked content type exposes: a query matches every field of its published entries, and a snippet can quote any of them. Before, it said a result never carried the stored body.
+
 ## [0.22.0] - 2026-10-26
 
 ### Added

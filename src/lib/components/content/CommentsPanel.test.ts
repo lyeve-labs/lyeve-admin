@@ -27,7 +27,7 @@ const thread = {
 
 describe('CommentsPanel', () => {
 	it('shows a thread with its replies, its author and who it mentions', () => {
-		const { container } = render(CommentsPanel, { props: { threads: [thread], people } });
+		const { container } = render(CommentsPanel, { props: { threads: [thread], people, mentionable: people } });
 		expect(container.textContent).toContain('Is the date right?');
 		expect(container.textContent).toContain('Yes.');
 		expect(container.textContent).toContain('@bo@example.com');
@@ -35,20 +35,20 @@ describe('CommentsPanel', () => {
 	});
 
 	it('offers to reopen a resolved thread', () => {
-		const { container, getByRole } = render(CommentsPanel, { props: { threads: [{ ...thread, resolved: true }], people } });
+		const { container, getByRole } = render(CommentsPanel, { props: { threads: [{ ...thread, resolved: true }], people, mentionable: people } });
 		getByRole('radio', { name: 'Resolved' })?.click();
 		expect(container.querySelector('form[action="?/resolveThread"] input[name="resolved"]')?.getAttribute('value') ?? 'false').toBe('false');
 	});
 
 	it('says a failed read failed, and offers no way to post into it', () => {
-		const { container } = render(CommentsPanel, { props: { threads: [], people, unavailable: true } });
+		const { container } = render(CommentsPanel, { props: { threads: [], people, mentionable: people, unavailable: true } });
 		expect(container.textContent).toContain('Comments could not be read');
 		expect(container.querySelector('form[action="?/comment"]')).toBeNull();
 	});
 
 	it('renders a refused comment as the refusal notice', () => {
 		const { getByTestId } = render(CommentsPanel, {
-			props: { threads: [], people, refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },
+			props: { threads: [], people, mentionable: people, refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },
 		});
 		expect(getByTestId('refusal-notice').textContent).toContain('example-feature');
 	});

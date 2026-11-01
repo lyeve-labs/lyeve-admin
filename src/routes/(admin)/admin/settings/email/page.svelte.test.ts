@@ -147,6 +147,17 @@ describe('email providers page', () => {
 		for (const name of API_FIELDS) expect(form.querySelector(`[name="${name}"]`), name).toBeNull();
 	});
 
+	it('starts with implicit TLS off on port 587 and names port 465 for it', async () => {
+		const { getAllByText, container } = setup([]);
+		await fireEvent.click(getAllByText('New provider')[0]);
+		const form = formEl(container);
+		expect((form.querySelector('[name="port"]') as HTMLInputElement).value).toBe('587');
+		expect((form.querySelector('input[name="use_tls"]') as HTMLInputElement).value).toBe('false');
+		expect(form.textContent).toContain('Implicit TLS');
+		expect(form.textContent).toContain('465');
+		expect(form.textContent).not.toContain('STARTTLS on the connection');
+	});
+
 	it('switches to the api fields, asks for the key and names the placeholders', async () => {
 		const { getAllByText, container } = setup([]);
 		await fireEvent.click(getAllByText('New provider')[0]);

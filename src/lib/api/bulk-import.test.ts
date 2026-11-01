@@ -206,6 +206,14 @@ describe('a refused import call', () => {
 		expect((await refusal(400, { error: 'bad request from upstream' })).message).toBe('The engine refused the request.');
 	});
 
+	// The engine's 413 names the route's request limit, the base64 encoding
+	// of the file plus its envelope, which is not the file size the drawer
+	// states.
+	it('names the file limit the drawer states when the engine refuses the size', async () => {
+		const err = await refusal(413, { error: 'Request body exceeds the 70953644 byte limit.', code: 'payload_too_large' });
+		expect(err.message).toBe('The file is larger than the 50 MB an import takes. Split it and import the parts.');
+	});
+
 	// A 5xx body can carry driver detail, and the outage sentence is the one
 	// that tells the operator what to do.
 	it('keeps the body of an outage off the page and says the engine did not answer', async () => {

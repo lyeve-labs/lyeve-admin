@@ -8,13 +8,15 @@ function client(get: (url: string) => Promise<unknown>): HttpClient {
 
 describe('listPeople', () => {
 	it('reads the bare array the engine answers', async () => {
-		const out = await listPeople(client(async () => [{ id: 'u1', email: 'a@example.com', roles: ['editor'] }]));
-		expect(out).toEqual([{ id: 'u1', email: 'a@example.com' }]);
+		const out = await listPeople(
+			client(async () => [{ id: 'u1', email: 'a@example.com', roles: ['editor'], tenant_id: 't1' }]),
+		);
+		expect(out).toEqual([{ id: 'u1', email: 'a@example.com', tenant_id: 't1' }]);
 	});
 
 	it('reads an enveloped answer and drops rows with no email', async () => {
 		const out = await listPeople(client(async () => ({ data: [{ id: 'u1', email: 'a@example.com' }, { id: 'u2' }] })));
-		expect(out).toEqual([{ id: 'u1', email: 'a@example.com' }]);
+		expect(out).toEqual([{ id: 'u1', email: 'a@example.com', tenant_id: '' }]);
 	});
 
 	it('answers none to a caller the engine refuses', async () => {

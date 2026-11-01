@@ -55,6 +55,12 @@ describe('ProviderForm', () => {
 		expect(screen.queryByLabelText(/Base URL/)).toBeNull();
 	});
 
+	it('says a higher priority is tried first, the order the engine picks a provider in', () => {
+		const { container } = setup();
+		expect(container.textContent).toContain('Higher is tried first when a call names no provider.');
+		expect(container.textContent).not.toContain('Lower is tried first');
+	});
+
 	it('asks a compatible kind for its base URL and lets it run keyless', async () => {
 		setup();
 		await fireEvent.click(screen.getByRole('radio', { name: 'OpenAI-compatible' }));

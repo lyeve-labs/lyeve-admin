@@ -78,14 +78,14 @@ describe('GoroutineEnginePanel', () => {
 		expect(container.textContent).toContain('This install runs without a parallel engine.');
 	});
 
-	it('shows an answer only on the form that asked', () => {
+	it('shows an answer only on the form that asked', async () => {
 		const { container } = setup({}, { form: 'parallel', error: 'Max concurrent must be between 1 and 1024.' });
 		const form = (action: string) => container.querySelector(`form[action="?/${action}"]`) as HTMLFormElement;
 		expect(form('parallel').textContent).toContain('Max concurrent must be between 1 and 1024.');
 		expect(form('pool').textContent).not.toContain('Max concurrent');
 		cleanup();
 		const saved = setup({}, { form: 'pool', saved: true });
-		expect((saved.container.querySelector('form[action="?/pool"]') as HTMLFormElement).textContent).toContain('Applied.');
+		await vi.waitFor(() => expect((saved.container.querySelector('form[action="?/pool"]') as HTMLFormElement).textContent).toContain('Applied.'));
 		expect((saved.container.querySelector('form[action="?/asyncHooks"]') as HTMLFormElement).textContent).not.toContain('Applied.');
 	});
 

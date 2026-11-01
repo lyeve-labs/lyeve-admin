@@ -56,14 +56,14 @@
 	let name = $state('');
 
 	/**
-	 * Deleting a tenant destroys everything stored under it, so the row asks
+	 * Deleting a tenant destroys its rows and users for good, so the row asks
 	 * first and names the tenant. enhance awaits this before it sends anything,
 	 * so canceling here means the request is never made.
 	 */
 	function deleteTenant(name: string): SubmitFunction {
 		return confirmed(
 			`Delete ${name}?`,
-			'Every row, file and user scoped to it goes with it.',
+			"Every row and user scoped to it goes with it. Its stored files stay in the storage backend until the backend's own lifecycle rules remove them.",
 			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
 		);
 	}

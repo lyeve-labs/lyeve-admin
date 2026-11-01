@@ -10,6 +10,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { PROVIDER_KINDS, effectiveGate, providerKindDescription, providerKindLabel } from '$lib/api/ai';
 	import { formatDateTime } from '$lib/format';
+	import { overlayClosed } from '$lib/overlay';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -92,7 +93,21 @@
 	// offers no write here either.
 	const canWrite = $derived(data.isSuperAdmin && effectiveGate(data.gate, data.aiLayoutGate).state === 'ok');
 
-	const save = tracked(() => async ({ update }) => update({ reset: false }));
+	/*
+	 * What the live region says after a save. Emptied when a save starts, so a
+	 * second save is heard as well, and set once the drawer has left, so the
+	 * focus moving back to the page does not cut the announcement off.
+	 */
+	let announced = $state('');
+	const save = tracked(() => {
+		announced = '';
+		return async ({ result, update }) => {
+			await update({ reset: false });
+			if (result.type !== 'success') return;
+			await overlayClosed();
+			announced = 'Saved.';
+		};
+	});
 </script>
 
 <PageShell
@@ -108,6 +123,12 @@
 		{/if}
 	{/snippet}
 
+	<!-- The row's "Saved." arrives with a new row, and a screen reader announces
+	     a region only when text arrives in one already on the page, so the
+	     sentence is spoken from here. A div because in Firefox Orca drops a
+	     quick insertion into a paragraph, and no status role because Orca reads
+	     a status bar as chrome and says nothing. -->
+	<div class="sr-only" aria-live="polite" aria-atomic="true" data-testid="price-saved">{announced}</div>
 	<AiSection level={2} tab="prices" gate={data.gate} layoutGate={data.aiLayoutGate} noun="prices">
 		<FormErrors message={pageFailure} />
 
@@ -153,7 +174,7 @@
 							<td data-cell="nowrap" class="text-muted">
 								{formatDateTime(p.updated_at)}
 								{#if mine && form && 'saved' in form}
-									<span class="block text-xs text-success" role="status">Saved.</span>
+									<span class="block text-xs text-success">Saved.</span>
 								{/if}
 							</td>
 							{#if data.isSuperAdmin}

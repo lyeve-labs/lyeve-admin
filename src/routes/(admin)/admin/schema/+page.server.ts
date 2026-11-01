@@ -12,6 +12,12 @@ import { NO_CANVAS, parsePositions, readCanvasLayout, saveCanvasLayout, type Can
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { section, type Gate } from '$lib/api/gate';
 
+/**
+ * The page renders in the browser only. Its diagram editor then never
+ * enters the server build, and the server answers with the page's data alone.
+ */
+export const ssr = false;
+
 /** Every schema write the engine serves takes one of these. */
 const WRITERS = ['admin', 'super_admin'];
 

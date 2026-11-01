@@ -581,25 +581,25 @@ describe('Goroutine engine', () => {
 		expect(forms[0].querySelector('[role="alert"]')?.textContent).toContain('between 1 and 4096');
 	});
 
-	it('reports a save on the form that made it', () => {
+	it('reports a save on the form that made it', async () => {
 		const { container } = render(ObservabilityPage, {
 			props: props({}, { form: 'asyncHooks', saved: true, view: ASYNC_VIEW }),
 		});
 		const forms = [...section(container).querySelectorAll('form')];
-		expect(forms[2].textContent).toContain('Applied');
+		await vi.waitFor(() => expect(forms[2].textContent).toContain('Applied'));
 		expect(forms[0].textContent).not.toContain('Applied');
 	});
 
 	// The confirmation clears itself, so the caveat it carried would clear with
 	// it. The caveat is a standing fact and stays outside the alert.
-	it('keeps the restart caveat outside the confirmation that clears itself', () => {
+	it('keeps the restart caveat outside the confirmation that clears itself', async () => {
 		const { container } = render(ObservabilityPage, {
 			props: props({}, { form: 'pool', saved: true, view: POOL_VIEW }),
 		});
 		const form = [...section(container).querySelectorAll('form')][0];
-		const alert = [...form.querySelectorAll('[role="status"], [role="alert"]')].map((el) => el.textContent ?? '').join(' ');
-		expect(alert).toContain('Applied');
-		expect(alert).not.toContain('holds until the engine restarts');
+		const alert = () => [...form.querySelectorAll('[aria-live="polite"], [role="alert"]')].map((el) => el.textContent ?? '').join(' ');
+		await vi.waitFor(() => expect(alert()).toContain('Applied'));
+		expect(alert()).not.toContain('holds until the engine restarts');
 		expect(form.textContent).toContain('The change holds until the engine restarts.');
 	});
 

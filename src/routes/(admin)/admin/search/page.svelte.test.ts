@@ -143,6 +143,15 @@ describe('Search page public request', () => {
 		expect(field.readOnly).toBe(true);
 		expect(screen.getByRole('button', { name: 'Copy the request' })).toBeTruthy();
 	});
+
+	// A public query matches every field and its snippet can quote any of
+	// them, so the picker must not promise that the body stays private.
+	it('says a public schema exposes every field to a query', () => {
+		const { container } = render(SearchPage, { props: { data: data() as never, form: null } });
+		const text = container.textContent ?? '';
+		expect(text).toContain('A query matches every field, and the snippet can quote any of them');
+		expect(text).not.toContain('never the stored body');
+	});
 });
 
 describe('Search page counts', () => {

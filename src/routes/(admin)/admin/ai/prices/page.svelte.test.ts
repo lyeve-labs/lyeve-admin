@@ -1,13 +1,26 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
+import { tick } from 'svelte';
 import Page from './+page.svelte';
 import { fixturePrice, fixtureSettings } from '$lib/components/ai/fixtures';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+// enhance hands back each form's submit function by its action, so a test can
+// drive a save without the router a real submission needs in jsdom.
+const forms = vi.hoisted(() => ({ submits: new Map<string, SubmitFunction>() }));
+vi.mock('$app/forms', () => ({
+	enhance: (el: HTMLFormElement, fn?: SubmitFunction) => {
+		if (fn) forms.submits.set(el.getAttribute('action') ?? '', fn);
+		return { destroy() {} };
+	},
+}));
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	forms.submits.clear();
+});
 
 function setup(overrides: Record<string, unknown> = {}, form: unknown = null) {
 	return render(Page, {
@@ -16,6 +29,23 @@ function setup(overrides: Record<string, unknown> = {}, form: unknown = null) {
 			form,
 		} as never,
 	});
+}
+
+/** Opens the drawer, starts a save through its form, and returns what finishes it. */
+async function startSave() {
+	if (!forms.submits.has('?/save')) await fireEvent.click(screen.getAllByRole('button', { name: /new price/i })[0]);
+	const submit = forms.submits.get('?/save')!;
+	const callback = (await submit({ cancel() {} } as never)) as (opts: {
+		result: ActionResult;
+		update: () => Promise<void>;
+	}) => Promise<void>;
+	return (result: ActionResult = { type: 'success', status: 200, data: { key: 'openai/gpt-4o', saved: true } }) =>
+		callback({ result, update: async () => {} });
+}
+
+async function saveOnce() {
+	const finish = await startSave();
+	await finish();
 }
 
 describe('AI prices page', () => {
@@ -64,7 +94,55 @@ describe('AI prices page', () => {
 
 	it('matches a saved result to its row', () => {
 		const saved = setup({}, { key: 'openai/gpt-4o', saved: true });
-		expect(saved.getByRole('status').textContent).toContain('Saved.');
+		const row = saved.container.querySelector('tbody tr') as HTMLElement;
+		expect(row.textContent).toContain('Saved.');
+		// The row's copy is what ties the sentence to its model, so a screen
+		// reader browsing the table finds it there.
+		expect(row.querySelector('[aria-hidden="true"]')?.textContent ?? '').not.toContain('Saved.');
+	});
+
+	/*
+	 * Orca speaks none of a region marked as a status, and a new price's row
+	 * arrives holding its "Saved.", so the sentence is spoken from a region
+	 * that was on the page and empty before the save.
+	 */
+	it('announces a save from a live region mounted empty', async () => {
+		const view = setup();
+		const live = view.getByTestId('price-saved');
+		expect(live.tagName).toBe('DIV');
+		expect(live.getAttribute('aria-live')).toBe('polite');
+		expect(live.getAttribute('aria-atomic')).toBe('true');
+		expect(live.hasAttribute('role')).toBe(false);
+		expect(live.textContent).toBe('');
+
+		await saveOnce();
+
+		expect(view.getByTestId('price-saved')).toBe(live);
+		expect(live.textContent).toBe('Saved.');
+		expect(view.container.querySelector('[role="status"]')).toBeNull();
+	});
+
+	// The same sentence left in place says nothing, so a second save empties the
+	// region while it runs and fills it again.
+	it('announces a second save again', async () => {
+		const view = setup();
+		const live = view.getByTestId('price-saved');
+		await saveOnce();
+		expect(live.textContent).toBe('Saved.');
+
+		const finish = await startSave();
+		await tick();
+		expect(live.textContent).toBe('');
+		await finish();
+		expect(live.textContent).toBe('Saved.');
+	});
+
+	// A failed save keeps the drawer open beside its message and says nothing here.
+	it('announces nothing for a failed save', async () => {
+		const view = setup();
+		const finish = await startSave();
+		await finish({ type: 'failure', status: 400, data: { action: 'save', error: 'Model is required.' } });
+		expect(view.getByTestId('price-saved').textContent).toBe('');
 	});
 
 	it('shows a failed delete on the page and not in the drawer opened after it', async () => {

@@ -19,7 +19,7 @@ import {
 	type LogSearchResponse,
 	type Summary,
 } from '@lyeve-labs/client-rest';
-import { applyMigrations } from '$lib/api/migrate';
+import { applyMigrations, pendingMigrations } from '$lib/api/migrate';
 import { section, type Gate, type Section } from '$lib/api/gate';
 import { rowsOf, statedTotal, type ListEnvelope } from '$lib/api/list';
 import { actionError } from '$lib/server/action-error';
@@ -289,9 +289,17 @@ export const actions: Actions = {
 
 		const form = await event.request.formData();
 		const back = localPath(form.get('redirectTo'), '/admin');
+		const client = authedClient(event);
 
 		try {
-			await applyMigrations(authedClient(event));
+			// The engine applies whatever is queued when the post arrives, which
+			// can hold a drop another tenant's save queued after the reader's list
+			// was read. Only the queue the reader confirmed is applied.
+			const queued = (await pendingMigrations(client)).items.map((item) => item.description);
+			if (JSON.stringify(queued) !== String(form.get('expected') ?? '')) {
+				return fail(409, { error: 'The queue changed since it was listed. Review it again.' });
+			}
+			await applyMigrations(client);
 		} catch (err) {
 			// A migration that fails names the statement that failed, and that
 			// sentence is the whole value of the message.

@@ -146,6 +146,31 @@ describe('the connection form', () => {
 		expect(names).toContain('deprovision_on_delete');
 	});
 
+	it('offers the SAML providers to link and submits the choice', async () => {
+		const { container } = render(ScimPage, {
+			props: props({ saml: { state: 'ok', providers: [{ id: 's1', name: 'okta' }] } }),
+		});
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]') as HTMLElement;
+		expect(said(dialog)).toContain('SAML provider');
+		expect(dialog.querySelector('input[type="hidden"][name="saml_provider_id"]')).not.toBeNull();
+	});
+
+	it('says the SAML providers could not be read instead of offering none', async () => {
+		const { container } = render(ScimPage, { props: props({ saml: { state: 'failed' } }) });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]') as HTMLElement;
+		expect(said(dialog)).toContain('The SAML providers could not be read');
+		expect(dialog.querySelector('[name="saml_provider_id"]')).toBeNull();
+	});
+
+	it('offers no link when SAML is off', async () => {
+		const { container } = render(ScimPage, { props: props({ saml: { state: 'off' } }) });
+		await fireEvent.click(screen.getByRole('button', { name: /new connection/i }));
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]') as HTMLElement;
+		expect(said(dialog)).not.toContain('SAML provider');
+	});
+
 	it('warns that rotating breaks provisioning until the directory is updated', async () => {
 		const { container } = render(ScimPage, { props: props() });
 		await fireEvent.click(screen.getByLabelText('Rotate the token for Azure AD'));

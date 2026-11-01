@@ -108,11 +108,26 @@
 {:else if statements !== null}
 	{@const list = statements}
 	<Modal open size="lg" title="Preview DDL" {onclose}>
+		<!-- A save runs each rename through its own route before the definition,
+		     so the engine previews the rest under the old names and never lists
+		     a rename. It is named here, ahead of what the engine answered. -->
+		{#if change.renames.length > 0}
+			<ul class="mb-4 space-y-0.5 text-sm" data-testid="ddl-renames">
+				{#each change.renames as r (r.from)}
+					<li>Renames <span class="font-mono">{r.from}</span> to <span class="font-mono">{r.to}</span>. The data moves with it.</li>
+				{/each}
+			</ul>
+		{/if}
 		{#if error}
 			<Alert tone="danger">{error}</Alert>
 		{:else if list.length === 0}
-			<p class="text-sm text-muted">No DDL changes. The table already matches this definition.</p>
+			<p class="text-sm text-muted">
+				{change.renames.length > 0 ? 'Besides the renames, the table already matches this definition.' : 'No DDL changes. The table already matches this definition.'}
+			</p>
 		{:else}
+			{#if change.renames.length > 0}
+				<p class="mb-2 text-sm text-muted">The renames run first. Then:</p>
+			{/if}
 			<div class="flex flex-col gap-4">
 				{#each list as stmt, i (stmt.description + i)}
 					<div data-testid="ddl-statement" data-destructive={stmt.destructive ? 'true' : undefined}>

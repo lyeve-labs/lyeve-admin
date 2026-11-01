@@ -53,6 +53,21 @@ describe('the configuration page', () => {
 		expect(secret.textContent).toContain('Stored, not shown.');
 	});
 
+	it('saves a setting the engine reads at start and says it applies at the next restart', async () => {
+		const atStart = { key: 'refresh_token_ttl_secs', source: 'default', editable: true, read_at_start: true };
+		render(ConfigurationPage, {
+			props: props(
+				{ provenance: { ok: true, value: { settings: [atStart], counts: {}, suppressed: [] } } },
+				{ key: 'refresh_token_ttl_secs', success: true }
+			),
+		});
+		const input = screen.getByLabelText('refresh_token_ttl_secs') as HTMLInputElement;
+		expect(input.closest('form')?.getAttribute('action')).toBe('?/save');
+		expect(document.body.textContent).toContain('A saved value applies at the next restart.');
+		expect(document.body.textContent).toContain('Saved. It applies when the engine next restarts.');
+		expect(document.body.textContent).not.toContain('The engine is using it now.');
+	});
+
 	it('shows a refused save under the setting it belongs to only', () => {
 		render(ConfigurationPage, { props: props({}, { key: 'jwt_expiry_secs', error: 'jwt_expiry_secs must be at least 60' }) });
 		expect(row('jwt_expiry_secs').textContent).toContain('jwt_expiry_secs must be at least 60');

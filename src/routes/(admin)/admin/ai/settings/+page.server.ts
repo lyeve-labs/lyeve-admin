@@ -48,7 +48,8 @@ export const load: PageServerLoad = async (event) => {
 		if (provenance) {
 			instanceReadable = true;
 			instance = INSTANCE_KEYS.map((key) => {
-				const s = provenance.settings.find((x) => x.key === key);
+				// The engine lists a setting under its environment name, in upper case.
+				const s = provenance.settings.find((x) => x.key.toUpperCase() === key.toUpperCase());
 				return { key, value: s?.value ?? DEFAULTS[key], source: s?.source ?? 'default', editable: s?.editable ?? false };
 			});
 		}

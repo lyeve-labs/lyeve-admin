@@ -1,5 +1,7 @@
 import { confirm, toast } from '@lyeve-labs/ui-kit';
 import type { SubmitFunction } from '@sveltejs/kit';
+import { invalidate } from '$app/navigation';
+import { MIGRATIONS_DEPENDENCY } from '$lib/api/migrate';
 import { appliedMessage } from '$lib/schema/editor';
 import type { HistoryEntry } from '../+page.server';
 
@@ -99,6 +101,9 @@ export class DdlHistory {
 				this.applyError = String((result.data as { error?: string })?.error ?? 'The queued changes could not be applied.');
 				this.load();
 			}
+			// A failed apply can still have run the statements before the one that
+			// failed, so the header's count is read again either way.
+			if (result.type === 'success' || result.type === 'failure') await invalidate(MIGRATIONS_DEPENDENCY);
 		};
 	};
 }

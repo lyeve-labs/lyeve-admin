@@ -433,21 +433,22 @@ describe('requireRole', () => {
 // stripProtectedFields
 
 describe('stripProtectedFields', () => {
-	it('removes server-controlled fields', () => {
+	it('removes the columns the engine writes itself', () => {
 		const out = stripProtectedFields({
 			id: 'x',
-			_id: 'y',
-			status: 'published',
 			_status: 'draft',
-			created_by: 'u',
-			updated_by: 'u',
 			created_at: 't',
 			updated_at: 't',
+			deleted_at: 't',
 			tenant_id: 't',
-			system: true,
 			title: 'keep me',
 		});
 		expect(out).toEqual({ title: 'keep me' });
+	});
+
+	it('keeps user fields whose names only sound like system ones', () => {
+		const data = { status: 'shipped', _id: 'y', created_by: 'u', updated_by: 'u', system: 'north', _locale: 'fr' };
+		expect(stripProtectedFields(data)).toEqual(data);
 	});
 
 	it('leaves an ordinary payload untouched', () => {

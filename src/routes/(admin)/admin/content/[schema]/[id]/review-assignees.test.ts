@@ -90,7 +90,7 @@ describe('the review picker', () => {
 			'/definitions?': { data: [] },
 			'/api/admin/users?': [{ id: B, email: 'mira.costa@example.com' }],
 		});
-		expect(review.people).toEqual([{ id: B, email: 'mira.costa@example.com' }]);
+		expect(review.people).toEqual([{ id: B, email: 'mira.costa@example.com', tenant_id: '' }]);
 	});
 });
 

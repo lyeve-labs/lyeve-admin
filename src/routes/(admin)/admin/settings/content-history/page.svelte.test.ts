@@ -187,11 +187,11 @@ describe('content history settings', () => {
 		expect(said(container)).toContain('now fixes a setting');
 	});
 
-	it('reports what a prune removed', () => {
+	it('reports what a prune removed', async () => {
 		const { container } = render(Page, {
 			props: props({ form: { action: 'prune', pruned: { commits: 12, legacy_rows: 3, activity_rows: 40, done: true } } }),
 		});
-		expect(said(container)).toContain('Removed 12 versions, 3 earlier revisions and 40 activity rows.');
+		await vi.waitFor(() => expect(said(container)).toContain('Removed 12 versions, 3 earlier revisions and 40 activity rows.'));
 		expect(said(container)).not.toContain('background');
 	});
 

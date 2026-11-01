@@ -50,6 +50,13 @@ describe('the import wizard', () => {
 		);
 	});
 
+	it('names the accepted formats in a short line instead of the raw extension list', () => {
+		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
+		const text = document.body.textContent ?? '';
+		expect(text).toContain('CSV, JSON, NDJSON, JSONL, YAML, or XLSX');
+		expect(text).not.toContain('.csv,.json');
+	});
+
 	it('writes the chosen file size in the unit the rest of the admin uses', async () => {
 		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
 		const input = document.getElementById('import-file') as HTMLInputElement;
@@ -206,6 +213,29 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		await waitFor(() => expect(document.body.textContent).toContain('The engine did not confirm the import. Check the entries before trying again.'));
 		expect(document.body.textContent).not.toContain('Nothing was imported');
 		expect(document.body.textContent).not.toContain('network error');
+	});
+
+	it('reads out a dry run that every row passes', async () => {
+		const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				if (url.endsWith('/preview')) {
+					return json({ source_format: 'csv', source_name: 'orders.csv', columns: ['placed_at'], rows: [], total_rows: 1, errors: [], export: false, schemas: {} });
+				}
+				return json({ total_rows: 1, valid_rows: 1, error_rows: 0, errors: [] });
+			}),
+		);
+		render(ImportWizard, { props: { open: true, schemas, onstarted: vi.fn() } });
+		await fireEvent.click(screen.getByRole('radio', { name: 'From a web address' }));
+		await fireEvent.input(document.getElementById('import-url') as HTMLInputElement, {
+			target: { value: 'https://example.com/orders.csv' },
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Read the file' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Dry run' }));
+		const region = (await screen.findByText(/Every row passes\./)).closest('[aria-live="polite"]');
+		expect(region?.getAttribute('aria-atomic')).toBe('true');
+		expect(region?.textContent).toContain('Every row passes.');
 	});
 
 	// The console renews the engine's short token only on a request its own

@@ -336,7 +336,9 @@ describe('creating an account', () => {
 		});
 	});
 
-	it('succeeds when roles field is missing (defaults to [editor])', async () => {
+	// The engine makes an account sent no role an editor, so the action names
+	// the reading role instead.
+	it('creates a viewer when the roles field is missing', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
 			json({ id: 'u1' })
 		) as unknown as typeof globalThis.fetch;
@@ -349,6 +351,8 @@ describe('creating an account', () => {
 		}) as never);
 
 		expect(result).toEqual({ ok: true });
+		const body = JSON.parse(String((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1]?.body));
+		expect(body.roles).toEqual(['viewer']);
 	});
 
 	it('succeeds on a valid create with roles', async () => {

@@ -59,13 +59,29 @@ export interface SamlProvider {
 	idp_cert_expires_at?: string | null;
 }
 
-/** A vendor preset that fills the protocol settings. */
+/** The settings a template fills. Entity ID and sign-on URL are often empty, because they name the customer's own tenant. */
+export interface SamlTemplateConfig {
+	entity_id?: string;
+	sso_url?: string;
+	slo_url?: string;
+	idp_cert_hint?: string;
+	name_id_format?: string;
+	want_authn_signed?: boolean;
+	want_assertions_signed?: boolean;
+	want_response_signed?: boolean;
+	sign_authn_requests?: boolean;
+	encrypt_assertions?: boolean;
+	attributes_mapping?: Record<string, string>;
+}
+
+/** A vendor preset that fills the protocol settings. The list leaves out its config, and a read of one template carries it. */
 export interface SamlTemplate {
 	key: string;
 	name: string;
 	description?: string;
 	vendor?: string;
 	docs_url?: string;
+	config?: SamlTemplateConfig;
 }
 
 export type SamlGate = Gate;
@@ -87,6 +103,10 @@ export async function listProviders(
 
 export async function listTemplates(client: HttpClient): Promise<SamlTemplate[]> {
 	return client.get<SamlTemplate[]>(TEMPLATES_URL);
+}
+
+export async function getTemplate(client: HttpClient, key: string): Promise<SamlTemplate> {
+	return client.get<SamlTemplate>(`${TEMPLATES_URL}/${encodeURIComponent(key)}`);
 }
 
 export interface CreateProvider {

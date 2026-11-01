@@ -105,6 +105,18 @@ describe('Users create', () => {
 		);
 	});
 
+	it('starts a new account with the reading role, never editor', async () => {
+		const { container, getAllByRole } = render(UsersPage, { props: props() });
+
+		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
+
+		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
+		const ticked = [...dialog.querySelectorAll<HTMLInputElement>('input[name="roles"]')]
+			.filter((el) => el.checked)
+			.map((el) => el.value);
+		expect(ticked).toEqual(['viewer']);
+	});
+
 	// The roles offered here and on the API key page are the same list.
 	it('offers every role the instance issues', async () => {
 		const { container, getAllByRole } = render(UsersPage, { props: props() });

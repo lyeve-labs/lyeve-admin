@@ -54,6 +54,8 @@ type StoredEntry = {
 	body?: unknown;
 	meta?: unknown;
 	status?: string;
+	/** Absent for an entry of no tenant. */
+	tenant_id?: string;
 };
 
 /**
@@ -65,6 +67,7 @@ async function getEntry(client: HttpClient, id: string) {
 	const e = await client.get<StoredEntry>(`/api/admin/content/${encodeURIComponent(id)}`);
 	return {
 		id: e.id,
+		tenant_id: e.tenant_id ?? '',
 		created_at: e.created_at,
 		updated_at: e.updated_at,
 		data: {
@@ -310,7 +313,10 @@ async function loadReview(
  */
 export type EntryComments = {
 	threads: EntryComment[];
+	/** Every account the directory names, so an author reads by email. */
 	people: { id: string; email: string }[];
+	/** The accounts a comment can mention. */
+	mentionable: { id: string; email: string }[];
 	unavailable: boolean;
 };
 
@@ -318,14 +324,21 @@ async function loadComments(
 	client: HttpClient,
 	entryId: string,
 	people: Promise<Person[]>,
+	tenant: Promise<string>,
 ): Promise<EntryComments | null> {
-	// Accounts to mention. A caller who may not list them comments without mentions.
+	// Accounts to mention. A caller who may not list them comments without
+	// mentions. The engine mails only accounts of the entry's own tenant and
+	// refuses the comment for anyone else, so only those are offered.
+	const directory = async () => {
+		const [all, own] = await Promise.all([people, tenant]);
+		return { people: all, mentionable: all.filter((p) => p.tenant_id === own) };
+	};
 	try {
 		const threads = await listComments(client, entryId, 'all');
-		return { threads, people: await people, unavailable: false };
+		return { threads, ...(await directory()), unavailable: false };
 	} catch (err) {
 		if (err instanceof ApiError && err.status === 404) return null;
-		return { threads: [], people: await people, unavailable: true };
+		return { threads: [], ...(await directory()), unavailable: true };
 	}
 }
 
@@ -371,15 +384,21 @@ export const load: PageServerLoad = async (event) => {
 	// One read of the directory serves the mention list and the review picker.
 	const people = listPeople(client);
 
+	const entry = getEntry(client, params.id);
+	// Caught where it starts: when the entry read fails the load throws before
+	// the comments ever read the tenant, and a rejection nobody holds by then
+	// is an unhandled one. The entry's own failure is reported below.
+	const tenant = entry.then((e) => e.tenant_id).catch(() => '');
+
 	const [schemaDef, item, revisionList, localization, review, comments, releases] = await Promise.all([
 		getSchema(params.schema, client).catch((err: unknown): Schema => readError(err, `Schema "${params.schema}" not found`)),
-		getEntry(client, params.id).catch((err: unknown) => readError(err, 'Entry not found')),
+		entry.catch((err: unknown) => readError(err, 'Entry not found')),
 		listRevisions(client, params.id),
 		loadLocalization(client, params.id, runs(plugins, PLUGIN.localization)),
 		loadReview(client, params.id, runs(plugins, PLUGIN.review), user).then(async (r) =>
 			r ? { ...r, people: await people } : null,
 		),
-		loadComments(client, params.id, people).catch(() => null),
+		loadComments(client, params.id, people, tenant).catch(() => null),
 		loadReleases(client, params.id).catch(() => null),
 	]);
 

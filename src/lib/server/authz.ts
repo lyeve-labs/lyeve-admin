@@ -198,23 +198,16 @@ export function assertRole(user: User, roles: string[]): User {
 }
 
 /**
- * Strip server-controlled / protected fields from a user-supplied content
- * payload to blunt mass-assignment. The backend remains authoritative
- * for per-field write ACLs. This removes the obvious privilege fields a
- * crafted form could otherwise inject.
+ * Strip the columns the engine writes itself from a user-supplied content
+ * payload, so a crafted form cannot set an entry's id, tenant, timestamps or
+ * published state. The backend remains authoritative for per-field write
+ * ACLs.
+ *
+ * Only those names are taken out, because the engine keeps each as a column
+ * of its own and none can hold a user's field. _locale stays: the editor
+ * sends it to name the language of the entry.
  */
-const PROTECTED_FIELDS = new Set([
-	'id',
-	'_id',
-	'_status',
-	'status',
-	'created_by',
-	'updated_by',
-	'created_at',
-	'updated_at',
-	'tenant_id',
-	'system',
-]);
+const PROTECTED_FIELDS = new Set(['id', '_status', 'created_at', 'updated_at', 'deleted_at', 'tenant_id']);
 
 export function stripProtectedFields(data: Record<string, unknown>): Record<string, unknown> {
 	return Object.fromEntries(Object.entries(data).filter(([k]) => !PROTECTED_FIELDS.has(k)));

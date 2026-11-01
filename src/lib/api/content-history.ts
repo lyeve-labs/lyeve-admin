@@ -20,10 +20,10 @@ export const HISTORY_URL = '/api/admin/content/history';
 export const ACTIVITY_URL = '/api/admin/content/activity';
 export const ACTIVITY_ALL_URL = '/api/admin/content/activity/all';
 
-/** The capability that reads versions older than the free window. */
+/** The capability that reads versions older than the read window. */
 export const HISTORY_READ_FEATURE = 'content-pro';
 /** The window a reader without that capability sees, in days. */
-export const FREE_READ_DAYS = 30;
+export const READ_WINDOW_DAYS = 30;
 
 /** The longest retention a field takes, in days: a century. */
 export const MAX_KEEP_DAYS = 36500;
@@ -303,7 +303,7 @@ export function listActivity(
 	return client.get<ListEnvelope<ActivityRow> | ActivityRow[]>(`${base}?${params}`);
 }
 
-/** Whether the license reads versions older than the free window for this tenant. */
+/** Whether the license reads versions older than the read window for this tenant. */
 export function readsOlderVersions(ent: { features?: string[]; withheld?: string[] } | null | undefined): boolean {
 	return (ent?.features ?? []).includes(HISTORY_READ_FEATURE) && !(ent?.withheld ?? []).includes(HISTORY_READ_FEATURE);
 }

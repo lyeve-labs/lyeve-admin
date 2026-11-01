@@ -192,6 +192,42 @@ describe('opening the sign-in page', () => {
 		expect(result).toMatchObject({ passwordReset: true, magicLink: false });
 	});
 
+	// Every refused request counts as a failed one on the dashboard, so the
+	// page asks the engine's list once and sends no route a request it refuses.
+	it('reads the sign-in methods from the engine list and asks no route that would refuse', async () => {
+		const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
+			const s = String(url);
+			if (s.includes('/api/admin/auth/sign-in-routes')) {
+				return json({
+					routes: [
+						{ method: 'GET', path: '/api/admin/auth/oauth-providers' },
+						{ method: 'POST', path: '/api/admin/auth/password-reset/request' },
+					],
+				});
+			}
+			if (s.includes('/api/admin/auth/oauth-providers')) return json([{ name: 'github' }]);
+			return json({ error: 'not found' }, 404);
+		}) as unknown as typeof globalThis.fetch;
+
+		const result = await load({ fetch, cookies: mockCookies() } as never);
+		expect(result).toMatchObject({ passwordReset: true, magicLink: false, oauthProviders: ['github'], samlProviders: [] });
+		const asked = vi.mocked(fetch).mock.calls.map(([u]) => String(u));
+		expect(asked.filter((u) => /password-reset|magic-link|saml-providers/.test(u))).toEqual([]);
+	});
+
+	it('asks each route when the engine keeps no list of sign-in routes', async () => {
+		const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
+			const s = String(url);
+			if (s.includes('/api/admin/auth/sign-in-routes')) return json({ error: 'not found' }, 404);
+			if (s.includes('/password-reset/request')) return json({ error: 'not allowed' }, 405);
+			if (s.includes('/magic-link/request')) return json({ error: 'not found' }, 404);
+			return json([]);
+		}) as unknown as typeof globalThis.fetch;
+
+		const result = await load({ fetch, cookies: mockCookies() } as never);
+		expect(result).toMatchObject({ passwordReset: true, magicLink: false });
+	});
+
 	it('keeps both recovery links when the engine does not answer the check', async () => {
 		const fetch = vi.fn(async () => Promise.reject(new TypeError('fetch failed'))) as unknown as typeof globalThis.fetch;
 

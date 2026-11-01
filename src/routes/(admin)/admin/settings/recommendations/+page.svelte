@@ -193,7 +193,7 @@
 				     as a working experiment. -->
 				<EmptyState
 					title="Nobody has been bucketed yet"
-					description="No reader has asked for a feed, so there is no split to report."
+					description="A reader joins a group the first time a request signed in as that reader asks for its group. Asking for a feed puts nobody in one."
 				>
 					{#snippet iconSnippet()}
 						<Sparkles size={ICON.lg} />
@@ -214,8 +214,8 @@
 				     row of three numbers stays whole. -->
 				{#if skewed}
 					<Alert tone="warn">
-						The two arms are far apart. Bucketing is by hash, so a few points of drift is
-						normal and this is not: either the control arm is too small to measure against,
+						The two arms are far apart. Each reader is assigned at random, so a few points
+						of drift is normal and this is not: either the control arm is too small to measure against,
 						or a real share of readers are being shown random content.
 					</Alert>
 				{/if}

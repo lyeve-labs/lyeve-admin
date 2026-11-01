@@ -103,16 +103,19 @@ describe('the profiler page', () => {
 	});
 
 	// The exports post to the admin's own proxy, which forwards the session
-	// to the engine's debug route and hands the pprof bytes back as a file.
-	it('offers the four pprof exports as downloads through the debug proxy', () => {
+	// to the engine's debug route and hands the pprof bytes back as a file. A
+	// proxy in front of both sends every /api/ path to the engine, so the
+	// console's route has to live outside it.
+	it('offers the four pprof exports as downloads through the console, never an engine path', () => {
 		const { getByTestId } = render(ProfilerPage, props(page()));
 		const forms = [...getByTestId('profiler-exports').querySelectorAll('form')].map((f) => f.getAttribute('action'));
 		expect(forms).toEqual([
-			'/api/admin/debug/profiler/profile/cpu',
-			'/api/admin/debug/profiler/profile/goroutine',
-			'/api/admin/debug/profiler/profile/heap',
-			'/api/admin/debug/profiler/profile/allocs',
+			'/admin/observability/profiler/profile/cpu',
+			'/admin/observability/profiler/profile/goroutine',
+			'/admin/observability/profiler/profile/heap',
+			'/admin/observability/profiler/profile/allocs',
 		]);
+		for (const action of forms) expect(action?.startsWith('/api/')).toBe(false);
 	});
 
 	it('draws a captured flamegraph as an image from its SVG', () => {

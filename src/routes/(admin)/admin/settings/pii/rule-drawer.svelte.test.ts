@@ -56,3 +56,34 @@ describe('PII rule drawer after a save', () => {
 		expect(document.querySelector('form[action="?/create"]')).toBeNull();
 	});
 });
+
+/*
+ * A snippet declared inside the form is a child of the form rather than a
+ * prop of the drawer, so the drawer once rendered no button to save with.
+ */
+describe('PII rule drawer footer', () => {
+	it('offers Create in the drawer, and it submits the rule form', async () => {
+		render(PiiPage, { props: { data: data as never, form: null as never } });
+		await fireEvent.click(screen.getAllByRole('button', { name: /new rule/i })[0]);
+		await tick();
+		await fireEvent.input(screen.getByLabelText(/^Name/), { target: { value: 'card' } });
+		await fireEvent.input(screen.getByLabelText(/^Pattern/), { target: { value: '\\d{16}' } });
+		await fireEvent.input(screen.getByLabelText(/^Replaced with/), { target: { value: '[card]' } });
+		const ruleForm = document.querySelector<HTMLFormElement>('form[action="?/create"]');
+		const create = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement;
+		expect(create.form).toBe(ruleForm);
+		const submitted = vi.fn((e: Event) => e.preventDefault());
+		ruleForm?.addEventListener('submit', submitted);
+		await fireEvent.click(create);
+		expect(submitted).toHaveBeenCalledTimes(1);
+	});
+
+	it('offers Save when a rule is edited', async () => {
+		const rule = { id: 'r1', name: 'card', description: '', pattern: '\\d{16}', replacement: '[card]', priority: 100, enabled: false };
+		render(PiiPage, { props: { data: { ...data, rules: { ...data.rules, custom: [rule] } } as never, form: null as never } });
+		await fireEvent.click(screen.getByRole('button', { name: /^Edit/ }));
+		await tick();
+		const save = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+		expect(save.form).toBe(document.querySelector('form[action="?/update"]'));
+	});
+});

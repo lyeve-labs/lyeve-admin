@@ -37,7 +37,9 @@ function setup() {
 const plan = {
 	applied: false,
 	plan: { schemas: [{ name: 'articles', action: 'create', ddl: ['CREATE TABLE _articles ()'] }] },
-	renamed: { 'Blog Post': 'blog_post' },
+	// The engine keys a rename by the name it ends with and writes the line
+	// out as its value.
+	renamed: { blog_post: 'Blog Post -> blog_post', 'product.product_name': 'productName -> product_name' },
 	notes: [{ schema: 'articles', field: 'body', message: 'Rich text becomes text.' }],
 };
 
@@ -69,6 +71,8 @@ describe('ImportDrawer', () => {
 		expect(shown.textContent).toContain('articles');
 		expect(shown.textContent).toContain('Creates');
 		expect(shown.textContent).toContain('Blog Post to blog_post');
+		expect(shown.textContent).toContain('product.productName to product_name');
+		expect(shown.textContent).not.toContain('->');
 		expect(shown.textContent).toContain('articles.body: Rich text becomes text.');
 	});
 

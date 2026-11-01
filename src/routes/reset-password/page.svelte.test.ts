@@ -27,6 +27,14 @@ describe('Reset password page', () => {
 		expect(getByRole('link', { name: /sign in/i }).getAttribute('href')).toBe('/login');
 	});
 
+	it('reads out that the password changed', async () => {
+		const { findByText } = render(ResetPage, { props: props('t1', { done: true }) });
+
+		const region = (await findByText('Your password has been changed. Sign in with the new one.')).closest('[aria-live="polite"]');
+		expect(region?.getAttribute('aria-atomic')).toBe('true');
+		expect(region?.textContent).toContain('Your password has been changed.');
+	});
+
 	it('offers a new link for an expired one instead of the form', () => {
 		const { getByRole, container } = render(ResetPage, {
 			props: props('t1', { error: 'This reset link is invalid or has expired. Request a new one.', expired: true }),

@@ -305,6 +305,7 @@
 					<CommentsPanel
 						threads={data.comments.threads}
 						people={data.comments.people}
+						mentionable={data.comments.mentionable}
 						unavailable={data.comments.unavailable}
 						error={commentError || undefined}
 						refused={commentError ? sideRefusal : null}

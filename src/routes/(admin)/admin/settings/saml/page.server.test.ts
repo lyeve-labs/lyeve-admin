@@ -20,6 +20,27 @@ function event(body: unknown, search: string) {
 }
 
 describe('SAML load', () => {
+	// The list names each template, and only the template itself carries the
+	// settings the drawer fills in.
+	it('reads each template with the settings it fills', async () => {
+		const okta = { key: 'okta', name: 'Okta', description: 'd', config: { name_id_format: 'urn:x', attributes_mapping: { email: 'email' } } };
+		const fetch = vi.fn(async (url: string) => {
+			const path = String(url);
+			const body = path.startsWith('/api/admin/saml-templates/okta')
+				? okta
+				: path.startsWith('/api/admin/saml-templates')
+					? [{ key: 'okta', name: 'Okta', description: 'd' }]
+					: { data: [], total_count: 0 };
+			return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		});
+		const out = (await load({
+			fetch,
+			url: new URL('http://admin/admin/settings/saml'),
+			parent: async () => ({ plugins: { state: 'named', running: ['saml'], withheld: [] } }),
+		} as never)) as { templates: unknown };
+		expect(out.templates).toEqual([okta]);
+	});
+
 	it('sends a page past the end back to the last page that holds providers', async () => {
 		await expect(load(event({ data: [], total_count: 30 }, '?offset=75&limit=25'))).rejects.toMatchObject({
 			status: 307,

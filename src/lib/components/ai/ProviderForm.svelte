@@ -149,7 +149,7 @@
 		value={provider?.priority ?? 100}
 		min={-1000}
 		max={1000}
-		hint="Lower is tried first when a call names no provider."
+		hint="Higher is tried first when a call names no provider."
 	/>
 
 	<CheckboxGroup

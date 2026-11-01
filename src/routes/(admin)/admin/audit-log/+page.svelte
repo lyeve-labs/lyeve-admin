@@ -135,7 +135,7 @@
 	{#snippet actions()}
 		<!-- Posts to an endpoint, not an action: SvelteKit refuses a Response from a
 		     form action, and a download has to be one. -->
-		<form method="POST" action="/api/admin/audit-log/export">
+		<form method="POST" action="/admin/audit-log/export">
 			{@render exportFilter()}
 			<Button type="submit" variant="secondary" size="sm">
 				<Download size={ICON.sm} /> Export JSON
@@ -143,7 +143,7 @@
 		</form>
 
 		{#if data.isSuperAdmin}
-			<form method="POST" action="/api/admin/audit-log/export-all">
+			<form method="POST" action="/admin/audit-log/export-all">
 				{@render exportFilter()}
 				<Button type="submit" variant="secondary" size="sm">
 					<Download size={ICON.sm} /> Export all

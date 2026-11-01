@@ -32,6 +32,9 @@ const admin = {
 
 const superAdmin = { ...admin, roles: ['super_admin'] };
 
+/** The queue the engine lists and the dialog showed. */
+const QUEUED = ['drop column _posts.title'];
+
 /**
  * One apply attempt.
  *
@@ -40,17 +43,26 @@ const superAdmin = { ...admin, roles: ['super_admin'] };
  */
 function applyEvent(
 	fields: Record<string, string>,
-	{ apply = json({ applied: 2 }), user = superAdmin }: { apply?: Response; user?: unknown } = {}
+	{
+		apply = json({ applied: 2 }),
+		user = superAdmin,
+		queued = QUEUED,
+	}: { apply?: Response; user?: unknown; queued?: string[] } = {}
 ) {
 	const seen: { url: string; method: string | undefined }[] = [];
 	const fetch = vi.fn(async (url: string, init?: RequestInit) => {
 		seen.push({ url: String(url), method: init?.method });
 		if (String(url).includes('/api/admin/auth/me')) return json(user);
 		if (String(url).includes('/api/admin/migrate/apply')) return apply.clone();
+		if (String(url).includes('/api/admin/migrate')) {
+			return json({ pending: queued.length, items: queued.map((description) => ({ schema_name: 'posts', description })) });
+		}
 		return json({});
 	}) as unknown as typeof globalThis.fetch;
 
+	// The form carries the queue the dialog listed, which matches the engine's unless a case says otherwise.
 	const form = new FormData();
+	form.set('expected', JSON.stringify(QUEUED));
 	for (const [k, v] of Object.entries(fields)) form.set(k, v);
 
 	return {
@@ -91,6 +103,33 @@ describe('admin dashboard applyMigrations action', () => {
 
 		const write = seen.find((r) => r.url.includes('/api/admin/migrate/apply'));
 		expect(write?.method).toBe('POST');
+	});
+
+	/*
+	 * The engine applies whatever is queued when the post arrives. A drop that
+	 * another tenant's save queued after the dialog was drawn was never shown,
+	 * so it must not run.
+	 */
+	it('applies nothing when the queue changed since it was listed', async () => {
+		const { seen, event } = applyEvent(
+			{ redirectTo: '/admin' },
+			{ queued: ['drop column _posts.title', 'drop column _pages.body'] }
+		);
+
+		const result = (await actions.applyMigrations(event)) as { status: number; data: { error: string } };
+
+		expect(result.status).toBe(409);
+		expect(result.data.error).toBe('The queue changed since it was listed. Review it again.');
+		expect(seen.some((r) => r.url.includes('/api/admin/migrate/apply'))).toBe(false);
+	});
+
+	it('applies nothing when the form names no queue', async () => {
+		const { seen, event } = applyEvent({ redirectTo: '/admin', expected: '' });
+
+		const result = (await actions.applyMigrations(event)) as { status: number };
+
+		expect(result.status).toBe(409);
+		expect(seen.some((r) => r.url.includes('/api/admin/migrate/apply'))).toBe(false);
 	});
 
 	it('returns the reader to the screen they submitted from', async () => {

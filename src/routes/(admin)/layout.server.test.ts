@@ -60,7 +60,7 @@ describe('the console frame', () => {
 		) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies(); // no __Host-sys_session set
 
-		const r = await catchRedirect(() => load({ fetch, cookies } as never));
+		const r = await catchRedirect(() => load({ fetch, depends: vi.fn(), cookies } as never));
 		expect(r.status).toBe(302);
 		expect(r.location).toBe('/login');
 	});
@@ -75,7 +75,7 @@ describe('the console frame', () => {
 		const cookies = mockCookies({ '__Host-sys_session': 'expired-token' });
 		const url = new URL('https://admin.example.com/admin/content/posts?offset=40');
 
-		const r = await catchRedirect(() => load({ fetch, cookies, url, request: new Request(url) } as never));
+		const r = await catchRedirect(() => load({ fetch, depends: vi.fn(), cookies, url, request: new Request(url) } as never));
 
 		// The delete has to repeat the attributes the cookie was set with. A
 		// __Host- cookie cleared without Secure is discarded by the browser, the
@@ -101,7 +101,7 @@ describe('the console frame', () => {
 		const request = new Request(url, { method: 'POST' });
 
 		const r = await catchRedirect(() =>
-			load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'expired-token' }), url, request } as never)
+			load({ fetch, depends: vi.fn(), cookies: mockCookies({ '__Host-sys_session': 'expired-token' }), url, request } as never)
 		);
 
 		expect(r.location).toBe('/login?ended=1&next=%2Fadmin%2Fusers');
@@ -127,7 +127,7 @@ describe('the console frame', () => {
 			});
 		}
 
-		await load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'valid-token' }), url } as never);
+		await load({ fetch, depends: vi.fn(), cookies: mockCookies({ '__Host-sys_session': 'valid-token' }), url } as never);
 
 		expect(read).toBe(false);
 	});
@@ -144,7 +144,7 @@ describe('the console frame', () => {
 				return json({});
 			}) as unknown as typeof globalThis.fetch;
 			const cookies = mockCookies({ '__Host-sys_session': 'valid-token' });
-			const thrown = (await Promise.resolve(load({ fetch, cookies } as never)).then(
+			const thrown = (await Promise.resolve(load({ fetch, depends: vi.fn(), cookies } as never)).then(
 				() => {
 					throw new Error('expected the outage page');
 				},
@@ -199,7 +199,7 @@ describe('the console frame', () => {
 		}) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies({ '__Host-sys_session': 'valid-token' });
 
-		const result = await load({ fetch, cookies } as never);
+		const result = await load({ fetch, depends: vi.fn(), cookies } as never);
 
 		expect(result).toBeDefined();
 		expect(result!.user).toEqual(user);
@@ -239,11 +239,15 @@ describe('the console frame', () => {
 
 		it('reads the pending count in load, so no component has to', async () => {
 			const { seen, fetch, cookies } = engine(() => json({ pending: 3 }));
+			const depends = vi.fn();
 
-			const result = await load({ fetch, cookies } as never);
+			const result = await load({ fetch, cookies, depends } as never);
+
+			// A write that changes the queue reads the count again by this name.
+			expect(depends).toHaveBeenCalledWith('app:migrations');
 
 			expect(seen.some((u) => u.includes('/api/admin/migrate'))).toBe(true);
-			expect(result!.migrations).toEqual({ pending: 3 });
+			expect(result!.migrations).toEqual({ pending: 3, items: [] });
 		});
 
 		it('leaves the count unknown when the engine does not answer', async () => {
@@ -251,9 +255,9 @@ describe('the console frame', () => {
 			// database is in step with schemas nobody checked.
 			const { fetch, cookies } = engine(() => Promise.reject(new Error('connection refused')));
 
-			const result = await load({ fetch, cookies } as never);
+			const result = await load({ fetch, depends: vi.fn(), cookies } as never);
 
-			expect(result!.migrations).toEqual({ pending: null });
+			expect(result!.migrations).toEqual({ pending: null, items: [] });
 			expect(result!.user).toBeDefined();
 		});
 
@@ -266,7 +270,7 @@ describe('the console frame', () => {
 				return json({});
 			}) as unknown as typeof globalThis.fetch;
 
-			const result = await load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'valid-token' }) } as never);
+			const result = await load({ fetch, depends: vi.fn(), cookies: mockCookies({ '__Host-sys_session': 'valid-token' }) } as never);
 
 			expect(result!.migrations).toBeNull();
 			expect(seen.some((u) => u.includes('/api/admin/migrate'))).toBe(false);
@@ -277,7 +281,7 @@ describe('the console frame', () => {
 			// and an admin's request would only be refused.
 			const { seen, fetch, cookies } = engine(() => json({ pending: 3 }), [role]);
 
-			const result = await load({ fetch, cookies } as never);
+			const result = await load({ fetch, depends: vi.fn(), cookies } as never);
 
 			expect(result!.migrations).toBeNull();
 			expect(seen.some((u) => u.includes('/api/admin/migrate'))).toBe(false);
@@ -299,7 +303,7 @@ describe('the console frame', () => {
 				for (const [path, answer] of Object.entries(routes)) if (String(url).includes(path)) return answer();
 				return json({});
 			}) as unknown as typeof globalThis.fetch;
-			return { seen, run: () => load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'valid-token' }) } as never) };
+			return { seen, run: () => load({ fetch, depends: vi.fn(), cookies: mockCookies({ '__Host-sys_session': 'valid-token' }) } as never) };
 		}
 		const status = {
 			compiled: ['media', 'search', 'audit'],
@@ -467,7 +471,7 @@ describe('the console frame', () => {
 				for (const [path, answer] of Object.entries(routes)) if (String(url).includes(path)) return answer();
 				return json({});
 			}) as unknown as typeof globalThis.fetch;
-			return { seen, run: () => load({ fetch, cookies: mockCookies({ '__Host-sys_session': 'valid-token' }) } as never) };
+			return { seen, run: () => load({ fetch, depends: vi.fn(), cookies: mockCookies({ '__Host-sys_session': 'valid-token' }) } as never) };
 		}
 		const presentation = {
 			links: [
@@ -534,7 +538,7 @@ describe('the console frame', () => {
 		}) as unknown as typeof globalThis.fetch;
 		const cookies = mockCookies({ '__Host-sys_session': 'valid-token' });
 
-		const result = await load({ fetch, cookies } as never);
+		const result = await load({ fetch, depends: vi.fn(), cookies } as never);
 
 		expect(result).toBeDefined();
 		expect(result!.user).toEqual(user);
