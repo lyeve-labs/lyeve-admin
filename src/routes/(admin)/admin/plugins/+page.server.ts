@@ -19,7 +19,7 @@ export const load: PageServerLoad = async (event) => {
 		(report) => ({ plugins: report.plugins ?? [], gate: GATE_OK as Gate }),
 		(err: unknown) => ({
 			plugins: [] as PluginStatus[],
-			gate: gateOf(err, 'The plugin status could not be read. This is not a report that the build carries no plugins.'),
+			gate: gateOf(err, 'Could not load the plugin status.'),
 		}),
 	);
 };

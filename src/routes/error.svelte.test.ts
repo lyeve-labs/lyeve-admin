@@ -23,7 +23,7 @@ function renderAt(status: number, message = '') {
 describe('Root error page', () => {
 	it('opens its heading outline with an h1 that names the page', () => {
 		const { container, getByRole } = renderAt(404);
-		expect(getByRole('heading', { level: 1, name: 'This page could not be opened' })).toBeTruthy();
+		expect(getByRole('heading', { level: 1, name: 'Could not open this page' })).toBeTruthy();
 		expect(outlineSkips(container)).toEqual([]);
 	});
 

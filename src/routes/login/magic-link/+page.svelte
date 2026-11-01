@@ -19,7 +19,7 @@
 
 <PageTitle title="Email a sign-in link" />
 
-<AuthShell title="Sign in with an email link" description="We will email you a link that signs you in.">
+<AuthShell title="Sign in with an email link" description="Get a link by email that signs you in.">
 	{#if form && 'sent' in form && form.sent}
 		<div class="space-y-5">
 			<Alert tone="success" announce>

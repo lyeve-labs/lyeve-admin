@@ -33,34 +33,34 @@ export interface HubGroup {
 
 /** What each sidebar entry holds, in the words the hub shows under it. */
 const DESCRIBE: Readonly<Record<string, string>> = {
-	customization: "This tenant's name, logo and colors, its dashboard, its menu and pages of its own.",
-	localization: 'The languages content is kept in, and the order a missing translation falls back through.',
-	email: 'How mail is sent: the provider pool, and the fallback transport behind it.',
-	recommendations: 'Similar and trending entries and a feed per reader, computed from what readers do.',
-	permissions: 'Content and flow access per role, as rules over every schema, one schema, or one flow.',
-	security: 'What is protecting this instance right now, read from the running engine.',
-	oauth: 'OpenID Connect and OAuth 2.0 providers people can sign in with.',
-	saml: 'SAML identity providers people sign in through, and their certificates.',
-	scim: 'Identity providers allowed to create and remove accounts without anybody signing in.',
-	'rate-limits': 'Every limit a request passes through, and who is close to one right now.',
-	'tenant-rate-limits': "This tenant's own limit, the addresses it always allows or refuses, and what was refused.",
-	captcha: "The captcha this tenant's own pages and flows check. The admin login keeps the install's.",
-	'sign-in': 'How long accounts your identity provider created may sign in without it.',
-	'api-access': 'How external apps authenticate, what each role may do, and a token to try it with.',
-	'api-keys': 'Machine-to-machine credentials for the content API, with their usage.',
-	'admin-tokens': 'Scoped, expiring credentials for scripts that call the admin API, and what each one did.',
-	grpc: 'The gRPC listener and what answers there.',
-	graphql: 'The schema generated from your content types, where it answers, and the allowed queries.',
-	'message-broker': 'Where content events are published, and whether they are arriving.',
-	storage: 'Where uploads are written, and which provider receives them.',
-	'content-history': 'Which content types keep their versions, for how long, and the record of who changed what.',
-	residency: "The regions this instance runs in, and which tenant's data sits in each.",
-	gdpr: 'Every piece of personal data held for one subject, exported or erased.',
-	pii: 'What is redacted from responses and logs, and who has read it unmasked.',
-	privacy: "What an erasure does with this tenant's form submissions, and what people may take when they export their own data.",
-	license: 'The license this instance runs on, and where a new key is activated.',
-	configuration: 'Every setting the engine reads, and the layer each value came from.',
-	'config-sync': 'Export this configuration as one bundle, and compare, dry run and apply a bundle from another instance.',
+	customization: "Set this tenant's name, logo, colors, dashboard and menu, and add pages of its own.",
+	localization: 'Choose the languages for content and the order a missing translation falls back through.',
+	email: 'Set up the mail providers and the fallback transport behind them.',
+	recommendations: 'Set up similar entries, trending entries and a feed for each reader, based on what readers do.',
+	permissions: 'Set what each role can do with content and flows, for every schema, one schema or one flow.',
+	security: 'See what protects this instance right now.',
+	oauth: 'Add the OpenID Connect and OAuth 2.0 providers people can sign in with.',
+	saml: 'Add the SAML identity providers people sign in through, and manage their certificates.',
+	scim: 'Let identity providers create and remove accounts without anyone signing in.',
+	'rate-limits': 'See each rate limit and who is close to reaching one.',
+	'tenant-rate-limits': "Set this tenant's rate limit and the addresses it always allows or blocks, and see what was refused.",
+	captcha: "Choose the captcha this tenant's pages and flows use. The admin sign-in keeps the instance's captcha.",
+	'sign-in': 'Set how long accounts from your identity provider can sign in without it.',
+	'api-access': 'See how external apps authenticate and what each role can do, and get a token to try it.',
+	'api-keys': 'Create machine-to-machine credentials for the content API and see their usage.',
+	'admin-tokens': 'Create scoped, expiring credentials for scripts that call the admin API, and see what each one did.',
+	grpc: 'Check the gRPC listener and the routes it serves.',
+	graphql: 'See the schema generated from your content types, its endpoint and the allowed queries.',
+	'message-broker': 'Choose where content events are published, and check that they arrive.',
+	storage: 'Choose where uploads are stored and which provider receives them.',
+	'content-history': 'Choose which content types keep versions and for how long, and see who changed what.',
+	residency: "See the regions this instance runs in and which tenant's data is stored in each.",
+	gdpr: 'Export or erase every piece of personal data held about one person.',
+	pii: 'Choose what is redacted from responses and logs, and see who viewed it unmasked.',
+	privacy: "Choose what an erasure does with this tenant's form submissions and what people get when they export their data.",
+	license: 'See the license this instance runs on and activate a new key.',
+	configuration: 'See every setting the engine uses and the layer each value came from.',
+	'config-sync': 'Export this configuration as one bundle, or compare, dry run and apply a bundle from another instance.',
 };
 
 /** The instance groups, by purpose, each naming sidebar entries by id. */
@@ -68,25 +68,25 @@ const GROUPS: readonly { id: string; label: string; description: string; ids: re
 	{
 		id: 'workspace',
 		label: 'Workspace',
-		description: 'How this admin looks and what it offers its team.',
+		description: 'Set how this admin looks and what it offers your team.',
 		ids: ['customization', 'localization', 'email', 'recommendations'],
 	},
 	{
 		id: 'access',
 		label: 'Sign-in and access',
-		description: 'Who may sign in, on whose word, and what each role may do.',
+		description: 'Choose who can sign in and how, and what each role can do.',
 		ids: ['permissions', 'security', 'sign-in', 'oauth', 'saml', 'scim', 'rate-limits', 'tenant-rate-limits', 'captcha'],
 	},
 	{
 		id: 'apis',
 		label: 'APIs and delivery',
-		description: 'How other systems reach the content and hear about changes.',
+		description: 'Connect other systems to your content and its change events.',
 		ids: ['api-access', 'api-keys', 'admin-tokens', 'grpc', 'graphql', 'message-broker'],
 	},
 	{
 		id: 'data',
 		label: 'Data and compliance',
-		description: 'Where data lives, how long it is kept, and what an auditor asks for.',
+		description: 'Choose where data is stored and how long it is kept, and find what an auditor asks for.',
 		// Retention is a tab of the audit log, beside the entries the policies
 		// delete and the holds protect.
 		ids: ['storage', 'content-history', 'residency', 'gdpr', 'privacy', 'pii'],
@@ -94,7 +94,7 @@ const GROUPS: readonly { id: string; label: string; description: string; ids: re
 	{
 		id: 'instance',
 		label: 'Instance',
-		description: 'The license, the settings the engine runs on, and moving them between instances.',
+		description: 'Manage the license and the engine settings, and move settings between instances.',
 		ids: ['license', 'configuration', 'config-sync'],
 	},
 ];
@@ -126,14 +126,14 @@ export function settingsHub(tree: NavTree, personal: PersonalPages): HubGroup[] 
 	const account: HubGroup = {
 		id: 'account',
 		label: 'Your account',
-		description: 'Settings that are yours, whatever your role.',
+		description: 'Change your own settings, whatever your role.',
 		entries: [
-			{ id: 'account', label: 'Account and appearance', href: '/admin/settings/account', icon: UserRound, description: 'Your email and roles, and the color scheme this admin uses for you.' },
+			{ id: 'account', label: 'Account and appearance', href: '/admin/settings/account', icon: UserRound, description: 'See your email and roles, and choose your color scheme.' },
 			...(personal.twoFactor
-				? [{ id: 'mfa', label: 'Two-factor authentication', href: '/admin/settings/mfa', icon: ShieldCheck, description: 'A second step at sign-in, from an authenticator app, and your recovery codes.' }]
+				? [{ id: 'mfa', label: 'Two-factor authentication', href: '/admin/settings/mfa', icon: ShieldCheck, description: 'Add a second sign-in step with an authenticator app, and manage your recovery codes.' }]
 				: []),
 			...(personal.trustedDevices
-				? [{ id: 'devices', label: 'Trusted devices', href: '/admin/settings/devices', icon: MonitorSmartphone, description: 'The browsers that skip the second step, and a way to forget them.' }]
+				? [{ id: 'devices', label: 'Trusted devices', href: '/admin/settings/devices', icon: MonitorSmartphone, description: 'See the browsers that skip the second step, and forget any of them.' }]
 				: []),
 		],
 	};

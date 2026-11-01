@@ -389,7 +389,7 @@ describe('requireUser', () => {
 		it('throws 403 for an address rule or a firewall in front of the engine', async () => {
 			const err = await refusedWith(403, { error: 'forbidden' });
 			expect(err.status).toBe(403);
-			expect(err.body?.message).toBe('This account or network cannot reach the admin right now.');
+			expect(err.body?.message).toBe('Access to the admin is blocked for this account or network.');
 		});
 
 		it('throws 429 for the request rate, never with the outage wording', async () => {

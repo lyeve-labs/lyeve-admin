@@ -126,7 +126,7 @@ describe('plugin detail page', () => {
 			startedAt: null,
 			routes: [],
 		});
-		expect(screen.getByText('Serves nothing yet')).toBeTruthy();
+		expect(screen.getByText('Not running')).toBeTruthy();
 		const list = container.querySelector('dl');
 		expect(list?.textContent).toContain('Not enabled');
 		expect(list?.textContent).toContain('not enabled here');
@@ -173,9 +173,9 @@ describe('plugin detail page', () => {
 	it('says the status could not be read instead of drawing an empty page', () => {
 		const { container } = renderPage(null, {
 			roles: ['admin'],
-			statusGate: { state: 'error', message: 'The plugin status could not be read. This is not a report that the plugin is stopped.' },
+			statusGate: { state: 'error', message: 'Could not load the plugin status.' },
 		});
-		expect(container.textContent).toContain('The plugin status could not be read.');
+		expect(container.textContent).toContain('Could not load the plugin status.');
 	});
 
 	it('tells a reader the engine refuses the status to that it is not theirs', () => {
@@ -188,7 +188,7 @@ describe('plugin detail page', () => {
 		expect(container.querySelector('h1')?.textContent).toContain('search');
 		expect(container.querySelector('dl')).toBeNull();
 		expect(
-			screen.getByText('What this plugin is and what it serves on this instance.'),
+			screen.getByText('See what this plugin does and the routes it serves on this instance.'),
 		).toBeTruthy();
 	});
 });

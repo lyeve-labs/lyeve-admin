@@ -140,7 +140,7 @@ describe('data export writes', () => {
 			error: 'Enter a name for the export.',
 		});
 		const unknown = write({ ...EXPORT, format: 'xlsx' });
-		expect(((await actions.start(unknown.event)) as Failure).data).toEqual({ action: 'start', error: 'Choose a format the plugin can write.' });
+		expect(((await actions.start(unknown.event)) as Failure).data).toEqual({ action: 'start', error: 'Choose a format.' });
 		expect([...unnamed.calls, ...unknown.calls]).toEqual([]);
 	});
 

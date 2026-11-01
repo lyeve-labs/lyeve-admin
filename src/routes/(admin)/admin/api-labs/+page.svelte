@@ -119,7 +119,7 @@
 			const verb = selectedRisk === 'destructive' ? 'delete from' : 'write to';
 			const ok = await confirmDialog(
 				`Send ${selected.method} ${selected.path}?`,
-				`This will ${verb} the instance you are signed in to, as you. Nothing here is a rehearsal.`,
+				`This will ${verb} the instance you are signed in to, as you. This is not a test run.`,
 				{ confirmLabel: 'Send it' },
 			);
 			if (!ok) {
@@ -138,7 +138,7 @@
 		if (grpcWrites || grpcRoute.startsWith('DELETE ')) {
 			const ok = await confirmDialog(
 				'Run this call?',
-				'It goes to the transcoding listener as you, and it writes.',
+				'It runs on the transcoding listener as you, and it changes data.',
 				{ confirmLabel: 'Run it' },
 			);
 			if (!ok) {
@@ -157,7 +157,7 @@
 		if (graphqlMutates(document)) {
 			const ok = await confirmDialog(
 				'Send this mutation?',
-				'It writes to the instance you are signed in to, as you.',
+				'It changes data on the instance you are signed in to, as you.',
 				{ confirmLabel: 'Send it' },
 			);
 			if (!ok) {
@@ -189,7 +189,7 @@
 			<p class="text-xs text-muted">Documented: {doc.code} {doc.description}</p>
 		{:else if doc === false}
 			<p class="text-xs text-warn">
-				{result.status} is not one of the statuses the document lists for this route
+				{result.status} is not a documented status for this route
 				({expectedFor.statuses?.map((x) => x.code).join(', ')}).
 			</p>
 		{/if}
@@ -223,19 +223,19 @@
 
 <PageShell
 	title="API labs"
-	description="Send a real request to this instance and read what it answers."
+	description="Send a real request to this instance and see the response."
 	width="wide"
 >
 	<!-- The one thing a tester has to understand before the first send. -->
 	<Alert tone="warn">
-		Every request goes to the instance you are signed in to, as you. There is no sandbox here
-		and nothing is replayed against a copy: a write writes, and a delete deletes.
+		Every request goes to the instance you are signed in to, as you. There is no sandbox, so a
+		write changes data and a delete removes it.
 	</Alert>
 
 	{#if data.source === 'catalog'}
 		<Alert tone="danger">
-			The engine did not answer with its API document, so this list is the built-in catalog
-			rather than what this build actually serves. An endpoint missing here may still exist.
+			Could not load the API document, so this list is the built-in catalog, not what this
+			build serves. An endpoint missing here may still exist.
 		</Alert>
 	{/if}
 
@@ -261,7 +261,7 @@
 			<SearchInput id="endpoint-narrow" bind:value={narrow} placeholder="Search {data.endpoints.length} endpoints" />
 
 			{#if visible.length === 0}
-				<EmptyState title="No endpoint matches" description="Nothing here is named or pathed that way.">
+				<EmptyState title="No endpoints match this search" description="Try another name or path.">
 					{#snippet iconSnippet()}
 						<Terminal size={ICON.lg} />
 					{/snippet}
@@ -342,7 +342,7 @@
 								id="lab-path-{name}"
 								name="p_{name}"
 								label="{name} (in the path)"
-								hint="Required. The path is sent with this value in place of the placeholder."
+								hint="Required. This value replaces the placeholder in the path."
 								required
 							/>
 						{/each}
@@ -359,7 +359,7 @@
 								id="lab-body"
 								name="body"
 								label="Request body"
-								hint="JSON. Left empty, nothing is sent as a body."
+								hint="JSON. Leave it empty to send no body."
 								rows={8}
 								bind:value={body}
 							/>
@@ -382,8 +382,8 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>GraphQL</SectionHeading>
 			<p class="text-xs text-muted">
-				Posted to <span class="font-mono">{GRAPHQL_URL}</span>. The schema is generated from your
-				content types, so the fields here are the ones the schema builder made.
+				Sent to <span class="font-mono">{GRAPHQL_URL}</span>. The schema is generated from your
+				content types, so its fields match what you built in the schema builder.
 			</p>
 
 			<form method="POST" action="?/graphql" use:enhance={sendGraphql}>
@@ -400,7 +400,7 @@
 						id="lab-variables"
 						name="variables"
 						label="Variables"
-						hint="A JSON object, or empty. Anything else is refused before it is sent."
+						hint="Enter a JSON object, or leave it empty. Anything else is not sent."
 						rows={4}
 						bind:value={variables}
 					/>
@@ -420,12 +420,12 @@
 					<!-- GraphQL answers 200 and puts the failure in the body, so a
 					     status badge alone reads as success. -->
 					<Alert tone="warn">
-						The status is 200 and the body carries an `errors` array. GraphQL reports failures
-						inside a successful response, so read the body rather than the status.
+						The status is 200, but the body has an `errors` array. GraphQL reports failures
+						inside a successful response, so check the body, not the status.
 					</Alert>
 				{/if}
 				{#if gqlMutated}
-					<Alert tone="brand">That was a mutation, so anything it changed is changed.</Alert>
+					<Alert tone="brand">That was a mutation, so its changes are already applied.</Alert>
 				{/if}
 				{@render answer(gqlResult)}
 			{/if}
@@ -439,11 +439,11 @@
 				<GateNotice
 					gate={data.grpc.gate}
 					title="the gRPC listener"
-					absent="The gRPC plugin is not part of this build, or the instance does not enable it, so there is no listener to call."
+					absent="The gRPC listener is not included in this build, or it is turned off on this instance."
 				/>
 			{:else if !data.grpc.listening}
 				<Alert tone="danger">
-					The plugin is present and nothing is listening. The gRPC screen says why.
+					The gRPC plugin is installed, but its listener is not running. The gRPC screen shows why.
 				</Alert>
 			{:else}
 				<!-- Sent, not fetched. The engine's invoke route runs the call
@@ -451,9 +451,8 @@
 				     addresses a host and the listener's own JWT check still
 				     decides the answer. -->
 				<Alert tone="brand">
-					These paths are served by the gRPC plugin's own listener. The engine runs the call
-					inside the plugin rather than reaching across to it, and the listener authenticates
-					it against your token exactly as it would a direct caller.
+					The gRPC plugin's own listener serves these paths. It checks your token exactly as it
+					would for a direct caller.
 				</Alert>
 				<form method="POST" action="?/grpc" use:enhance={sendGrpc}>
 					<div class="grid gap-4">
@@ -495,8 +494,8 @@
 				{/if}
 				{#if data.grpc.routes.length === 0}
 					<EmptyState
-						title="Nothing is transcoded"
-						description="The listener is up and serves the health check alone."
+						title="No transcoded routes"
+						description="The listener is running and serves only the health check."
 					>
 						{#snippet iconSnippet()}
 							<Network size={ICON.lg} />

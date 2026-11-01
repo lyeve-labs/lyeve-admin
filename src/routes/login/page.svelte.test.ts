@@ -47,10 +47,10 @@ describe('Login page', () => {
 
 	it('states why a sign-in was refused', () => {
 		const { container } = render(LoginPage, {
-			props: props({ form: { error: 'Too many attempts. Please try again in a moment.' } }),
+			props: props({ form: { error: 'Too many attempts. Try again in a moment.' } }),
 		});
 
-		expect(container.textContent).toContain('Too many attempts. Please try again in a moment.');
+		expect(container.textContent).toContain('Too many attempts. Try again in a moment.');
 		expect(container.querySelector('#password')).not.toBeNull();
 	});
 
@@ -257,7 +257,7 @@ describe('Login page after a session ended', () => {
 
 	it('keeps the organization a refused sign-in named', () => {
 		const { container } = render(LoginPage, {
-			props: props({ form: { error: 'Invalid email or password.', tenant: 'acme' } }),
+			props: props({ form: { error: 'Incorrect email or password.', tenant: 'acme' } }),
 		});
 
 		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('acme');

@@ -313,14 +313,14 @@ describe('try it', () => {
 	it('offers an admin no way to send a write, and says why', async () => {
 		const { getByRole, container } = withMethod('DELETE', false);
 		await fireEvent.click(getByRole('button', { name: /DELETE \/api\/v1\/content\/post/ }));
-		expect(container.textContent).toContain("is a super admin's");
-		expect(container.textContent).not.toContain('I mean to send this');
+		expect(container.textContent).toContain('Only a super admin can send');
+		expect(container.textContent).not.toContain('I understand this');
 	});
 
 	it('makes a super admin acknowledge the one call', async () => {
 		const { getByRole, container } = withMethod('DELETE', true);
 		await fireEvent.click(getByRole('button', { name: /DELETE \/api\/v1\/content\/post/ }));
-		expect(container.textContent).toContain('I mean to send this DELETE');
+		expect(container.textContent).toContain('I understand this DELETE');
 	});
 
 	// A path still carrying {id} asks the engine for a record whose id is the

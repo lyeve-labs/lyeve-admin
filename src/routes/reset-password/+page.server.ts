@@ -9,7 +9,7 @@ import { organizationFromUrl } from '$lib/organization';
 import { asksOrganization } from '$lib/server/sign-in-organization';
 import type { Actions, PageServerLoad } from './$types';
 
-const EXPIRED = 'This reset link is invalid or has expired. Request a new one.';
+const EXPIRED = 'This reset link no longer works. Request a new one.';
 
 function apiCode(e: ApiError): string {
 	const body = e.body as { code?: unknown } | undefined;
@@ -32,7 +32,7 @@ export const load: PageServerLoad = ({ url }) => {
 export const actions: Actions = {
 	default: async (event) => {
 		const limit = checkRateLimit(event.getClientAddress());
-		if (!limit.allowed) return fail(429, { error: 'Too many attempts. Please try again later.' });
+		if (!limit.allowed) return fail(429, { error: 'Too many attempts. Try again later.' });
 
 		const form = await event.request.formData();
 		const token = String(form.get('token') ?? '').trim();

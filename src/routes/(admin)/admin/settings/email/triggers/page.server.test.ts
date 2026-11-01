@@ -123,7 +123,7 @@ describe('email trigger writes', () => {
 		const { event, calls } = write({ ...TRIGGER, to_static: '' });
 		expect(((await actions.save(event)) as Failure).data).toEqual({
 			action: 'save',
-			error: 'Give at least one recipient, a fixed address or a field of the record.',
+			error: 'Add at least one recipient: a fixed address or a field of the record.',
 		});
 		expect(calls).toEqual([]);
 	});

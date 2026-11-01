@@ -8,7 +8,7 @@
  */
 export const OUTAGE = {
 	title: 'Temporarily unavailable',
-	body: 'The engine or its database did not answer, so this page could not be read. You are still signed in and nothing was changed. Try again in a moment.',
+	body: "The engine is unavailable, so this page did not load. You're still signed in, and nothing was changed. Try again in a moment.",
 	action: 'Try again',
 } as const;
 
@@ -20,5 +20,5 @@ export const OUTAGE = {
  */
 export const BUSY = {
 	title: 'Too many requests',
-	body: 'Too many requests reached the engine. Try again in a moment.',
+	body: 'Too many requests in a short time. Wait a moment, then try again.',
 } as const;

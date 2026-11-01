@@ -74,7 +74,7 @@ describe('auth/magic-link/verify actions', () => {
 		const fetch = vi.fn(async () => json({ error: 'invalid or expired magic link' }, 400)) as unknown as typeof globalThis.fetch;
 		const result = (await actions.verify(event({ token: 'spent' }, fetch))) as { status: number; data: { error: string } };
 		expect(result.status).toBe(400);
-		expect(result.data.error).toMatch(/invalid or has expired/);
+		expect(result.data.error).toMatch(/no longer works/);
 	});
 
 	it('finishes the second factor and opens the console', async () => {
@@ -97,7 +97,7 @@ describe('auth/magic-link/verify actions', () => {
 			data: Record<string, unknown>;
 		};
 		expect(result.status).toBe(400);
-		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch' });
+		expect(result.data).toEqual({ error: 'That code did not match. Try again.', mfa_required: true, challenge_token: 'ch' });
 	});
 
 	it('drops an expired challenge and asks for a new link', async () => {
@@ -127,7 +127,7 @@ describe('auth/magic-link/verify actions', () => {
 		};
 		expect(result.status).toBe(503);
 		expect(result.data).toEqual({
-			error: 'The engine did not answer, so the code was not checked. Try again in a moment.',
+			error: 'Could not check the code. Try again in a moment.',
 			mfa_required: true,
 			challenge_token: 'ch',
 		});

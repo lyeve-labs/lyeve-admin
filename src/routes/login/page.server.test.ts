@@ -250,7 +250,7 @@ describe('signing in', () => {
 			fetch: vi.fn() as never,
 			cookies: mockCookies(),
 		}) as never);
-		expect(result).toEqual({ error: 'Email and password are required.', tenant: '' });
+		expect(result).toEqual({ error: 'Enter your email and password.', tenant: '' });
 	});
 
 	// An adapter behind a proxy it was not told about cannot name the
@@ -380,7 +380,7 @@ describe('signing in', () => {
 		}) as never) as { status: number; data: { error: string } };
 
 		expect(result.status).toBe(503);
-		expect(result.data.error).toBe('Sign-in is unavailable right now. Please try again shortly.');
+		expect(result.data.error).toBe('Sign-in is unavailable right now. Try again in a moment.');
 	});
 
 	// The engine rate-limits login at 5 attempts. Reporting that as a bad
@@ -424,7 +424,7 @@ describe('signing in', () => {
 
 	it('still reports a rejected credential as a rejected credential', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
-			json({ error: 'Invalid email or password.' }, 401)
+			json({ error: 'Incorrect email or password.' }, 401)
 		) as unknown as typeof globalThis.fetch;
 		const formData = new FormData();
 		formData.set('email', 'a@b.co');
@@ -436,7 +436,7 @@ describe('signing in', () => {
 			cookies: mockCookies(),
 		}) as never);
 
-		expect(result).toEqual({ error: 'Invalid email or password.', tenant: '' });
+		expect(result).toEqual({ error: 'Incorrect email or password.', tenant: '' });
 	});
 
 	// MFA lockout and challenge exhaustion both return 429. Calling either an
@@ -470,7 +470,7 @@ describe('signing in', () => {
 			cookies,
 		}) as never);
 
-		expect(result).toEqual({ error: 'Verification code is required.', mfa_required: true, challenge_token: 'ch-tok' });
+		expect(result).toEqual({ error: 'Enter the verification code.', mfa_required: true, challenge_token: 'ch-tok' });
 	});
 
 	it('MFA step: sets cookie and redirects on successful MFA verification', async () => {
@@ -519,7 +519,7 @@ describe('signing in', () => {
 	it('MFA step: reports a 422 as an invalid code and keeps the challenge', async () => {
 		const result = await verify(() => json({ error: 'invalid code' }, 422));
 		expect(result.status).toBe(400);
-		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch-tok' });
+		expect(result.data).toEqual({ error: 'That code did not match. Try again.', mfa_required: true, challenge_token: 'ch-tok' });
 	});
 
 	// A 401 is a challenge the engine no longer honors. No code passes it, so
@@ -543,7 +543,7 @@ describe('signing in', () => {
 		);
 		expect(result.status).toBe(401);
 		expect(result.data).toEqual({
-			error: 'This account has no authenticator app to check the code against. Ask an administrator to restore your access.',
+			error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',
 		});
 	});
 
@@ -573,7 +573,7 @@ describe('signing in', () => {
 		const result = await verify(answer);
 		expect(result.status).toBe(503);
 		expect(result.data).toEqual({
-			error: 'The engine did not answer, so the code was not checked. Try again in a moment.',
+			error: 'Could not check the code. Try again in a moment.',
 			mfa_required: true,
 			challenge_token: 'ch-tok',
 		});
@@ -673,7 +673,7 @@ describe('a sign-in the engine challenges', () => {
 
 		const result = await submit({ email: 'a@b.co', password: 'wrong' }, fetch);
 
-		expect(result).toEqual({ error: 'Invalid email or password.', tenant: '' });
+		expect(result).toEqual({ error: 'Incorrect email or password.', tenant: '' });
 	});
 });
 
@@ -720,7 +720,7 @@ describe('naming the organization at sign-in', () => {
 
 		const result = await submit({ email: 'a@b.co', password: 'wrong', tenant: 'acme' }, fetch);
 
-		expect(result).toEqual({ error: 'Invalid email or password.', tenant: 'acme' });
+		expect(result).toEqual({ error: 'Incorrect email or password.', tenant: 'acme' });
 	});
 
 	it('refuses a name the engine would not read, without calling it', async () => {

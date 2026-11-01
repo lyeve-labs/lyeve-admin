@@ -176,7 +176,7 @@ describe('the console frame', () => {
 				{ error: 'cap_exceeded', cap: 'admin.seats', limit: 3, current: 3, upgrade_url: '' },
 				"Every admin seat is taken. You're using 3 of 3, the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.",
 			],
-			[403, { error: 'forbidden' }, 'This account or network cannot reach the admin right now.'],
+			[403, { error: 'forbidden' }, 'Access to the admin is blocked for this account or network.'],
 			[429, { error: 'rate limit exceeded' }, BUSY.body],
 		])('keeps the cookie and shows its own page for a %i', async (status, body, message) => {
 			const { thrown, cookies } = await outage(() => json(body, status));

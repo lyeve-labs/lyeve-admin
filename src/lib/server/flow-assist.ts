@@ -9,7 +9,7 @@ import { authedHeaders } from '$lib/server/authz';
 import { AI_BUDGET_TEXT, aiBudgetSpent } from '$lib/server/ai-load';
 import type { AssistRefusal } from '$lib/flow/assistant';
 
-const NO_CATALOG_TEXT = 'This engine does not publish the node catalog the assistant reads. Update the flow plugin.';
+const NO_CATALOG_TEXT = 'The assistant needs a newer version of the flow plugin.';
 const UNAVAILABLE_FALLBACK = 'The flow validator is not available on this engine.';
 const FAILED_TEXT = 'The assistant did not answer. Try again.';
 
@@ -41,7 +41,7 @@ export function assistRefusal(err: unknown): AssistRefusal {
 	if (err instanceof CatalogError) {
 		if (err.status === 404) return { state: 'unavailable', message: NO_CATALOG_TEXT };
 		if (err.status === 402) return { state: 'locked' };
-		return { state: 'error', message: 'The node catalog could not be read.' };
+		return { state: 'error', message: 'Could not load the node catalog. Try again.' };
 	}
 	if (err instanceof ApiError) {
 		if (aiBudgetSpent(err)) return { state: 'error', message: AI_BUDGET_TEXT };

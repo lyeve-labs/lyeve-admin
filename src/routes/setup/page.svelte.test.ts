@@ -92,15 +92,15 @@ describe('Setup page: setup mode', () => {
 
 		expect(container.querySelectorAll('[data-missing="secret"]').length).toBe(2);
 		expect(container.querySelector('[data-block="env"]')?.textContent).toContain('JWT_SECRET=aaaa1111');
-		expect(container.textContent).toContain('These secrets are shown once');
-		expect(container.textContent).toContain('never writes them anywhere');
+		expect(container.textContent).toContain('These secrets are shown only once');
+		expect(container.textContent).toContain('The engine does not save them');
 	});
 
 	it('says the secrets were already shown when the engine withholds them', () => {
 		const status = { ...fullStatus, secrets_included: false, env: 'JWT_SECRET=<shown once>\n' };
 		const { container } = render(SetupPage, { props: { data: data('setup_mode'), form: { status } as never } });
 		expect(container.textContent).toContain('already shown once');
-		expect(container.textContent).not.toContain('These secrets are shown once');
+		expect(container.textContent).not.toContain('These secrets are shown only once');
 	});
 
 	it('waits for the restart by polling once the status is on screen', async () => {
@@ -115,7 +115,7 @@ describe('Setup page: setup mode', () => {
 
 	it('warns when the engine holds no token at all', () => {
 		const { container } = render(SetupPage, { props: { data: data('setup_mode', null), form: null } });
-		expect(container.textContent).toContain('holds no setup token');
+		expect(container.textContent).toContain('has no setup token');
 	});
 });
 

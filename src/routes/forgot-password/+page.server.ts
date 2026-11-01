@@ -18,7 +18,7 @@ export const actions: Actions = {
 	default: async (event) => {
 		const limit = checkRateLimit(event.getClientAddress());
 		if (!limit.allowed) {
-			return fail(429, { error: 'Too many attempts. Please try again later.', email: '', tenant: '' });
+			return fail(429, { error: 'Too many attempts. Try again later.', email: '', tenant: '' });
 		}
 
 		const form = await event.request.formData();

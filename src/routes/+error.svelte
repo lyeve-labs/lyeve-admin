@@ -25,6 +25,6 @@
 <div class="flex min-h-screen items-center justify-center px-page-x py-page-y">
 	<!-- Hidden, as the console's error page hides its title, so a screen
 	     reader's heading list still starts at an h1. -->
-	<h1 class="sr-only">This page could not be opened</h1>
+	<h1 class="sr-only">Could not open this page</h1>
 	<ErrorPanel level={2} {status} {message} homeHref="/" homeLabel="Home" />
 </div>

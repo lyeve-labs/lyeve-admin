@@ -17,8 +17,7 @@ export type LoadOutcome = { locked: boolean; loadError: string | null };
 
 /** The static engine banner for one resource, named in the plural. */
 export function engineBanner(plural: string): string {
-	const Plural = plural.charAt(0).toUpperCase() + plural.slice(1);
-	return `${Plural} could not be read from the engine. This is not a report that there are none.`;
+	return `Could not load ${plural}.`;
 }
 
 export function flowLoadOutcome(err: unknown, session: SessionEvent, plural: string): LoadOutcome {
