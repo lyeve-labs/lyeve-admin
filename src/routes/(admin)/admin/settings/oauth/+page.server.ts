@@ -11,7 +11,7 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	const providers = await section(
 		listOAuthProviders(client),
-		'The OAuth providers could not be read. This is not a report that there are none.'
+		'Could not load OAuth providers.'
 	);
 	return { providers };
 };
@@ -50,7 +50,7 @@ export const actions: Actions = {
 				client,
 			);
 		} catch (e: unknown) {
-			return tagged('create', actionFailure(e, 'The provider could not be created.'));
+			return tagged('create', actionFailure(e, 'Could not create the provider. Try again.'));
 		}
 		return { success: true };
 	},
@@ -80,7 +80,7 @@ export const actions: Actions = {
 		try {
 			await updateOAuthProvider(id, payload as Parameters<typeof updateOAuthProvider>[1], client);
 		} catch (e: unknown) {
-			return tagged('update', actionFailure(e, 'The provider could not be saved.'));
+			return tagged('update', actionFailure(e, 'Could not save the provider. Try again.'));
 		}
 		return { success: true };
 	},
@@ -94,7 +94,7 @@ export const actions: Actions = {
 		try {
 			await deleteOAuthProvider(id, client);
 		} catch (e: unknown) {
-			return tagged('delete', actionFailure(e, 'The provider could not be deleted.'));
+			return tagged('delete', actionFailure(e, 'Could not delete the provider. Try again.'));
 		}
 		return { success: true };
 	},

@@ -108,8 +108,8 @@ describe('SCIM writes', () => {
 	});
 
 	it.each([
-		[{ name: ' ' }, 'Name the connection'],
-		[{ bearer_token: 'short' }, 'Use at least 32 characters.'],
+		[{ name: ' ' }, 'Enter a name for the connection'],
+		[{ bearer_token: 'short' }, 'Enter a token of at least 32 characters.'],
 		[{ deprovision_action: 'shred' }, 'Choose what happens to a deprovisioned account.'],
 	])('refuses %o before it creates anything', async (over, sentence) => {
 		const { event, calls } = write({ ...CONNECTION, ...over });
@@ -141,7 +141,7 @@ describe('SCIM writes', () => {
 
 	it.each(['rotate', 'delete'] as const)('names nothing to %s without a request', async (name) => {
 		const { event, calls } = write({ ...CONNECTION, id: '' });
-		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'No connection was named.' });
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'This form is missing its connection. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -152,9 +152,9 @@ describe('SCIM writes', () => {
 	});
 
 	it.each([
-		['create', 'The connection could not be created.'],
-		['rotate', 'The token could not be rotated.'],
-		['delete', 'The connection could not be removed.'],
+		['create', 'Could not create the connection. Try again.'],
+		['rotate', 'Could not rotate the token. Try again.'],
+		['delete', 'Could not delete the connection. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = write(CONNECTION, OUTAGE);
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });

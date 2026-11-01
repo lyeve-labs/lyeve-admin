@@ -105,7 +105,7 @@ describe('License page status', () => {
 	it('says what an expired license leaves off', () => {
 		const { getByText } = mount({ ent: entitlements({ state: 'expired' }) });
 		expect(getByText('Example, expired')).toBeTruthy();
-		expect(getByText('What the license granted is off until it is renewed.')).toBeTruthy();
+		expect(getByText('Features from the license are off until you renew it.')).toBeTruthy();
 	});
 
 	it('shows a state it has no words for as it arrived', () => {
@@ -133,7 +133,7 @@ describe('License page status', () => {
 
 	it('says the license could not be read rather than claiming there is none', () => {
 		const { getByText, queryByText } = mount({ ent: null });
-		expect(getByText(/The license could not be read/)).toBeTruthy();
+		expect(getByText(/Could not load the license/)).toBeTruthy();
 		expect(queryByText('No license')).toBeNull();
 	});
 
@@ -152,7 +152,7 @@ describe('License page status', () => {
 	});
 
 	it('says the state and the plan in the module\'s words and nothing else, in every state', () => {
-		const head = 'Settings License The license this instance runs on, and where a new key is activated. Status';
+		const head = "Settings License See this instance's license and activate a new key. Status";
 		const key = 'License token or key Paste the license token or key you were issued.';
 		const renew = `Renew license ${key} Renew license`;
 		const activate =
@@ -160,7 +160,7 @@ describe('License page status', () => {
 		const expected: Record<string, string> = {
 			active: `Example, active Plan ExampleExpires No expiry on record ${renew}`,
 			grace: `Example, grace period Renew the license to keep what it grants. Plan ExampleExpires No expiry on record ${renew}`,
-			expired: `Example, expired What the license granted is off until it is renewed. Plan ExampleExpires No expiry on record ${renew}`,
+			expired: `Example, expired Features from the license are off until you renew it. Plan ExampleExpires No expiry on record ${renew}`,
 			free: `No license Everything that needs no license is running. Plan Example ${activate}`,
 			'': `No license Everything that needs no license is running. Plan Example ${activate}`,
 		};

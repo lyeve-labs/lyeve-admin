@@ -51,7 +51,7 @@ describe('the gate', () => {
 			props: props({ gate: { state: 'error', message: 'The split could not be read.' }, stats: null }),
 		});
 		expect(said(container)).toContain('could not be read');
-		expect(said(container)).not.toContain('Nobody has been bucketed yet');
+		expect(said(container)).not.toContain('No readers assigned yet');
 	});
 });
 
@@ -61,7 +61,7 @@ describe('the trending list', () => {
 			props: props({ trending: { ok: false, gate: { state: 'forbidden' } } }),
 		});
 		expect(said(container)).toContain('Your role cannot open trending entries');
-		expect(said(container)).not.toContain('Nothing is trending yet');
+		expect(said(container)).not.toContain('No trending entries yet');
 	});
 });
 
@@ -71,7 +71,7 @@ describe('the split', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({ stats: stats({ total_users: 0, recommendation_pct: 0, random_pct: 0 }) }),
 		});
-		expect(said(container)).toContain('Nobody has been bucketed yet');
+		expect(said(container)).toContain('No readers assigned yet');
 	});
 
 	// A feed request puts nobody in a group. Only the request for the
@@ -81,7 +81,7 @@ describe('the split', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({ stats: stats({ total_users: 0, recommendation_pct: 0, random_pct: 0 }) }),
 		});
-		expect(said(container)).toContain('a request signed in as that reader asks for its group');
+		expect(said(container)).toContain('a request signed in as them asks for their group');
 		expect(said(container)).not.toContain('asked for a feed');
 	});
 
@@ -110,7 +110,7 @@ describe('the recompute', () => {
 	// operator looking for a fault that is not there.
 	it('shows an already running recompute as information, not a failure', () => {
 		const { container } = render(RecommendationsPage, {
-			props: props({}, { action: 'refresh', error: 'A recompute is already running. Wait for it rather than starting a second.' }),
+			props: props({}, { action: 'refresh', error: 'A recompute is already running. Wait for it to finish.' }),
 		});
 		expect(said(container)).toContain('already running');
 	});

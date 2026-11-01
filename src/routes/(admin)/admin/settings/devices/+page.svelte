@@ -67,7 +67,7 @@
 
 <PageShell
 	title="Trusted devices"
-	description="Browsers this account is remembered on. The list belongs to the account, not the instance."
+	description="See the browsers trusted for your account, and forget any you no longer use."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -76,7 +76,7 @@
 			level={2}
 			gate={data.gate}
 			title="Device recognition"
-			absent="The device recognition plugin is not part of this build, so no device is remembered."
+			absent="Device recognition is not included in this build."
 		/>
 	{:else}
 		{#if formError}
@@ -91,8 +91,7 @@
 				</Alert>
 			{:else}
 				<p class="text-xs text-muted">
-					Trusting remembers the browser you are reading this in. There is no way to trust a
-					different one from here: the fingerprint comes from the request itself.
+					Trusting remembers the browser you're using now. To trust another browser, open this page in that browser.
 				</p>
 				<form
 					method="POST"
@@ -121,8 +120,8 @@
 
 			{#if data.devices.length === 0}
 				<EmptyState
-					title="No device is remembered"
-					description="Every sign-in on this account is treated as coming from somewhere new."
+					title="No trusted devices yet"
+					description="Every sign-in to your account is treated as coming from a new device."
 				>
 					{#snippet iconSnippet()}
 						<MonitorSmartphone size={ICON.lg} />
@@ -137,8 +136,8 @@
 				</ListToolbar>
 				{#if visible.length === 0}
 					<EmptyState
-						title="No device on this page matches"
-						description="Clear the search, or turn the page: the box narrows what is on screen."
+						title="No devices match this search"
+						description="The search covers this page only. Clear it, or go to the next page."
 					/>
 				{:else}
 					<Table label="Remembered devices">

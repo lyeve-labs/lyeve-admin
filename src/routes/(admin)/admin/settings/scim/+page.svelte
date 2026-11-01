@@ -132,7 +132,7 @@
 	 */
 	function removeConnection(p: ScimProvider): SubmitFunction {
 		return confirmed(
-			`Delete SCIM connection ${p.name}`,
+			`Delete SCIM connection ${p.name}?`,
 			'The identity provider stops being able to create or remove accounts here. Accounts it already created are left as they are.',
 			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
 		);
@@ -144,7 +144,7 @@
 
 <PageShell
 	title="SCIM provisioning"
-	description="Identity providers allowed to create and remove accounts here without anybody signing in."
+	description="Let identity providers create and remove accounts here without anyone signing in."
 	width="wide"
 >
 	{#snippet actions()}
@@ -160,7 +160,7 @@
 			level={2}
 			gate={data.gate}
 			title="SCIM provisioning"
-			absent="The SCIM plugin is not part of this build, so no directory can provision accounts here."
+			absent="SCIM provisioning is not included in this build."
 		/>
 	{:else}
 		{#if rowError}
@@ -178,9 +178,7 @@
 			<SectionHeading level={2}>Where the directory sends its requests</SectionHeading>
 			<CopyField label="Base path" labelHidden value={SCIM_BASE_PATH} copyLabel="Copy base path" />
 			<p class="text-xs text-muted">
-				Give the directory this path under the URL it reaches this instance at, and the bearer
-				token from the connection below. The token is the whole authentication for these
-				endpoints.
+				Give the directory this path, added to this instance's URL, and the bearer token from a connection below. The token is the only authentication these endpoints use.
 			</p>
 		</section>
 
@@ -189,8 +187,8 @@
 
 			{#if data.providers.length === 0}
 				<EmptyState
-					title="No directory is connected"
-					description={canWrite ? 'Add a connection to let an identity provider manage accounts here.' : 'A super admin adds a connection to let an identity provider manage accounts here.'}
+					title="No connections yet"
+					description={canWrite ? 'Add a connection to let an identity provider manage accounts here.' : 'Ask a super admin to add a connection, which lets an identity provider manage accounts here.'}
 				>
 					{#snippet iconSnippet()}
 						<KeyRound size={ICON.lg} />
@@ -212,8 +210,8 @@
 				</ListToolbar>
 				{#if visible.length === 0}
 					<EmptyState
-						title="No connection on this page matches"
-						description="Clear the search, or turn the page: the box narrows what is on screen."
+						title="No connections match this search"
+						description="The search covers this page only. Clear it, or go to the next page."
 					/>
 				{:else}
 					<Table label="Connections">
@@ -297,7 +295,7 @@
 				id="scim-name"
 				name="name"
 				label="Name"
-				hint="Which directory this is. Nobody outside this screen reads it."
+				hint="Which directory this is. It is shown only on this screen."
 				bind:value={name}
 				required
 			/>
@@ -305,7 +303,7 @@
 				id="scim-token"
 				name="bearer_token"
 				label="Bearer token"
-				hint="At least {MIN_TOKEN_LENGTH} characters. Stored as a hash, so this is the only time it can be read. Copy it into the directory now."
+				hint="At least {MIN_TOKEN_LENGTH} characters. It is stored as a hash, so you cannot see it again. Copy it into the directory now."
 				bind:value={token}
 				required
 			/>
@@ -321,7 +319,7 @@
 					hint="Sign-in through this provider uses this connection's attribute mapping. The link is set when the connection is created. To change it, create a new connection and remove this one."
 				/>
 			{:else if data.saml?.state === 'failed'}
-				<Alert tone="warn">The SAML providers could not be read, so none can be linked now. Reload the page to try again.</Alert>
+				<Alert tone="warn">Could not load the SAML providers, so you cannot link one now. Reload the page to try again.</Alert>
 			{/if}
 			<RadioGroup
 				name="deprovision_action"
@@ -336,7 +334,7 @@
 			<Toggle
 				id="scim-deprovision"
 				label="Act on removals at all"
-				hint="Always on. It governs a directory that deletes the person, which is handled the way chosen above. Okta and Microsoft Entra mark the person inactive instead, and that always disables the account, whichever way is chosen."
+				hint="Always on. When a directory deletes a person, the account is handled the way you chose above. Okta and Microsoft Entra mark the person inactive instead, which always disables the account, whatever you chose."
 				checked={true}
 				disabled
 			/>
@@ -358,8 +356,7 @@
 		<div class="flex flex-col gap-4">
 			<FormErrors message={failedIn(['rotate'])} />
 			<Alert tone="warn">
-				The old token stops working the moment this one is stored. Provisioning fails until
-				the directory is updated with the new one.
+				The old token stops working as soon as the new one is saved. Provisioning fails until you update the directory with the new token.
 			</Alert>
 			<PasswordInput
 				id="scim-new-token"

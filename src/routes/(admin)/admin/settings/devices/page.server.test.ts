@@ -62,7 +62,7 @@ describe('device writes', () => {
 
 	it('asks for a name before it trusts anything', async () => {
 		const { event, calls } = write({ label: ' ' });
-		expect(((await actions.trust(event)) as Failure).data.error).toBe('Name this device, or you will not know which one it was.');
+		expect(((await actions.trust(event)) as Failure).data.error).toBe('Enter a name for this device.');
 		expect(calls).toEqual([]);
 	});
 
@@ -74,7 +74,7 @@ describe('device writes', () => {
 
 	it('names nothing to forget without a request', async () => {
 		const { event, calls } = write({});
-		expect(((await actions.untrust(event)) as Failure).data.error).toBe('No device was named.');
+		expect(((await actions.untrust(event)) as Failure).data.error).toBe('This form is missing its device. Reload the page and try again.');
 		expect(calls).toEqual([]);
 	});
 
@@ -85,8 +85,8 @@ describe('device writes', () => {
 	});
 
 	it.each([
-		['trust', 'This device could not be trusted.'],
-		['untrust', 'The device could not be removed.'],
+		['trust', 'Could not trust this device. Try again.'],
+		['untrust', 'Could not forget this device. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = write({ label: 'Laptop', id: 'd1' }, OUTAGE);
 		expect(((await actions[name](event)) as Failure).data.error).toBe(sentence);

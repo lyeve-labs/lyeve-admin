@@ -56,9 +56,9 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 describe('tenant rate limits', () => {
 	it('says the install limit applies beside the tenant one', () => {
 		const { container } = render(TenantPage, { props: props() });
-		expect(said(container)).toContain("No limit of this tenant's own");
+		expect(said(container)).toContain('This tenant has no limit of its own');
 		expect(said(container)).toContain('50/second');
-		expect(said(container)).toContain('can only tighten');
+		expect(said(container)).toContain('can only make it stricter');
 	});
 
 	it('lists each address on its list and counts them against the stated ceiling', () => {
@@ -125,18 +125,18 @@ describe('tenant rate limit drawers', () => {
 	it('shows a refused limit save inside the limit drawer', async () => {
 		const { rerender } = render(TenantPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: 'Set a limit' }));
-		await rerender(props({}, { action: 'limit', error: 'The tenant limit could not be saved.' }));
-		expect(drawerText('tenant-limit-form')).toContain('The tenant limit could not be saved.');
-		expect(drawerText('address-form')).not.toContain('could not be saved');
+		await rerender(props({}, { action: 'limit', error: 'Could not save the tenant limit. Try again.' }));
+		expect(drawerText('tenant-limit-form')).toContain('Could not save the tenant limit. Try again.');
+		expect(drawerText('address-form')).not.toContain('Could not save');
 	});
 
 	it('leaves a newly opened address drawer clean after a failed delete', async () => {
 		const { container } = render(TenantPage, {
-			props: props({}, { action: 'deleteAddress', error: 'The entry could not be removed.' }),
+			props: props({}, { action: 'deleteAddress', error: 'Could not remove the entry. Try again.' }),
 		});
-		expect(said(container)).toContain('The entry could not be removed.');
+		expect(said(container)).toContain('Could not remove the entry. Try again.');
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New address' })[0]);
-		expect(drawerText('address-form')).not.toContain('could not be removed');
+		expect(drawerText('address-form')).not.toContain('Could not remove');
 	});
 
 	it('keeps a refused address out of the limit drawer', async () => {
@@ -186,7 +186,7 @@ describe('the license', () => {
 		for (const b of screen.getAllByRole('button', { name: 'New address' })) expect((b as HTMLButtonElement).disabled).toBe(true);
 		expect((screen.getByRole('button', { name: 'Clear' }) as HTMLButtonElement).disabled).toBe(false);
 		expect((screen.getByRole('button', { name: 'Delete 198.51.100.7/32' }) as HTMLButtonElement).disabled).toBe(false);
-		expect(screen.getByText(/Setting or changing this limit needs a license/)).toBeTruthy();
+		expect(screen.getByText(/Setting this limit needs a license/)).toBeTruthy();
 	});
 
 	it('offers both writes on a licensed install', () => {

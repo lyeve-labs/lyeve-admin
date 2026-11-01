@@ -76,7 +76,7 @@
 
 <PageShell
 	title="Recommendations"
-	description="Similar entries, trending entries and a feed per reader, computed from what your readers do."
+	description="See the similar entries, trending entries and personal feeds computed from what your readers do."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -95,7 +95,7 @@
 			level={2}
 			gate={data.gate}
 			title="Recommendations"
-			absent="The recommendations plugin is not part of this build, so nothing is being computed."
+			absent="Recommendations are not included in this build."
 		/>
 	{:else}
 		{#if formError}
@@ -128,9 +128,7 @@
 					shows whether recommending changes what people read.
 				</p>
 				<p>
-					The lists are computed, not live: new behavior counts once a super admin recomputes them.
-					Nothing recomputes on a schedule yet, so
-					run it after a batch of activity, or from a cron job calling
+					The lists are not live. New activity counts only after a super admin recomputes them. There is no schedule yet, so recompute after a batch of activity, or from a cron job that calls
 					<span class="font-mono text-xs">POST /api/admin/recommendations/refresh</span>.
 				</p>
 			</div>
@@ -142,11 +140,11 @@
 				<GateNotice
 					gate={data.trending.gate}
 					title="Trending entries"
-					absent="This version of the recommendations plugin keeps no trending list."
+					absent="The trending list needs a newer version of the recommendations plugin."
 				/>
 			{:else if data.trending.value.length === 0}
 				<EmptyState
-					title="Nothing is trending yet"
+					title="No trending entries yet"
 					description="An entry trends once readers have been tracked on it and a recompute has run."
 				/>
 			{:else}
@@ -177,7 +175,7 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Wire it into your application</SectionHeading>
 			<p class="text-sm text-muted">
-				Every call takes the reader's token or an API key, and reads the tenant from it.
+				Send the reader's token or an API key with every call. The tenant comes from that token or key.
 			</p>
 			<div class="flex flex-col gap-2">
 				<div class="flex justify-end"><CopyButton value={INTEGRATION_EXAMPLE} label="Copy the calls" /></div>
@@ -192,8 +190,8 @@
 				     correct. Drawing it as an even split of zero people would read
 				     as a working experiment. -->
 				<EmptyState
-					title="Nobody has been bucketed yet"
-					description="A reader joins a group the first time a request signed in as that reader asks for its group. Asking for a feed puts nobody in one."
+					title="No readers assigned yet"
+					description="A reader is assigned to a group the first time a request signed in as them asks for their group. Generating a feed below assigns no one."
 				>
 					{#snippet iconSnippet()}
 						<Sparkles size={ICON.lg} />
@@ -214,9 +212,7 @@
 				     row of three numbers stays whole. -->
 				{#if skewed}
 					<Alert tone="warn">
-						The two arms are far apart. Each reader is assigned at random, so a few points
-						of drift is normal and this is not: either the control arm is too small to measure against,
-						or a real share of readers are being shown random content.
+						The two arms are far apart. Readers are assigned at random, so a few points of drift is normal, but this much is not. Either the control arm is too small to measure against, or many readers are being shown random content.
 					</Alert>
 				{/if}
 			{/if}
@@ -226,20 +222,18 @@
 			<SectionHeading level={2}>What one reader would see</SectionHeading>
 			{#if !data.canRecompute}
 				<Alert tone="brand">
-					Generating a feed for a named reader is a super admin's, since it reads what that
-					person has been doing.
+					Only a super admin can generate a feed for a named reader, because it shows what that person has been doing.
 				</Alert>
 			{:else}
 				<p class="text-xs text-muted">
-					Generates the feed for one reader now. This is the same computation the reader would
-					get, so it shows what they would actually be shown rather than a sample.
+					Generate the feed for one reader now. It runs the same computation the reader gets, so you see exactly what they would be shown.
 					{#if !data.readers.ok}
-						The accounts could not be read, so give the user id as it appears on the Users page.
+						Could not load the accounts. Enter the user id from the Users page.
 					{:else if readerOptions.length > 0}
 						Find a reader by email to fill in their id, or paste the id of any account from the Users
 						page.
 					{:else}
-						Give the user id as it appears on the Users page.
+						Enter the user id from the Users page.
 					{/if}
 				</p>
 				<!-- The combobox posts the label it shows, an email, so it only
@@ -277,7 +271,7 @@
 				{#if preview !== null}
 					{#if preview.length === 0}
 						<EmptyState
-							title="Nothing to recommend to this reader"
+							title="No recommendations for this reader"
 							description="Either they have read nothing yet, or no content is similar enough to rank."
 						>
 							{#snippet iconSnippet()}

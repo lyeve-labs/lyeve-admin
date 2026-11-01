@@ -123,7 +123,7 @@ describe('rate-limits page', () => {
 	it('without the capability, shows custom rules as not enabled and says stored ones are not enforced', () => {
 		const { getByText, queryByRole } = setup({ customEnabled: false });
 		expect(getByText('Custom rate limits')).toBeTruthy();
-		expect(getByText(/stored rule is not enforced/)).toBeTruthy();
+		expect(getByText(/saved rule is not enforced/)).toBeTruthy();
 		expect(getByText('Not enforced')).toBeTruthy();
 		expect(queryByRole('button', { name: /New rule/ })).toBeNull();
 		expect(queryByRole('button', { name: /Edit POST \/api\/admin\/auth\/login/ })).toBeNull();
@@ -149,7 +149,7 @@ describe('rate-limits page', () => {
 			superAdmin: false,
 			rules: [{ ...customRule, enforced: true }, own],
 		});
-		expect(getByText('Only a super admin changes a rule for every tenant.')).toBeTruthy();
+		expect(getByText('Only a super admin can change a rule for every tenant.')).toBeTruthy();
 		expect(queryByRole('button', { name: 'Edit the rule for GET /api/content/{schema}' })).toBeNull();
 		expect(queryByRole('button', { name: 'Delete the rule for GET /api/content/{schema}' })).toBeNull();
 		expect(getByRole('button', { name: 'Duplicate the rule for GET /api/content/{schema}' })).toBeTruthy();
@@ -161,7 +161,7 @@ describe('rate-limits page', () => {
 		const { getByRole, queryByText } = setup({ customEnabled: true, rules: [{ ...customRule, enforced: true }] });
 		expect(getByRole('button', { name: 'Edit the rule for GET /api/content/{schema}' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Delete the rule for GET /api/content/{schema}' })).toBeTruthy();
-		expect(queryByText('Only a super admin changes a rule for every tenant.')).toBeNull();
+		expect(queryByText('Only a super admin can change a rule for every tenant.')).toBeNull();
 	});
 
 	it('names the setting behind an engine limit', () => {
@@ -178,49 +178,49 @@ describe('rate-limits page', () => {
 
 describe('rate-limits drawers', () => {
 	const drawerText = (id: string) => document.body.querySelector(`form#${id}`)?.textContent ?? '';
-	const deleted = { action: 'delete', error: 'The rule could not be removed.' };
+	const deleted = { action: 'delete', error: 'Could not delete the rule. Try again.' };
 
 	it('shows a refused rule save inside the open drawer', async () => {
 		const { getAllByRole, rerender } = setup({ customEnabled: true });
 		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
-		await rerender(props({ customEnabled: true, form: { action: 'rule', error: 'The rule could not be saved.' } }));
-		expect(drawerText('rate-rule-form')).toContain('The rule could not be saved.');
+		await rerender(props({ customEnabled: true, form: { action: 'rule', error: 'Could not save the rule. Try again.' } }));
+		expect(drawerText('rate-rule-form')).toContain('Could not save the rule. Try again.');
 	});
 
 	it('leaves a newly opened rule drawer clean after a failed delete', async () => {
 		const { container, getAllByRole } = setup({ customEnabled: true, form: deleted });
-		expect(container.textContent).toContain('The rule could not be removed.');
+		expect(container.textContent).toContain('Could not delete the rule. Try again.');
 		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
-		expect(drawerText('rate-rule-form')).not.toContain('could not be removed');
+		expect(drawerText('rate-rule-form')).not.toContain('Could not delete');
 	});
 
 	it('shows a refused global save in its own drawer and in no other', async () => {
 		const { getByRole, rerender, container } = setup({ customEnabled: true });
 		await fireEvent.click(getByRole('button', { name: 'Edit the global limit' }));
-		await rerender(props({ customEnabled: true, form: { action: 'global', error: 'The global limit could not be saved.' } }));
-		expect(drawerText('rate-global-form')).toContain('The global limit could not be saved.');
-		expect(drawerText('rate-rule-form')).not.toContain('could not be saved');
-		expect(container.textContent?.split('The global limit could not be saved.').length).toBe(2);
+		await rerender(props({ customEnabled: true, form: { action: 'global', error: 'Could not save the global limit. Try again.' } }));
+		expect(drawerText('rate-global-form')).toContain('Could not save the global limit. Try again.');
+		expect(drawerText('rate-rule-form')).not.toContain('Could not save');
+		expect(container.textContent?.split('Could not save the global limit. Try again.').length).toBe(2);
 	});
 
 	it('shows a refused protection save inside the protection drawer', async () => {
 		const { getByRole, rerender } = setup({ customEnabled: true });
 		await fireEvent.click(getByRole('button', { name: /Edit POST \/api\/admin\/auth\/login/ }));
-		await rerender(props({ customEnabled: true, form: { action: 'protection', error: 'The protection could not be saved.' } }));
-		expect(drawerText('rate-protection-form')).toContain('The protection could not be saved.');
+		await rerender(props({ customEnabled: true, form: { action: 'protection', error: 'Could not save the protection. Try again.' } }));
+		expect(drawerText('rate-protection-form')).toContain('Could not save the protection. Try again.');
 	});
 
 	it('leaves a reopened drawer clean of the failure it showed before', async () => {
-		const { getAllByRole } = setup({ customEnabled: true, form: { action: 'rule', error: 'The rule could not be saved.' } });
+		const { getAllByRole } = setup({ customEnabled: true, form: { action: 'rule', error: 'Could not save the rule. Try again.' } });
 		await fireEvent.click(getAllByRole('button', { name: /New rule/ })[0]);
-		expect(drawerText('rate-rule-form')).not.toContain('could not be saved');
+		expect(drawerText('rate-rule-form')).not.toContain('Could not save');
 	});
 });
 
 describe('rate-limits controls', () => {
 	it('names the rule in the delete confirmation', async () => {
 		setup({ customEnabled: true, rules: [{ ...customRule, enforced: true }] });
-		expect(await deleteTitle()).toBe('Delete rule GET /api/content/{schema}');
+		expect(await deleteTitle()).toBe('Delete rule GET /api/content/{schema}?');
 	});
 
 	it('offers the two ways of counting as radios, each with its sentence', async () => {
@@ -237,7 +237,7 @@ describe('rate-limits controls', () => {
 describe('the stored rule count on a paged list', () => {
 	it('counts every stored rule from the total, not the rows on this page', () => {
 		const { getByText } = setup({ total: 120 });
-		expect(getByText(/120\s+stored rules are not enforced/)).toBeTruthy();
+		expect(getByText(/120\s+saved rules are not enforced/)).toBeTruthy();
 	});
 });
 

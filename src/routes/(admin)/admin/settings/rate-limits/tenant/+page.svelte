@@ -86,7 +86,7 @@
 	const saveLimit = tracked(() => async ({ result, update }) => {
 		if (result.type !== 'failure') limitOpen = false;
 		await update();
-		if (result.type === 'success') toast.success('Saved the tenant limit');
+		if (result.type === 'success') toast.success('Tenant limit saved.');
 	});
 
 	let addressOpen = $state(false);
@@ -125,7 +125,7 @@
 	const clearLimit = confirmed(
 		'Clear the tenant limit?',
 		'This tenant goes back to the install-wide limit alone.',
-		{ confirmLabel: 'Clear', success: 'Cleared the tenant limit' },
+		{ confirmLabel: 'Clear', success: 'Tenant limit cleared.' },
 	);
 
 	// The window is the address, so the server render already marks the one
@@ -188,7 +188,7 @@
 
 <PageShell
 	title="Tenant rate limits"
-	description="This tenant's own limit, the addresses it always serves or always refuses, and what was refused."
+	description="Set this tenant's own limit and address lists, and see which requests were refused."
 	width="wide"
 	back={{ href: '/admin/settings/rate-limits', label: 'Rate limits' }}
 >
@@ -197,7 +197,7 @@
 			level={2}
 			gate={data.gate}
 			title="Rate limits"
-			absent="The rate limit plugin is not part of this build, so no request is limited."
+			absent="Rate limiting is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={formError} refused={refusal} />
@@ -205,7 +205,7 @@
 		<section class="flex flex-col gap-4" aria-label="Tenant limit">
 			<SectionHeading level={2}>Tenant limit</SectionHeading>
 			{#if !data.limit.ok}
-				<GateNotice gate={data.limit.gate} title="Tenant limit" absent="This version of the plugin has no tenant limit." />
+				<GateNotice gate={data.limit.gate} title="Tenant limit" absent="The tenant limit needs a newer version of the rate limit plugin." />
 			{:else}
 				<Card pad="md">
 					<div class="flex flex-wrap items-start justify-between gap-4">
@@ -216,14 +216,13 @@
 									<Badge tone={own.enabled ? 'success' : 'neutral'} dot>{own.enabled ? 'Enforced' : 'Off'}</Badge>
 								</p>
 							{:else}
-								<p class="text-fg">No limit of this tenant's own.</p>
+								<p class="text-fg">This tenant has no limit of its own.</p>
 							{/if}
 							<p class="text-muted">
 								{#if install && install.enabled}
-									The install-wide limit of {rateLabel(install.rate)} with bursts of {formatCount(install.burst)} applies
-									beside it, so a tenant limit can only tighten it.
+									The install-wide limit of {rateLabel(install.rate)} with bursts of {formatCount(install.burst)} also applies, so a tenant limit can only make it stricter.
 								{:else}
-									The install sets no global limit.
+									No install-wide limit is set.
 								{/if}
 							</p>
 						</div>
@@ -247,8 +246,7 @@
 					</div>
 					{#if !limitLicensed}
 						<p id="limit-license" class="mt-3 text-xs text-faint">
-							Setting or changing this limit needs a license this install does not hold. Clearing it is always
-							allowed.
+							Setting this limit needs a license this install does not have. You can always clear it.
 						</p>
 					{/if}
 				</Card>
@@ -276,14 +274,13 @@
 				<GateNotice
 					gate={data.addresses.gate}
 					title="Address lists"
-					absent="This version of the plugin keeps no address lists."
+					absent="Address lists need a newer version of the rate limit plugin."
 				/>
 			{:else}
 				{#if !addressesLicensed}
 					<div id="address-license">
 						<Alert tone="brand">
-							Adding an address needs a license this install does not hold. Entries already saved keep applying, and
-							removing one is always allowed.
+							Adding an address needs a license this install does not have. Saved entries still apply, and you can always remove one.
 						</Alert>
 					</div>
 				{/if}
@@ -303,11 +300,11 @@
 				<GateNotice
 					gate={data.history.gate}
 					title="Refusal history"
-					absent="This version of the plugin records no refusal history."
+					absent="Refusal history needs a newer version of the rate limit plugin."
 				/>
 			{:else if history}
 				{#if totals.length === 0}
-					<EmptyState title="Nothing was refused" description="No rule or list entry refused a request in this window.">
+					<EmptyState title="No refused requests" description="No rule or list entry refused a request in this window.">
 						{#snippet iconSnippet()}
 							<ShieldBan size={ICON.lg} />
 						{/snippet}
@@ -380,8 +377,7 @@
 				     and how to proceed, beside the entry that caused it. -->
 				<Alert tone="danger" title="That entry would lock you out">
 					<p>
-						{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it
-						would refuse this console to you, and only an operator of the install could undo that.
+						{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it would lock you out of this console, and only an operator of the install could undo that.
 					</p>
 					<p class="mt-2">
 						Add your own address to the allow list first, then deny the range. An allowed address is served

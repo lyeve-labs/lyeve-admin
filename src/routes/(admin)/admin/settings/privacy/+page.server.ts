@@ -42,17 +42,17 @@ export const load: PageServerLoad = async (event) => {
 		read<FormErasure>(
 			PLUGIN.schema,
 			() => readFormErasure(client),
-			'What an erasure does with form submissions could not be read. This is not a report that it uses the default.',
+			'Could not load what an erasure does with form submissions.',
 		),
 		read<ExportSections>(
 			PLUGIN.productAnalytics,
 			() => readExportSections(client),
-			'What a person may include in an export could not be read. This is not a report that nothing is offered.',
+			'Could not load what a person may include in an export.',
 		),
 		read<{ roles: string[] }>(
 			PLUGIN.productAnalytics,
 			() => readExportRoles(client),
-			'Who may export their own data could not be read. This is not a report that every role may.',
+			'Could not load who may export their own data.',
 		),
 	]);
 	// Every setting here is a tenant's. A session that names none is told so
@@ -88,7 +88,7 @@ export const actions: Actions = {
 			await saveFormErasure(authedClient(event), mode);
 			return { action: 'erasure' as const, saved: true };
 		} catch (err) {
-			return saveFailed('erasure', err, 'The choice could not be saved. Erasures keep following the one saved before.');
+			return saveFailed('erasure', err, 'Could not save your choice. Try again.');
 		}
 	},
 
@@ -104,7 +104,7 @@ export const actions: Actions = {
 			await saveExportSections(authedClient(event), [...new Set(excluded)]);
 			return { action: 'sections' as const, saved: true };
 		} catch (err) {
-			return saveFailed('sections', err, 'What a person may include could not be saved. Nothing was changed.');
+			return saveFailed('sections', err, 'Could not save what a person may include. Try again.');
 		}
 	},
 
@@ -113,13 +113,13 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const scope = String(form.get('scope') ?? '');
 		if (scope !== 'every' && scope !== 'chosen') {
-			return fail(400, { action: 'roles' as const, error: 'Choose every role, or the roles ticked below.' });
+			return fail(400, { action: 'roles' as const, error: 'Choose who may export.' });
 		}
 		let roles: string[] = [];
 		if (scope === 'chosen') {
 			roles = listed(form, 'roles').filter((r) => !ALWAYS_EXPORT.includes(r));
 			if (roles.some((r) => r.length > MAX_ROLE_LENGTH)) {
-				return fail(400, { action: 'roles' as const, error: `A role name is at most ${MAX_ROLE_LENGTH} characters.` });
+				return fail(400, { action: 'roles' as const, error: `Use role names of at most ${MAX_ROLE_LENGTH} characters.` });
 			}
 			if (roles.length > MAX_EXPORT_ROLES) {
 				return fail(400, { action: 'roles' as const, error: `Choose at most ${MAX_EXPORT_ROLES} roles.` });
@@ -132,7 +132,7 @@ export const actions: Actions = {
 			await saveExportRoles(authedClient(event), roles);
 			return { action: 'roles' as const, saved: true };
 		} catch (err) {
-			return saveFailed('roles', err, 'Who may export could not be saved. Nothing was changed.');
+			return saveFailed('roles', err, 'Could not save who may export. Try again.');
 		}
 	},
 };

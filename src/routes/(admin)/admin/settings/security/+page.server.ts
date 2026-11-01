@@ -11,7 +11,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const report = await section(
 		getSecurityControls(authedClient(event)),
-		'The security report could not be read. This is not a report that nothing protects this instance.'
+		'Could not load the security report.'
 	);
 	return { report };
 };

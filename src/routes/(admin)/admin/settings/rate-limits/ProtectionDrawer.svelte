@@ -25,7 +25,7 @@
 		protectionOpen = true;
 	}
 
-	const saveProtectionSubmit = tracked(closing(() => (protectionOpen = false), 'Saved the protection'));
+	const saveProtectionSubmit = tracked(closing(() => (protectionOpen = false), 'Protection saved.'));
 </script>
 
 <Drawer bind:open={protectionOpen} title={protection ? protection.name : 'Protection'}>

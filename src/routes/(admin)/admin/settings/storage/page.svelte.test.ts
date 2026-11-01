@@ -57,7 +57,7 @@ describe('Storage controls by role', () => {
 });
 
 describe('the provider drawer', () => {
-	const failed = { action: 'create', providerError: 'The provider could not be created.' };
+	const failed = { action: 'create', providerError: 'Could not create the provider. Try again.' };
 
 	it('keeps a failed create out of an edit opened after it', async () => {
 		const { getByRole } = render(StoragePage, { props: { ...props(), form: failed as never } });
@@ -65,7 +65,7 @@ describe('the provider drawer', () => {
 		await new Promise((r) => setTimeout(r, 0));
 		const drawer = document.body.querySelector('form#provider-form');
 		expect(drawer).not.toBeNull();
-		expect(drawer?.textContent).not.toContain('The provider could not be created.');
+		expect(drawer?.textContent).not.toContain('Could not create the provider. Try again.');
 	});
 
 	it('shows a failed create that came back while the create drawer was open', async () => {
@@ -73,7 +73,7 @@ describe('the provider drawer', () => {
 		getAllByRole('button', { name: /new provider/i })[0].click();
 		await new Promise((r) => setTimeout(r, 0));
 		await rerender({ ...props(), form: failed as never });
-		expect(document.body.querySelector('form#provider-form')?.textContent).toContain('The provider could not be created.');
+		expect(document.body.querySelector('form#provider-form')?.textContent).toContain('Could not create the provider. Try again.');
 	});
 });
 

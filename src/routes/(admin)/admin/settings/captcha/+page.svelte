@@ -41,19 +41,19 @@
 
 	const save = tracked(() => async ({ result, update }) => {
 		await update({ reset: false });
-		if (result.type === 'success') toast.success('Saved the captcha settings');
+		if (result.type === 'success') toast.success('Captcha settings saved.');
 	});
 
 	const clear = confirmed(
 		'Clear the tenant captcha settings?',
 		"This tenant's pages and flows go back to the install's captcha, and the stored secret is deleted.",
-		{ confirmLabel: 'Clear', success: 'Cleared the captcha settings' },
+		{ confirmLabel: 'Clear', success: 'Captcha settings cleared.' },
 	);
 </script>
 
 <PageShell
 	title="Captcha"
-	description="The captcha this tenant's own pages and flows check, with keys of its own."
+	description="Set the captcha this tenant's own pages and flows use, with keys of its own."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -62,12 +62,11 @@
 			level={2}
 			gate={data.gate}
 			title="Captcha"
-			absent="The captcha plugin is not part of this build, so no form is challenged."
+			absent="Captcha is not included in this build."
 		/>
 	{:else}
 		<Alert tone="brand" title="The admin login always uses the install's captcha">
-			These settings apply to this tenant's own pages and flows. Signing in to this console is challenged with the
-			install's settings whatever is saved here, so a wrong key here cannot lock an admin out.
+			These settings apply to this tenant's own pages and flows. Signing in to this console always uses the install's captcha, so a wrong key here cannot lock you out.
 		</Alert>
 
 		<FormErrors message={formError} refused={refusal} />
@@ -78,11 +77,11 @@
 				<div class="flex flex-col gap-2 text-sm">
 					<p class="text-fg" data-testid="captcha-source">
 						{#if settings.source === 'tenant' && tenant}
-							This tenant's flows check {providerLabel(tenant.provider)} with its own keys.
+							This tenant's flows use {providerLabel(tenant.provider)} with its own keys.
 						{:else if settings.instance.enabled}
-							This tenant's flows check the install's {providerLabel(settings.instance.provider)}.
+							This tenant's flows use the install's {providerLabel(settings.instance.provider)}.
 						{:else}
-							No captcha is checked: neither this tenant nor the install has one set.
+							No captcha is in use. Neither this tenant nor the install has one set.
 						{/if}
 					</p>
 					<p class="text-muted">
@@ -100,8 +99,7 @@
 			<SectionHeading level={2}>Tenant settings</SectionHeading>
 			{#if !settings.licensed}
 				<p class="text-sm text-muted" id="captcha-license-note">
-					Saving or changing tenant captcha settings needs a license this install does not hold. Settings already
-					saved keep applying, and clearing them is always allowed.
+					Saving tenant captcha settings needs a license this install does not have. Settings already saved still apply, and you can always clear them.
 				</p>
 			{/if}
 			<Card pad="md">
@@ -128,7 +126,7 @@
 						autocomplete="off"
 						hint={tenant?.has_secret
 							? 'A secret is stored and is never shown. Leave this empty to keep it, or enter a new one to replace it.'
-							: 'Used to verify each answer with the provider. It is stored sealed and never shown again.'}
+							: 'Used to verify each answer with the provider. It is stored encrypted and never shown again.'}
 						bind:value={secret}
 						required={!tenant?.has_secret}
 					/>
@@ -137,7 +135,7 @@
 							id="captcha-score-floor"
 							name="score_floor"
 							label="Score floor"
-							hint="reCAPTCHA v3 scores each check from 0 to 1. A check below this fails. Empty uses the provider's default."
+							hint="reCAPTCHA v3 scores each check from 0 to 1. A check below this fails. Leave empty to use the provider's default."
 							placeholder="0.5"
 							bind:value={scoreFloor}
 						/>

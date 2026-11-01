@@ -47,15 +47,15 @@ export const load: PageServerLoad = async (event) => {
 	const [limit, addresses, history] = await Promise.all([
 		section(
 			readTenantGlobal(client),
-			'The tenant limit could not be read. This is not a report that none is set.',
+			'Could not load the tenant limit.',
 		),
 		section(
 			listAddressEntries(client),
-			'The address lists could not be read. This is not a report that they are empty.',
+			'Could not load the address lists.',
 		),
 		section(
 			readRefusalHistory(client, hours),
-			'The refusal history could not be read. This is not a report that nothing was refused.',
+			'Could not load the refusal history.',
 		),
 	]);
 
@@ -82,15 +82,15 @@ export const actions: Actions = {
 		const rate = num(form.get('rate'));
 		const burst = Math.floor(num(form.get('burst')));
 		if (!Number.isFinite(rate) || rate <= 0) {
-			return fail(400, { action: 'limit', error: 'The rate is requests per second and must be more than zero.' });
+			return fail(400, { action: 'limit', error: 'Enter a rate above zero, in requests per second.' });
 		}
 		if (!Number.isFinite(burst) || burst < 1) {
-			return fail(400, { action: 'limit', error: 'The burst must be at least one request.' });
+			return fail(400, { action: 'limit', error: 'Enter a burst of at least one request.' });
 		}
 		try {
 			await setTenantGlobal(authedClient(event), { rate, burst, enabled: form.get('enabled') === 'true' });
 		} catch (err) {
-			return tagged('limit', actionFailure(err, 'The tenant limit could not be saved.'));
+			return tagged('limit', actionFailure(err, 'Could not save the tenant limit. Try again.'));
 		}
 		return { savedLimit: true };
 	},
@@ -101,7 +101,7 @@ export const actions: Actions = {
 		try {
 			await clearTenantGlobal(authedClient(event));
 		} catch (err) {
-			return tagged('clear', actionFailure(err, 'The tenant limit could not be cleared.'));
+			return tagged('clear', actionFailure(err, 'Could not clear the tenant limit. Try again.'));
 		}
 		return { clearedLimit: true };
 	},
@@ -115,7 +115,7 @@ export const actions: Actions = {
 		if (!cidrIsSound(cidr)) {
 			return fail(400, { action: 'address', error: 'Enter one address, such as 203.0.113.7, or a range, such as 203.0.113.0/24 or 2001:db8::/32.' });
 		}
-		if (note.length > 255) return fail(400, { action: 'address', error: 'A note is at most 255 characters.' });
+		if (note.length > 255) return fail(400, { action: 'address', error: 'Enter a note of at most 255 characters.' });
 		try {
 			await createAddressEntry(authedClient(event), { cidr, list, note });
 		} catch (err) {
@@ -129,13 +129,13 @@ export const actions: Actions = {
 				case ADDRESS_LIST_FULL:
 					return fail(409, {
 						action: 'address',
-						error: 'This tenant holds as many address entries as it may. Remove one before adding another.',
+						error: 'This tenant has reached its limit of address entries. Remove one before adding another.',
 						listFull: true,
 					});
 				case ADDRESS_DUPLICATE:
 					return fail(409, { action: 'address', error: `${cidr} is already on the ${list} list.`, duplicate: cidr });
 			}
-			return tagged('address', actionFailure(err, 'The address could not be added.'));
+			return tagged('address', actionFailure(err, 'Could not add the address. Try again.'));
 		}
 		return { savedAddress: cidr, list };
 	},
@@ -144,11 +144,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '').trim();
-		if (!id) return fail(400, { action: 'deleteAddress', error: 'No entry was named.' });
+		if (!id) return fail(400, { action: 'deleteAddress', error: 'This form is missing its entry. Reload the page and try again.' });
 		try {
 			await deleteAddressEntry(authedClient(event), id);
 		} catch (err) {
-			return tagged('deleteAddress', actionFailure(err, 'The entry could not be removed.'));
+			return tagged('deleteAddress', actionFailure(err, 'Could not remove the entry. Try again.'));
 		}
 		return { removedAddress: id };
 	},
