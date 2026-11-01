@@ -184,6 +184,9 @@ const path = (...parts: string[]) => parts.map(encodeURIComponent).join('/');
  */
 const VERSION_MISMATCH = 'SCHEMA_VERSION_MISMATCH';
 
+/** The code the engine refuses a create with when a content type of that name exists. */
+const ALREADY_EXISTS = 'SCHEMA_EXISTS';
+
 const refusedAs = (err: unknown, code: string) =>
 	err instanceof ApiError && err.status === 412 && (err.body as { code?: unknown } | undefined)?.code === code;
 
@@ -194,6 +197,9 @@ const CHANGED_SINCE_OPENED =
 /** The condition a write is sent on: only the definition at `version`. None when the read named no version. */
 const onlyAt = (version: string): RequestInit | undefined => (version ? { headers: { 'If-Match': `"${version}"` } } : undefined);
 
+/** The condition a new content type is sent on: create it, never replace one of that name. */
+const createOnly: RequestInit = { headers: { 'If-None-Match': '*' } };
+
 export const actions: Actions = {
 	/**
 	 * Saves one schema. Renamed fields go through the engine's rename route
@@ -203,7 +209,8 @@ export const actions: Actions = {
 	 * Every write names the version of the definition the builder opened, and
 	 * each rename answers the version it stored, which the next write names. A
 	 * content type someone changed since it was opened is then refused rather
-	 * than overwritten with what the builder held.
+	 * than overwritten with what the builder held. A new content type is sent
+	 * as a create only, so it never replaces one that already has its name.
 	 */
 	save: async (event) => {
 		await requireRole(event, WRITERS);
@@ -246,14 +253,19 @@ export const actions: Actions = {
 		}
 
 		try {
-			const saved = await retryBusy(() => client.post<Schema>('/api/admin/schemas', schema, original ? onlyAt(version) : undefined));
+			const saved = await retryBusy(() => client.post<Schema>('/api/admin/schemas', schema, original ? onlyAt(version) : createOnly));
 			return { scope: 'save' as const, saved };
 		} catch (err) {
 			const done = renamed.length ? ` The renames went through: ${said()}.` : '';
 			const stale = refusedAs(err, VERSION_MISMATCH);
+			const message = refusedAs(err, ALREADY_EXISTS)
+				? `A content type named ${schema.name} already exists. Open it from the list, or give this one another machine name.`
+				: stale
+					? CHANGED_SINCE_OPENED
+					: actionError(err, 'The schema could not be saved.');
 			return fail(statusOf(err), {
 				scope: 'save' as const,
-				error: `${stale ? CHANGED_SINCE_OPENED : actionError(err, 'The schema could not be saved.')}${done}`,
+				error: `${message}${done}`,
 				renamed,
 				version,
 				stale,

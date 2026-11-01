@@ -350,6 +350,26 @@ describe('admin/schema save action', () => {
 		expect(calls.filter((c) => c.init?.method === 'POST')).toEqual([]);
 	});
 
+	it('creates a new content type only, never over one of the same name', async () => {
+		const { event, calls } = formEvent({ '/api/admin/schemas': () => json({ ...posts, version: 'v1' }) }, { schema: JSON.stringify(posts), original: '', renames: '[]' });
+		const out = await actions.save(event);
+		expect(out).toEqual({ scope: 'save', saved: { ...posts, version: 'v1' } });
+		const post = calls.find((c) => c.init?.method === 'POST');
+		expect(new Headers(post?.init?.headers).get('If-None-Match')).toBe('*');
+		expect(new Headers(post?.init?.headers).get('If-Match')).toBeNull();
+	});
+
+	it('says a content type of that name exists when the engine refuses the create', async () => {
+		const { event } = formEvent(
+			{ '/api/admin/schemas': () => json({ error: 'a schema of this name exists', code: 'SCHEMA_EXISTS' }, 412) },
+			{ schema: JSON.stringify(posts), original: '', renames: '[]' },
+		);
+		const out = (await actions.save(event)) as { status: number; data: { error: string; stale: boolean } };
+		expect(out.status).toBe(412);
+		expect(out.data.error).toBe('A content type named posts already exists. Open it from the list, or give this one another machine name.');
+		expect(out.data.stale).toBe(false);
+	});
+
 	it('refuses a machine name edited in the definition of a saved schema', async () => {
 		const { event, calls } = formEvent({}, { schema: JSON.stringify(posts), original: 'articles', renames: '[]' });
 		const out = (await actions.save(event)) as { status: number };
