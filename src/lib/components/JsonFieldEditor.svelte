@@ -71,12 +71,15 @@
 		id,
 		value = $bindable(''),
 		error = undefined,
+		errorKey = undefined,
 		required = false,
 	}: {
 		id?: string;
 		/** The document as JSON text, the form state's shape for a json field. */
 		value?: string;
 		error?: string;
+		/** The key the error is about. Its row carries the message. */
+		errorKey?: string;
 		required?: boolean;
 	} = $props();
 
@@ -96,6 +99,14 @@
 		return JSON.stringify(JSON.parse(value), null, 2);
 	});
 	const pairable = $derived(pairsOf(value) !== null);
+
+	const uid = $props.id();
+	const base = $derived(id ?? uid);
+	// The row that holds the refused key shows the message under its value,
+	// which the kit marks invalid and describes. With no such row, the message
+	// stays under the editor and the first key points at it.
+	const marked = $derived(error && errorKey ? pairs.findIndex((p) => p.key.trim() === errorKey) : -1);
+	const looseError = $derived(`${base}-error`);
 
 	function syncFromPairs() {
 		value = textOf(pairs);
@@ -147,6 +158,8 @@
 					<Input
 						label="Key"
 						id={index === 0 ? id : undefined}
+						aria-invalid={marked === -1 && error && index === 0 ? 'true' : undefined}
+						describedBy={marked === -1 && error && index === 0 ? looseError : undefined}
 						value={pair.key}
 						placeholder="key"
 						class="[&_label]:sr-only"
@@ -155,6 +168,8 @@
 					/>
 					<Input
 						label="Value"
+						id="{base}-value-{index}"
+						error={index === marked ? error : undefined}
 						value={pair.value}
 						placeholder="value"
 						class="[&_label]:sr-only"
@@ -187,8 +202,8 @@
 		/>
 	{/if}
 
-	{#if mode === 'pairs' && error}
-		<p class="text-xs text-danger">{error}</p>
+	{#if mode === 'pairs' && error && marked === -1}
+		<p id={looseError} class="text-xs text-danger">{error}</p>
 	{/if}
 
 	{#if preview}

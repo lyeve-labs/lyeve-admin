@@ -29,6 +29,31 @@ describe('a schema refusal from the content plugin', () => {
 		expect(out).toEqual({ error: 'The entry was not saved. owner: is required.', fieldErrors: {} });
 	});
 
+	it('names the key inside a field that the refusal points at', () => {
+		const body = {
+			error: 'A field holds a masked value.',
+			field: 'data.email',
+			errors: [{ field: 'data', message: 'The key email holds a masked value.' }],
+		};
+		const out = fieldRefusalOf(new ApiError(422, JSON.stringify(body), body), ['status', 'data']);
+
+		expect(out).toEqual({
+			error: 'The entry was not saved. Check the highlighted fields.',
+			fieldErrors: { data: 'The key email holds a masked value.' },
+			errorKeys: { data: 'email' },
+		});
+	});
+
+	it('reads an entry that names a key as a message for its field', () => {
+		const out = fieldRefusalOf(refusal([{ field: 'data.email', message: 'is not an address' }]), ['data']);
+
+		expect(out).toEqual({
+			error: 'The entry was not saved. Check the highlighted fields.',
+			fieldErrors: { data: 'is not an address' },
+			errorKeys: { data: 'email' },
+		});
+	});
+
 	it('leaves any other failure to the caller', () => {
 		expect(fieldRefusalOf(new ApiError(409, 'slug already in use'), ['title'])).toBeNull();
 		expect(fieldRefusalOf(new Error('offline'), ['title'])).toBeNull();

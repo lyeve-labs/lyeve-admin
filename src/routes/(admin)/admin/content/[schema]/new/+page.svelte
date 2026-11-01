@@ -18,6 +18,7 @@
 	// svelte-ignore state_referenced_locally
 	let formValues = $state<Record<string, unknown>>(buildEmpty(data.schemaDef?.fields ?? []));
 	let validationErrors = $state<Record<string, string>>({});
+	let errorKeys = $state<Record<string, string>>({});
 	let submitting = $state(false);
 
 	// Locale. Default to first locale's code or 'en'. A schema that is not
@@ -38,7 +39,10 @@
 	// A value the plugin refused comes back by field, so each control marks its
 	// own message the way a value refused before sending does.
 	$effect(() => {
-		if (form && 'fieldErrors' in form && form.fieldErrors) validationErrors = form.fieldErrors as Record<string, string>;
+		if (form && 'fieldErrors' in form && form.fieldErrors) {
+			validationErrors = form.fieldErrors as Record<string, string>;
+			errorKeys = ('errorKeys' in form && form.errorKeys ? form.errorKeys : {}) as Record<string, string>;
+		}
 	});
 
 	// Set once the create answered but a link did not land. The entry exists,
@@ -50,6 +54,7 @@
 		if (Object.keys(errors).length > 0) {
 			e.preventDefault();
 			validationErrors = errors;
+			errorKeys = {};
 		}
 	}
 
@@ -115,6 +120,7 @@
 				fields={userFields}
 				{formValues}
 				{validationErrors}
+				{errorKeys}
 				relations={data.relations}
 				mediaChoices={data.mediaChoices}
 				error={form?.error}

@@ -12,6 +12,7 @@
 		fields,
 		formValues,
 		validationErrors = {},
+		errorKeys = {},
 		relations = {},
 		mediaChoices = [],
 		error,
@@ -20,6 +21,8 @@
 		/** Reactive $state proxy from parent - mutated in-place by FieldInput */
 		formValues: Record<string, unknown>;
 		validationErrors?: Record<string, string>;
+		/** The key inside a json field that its error is about, by field name. */
+		errorKeys?: Record<string, string>;
 		/** What each related collection's read gave, by collection name. */
 		relations?: Record<string, RelationChoices>;
 		/** Published library files a media field may point at. Null when the library could not be read. */
@@ -76,9 +79,13 @@
 		const first = untrack(() => fields).find((f) => named.includes(f.name));
 		if (!first) return;
 		const box = root.querySelector(`[data-field-name="${first.name}"]`);
-		const control = box?.querySelector<HTMLElement>(
-			'input:not([type="hidden"]), textarea, select, button, [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
-		);
+		// A field that marks a part of itself, such as one key of a json
+		// value, takes focus on that part.
+		const control =
+			box?.querySelector<HTMLElement>('[aria-invalid="true"]') ??
+			box?.querySelector<HTMLElement>(
+				'input:not([type="hidden"]), textarea, select, button, [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
+			);
 		control?.focus();
 	});
 
@@ -131,6 +138,7 @@
 						relationFailed={relationOf(field)?.failed ?? false}
 						{mediaChoices}
 						error={validationErrors[field.name]}
+						errorKey={errorKeys[field.name]}
 					/>
 				</div>
 			{:else}
@@ -150,6 +158,7 @@
 					relationFailed={relationOf(field)?.failed ?? false}
 					{mediaChoices}
 					error={validationErrors[field.name]}
+					errorKey={errorKeys[field.name]}
 				/>
 			{/if}
 		</div>
