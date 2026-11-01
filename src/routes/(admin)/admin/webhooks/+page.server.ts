@@ -21,10 +21,10 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
 
 /** What the page says for a list read that failed for no reason it can name. */
-const LIST_FAILED = 'The webhooks could not be read. This is not a report that there are none.';
+const LIST_FAILED = 'Could not load webhooks.';
 
 /** What the drawer says when the schema names could not be read. */
-const SCHEMAS_FAILED = 'The schemas could not be read.';
+const SCHEMAS_FAILED = 'Could not load schemas.';
 
 /** One page of the dead letter queue. */
 const DEAD_LETTER_PAGE = 50;
@@ -92,7 +92,7 @@ export const actions: Actions = {
 		try {
 			await createWebhookRecord(authedClient(event), parsed.body);
 		} catch (err) {
-			return tagged('create', actionFailure(err, 'Failed to create webhook'));
+			return tagged('create', actionFailure(err, 'Could not create the webhook. Try again.'));
 		}
 	},
 
@@ -108,7 +108,7 @@ export const actions: Actions = {
 		try {
 			await updateWebhookRecord(authedClient(event), id, parsed.body);
 		} catch (err) {
-			return tagged('update', actionFailure(err, 'Failed to update webhook'));
+			return tagged('update', actionFailure(err, 'Could not save the webhook. Try again.'));
 		}
 	},
 
@@ -123,7 +123,7 @@ export const actions: Actions = {
 		try {
 			await deleteWebhook(id, client);
 		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Failed to delete webhook'));
+			return tagged('delete', actionFailure(err, 'Could not delete the webhook. Try again.'));
 		}
 	},
 
@@ -138,7 +138,7 @@ export const actions: Actions = {
 			const result = await testWebhook(id, client);
 			return { testResult: { id, ...result } };
 		} catch (err) {
-			return tagged('test', actionFailure(err, 'Failed to test webhook'));
+			return tagged('test', actionFailure(err, 'Could not test the webhook. Try again.'));
 		}
 	},
 
@@ -153,7 +153,7 @@ export const actions: Actions = {
 				const items = await listDeliveries(id, client, DELIVERY_LIMIT);
 				return { deliveries: { id, items, limit: DELIVERY_LIMIT } };
 			} catch (err) {
-				return tagged('deliveries', actionFailure(err, 'Failed to load deliveries'));
+				return tagged('deliveries', actionFailure(err, 'Could not load deliveries. Try again.'));
 			}
 		},
 
@@ -175,7 +175,7 @@ export const actions: Actions = {
 				};
 				return { rotated: { id, name: result.webhook?.name ?? '', secret: result.new_secret ?? '' } };
 			} catch (err) {
-				return tagged('rotate-secret', actionFailure(err, 'Failed to rotate webhook secret'));
+				return tagged('rotate-secret', actionFailure(err, 'Could not rotate the signing secret. Try again.'));
 			}
 		},
 
@@ -191,7 +191,7 @@ export const actions: Actions = {
 				const result = await retryDelivery(id, deliveryId, client);
 				return { retryResult: result };
 			} catch (err) {
-				return tagged('retry-delivery', actionFailure(err, 'Failed to retry delivery'));
+				return tagged('retry-delivery', actionFailure(err, 'Could not retry the delivery. Try again.'));
 			}
 		},
 
@@ -228,7 +228,7 @@ export const actions: Actions = {
 			} catch (err) {
 				// A page turned inside the open queue reports there, and the first
 				// read reports above the list, where the button was.
-				return tagged(turned ? 'dead-letters-page' : 'dead-letters', actionFailure(err, 'Failed to load dead letters'));
+				return tagged(turned ? 'dead-letters-page' : 'dead-letters', actionFailure(err, 'Could not load dead letters. Try again.'));
 			}
 		},
 
@@ -243,7 +243,7 @@ export const actions: Actions = {
 				const result = await replayDeadLetter(id, client);
 				return { deadLetterReplay: result };
 			} catch (err) {
-				return tagged('dead-letter-replay', actionFailure(err, 'Failed to replay dead letter'), id);
+				return tagged('dead-letter-replay', actionFailure(err, 'Could not replay the dead letter. Try again.'), id);
 			}
 		},
 
@@ -258,7 +258,7 @@ export const actions: Actions = {
 				const result = await dismissDeadLetter(id, client);
 				return { deadLetterDismiss: result };
 			} catch (err) {
-				return tagged('dead-letter-dismiss', actionFailure(err, 'Failed to dismiss dead letter'), id);
+				return tagged('dead-letter-dismiss', actionFailure(err, 'Could not dismiss the dead letter. Try again.'), id);
 			}
 		},
 
@@ -272,7 +272,7 @@ export const actions: Actions = {
 			try {
 				await deleteDeadLetter(id, client);
 			} catch (err) {
-				return tagged('dead-letter-delete', actionFailure(err, 'Failed to delete dead letter'), id);
+				return tagged('dead-letter-delete', actionFailure(err, 'Could not delete the dead letter. Try again.'), id);
 			}
 		}
 };

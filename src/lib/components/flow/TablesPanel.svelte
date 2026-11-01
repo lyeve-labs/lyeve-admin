@@ -54,10 +54,10 @@
 	{:else if tables.status === 'loading'}
 		<div class="flex items-center gap-2 text-xs text-muted">
 			<Spinner size={ICON.sm} />
-			Reading the schema
+			Loading tables
 		</div>
 	{:else if tables.status === 'error'}
-		<p class="text-xs text-danger">{tables.message ?? 'The tables could not be listed.'}</p>
+		<p class="text-xs text-danger">{tables.message ?? 'Could not load tables.'}</p>
 		{#if onretry}
 			<div>
 				<Button variant="secondary" size="sm" onclick={onretry}>
@@ -67,7 +67,7 @@
 			</div>
 		{/if}
 	{:else if tables.tables.length === 0}
-		<p class="text-xs text-muted">The datasource has no tables the engine can read.</p>
+		<p class="text-xs text-muted">This datasource has no readable tables.</p>
 	{:else}
 		<SearchInput bind:value={filter} placeholder="Filter tables" label="Filter tables" />
 		<ul class="flex min-h-0 flex-1 flex-col overflow-y-auto">

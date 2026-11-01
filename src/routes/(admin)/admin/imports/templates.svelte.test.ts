@@ -63,7 +63,7 @@ describe('mapping templates', () => {
 
 	it('says a failed read failed rather than that there are none', () => {
 		const { container } = render(ImportsPage, { props: props({ templates: [], templatesRead: false }) });
-		expect(said(container)).toContain('The templates could not be read');
+		expect(said(container)).toContain('Could not load templates');
 		expect(said(container)).not.toContain('No mapping template');
 	});
 
@@ -76,7 +76,7 @@ describe('mapping templates', () => {
 
 	it('says what an unlicensed install keeps', () => {
 		const { container } = render(ImportsPage, { props: props({ licensed: false }) });
-		expect(said(container)).toContain('Saving a template and the date, split and lookup transforms need a license');
+		expect(said(container)).toContain('Saving templates and the date, split and lookup transforms need a license');
 	});
 
 	it('opens a stored template in the drawer with its transform', async () => {

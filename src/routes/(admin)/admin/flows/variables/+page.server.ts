@@ -62,7 +62,7 @@ export const actions: Actions = {
 		const value = String(data.get('value') ?? '');
 		const isSecret = data.get('is_secret') === 'true' || data.get('is_secret') === 'on';
 		if (!KEY.test(key)) {
-			return fail(400, { action: 'put', error: 'A key is lower case letters, digits and underscores, starting with a letter.', key });
+			return fail(400, { action: 'put', error: 'Use lower case letters, digits and underscores for the key, starting with a letter.', key });
 		}
 		// A secret is write-only: the edit form shows an empty field and blank
 		// means keep what is stored, so there is nothing to send.
@@ -70,7 +70,7 @@ export const actions: Actions = {
 		try {
 			await putVariable(client, { key, value, is_secret: isSecret });
 		} catch (err) {
-			return fail(400, { action: 'put', error: actionError(err, 'Failed to save variable'), key });
+			return fail(400, { action: 'put', error: actionError(err, 'Could not save the variable. Try again.'), key });
 		}
 		return { saved: key };
 	},
@@ -83,7 +83,7 @@ export const actions: Actions = {
 		try {
 			await deleteVariable(client, key);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete variable') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the variable. Try again.') });
 		}
 	},
 };

@@ -260,7 +260,7 @@
 
 <PageShell
 	title="Reviews"
-	description="Editorial review: the definitions content moves through, and where every entry under review stands."
+	description="Define the review stages content moves through, and see where each entry under review stands."
 	width="wide"
 >
 	{#snippet actions()}
@@ -300,12 +300,12 @@
 					<GateNotice
 						gate={data.definitions.gate}
 						title="Review definitions"
-						absent="This build serves no review definitions."
+						absent="Review definitions are not included in this build."
 					/>
 				{:else if definitionRows.length === 0}
 					<EmptyState
-						title="No definition yet"
-						description="A definition is an ordered list of stages, each with a required role and an SLA. Content moves through it one stage at a time."
+						title="No definitions yet"
+						description="Create a definition to send content through review stages, each with a required role and an SLA."
 					>
 						{#snippet iconSnippet()}<ClipboardCheck size={ICON.lg} />{/snippet}
 						{#snippet action()}
@@ -336,7 +336,7 @@
 									<td data-cell="nowrap" class="font-mono text-xs">{row.definition.content_schema || 'default'}</td>
 									<td>
 										{#if row.stages === null}
-											<span class="text-xs text-warn">Stages could not be read</span>
+											<span class="text-xs text-warn">Could not load stages. Reload the page to try again.</span>
 										{:else}
 										<ol class="flex flex-wrap items-center gap-1.5">
 											{#each row.stages as stage, i (stage.id)}
@@ -388,28 +388,28 @@
 			</ListToolbar>
 			{#if !data.assignments.ok && data.assignments.gate.state === 'forbidden'}
 				<!-- The rules decide this, not the role, so the notice names them. -->
-				<Alert tone="warn" title="You may not list reviews">
-					The permission rules grant no read on <span class="font-mono">reviews</span> to your roles.
+				<Alert tone="warn" title="You cannot see reviews">
+					Your roles have no read permission on <span class="font-mono">reviews</span>.
 				</Alert>
 			{:else if !data.assignments.ok}
 				<GateNotice
 					gate={data.assignments.gate}
 					title="Review assignments"
-					absent="This build serves no review assignments."
+					absent="Review assignments are not included in this build."
 				/>
 			{:else if assignmentRows.length === 0}
 				<EmptyState
 					title="Nothing under review"
 					description={data.status
-						? 'No assignment has this status. Widen the filter to see the rest.'
-						: 'Start an entry through a definition from its editor and it appears here.'}
+						? 'No assignments match this status.'
+						: 'Entries appear here when you start a review from the entry editor.'}
 				>
 					{#snippet iconSnippet()}<ClipboardCheck size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else}
 				{#if !data.entriesNamed}
 					<p class="text-xs text-muted">
-						Entries, definitions and stages are listed by ID. Their names are read through routes only an admin can open.
+						Entries, definitions and stages show by ID, because only an admin can see their names.
 					</p>
 				{/if}
 				<Table label="Review assignments">
@@ -500,7 +500,7 @@
 			id="definition-slug"
 			name="slug"
 			label="Slug"
-			hint="What a permission rule names, as review:<slug>. Derived from the name when left empty, and never changes."
+			hint="Permission rules refer to this definition as review:<slug>. If you leave it empty, it is made from the name. It cannot be changed later."
 			bind:value={slug}
 			class="font-mono"
 			autocomplete="off"
@@ -522,7 +522,7 @@
 				label="Content schema"
 				hint={data.schemas.ok
 					? 'The schema whose entries this definition reviews.'
-					: 'The schemas could not be read, so type the name of the schema whose entries this definition reviews.'}
+					: 'Could not load schemas. Type the name of the schema whose entries this definition reviews.'}
 				value={contentSchema ?? ''}
 				oninput={(e) => (contentSchema = (e.currentTarget as HTMLInputElement).value)}
 				class="font-mono"
@@ -531,7 +531,7 @@
 		<Toggle
 			id="definition-publish"
 			label="Publish on approval"
-			hint="The last approval sets the entry to published. Off, the entry stays as it was and publish is a separate action."
+			hint="The last approval publishes the entry. When off, the entry stays as it was and you publish it separately."
 			bind:checked={publishOnApprove}
 		/>
 
@@ -593,7 +593,7 @@
 								<Input
 									id="stage-role-{stage.key}"
 									label="Required role"
-									hint="Empty takes anyone the rules admit; admin and super_admin always may."
+									hint="Leave empty to allow anyone the permission rules allow. The admin and super_admin roles can always act."
 									bind:value={stage.required_role}
 									placeholder="editor"
 									mono
@@ -615,7 +615,7 @@
 								<NumberInput
 									id="stage-quorum-{stage.key}"
 									label="Approvals needed"
-									hint="1 is a single approval. Above 1, that many assignees each approve."
+									hint="1 needs a single approval. A higher number needs that many assignees to approve."
 									min={1}
 									max={100}
 									step={1}
@@ -645,7 +645,7 @@
 										label={stage.escalate_kind === 'user' ? 'User id' : 'Role'}
 										hint={stage.escalate_kind === 'user'
 											? 'The user becomes the assignee when the SLA passes.'
-											: 'A holder of this role may act on the stage once the SLA passes.'}
+											: 'Anyone with this role can act on the stage once the SLA passes.'}
 										disabled={stagesLocked}
 										bind:value={stage.escalate_to}
 										mono
@@ -655,7 +655,7 @@
 									<Input
 										id="stage-condition-field-{stage.key}"
 										label="Only when the field"
-										hint="Empty runs the stage for every entry."
+										hint="Leave empty to run the stage for every entry."
 										disabled={stagesLocked}
 										bind:value={stage.condition_field}
 										placeholder="category"

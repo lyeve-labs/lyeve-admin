@@ -216,7 +216,7 @@ describe('deleting a definition', () => {
 		engine.delete.mockRejectedValue(new ApiError(503, 'pq: down'));
 		expect(((await actions.delete(actionEvent({ id: 'd1' }))) as Failure).data).toEqual({
 			action: 'delete',
-			error: 'Failed to delete the definition.',
+			error: 'Could not delete the definition. Try again.',
 		});
 	});
 

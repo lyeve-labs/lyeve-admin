@@ -222,9 +222,9 @@ describe('admin/webhooks/incoming writes', () => {
 	});
 
 	it.each([
-		['create', 'Failed to create incoming webhook'],
-		['update', 'Failed to update incoming webhook'],
-		['delete', 'Failed to delete incoming webhook'],
+		['create', 'Could not create the incoming webhook. Try again.'],
+		['update', 'Could not save the incoming webhook. Try again.'],
+		['delete', 'Could not delete the incoming webhook. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = superAdminWrite({ ...ENDPOINT, id: 'i1' }, json({ error: 'dial tcp 10.0.0.4:5432' }, 503));
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });

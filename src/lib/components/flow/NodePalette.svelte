@@ -126,7 +126,7 @@
 			</section>
 		{/each}
 		{#if unread}
-			<p class="p-2 text-sm text-muted">The node types could not be read, so there is nothing to add.</p>
+			<p class="p-2 text-sm text-muted">Could not load node types.</p>
 		{:else if groups.length === 0}
 			<p class="p-2 text-sm text-muted">No node type matches.</p>
 		{/if}

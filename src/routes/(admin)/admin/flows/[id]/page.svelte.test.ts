@@ -202,11 +202,11 @@ describe('flow editor page', () => {
 
 	// The import drawer and the rest of the editor share one form result.
 	it('keeps a failed save out of the import drawer opened after it', async () => {
-		const { container, getByRole } = setup({ error: 'A flow needs a name.' });
-		expect(container.textContent).toContain('A flow needs a name.');
+		const { container, getByRole } = setup({ error: 'Enter a name for the flow.' });
+		expect(container.textContent).toContain('Enter a name for the flow.');
 		await pickOverflow(getByRole, 'Import');
 		const form = container.querySelector('#flow-import-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('A flow needs a name.');
+		expect(form.textContent).not.toContain('Enter a name for the flow.');
 	});
 
 	it('shows a failed import inside the import drawer and not above the canvas', async () => {
@@ -606,13 +606,13 @@ describe('flow editor page', () => {
 		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
 		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
 		expect(drawer.textContent).toContain('the runs could not be read');
-		expect(drawer.textContent).not.toContain('No runs recorded yet.');
+		expect(drawer.textContent).not.toContain('No runs yet.');
 	});
 
 	it('says the node types could not be read rather than that none matches', () => {
-		const { getByTestId } = setup(null, { catalog: [], catalogGate: { state: 'error', message: 'The node types could not be read, so the palette has nothing to offer.' } });
-		expect(getByTestId('flow-catalog-unread').textContent).toContain('The node types could not be read');
-		expect(getByTestId('node-palette').textContent).toContain('could not be read');
+		const { getByTestId } = setup(null, { catalog: [], catalogGate: { state: 'error', message: 'Could not load node types.' } });
+		expect(getByTestId('flow-catalog-unread').textContent).toContain('Could not load node types');
+		expect(getByTestId('node-palette').textContent).toContain('Could not load node types');
 		expect(getByTestId('node-palette').textContent).not.toContain('No node type matches.');
 	});
 
@@ -629,7 +629,7 @@ describe('flow editor page', () => {
 		);
 		const { getByRole } = setup();
 		await pickOverflow(getByRole, 'Export');
-		await vi.waitFor(() => expect(document.body.textContent).toContain('The export could not be loaded.'));
+		await vi.waitFor(() => expect(document.body.textContent).toContain('Could not load the export.'));
 		expect(document.body.textContent).not.toContain('Loading the export.');
 		expect(document.body.querySelector('pre')).toBeNull();
 	});
@@ -658,7 +658,7 @@ describe('flow editor page', () => {
 		const { getByRole, container } = setup();
 		await fireEvent.click(getByRole('tab', { name: 'Guide' }));
 		expect(container.textContent).toContain('nodes.<id>.output');
-		expect(container.textContent).toContain('never carries a secret');
+		expect(container.textContent).toContain('never includes a secret');
 	});
 
 	it('renders the not-enabled state when the engine answered 402', () => {
@@ -699,7 +699,7 @@ describe('flow editor page', () => {
 		});
 		const publish = () => getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
 		expect(publish().disabled).toBe(true);
-		expect(publish().parentElement?.textContent).toContain('The live version is this draft');
+		expect(publish().parentElement?.textContent).toContain('This draft is already live');
 		await fireEvent.input(container.querySelector('#flow-name') as HTMLInputElement, { target: { value: 'Renamed' } });
 		expect(publish().disabled).toBe(false);
 	});
@@ -766,7 +766,7 @@ describe('flow editor page', () => {
 		const { getByRole, getByTestId, container, queryByText } = setup(null, { flow: { ...fixtureFlow, status: 'active', version: 1 } });
 		await fireEvent.click(getByRole('button', { name: 'Test' }));
 		await vi.waitFor(() => expect(getByTestId('flow-problems')).toBeTruthy());
-		expect(container.textContent).toContain('One element uses what this instance does not enable: orders.');
+		expect(container.textContent).toContain('One element uses a feature the license on this instance does not include: orders.');
 		expect(container.querySelector('[data-node-id="orders"]')?.className).toContain('border-danger');
 		expect(queryByText('payment_required')).toBeNull();
 	});
@@ -812,12 +812,12 @@ describe('flow editor page', () => {
 	it('says the versions could not be read, offers no rollback and never calls the draft unpublished', () => {
 		const live = { ...fixtureFlow, status: 'active', version: 2 };
 		const { getByTestId, queryByRole, getByRole } = setup(null, { flow: live, versions: { ok: false, gate: { state: 'unavailable' } } });
-		expect(getByTestId('versions-unread').textContent).toContain('The versions could not be read');
+		expect(getByTestId('versions-unread').textContent).toContain('Could not load versions');
 		expect(queryByRole('button', { name: 'Roll back' })).toBeNull();
 		const publish = getByRole('button', { name: 'Publish' }) as HTMLButtonElement;
 		expect(publish.disabled).toBe(false);
 		expect(publish.className).not.toContain('bg-brand');
-		expect(publish.parentElement?.textContent).toContain('this draft may already be live');
+		expect(publish.parentElement?.textContent).toContain('This draft may already be live');
 	});
 
 	it('seeds the test trigger of a contributed trigger with its type alone and says where the payload keys go', () => {
@@ -825,13 +825,13 @@ describe('flow editor page', () => {
 		const { container } = setup(null, { flow });
 		const field = container.querySelector('#test-trigger') as HTMLTextAreaElement;
 		expect(JSON.parse(field.value)).toEqual({ type: 'email.bounced' });
-		expect(field.parentElement?.parentElement?.textContent).toContain('beside type');
+		expect(field.parentElement?.parentElement?.textContent).toContain('next to type');
 	});
 
 	it('keeps the built-in hint under the test trigger of a built-in trigger', () => {
 		const { container } = setup();
 		const field = container.querySelector('#test-trigger') as HTMLTextAreaElement;
-		expect(field.parentElement?.parentElement?.textContent).not.toContain('beside type');
+		expect(field.parentElement?.parentElement?.textContent).not.toContain('next to type');
 	});
 
 	/** Opens the drawer's Assistant tab. */
@@ -898,7 +898,7 @@ describe('flow editor page', () => {
 	it('holds Accept when the assistant answered with no definition', () => {
 		const { getByRole, getByTestId } = setup({ assist: { prompt: 'x', draft: { ...cleanDraft, definition: null } } });
 		expect((getByRole('button', { name: 'Accept' }) as HTMLButtonElement).disabled).toBe(true);
-		expect(getByTestId('accept-reason').textContent).toContain('no definition');
+		expect(getByTestId('accept-reason').textContent).toContain('did not return a flow');
 	});
 
 	it('accepts a clean draft into the editor, keeping the flow slug and marking it unsaved', async () => {

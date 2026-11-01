@@ -37,14 +37,14 @@
 				id="{id}-layout"
 				label="Written as"
 				placeholder="02/01/2006"
-				hint="The reference date 2 January 2006, 15:04:05, written the way the cells are."
+				hint="Write the reference date 2 January 2006, 15:04:05 the way the cells show it."
 				bind:value={draft.layout}
 			/>
 			<Input
 				id="{id}-output"
 				label="Stored as"
 				placeholder="2006-01-02"
-				hint="Empty stores the full timestamp."
+				hint="Leave empty to store the full timestamp."
 				bind:value={draft.outputLayout}
 			/>
 		</div>
@@ -52,7 +52,7 @@
 		<Input
 			id="{id}-separator"
 			label="Separator"
-			hint="Each item is trimmed and an empty one is dropped."
+			hint="Spaces around each item are trimmed, and empty items are dropped."
 			bind:value={draft.separator}
 		/>
 	{:else if draft.transform === 'lookup'}
@@ -62,13 +62,13 @@
 			rows={4}
 			mono
 			placeholder={'NY = New York\nCA = California'}
-			hint="One pair per line, the value in the file then what to store. At most 1000."
+			hint="One pair per line: the value in the file, then the value to store. Up to 1000 pairs."
 			bind:value={draft.lookup}
 		/>
 		<Input
 			id="{id}-fallback"
 			label="For any other value"
-			hint="Empty rejects the row, so a value nobody listed is never stored as it is."
+			hint="Leave empty to reject a row whose value is not in the list."
 			bind:value={draft.fallback}
 		/>
 	{/if}

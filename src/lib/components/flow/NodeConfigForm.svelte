@@ -93,7 +93,7 @@
 
 	const fieldsEmptyHint = $derived(
 		typeof value[SCHEMA_KEY] === 'string' && value[SCHEMA_KEY] && !schemaKnown
-			? 'The schema is not in the list, so its fields cannot be offered.'
+			? 'This schema is not in the list, so its fields cannot be shown.'
 			: 'Choose a schema first to pick from its fields.'
 	);
 
@@ -249,16 +249,16 @@
 	const datasourcesEmpty = $derived.by(() => {
 		switch (datasourcesGate.state) {
 			case 'ok':
-				return 'No datasource of a matching kind exists yet. Type the name.';
+				return 'No datasource of this kind yet. Type the name.';
 			case 'forbidden':
-				return 'Your role cannot list the datasources. Type the name.';
+				return 'Your role cannot list datasources. Type the name.';
 			case 'locked':
 			case 'full':
 				return 'Datasources are not enabled on this instance. Type the name.';
 			case 'absent':
-				return 'This instance does not serve datasources. Type the name.';
+				return 'Datasources are not included in this build. Type the name.';
 			default:
-				return 'The datasources could not be read. Type the name.';
+				return 'Could not load datasources. Type the name.';
 		}
 	});
 </script>
@@ -365,7 +365,7 @@
 				value={str(current)}
 				{hint}
 				{error}
-				emptyHint="No content schemas were loaded. Type the name."
+				emptyHint="No content schemas to choose from. Type the name."
 				onchange={(v) => set(field.key, v)}
 			/>
 		{:else if widget === 'field'}
@@ -414,7 +414,7 @@
 				value={str(current)}
 				hint={eventDescription(events, current) ?? hint}
 				error={error ?? hookNameError(current)}
-				emptyHint="The engine listed no hooks. Type the name a plugin publishes."
+				emptyHint="No hooks to choose from. Type the name a plugin publishes."
 				customLabel="Another hook name"
 				customPlaceholder="plugin:after_something"
 				customHint="The name a plugin publishes, such as flow.run_failed."

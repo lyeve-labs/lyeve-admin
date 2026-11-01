@@ -235,7 +235,7 @@ describe('picker hints', () => {
 		expect(hookNameError('form:after_submit')).toBeUndefined();
 		expect(hookNameError('')).toBeUndefined();
 		expect(hookNameError(undefined)).toBeUndefined();
-		expect(hookNameError('Form:After')).toContain('lowercase');
+		expect(hookNameError('Form:After')).toContain('lower case');
 		expect(hookNameError('9lives')).toContain('starting with a letter');
 		expect(hookNameError(`a${'b'.repeat(80)}`)).toContain('80 characters');
 	});

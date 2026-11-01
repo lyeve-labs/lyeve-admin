@@ -204,7 +204,7 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(wh: Webhook) {
-		const ok = await confirmDialog(`Delete webhook ${wh.name}`, `Delete ${wh.name}? This cannot be undone.`, {
+		const ok = await confirmDialog(`Delete webhook ${wh.name}?`, 'This cannot be undone.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
@@ -281,7 +281,7 @@
 
 <PageShell
 	title="Webhooks"
-	description="Outgoing HTTP callbacks fired on content lifecycle events."
+	description="Send HTTP callbacks to other services when content changes."
 	width="wide"
 >
 	{#snippet actions()}
@@ -307,7 +307,7 @@
 	<FormErrors message={pageError} refused={pageRefusal} />
 
 	{#if data.webhooks.ok && !isSuperAdmin}
-		<Alert tone="brand">Your role reads and tests webhooks. Creating, changing or deleting one takes a super admin.</Alert>
+		<Alert tone="brand">You can view and test webhooks. Only a super admin can create, change or delete them.</Alert>
 	{/if}
 
 	{#if !data.webhooks.ok}
@@ -315,13 +315,13 @@
 			level={2}
 			gate={data.webhooks.gate}
 			title="Webhooks"
-			absent="The webhook plugin is not part of this build, so no callback is sent on a content event."
+			absent="Webhooks are not included in this build."
 		/>
 	{:else if data.webhooks.value.length === 0}
 		<EmptyState
 			level={2}
-			title="No webhooks configured yet"
-			description="Add one to receive HTTP callbacks on content events."
+			title="No webhooks yet"
+			description="Create a webhook to send HTTP callbacks when content changes."
 		>
 			{#snippet iconSnippet()}<WebhookIcon size={ICON.lg} />{/snippet}
 			{#snippet action()}
@@ -345,7 +345,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState level={2} title="No webhook on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
+			<EmptyState level={2} title="No webhooks on this page match" description="The search and status filter apply only to this page. Clear them or go to the next page." />
 		{:else}
 		<Table label="Webhooks">
 			<thead>
@@ -512,7 +512,7 @@
 			id="webhook-secret"
 			name="secret"
 			label="Signing secret"
-			hint={editing ? 'Leave blank to keep current' : 'Optional. Signs each payload with HMAC-SHA256.'}
+			hint={editing ? 'Leave blank to keep the current secret.' : 'Optional. Signs each payload with HMAC-SHA256.'}
 			bind:value={secret}
 		/>
 		<CheckboxGroup name="events" label="Events" orientation="horizontal" options={EVENT_OPTIONS} bind:value={events} />
@@ -526,8 +526,8 @@
 			hint={data.schemas.ok
 				? 'Leave empty to fire on every schema.'
 				: editing
-					? 'The schemas could not be read, so only the ones this webhook already names are listed.'
-					: 'The schemas could not be read, so none can be picked. Saved like this, the webhook fires on every schema.'}
+					? 'Could not load schemas. Only the ones this webhook already uses are listed.'
+					: 'Could not load schemas. If you save it like this, the webhook fires for every schema.'}
 			searchable
 			options={schemaOptions}
 			bind:value={schemas}
@@ -544,7 +544,7 @@
 
 		<fieldset class="flex flex-col gap-4 border-t border-line pt-4">
 			<legend class="text-sm font-medium text-fg">Delivery options</legend>
-			<p class="text-xs text-muted">Leave a field empty to use the default. An option this instance does not enable is refused when you save.</p>
+			<p class="text-xs text-muted">Leave a field empty to use the default. An option that is not enabled on this instance cannot be saved.</p>
 			<Textarea
 				id="webhook-template"
 				name="payload_template"
@@ -552,7 +552,7 @@
 				rows={3}
 				mono
 				bind:value={template}
-				hint="A Go template for the body. Empty sends the standard event JSON."
+				hint="A Go template for the body. Leave empty to send the standard event JSON."
 			/>
 			<Input id="webhook-jsonpath" name="jsonpath_filter" label="JSONPath filter" mono bind:value={jsonpath} placeholder="$.data.status" />
 			<Textarea
@@ -592,7 +592,7 @@
 	<Modal open title="New signing secret for {reveal.name}" onclose={() => (reveal = null)}>
 		<div class="flex flex-col gap-3">
 			<p class="text-sm text-fg">
-				{reveal.name} now signs every delivery with this secret, and the old one no longer verifies. Copy it to the receiver now. It is not shown again.
+				Every delivery from {reveal.name} is now signed with this secret, and the old secret stops working. Copy it to the receiver now. It is not shown again.
 			</p>
 			<CopyField value={reveal.secret} label="Signing secret" mono secret />
 		</div>

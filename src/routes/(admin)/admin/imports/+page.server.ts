@@ -86,7 +86,7 @@ export const load: PageServerLoad = async (event) => {
 							}))
 							.sort((a, b) => a.name.localeCompare(b.name))
 					),
-					'The content types could not be read, so there is nothing to import into yet.'
+					'Could not load content types.'
 				)
 			: { ok: false, gate };
 
@@ -107,7 +107,7 @@ export const load: PageServerLoad = async (event) => {
 				skipped: skipped.rows,
 				skippedTotal: skipped.total,
 			})),
-			'The rows of this import could not be read.'
+			'Could not load the rows of this import.'
 		);
 	}
 
@@ -118,7 +118,7 @@ export const load: PageServerLoad = async (event) => {
 	// read as what they are.
 	const read =
 		gate.state === 'ok'
-			? await section(listTemplates(client), 'The templates could not be read. This is not a report that there are none.')
+			? await section(listTemplates(client), 'Could not load templates.')
 			: null;
 	const templates = read?.ok
 		? {
@@ -148,22 +148,22 @@ export const load: PageServerLoad = async (event) => {
 /** Reads the template drawer. A string is the message for a refused one. */
 function templateBody(form: FormData): SaveMappingTemplate | string {
 	const name = String(form.get('name') ?? '').trim();
-	if (!name || name.length > 255) return 'Name the template, in at most 255 characters.';
+	if (!name || name.length > 255) return 'Enter a template name of up to 255 characters.';
 	const contentType = String(form.get('content_type') ?? '').trim();
 	if (!contentType) return 'Choose the content type the template maps onto.';
 	const mode = form.get('mode') === 'upsert' ? 'upsert' : 'create';
 	const upsertKey = String(form.get('upsert_key') ?? '').trim();
-	if (mode === 'upsert' && !upsertKey) return 'Create and update needs the key field that finds the entry.';
+	if (mode === 'upsert' && !upsertKey) return 'Choose a key field to create and update entries.';
 	let mappings: FieldMapping[];
 	try {
 		mappings = JSON.parse(String(form.get('mappings') ?? '[]')) as FieldMapping[];
 	} catch {
-		return 'The mapping could not be read.';
+		return 'Could not read the mapping. Reload the page and try again.';
 	}
 	if (!Array.isArray(mappings) || mappings.length === 0) return 'Map at least one column.';
-	if (mappings.length > 500) return 'A template maps at most 500 columns.';
+	if (mappings.length > 500) return 'A template can map up to 500 columns.';
 	if (mappings.some((m) => !m || typeof m.source_field !== 'string' || !m.source_field.trim() || !m.target_field)) {
-		return 'Every mapping names a column in the file and the field it fills.';
+		return 'Give every mapping a column in the file and the field it fills.';
 	}
 	return {
 		name,
@@ -194,7 +194,7 @@ async function saveTemplate(event: Parameters<Actions[string]>[0], id: string | 
 		if (id) await updateTemplate(authedClient(event), id, body);
 		else await createTemplate(authedClient(event), body);
 	} catch (err) {
-		return failure('saveTemplate', err, 'The template could not be saved.');
+		return failure('saveTemplate', err, 'Could not save the template. Try again.');
 	}
 	return { savedTemplate: body.name };
 }
@@ -205,7 +205,7 @@ export const actions: Actions = {
 	updateTemplate: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'saveTemplate', error: 'No template was named.' });
+		if (!id) return fail(400, { action: 'saveTemplate', error: 'This form is missing its template. Reload the page and try again.' });
 		return saveTemplate(event, id);
 	},
 
@@ -214,11 +214,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'deleteTemplate', error: 'No template was named.' });
+		if (!id) return fail(400, { action: 'deleteTemplate', error: 'This form is missing its template. Reload the page and try again.' });
 		try {
 			await deleteTemplate(authedClient(event), id);
 		} catch (err) {
-			return failure('deleteTemplate', err, 'The template could not be deleted.');
+			return failure('deleteTemplate', err, 'Could not delete the template. Try again.');
 		}
 		return { removedTemplate: id };
 	},
@@ -228,11 +228,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'cancel', error: 'No import was named.' });
+		if (!id) return fail(400, { action: 'cancel', error: 'This form is missing its import. Reload the page and try again.' });
 		try {
 			await cancelJob(client, id);
 		} catch (err) {
-			return fail(400, { action: 'cancel', error: actionError(err, 'The import could not be canceled.') });
+			return fail(400, { action: 'cancel', error: actionError(err, 'Could not cancel the import. Try again.') });
 		}
 		return { canceled: id };
 	},
@@ -246,11 +246,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'rollback', error: 'No import was named.' });
+		if (!id) return fail(400, { action: 'rollback', error: 'This form is missing its import. Reload the page and try again.' });
 		try {
 			await rollbackJob(client, id);
 		} catch (err) {
-			return fail(400, { action: 'rollback', error: actionError(err, 'The import could not be rolled back.') });
+			return fail(400, { action: 'rollback', error: actionError(err, 'Could not roll back the import. Try again.') });
 		}
 		return { rolledBack: id };
 	},

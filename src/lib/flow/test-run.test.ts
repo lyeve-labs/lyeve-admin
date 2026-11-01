@@ -33,13 +33,13 @@ describe('parseTrigger', () => {
 describe('testFailure', () => {
 	it('names the nodes a 402 refused', () => {
 		const out = testFailure(new FlowRefusal([{ node_id: 'orders', path: '/type', message: 'x' }]));
-		expect(out).toMatchObject({ kind: 'refused', text: 'One element uses what this instance does not enable: orders.' });
+		expect(out).toMatchObject({ kind: 'refused', text: 'One element uses a feature the license on this instance does not include: orders.' });
 	});
 
 	it('reads the blocked message as the blocked state and a 422 list as problems', () => {
 		expect(testFailure(new ApiError(422, BLOCKED_MESSAGE))).toEqual({ kind: 'blocked' });
 		const list = JSON.stringify({ ok: false, errors: [{ node_id: 'join', path: '/config', message: 'required' }] });
-		expect(testFailure(new ApiError(422, list))).toMatchObject({ kind: 'refused', text: 'The definition did not validate.', errors: [{ node_id: 'join' }] });
+		expect(testFailure(new ApiError(422, list))).toMatchObject({ kind: 'refused', text: 'Fix the problems in the definition.', errors: [{ node_id: 'join' }] });
 	});
 
 	it('says the run failed when the error says nothing', () => {
@@ -48,7 +48,7 @@ describe('testFailure', () => {
 });
 
 describe('testFailure for an answer that is not the engine speaking', () => {
-	const OUTAGE_TEXT = 'The engine did not answer, so the test run did not finish. Try again in a moment.';
+	const OUTAGE_TEXT = 'The test run did not finish. Try again in a moment.';
 
 	// The client puts the raw body of a non-JSON answer in the message, so a
 	// proxy's error page would be printed as the run's failure.

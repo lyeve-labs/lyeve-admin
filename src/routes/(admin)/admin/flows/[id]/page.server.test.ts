@@ -353,7 +353,7 @@ describe('admin/flows/[id] actions', () => {
 		const { event } = actionEvent(new FormData(), { '/api/admin/flows/f1/publish': () => json(body, 409) });
 		const result = (await actions.publish(event)) as { status: number; data: { error: string; errors: { node_id?: string }[] } };
 		expect(result.status).toBe(409);
-		expect(result.data.error).toContain('Another flow already answers this HTTP path');
+		expect(result.data.error).toContain('Another flow already uses this HTTP path');
 		expect(result.data.errors[0].node_id).toBe('trigger');
 		expect(result.data.error).not.toContain('{');
 	});

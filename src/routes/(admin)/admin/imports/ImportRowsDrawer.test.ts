@@ -64,7 +64,7 @@ describe('ImportRowsDrawer', () => {
 		expect(table.textContent).toContain('5');
 		expect(table.textContent).toContain('Title is required');
 		expect(table.textContent).toContain('(required)');
-		expect(said()).toContain('The first 1 of 3. The download has them all.');
+		expect(said()).toContain('Showing the first 1 of 3. Download all to see every row.');
 	});
 
 	it('offers every rejected row as a download', () => {
@@ -87,7 +87,7 @@ describe('ImportRowsDrawer', () => {
 
 	it('says an import that no longer exists is gone', () => {
 		setup({ ok: false, gate: { state: 'absent' } });
-		expect(said()).toContain('That import no longer exists');
+		expect(said()).toContain('This import no longer exists');
 	});
 
 	it('asks the page to close from its Close button', async () => {

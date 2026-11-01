@@ -75,7 +75,7 @@ describe('webhooks page', () => {
 
 		await fireEvent.click(getByTitle('Delete'));
 		await tick();
-		expect(kit.confirm).toHaveBeenCalledWith('Delete webhook Ship it', expect.stringContaining('Ship it'), {
+		expect(kit.confirm).toHaveBeenCalledWith('Delete webhook Ship it?', 'This cannot be undone.', {
 			confirmLabel: 'Delete',
 		});
 		expect(submit).not.toHaveBeenCalled();
@@ -124,7 +124,7 @@ describe('the webhook list when it could not be read', () => {
 	it('says the engine did not answer and offers no first webhook', () => {
 		const { container, queryByRole } = failed({ state: 'unavailable' });
 		expect(container.textContent).toContain('so webhooks could not be read. Nothing was changed.');
-		expect(container.textContent).not.toContain('No webhooks configured yet');
+		expect(container.textContent).not.toContain('No webhooks yet');
 		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
 		// The queue is the same plugin's read, so it is not offered either.
 		expect(queryByRole('button', { name: /dead letters/i })).toBeNull();
@@ -134,7 +134,7 @@ describe('the webhook list when it could not be read', () => {
 	it('names the role for a refusal', () => {
 		const { container } = failed({ state: 'forbidden' });
 		expect(container.textContent).toContain('Your role cannot open webhooks.');
-		expect(container.textContent).not.toContain('No webhooks configured yet');
+		expect(container.textContent).not.toContain('No webhooks yet');
 	});
 });
 
@@ -152,7 +152,7 @@ describe('the webhook controls by role', () => {
 		expect(queryByRole('button', { name: /rotate the signing secret/i })).toBeNull();
 		expect(getByRole('button', { name: 'Test Ship it' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Delivery history for Ship it' })).toBeTruthy();
-		expect(container.textContent).toContain('Creating, changing or deleting one takes a super admin.');
+		expect(container.textContent).toContain('Only a super admin can create, change or delete them.');
 	});
 
 	it('offers a super admin every write', () => {
@@ -184,18 +184,18 @@ describe('the webhook drawer and the failures of other actions', () => {
 	const drawerText = () => document.body.querySelector('form#webhook-form')?.textContent ?? '';
 
 	it('leaves a newly opened create drawer clean after a failed delete', async () => {
-		const { container, getByRole } = render(WebhooksPage, { props: props({ action: 'delete', error: 'Failed to delete webhook' }) });
-		expect(container.textContent).toContain('Failed to delete webhook');
+		const { container, getByRole } = render(WebhooksPage, { props: props({ action: 'delete', error: 'Could not delete the webhook. Try again.' }) });
+		expect(container.textContent).toContain('Could not delete the webhook. Try again.');
 		await fireEvent.click(getByRole('button', { name: /new webhook/i }));
-		expect(drawerText()).not.toContain('Failed to delete webhook');
+		expect(drawerText()).not.toContain('Could not delete the webhook. Try again.');
 	});
 
 	it('shows a failed save inside the open drawer, first in its form', async () => {
 		const { getByRole, rerender } = render(WebhooksPage, { props: props(null) });
 		await fireEvent.click(getByRole('button', { name: /new webhook/i }));
-		await rerender(props({ action: 'create', error: 'Failed to create webhook' }));
+		await rerender(props({ action: 'create', error: 'Could not create the webhook. Try again.' }));
 		const form = document.body.querySelector('form#webhook-form') as HTMLFormElement;
-		expect(form.firstElementChild?.textContent).toContain('Failed to create webhook');
+		expect(form.firstElementChild?.textContent).toContain('Could not create the webhook. Try again.');
 	});
 });
 
@@ -268,16 +268,16 @@ describe('a rotated signing secret', () => {
 	});
 
 	it('clears an earlier failure once a rotation succeeds', async () => {
-		const { container } = render(WebhooksPage, { props: props({ action: 'test', error: 'Failed to test webhook' }) });
-		expect(container.textContent).toContain('Failed to test webhook');
+		const { container } = render(WebhooksPage, { props: props({ action: 'test', error: 'Could not test the webhook. Try again.' }) });
+		expect(container.textContent).toContain('Could not test the webhook. Try again.');
 		const update = await rotate({ type: 'success', data: { rotated: { id: 'w1', name: 'Ship it', secret: 'c0ffee-secret' } } });
-		expect(container.textContent).not.toContain('Failed to test webhook');
+		expect(container.textContent).not.toContain('Could not test the webhook. Try again.');
 		expect(update).not.toHaveBeenCalled();
 	});
 
 	it('applies a failed rotation so the page reports it', async () => {
 		render(WebhooksPage, { props: props(null) });
-		const update = await rotate({ type: 'failure', data: { action: 'rotate-secret', error: 'Failed to rotate webhook secret' } });
+		const update = await rotate({ type: 'failure', data: { action: 'rotate-secret', error: 'Could not rotate the signing secret. Try again.' } });
 		expect(update).toHaveBeenCalled();
 		expect(secretShown()).toBe(false);
 	});
@@ -299,7 +299,7 @@ describe('the failures of the history and the queue', () => {
 	);
 
 	it('still reports a queue that could not be opened above the list', () => {
-		const { container } = render(WebhooksPage, { props: props({ action: 'dead-letters', error: 'Failed to load dead letters' }) });
-		expect(container.textContent).toContain('Failed to load dead letters');
+		const { container } = render(WebhooksPage, { props: props({ action: 'dead-letters', error: 'Could not load dead letters. Try again.' }) });
+		expect(container.textContent).toContain('Could not load dead letters. Try again.');
 	});
 });
