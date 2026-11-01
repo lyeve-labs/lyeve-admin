@@ -54,7 +54,7 @@ describe('AI prompt page', () => {
 		await waitFor(() => expect(region(saved.container)?.textContent).toContain('Saved as version 3.'));
 		cleanup();
 		const restored = setup({}, { scope: 'restore', version: 3, from: 1 });
-		await waitFor(() => expect(region(restored.container)?.textContent).toContain('Version 1 is current again, saved as version 3.'));
+		await waitFor(() => expect(region(restored.container)?.textContent).toContain('Version 1 restored as version 3.'));
 	});
 
 	// A reload that hands back the same text in force is not a new version.

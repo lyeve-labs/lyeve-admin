@@ -161,7 +161,7 @@
 	function removeExperiment(e: Experiment): SubmitFunction {
 		return confirmed(
 			`Delete experiment ${e.name}?`,
-			'Its variants, its metrics and every exposure recorded against it go with it.',
+			'Its variants, metrics and recorded exposures are deleted too.',
 			{ confirmLabel: 'Delete', success: `Deleted ${e.name}` },
 		);
 	}
@@ -171,7 +171,7 @@
 
 <PageShell
 	title="Experiments"
-	description="A/B tests, the traffic they split and what the results support."
+	description="Run A/B tests, split traffic between variants and see what the results show."
 	width="wide"
 >
 	{#snippet actions()}
@@ -187,7 +187,7 @@
 			level={2}
 			gate={data.gate}
 			title="A/B testing"
-			absent="The A/B testing plugin is not part of this build, so no traffic is being split."
+			absent="A/B testing is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={pageFailure} />
@@ -195,8 +195,8 @@
 		{#if data.experiments.length === 0}
 			<EmptyState
 				level={2}
-				title="No experiment is set up"
-				description="Create one to split traffic between variants and measure the difference."
+				title="No experiments yet"
+				description="Create an experiment to split traffic between variants and measure the difference."
 			>
 				{#snippet iconSnippet()}
 					<FlaskConical size={ICON.lg} />
@@ -223,8 +223,8 @@
 			{#if visible.length === 0}
 				<EmptyState
 					level={2}
-					title="No experiment matches"
-					description="Nothing here is named or described that way."
+					title="No experiments match this search"
+					description="The search covers names and descriptions."
 				>
 					{#snippet iconSnippet()}
 						<FlaskConical size={ICON.lg} />
@@ -342,7 +342,7 @@
 				id="exp-description"
 				name="description"
 				label="What it is testing"
-				hint="Write the question. A result is read months later by somebody who was not here."
+				hint="Write the question this experiment answers, for whoever reads the result later."
 				rows={3}
 				bind:value={description}
 			/>
@@ -357,7 +357,7 @@
 				id="exp-min-sample"
 				name="min_sample_size"
 				label="Minimum exposures"
-				hint="Counted across all variants together. Below this no result counts as significant, whatever the p-value says."
+				hint="Total exposures across all variants. Below this, no result counts as significant, whatever the p-value says."
 				bind:value={minSample}
 			/>
 			<!-- Toggle renders a button, which submits nothing, and the action
@@ -366,7 +366,7 @@
 			<Toggle
 				id="exp-auto-stop"
 				label="Stop automatically once significant"
-				hint="Ends the experiment the moment the threshold is met. Leave off to watch it yourself."
+				hint="When on, the experiment stops as soon as the confidence level is met."
 				bind:checked={autoStop}
 			/>
 		</div>

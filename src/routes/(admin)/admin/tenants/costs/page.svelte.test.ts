@@ -137,7 +137,7 @@ describe('tenant costs page', () => {
 				form: { form: 'aggregate', saved: true, result: { tenant_id: 't', entries_saved: 3, budget_events: 1, anomalies: 0 } } as never,
 			},
 		});
-		expect(await screen.findByText('The feed ran')).toBeTruthy();
+		expect(await screen.findByText('Costs updated')).toBeTruthy();
 		expect(screen.getByText(/3 cost lines written, 1 budget events published/)).toBeTruthy();
 		cleanup();
 		render(CostsPage, {
@@ -173,10 +173,10 @@ describe('the budget drawer and the failures of other actions', () => {
 	const drawerText = () => document.body.querySelector('form#budget-form')?.textContent ?? '';
 
 	it('leaves a newly opened budget drawer clean after a failed delete', async () => {
-		render(CostsPage, { props: { data: data(), form: { form: 'budget', error: 'Failed to delete the budget.', locked: false } as never } });
-		expect(screen.getAllByText('Failed to delete the budget.')).toHaveLength(1);
+		render(CostsPage, { props: { data: data(), form: { form: 'budget', error: 'Could not delete the budget. Try again.', locked: false } as never } });
+		expect(screen.getAllByText('Could not delete the budget. Try again.')).toHaveLength(1);
 		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
-		expect(drawerText()).not.toContain('Failed to delete the budget.');
+		expect(drawerText()).not.toContain('Could not delete the budget. Try again.');
 	});
 
 	it('keeps the warn tone of a refusal for a ledger that is not enabled', async () => {
@@ -219,7 +219,7 @@ describe('the budget controls', () => {
 		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Storage cap' }));
 		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
-		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap', expect.any(String), { confirmLabel: 'Delete' });
+		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap?', expect.any(String), { confirmLabel: 'Delete' });
 		expect(new FormData(form).get('id')).toBe('b1');
 	});
 });

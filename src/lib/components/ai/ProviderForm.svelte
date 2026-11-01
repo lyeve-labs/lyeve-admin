@@ -58,7 +58,7 @@
 
 	const keyHint = $derived(
 		provider?.needs_key
-			? 'The stored key could not be read after a key rotation. Enter it again. Nothing else about the row is lost.'
+			? "The saved key can no longer be decrypted after an encryption key change. Enter it again. The provider's other settings are kept."
 			: provider?.has_key
 				? 'A key is stored. Leave this blank to keep it.'
 				: compatible
@@ -83,7 +83,7 @@
 			id="{id}-preset"
 			name="preset"
 			label="Preset"
-			hint="Fills the base URL and the key header for a server people run. The row stays OpenAI-compatible."
+			hint="Fills in the base URL and key header for a self-hosted server. The provider stays OpenAI-compatible."
 			options={presetOptions}
 			searchable
 			value={preset}
@@ -99,8 +99,8 @@
 			bind:value={baseUrl}
 			placeholder={anthropicShaped ? 'https://gateway.example.com/anthropic/v1' : 'http://localhost:11434/v1'}
 			hint={anthropicShaped
-				? 'The root that serves the Anthropic Messages API, the part before /messages.'
-				: 'The OpenAI-shaped root the requests are sent to.'}
+				? 'The root URL of the Anthropic Messages API, without /messages.'
+				: 'The root URL of the OpenAI-compatible API.'}
 		/>
 		<Input
 			id="{id}-key-header"
@@ -109,8 +109,8 @@
 			bind:value={keyHeader}
 			placeholder={anthropicShaped ? 'x-api-key' : 'Authorization'}
 			hint={anthropicShaped
-				? 'Blank sends x-api-key, as Anthropic does. A gateway may want Authorization.'
-				: 'Blank sends Authorization: Bearer. Azure wants api-key.'}
+				? 'Leave blank to send x-api-key, as Anthropic expects. Some gateways expect Authorization.'
+				: 'Leave blank to send Authorization: Bearer. Azure expects api-key.'}
 		/>
 		<Input
 			id="{id}-query-string"
@@ -118,7 +118,7 @@
 			label="Query string"
 			bind:value={queryString}
 			placeholder="api-version=2024-10-21"
-			hint="Appended to every request. Azure wants api-version."
+			hint="Added to every request. Azure expects api-version."
 		/>
 	{/if}
 
@@ -140,7 +140,7 @@
 		label="Default model"
 		value={provider?.default_model ?? ''}
 		placeholder="gpt-4o"
-		hint="Used when a call names none."
+		hint="Used when a request does not name a model."
 	/>
 	<NumberInput
 		id="{id}-priority"
@@ -149,7 +149,7 @@
 		value={provider?.priority ?? 100}
 		min={-1000}
 		max={1000}
-		hint="Higher is tried first when a call names no provider."
+		hint="When a request does not name a provider, higher priority is tried first."
 	/>
 
 	<CheckboxGroup
@@ -160,7 +160,7 @@
 		options={MODALITIES.map((m) => ({ value: m, label: m }))}
 		value={MODALITIES.filter((m) => modalities[m])}
 		onchange={(v) => (modalities = { text: v.includes('text'), embed: v.includes('embed'), image: v.includes('image') })}
-		hint="What this row may serve. The model's own table decides the rest. A call needs both."
+		hint="What this provider may be used for. A request also needs a model that supports it."
 	/>
 
 	<NumberInput
@@ -169,7 +169,7 @@
 		label="Rate limit"
 		value={provider?.rate_limit_rpm ?? 0}
 		min={0}
-		hint="Requests per minute. 0 is none."
+		hint="Requests per minute. 0 means no limit."
 	/>
 	<NumberInput
 		id="{id}-budget"
@@ -178,11 +178,11 @@
 		value={provider?.max_budget_usd ?? 0}
 		min={0}
 		step={0.01}
-		hint="Dollars per billing period. 0 is none. A call past it answers 402."
+		hint="Dollars per billing period. 0 means no limit. Requests over the budget are refused with a 402."
 	/>
 
 	<div class="md:col-span-2">
-		<Toggle id="{id}-enabled" label="Enabled" hint="Off keeps the row and takes it out of routing." bind:checked={enabled} />
+		<Toggle id="{id}-enabled" label="Enabled" hint="When on, requests can be sent to this provider. Turning it off keeps its settings." bind:checked={enabled} />
 	</div>
 
 	{#if compatible && superAdmin}
@@ -190,14 +190,14 @@
 			<Toggle
 				id="{id}-allow-private"
 				label="Allow a private address"
-				hint="Off refuses a base URL that resolves to a private, loopback or link-local address."
+				hint="When on, the base URL may resolve to a private, loopback or link-local address."
 				bind:checked={allowPrivate}
 			/>
 			{#if allowPrivate}
 				<p class="text-xs text-warn" role="note">
-					Requests for this row skip the private-address check, which is how a local Ollama or vLLM is reached.
-					Anything on this network the engine can reach, this row can be pointed at. The engine database's own
-					address is refused either way. Only a super admin may set this.
+					Requests to this provider skip the private-address check, so you can reach a local Ollama or vLLM.
+					The provider can then point at anything on your network the engine can reach, except the engine's own
+					database. Only a super admin can set this.
 				</p>
 			{/if}
 		</div>

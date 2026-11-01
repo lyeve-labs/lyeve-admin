@@ -37,7 +37,7 @@ export const load: PageServerLoad = async (event) => {
 	// Only the engine's 404 says the tenant does not exist. A refusal or an
 	// outage keeps a status of its own.
 	const tenant = await getTenant(event.params.id, client).catch((err: unknown) =>
-		readError(err, 'No tenant has that id.'),
+		readError(err, 'Tenant not found.'),
 	);
 
 	// The members are paged rather than capped, so a tenant with more than one
@@ -50,11 +50,11 @@ export const load: PageServerLoad = async (event) => {
 	// with nothing in it, and an empty list here would offer only what is
 	// already withheld.
 	const [features, license, members] = await Promise.all([
-		section(getTenantFeatures(client, tenant.slug), "This tenant's features could not be read."),
-		section(getEntitlements(client), 'The license could not be read, so what this tenant may use cannot be offered.'),
+		section(getTenantFeatures(client, tenant.slug), "Could not load this tenant's features."),
+		section(getEntitlements(client), 'Could not load the license.'),
 		section(
 			listTenantMembers(client, tenant.slug, limit, offset),
-			"This tenant's members could not be read. This is not a report that it has none.",
+			"Could not load this tenant's members.",
 		),
 	]);
 
@@ -108,7 +108,7 @@ export const actions: Actions = {
 			const saved = await setTenantFeatures(authedClient(event), slug, withheldFrom(offered, available));
 			return { featuresSaved: saved.withheld.length };
 		} catch (err) {
-			return fail(400, { featuresError: actionError(err, 'What this tenant may use could not be saved.') });
+			return fail(400, { featuresError: actionError(err, "Could not save this tenant's features. Try again.") });
 		}
 	},
 
@@ -118,7 +118,7 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '').trim();
 		const userId = String(form.get('user_id') ?? '').trim();
 		const roles = form.getAll('roles').map(String).filter(Boolean);
-		if (!userId && !email) return fail(400, { action: 'grant', memberError: 'Name the account by its email.', fields: { email: 'Required' } });
+		if (!userId && !email) return fail(400, { action: 'grant', memberError: 'Enter the account email.', fields: { email: 'Required' } });
 		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
 		const client = authedClient(event);
 		try {
@@ -130,7 +130,7 @@ export const actions: Actions = {
 			// An account the lookup did not reach could be a super admin at home
 			// here, so nothing is saved for it.
 			if (!found) {
-				return fail(404, { action: 'grant', memberError: 'The account could not be found, so nothing was saved.' });
+				return fail(404, { action: 'grant', memberError: 'This account no longer exists.' });
 			}
 			// A membership in the home tenant replaces the account's roles when it
 			// signs in there. Written for a super admin, it would either drop
@@ -138,8 +138,8 @@ export const actions: Actions = {
 			if (found && found.tenant_id === slug && (found.roles ?? []).includes('super_admin')) {
 				return fail(409, {
 					action: 'grant',
-					memberError: `${found.email} is a super admin whose home is this tenant. Its roles are set on the Users page.`,
-					fields: userId ? undefined : { email: 'A super admin at home' },
+					memberError: `${found.email} is a super admin whose home tenant is this one. Change their roles on the Users page.`,
+					fields: userId ? undefined : { email: 'Managed on the Users page' },
 				});
 			}
 			await grantMembership(client, found.id, slug, roles);
@@ -147,7 +147,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const full = seatRefusal(err);
 			if (full) return fail(402, { action: 'grant', memberError: refusalText(full), refused: full });
-			return fail(400, { action: 'grant', memberError: actionError(err, 'The membership could not be saved.') });
+			return fail(400, { action: 'grant', memberError: actionError(err, 'Could not save the membership. Try again.') });
 		}
 	},
 
@@ -159,7 +159,7 @@ export const actions: Actions = {
 			await revokeMembership(authedClient(event), userId, await tenantSlug(event));
 			return { memberRevoked: true };
 		} catch (err) {
-			return fail(400, { action: 'revoke', memberError: actionError(err, 'The membership could not be removed.') });
+			return fail(400, { action: 'revoke', memberError: actionError(err, 'Could not remove the membership. Try again.') });
 		}
 	},
 
@@ -169,7 +169,7 @@ export const actions: Actions = {
 			await archiveTenant(event.params.id ?? '', authedClient(event));
 			return { archived: true };
 		} catch (err) {
-			return fail(400, { stateError: actionError(err, 'The tenant could not be archived.') });
+			return fail(400, { stateError: actionError(err, 'Could not archive the tenant. Try again.') });
 		}
 	},
 
@@ -179,7 +179,7 @@ export const actions: Actions = {
 			await restoreTenant(event.params.id ?? '', authedClient(event));
 			return { restored: true };
 		} catch (err) {
-			return fail(400, { stateError: actionError(err, 'The tenant could not be restored.') });
+			return fail(400, { stateError: actionError(err, 'Could not restore the tenant. Try again.') });
 		}
 	},
 };

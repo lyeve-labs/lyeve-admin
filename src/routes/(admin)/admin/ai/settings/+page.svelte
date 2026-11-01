@@ -21,7 +21,7 @@
 	const instanceTranscripts = $derived(data.instance.find((s) => s.key === 'ai_transcripts_enabled'));
 </script>
 
-<PageShell title="AI settings" description="The switch for this tenant, transcript storage and how long a transcript is kept." width="wide">
+<PageShell title="AI settings" description="Turn AI on or off for this tenant, and choose whether and how long transcripts are kept." width="wide">
 	<AiSection level={2} tab="settings" gate={AI_OK} layoutGate={data.aiLayoutGate} noun="settings">
 		{#if settings}
 			<section class="flex flex-col gap-4">
@@ -33,24 +33,22 @@
 							<Toggle
 								id="ai-enabled"
 								label="AI for this tenant"
-								hint="Off: every route answers 404, the flow nodes refuse with the reason, the editor assistant is gone and a plugin calling through the host is told AI is disabled. Nothing is sent anywhere."
+								hint="When off, AI routes return 404, flow nodes and the editor assistant stop, and other plugins are told AI is disabled. Nothing is sent to any provider."
 								checked={settings.enabled}
 								onchange={() => enabledForm?.requestSubmit()}
 							/>
 							<div class="rounded-md border border-line bg-surface-2 p-4 text-sm leading-relaxed text-muted" data-testid="what-never-leaves">
 								<p class="mb-2 font-medium text-fg">What never leaves this instance</p>
 								<p>
-									The only bytes that leave are the request to the endpoint you configured: the system prompt, the
-									conversation, and for an image operation the picture. They go to the vendor behind that endpoint,
-									under the agreement you hold with that vendor, and to nobody else. This plugin ships no default
-									provider, no hosted proxy and no telemetry of prompts. LyEve Labs never sees your prompts, your
-									responses, your keys, your transcripts, the vendor's replies, which vendor you use, or whether the
-									feature is in use. A local endpoint on your own network sends
-									nothing to a third party at all. Transcripts are stored in your database,
-									under the retention window below, and are covered by tenant deletion and by data-subject export and
-									erasure. Nothing is anonymized, because nothing needs to be: the data stays where it was written.
-									Read your vendor's data processing agreement and training-use terms. They are yours to sign, and
-									the plugin cannot change what they say.
+									Only the request to the endpoint you configured leaves this instance: the system prompt, the
+									conversation and, for image operations, the image. It goes to the vendor behind that endpoint, under
+									your agreement with that vendor, and to nobody else. The plugin has no default provider, no hosted
+									proxy and no prompt telemetry. LyEve Labs never sees your prompts, responses, keys, transcripts or
+									vendor replies, which vendor you use, or whether you use AI at all. A local endpoint on your own
+									network sends nothing to a third party. Transcripts are stored in your database for the retention
+									window below, and are included in tenant deletion and in data subject export and erasure.
+									They are not anonymized, because they never leave your database. Read your vendor's data processing
+									agreement and training-use terms. You sign those terms, and the plugin cannot change them.
 								</p>
 							</div>
 						</form>
@@ -60,7 +58,7 @@
 							<Toggle
 								id="ai-transcripts"
 								label="Store transcripts"
-								hint="Off means nothing is written: no messages, no recap, and a call reports no transcript id. Existing transcripts stay until retention removes them."
+								hint="When off, no messages or recaps are stored and requests return no transcript id. Existing transcripts stay until retention removes them."
 								checked={settings.transcripts_enabled}
 								disabled={!settings.enabled}
 								onchange={() => transcriptsForm?.requestSubmit()}
@@ -74,7 +72,7 @@
 							{#if settings.updated_at && settings.updated_by}
 								Last changed {formatDateTime(settings.updated_at)} by {settings.updated_by}.
 							{:else}
-								Never changed. A tenant with no row is on.
+								Never changed. AI is on by default.
 							{/if}
 						</p>
 					</div>
@@ -86,8 +84,8 @@
 				<Card>
 					<div class="flex flex-col gap-4">
 						<p class="text-sm text-muted">
-							Retention is set per instance, not per tenant. An hourly sweeper removes transcripts older than the window
-							on every tenant. The minimum is 1h and the default is 720h, thirty days.
+							Retention applies to the whole instance, not one tenant. Every hour, transcripts older than the retention
+							window are deleted on every tenant. The minimum is 1h and the default is 720h (30 days).
 						</p>
 						{#if data.instanceReadable && retention && instanceTranscripts}
 							<DescriptionList
@@ -104,18 +102,18 @@
 								label="Retention"
 								value={retention.value}
 								action="?/config"
-								saved="Saved. The next sweep applies it."
+								saved="Retention saved. It applies from the next hourly cleanup."
 								result={configResult}
 							/>
 						{:else if data.isSuperAdmin && data.instanceReadable}
 							<p class="text-xs text-faint">
 								<Badge tone="neutral" size="sm">{retention?.source ?? 'default'}</Badge>
-								Set outside the admin. Change it where it is set.
+								This setting comes from outside the admin console. Change it there.
 							</p>
 						{:else if !data.isSuperAdmin}
-							<p class="text-xs text-faint">The instance settings are visible to super admins, who set the window in the instance configuration.</p>
+							<p class="text-xs text-faint">Only a super admin can see and change the retention window.</p>
 						{:else}
-							<p class="text-xs text-faint">The instance configuration could not be read, so this instance's window is not shown.</p>
+							<p class="text-xs text-faint">Could not load the retention window. Reload the page to try again.</p>
 						{/if}
 					</div>
 				</Card>

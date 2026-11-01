@@ -86,7 +86,7 @@ describe('editing a destination', () => {
 	it('gives its own sentence for an outage', async () => {
 		engine.put.mockRejectedValue(new ApiError(503, 'connection refused', {}));
 		const out = (await actions.update(event(EDIT))) as Failure;
-		expect(String(out.data.error)).toContain('The destination could not be saved.');
+		expect(String(out.data.error)).toContain('Could not save the destination. Try again.');
 		expect(String(out.data.error)).not.toContain('connection refused');
 	});
 
@@ -116,7 +116,7 @@ describe('deleting a destination', () => {
 	it('gives its own sentence for an outage', async () => {
 		engine.delete.mockRejectedValue(new ApiError(503, 'connection refused', {}));
 		const out = (await actions.delete(event({ id: 's1' }))) as Failure;
-		expect(String(out.data.error)).toContain('The destination could not be deleted.');
+		expect(String(out.data.error)).toContain('Could not delete the destination. Try again.');
 	});
 
 	it('is for an admin', async () => {

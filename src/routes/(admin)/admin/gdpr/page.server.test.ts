@@ -33,14 +33,14 @@ describe('privacy request failures', () => {
 		rest.exportSubject.mockRejectedValue(new ApiError(500, 'pq: relation "sys_users" does not exist'));
 		const out = (await actions.export(formEvent({ subject: 'jane@example.com' }))) as Failure;
 		expect(out.data.error).not.toContain('sys_users');
-		expect(out.data.error).toBe('The export could not be made. Nothing was read for this subject.');
+		expect(out.data.error).toBe('Could not export data for this subject. Try again.');
 	});
 
 	it('keeps the text of an engine failure off the page on erasure', async () => {
 		rest.eraseSubject.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
 		const out = (await actions.erase(formEvent({ subject: 'jane@example.com', confirm: 'jane@example.com' }))) as Failure;
 		expect(out.data.error).not.toContain('10.0.0.4');
-		expect(out.data.error).toBe('The erasure was not attempted, so nothing was erased. Try again in a moment.');
+		expect(out.data.error).toBe('Could not start the erasure. Nothing was erased. Try again.');
 	});
 
 	it('relays a refusal written for the operator', async () => {
@@ -178,19 +178,19 @@ describe('the export step-up save', () => {
 		engine.put.mockRejectedValue(new ApiError(422, 'this install has no way to send mail, so email cannot be required', { code: 'step_up_mail_unavailable' }));
 		const out = (await actions.stepUp(factorsEvent(['email']))) as Failure;
 		expect(out.status).toBe(422);
-		expect(out.data.error).toContain('This install cannot send mail');
+		expect(out.data.error).toContain('Email is not set up');
 	});
 
 	it('reads the refusal by its status, whatever its code is named', async () => {
 		engine.put.mockRejectedValue(new ApiError(422, 'no mail', { code: 'step_up_email_unavailable' }));
 		const out = (await actions.stepUp(factorsEvent(['email']))) as Failure;
-		expect(out.data.error).toContain('This install cannot send mail');
+		expect(out.data.error).toContain('Email is not set up');
 	});
 
 	it("puts the engine's refusal of an unknown factor in the console's words", async () => {
 		engine.put.mockRejectedValue(new ApiError(400, 'a factor is not one of password, code and email'));
 		const out = (await actions.stepUp(factorsEvent(['code']))) as Failure;
-		expect(out.data.error).toBe('One of the steps is not one this install knows. Nothing was changed.');
+		expect(out.data.error).toBe('One of the chosen steps is not available. Reload the page and try again.');
 	});
 
 	it('reports an outage as one, and keeps its engine text off the page', async () => {

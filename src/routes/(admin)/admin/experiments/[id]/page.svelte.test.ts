@@ -169,12 +169,12 @@ describe('the traffic split', () => {
 describe('the empty states', () => {
 	it('says an experiment with no variants splits nothing', () => {
 		const { container } = render(DetailPage, { props: props({ variants: [] }) });
-		expect(said(container)).toContain('splits nothing');
+		expect(said(container)).toContain('Add a control and at least one other variant');
 	});
 
 	it('says an experiment with no metric can never produce a result', () => {
 		const { container } = render(DetailPage, { props: props({ metrics: [] }) });
-		expect(said(container)).toContain('can never produce a result');
+		expect(said(container)).toContain('Without one, this experiment has no result.');
 	});
 
 	it('says nobody has been exposed yet when the results answer with no exposure', () => {
@@ -193,7 +193,7 @@ describe('a panel that could not be read', () => {
 		const { container } = render(DetailPage, { props: props({ variants: down }) });
 		const text = said(container);
 		expect(text).toContain('the variants could not be read');
-		expect(text).not.toContain('splits nothing');
+		expect(text).not.toContain('Add a control and at least one other variant');
 		expect(text).not.toContain('New variant');
 	});
 
@@ -201,7 +201,7 @@ describe('a panel that could not be read', () => {
 		const { container } = render(DetailPage, { props: props({ metrics: down }) });
 		const text = said(container);
 		expect(text).toContain('the metrics could not be read');
-		expect(text).not.toContain('can never produce a result');
+		expect(text).not.toContain('Without one, this experiment has no result.');
 		expect(text).not.toContain('New metric');
 	});
 
@@ -221,9 +221,9 @@ describe('a panel that could not be read', () => {
 describe('where a failure shows', () => {
 	it('shows a failed remove on the page and not in a drawer opened after it', async () => {
 		const { container, getAllByText } = render(DetailPage, {
-			props: props({}, { action: 'removeVariant', error: 'The variant could not be removed.' }),
+			props: props({}, { action: 'removeVariant', error: 'Could not remove the variant. Try again.' }),
 		});
-		expect(said(container)).toContain('The variant could not be removed.');
+		expect(said(container)).toContain('Could not remove the variant. Try again.');
 
 		await fireEvent.click(getAllByText('New variant')[0]);
 		const drawer = container.ownerDocument.querySelector('#variant-form') as HTMLElement;

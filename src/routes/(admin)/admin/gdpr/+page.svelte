@@ -30,7 +30,7 @@
 		{
 			value: 'email',
 			label: 'A code sent to their email address',
-			description: 'A one-time code is mailed to the address on the account. The install has to be able to send mail.',
+			description: 'A one-time code is sent to the address on the account. Email must be set up.',
 		},
 	];
 
@@ -104,7 +104,7 @@
 
 <PageShell
 	title="Privacy requests"
-	description="Every piece of personal data held for one subject, exported or erased. GDPR calls this a data subject request. Super admins only."
+	description="Export or erase all personal data held for one person. GDPR calls this a data subject request. Only super admins can use this page."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -114,7 +114,7 @@
 		<Card>
 			<div class="flex flex-col gap-4">
 				<p class="text-sm text-muted">
-					Fans the identifier out to every plugin and returns the merged personal data as JSON.
+					Export collects this subject's personal data from every plugin into one JSON file.
 				</p>
 				<form
 					method="POST"
@@ -190,7 +190,7 @@
 		<Card>
 			<div class="flex flex-col gap-4">
 				<Alert tone="danger" title="This cannot be undone">
-					Permanently erases or anonymizes all personal data for the subject across every plugin.
+					All personal data for this subject is permanently erased or anonymized in every plugin.
 				</Alert>
 				<form
 					method="POST"
@@ -223,7 +223,7 @@
 						name="confirm"
 						bind:value={eraseConfirm}
 						autocomplete="off"
-						placeholder="Re-type to confirm erasure"
+						placeholder="jane@example.com"
 						error={confirmError}
 						hint="Erasure stays disabled until this matches"
 					/>
@@ -274,9 +274,9 @@
 				<p>
 					Erased <span class="font-medium">{eraseResult.total_rows}</span>
 					{eraseResult.total_rows === 1 ? 'row' : 'rows'} for
-					<span class="font-mono text-xs">{eraseResult.identifier}</span>, but part of the instance could
-					not erase, so data for this subject is still held there. The engine's log names the part that
-					failed. Run the erasure again once the cause is fixed.
+					<span class="font-mono text-xs">{eraseResult.identifier}</span>, but some data could not be
+					erased and is still stored. The engine log shows which part failed. Run the erasure again once the
+					cause is fixed.
 				</p>
 				<ul class="mt-2 list-disc pl-5 text-xs">
 					{#each eraseFailures as failure, i (i)}
@@ -300,8 +300,8 @@
 			<div class="flex flex-col gap-1">
 				<SectionHeading level={2}>Before a person exports their own data</SectionHeading>
 				<p class="text-sm text-muted">
-					A signed-in person can download a copy of their own data. This decides what they prove first, on every
-					tenant of this install.
+					Signed-in people can download a copy of their own data. Choose what they must confirm first. This
+					applies to every tenant on this install.
 				</p>
 			</div>
 			{#if 'stopped' in data.stepUp}
@@ -316,7 +316,7 @@
 				<GateNotice
 					gate={data.stepUp.gate}
 					title="What a person proves before exporting"
-					absent="This install asks nothing more before a person exports their own data."
+					absent="Export requirements are not included in this build. Being signed in is enough to export."
 				/>
 			{:else}
 				<Card>
@@ -331,7 +331,7 @@
 						{#if stepUpResult?.error}
 							<FormErrors message={stepUpResult.error} refused={stepUpResult.refused} />
 						{:else if stepUpResult?.ok}
-							<Alert tone="success" autoDismiss>Saved. The next export on every tenant asks for this.</Alert>
+							<Alert tone="success" autoDismiss>Export requirements saved. They apply to the next export on every tenant.</Alert>
 						{/if}
 						<div class="flex justify-end">
 							<Button type="submit" variant="primary" loading={saveStepUp.pending}>Save</Button>

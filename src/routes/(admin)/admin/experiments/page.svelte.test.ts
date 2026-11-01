@@ -49,7 +49,7 @@ describe('the gate', () => {
 			props: props({ gate: { state: 'locked', upgradeUrl: '' }, experiments: [] }),
 		});
 		expect(said(container)).toContain('Not enabled on this instance');
-		expect(said(container)).not.toContain('No experiment is set up');
+		expect(said(container)).not.toContain('No experiments yet');
 	});
 
 	it('reports a failed read as a failure, not as nothing running', () => {
@@ -60,7 +60,7 @@ describe('the gate', () => {
 			}),
 		});
 		expect(said(container)).toContain('could not be read');
-		expect(said(container)).not.toContain('No experiment is set up');
+		expect(said(container)).not.toContain('No experiments yet');
 	});
 });
 
@@ -134,7 +134,7 @@ describe('the list', () => {
 
 	it('says what an empty list means', () => {
 		const { container } = render(ExperimentsPage, { props: props({ experiments: [] }) });
-		expect(said(container)).toContain('No experiment is set up');
+		expect(said(container)).toContain('No experiments yet');
 	});
 });
 
@@ -156,7 +156,7 @@ describe('the confidence level', () => {
 		await fireEvent.click(getAllByText('New experiment')[0]);
 		const field = getByLabelText('Minimum exposures');
 		expect(field.getAttribute('name')).toBe('min_sample_size');
-		expect(said(field.ownerDocument.body)).toContain('Counted across all variants together.');
+		expect(said(field.ownerDocument.body)).toContain('Total exposures across all variants.');
 		expect(said(field.ownerDocument.body)).not.toContain('per variant');
 	});
 
@@ -174,9 +174,9 @@ describe('the confidence level', () => {
 describe('where a failure shows', () => {
 	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
 		const { container, getAllByText } = render(ExperimentsPage, {
-			props: props({}, { action: 'delete', error: 'The experiment could not be removed.' }),
+			props: props({}, { action: 'delete', error: 'Could not delete the experiment. Try again.' }),
 		});
-		expect(said(container)).toContain('The experiment could not be removed.');
+		expect(said(container)).toContain('Could not delete the experiment. Try again.');
 
 		await fireEvent.click(getAllByText('New experiment')[0]);
 		const drawer = container.ownerDocument.querySelector('#experiment-form') as HTMLElement;
@@ -187,10 +187,10 @@ describe('where a failure shows', () => {
 		const { container, getAllByText, rerender } = render(ExperimentsPage, { props: props() });
 		await fireEvent.click(getAllByText('New experiment')[0]);
 
-		await rerender(props({}, { action: 'save', error: 'Name the experiment so a result can be attributed to it.' }));
+		await rerender(props({}, { action: 'save', error: 'Enter a name for the experiment.' }));
 
 		const drawer = container.ownerDocument.querySelector('#experiment-form') as HTMLElement;
-		expect(said(drawer)).toContain('Name the experiment');
+		expect(said(drawer)).toContain('Enter a name for the experiment.');
 	});
 });
 

@@ -222,7 +222,7 @@ describe('Audit log toolbar', () => {
 			props: {
 				data: data({
 					filter: { q: 'content', action: 'content.delete', from: '2026-01-01', to: '' },
-					exportNote: 'An export holds the entries the dates, action and resource type match, at most 100,000.',
+					exportNote: 'Exports include the entries that match the dates, action and resource type, up to 100,000.',
 				}) as never,
 				form: null as never,
 			},
@@ -233,7 +233,7 @@ describe('Audit log toolbar', () => {
 		expect(sent.get('from')).toBe('2026-01-01');
 		expect(sent.get('q')).toBe('content');
 		expect(sent.has('to')).toBe(false);
-		expect(container.textContent).toContain('at most 100,000');
+		expect(container.textContent).toContain('up to 100,000');
 	});
 
 	// A proxy in front of the console and the engine sends every /api/ path to
@@ -310,7 +310,7 @@ describe('Audit log regions', () => {
  */
 describe('Audit log failed read', () => {
 	const failed = {
-		entries: { ok: false, gate: { state: 'error', message: 'The audit log could not be read. This is not a report that it is empty.' } },
+		entries: { ok: false, gate: { state: 'error', message: 'Could not load the audit log.' } },
 		total: null,
 		actions: [],
 	};
@@ -318,7 +318,7 @@ describe('Audit log failed read', () => {
 	it('shows the failure in place of the first-run state', () => {
 		const { container } = render(AuditLogPage, { props: { data: data(failed) as never, form: null as never } });
 
-		expect(container.textContent).toContain('The audit log could not be read');
+		expect(container.textContent).toContain('Could not load the audit log');
 		expect(container.textContent).not.toContain('No audit entries yet');
 		expect(container.querySelector('table')).toBeNull();
 	});
@@ -350,7 +350,7 @@ describe('Audit log empty page under a count', () => {
 		});
 		expect(container.textContent).not.toContain('No audit entries yet');
 		expect(container.textContent).toContain('Nothing on this page');
-		expect(container.textContent).toContain('The log holds 120 entries');
+		expect(container.textContent).toContain('The audit log has 120 entries');
 		const first = [...container.querySelectorAll('a')].find((a) => a.textContent?.includes('Go to the first page'));
 		expect(first?.getAttribute('href')).toBe('/admin/audit-log');
 	});

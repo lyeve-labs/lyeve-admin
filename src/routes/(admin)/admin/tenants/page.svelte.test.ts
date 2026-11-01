@@ -199,20 +199,20 @@ describe('the tenant drawer and the failures of other actions', () => {
 
 	it('leaves a newly opened create drawer clean after a failed delete', async () => {
 		const { container, getAllByRole } = render(TenantsPage, {
-			props: { data: data() as never, form: { action: 'delete', error: 'Failed to delete tenant' } as never },
+			props: { data: data() as never, form: { action: 'delete', error: 'Could not delete the tenant. Try again.' } as never },
 		});
-		expect(container.textContent).toContain('Failed to delete tenant');
+		expect(container.textContent).toContain('Could not delete the tenant. Try again.');
 		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
-		expect(drawerText()).not.toContain('Failed to delete tenant');
+		expect(drawerText()).not.toContain('Could not delete the tenant. Try again.');
 	});
 
 	it('shows a failed save inside the open drawer and not above the list', async () => {
 		const { container, getAllByRole, rerender } = render(TenantsPage, { props: props() });
 		await fireEvent.click(getAllByRole('button', { name: /new tenant/i })[0]);
-		await rerender({ data: data() as never, form: { action: 'create', error: 'Failed to create tenant' } as never });
-		expect(drawerText()).toContain('Failed to create tenant');
+		await rerender({ data: data() as never, form: { action: 'create', error: 'Could not create the tenant. Try again.' } as never });
+		expect(drawerText()).toContain('Could not create the tenant. Try again.');
 		const outside = container.textContent?.replace(drawerText(), '') ?? '';
-		expect(outside).not.toContain('Failed to create tenant');
+		expect(outside).not.toContain('Could not create the tenant. Try again.');
 	});
 });
 
@@ -225,7 +225,7 @@ describe('the tenant delete question', () => {
 		await submit?.({ cancel: vi.fn() });
 		expect(forms.confirm).toHaveBeenCalledWith(
 			'Delete Tenant 0?',
-			"Every row and user scoped to it goes with it. Its stored files stay in the storage backend until the backend's own lifecycle rules remove them.",
+			"All of its data and users are deleted. Its stored files stay in the storage backend until that backend's own lifecycle rules remove them.",
 			{ confirmLabel: 'Delete' },
 		);
 	});
@@ -261,7 +261,7 @@ describe('the tenant drawer fields', () => {
 	it('says what an emptied plan is stored as', async () => {
 		const { getAllByRole } = render(TenantsPage, { props: props() });
 		await fireEvent.click(getAllByRole('button', { name: /^edit tenant-0|^edit tenant 0/i })[0]);
-		expect(document.body.textContent).toContain('Left empty, it is stored as free.');
+		expect(document.body.textContent).toContain('Leave it empty to use free.');
 	});
 
 	it('draws a license refusal inside the drawer', async () => {
@@ -297,7 +297,7 @@ describe('Tenants refusals', () => {
 			props: props({ canProvision: false, provisioningUrl: ADD_ON }),
 		});
 
-		expect(getByTestId('not-enabled').textContent).toContain('The license on this instance does not include creating tenants.');
+		expect(getByTestId('not-enabled').textContent).toContain('Your license does not include creating tenants.');
 		const link = getByRole('link', { name: 'View the add-on' });
 		expect(link.getAttribute('href')).toBe(ADD_ON);
 		expect(link.getAttribute('rel')).toBe('noopener noreferrer');
@@ -308,7 +308,7 @@ describe('Tenants refusals', () => {
 			props: props({ canProvision: false, provisionGate: { state: 'absent' } }),
 		});
 
-		expect(container.textContent).toContain('This instance does not serve tenant provisioning, so a tenant cannot be created here.');
+		expect(container.textContent).toContain('Creating tenants is not included in this build.');
 		expect(container.textContent).not.toContain('license');
 		expect(queryByTestId('not-enabled')).toBeNull();
 	});
@@ -362,8 +362,8 @@ describe('Tenants with none listed and no create offered', () => {
 		const { container } = render(TenantsPage, {
 			props: props({ tenants: [], total: 0, canProvision: false, provisionGate: { state: 'absent' } }),
 		});
-		expect(container.textContent).toContain('This instance does not serve tenant provisioning');
-		expect(container.textContent).not.toContain('The tenants below');
+		expect(container.textContent).toContain('Creating tenants is not included in this build.');
+		expect(container.textContent).not.toContain('the tenants below');
 		expect(container.textContent).toContain('No tenants yet');
 		expect(container.textContent).not.toContain('Create a tenant');
 	});
@@ -371,12 +371,12 @@ describe('Tenants with none listed and no create offered', () => {
 	it('names no tenants below when the license does not include creating them', () => {
 		const { container } = render(TenantsPage, { props: props({ tenants: [], total: 0, canProvision: false }) });
 		expect(container.textContent).toContain('does not include creating tenants');
-		expect(container.textContent).not.toContain('The tenants below');
+		expect(container.textContent).not.toContain('the tenants below');
 		expect(container.textContent).not.toContain('Create a tenant');
 	});
 
 	it('keeps the sentence about the tenants below when some are listed', () => {
 		const { container } = render(TenantsPage, { props: props({ canProvision: false, provisionGate: { state: 'absent' } }) });
-		expect(container.textContent).toContain('The tenants below can still be edited, disabled and deleted.');
+		expect(container.textContent).toContain('You can still edit, disable and delete the tenants below.');
 	});
 });

@@ -455,7 +455,7 @@ describe('admin/tenants update, toggle and delete', () => {
 
 	it('keeps driver text out of an outage on delete', async () => {
 		const result = await actions.delete(writeEvent({ id: 't1' }, () => json({ error: 'pq: connection refused' }, 503)));
-		expect(result).toEqual({ status: 400, data: { action: 'delete', error: 'Failed to delete tenant' } });
+		expect(result).toEqual({ status: 400, data: { action: 'delete', error: 'Could not delete the tenant. Try again.' } });
 	});
 
 	it('deletes a tenant the engine accepts', async () => {

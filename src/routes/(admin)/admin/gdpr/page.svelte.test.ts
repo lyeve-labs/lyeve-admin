@@ -45,8 +45,8 @@ describe('Privacy request erasure outcome', () => {
 		const text = said(container);
 		expect(text).toContain('Erasure incomplete');
 		expect(text).not.toContain('Erasure complete');
-		expect(text).toContain('data for this subject is still held there');
-		expect(text).toContain("The engine's log names the part that failed.");
+		expect(text).toContain('some data could not be erased and is still stored');
+		expect(text).toContain('The engine log shows which part failed.');
 		const items = [...container.querySelectorAll('li')].map((li) => li.textContent?.trim());
 		expect(items).toEqual([ERASERS_FAILED]);
 	});
@@ -97,7 +97,7 @@ describe('Privacy request erasure outcome', () => {
 			expect(text).toContain('Erased 3 rows');
 			expect(text).not.toContain('Erasure complete');
 			expect(text).not.toContain('Erasure incomplete');
-			expect(text).not.toContain('the part that failed');
+			expect(text).not.toContain('which part failed');
 			expect(text).not.toContain('Run the erasure again');
 			expect(container.querySelectorAll('li')).toHaveLength(0);
 		} finally {
@@ -114,7 +114,7 @@ describe('Privacy request erasure outcome', () => {
 		});
 		const text = said(container);
 		expect(text).toContain('Erasure incomplete');
-		expect(text).toContain("The engine's log names the part that failed.");
+		expect(text).toContain('The engine log shows which part failed.');
 		expect(text).toContain('Run the erasure again once the cause is fixed.');
 		expect(text).not.toContain('Erasure kept some records');
 	});
@@ -172,7 +172,7 @@ describe('what a person proves before exporting', () => {
 
 	it('confirms a save', async () => {
 		const { container } = render(GdprPage, { props: stepUp(['code'], { action: 'stepUp', ok: true }) });
-		await vi.waitFor(() => expect(said(container)).toContain('Saved. The next export on every tenant asks for this.'));
+		await vi.waitFor(() => expect(said(container)).toContain('Export requirements saved. They apply to the next export on every tenant.'));
 	});
 
 	it('says why the section is empty while its plugin is stopped', () => {
@@ -193,10 +193,10 @@ describe('what a person proves before exporting', () => {
 
 	it('keeps a refused save on screen', async () => {
 		const { container } = render(GdprPage, {
-			props: stepUp(['email'], { action: 'stepUp', error: 'This install cannot send mail, so an emailed code cannot be required.' }),
+			props: stepUp(['email'], { action: 'stepUp', error: 'Email is not set up, so an emailed code cannot be required.' }),
 		});
-		await vi.waitFor(() => expect(said(container)).toContain('This install cannot send mail'));
+		await vi.waitFor(() => expect(said(container)).toContain('Email is not set up'));
 		await twoFrames();
-		expect(said(container)).not.toContain('Saved.');
+		expect(said(container)).not.toContain('Export requirements saved.');
 	});
 });

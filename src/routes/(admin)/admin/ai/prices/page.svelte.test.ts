@@ -146,11 +146,11 @@ describe('AI prices page', () => {
 	});
 
 	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
-		const { container, getByText, getAllByRole } = setup({}, { action: 'delete', key: 'openai/gpt-4o', error: 'Failed to delete the price' });
-		expect(getByText('Failed to delete the price')).toBeTruthy();
+		const { container, getByText, getAllByRole } = setup({}, { action: 'delete', key: 'openai/gpt-4o', error: 'Could not delete the price. Try again.' });
+		expect(getByText('Could not delete the price. Try again.')).toBeTruthy();
 		await fireEvent.click(getAllByRole('button', { name: /new price/i })[0]);
 		const form = container.querySelector('#price-form') as HTMLElement;
-		expect(form.textContent).not.toContain('Failed to delete the price');
+		expect(form.textContent).not.toContain('Could not delete the price. Try again.');
 	});
 
 	it('shows a failed save inside the open drawer and not on the page behind it', async () => {

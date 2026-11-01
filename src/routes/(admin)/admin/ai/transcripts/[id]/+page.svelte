@@ -122,8 +122,8 @@
 					</Card>
 				{:else}
 					<p class="text-sm text-muted">
-						No recap yet. Recap asks the same provider for a short summary and stores it on this transcript. The
-						call is itself a costed message.
+						No recap yet. Recap asks the same provider for a short summary and saves it on this transcript. The
+						recap request adds its own cost to this transcript.
 					</p>
 				{/if}
 			</section>

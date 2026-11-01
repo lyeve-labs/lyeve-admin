@@ -76,7 +76,7 @@ describe('Data export gate', () => {
 		const { container } = render(ExportPage, {
 			props: props({ gate: { state: 'absent' }, jobs: [] }),
 		});
-		expect(said(container)).toContain('not part of this build');
+		expect(said(container)).toContain('Data export is not included in this build.');
 	});
 });
 
@@ -105,7 +105,7 @@ describe('Data export jobs', () => {
 
 	it('says a completed export that wrote the row ceiling reached it', () => {
 		const { container } = render(ExportPage, { props: props({ jobs: [job({ rows_written: 10000, rows_total: 10000 })] }) });
-		expect(said(container)).toContain('Reached the 10,000 entry ceiling. Entries past it are not in the file.');
+		expect(said(container)).toContain('Reached the 10,000 entry limit. Entries past it are not in the file.');
 		expect(said(container)).not.toContain('Stopped');
 		cleanup();
 		const under = render(ExportPage, { props: props({ jobs: [job({ rows_written: 9999 })] }) });
@@ -146,7 +146,7 @@ describe('Data export jobs', () => {
 
 	it('reads an empty list as nothing exported yet', () => {
 		const { container } = render(ExportPage, { props: props({ jobs: [], total: 0 }) });
-		expect(said(container)).toContain('Nothing has been exported');
+		expect(said(container)).toContain('No exports yet');
 	});
 });
 
@@ -170,7 +170,7 @@ describe('Data export schedules', () => {
 
 	it('says plainly when nothing recurring is configured', () => {
 		const { container } = render(ExportPage, { props: props() });
-		expect(said(container)).toContain('No recurring export');
+		expect(said(container)).toContain('No schedules yet');
 	});
 });
 
@@ -201,12 +201,12 @@ describe('Data export while a job runs', () => {
  * beside the one that is already running.
  */
 describe('Data export panels that could not be read', () => {
-	const failed = { ok: false, gate: { state: 'error', message: 'The schedules could not be read. This is not a report that there are none.' } };
+	const failed = { ok: false, gate: { state: 'error', message: 'Could not load the schedules.' } };
 
 	it('says the schedules could not be read instead of that there are none', () => {
 		const { container } = render(ExportPage, { props: props({ schedules: failed }) });
-		expect(said(container)).toContain('The schedules could not be read');
-		expect(said(container)).not.toContain('No recurring export');
+		expect(said(container)).toContain('Could not load the schedules.');
+		expect(said(container)).not.toContain('No schedules yet');
 	});
 
 	it('offers no new schedule while the list is unread', () => {
@@ -234,9 +234,9 @@ describe('Data export filter on this page', () => {
 
 		await fireEvent.input(search, { target: { value: 'nothing like it' } });
 
-		expect(said(container)).toContain('Nothing on this page matches');
+		expect(said(container)).toContain('No exports match this search');
 		expect(container.querySelector('table')).toBeNull();
-		const empty = [...container.querySelectorAll('*')].find((el) => el.textContent?.trim() === 'Nothing on this page matches');
+		const empty = [...container.querySelectorAll('*')].find((el) => el.textContent?.trim() === 'No exports match this search');
 		const pager = container.querySelector('nav');
 		if (empty && pager) {
 			expect(empty.compareDocumentPosition(pager) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -247,18 +247,18 @@ describe('Data export filter on this page', () => {
 describe('Data export failures stay where they were made', () => {
 	it('shows a failed row action on the page and opens the next drawer clean', async () => {
 		const { getAllByRole, container } = render(ExportPage, {
-			props: props({}, { action: 'cancel', error: 'The export could not be canceled.' }),
+			props: props({}, { action: 'cancel', error: 'Could not cancel the export. Try again.' }),
 		});
-		expect(said(container)).toContain('The export could not be canceled.');
+		expect(said(container)).toContain('Could not cancel the export. Try again.');
 		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
 		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('could not be canceled');
 	});
 
 	it('keeps a refused schedule in its own drawer, not on the page or in the export drawer', async () => {
 		const { getAllByRole, container } = render(ExportPage, {
-			props: props({}, { action: 'createSchedule', error: 'Say when the schedule runs.' }),
+			props: props({}, { action: 'createSchedule', error: 'Choose when the schedule runs.' }),
 		});
-		expect(said(container)).not.toContain('Say when the schedule runs.');
+		expect(said(container)).not.toContain('Choose when the schedule runs.');
 		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
 		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('Say when');
 	});
