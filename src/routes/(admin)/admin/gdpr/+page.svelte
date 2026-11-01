@@ -307,7 +307,7 @@
 			{#if 'stopped' in data.stepUp}
 				<!-- Only a super admin opens this page, and may read the plugin list. -->
 				<NotRunning
-					title="What a person proves before exporting"
+					title="Identity check before export"
 					plugin={PLUGIN.productAnalytics}
 					reason={data.stepUp.stopped}
 					operator
@@ -315,7 +315,7 @@
 			{:else if !data.stepUp.ok}
 				<GateNotice
 					gate={data.stepUp.gate}
-					title="What a person proves before exporting"
+					title="Identity check before export"
 					absent="Export requirements are not included in this build. Being signed in is enough to export."
 				/>
 			{:else}
@@ -323,7 +323,7 @@
 					<form method="POST" action="?/stepUp" use:enhance={saveStepUp.enhance} class="flex flex-col gap-4">
 						<CheckboxGroup
 							name="factors"
-							label="What a person proves first"
+							label="Required checks"
 							hint="Every ticked step is required. With nothing ticked, being signed in is enough."
 							options={FACTOR_OPTIONS}
 							bind:value={factors}

@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ cookies, url, fetch }) => {
 		error(502, 'Engine unreachable');
 	}
 	if (!res.ok) {
-		if (res.status === 403) error(403, 'Your role cannot export content types');
+		if (res.status === 403) error(403, 'Your role cannot export schemas. Ask a super admin if you need it.');
 		error(502, 'Could not export the content types. Try again.');
 	}
 	const headers = new Headers();

@@ -130,7 +130,7 @@
 			{:else}
 				<ListToolbar label="Filter devices">
 					{#snippet search()}
-						<label for="device-search" class="sr-only">Narrow this page</label>
+						<label for="device-search" class="sr-only">Filter this page</label>
 						<SearchInput id="device-search" bind:value={query} placeholder="Name or browser on this page" />
 					{/snippet}
 				</ListToolbar>

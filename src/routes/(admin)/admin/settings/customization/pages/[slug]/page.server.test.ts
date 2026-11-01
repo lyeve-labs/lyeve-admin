@@ -43,7 +43,7 @@ describe('custom page editor load', () => {
 	// database did not answer.
 	it('answers 404 only for the engine 404', async () => {
 		api.getCustomPage.mockRejectedValueOnce(new ApiError(404, 'not found'));
-		await expect(load(event())).rejects.toMatchObject({ status: 404, body: { message: 'No page has that address.' } });
+		await expect(load(event())).rejects.toMatchObject({ status: 404, body: { message: 'This page does not exist.' } });
 		api.getCustomPage.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
 		await expect(load(event())).rejects.toMatchObject({ status: 503 });
 		api.getCustomPage.mockRejectedValueOnce(new ApiError(403, 'forbidden'));

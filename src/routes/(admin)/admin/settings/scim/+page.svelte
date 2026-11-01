@@ -204,7 +204,7 @@
 			{:else}
 				<ListToolbar label="Filter connections">
 					{#snippet search()}
-						<label for="scim-search" class="sr-only">Narrow this page</label>
+						<label for="scim-search" class="sr-only">Filter this page</label>
 						<SearchInput id="scim-search" bind:value={query} placeholder="Connection name on this page" />
 					{/snippet}
 				</ListToolbar>
@@ -333,7 +333,7 @@
 			<input type="hidden" name="deprovision_on_delete" value="true" />
 			<Toggle
 				id="scim-deprovision"
-				label="Act on removals at all"
+				label="Act on removals"
 				hint="Always on. When a directory deletes a person, the account is handled the way you chose above. Okta and Microsoft Entra mark the person inactive instead, which always disables the account, whatever you chose."
 				checked={true}
 				disabled

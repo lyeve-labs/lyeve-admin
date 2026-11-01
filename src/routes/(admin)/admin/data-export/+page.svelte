@@ -254,7 +254,7 @@
 			{:else}
 				<ListToolbar label="Filter exports">
 					{#snippet search()}
-						<label for="export-narrow" class="sr-only">Narrow this page</label>
+						<label for="export-narrow" class="sr-only">Filter this page</label>
 						<SearchInput
 							id="export-narrow"
 							bind:value={narrow}

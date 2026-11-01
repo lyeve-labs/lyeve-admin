@@ -49,7 +49,7 @@ const UNREAD: Section<never> = { ok: false, gate: { state: 'absent' } };
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
 	if (!user.roles.some((role) => OPERATOR_ROLES.includes(role))) {
-		error(403, 'Requires admin or super_admin role');
+		error(403, 'Only an admin or a super admin can open this page.');
 	}
 	const page: CostsPage = {
 		enabled: true,

@@ -21,9 +21,9 @@ function mount(status: number, message = '', at = 'http://admin.test/admin') {
 describe('ErrorPanel', () => {
 	describe('a reader the engine knows and refuses', () => {
 		it('says why, in the words the load gave', () => {
-			const { getByText } = mount(403, 'Requires super_admin role');
+			const { getByText } = mount(403, 'Only a super admin can open this page.');
 			expect(getByText('Access denied')).toBeTruthy();
-			expect(getByText('Requires super_admin role')).toBeTruthy();
+			expect(getByText('Only a super admin can open this page.')).toBeTruthy();
 		});
 
 		it('falls back to a plain refusal when the load gave no words', () => {

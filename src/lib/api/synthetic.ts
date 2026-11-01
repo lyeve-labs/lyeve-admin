@@ -228,8 +228,8 @@ export function runAlreadyGoing(err: unknown): boolean {
 
 /** What Run now says when the run is still going, its own or an earlier one. */
 export function runGoingOnText(name: string, already: boolean): string {
-	const first = already ? `A run of ${name} is already going.` : `${name} is still running.`;
-	return `${first} Its results appear in the list when it ends.`;
+	const first = already ? `${name} is already running.` : `${name} is still running.`;
+	return `${first} Its results appear in the list when it finishes.`;
 }
 
 /** How one run went across its regions. */

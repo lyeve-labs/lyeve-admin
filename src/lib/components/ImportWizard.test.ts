@@ -210,7 +210,7 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		await fireEvent.click(screen.getByRole('button', { name: 'Read the file' }));
 		await fireEvent.click(await screen.findByRole('button', { name: 'Dry run' }));
 		await fireEvent.click(await screen.findByRole('button', { name: 'Import 1 row' }));
-		await waitFor(() => expect(document.body.textContent).toContain('The engine did not confirm the import. Check the entries before trying again.'));
+		await waitFor(() => expect(document.body.textContent).toContain('Could not confirm whether the import started. Check the entries before you try again.'));
 		expect(document.body.textContent).not.toContain('Nothing was imported');
 		expect(document.body.textContent).not.toContain('network error');
 	});

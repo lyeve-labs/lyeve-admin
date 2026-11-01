@@ -255,7 +255,7 @@
 		<Input
 			id="trigger-to-field"
 			name="to_field"
-			label="And to the address in field"
+			label="Recipient field"
 			placeholder="email"
 			mono
 			hint="A record field with an email address, such as the customer's email. Leave blank to send only to the fixed addresses."

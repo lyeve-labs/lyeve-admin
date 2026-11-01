@@ -99,7 +99,7 @@
 	</section>
 
 	<section class="flex flex-col gap-1">
-		<SectionHeading level={3}>Test against live</SectionHeading>
+		<SectionHeading level={3}>Run a test</SectionHeading>
 		<p class="text-muted">
 			Run test executes the draft on the canvas, not the published version, with the trigger JSON
 			from the Test tab. A node with side effects (writes, HTTP calls other than GET, email, events)

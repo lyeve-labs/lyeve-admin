@@ -41,7 +41,7 @@ describe('TransformField', () => {
 		cleanup();
 		setup(blank({ transform: 'lookup' }));
 		expect(screen.getByLabelText(/^Lookup/)).toBeTruthy();
-		expect(screen.getByLabelText(/For any other value/)).toBeTruthy();
+		expect(screen.getByLabelText(/Fallback value/)).toBeTruthy();
 	});
 
 	it('writes what the reader types back into the draft', async () => {

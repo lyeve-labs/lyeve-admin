@@ -258,7 +258,7 @@
 		{/if}
 		<ListToolbar label="Filter API keys">
 			{#snippet search()}
-				<label for="key-search" class="sr-only">Narrow this page</label>
+				<label for="key-search" class="sr-only">Filter this page</label>
 				<SearchInput id="key-search" bind:value={query} placeholder="Name, role or schema on this page" />
 			{/snippet}
 			{#snippet filters()}

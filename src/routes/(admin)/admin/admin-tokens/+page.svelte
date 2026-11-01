@@ -276,7 +276,7 @@
 	{:else}
 		<ListToolbar label="Filter admin tokens">
 			{#snippet search()}
-				<label for="token-search" class="sr-only">Narrow this page</label>
+				<label for="token-search" class="sr-only">Filter this page</label>
 				<SearchInput id="token-search" bind:value={query} placeholder="Name, prefix, owner or grant on this page" />
 			{/snippet}
 			{#snippet filters()}

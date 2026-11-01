@@ -40,7 +40,7 @@ export interface UsageSummary {
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const user = await loadUser(event);
-	if (!user.roles.includes('super_admin')) error(403, 'This page needs the super_admin role.');
+	if (!user.roles.includes('super_admin')) error(403, 'Only a super admin can open this page.');
 	const client = authedClient(event);
 	// The endpoint pages at fifty, so a read that names no window shows the
 	// first fifty keys as every key the instance has.

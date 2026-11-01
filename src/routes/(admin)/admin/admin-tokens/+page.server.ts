@@ -48,7 +48,7 @@ function loadError(err: unknown, what: string): string {
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const user = await loadUser(event);
-	if (!user.roles.some((r) => OWNER_ROLES.includes(r))) error(403, 'This page needs the admin or super_admin role.');
+	if (!user.roles.some((r) => OWNER_ROLES.includes(r))) error(403, 'Only an admin or a super admin can open this page.');
 	const superAdmin = user.roles.includes('super_admin');
 	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, PAGE, MAX_PAGE);

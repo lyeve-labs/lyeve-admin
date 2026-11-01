@@ -261,7 +261,7 @@
 			{:else}
 				<ListToolbar label="Filter quotas">
 					{#snippet search()}
-						<label for="quota-search" class="sr-only">Narrow this page</label>
+						<label for="quota-search" class="sr-only">Filter this page</label>
 						<SearchInput id="quota-search" bind:value={query} placeholder="Tenant on this page" />
 					{/snippet}
 				</ListToolbar>

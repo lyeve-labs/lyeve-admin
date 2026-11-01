@@ -201,7 +201,7 @@
 					<Input
 						id="replace-code"
 						name="code"
-						label="Or a code"
+						label="Or enter a code"
 						hint="A current code from an authenticator app already set up, or a backup code."
 						bind:value={replaceCode}
 						autocomplete="one-time-code"

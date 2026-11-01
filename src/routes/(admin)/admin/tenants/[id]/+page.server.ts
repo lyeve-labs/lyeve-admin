@@ -31,7 +31,7 @@ import {
 
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
-	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
+	if (!user.roles.includes('super_admin')) error(403, 'Only a super admin can open this page.');
 	const client = authedClient(event);
 
 	// Only the engine's 404 says the tenant does not exist. A refusal or an

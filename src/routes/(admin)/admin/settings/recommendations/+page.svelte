@@ -199,7 +199,7 @@
 				</EmptyState>
 			{:else if stats}
 				<div class="grid gap-4 sm:grid-cols-3">
-					<Stat size="sm" mono label="Readers bucketed" value={stats.total_users} />
+					<Stat size="sm" mono label="Readers assigned" value={stats.total_users} />
 					<Stat size="sm" mono label="Getting recommendations" value={percent(stats.recommendation_pct)} />
 					<Stat size="sm" mono label="Control arm, random" value={percent(stats.random_pct)} />
 				</div>

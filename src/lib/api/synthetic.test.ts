@@ -205,10 +205,10 @@ describe('a run now', () => {
 
 	it('says where the results of a run still going appear', () => {
 		expect(runGoingOnText('Homepage', false)).toBe(
-			'Homepage is still running. Its results appear in the list when it ends.',
+			'Homepage is still running. Its results appear in the list when it finishes.',
 		);
 		expect(runGoingOnText('Homepage', true)).toBe(
-			'A run of Homepage is already going. Its results appear in the list when it ends.',
+			'Homepage is already running. Its results appear in the list when it finishes.',
 		);
 	});
 });

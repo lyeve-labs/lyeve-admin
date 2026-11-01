@@ -608,7 +608,7 @@
 							<dd class="text-muted">{plan.kind.cardinality}</dd>
 							<dt class="text-faint">Stored as</dt>
 							<dd class="font-mono text-muted">{plan.kind.type}</dd>
-							<dt class="text-faint">Key lives in</dt>
+							<dt class="text-faint">Key stored in</dt>
 							<dd class="text-muted">{plan.kind.storage}</dd>
 							<dt class="text-faint">Read through</dt>
 							<dd class="font-mono text-muted">{plan.reads}</dd>
@@ -706,7 +706,7 @@
 					<tr class="border-b border-line text-faint">
 						<th scope="col" class="py-2 pe-4 font-medium">Kind</th>
 						<th scope="col" class="py-2 pe-4 font-medium">Cardinality</th>
-						<th scope="col" class="py-2 pe-4 font-medium">Key lives in</th>
+						<th scope="col" class="py-2 pe-4 font-medium">Key stored in</th>
 						<th scope="col" class="py-2 font-medium">What saving creates</th>
 					</tr>
 				</thead>

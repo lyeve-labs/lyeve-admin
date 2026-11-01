@@ -22,7 +22,7 @@ const FAILED = {
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
-		error(403, 'Requires admin or super_admin role');
+		error(403, 'Only an admin or a super admin can open this page.');
 	}
 
 	const client = authedClient(event);

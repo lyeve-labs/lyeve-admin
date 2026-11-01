@@ -222,7 +222,7 @@
 			{:else}
 				<ListToolbar label="Filter captured statements">
 					{#snippet search()}
-						<label for="query-narrow" class="sr-only">Narrow this page</label>
+						<label for="query-narrow" class="sr-only">Filter this page</label>
 						<SearchInput
 							id="query-narrow"
 							bind:value={narrow}

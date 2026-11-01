@@ -231,6 +231,6 @@ describe('Slow queries filter', () => {
 describe('the search box', () => {
 	it('is named for a screen reader', () => {
 		const { container } = render(QueriesPage, { props: props() });
-		expect(container.querySelector('label[for="query-narrow"]')?.textContent).toBe('Narrow this page');
+		expect(container.querySelector('label[for="query-narrow"]')?.textContent).toBe('Filter this page');
 	});
 });

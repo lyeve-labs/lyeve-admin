@@ -56,7 +56,7 @@ export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
 	// Captured SQL carries the text of a query written against one tenant's
 	// data, so the whole page is the super admin's.
-	if (!user.roles.includes('super_admin')) error(403, 'Requires super_admin role');
+	if (!user.roles.includes('super_admin')) error(403, 'Only a super admin can open this page.');
 
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
 	const dialect = dialectOf(event.url.searchParams.get('dialect'));

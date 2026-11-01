@@ -25,7 +25,7 @@ const PAGE_SIZE = 50;
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const user = await loadUser(event);
-	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) error(403, 'Requires admin role');
+	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) error(403, 'Only an admin or a super admin can open this page.');
 	const client = authedClient(event);
 	const limit = PAGE_SIZE;
 	// The offset comes from the address, so it is clamped and snapped to a page

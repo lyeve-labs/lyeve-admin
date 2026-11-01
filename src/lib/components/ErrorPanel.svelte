@@ -107,7 +107,7 @@
 			missing: message || 'That page or record does not exist.',
 			busy: message || BUSY.body,
 			outage: OUTAGE.body,
-			server: 'Something went wrong on the server. Try again once. The details below show what the server returned.',
+			server: 'The server could not complete the request. Try again. If it fails again, the details below show what the server returned.',
 		}[variant],
 	);
 

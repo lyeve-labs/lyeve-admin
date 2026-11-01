@@ -158,7 +158,7 @@
 					<thead>
 						<tr>
 							<th scope="col">Service</th>
-							<th scope="col">Health says</th>
+							<th scope="col">Health status</th>
 						</tr>
 					</thead>
 					<tbody>

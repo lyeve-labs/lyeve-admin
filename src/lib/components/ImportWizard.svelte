@@ -253,7 +253,7 @@
 				// The engine stores a start's job before it answers, so a start
 				// whose answer never came back may already be importing.
 				error = starts
-					? 'The engine did not confirm the import. Check the entries before trying again.'
+					? 'Could not confirm whether the import started. Check the entries before you try again.'
 					: 'The request did not reach the engine. Nothing was imported. Try again in a moment.';
 				return null;
 			}

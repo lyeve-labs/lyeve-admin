@@ -183,8 +183,8 @@ describe('two-factor authentication page', () => {
 
 	it('says the state could not be read instead of offering to turn it on', () => {
 		const { container, queryByRole } = setup({ ok: false, gate: { state: 'unavailable' } });
-		expect(container.textContent).toContain('could not be read');
-		expect(container.textContent).not.toContain('is off for this account');
+		expect(container.textContent).toContain('Could not load the two-factor status');
+		expect(container.textContent).not.toContain('Not enabled on this account');
 		expect(queryByRole('button', { name: /Turn on/ })).toBeNull();
 		expect(queryByRole('button', { name: /Turn off/ })).toBeNull();
 	});

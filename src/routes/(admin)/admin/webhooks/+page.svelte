@@ -336,7 +336,7 @@
 	{:else}
 		<ListToolbar label="Filter webhooks">
 			{#snippet search()}
-				<label for="webhook-search" class="sr-only">Narrow this page</label>
+				<label for="webhook-search" class="sr-only">Filter this page</label>
 				<SearchInput id="webhook-search" bind:value={query} placeholder="Name, URL, event or schema on this page" />
 			{/snippet}
 			{#snippet filters()}

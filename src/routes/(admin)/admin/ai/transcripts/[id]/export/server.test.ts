@@ -40,7 +40,7 @@ describe('transcript export route', () => {
 		for (const [status, message] of [
 			[404, 'Transcript not found'],
 			[402, 'AI is not enabled on this instance'],
-			[403, 'Your role cannot export transcripts'],
+			[403, 'Your role cannot export transcripts. Ask a super admin if you need it.'],
 		] as const) {
 			const fetch = vi.fn(async () => new Response('{"error":"x"}', { status })) as unknown as typeof globalThis.fetch;
 			await expect(GET(event(fetch))).rejects.toMatchObject({ status, body: { message } });

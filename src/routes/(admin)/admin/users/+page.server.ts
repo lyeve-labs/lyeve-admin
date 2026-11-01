@@ -27,7 +27,7 @@ export const load: PageServerLoad = async (event) => {
 	const { url, parent } = event;
 	const { user, plugins } = await parent();
 	if (!user.roles.includes('super_admin')) {
-		error(403, 'Requires super_admin role');
+		error(403, 'Only a super admin can open this page.');
 	}
 
 	const client = authedClient(event);

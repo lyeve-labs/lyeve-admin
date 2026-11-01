@@ -357,7 +357,7 @@
 									</td>
 									<td data-cell="nowrap">
 										<Badge tone={row.definition.publish_on_approve ? 'success' : 'neutral'}>
-											{row.definition.publish_on_approve ? 'Publishes' : 'Stays as it was'}
+											{row.definition.publish_on_approve ? 'Publishes' : 'No change'}
 										</Badge>
 									</td>
 									<td data-cell="nowrap" class="text-right">

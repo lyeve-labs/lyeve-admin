@@ -23,7 +23,7 @@ export const load: PageServerLoad = async (event) => {
 		// Only the engine's 404 says the page does not exist. A refusal or an
 		// outage keeps a status of its own.
 		getCustomPage(client, event.params.slug).catch((err: unknown) =>
-			readError(err, 'No page has that address.'),
+			readError(err, 'This page does not exist.'),
 		),
 		// The gate says why the list is missing, so a role refusal and an
 		// outage are not one failure.

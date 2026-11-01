@@ -53,7 +53,7 @@ export const load: PageServerLoad = async (event) => {
 
 	// A build that links no license module has no license to show, so the page
 	// is not there. An engine that does not say keeps the page.
-	if (entitlements?.license_module === false) error(404, 'No page has that address.');
+	if (entitlements?.license_module === false) error(404, 'This page does not exist.');
 
 	return { entitlements };
 };

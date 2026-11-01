@@ -67,7 +67,7 @@
 		/>
 		<Input
 			id="{id}-fallback"
-			label="For any other value"
+			label="Fallback value"
 			hint="Leave empty to reject a row whose value is not in the list."
 			bind:value={draft.fallback}
 		/>

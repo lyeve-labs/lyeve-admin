@@ -42,9 +42,9 @@
 		{#if p}
 			<div class="flex flex-wrap items-center gap-2">
 				{#if p.active_version === 0}
-					<Badge tone="neutral">Shipped default in force</Badge>
+					<Badge tone="neutral">Using the default prompt</Badge>
 				{:else}
-					<Badge tone="brand">Version {p.active_version} in force</Badge>
+					<Badge tone="brand">Using version {p.active_version}</Badge>
 				{/if}
 				<span class="text-xs text-faint">{p.versions.length} saved {p.versions.length === 1 ? 'version' : 'versions'}</span>
 			</div>
