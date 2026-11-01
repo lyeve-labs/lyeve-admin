@@ -58,9 +58,9 @@ describe('custom page block controls', () => {
 
 	it('keeps the schema a block names on screen when the schema list was not read', () => {
 		render(EditorPage, {
-			props: { data: { customPage: stored, schemas: [], schemasGate: { state: 'error', message: 'The schemas could not be read, so no schema can be picked below. A block keeps the schemas it already names.' }, user: { roles: ['admin'] } }, form: null } as never,
+			props: { data: { customPage: stored, schemas: [], schemasGate: { state: 'error', message: 'Could not load schemas. Blocks keep the schemas they already use.' }, user: { roles: ['admin'] } }, form: null } as never,
 		});
-		expect(document.body.textContent).toContain('The schemas could not be read');
+		expect(document.body.textContent).toContain('Could not load schemas');
 		expect(document.querySelector('#block-2-schemas')?.closest('div')?.parentElement?.textContent).toContain('articles');
 	});
 });

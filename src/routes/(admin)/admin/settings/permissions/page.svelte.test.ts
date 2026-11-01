@@ -76,7 +76,7 @@ function setup() {
 	});
 }
 
-function setupFailedLoad(loadGate: unknown = { state: 'error', message: 'Permission rules could not be read from the engine.' }) {
+function setupFailedLoad(loadGate: unknown = { state: 'error', message: 'Could not load permission rules.' }) {
 	return render(PermissionsPage, {
 		props: {
 			data: {
@@ -154,7 +154,7 @@ describe('permissions page load failure', () => {
 		// so an unreachable engine or an expired session must not share that
 		// picture.
 		const { container } = setupFailedLoad();
-		expect(container.textContent).toContain('Permission rules could not be read from the engine.');
+		expect(container.textContent).toContain('Could not load permission rules.');
 		expect(container.querySelector('table'), 'a matrix was drawn from a failed read').toBeNull();
 	});
 
@@ -220,7 +220,7 @@ describe('permissions page role ceiling', () => {
 		const { queryAllByRole, container } = setupAtCeiling(1);
 		expect(container.textContent).toContain('1 of 1 roles');
 		expect(container.textContent).toContain(
-			"The engine refuses a new role past this instance's ceiling of 1. Every role you have keeps working.",
+			"This instance's role ceiling is 1, so you cannot add another role. Your existing roles keep working.",
 		);
 		expect(queryAllByRole('button').find((b) => b.textContent?.includes('New role'))).toBeFalsy();
 	});
@@ -478,7 +478,7 @@ describe('permissions page inherited grants', () => {
 
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
 		expect(dialog.textContent).toContain('This rule replaces the wildcard rule on article');
-		expect(dialog.textContent).toContain('an action left clear is denied on article');
+		expect(dialog.textContent).toContain('any action you leave clear is denied there');
 		expect(dialog.textContent).not.toContain('does not revoke');
 	});
 
@@ -686,15 +686,15 @@ describe('permissions page drawers', () => {
 	it('shows a refused rule save inside the open rule drawer', async () => {
 		const { getAllByRole, rerender } = setupWith(null);
 		await fireEvent.click(editButton(getAllByRole('button')));
-		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
-		expect(ruleText()).toContain('The rule could not be saved.');
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'Could not save the rule. Try again.' } } as never);
+		expect(ruleText()).toContain('Could not save the rule. Try again.');
 	});
 
 	it('shows a refused role inside the open role drawer', async () => {
 		const { getAllByRole, rerender } = setupWith(null);
 		await fireEvent.click(newRoleButton(getAllByRole('button')));
-		await rerender({ data: dataWith(), form: { action: 'role', error: 'The rule could not be saved.' } } as never);
-		expect(roleText()).toContain('The rule could not be saved.');
+		await rerender({ data: dataWith(), form: { action: 'role', error: 'Could not save the rule. Try again.' } } as never);
+		expect(roleText()).toContain('Could not save the rule. Try again.');
 	});
 
 	it('takes the ceiling from the refusal when the limits read failed', () => {
@@ -719,8 +719,8 @@ describe('permissions page drawers', () => {
 	});
 
 	it('leaves newly opened drawers clean after a failed delete', async () => {
-		const { container, getAllByRole } = setupWith({ action: 'delete', error: 'The rule could not be removed.' });
-		expect(container.textContent).toContain('The rule could not be removed.');
+		const { container, getAllByRole } = setupWith({ action: 'delete', error: 'Could not remove the rule. Try again.' });
+		expect(container.textContent).toContain('Could not remove the rule. Try again.');
 		await fireEvent.click(newRoleButton(getAllByRole('button')));
 		expect(roleText()).not.toContain('could not be removed');
 		await fireEvent.click(editButton(getAllByRole('button')));
@@ -730,8 +730,8 @@ describe('permissions page drawers', () => {
 	it('keeps a failed rule save out of the role drawer', async () => {
 		const { getAllByRole, rerender } = setupWith(null);
 		await fireEvent.click(newRoleButton(getAllByRole('button')));
-		await rerender({ data: dataWith(), form: { action: 'rule', error: 'The rule could not be saved.' } } as never);
-		expect(roleText()).not.toContain('could not be saved');
+		await rerender({ data: dataWith(), form: { action: 'rule', error: 'Could not save the rule. Try again.' } } as never);
+		expect(roleText()).not.toContain('Could not save');
 	});
 
 	it('says in the new rule form that the flows could not be read', async () => {
@@ -739,7 +739,7 @@ describe('permissions page drawers', () => {
 		const add = getAllByRole('button').find((b) => b.getAttribute('aria-label') === 'Add a schema rule for editor');
 		expect(add, 'no control adds a rule for a new resource').toBeTruthy();
 		await fireEvent.click(add!);
-		expect(container.ownerDocument.body.textContent).toContain('The flows could not be read');
+		expect(container.ownerDocument.body.textContent).toContain('Could not load flows');
 	});
 });
 

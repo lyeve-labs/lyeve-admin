@@ -110,7 +110,7 @@
 
 	// Built at submit time, so the question carries the title as edited.
 	const confirmDelete: SubmitFunction = (input) =>
-		confirmed(`Delete ${page.title}?`, 'Its menu entry goes with it, and the dashboard stops showing it.', {
+		confirmed(`Delete ${page.title}?`, 'Its menu entry is removed too, and the dashboard stops showing it.', {
 			confirmLabel: 'Delete',
 		})(input);
 </script>
@@ -134,7 +134,7 @@
 		{#if form?.error}
 			<Alert tone="danger">{form.error}</Alert>
 		{:else if form && 'saved' in form}
-			<Alert tone="success" autoDismiss>Saved.</Alert>
+			<Alert tone="success" autoDismiss>Page saved.</Alert>
 		{/if}
 
 		{#if data.schemasGate.state !== 'ok'}
@@ -142,7 +142,7 @@
 				level={2}
 				gate={data.schemasGate}
 				title="The schema list"
-				absent="This instance serves no schema list, so no schema can be picked below."
+				absent="The schema list is not included in this build, so you cannot choose a schema below."
 			/>
 		{/if}
 
@@ -216,7 +216,7 @@
 									</div>
 								</div>
 							{/each}
-							<p class="text-xs text-faint">An address is an https URL, or an admin path starting /admin/.</p>
+							<p class="text-xs text-faint">Use an https URL or an admin path starting /admin/.</p>
 							<div>
 								<Button variant="secondary" size="sm" type="button" onclick={() => (block.links = [...(block.links ?? []), { label: '', url: 'https://' }])}>
 									<Plus size={ICON.sm} /> Add link

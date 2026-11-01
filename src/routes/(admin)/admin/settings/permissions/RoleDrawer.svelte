@@ -55,8 +55,7 @@
 			required
 		/>
 		<p class="text-sm text-muted">
-			The role starts with no actions on any schema or flow, which denies it every content and flow
-			request until you grant one.
+			A new role can do nothing with any schema or flow until you grant it an action.
 		</p>
 	</form>
 	{#snippet footer()}

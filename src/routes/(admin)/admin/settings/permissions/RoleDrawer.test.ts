@@ -35,8 +35,8 @@ describe('RoleDrawer', () => {
 	});
 
 	it('shows the failure it is given first in its form', () => {
-		render(RoleDrawer, { props: { open: true, error: 'The rule could not be saved.' } });
-		expect(roleForm()?.firstElementChild?.textContent).toContain('The rule could not be saved.');
+		render(RoleDrawer, { props: { open: true, error: 'Could not save the rule. Try again.' } });
+		expect(roleForm()?.firstElementChild?.textContent).toContain('Could not save the rule. Try again.');
 	});
 
 	it('shows the role ceiling refusal with its numbers', () => {

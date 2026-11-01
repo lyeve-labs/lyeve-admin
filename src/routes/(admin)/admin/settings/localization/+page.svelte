@@ -81,7 +81,7 @@
 
 <PageShell
 	title="Locales"
-	description="The languages this tenant keeps content in, and the order a missing translation falls back through."
+	description="Choose the languages for this tenant's content and the order missing translations fall back through."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -94,7 +94,7 @@
 			level={2}
 			gate={data.locales.gate}
 			title="Locales"
-			absent="The localization plugin is not part of this build, so content is kept in one language."
+			absent="Localization is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={form?.error ?? undefined} refused={pageRefusal} />
@@ -124,7 +124,7 @@
 						id="default-locale"
 						name="default_locale"
 						label="Default locale"
-						hint="The language the source fields are written in. A reader who asks for nothing else gets this."
+						hint="The language of the source fields. Readers who do not ask for a language get this one."
 						placeholder="en"
 						bind:value={defaultLocale}
 						autocomplete="off"
@@ -137,7 +137,7 @@
 				<div class="flex flex-col gap-4">
 					<SectionHeading level={2}>Enabled locales</SectionHeading>
 					<p class="text-sm text-muted">
-						Each one is a tab in every entry's Translations panel. Language tags such as
+						Each locale adds a tab to every entry's Translations panel. Use language tags such as
 						<span class="font-mono">fr</span> or <span class="font-mono">pt-BR</span>.
 					</p>
 					<div class="flex flex-wrap items-center gap-2" role="list" aria-label="Enabled locales">
@@ -150,7 +150,7 @@
 								{/if}
 							</div>
 						{:else}
-							<span class="text-sm text-faint">No locale enabled yet.</span>
+							<span class="text-sm text-faint">No locales enabled yet.</span>
 						{/each}
 					</div>
 					<div class="flex items-end gap-2">
@@ -179,8 +179,8 @@
 				<div class="flex flex-col gap-4">
 					<SectionHeading level={2}>Fallback chain</SectionHeading>
 					<p class="text-sm text-muted">
-						When a translation is missing, the reader gets the first locale in this order that has
-						one, and the source fields after that.
+						When a translation is missing, readers get the first locale in this order that has one,
+						then the source fields.
 					</p>
 					<ol class="flex flex-col gap-2" aria-label="Fallback chain">
 						{#each chain as code, i (code)}
@@ -211,7 +211,7 @@
 									type="button"
 									variant="ghost"
 									size="sm"
-									aria-label="Take {code} out of the chain"
+									aria-label="Remove {code} from the chain"
 									onclick={() => (chain = chain.filter((l) => l !== code))}
 								>
 									<X size={ICON.sm} />
@@ -219,7 +219,7 @@
 							</li>
 						{:else}
 							<li class="text-sm text-faint">
-								Empty. A missing translation falls straight back to the source.
+								No locales in the chain. A missing translation falls back to the source fields.
 							</li>
 						{/each}
 					</ol>

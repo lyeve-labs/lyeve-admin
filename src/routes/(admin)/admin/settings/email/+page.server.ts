@@ -64,7 +64,7 @@ async function loadMail(event: Parameters<PageServerLoad>[0], superAdmin: boolea
 	if (!sessionToken(event)) return null;
 	return section(
 		authedClient(event).get<ConfigProvenance>('/api/admin/config').then(mailSettings),
-		'The fallback transport could not be read. This is not a report that it is unset.',
+		'Could not load the fallback transport.',
 	);
 }
 
@@ -99,7 +99,7 @@ export const load: PageServerLoad = async (event) => {
 	}
 	const [mail, providers] = await Promise.all([
 		loadMail(event, user.roles.includes('super_admin')),
-		section(listEmailProviders(authedClient(event)), 'The providers could not be read. This is not a report that there are none.'),
+		section(listEmailProviders(authedClient(event)), 'Could not load email providers.'),
 	]);
 	return { mail, providers };
 };
@@ -122,7 +122,7 @@ export const actions: Actions = {
 		try {
 			await createEmailProvider(authedClient(event), parsed.body);
 		} catch (err) {
-			return tagged('provider', actionFailure(err, 'Failed to create the provider.'));
+			return tagged('provider', actionFailure(err, 'Could not create the provider. Try again.'));
 		}
 	},
 
@@ -130,13 +130,13 @@ export const actions: Actions = {
 		await requireUser(event);
 		const data = await event.request.formData();
 		const id = text(data, 'id');
-		if (!id) return fail(400, { action: 'provider', error: 'Which provider to update is missing.' });
+		if (!id) return fail(400, { action: 'provider', error: 'This form is missing its provider. Reload the page and try again.' });
 		const parsed = parseProvider(data, true);
 		if ('error' in parsed) return fail(400, { action: 'provider', error: parsed.error });
 		try {
 			await updateEmailProvider(authedClient(event), id, parsed.body);
 		} catch (err) {
-			return tagged('provider', actionFailure(err, 'Failed to update the provider.'));
+			return tagged('provider', actionFailure(err, 'Could not save the provider. Try again.'));
 		}
 	},
 
@@ -146,7 +146,7 @@ export const actions: Actions = {
 		try {
 			await deleteEmailProvider(authedClient(event), text(data, 'id'));
 		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Failed to delete the provider.'));
+			return tagged('delete', actionFailure(err, 'Could not delete the provider. Try again.'));
 		}
 	},
 
@@ -155,17 +155,17 @@ export const actions: Actions = {
 	// engine is told to unset one.
 	saveSetting: async (event) => {
 		await requireUser(event);
-		if (!sessionToken(event)) return fail(401, { error: 'Not authenticated' });
+		if (!sessionToken(event)) return fail(401, { error: 'Your session has ended. Sign in again.' });
 
 		const data = await event.request.formData();
 		const key = text(data, 'key');
-		if (!key) return fail(400, { error: 'Setting name is required' });
-		if (!MAIL_KEYS.includes(key)) return fail(400, { key, error: 'Not a mail setting' });
+		if (!key) return fail(400, { error: 'This form is missing its setting. Reload the page and try again.' });
+		if (!MAIL_KEYS.includes(key)) return fail(400, { key, error: 'This setting cannot be changed here.' });
 
 		const value = data.get('value')?.toString() ?? '';
 		const secret = text(data, 'secret') === 'true';
 		if (secret && value === '') {
-			return fail(400, { key, error: 'Enter a value, or clear it from Configuration' });
+			return fail(400, { key, error: 'Enter a value, or clear it from Configuration.' });
 		}
 
 		try {
@@ -184,7 +184,7 @@ export const actions: Actions = {
 			// A failure of the engine keeps neither its status nor its text,
 			// because neither is written for the operator.
 			const status = e instanceof ApiError && e.status < 500 ? e.status : 502;
-			return fail(status, { key, error: actionError(e, 'The setting could not be saved. Nothing was changed.') });
+			return fail(status, { key, error: actionError(e, 'Could not save the setting. Try again.') });
 		}
 	},
 };

@@ -85,7 +85,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const refused = refusalOf(err);
 			if (refused) return fail(402, { scope: 'export' as const, error: refusalText(refused), refused });
-			return fail(400, { scope: 'export' as const, error: actionError(err, 'The configuration could not be exported.') });
+			return fail(400, { scope: 'export' as const, error: actionError(err, 'Could not export the configuration. Try again.') });
 		}
 	},
 
@@ -97,7 +97,7 @@ export const actions: Actions = {
 			const plan = await diffConfig(authedClient(event), read.req);
 			return { scope: 'sync' as const, mode: 'diff' as const, plan };
 		} catch (err) {
-			return syncFailure(err, 'diff', 'The bundle could not be compared with this instance.');
+			return syncFailure(err, 'diff', 'Could not compare the bundle with this instance. Try again.');
 		}
 	},
 
@@ -113,7 +113,7 @@ export const actions: Actions = {
 			// answer a dry run exists to give.
 			const result = applyResultOf(err);
 			if (result) return { scope: 'sync' as const, mode: 'dry-run' as const, plan: result.plan };
-			return syncFailure(err, 'dry-run', 'The dry run could not be made.');
+			return syncFailure(err, 'dry-run', 'Could not complete the dry run. Try again.');
 		}
 	},
 
@@ -129,11 +129,11 @@ export const actions: Actions = {
 			if (result) {
 				const status = err && typeof err === 'object' && 'status' in err && typeof err.status === 'number' ? err.status : 409;
 				const message = result.failed
-					? 'The apply stopped part way. What follows says what was written and what was not.'
-					: 'The bundle has problems, so nothing was written.';
+					? 'The apply stopped partway. The details below show what was written and what was not.'
+					: 'Fix the problems in the bundle, then apply it again. Nothing was written.';
 				return fail(status, { scope: 'sync' as const, mode: 'apply' as const, error: message, plan: result.plan, result });
 			}
-			return syncFailure(err, 'apply', 'The bundle could not be applied. Nothing was written.');
+			return syncFailure(err, 'apply', 'Could not apply the bundle. Nothing was written. Try again.');
 		}
 	},
 };

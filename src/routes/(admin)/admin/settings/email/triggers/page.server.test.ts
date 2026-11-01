@@ -175,13 +175,13 @@ describe('email trigger writes', () => {
 
 	it('names nothing to delete without a request', async () => {
 		const { event, calls } = write({});
-		expect(((await actions.delete(event)) as Failure).data).toEqual({ action: 'delete', error: 'Choose a trigger.' });
+		expect(((await actions.delete(event)) as Failure).data).toEqual({ action: 'delete', error: 'This form is missing its trigger. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 
 	it.each([
-		['save', 'The trigger could not be saved.'],
-		['delete', 'The trigger could not be deleted.'],
+		['save', 'Could not save the trigger. Try again.'],
+		['delete', 'Could not delete the trigger. Try again.'],
 	] as const)('answers an outage on %s as an outage, without the engine text', async (name, sentence) => {
 		const { event } = write({ ...TRIGGER, id: 't1' }, json({ error: 'dial tcp 10.0.0.4:5432' }, 503));
 		const out = (await actions[name](event)) as Failure;

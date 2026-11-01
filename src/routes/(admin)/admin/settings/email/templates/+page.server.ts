@@ -37,11 +37,11 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	// The list first: it creates the required templates a new tenant does
 	// not hold yet, and the count after it includes them.
-	const templates = await section(listTemplates(client), 'The templates could not be read. This is not a report that there are none.');
+	const templates = await section(listTemplates(client), 'Could not load email templates.');
 	// A failed limits read states nothing, and the create still answers the
 	// ceiling, so it is left out rather than shown.
 	const [starters, limits] = await Promise.all([
-		section(templateStarters(client), 'The ready-made templates could not be read, so only a blank one is offered.'),
+		section(templateStarters(client), 'Could not load the ready-made templates, so only a blank one is available.'),
 		templateLimits(client).catch((): TemplateLimits | null => null),
 	]);
 	return { templates, starters, limits };
@@ -79,7 +79,7 @@ export const actions: Actions = {
 			}
 			const key = text(data, 'key');
 			if (!TEMPLATE_KEY.test(key)) {
-				return fail(400, { action: 'save', error: 'A name is lower case letters, digits and dashes, and starts with a letter.' });
+				return fail(400, { action: 'save', error: 'Enter a name that starts with a letter and uses only lowercase letters, digits and dashes.' });
 			}
 			const created = await createTemplate(client, { key, subject, mjml_source: body, status: status(data) });
 			return { saved: created.id };
@@ -87,31 +87,31 @@ export const actions: Actions = {
 			// 409 on a create is a name the tenant already holds. The plugin's
 			// sentence for a refused body (422) is written for the author.
 			if (err instanceof ApiError && err.status === 409) return fail(409, { action: 'save', error: 'A template with that name already exists.' });
-			return tagged('save', actionFailure(err, 'The template could not be saved.', err instanceof ApiError && err.status === 422 ? 422 : 400));
+			return tagged('save', actionFailure(err, 'Could not save the template. Try again.', err instanceof ApiError && err.status === 422 ? 422 : 400));
 		}
 	},
 
 	delete: async (event) => {
 		await requireUser(event);
 		const id = text(await event.request.formData(), 'id');
-		if (!id) return fail(400, { action: 'delete', error: 'Choose a template.' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its template. Reload the page and try again.' });
 		try {
 			await deleteTemplate(authedClient(event), id);
 			return { deleted: id };
 		} catch (err) {
-			return tagged('delete', actionFailure(err, 'The template could not be deleted.', err instanceof ApiError && err.status === 409 ? 409 : 400));
+			return tagged('delete', actionFailure(err, 'Could not delete the template. Try again.', err instanceof ApiError && err.status === 409 ? 409 : 400));
 		}
 	},
 
 	preview: async (event) => {
 		await requireUser(event);
 		const key = text(await event.request.formData(), 'key');
-		if (!key) return fail(400, { action: 'preview', error: 'Choose a template.' });
+		if (!key) return fail(400, { action: 'preview', error: 'This form is missing its template. Reload the page and try again.' });
 		try {
 			const out = await previewTemplate(authedClient(event), key, SAMPLE_VARS);
 			return { preview: { key, subject: out.subject, html: out.html } };
 		} catch (err) {
-			return tagged('preview', actionFailure(err, 'The template could not be rendered. Check the body for an unclosed tag or a misspelled variable.'));
+			return tagged('preview', actionFailure(err, 'Could not render the template. Check the body for an unclosed tag or a misspelled variable.'));
 		}
 	},
 };
