@@ -148,12 +148,12 @@ describe('content history settings', () => {
 
 	it('shows no lock banner when the tenant decides everything', () => {
 		const { container } = render(Page, { props: props() });
-		expect(said(container)).not.toContain("The server's environment sets these");
+		expect(said(container)).not.toContain("Environment variables set these");
 	});
 
 	it('says older versions need the capability to read, only when the license lacks it', () => {
 		const lacking = render(Page, { props: props() });
-		expect(said(lacking.container)).toContain('reading them needs a license with the content-pro feature');
+		expect(said(lacking.container)).toContain('Reading them needs a license with the content-pro feature');
 		cleanup();
 		const licensed = render(Page, { props: props({ readsOlder: true }) });
 		expect(said(licensed.container)).not.toContain('content-pro');
@@ -170,7 +170,7 @@ describe('content history settings', () => {
 
 	it('says an older engine does not keep the settings, instead of failing', () => {
 		const { container } = render(Page, { props: props({ gate: { state: 'absent' } }) });
-		expect(said(container)).toContain('This engine does not keep content history settings.');
+		expect(said(container)).toContain('Content history needs a newer version of the engine.');
 		expect(container.querySelector('form[action="?/save"]')).toBeNull();
 	});
 
@@ -182,9 +182,9 @@ describe('content history settings', () => {
 
 	it("renders a save's refusal", () => {
 		const { container } = render(Page, {
-			props: props({ form: { action: 'save', error: "The server's environment now fixes a setting this form changed." } }),
+			props: props({ form: { action: 'save', error: "An environment variable now sets one of the settings you changed." } }),
 		});
-		expect(said(container)).toContain('now fixes a setting');
+		expect(said(container)).toContain('now sets one of the settings');
 	});
 
 	it('reports what a prune removed', async () => {

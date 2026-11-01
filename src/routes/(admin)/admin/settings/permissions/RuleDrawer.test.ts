@@ -84,14 +84,14 @@ describe('RuleDrawer', () => {
 	it('says the flows could not be read when a new resource is to be chosen', () => {
 		const { component } = setup({ flowsFailed: true });
 		flushSync(() => component.edit('editor', null));
-		expect(ruleForm()?.textContent).toContain('The flows could not be read');
+		expect(ruleForm()?.textContent).toContain('Could not load flows');
 		expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
 	it('shows the failure it is given first in its form', () => {
-		const { component } = setup({ error: 'The rule could not be saved.' });
+		const { component } = setup({ error: 'Could not save the rule. Try again.' });
 		flushSync(() => component.edit('editor', 'article'));
-		expect(ruleForm()?.firstElementChild?.textContent).toContain('The rule could not be saved.');
+		expect(ruleForm()?.firstElementChild?.textContent).toContain('Could not save the rule. Try again.');
 	});
 
 	it('hands a stored rule emptied of every grant to the page to delete', async () => {

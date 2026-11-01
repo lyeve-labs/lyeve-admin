@@ -30,7 +30,7 @@
 
 <PageShell
 	title="Settings"
-	description="Every settings page, grouped by what you came to change. What you see follows your role and what this instance runs."
+	description="Find a setting by what you want to change. The pages you see depend on your role and the plugins in this build."
 	width="wide"
 >
 	{#each groups as group (group.id)}

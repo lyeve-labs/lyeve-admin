@@ -135,7 +135,7 @@
 	const confirmReset: SubmitFunction = async ({ cancel }) => {
 		const ok = await confirmDialog(
 			'Reset the dashboard?',
-			'Everyone in this tenant goes back to the stock dashboard, and this layout is deleted.',
+			'Everyone in this tenant sees the stock dashboard again, and this layout is deleted.',
 			{ confirmLabel: 'Reset' },
 		);
 		if (!ok) {
@@ -149,7 +149,7 @@
 <PageShell
 	title="Dashboard"
 	documentTitle="Dashboard - Customization"
-	description="Compose the dashboard this tenant opens on, from widgets over data the admin already has. Each widget can be limited to roles."
+	description="Build this tenant's dashboard from widgets and choose which roles see each one."
 	width="wide"
 	back={{ href: '/admin/settings/customization', label: 'Customization' }}
 >
@@ -163,17 +163,17 @@
 	{#if form?.error}
 		<Alert tone="danger">{form.error}</Alert>
 	{:else if form && 'saved' in form}
-		<Alert tone="success" autoDismiss>Saved. Everyone in this tenant sees this dashboard now, each with the widgets their role allows.</Alert>
+		<Alert tone="success" autoDismiss>Dashboard saved. Everyone in this tenant now sees the widgets their role allows.</Alert>
 	{:else if form && 'reset' in form}
-		<Alert tone="success" autoDismiss>Reset. The stock dashboard is back.</Alert>
+		<Alert tone="success" autoDismiss>Dashboard reset. Everyone sees the stock dashboard again.</Alert>
 	{/if}
 
 	<p class="text-sm text-muted" data-testid="layout-state">
 		{#if data.layout.custom}
-			This tenant shows its own dashboard of {data.layout.widgets.length}
+			This tenant uses its own dashboard of {data.layout.widgets.length}
 			{data.layout.widgets.length === 1 ? 'widget' : 'widgets'}{#if data.layout.updated_at}, saved {formatDateTime(data.layout.updated_at)}{/if}.
 		{:else}
-			This tenant shows the stock dashboard. Saving a layout replaces it. A reset brings it back.
+			This tenant uses the stock dashboard. Saving a layout replaces it, and a reset brings it back.
 		{/if}
 	</p>
 
@@ -182,7 +182,7 @@
 			level={2}
 			gate={data.schemasGate}
 			title="The schema list"
-			absent="This instance serves no schema list, so no schema can be picked below."
+			absent="The schema list is not included in this build, so you cannot choose a schema below."
 		/>
 	{/if}
 
@@ -223,7 +223,7 @@
 						<p class="text-sm text-muted">
 							{kind.description}
 							{#if kind.adminData}
-								Its data is an admin's to read: a viewer or editor shown this widget sees it say it could not be read.
+								Only admins can see its data. Viewers and editors see a message that it could not be loaded.
 							{/if}
 						</p>
 						<div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
@@ -234,7 +234,7 @@
 
 						{#if w.type === 'entry_counts'}
 							{#if data.schemasGate.state === 'ok' && schemaOptions.length === 0}
-								<p class="text-sm text-muted">This tenant has no schemas to count yet.</p>
+								<p class="text-sm text-muted">No schemas to count yet.</p>
 							{:else}
 								<MultiSelect
 									id="widget-{w.id}-schemas"
@@ -282,7 +282,7 @@
 										</div>
 									</div>
 								{/each}
-								<p class="text-xs text-faint">An address is an https URL, or an admin path starting /admin/.</p>
+								<p class="text-xs text-faint">Use an https URL or an admin path starting /admin/.</p>
 								<div>
 									<Button variant="secondary" size="sm" type="button" onclick={() => (w.links = [...(w.links ?? []), { label: '', url: 'https://' }])}>
 										<Plus size={ICON.sm} /> Add link
@@ -299,7 +299,7 @@
 	<section class="flex flex-col gap-3">
 		<SectionHeading level={2}>Add a widget</SectionHeading>
 		{#if full}
-			<p class="text-sm text-muted">A dashboard holds at most {MAX_WIDGETS} widgets. Remove one to add another.</p>
+			<p class="text-sm text-muted">A dashboard can have at most {MAX_WIDGETS} widgets. Remove one to add another.</p>
 		{:else}
 			<ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				{#each kinds as k (k.type)}
@@ -335,7 +335,7 @@
 		<div class="flex flex-wrap items-end justify-between gap-3">
 			<div class="flex flex-col gap-1">
 				<SectionHeading level={2}>Preview</SectionHeading>
-				<p class="text-sm text-muted">The layout above, unsaved, as one role sees it. The numbers are read with your own access.</p>
+				<p class="text-sm text-muted">See the unsaved layout above as one role would. The numbers use your own access.</p>
 			</div>
 			<form method="POST" action="?/preview" class="flex items-end gap-2" use:enhance={runPreview}>
 				<input type="hidden" name="widgets" value={wire} />

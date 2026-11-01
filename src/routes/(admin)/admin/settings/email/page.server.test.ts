@@ -258,6 +258,6 @@ describe('admin/settings/email fallback transport', () => {
 		});
 		const result = (await actions.saveSetting(event)) as { status: number; data: { error: string } };
 		expect(result.status).toBe(502);
-		expect(result.data.error).toBe('The setting could not be saved. Nothing was changed.');
+		expect(result.data.error).toBe('Could not save the setting. Try again.');
 	});
 });

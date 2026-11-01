@@ -262,7 +262,7 @@ describe('tab icon', () => {
 		expect(await actions.favicon(event({ favicon_url: 'https://images.example.com/icon.png' }))).toEqual({ faviconSaved: true, faviconImported: true });
 		const refused = (await actions.favicon(event({ favicon_url: 'javascript:alert(1)' }))) as { status: number; data: { faviconError: string; fields: Record<string, string> } };
 		expect(refused.status).toBe(400);
-		expect(refused.data.faviconError).toMatch(/tab icon address/);
+		expect(refused.data.faviconError).toMatch(/for the tab icon/);
 		expect(refused.data.fields.favicon_url).toBeTruthy();
 	});
 
@@ -311,8 +311,8 @@ describe('menu link, dashboard page and page delete', () => {
 
 	it('keeps an outage body off the page', async () => {
 		api.getCustomization.mockRejectedValue(outage);
-		expect(await actions.removeLink(event({ index: '0' }))).toMatchObject({ data: { menuError: 'The link could not be removed.' } });
-		expect(await actions.home(event({ home_page: 'x' }))).toMatchObject({ data: { pagesError: 'The dashboard page could not be saved.' } });
+		expect(await actions.removeLink(event({ index: '0' }))).toMatchObject({ data: { menuError: 'Could not remove the link. Try again.' } });
+		expect(await actions.home(event({ home_page: 'x' }))).toMatchObject({ data: { pagesError: 'Could not save the dashboard page. Try again.' } });
 	});
 
 	it.each(['removeLink', 'home', 'deletePage'] as const)('holds %s to an admin', async (name) => {
@@ -330,6 +330,6 @@ describe('a failed page delete', () => {
 		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found'));
 		expect(await actions.deletePage(event({ slug: 'gone' }))).toMatchObject({ status: 400, data: { pageDeleteError: 'page not found' } });
 		api.deleteCustomPage.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
-		expect(await actions.deletePage(event({ slug: 'x' }))).toMatchObject({ data: { pageDeleteError: 'The page could not be deleted.' } });
+		expect(await actions.deletePage(event({ slug: 'x' }))).toMatchObject({ data: { pageDeleteError: 'Could not delete the page. Try again.' } });
 	});
 });

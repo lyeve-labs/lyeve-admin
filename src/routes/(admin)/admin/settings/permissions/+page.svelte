@@ -188,7 +188,7 @@
 
 <PageShell
 	title="Row-level permissions"
-	description="Content and flow access per role: one wildcard rule over every schema, a rule per schema, an All flows rule, and a rule per flow."
+	description="Set what each role can do with each schema and flow."
 	width="wide"
 >
 	{#snippet actions()}
@@ -202,7 +202,7 @@
 
 	{#if !loadError && atRoleCap && !failure?.roleCapReached}
 		<Alert tone="info" title="{storedRoleCount} of {roleCap} roles">
-			The engine refuses a new role past this instance's ceiling of {roleCap}. Every role you have keeps working.
+			This instance's role ceiling is {roleCap}, so you cannot add another role. Your existing roles keep working.
 		</Alert>
 	{/if}
 
@@ -211,7 +211,7 @@
 		     the one action on the page. -->
 		<RefusalNotice refusal={pageRefusal} lead={loadError || atRoleCap} />
 	{:else if failure?.roleCapReached}
-		<Alert tone="warn" title="That would pass this instance's role ceiling">
+		<Alert tone="warn" title="Role ceiling reached">
 			{#snippet children()}
 				{#if refusedLimit !== null && refusedCount !== null}
 					The ceiling is {refusedLimit} roles and this instance has {refusedCount}.
@@ -220,7 +220,7 @@
 				{:else}
 					This instance allows no more roles.
 				{/if}
-				Nothing was changed and every role you have keeps working.
+				Nothing was saved, and your existing roles keep working.
 			{/snippet}
 		</Alert>
 	{:else if pageError}
@@ -234,7 +234,7 @@
 			level={2}
 			gate={loadGate}
 			title="Row-level permissions"
-			absent="The permissions plugin is not running on this instance, so it holds no row-level rules to manage."
+			absent="Row-level permissions are not included in this build."
 		/>
 	{:else}
 		<!-- The explanatory card below renders its title as an h3, so without this
@@ -252,15 +252,15 @@
 						id="show-unruled"
 						bind:checked={showUnruled}
 						label="Show resources with no rule"
-						hint="A schema with no rule of its own takes the wildcard rule, and a flow the All flows rule. This brings those rows in."
+						hint="Shows schemas that use the wildcard rule and flows that use the All flows rule."
 					/>
 				{/snippet}
 			</ListToolbar>
 
 			{#if !filterMatches}
 				<EmptyState
-					title="No resource matches"
-					description="Clear the filter, or turn on the resources with no rule: a schema or flow nobody has ruled on is hidden until then."
+					title="No resources match this search"
+					description="Clear the search, or turn on Show resources with no rule to include schemas and flows without a rule of their own."
 				/>
 			{:else}
 				<Table label="Rules by role">
@@ -356,7 +356,7 @@
 											{#if !row.perm}
 												<span class="block pl-6 text-xs text-faint">no rule, denied</span>
 											{:else if row.perm.actions.length === 0}
-												<span class="block pl-6 text-xs text-faint">rule present, grants nothing</span>
+												<span class="block pl-6 text-xs text-faint">rule grants nothing</span>
 											{/if}
 										</td>
 										{#each ACTIONS as action}
@@ -371,11 +371,11 @@
 									<tr>
 										<td colspan="8" class="text-sm text-muted">
 											{#if filterText}
-												No schema in this role matches the filter.
+												No schemas in this role match this search.
 											{:else if wildcard}
-												No schema rule of its own. Every schema takes the wildcard rule above. Flows take no rule at all.
+												No schema rules of its own. Every schema uses the wildcard rule above, and every flow is denied.
 											{:else}
-												No rule at all, so {role} is denied every action on every schema and every flow.
+												{role} has no rules, so it is denied every action on every schema and flow.
 											{/if}
 										</td>
 									</tr>

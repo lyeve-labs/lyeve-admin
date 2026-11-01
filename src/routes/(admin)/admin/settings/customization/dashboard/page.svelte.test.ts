@@ -77,7 +77,7 @@ describe('dashboard widget controls', () => {
 				data: {
 					layout: { entitled: true, custom: true, widgets, updated_at: null },
 					schemas,
-					schemasGate: schemasRead === 'forbidden' ? { state: 'forbidden' } : schemasRead ? { state: 'ok' } : { state: 'error', message: 'The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.' },
+					schemasGate: schemasRead === 'forbidden' ? { state: 'forbidden' } : schemasRead ? { state: 'ok' } : { state: 'error', message: 'Could not load schemas. Widgets keep the schemas they already use.' },
 					plugins: { state: 'named', running: ['content', 'media', 'audit'], withheld: [] },
 					user: { roles: ['admin'] },
 				},
@@ -105,7 +105,7 @@ describe('dashboard widget controls', () => {
 
 	it('keeps the schemas a widget names on screen when the schema list was not read', () => {
 		const { container } = mountWith([{ id: 'b', type: 'entry_counts', schemas: ['orders'] }], false, []);
-		expect(container.textContent).toContain('The schemas could not be read');
+		expect(container.textContent).toContain('Could not load schemas');
 		expect(container.textContent).not.toContain('no schemas to count yet');
 		expect(container.querySelector('#widget-b-schemas')?.closest('div')?.parentElement?.textContent).toContain('orders');
 	});

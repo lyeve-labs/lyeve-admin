@@ -81,9 +81,9 @@ describe('email triggers without the license for writes', () => {
 describe('email triggers page', () => {
 	it('says a failed template read failed rather than that the tenant has none', () => {
 		render(TriggersPage, {
-			props: props({ templates: { ok: false, gate: { state: 'error', message: 'The templates could not be read.' } } }),
+			props: props({ templates: { ok: false, gate: { state: 'error', message: 'Could not load email templates.' } } }),
 		});
-		expect(screen.getByText('The templates could not be read.')).toBeTruthy();
+		expect(screen.getByText('Could not load email templates.')).toBeTruthy();
 		expect(screen.queryByText('No active template')).toBeNull();
 	});
 
@@ -101,7 +101,7 @@ describe('email triggers page', () => {
 
 	it('offers no create while the templates could not be read', () => {
 		render(TriggersPage, {
-			props: props({ templates: { ok: false, gate: { state: 'error', message: 'The templates could not be read.' } } }),
+			props: props({ templates: { ok: false, gate: { state: 'error', message: 'Could not load email templates.' } } }),
 		});
 		expect(screen.queryByRole('button', { name: 'New trigger' })).toBeNull();
 	});
@@ -143,8 +143,8 @@ describe('email trigger drawer', () => {
 	it('shows a refused save inside the open drawer', async () => {
 		const { rerender } = render(TriggersPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
-		await rerender(props({}, { action: 'save', error: 'The trigger could not be saved.' }));
-		expect(drawerText()).toContain('The trigger could not be saved.');
+		await rerender(props({}, { action: 'save', error: 'Could not save the trigger. Try again.' }));
+		expect(drawerText()).toContain('Could not save the trigger. Try again.');
 	});
 
 	it('shows the license a refused save needs inside the open drawer', async () => {
@@ -157,8 +157,8 @@ describe('email trigger drawer', () => {
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
-		const { container } = render(TriggersPage, { props: props({}, { action: 'delete', error: 'The trigger could not be deleted.' }) });
-		expect(container.textContent).toContain('The trigger could not be deleted.');
+		const { container } = render(TriggersPage, { props: props({}, { action: 'delete', error: 'Could not delete the trigger. Try again.' }) });
+		expect(container.textContent).toContain('Could not delete the trigger. Try again.');
 		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
 		expect(drawerText()).not.toContain('could not be deleted');
 	});

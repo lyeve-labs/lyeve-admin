@@ -208,7 +208,7 @@ describe('flows as resources', () => {
 		mockedUpsertPermission.mockClear();
 		const result = (await actions.upsert(upsertEvent({ role: 'editor', schema_name: 'article', actions: ['read', 'activate'] }))) as { status: number; data: { error: string } };
 		expect(result.status).toBe(422);
-		expect(result.data.error).toContain('flows only');
+		expect(result.data.error).toContain('only to flows');
 		expect(mockedUpsertPermission).not.toHaveBeenCalled();
 	});
 
@@ -292,6 +292,6 @@ describe('refused writes', () => {
 		mockedUpsertPermission.mockRejectedValueOnce(new ApiError(500, 'pq: boom'));
 		const result = (await actions.upsert(upsertEvent({ role: 'reviewer', schema_name: '*', drawer: 'role' }))) as Failed;
 		expect(result.data.action).toBe('role');
-		expect(result.data.error).toBe('The rule could not be saved.');
+		expect(result.data.error).toBe('Could not save the rule. Try again.');
 	});
 });

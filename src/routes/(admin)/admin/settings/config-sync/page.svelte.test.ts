@@ -89,7 +89,7 @@ describe('config sync page', () => {
 		const { getByTestId } = setup({
 			scope: 'sync',
 			mode: 'apply',
-			error: 'The apply stopped part way.',
+			error: 'The apply stopped partway.',
 			plan,
 			result: {
 				applied: false,

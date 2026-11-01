@@ -49,7 +49,7 @@ describe('the configuration page', () => {
 		expect(row('database_url').textContent).toContain('Set by an environment variable, which always wins.');
 		expect(row('database_url').querySelector('form')).toBeNull();
 		const secret = row('smtp_password');
-		expect(secret.textContent).toContain('Pinned by /etc/lyeve/lyeve.yaml. Tag the value !overridable to edit it here.');
+		expect(secret.textContent).toContain('Set in /etc/lyeve/lyeve.yaml. Tag the value !overridable there to edit it here.');
 		expect(secret.textContent).toContain('Stored, not shown.');
 	});
 
@@ -65,7 +65,7 @@ describe('the configuration page', () => {
 		expect(input.closest('form')?.getAttribute('action')).toBe('?/save');
 		expect(document.body.textContent).toContain('A saved value applies at the next restart.');
 		expect(document.body.textContent).toContain('Saved. It applies when the engine next restarts.');
-		expect(document.body.textContent).not.toContain('The engine is using it now.');
+		expect(document.body.textContent).not.toContain('Saved. It applies now.');
 	});
 
 	it('shows a refused save under the setting it belongs to only', () => {
@@ -80,14 +80,14 @@ describe('the configuration page', () => {
 		expect(screen.queryByText('database_url', { selector: 'code' })).toBeNull();
 		expect(screen.getByText('jwt_expiry_secs', { selector: 'code' })).toBeTruthy();
 		await fireEvent.input(screen.getByPlaceholderText('Name or what it does'), { target: { value: 'nothing like this' } });
-		expect(screen.getByText('No setting matches that filter')).toBeTruthy();
+		expect(screen.getByText('No settings match this search')).toBeTruthy();
 	});
 
 	it('warns about settings an empty variable holds empty', () => {
 		render(ConfigurationPage, {
 			props: props({ provenance: { ok: true, value: { settings, counts: {}, suppressed: ['redis_url'] } } }),
 		});
-		expect(screen.getByText('Held empty by an environment variable')).toBeTruthy();
+		expect(screen.getByText('Set to empty by an environment variable')).toBeTruthy();
 		expect(screen.getByText('redis_url')).toBeTruthy();
 	});
 
@@ -100,7 +100,7 @@ describe('the configuration page', () => {
 
 	it('says a failed read is a failure, not an engine with nothing set', () => {
 		const { container } = render(ConfigurationPage, { props: props({ provenance: { ok: false, gate: { state: 'unavailable' } } }) });
-		expect(container.textContent).not.toContain('No settings reported');
+		expect(container.textContent).not.toContain('No settings to show');
 		expect(screen.queryByLabelText('jwt_expiry_secs')).toBeNull();
 	});
 });

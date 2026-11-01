@@ -59,7 +59,7 @@
 
 <PageShell
 	title="Account and appearance"
-	description="The account you are signed in with, and how this admin looks for you. Nothing here changes it for anybody else."
+	description="See the account you are signed in with and choose how this admin looks. Changes here apply only to you."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -94,7 +94,7 @@
 				<SectionHeading level={2}>Appearance</SectionHeading>
 			{/snippet}
 			<div class="flex flex-col gap-4">
-				<p class="text-sm text-muted">The color scheme this admin uses in this browser. System follows your desktop, dusk included.</p>
+				<p class="text-sm text-muted">Choose the color scheme for this admin in this browser. System follows your desktop setting and changes when it does.</p>
 				<!-- One radiogroup, not three buttons. The kit's control announces the
 				     chosen segment, holds a single tab stop and moves the selection on
 				     the arrow keys. The paragraph above names the group on screen, so

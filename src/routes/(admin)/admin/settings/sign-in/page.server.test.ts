@@ -104,6 +104,6 @@ describe('sign-in window save', () => {
 	it('reports an outage without the engine detail', async () => {
 		api.saveProviderWindow.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
 		const result = (await actions.save(formEvent({ days: '12' }))) as unknown as Failed;
-		expect(result.data.error).toBe('The sign-in window could not be saved.');
+		expect(result.data.error).toBe('Could not save the sign-in window. Try again.');
 	});
 });

@@ -51,7 +51,7 @@ describe('the gate', () => {
 		const { container } = render(BrokerPage, {
 			props: props({ permitted: false, status: null }),
 		});
-		expect(said(container)).toContain("super admin's to read");
+		expect(said(container)).toContain('Only a super admin can view the broker status');
 	});
 
 	// The worst thing this page can do is report a failed read as a working
@@ -75,7 +75,7 @@ describe('what the numbers mean', () => {
 		});
 		const text = said(container);
 		expect(text).toContain('refused 12 events');
-		expect(text).toContain('nothing else reported this');
+		expect(text).toContain('No other screen reports these failures');
 	});
 
 	it('separates having nowhere to send from being refused', () => {
@@ -83,8 +83,8 @@ describe('what the numbers mean', () => {
 			props: props({ status: status({ published: 0, dropped: 8, connected: false }) }),
 		});
 		const text = said(container);
-		expect(text).toContain('had nowhere to go');
-		expect(text).toContain('not at the broker');
+		expect(text).toContain('were dropped because no broker connection');
+		expect(text).toContain('not the broker');
 	});
 
 	it('names a disabled plugin as the cause rather than the broker', () => {
@@ -92,14 +92,14 @@ describe('what the numbers mean', () => {
 			props: props({ status: status({ degraded: true, dropped: 40, published: 0 }) }),
 		});
 		const text = said(container);
-		expect(text).toContain('Nothing is wrong with the broker');
+		expect(text).toContain('The broker itself is working');
 	});
 
 	// A counter reset by a restart is not a quiet week, and a reader comparing
 	// today's number to yesterday's needs to know which it is.
 	it('says the counters are per process', () => {
 		const { container } = render(BrokerPage, { props: props() });
-		expect(said(container)).toContain('since this process started');
+		expect(said(container)).toContain('since the engine last started');
 	});
 });
 
@@ -127,7 +127,7 @@ describe('an instance with no broker', () => {
 			[...container.querySelectorAll('th')].find((th) => th.textContent?.trim() === name)?.nextElementSibling?.textContent?.trim();
 		expect(row('Connected')).toBe('-');
 		expect(row('TLS')).toBe('-');
-		expect(row('Last publish')).toBe('Nothing has been published');
+		expect(row('Last publish')).toBe('Nothing published yet');
 	});
 
 	it('still states the delivery rate with a broker', () => {
@@ -153,7 +153,7 @@ describe('the connection', () => {
 		const { container } = render(BrokerPage, {
 			props: props({ status: status({ published: 0, last_publish_at: null }) }),
 		});
-		expect(said(container)).toContain('Nothing has been published');
+		expect(said(container)).toContain('Nothing published yet');
 	});
 });
 
@@ -179,7 +179,7 @@ describe('the outbox', () => {
 			props: props({ status: status({ failed: 40, outbox: { enabled: true, available: true, pending: 3, dead: 2 } }) }),
 		});
 		const text = said(container);
-		expect(text).toContain('2 events ran out of attempts and never reached the broker.');
+		expect(text).toContain('2 events failed every retry and never reached the broker.');
 		expect(text).toContain('3 events are waiting in the outbox.');
 		expect(text).toContain('refused 40 publish attempts');
 		expect(text).not.toContain('fire and forget');

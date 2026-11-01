@@ -27,7 +27,7 @@ const ROLES = ['viewer', 'editor', 'admin'];
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
-	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Requires the admin role');
+	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Only an admin can change customization.');
 	const locked = {
 		gate: GATE_OK as Gate,
 		entitled: false,
@@ -50,7 +50,7 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		custom = await getCustomization(client);
 	} catch (err) {
-		return { ...locked, gate: gateOf(err, 'The customization could not be read. Nothing was changed.') };
+		return { ...locked, gate: gateOf(err, 'Could not load customization.') };
 	}
 	if (!custom.entitled) return locked;
 	const [media, dashboard] = await Promise.all([
@@ -102,7 +102,7 @@ async function saveImageAddress(event: Parameters<Actions[string]>[0], kind: Bra
 	const { field, noun } = IMAGE[kind];
 	const url = String((await event.request.formData()).get(field) ?? '').trim();
 	if (url && !logoAddressOk(url)) {
-		return { error: `A ${noun} address is an https URL or a published media library file.`, field: 'An https URL' };
+		return { error: `Enter an https URL or a published media library file for the ${noun}.`, field: 'An https URL' };
 	}
 	const client = authedClient(event);
 	// The admin loads images only from its own origin, so an image on another
@@ -114,12 +114,12 @@ async function saveImageAddress(event: Parameters<Actions[string]>[0], kind: Bra
 			const item = await importMedia(client, { url, public: true, max_bytes: LOGO_MAX_BYTES, folder: '/branding' });
 			if (!(LOGO_TYPES as readonly string[]).includes(item.content_type) || !item.public_url) {
 				await client.delete(`/api/admin/media/${encodeURIComponent(item.id)}`).catch(() => undefined);
-				return { error: `A ${noun} is a PNG, JPEG or WebP image.`, field: 'Not a PNG, JPEG or WebP image' };
+				return { error: `Use a PNG, JPEG or WebP image for the ${noun}.`, field: 'Not a PNG, JPEG or WebP image' };
 			}
 			stored = item.public_url;
 			imported = true;
 		} catch (err) {
-			return { error: importRefusal(actionError(err, 'The image at that address could not be imported.')), field: 'Could not be imported' };
+			return { error: importRefusal(actionError(err, 'Could not import the image at that address. Try again.')), field: 'Could not be imported' };
 		}
 	}
 	try {
@@ -128,7 +128,7 @@ async function saveImageAddress(event: Parameters<Actions[string]>[0], kind: Bra
 		await saveCustomization(client, settings);
 		return url ? { imported } : { removed: true };
 	} catch (err) {
-		return { error: actionError(err, `The ${noun} could not be saved.`) };
+		return { error: actionError(err, `Could not save the ${noun}. Try again.`) };
 	}
 }
 
@@ -145,7 +145,7 @@ async function saveImageUpload(event: Parameters<Actions[string]>[0], kind: Bran
 		return {};
 	} catch (err) {
 		if (err instanceof LogoRejected) return { error: err.message };
-		return { error: actionError(err, `The ${noun} could not be saved.`) };
+		return { error: actionError(err, `Could not save the ${noun}. Try again.`) };
 	}
 }
 
@@ -154,7 +154,7 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const accent = parseAccent(String(form.get('accent') ?? ''));
-		if (accent === null) return fail(400, { brandError: 'The accent is a color written #RRGGBB, such as #0a7cff.' });
+		if (accent === null) return fail(400, { brandError: 'Enter the accent color as #RRGGBB, such as #0a7cff.' });
 		try {
 			const settings = await current(event);
 			// The logo and the tab icon have their own forms and actions, so
@@ -168,7 +168,7 @@ export const actions: Actions = {
 			await saveCustomization(authedClient(event), settings);
 			return { brandSaved: true };
 		} catch (err) {
-			return fail(400, { brandError: actionError(err, 'The brand could not be saved.') });
+			return fail(400, { brandError: actionError(err, 'Could not save the brand. Try again.') });
 		}
 	},
 
@@ -215,7 +215,7 @@ export const actions: Actions = {
 			await saveCustomization(authedClient(event), settings);
 			return { menuSaved: true };
 		} catch (err) {
-			return fail(400, { menuError: actionError(err, 'The menu could not be saved.') });
+			return fail(400, { menuError: actionError(err, 'Could not save the menu. Try again.') });
 		}
 	},
 
@@ -237,7 +237,7 @@ export const actions: Actions = {
 			await saveCustomization(authedClient(event), settings);
 			return { linkSaved: true };
 		} catch (err) {
-			return fail(400, { linkError: actionError(err, 'The link could not be saved.') });
+			return fail(400, { linkError: actionError(err, 'Could not save the link. Try again.') });
 		}
 	},
 
@@ -250,7 +250,7 @@ export const actions: Actions = {
 			await saveCustomization(authedClient(event), settings);
 			return { linkRemoved: true };
 		} catch (err) {
-			return fail(400, { menuError: actionError(err, 'The link could not be removed.') });
+			return fail(400, { menuError: actionError(err, 'Could not remove the link. Try again.') });
 		}
 	},
 
@@ -263,7 +263,7 @@ export const actions: Actions = {
 			await saveCustomization(authedClient(event), settings);
 			return { homeSaved: true };
 		} catch (err) {
-			return fail(400, { pagesError: actionError(err, 'The dashboard page could not be saved.') });
+			return fail(400, { pagesError: actionError(err, 'Could not save the dashboard page. Try again.') });
 		}
 	},
 
@@ -290,7 +290,7 @@ export const actions: Actions = {
 				position: custom.pages.length,
 			});
 		} catch (err) {
-			return fail(400, { pageError: actionError(err, 'The page could not be created.') });
+			return fail(400, { pageError: actionError(err, 'Could not create the page. Try again.') });
 		}
 		redirect(303, `/admin/settings/customization/pages/${slug}`);
 	},
@@ -302,7 +302,7 @@ export const actions: Actions = {
 			await deleteCustomPage(authedClient(event), slug);
 			return { pageDeleted: true };
 		} catch (err) {
-			return fail(400, { pageDeleteError: actionError(err, 'The page could not be deleted.') });
+			return fail(400, { pageDeleteError: actionError(err, 'Could not delete the page. Try again.') });
 		}
 	},
 };

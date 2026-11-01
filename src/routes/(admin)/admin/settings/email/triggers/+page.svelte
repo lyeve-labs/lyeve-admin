@@ -137,10 +137,10 @@
 
 	<FormErrors message={deleteFailure?.error} refused={pageRefusal} />
 	{#if data.triggers.ok && !data.templates.ok}
-		<GateNotice level={2} gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
+		<GateNotice level={2} gate={data.templates.gate} title="Email templates" absent="Email templates need a newer version of the email plugin." />
 	{:else if data.triggers.ok && activeTemplates.length === 0}
 		<Alert tone="warn" title="No active template">
-			{#snippet children()}A trigger sends an active email template, and this tenant has none. <a class="text-brand underline" href="/admin/settings/email/templates">Create one in Email templates</a> first.{/snippet}
+			{#snippet children()}A trigger needs an active email template, and this tenant has none. <a class="text-brand underline" href="/admin/settings/email/templates">Create one in Email templates</a> first.{/snippet}
 		</Alert>
 	{/if}
 
@@ -148,15 +148,15 @@
 		<Alert tone="warn" title="Triggers cannot be created or changed">
 			{#snippet children()}Creating or editing a trigger needs {writeRefusal.kind === 'feature' && writeRefusal.feature
 					? writeRefusal.feature
-					: 'a capability'}, which the license on this instance does not include. Deleting a trigger is
-				allowed. <a class="text-brand underline" href={LICENSE_PAGE}>View the license</a>.{/snippet}
+					: 'a capability'}, which this instance's license does not include. You can still delete
+				triggers. <a class="text-brand underline" href={LICENSE_PAGE}>View the license</a>.{/snippet}
 		</Alert>
 	{/if}
 
 	{#if !data.triggers.ok}
-		<GateNotice level={2} gate={data.triggers.gate} title="Email triggers" absent="This version of the email plugin has no triggers." />
+		<GateNotice level={2} gate={data.triggers.gate} title="Email triggers" absent="Email triggers need a newer version of the email plugin." />
 	{:else if triggers.length === 0}
-		<EmptyState level={2} title="No triggers yet" description="A trigger sends a template to fixed addresses or to an address the record holds, each time its event fires.">
+		<EmptyState level={2} title="No triggers yet" description="Create a trigger to send a template to fixed addresses or to an address on the record each time its event fires.">
 			{#snippet iconSnippet()}<MailPlus size={ICON.lg} />{/snippet}
 			{#snippet action()}
 				{#if canCreate}
@@ -229,8 +229,8 @@
 			value={schema}
 			onvaluechange={(v) => (schema = v)}
 			hint={data.schemas.ok
-			? 'The schema whose records it watches. A review event names the schema of the entry under review.'
-			: 'The schemas could not be read, so only every schema is offered. Reload the page to pick one.'}
+			? 'The schema whose records the trigger watches. For a review event, choose the schema of the entry under review.'
+			: 'Could not load schemas, so only every schema is listed. Reload the page to try again.'}
 		/>
 		<Select
 			id="trigger-template"
@@ -241,7 +241,7 @@
 			options={templateOptions}
 			value={templateKey}
 			onvaluechange={(v) => (templateKey = v)}
-			hint="The record's fields are its variables, plus event, schema and record_id."
+			hint="The template can use the record's fields as variables, plus event, schema and record_id."
 		/>
 		<Textarea
 			id="trigger-to"
@@ -258,10 +258,10 @@
 			label="And to the address in field"
 			placeholder="email"
 			mono
-			hint="A field of the record that holds an address, such as the customer's email. Leave blank to send to the fixed addresses only."
+			hint="A record field with an email address, such as the customer's email. Leave blank to send only to the fixed addresses."
 			bind:value={toField}
 		/>
-		<Input id="trigger-locale" name="locale" label="Locale" placeholder="en" mono hint="Which translation of the template to send. Blank sends en." bind:value={locale} />
+		<Input id="trigger-locale" name="locale" label="Locale" placeholder="en" mono hint="Which translation of the template to send. Leave blank to send en." bind:value={locale} />
 		<Toggle id="trigger-enabled" label="Enabled" hint="A disabled trigger keeps its settings and sends nothing." bind:checked={enabled} />
 	</form>
 	{#snippet footer()}

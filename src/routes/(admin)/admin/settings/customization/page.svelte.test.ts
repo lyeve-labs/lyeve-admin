@@ -51,9 +51,9 @@ describe('the customization drawers and older failures', () => {
 	const pageText = () => document.body.querySelector('form#page-form')?.textContent ?? '';
 
 	it('opens the page drawer clean after a failed link save', async () => {
-		render(CustomizationPage, { props: props({}, { linkError: 'The link could not be saved.' }) });
+		render(CustomizationPage, { props: props({}, { linkError: 'Could not save the link. Try again.' }) });
 		await fireEvent.click(screen.getAllByRole('button', { name: /new page/i })[0]);
-		expect(pageText()).not.toContain('could not be saved');
+		expect(pageText()).not.toContain('Could not save');
 	});
 
 	it('shows a failed link save first in the open link drawer, and not when reopened', async () => {
@@ -90,9 +90,9 @@ describe('the customization controls', () => {
 
 	it('shows a failed page delete in the Pages card, not beside the dashboard form', () => {
 		render(CustomizationPage, {
-			props: props({ pages: [{ slug: 'welcome', title: 'Welcome', roles: [], blocks: [] }] }, { pageDeleteError: 'The page could not be deleted.' }),
+			props: props({ pages: [{ slug: 'welcome', title: 'Welcome', roles: [], blocks: [] }] }, { pageDeleteError: 'Could not delete the page. Try again.' }),
 		});
-		const alert = screen.getByText('The page could not be deleted.');
+		const alert = screen.getByText('Could not delete the page. Try again.');
 		const pagesHeading = screen.getByRole('heading', { name: 'Pages' });
 		expect(pagesHeading.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		expect(screen.getByTestId('dashboard-state').parentElement?.textContent).not.toContain('could not be deleted');
