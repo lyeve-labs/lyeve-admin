@@ -59,7 +59,7 @@ describe('Slow queries gate', () => {
 			props: props({ gate: { state: 'absent' }, entries: [] }),
 		});
 
-		expect(container.textContent).toContain('not part of this build');
+		expect(container.textContent).toContain('not included in this build');
 	});
 
 	it('names the store when the capture table did not answer', () => {
@@ -67,7 +67,7 @@ describe('Slow queries gate', () => {
 			props: props({ gate: { state: 'capture_store' }, entries: [] }),
 		});
 
-		expect(container.textContent).toContain('capture store did not answer');
+		expect(container.textContent).toContain('Could not load the slow query log.');
 	});
 
 	// A pending migration is applied while the page is open, so the notice
@@ -90,7 +90,7 @@ describe('Slow queries gate', () => {
 		});
 
 		expect(container.textContent).toContain('did not answer');
-		expect(container.textContent).not.toContain('capture store');
+		expect(container.textContent).not.toContain('Its table may be missing');
 		expect(container.textContent).toContain('Try again');
 	});
 });
@@ -129,7 +129,7 @@ describe('Slow queries list', () => {
 	it('reads an empty log as a quiet instance, not a broken one', () => {
 		const { container } = render(QueriesPage, { props: props({ entries: [], total: 0 }) });
 
-		expect(container.textContent).toContain('Nothing has been slow');
+		expect(container.textContent).toContain('No slow queries yet');
 	});
 });
 
@@ -209,7 +209,7 @@ describe('Slow queries analysis', () => {
 			props: props({ dialect: 'mssql', analyzeFailed: true }),
 		});
 
-		expect(container.textContent).toContain('could not explain these statements as mssql');
+		expect(container.textContent).toContain('Could not explain these statements as mssql');
 		expect(container.textContent).not.toContain('Nothing to suggest');
 	});
 });
@@ -222,7 +222,7 @@ describe('Slow queries filter', () => {
 		const input = container.querySelector('#query-narrow') as HTMLInputElement;
 		await fireEvent.input(input, { target: { value: 'no such statement' } });
 
-		expect(container.textContent).toContain('Nothing on this page matches');
+		expect(container.textContent).toContain('No statements on this page match this search');
 		expect(container.querySelector('table')).toBeNull();
 		expect(container.querySelector('nav[aria-label*="agination" i]')).toBeNull();
 	});

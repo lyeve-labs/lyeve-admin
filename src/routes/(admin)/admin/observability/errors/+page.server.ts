@@ -80,11 +80,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No alert was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its alert. Reload the page and try again.' });
 		try {
 			await acknowledge(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The alert could not be acknowledged.') });
+			return fail(400, { error: actionError(err, 'Could not acknowledge the alert. Try again.') });
 		}
 		return { acknowledged: id };
 	},
@@ -95,11 +95,11 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const action = form.get('action');
-		if (!id || !isTriageAction(action)) return fail(400, { error: 'Pick an alert and what to do with it.' });
+		if (!id || !isTriageAction(action)) return fail(400, { error: 'This form is missing its alert or action. Reload the page and try again.' });
 		try {
 			await triage(authedClient(event), id, action);
 		} catch (err) {
-			return actionFailure(err, 'The alert could not be changed.');
+			return actionFailure(err, 'Could not change the alert status. Try again.');
 		}
 		return { triaged: id, action };
 	},
@@ -112,12 +112,12 @@ export const actions: Actions = {
 		const assignee = String(form.get('assignee') ?? '').trim();
 		// The assign prompt names itself on a failure, so the prompt says it and
 		// the page does not.
-		if (!id) return fail(400, { error: 'No alert was named.', drawer: 'assign' });
-		if (assignee.length > 255) return fail(400, { error: 'An assignee is at most 255 characters.', drawer: 'assign' });
+		if (!id) return fail(400, { error: 'This form is missing its alert. Reload the page and try again.', drawer: 'assign' });
+		if (assignee.length > 255) return fail(400, { error: 'Enter an assignee of at most 255 characters.', drawer: 'assign' });
 		try {
 			await assign(authedClient(event), id, assignee);
 		} catch (err) {
-			const failed = actionFailure(err, 'The alert could not be assigned.');
+			const failed = actionFailure(err, 'Could not assign the alert. Try again.');
 			return fail(failed.status, { ...failed.data, drawer: 'assign' });
 		}
 		return { assigned: id, assignee };

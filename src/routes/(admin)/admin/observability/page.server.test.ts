@@ -141,7 +141,7 @@ describe('the tunable actions', () => {
 		const result = await actions.parallel(event);
 		expect(result).toMatchObject({ status: 400, data: { form: 'parallel' } });
 		const data = (result as { data: { error: string } }).data;
-		expect(data.error).toBe('Failed to reconfigure the parallel engine.');
+		expect(data.error).toBe('Could not save the parallel engine settings. Try again.');
 	});
 
 	it('returns a 402 as the license refusal, not as a generic error', async () => {

@@ -72,8 +72,8 @@
 	function deleteRule(rule: LogAlertRule): SubmitFunction {
 		return confirmed(
 			`Delete the rule on ${ruleScope(rule).toLowerCase()}?`,
-			'It stops firing. Its channels go with it.',
-			{ confirmLabel: 'Delete', success: 'Rule deleted' },
+			'The rule stops firing and its channels are deleted. This cannot be undone.',
+			{ confirmLabel: 'Delete', success: 'Rule deleted.' },
 		);
 	}
 
@@ -88,7 +88,7 @@
 
 <PageShell
 	title="Volume alerts"
-	description="Rules that fire when the log writes more entries than expected, and where each one says so."
+	description="Set rules that alert you when log volume passes a ceiling."
 	width="wide"
 	back={{ href: '/admin/logs', label: 'Logs' }}
 >
@@ -105,7 +105,7 @@
 			level={2}
 			gate={data.gate}
 			title="Volume alerts"
-			absent="The logging plugin is not part of this build, so there are no volume rules."
+			absent="Volume alerts are not included in this build."
 		/>
 	{:else}
 		{#if !inDrawer}
@@ -113,10 +113,10 @@
 		{/if}
 
 		<p class="text-sm text-muted">
-			A replica checks every rule each minute. A rule that passes its ceiling writes an ALERT entry to the live
-			tail and a warning to the log on every install, and tells each of its channels.
+			Every rule is checked once a minute. When a rule passes its ceiling, it notifies each of its channels. On every
+			install it also adds an ALERT entry to the live tail and a warning to the log.
 			{#if !data.superAdmin}
-				These are the rules scoped to your tenant. A super admin writes them.
+				These are your tenant's rules. Only a super admin can change them.
 			{/if}
 		</p>
 
@@ -124,8 +124,8 @@
 			<SectionHeading level={2}>Rules</SectionHeading>
 			{#if config.thresholds.length === 0}
 				<EmptyState
-					title="No volume rule"
-					description="A rule watches one level, or every level, over a window, and fires past a ceiling."
+					title="No volume rules yet"
+					description="Create a rule to get an alert when one level, or every level, passes a ceiling within a window."
 				>
 					{#snippet iconSnippet()}<BellRing size={ICON.lg} />{/snippet}
 					{#snippet action()}
@@ -238,7 +238,7 @@
 				id="log-rule-tenant"
 				name="tenant_id"
 				label="Tenant"
-				hint="Empty counts every tenant's entries."
+				hint="Leave empty to count entries from every tenant."
 				value={editing?.tenant_id ?? ''}
 				mono
 			/>
@@ -246,14 +246,14 @@
 				id="log-rule-plugin"
 				name="plugin"
 				label="Plugin"
-				hint="Empty counts every plugin's entries."
+				hint="Leave empty to count entries from every plugin."
 				value={editing?.plugin ?? ''}
 				mono
 			/>
 		</div>
 		<div>
 			<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
-			<Toggle id="log-rule-enabled" label="On" hint="An off rule is kept and never fires." bind:checked={enabled} />
+			<Toggle id="log-rule-enabled" label="On" hint="When on, the rule is checked every minute. Turn it off to pause it without deleting it." bind:checked={enabled} />
 		</div>
 		<fieldset class="flex flex-col gap-4 border-t border-line pt-4">
 			<legend class="text-sm font-medium text-fg">Channels</legend>

@@ -173,14 +173,14 @@
 
 	{#if !logTail}
 		<Alert tone="brand">
-			The logging plugin is not running on this instance, so there is no log tail to follow.
+			The live log tail is not included in this build.
 		</Alert>
 	{:else}
 		{#if logState === 'refused'}
-			<Alert tone="warn" title="The engine refused the log tail">
+			<Alert tone="warn" title="Could not connect to the live log tail">
 				<p>
-					The engine refused the stream, so the browser will not try it again. Your role may not
-					read the logs, or the engine did not answer.
+					The connection was refused, and it will not reconnect on its own. Your role may not have
+					access to logs, or the engine may be unavailable.
 				</p>
 				<div class="mt-3">
 					<Button variant="secondary" size="sm" onclick={retryLogStream}>
@@ -220,7 +220,7 @@
 				<EmptyState
 					iconSnippet={noLogEntries}
 					title="Waiting for log entries"
-					description="Entries at the selected level appear here as the engine emits them."
+					description="Entries at the selected level appear here as they are written."
 				/>
 			{/if}
 		{:else}

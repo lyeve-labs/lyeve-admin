@@ -86,20 +86,20 @@
 	}
 
 	const saveRule = tracked(() => {
-		const verb = editing ? 'Saved' : 'Created';
+		const verb = editing ? 'saved' : 'created';
 		const subject = pattern;
 		return async ({ result, update }) => {
 			if (result.type !== 'failure') ruleOpen = false;
 			await update();
-			if (result.type === 'success') toast.success(`${verb} ${subject}`);
+			if (result.type === 'success') toast.success(`Rule for ${subject} ${verb}.`);
 		};
 	});
 
 	function removeRule(r: CacheRule): SubmitFunction {
 		return confirmed(
 			`Delete the rule for ${r.pattern}?`,
-			'What it cached is evicted with it, and the route is served uncached from the next request.',
-			{ confirmLabel: 'Delete', success: `Deleted the rule for ${r.pattern}` },
+			'Its cached responses are removed, and the route is served without the cache from the next request.',
+			{ confirmLabel: 'Delete', success: `Rule for ${r.pattern} deleted.` },
 		);
 	}
 
@@ -110,19 +110,19 @@
 	function purge(what: string): SubmitFunction {
 		return confirmed(
 			`Purge ${what}?`,
-			'Each purged response is computed again the next time it is asked for.',
+			'Each purged response is computed again on its next request.',
 			{
 				confirmLabel: 'Purge',
 				success: (data) => {
 					const n = (data as { purged?: number } | undefined)?.purged ?? 0;
-					return `Purged ${n} ${n === 1 ? 'response' : 'responses'}`;
+					return `${n} ${n === 1 ? 'response' : 'responses'} purged.`;
 				},
 			},
 		);
 	}
 
 	const RECOMPUTED =
-		'Every flushed key is recomputed the next time it is asked for, so this puts that load on the database at once.';
+		'Each flushed key is computed again on its next request, which adds that load to the database immediately.';
 
 	/**
 	 * Every flushed key is recomputed on its next request, so this is a
@@ -134,22 +134,22 @@
 		if (data.flushScoped) {
 			return confirmed(
 				"Flush this tenant's cached responses?",
-				`Other tenants' entries and keys outside the response cache stay. ${RECOMPUTED}`,
-				{ confirmLabel: 'Flush', success: "Flushed this tenant's cached responses" },
+				`Other tenants' entries and keys outside the response cache are kept. ${RECOMPUTED}`,
+				{ confirmLabel: 'Flush', success: 'Cache flushed for this tenant.' },
 			);
 		}
 		return confirmed(
 			'Flush the cache?',
-			`Your session names no tenant, so on an install with many tenants this removes every key of every tenant. On an install with one tenant it removes that tenant's cached responses. ${RECOMPUTED}`,
-			{ confirmLabel: 'Flush', success: 'Flushed the cache' },
+			`Your session is not scoped to a tenant. On an install with many tenants, this removes every key of every tenant. On an install with one tenant, it removes that tenant's cached responses. ${RECOMPUTED}`,
+			{ confirmLabel: 'Flush', success: 'Cache flushed.' },
 		);
 	}
 
 	function flushTag(tag: string): SubmitFunction {
 		return confirmed(
 			`Flush everything tagged ${tag}?`,
-			`Every entry carrying the tag goes, whichever tenant it belongs to. ${RECOMPUTED}`,
-			{ confirmLabel: 'Flush', success: `Flushed everything tagged ${tag}` },
+			`Every entry with this tag is removed, for every tenant. ${RECOMPUTED}`,
+			{ confirmLabel: 'Flush', success: `Entries tagged ${tag} flushed.` },
 		);
 	}
 
@@ -157,14 +157,14 @@
 		return () =>
 			async ({ result, update }) => {
 				await update();
-				if (result.type === 'success') toast.success(`Reset the circuit for ${p.name}`);
+				if (result.type === 'success') toast.success(`Circuit reset for ${p.name}.`);
 			};
 	}
 </script>
 
 <PageShell
 	title="Cache"
-	description="What is being served from cache, which backends are behind it, and what is stored."
+	description="See what is served from the cache, which providers store it and what is stored."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -189,7 +189,7 @@
 			level={2}
 			gate={data.gate}
 			title="Cache"
-			absent="The cache plugin is not part of this build, so nothing is cached."
+			absent="The cache is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={fromDrawer ? undefined : formError} refused={fromDrawer ? null : refusal} />
@@ -200,9 +200,9 @@
 			     is entirely out of service. -->
 			<Alert tone="danger">
 				{tripped.length}
-				{tripped.length === 1 ? 'provider is' : 'providers are'} cut out by their circuit
-				breaker. The hit rate above still looks reasonable because another provider is
-				picking up, so nothing else reports this.
+				{tripped.length === 1 ? 'provider is' : 'providers are'} switched off by their circuit
+				breaker. The hit rate above still looks normal because another provider is
+				taking over, so this is the only place it shows.
 			</Alert>
 		{/if}
 
@@ -212,7 +212,7 @@
 					size="sm"
 					mono
 					label="Hit rate"
-					value={rate === null ? 'Nothing asked yet' : `${rate}%`}
+					value={rate === null ? 'No requests yet' : `${rate}%`}
 				/>
 				<Stat size="sm" mono label="Entries" value={data.stats.entries} />
 				<Stat
@@ -230,11 +230,11 @@
 				     store was full. A capacity problem dressed as a working
 				     cache: the hit rate falls and nothing errors. -->
 				<Alert tone="warn">
-					{data.stats.evictions} entries were pushed out before they expired, which means the
-					store filled up. The hit rate falls and nothing errors, so this is the only place
-					it shows.
+					{data.stats.evictions} entries were removed before they expired because the store
+					is full. The hit rate drops without any error, so this is the only place it
+					shows.
 					{#if full !== null}
-						The store is {Math.round(full * 100)}% of its ceiling.
+						The store is at {Math.round(full * 100)}% of its limit.
 					{/if}
 				</Alert>
 			{/if}
@@ -247,23 +247,23 @@
 					{#if data.providersLicensed}
 						Every configured provider runs, in priority order, with failover and a circuit breaker on each.
 					{:else}
-						This install runs one provider, the highest-priority one that starts. Any other configured
-						provider is listed below as left out.
+						Only one provider runs on this install: the highest-priority one that starts. Other configured
+						providers are listed below as left out.
 					{/if}
 				</p>
 			{/if}
 			{#if !data.providersRead}
 				{#if data.providersGate}
-					<GateNotice gate={data.providersGate} title="the providers" absent="This version of the cache plugin does not list its providers." />
+					<GateNotice gate={data.providersGate} title="the providers" absent="The provider list needs a newer version of the cache plugin." />
 				{:else}
 					<Alert tone="danger">
-						The providers could not be read. This is not a report that all of them are healthy.
+						Could not load providers. Reload the page to try again.
 					</Alert>
 				{/if}
 			{:else if data.providers.length === 0}
 				<EmptyState
-					title="No provider is configured"
-					description="The plugin is running with nowhere to store anything."
+					title="No providers configured"
+					description="Nothing can be cached until a provider is configured."
 				>
 					{#snippet iconSnippet()}
 						<Database size={ICON.lg} />
@@ -348,20 +348,20 @@
 				{/if}
 			</div>
 			<p class="text-sm text-muted">
-				A rule serves a public read route of this tenant from the cache for its time to live. A content
-				change purges what the rules tagged with its content type, and a rule with no tags is purged by
-				every content change.
+				A rule serves one of this tenant's public read routes from the cache for its time to live. When
+				content changes, responses from rules tagged with its content type are purged. A rule with no tags
+				is purged by every content change.
 			</p>
 			{#if rules.gate.state !== 'ok'}
 				<GateNotice
 					gate={rules.gate}
 					title="Response cache rules"
-					absent="This version of the cache plugin keeps no response cache rules."
+					absent="Response cache rules need a newer version of the cache plugin."
 				/>
 			{:else}
 				{#if rulesFull}
 					<div id="rules-full">
-						<Alert tone="warn" title="Every rule this install allows is in use">
+						<Alert tone="warn" title="All available rules are in use">
 							{rules.limit?.current} of {rules.limit?.limit} rules are in use. Delete one to add another, or
 							change the license to allow more. Existing rules keep serving either way.
 						</Alert>
@@ -390,8 +390,8 @@
 
 				{#if rules.rows.length === 0}
 					<EmptyState
-						title="No response is cached by rule"
-						description="Every public read is computed on each request until a rule names its route."
+						title="No response cache rules yet"
+						description="Create a rule to serve a public read route from the cache. Until then, every public read is computed on each request."
 					>
 						{#snippet iconSnippet()}
 							<Route size={ICON.lg} />
@@ -470,23 +470,23 @@
 
 			{#if !data.superAdmin}
 				<p class="text-sm text-muted">
-					The stored keys are listed for super admins only, because the store holds every tenant's keys.
+					Only super admins can see stored keys, because the store has every tenant's keys.
 				</p>
 			{:else if data.entriesGate}
 				<GateNotice
 					gate={data.entriesGate}
 					title="the stored entries"
-					absent="This version of the cache plugin does not list its stored entries."
+					absent="Stored entries need a newer version of the cache plugin."
 				/>
 			{:else if data.unlisted}
 				<Alert tone="brand">
-					This cache provider does not list its entries, so none are shown here. The counters above still
-					count them.
+					This cache provider cannot list its entries. The counters above still include
+					them.
 				</Alert>
 			{:else if data.entries.length === 0}
 				<EmptyState
 					title="Nothing is cached"
-					description="Either nothing has been asked for yet, or every entry has expired."
+					description="Nothing has been requested yet, or every entry has expired."
 				>
 					{#snippet iconSnippet()}
 						<Database size={ICON.lg} />
@@ -494,7 +494,7 @@
 				</EmptyState>
 			{:else}
 				{#if data.flushScoped}
-					<p class="text-xs text-faint">Only this tenant's keys are listed. The counters above count every tenant.</p>
+					<p class="text-xs text-faint">Only this tenant's keys are listed. The counters above include every tenant.</p>
 				{/if}
 				<Table label="Stored">
 					<thead>
@@ -548,7 +548,7 @@
 				id="rule-pattern"
 				name="pattern"
 				label="Route"
-				hint="A path under /api/v1/. A segment may be a glob such as post-*, a {'{name}'} for any one segment, and ** may end it."
+				hint="A path under /api/v1/. A segment can be a glob such as post-* or a {'{name}'} for any one segment. ** can only come last."
 				bind:value={pattern}
 				required
 			/>
@@ -564,7 +564,7 @@
 				id="rule-tags"
 				name="tags"
 				label="Tags"
-				hint="The content types whose changes purge this rule, separated by commas. Empty means every content change."
+				hint="Content types whose changes purge this rule, separated by commas. Leave empty to purge on every content change."
 				bind:value={ruleTagText}
 			/>
 			<input type="hidden" name="enabled" value={ruleEnabled ? 'true' : 'false'} />

@@ -36,7 +36,7 @@ function captureGate(err: unknown): CaptureGate {
 		const said = (err.body as { error?: unknown } | undefined)?.error;
 		if (said === CAPTURE_STORE_REFUSAL) return { state: 'capture_store' };
 	}
-	return gateOf(err, 'The query log could not be read. This is not a report that nothing was slow.');
+	return gateOf(err, 'Could not load the query log.');
 }
 
 /** The page size when a request names none. */

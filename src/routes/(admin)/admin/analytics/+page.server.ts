@@ -12,11 +12,11 @@ import { authedClient, loadUser } from '$lib/server/authz';
 
 /** What each part of the page says when its read failed for a reason it cannot name. */
 const FAILED = {
-	summary: 'The request summary could not be read. This is not a report that there was no traffic.',
-	endpoints: 'The endpoint breakdown could not be read. This is not a report that no endpoint was called.',
-	methods: 'The method breakdown could not be read. This is not a report that there were no requests.',
-	agents: 'The user agent breakdown could not be read. This is not a report that no client called.',
-	anomalies: 'The anomalies could not be read. This is not a report that there are none.',
+	summary: 'Could not load the request summary.',
+	endpoints: 'Could not load the endpoint breakdown.',
+	methods: 'Could not load the method breakdown.',
+	agents: 'Could not load the user agent breakdown.',
+	anomalies: 'Could not load anomalies.',
 } as const;
 
 export const load: PageServerLoad = async (event) => {

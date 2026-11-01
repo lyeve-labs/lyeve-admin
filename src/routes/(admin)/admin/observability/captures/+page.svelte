@@ -105,12 +105,12 @@
 	}
 
 	const saveRule = tracked(() => {
-		const verb = editing ? 'Saved' : 'Created';
+		const verb = editing ? 'saved' : 'created';
 		const subject = routePattern;
 		return async ({ result, update }) => {
 			if (result.type !== 'failure') ruleOpen = false;
 			await update();
-			if (result.type === 'success') toast.success(`${verb} ${subject}`);
+			if (result.type === 'success') toast.success(`Rule for ${subject} ${verb}.`);
 		};
 	});
 
@@ -130,7 +130,7 @@
 				selected = [];
 			}
 			await update();
-			if (result.type === 'success') toast.success(`Created ${subject}`);
+			if (result.type === 'success') toast.success(`Replay set ${subject} created.`);
 		};
 	});
 
@@ -169,8 +169,8 @@
 <PageShell
 	title="Request capture"
 	description={data.superAdmin
-		? 'Requests every tenant sent, kept with their responses so they can be replayed and compared.'
-		: 'Requests this tenant sent, kept with their responses so they can be replayed and compared.'}
+		? 'Review requests every tenant sent, with their responses, and replay them to compare.'
+		: 'Review requests this tenant sent, with their responses, and replay them to compare.'}
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -193,14 +193,14 @@
 			level={2}
 			gate={data.gate}
 			title="Request capture"
-			absent="The request capture plugin is not part of this build, so no request is kept."
+			absent="Request capture is not included in this build."
 		/>
 	{:else}
 		{#if refusal && !fromDrawer}
 			<RefusalNotice {refusal} />
 		{:else if needsWrites}
 			{@const s = data.sets.find((x) => x.id === needsWrites)}
-			<Alert tone="warn" title="This set holds a write">
+			<Alert tone="warn" title="This set includes a write">
 				<p>Replaying it repeats each write against this instance. Nothing in the set has run yet.</p>
 				{#if s}
 					<form method="POST" action="?/replaySet" class="mt-3" use:enhance={runSet(s, true)}>
@@ -216,9 +216,9 @@
 
 		{#if data.licensed === false}
 			<Alert tone="brand" title="Capture rules and replay sets are not included">
-				This install keeps every request for a day and replays them one at a time. Creating a rule, enabling one,
-				or saving a replay set needs a license that includes them. Rules and sets already saved keep working, and
-				switching a rule off or deleting one is always allowed.
+				Without them, every request is kept for a day and you replay requests one at a time. Creating or enabling a
+				rule, or saving a replay set, needs a license that includes them. Saved rules and sets keep working, and you
+				can always switch a rule off or delete it.
 			</Alert>
 		{/if}
 
@@ -226,21 +226,21 @@
 			<SectionHeading level={2}>Capture rules</SectionHeading>
 			<p class="text-sm text-muted">
 				{#if enabledRules > 0}
-					This tenant keeps only the requests an enabled rule matches, sampled at its rate and kept for its
-					retention. The first rule that matches a request decides.
+					Only requests that match an enabled rule are kept, sampled at its rate and kept for its retention.
+					The first matching rule applies.
 				{:else}
-					With no enabled rule, every request is kept for a day. The first enabled rule narrows that to what
-					the rules match.
+					With no enabled rule, every request is kept for a day. Once a rule is enabled, only requests that
+					match a rule are kept.
 				{/if}
 			</p>
 			{#if !data.rulesRead}
 				{#if data.rulesGate}
-					<GateNotice gate={data.rulesGate} title="the capture rules" absent="This version of the request capture plugin keeps no capture rules." />
+					<GateNotice gate={data.rulesGate} title="the capture rules" absent="Capture rules need a newer version of the request capture plugin." />
 				{:else}
-					<Alert tone="danger">The capture rules could not be read. This is not a report that there are none.</Alert>
+					<Alert tone="danger">Could not load capture rules. Reload the page to try again.</Alert>
 				{/if}
 			{:else if data.rules.length === 0}
-				<EmptyState title="No capture rule" description="Every request this tenant sends is kept for a day.">
+				<EmptyState title="No capture rules yet" description="Every request this tenant sends is kept for a day.">
 					{#snippet iconSnippet()}
 						<History size={ICON.lg} />
 					{/snippet}
@@ -330,13 +330,13 @@
 			<SectionHeading level={2}>Replay sets</SectionHeading>
 			{#if !data.setsRead}
 				{#if data.setsGate}
-					<GateNotice gate={data.setsGate} title="the replay sets" absent="This version of the request capture plugin keeps no replay sets." />
+					<GateNotice gate={data.setsGate} title="the replay sets" absent="Replay sets need a newer version of the request capture plugin." />
 				{:else}
-					<Alert tone="danger">The replay sets could not be read. This is not a report that there are none.</Alert>
+					<Alert tone="danger">Could not load replay sets. Reload the page to try again.</Alert>
 				{/if}
 			{:else if data.sets.length === 0}
 				<p class="text-sm text-muted">
-					No replay set yet. Select captures below and save them as a set to replay them together and compare
+					No replay sets yet. Select captures below and save them as a set to replay them together and compare
 					each response with the original.
 				</p>
 			{:else}
@@ -366,7 +366,7 @@
 										<form
 											method="POST"
 											action="?/deleteSet"
-											use:enhance={remove(s.name, 'Its captures stay. Only the list is deleted.')}
+											use:enhance={remove(s.name, 'Its captures are kept. Only the set is deleted.')}
 										>
 											<input type="hidden" name="id" value={s.id} />
 											<Button variant="ghost" size="sm" type="submit" aria-label="Delete {s.name}">
@@ -385,8 +385,8 @@
 				<div class="flex flex-col gap-3" data-testid="replay-results">
 					<SectionHeading level={3}>Replayed {replayedSet?.name ?? 'the set'}</SectionHeading>
 					<p class="text-sm text-muted">
-						{replay.results.filter((r) => r.diff && !diffChanged(r.diff)).length} of {replay.results.length} answered
-						as they did when captured.
+						{replay.results.filter((r) => r.diff && !diffChanged(r.diff)).length} of {replay.results.length} returned
+						the same response as when captured.
 					</p>
 					{#each replay.results as r (r.capture_id)}
 						{@const original = capturesById.get(r.capture_id)}
@@ -444,17 +444,17 @@
 			</div>
 			{#if data.superAdmin && data.captures.length > 0}
 				<p class="text-sm text-muted">
-					The list and its total cover every tenant. A replay set holds only captures your own tenant sent, and the
-					plugin refuses a set that names another tenant's.
+					This list and its total include every tenant. A replay set can only include captures from your own
+					tenant.
 				</p>
 			{/if}
 			{#if selected.length > MAX_SET_CAPTURES}
-				<Alert tone="warn">A set holds at most {MAX_SET_CAPTURES} captures, because a replay runs them in one request.</Alert>
+				<Alert tone="warn">A set can have at most {MAX_SET_CAPTURES} captures, because a replay runs them in one request.</Alert>
 			{/if}
 			{#if data.captures.length === 0}
 				<EmptyState
-					title="No request is kept"
-					description="Requests appear here as this tenant sends them, unless a rule leaves them out."
+					title="No captures yet"
+					description="Requests appear here as this tenant sends them, unless a rule excludes them."
 				>
 					{#snippet iconSnippet()}
 						<History size={ICON.lg} />
@@ -481,7 +481,7 @@
 									<Checkbox
 										id="pick-{c.id}"
 										label={foreign(c)
-											? `${c.method} ${capturePath(c.url)} came from another tenant, so it cannot join a replay set`
+											? `${c.method} ${capturePath(c.url)} is from another tenant and cannot be added to a replay set`
 											: `Select ${c.method} ${capturePath(c.url)}`}
 										labelHidden
 										disabled={foreign(c)}
@@ -534,7 +534,7 @@
 				id="capture-pattern"
 				name="route_pattern"
 				label="Route"
-				hint="An absolute path. A segment may be * or a {'{name}'} for any one segment, and ** may end it."
+				hint="An absolute path. A segment can be * or a {'{name}'} for any one segment. ** can only come last."
 				bind:value={routePattern}
 				required
 			/>
@@ -556,7 +556,7 @@
 				id="capture-retention"
 				name="retention_seconds"
 				label="Kept for"
-				hint="From an hour to 30 days. A replay of a capture is kept as long."
+				hint="From an hour to 30 days. Replays of a capture are kept just as long."
 				bind:value={retention}
 				options={retentionOptions(editing?.retention_seconds)}
 			/>

@@ -198,11 +198,11 @@
 
 	const saveProbe: SubmitFunction = () => {
 		const subject = name;
-		const verb = editing ? 'Saved' : 'Created';
+		const verb = editing ? 'saved' : 'created';
 		return async ({ result, update }) => {
 			if (result.type !== 'failure') open = false;
 			await update();
-			if (result.type === 'success') toast.success(`${verb} ${subject}`);
+			if (result.type === 'success') toast.success(`Probe ${subject} ${verb}.`);
 		};
 	};
 
@@ -228,8 +228,8 @@
 	function removeProbe(p: Probe): SubmitFunction {
 		return confirmed(
 			`Delete ${p.name}?`,
-			'Its results and its alert history go with it.',
-			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+			'Its results and alert history are deleted. This cannot be undone.',
+			{ confirmLabel: 'Delete', success: 'Probe deleted.' },
 		);
 	}
 
@@ -238,7 +238,7 @@
 
 <PageShell
 	title="Synthetic monitoring"
-	description="Checks this instance runs against itself on a schedule, and what they found."
+	description="Run scheduled checks against this instance and see their results."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -255,7 +255,7 @@
 			level={2}
 			gate={data.gate}
 			title="Synthetic monitoring"
-			absent="The synthetic monitoring plugin is not part of this build, so nothing is being probed."
+			absent="Synthetic monitoring is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={formError || undefined} refused={pageRefusal} />
@@ -278,7 +278,7 @@
 				level={2}
 				gate={data.alerts.gate}
 				title="the open alerts"
-				absent="This version of the synthetic monitoring plugin keeps no alert list."
+				absent="The alert list needs a newer version of the synthetic monitoring plugin."
 			/>
 		{:else if data.alerts.value.length > 0}
 			<section class="flex flex-col gap-4">
@@ -319,8 +319,8 @@
 
 			{#if data.probes.length === 0}
 				<EmptyState
-					title="No probe is configured"
-					description="Nothing is checking this instance from the outside."
+					title="No probes yet"
+					description="Create a probe to check this instance on a schedule."
 				>
 					{#snippet iconSnippet()}
 						<Radar size={ICON.lg} />
@@ -352,7 +352,7 @@
 					{/snippet}
 				</ListToolbar>
 				{#if visible.length === 0}
-					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
+					<EmptyState title="No probes on this page match these filters" description="Clear the filter to see the rest.">
 						{#snippet iconSnippet()}
 							<Radar size={ICON.lg} />
 						{/snippet}
@@ -478,8 +478,8 @@
 		<div class="flex flex-col gap-4">
 			{#if droppedHeaders.length > 0}
 				<Alert tone="warn">
-					Saving drops the {droppedHeaders.length === 1 ? 'header' : 'headers'} {droppedHeaders.join(', ')}. Every read
-					hides their values, so this form cannot send them back. Set them again through the API after saving.
+					Saving removes the {droppedHeaders.length === 1 ? 'header' : 'headers'} {droppedHeaders.join(', ')}. Their values
+					are never shown, so this form cannot keep them. Set them again through the API after saving.
 				</Alert>
 			{/if}
 			<Input id="probe-name" name="name" label="Name" bind:value={name} required />
@@ -522,7 +522,7 @@
 					id="probe-resource-id-field"
 					name="resource_id_field"
 					label="Field holding the new id"
-					hint="Read out of the create response so the rest of the cycle knows what it made."
+					hint="Read from the create response so later steps can use the new record."
 					bind:value={resourceIdField}
 				/>
 				<Input
@@ -532,7 +532,7 @@
 					autocomplete="off"
 					label="Auth token"
 					hint={storedSecret
-						? 'A save replaces the stored token, and no read returns it, so enter it again to keep it.'
+						? 'Saving replaces the stored token, which is never shown. Enter it again to keep it.'
 						: 'Sent as a bearer token on each request of the cycle. Leave it empty to send none.'}
 					required={storedSecret}
 					bind:value={secret}
@@ -553,7 +553,7 @@
 					autocomplete="new-password"
 					label="Password"
 					hint={storedSecret
-						? 'A save replaces the stored password, and no read returns it, so enter it again to keep it.'
+						? 'Saving replaces the stored password, which is never shown. Enter it again to keep it.'
 						: 'The password the probe signs in with.'}
 					required={storedSecret}
 					bind:value={secret}
@@ -587,7 +587,7 @@
 					id="probe-timeout"
 					name="timeout_seconds"
 					label="Timeout, in seconds"
-					hint="Shorter than the interval, or a slow run overlaps the next."
+					hint="Keep it shorter than the interval, or a slow run overlaps the next one."
 					bind:value={timeoutSeconds}
 				/>
 			</div>
@@ -595,7 +595,7 @@
 				id="probe-threshold"
 				name="alert_threshold"
 				label="Failures before an alert"
-				hint="Consecutive. One failure is usually the network, not the instance."
+				hint="Failures in a row. A single failure is usually a network problem, not the instance."
 				bind:value={alertThreshold}
 			/>
 
@@ -621,11 +621,11 @@
 			{#if target.gate.state === 'locked' || target.gate.state === 'absent'}
 				<NotEnabled
 					title="Notice channels"
-					description="This instance does not serve notice channels for a probe."
+					description="Notice channels are not enabled on this instance."
 					url={target.gate.state === 'locked' ? target.gate.upgradeUrl : null}
 				/>
 			{:else}
-				<Alert tone="danger">The notice channels could not be read. Nothing was changed.</Alert>
+				<Alert tone="danger">Could not load notice channels. Reload the page to try again.</Alert>
 			{/if}
 		{:else}
 			<form
@@ -638,8 +638,8 @@
 				<FormErrors message={channelsError || undefined} refused={channelsRefusal} />
 				<input type="hidden" name="id" value={target.probe.id} />
 				<p class="text-sm text-muted">
-					When this probe raises an alert, each channel hears that it is down, and again when the next run
-					passes. Email is on every install.
+					When this probe raises an alert, each channel is notified that it is down, and again when the next
+					run passes. Email alerts work on every install.
 				</p>
 				<AlertChannelFields
 					prefix="channel_"

@@ -183,7 +183,7 @@ describe('saving the default weights', () => {
 		const { event, calls } = actionEvent(weights, { 'GET /api/admin/search/ranking': () => json({ error: 'down' }, 503) });
 
 		const out = (await actions.ranking(event)) as Failure;
-		expect(out.data.rankingError).toBe('The weights could not be saved.');
+		expect(out.data.rankingError).toBe('Could not save the weights. Try again.');
 		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
 	});
 
@@ -224,7 +224,7 @@ describe('the public schemas', () => {
 			'PUT /api/admin/search/public-schemas': () => json({ error: 'pq: connection refused' }, 503),
 		});
 
-		expect(((await actions.publicSchemas(event)) as Failure).data.publicError).toBe('The public schemas could not be saved.');
+		expect(((await actions.publicSchemas(event)) as Failure).data.publicError).toBe('Could not save the public schemas. Try again.');
 	});
 });
 
@@ -249,7 +249,7 @@ describe('the synonym groups', () => {
 			'POST /api/admin/search/synonyms': () => json({ error: 'pq: down' }, 503),
 		});
 
-		expect(((await actions.createSynonym(event)) as Failure).data.synonymError).toBe('The synonym could not be saved.');
+		expect(((await actions.createSynonym(event)) as Failure).data.synonymError).toBe('Could not save the synonym. Try again.');
 	});
 
 	it('deletes the named group', async () => {
@@ -271,7 +271,7 @@ describe('the synonym groups', () => {
 	it('keeps outage detail out of a failed delete', async () => {
 		const { event } = actionEvent({ id: 's1' }, { 'DELETE /api/admin/search/synonyms': () => json({ error: 'pq: down' }, 503) });
 
-		expect(((await actions.deleteSynonym(event)) as Failure).data).toEqual({ synonymDeleteError: 'The synonym could not be deleted.' });
+		expect(((await actions.deleteSynonym(event)) as Failure).data).toEqual({ synonymDeleteError: 'Could not delete the synonym. Try again.' });
 	});
 });
 
@@ -294,7 +294,7 @@ describe('rebuilding the index', () => {
 		authz.roles = ['super_admin'];
 		const { event } = actionEvent({}, { 'POST /api/admin/search/reindex': () => json({ error: 'pq: down' }, 503) });
 
-		expect(((await actions.reindex(event)) as Failure).data.reindexError).toBe('The index could not be rebuilt.');
+		expect(((await actions.reindex(event)) as Failure).data.reindexError).toBe('Could not rebuild the index. Try again.');
 	});
 
 	it('refuses an admin before it reaches the plugin', async () => {

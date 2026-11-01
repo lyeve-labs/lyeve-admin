@@ -45,7 +45,7 @@
 	 * a subtitle that counted jobs would claim the page is all of them. It names
 	 * the feature instead and the pager states the range.
 	 */
-	const description = 'HTTP jobs on cron schedules.';
+	const description = 'Run HTTP requests on cron schedules.';
 
 	// One drawer for both writes: a null target is a new job.
 	let open = $state(false);
@@ -118,8 +118,8 @@
 	function deleteJob(name: string): SubmitFunction {
 		return confirmed(
 			`Delete ${name}?`,
-			'Its schedule stops and its run history goes with it.',
-			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+			'Its schedule stops and its run history is deleted. This cannot be undone.',
+			{ confirmLabel: 'Delete', success: 'Job deleted.' },
 		);
 	}
 
@@ -161,7 +161,7 @@
 			level={2}
 			gate={data.openGate}
 			title="The linked job"
-			absent="The job this link opens was not found. It may have been deleted."
+			absent="This job no longer exists."
 		/>
 	{/if}
 
@@ -170,7 +170,7 @@
 			level={2}
 			gate={data.jobs.gate}
 			title="Scheduled jobs"
-			absent="The cron plugin is not part of this build, so no job runs on a schedule."
+			absent="Scheduled jobs are not included in this build."
 		/>
 	{:else if data.jobs.value.length === 0}
 		<EmptyState level={2} title="No jobs yet" description="Schedule HTTP jobs to run on a cron expression.">
@@ -195,7 +195,7 @@
 		</ListToolbar>
 
 		{#if visible.length === 0}
-			<EmptyState level={2} title="No job on this page matches" description="Clear the search, or turn the page: the box narrows what is on screen." />
+			<EmptyState level={2} title="No jobs on this page match these filters" description="Clear the search and the status filter, or go to another page. The search covers only this page." />
 		{:else}
 		<Table label="Scheduled jobs">
 			<thead>
@@ -288,7 +288,7 @@
 	<Modal open title="Alert signing secret" onclose={() => (reveal = null)}>
 		<div class="flex flex-col gap-3">
 			<p class="text-sm text-fg">
-				{reveal.name} signs every failure alert it sends to its webhook with this secret. Copy it to the receiver now. It is not shown again.
+				Failure alerts for {reveal.name} are signed with this secret before they reach its webhook. Copy it to the receiver now. It is not shown again.
 			</p>
 			<CopyField value={reveal.secret} label="Signing secret" mono secret />
 		</div>
@@ -343,7 +343,7 @@
 			rows={4}
 			placeholder={'{\n  "key": "value"\n}'}
 			hint={editing?.payload
-				? 'Clearing it sends an empty JSON object on each run. Once a job has a payload, it cannot go back to sending none.'
+				? 'If you clear it, each run sends an empty JSON object. A job with a payload cannot go back to sending none.'
 				: undefined}
 			bind:value={payload}
 		/>
@@ -351,13 +351,13 @@
 		     reaches the action through a field of its own. -->
 		<div>
 			<input type="hidden" name="enabled" value={enabled ? 'on' : 'off'} />
-			<Toggle id="job-enabled" bind:checked={enabled} label="Enabled" hint="Job will run on schedule when enabled" />
+			<Toggle id="job-enabled" bind:checked={enabled} label="Enabled" hint="When on, the job runs on its schedule." />
 		</div>
 
 		<fieldset class="flex flex-col gap-4 border-t border-line pt-4">
 			<legend class="text-sm font-medium text-fg">Failure alerts</legend>
 			<p class="text-xs text-muted">
-				Where to say a job is failing, and again when it recovers. Leave every channel empty to send none. Email is on every install.
+				Choose where to send an alert when a job starts failing and when it recovers. Leave every channel empty to send no alerts. Email alerts work on every install.
 			</p>
 			<input type="hidden" name="alerts_stored" value={hasChannels(editing?.alerts) ? 'true' : 'false'} />
 			<AlertChannelFields prefix={ALERT_PREFIX} idPrefix="job-alert" value={editing?.alerts ?? null} />

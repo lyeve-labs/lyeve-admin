@@ -88,7 +88,7 @@ describe('Events gate', () => {
 		const { container } = render(EventsPage, {
 			props: props({ gate: { state: 'absent' }, events: [] }),
 		});
-		expect(said(container)).toContain('not part of this build');
+		expect(said(container)).toContain('not included in this build');
 	});
 });
 
@@ -103,14 +103,14 @@ describe('Events replay', () => {
 
 	it('warns that a real replay cannot be taken back', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(said(container)).toContain('Nothing undoes that.');
+		expect(said(container)).toContain('This cannot be undone.');
 	});
 
 	it('says plainly that a rehearsal posted nothing', () => {
 		const { container } = render(EventsPage, {
 			props: props({}, { started: 'r9', dryRun: true }),
 		});
-		expect(said(container)).toContain('Rehearsed. Nothing was published.');
+		expect(said(container)).toContain('Rehearsal started. It publishes nothing');
 	});
 
 	// The plugin publishes a replay through the same path as a live change,
@@ -136,7 +136,7 @@ describe('Events replay', () => {
 			props: props({ runs: [run({ dry_run: true, replayed: 400 })] }),
 		});
 		expect(said(container)).toContain('rehearsal');
-		expect(said(container)).toContain('nothing was posted');
+		expect(said(container)).toContain('nothing was published');
 	});
 
 	it('states progress against the total rather than the replayed count alone', () => {
@@ -200,7 +200,7 @@ describe('starting a replay', () => {
 describe('Events log', () => {
 	it('reads an empty log as a quiet instance', () => {
 		const { container } = render(EventsPage, { props: props({ events: [], total: 0 }) });
-		expect(said(container)).toContain('quiet instance');
+		expect(said(container)).toContain('Events appear here when a plugin or a flow publishes one.');
 	});
 
 	it('marks an event that carries an error, which is why anyone replays', () => {

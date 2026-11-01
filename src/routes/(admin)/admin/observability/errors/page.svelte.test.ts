@@ -99,7 +99,7 @@ describe('recent events', () => {
 
 	it('says a failed read failed', () => {
 		const { container } = setup({ events: null });
-		expect(container.textContent).toContain('could not be read');
+		expect(container.textContent).toContain('Could not load recent events.');
 	});
 });
 
@@ -127,15 +127,15 @@ describe('which surface says a failure', () => {
 
 	// A failed acknowledge or triage was said inside the next Assign prompt.
 	it('says a failed triage on the page and not in the Assign prompt', async () => {
-		const { container, getByRole } = setup({}, { error: 'The alert could not be changed.' });
-		expect(container.textContent).toContain('The alert could not be changed.');
+		const { container, getByRole } = setup({}, { error: 'Could not change the alert status. Try again.' });
+		expect(container.textContent).toContain('Could not change the alert status. Try again.');
 		await fireEvent.click(getByRole('button', { name: 'Assign this failure' }));
-		expect(dialog(container).textContent).not.toContain('could not be changed');
+		expect(dialog(container).textContent).not.toContain('Could not change');
 	});
 
 	it('says a failed assign inside the Assign prompt', async () => {
-		const { container, getByRole } = setup({}, { error: 'The alert could not be assigned.', drawer: 'assign' });
+		const { container, getByRole } = setup({}, { error: 'Could not assign the alert. Try again.', drawer: 'assign' });
 		await fireEvent.click(getByRole('button', { name: 'Assign this failure' }));
-		expect(dialog(container).textContent).toContain('The alert could not be assigned.');
+		expect(dialog(container).textContent).toContain('Could not assign the alert. Try again.');
 	});
 });

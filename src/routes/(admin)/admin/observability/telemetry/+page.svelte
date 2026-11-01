@@ -174,7 +174,7 @@
 			// A save that changed only header values stores what the effect
 			// cannot see, and the values typed must not stay on screen.
 			fillDestinationForm();
-			toast.success('Saved the destination');
+			toast.success('Destination saved.');
 		}
 	});
 
@@ -184,7 +184,7 @@
 		confirmed(
 			destination ? `Delete the destination ${destination.url}?` : 'Delete the destination?',
 			"This tenant's series stop being pushed there, and its stored headers are deleted.",
-			{ confirmLabel: 'Delete', success: 'Removed the destination' },
+			{ confirmLabel: 'Delete', success: 'Destination deleted.' },
 		)(input);
 </script>
 
@@ -199,8 +199,8 @@
 <PageShell
 	title="Telemetry"
 	description={data.superAdmin
-		? "The engine's whole metrics registry, and the backends it is shipped to."
-		: 'The request series recorded under this tenant.'}
+		? 'Browse every metric the engine records, and see where metrics are exported.'
+		: 'Browse the request metrics recorded for this tenant.'}
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -215,8 +215,8 @@
 			<Badge tone="violet" size="sm">Beta</Badge>
 		{/if}
 		<span class="text-xs text-muted">
-			Histograms keep the engine's buckets, one exporter set serves the whole instance, and
-			the tenant label is the tenant slug.
+			Histograms use the engine's buckets. One exporter set serves the whole instance. The
+			tenant label is the tenant slug.
 		</span>
 	</div>
 
@@ -225,9 +225,9 @@
 			<SectionHeading level={2}>Metrics</SectionHeading>
 			<span class="text-xs text-faint">
 				{#if data.superAdmin}
-					Whole registry: the process, the pool, every tenant's request series and the plugin's own.
+					Includes the process, the pool, every tenant's request series and the plugin's own metrics.
 				{:else}
-					Only the series carrying your tenant label. Instance-wide series are the super admin's.
+					Only series with your tenant label. Only a super admin can see instance-wide series.
 				{/if}
 			</span>
 		</div>
@@ -249,18 +249,18 @@
 			<GateNotice
 				gate={data.families.gate}
 				title="Telemetry metrics"
-				absent="The telemetry plugin is not in this build, so there is no metrics registry to show."
+				absent="Telemetry is not included in this build."
 			/>
 		{:else if families.length === 0}
 			<EmptyState
 				iconSnippet={noMetrics}
 				title="No series yet"
 				description={data.superAdmin
-					? 'The registry is empty. Series appear once the engine has served a request.'
-					: 'No request has been recorded under your tenant yet. Series appear once the API has served one.'}
+					? 'Series appear here after the engine serves a request.'
+					: 'Series appear here after the first API request under your tenant.'}
 			/>
 		{:else if shown.length === 0}
-			<EmptyState iconSnippet={noMetrics} title="No family matches" description="Nothing in the registry matches the filter." />
+			<EmptyState iconSnippet={noMetrics} title="No families match this filter" description="Clear the filter to see every family." />
 		{:else}
 			<div class="flex flex-col gap-3" data-testid="metric-families">
 				{#each shown as family (family.name)}
@@ -278,7 +278,7 @@
 							<p class="mb-3 text-xs text-muted">{family.help}</p>
 						{/if}
 						{#if family.samples.length === 0}
-							<p class="text-sm text-muted">No sample in this family.</p>
+							<p class="text-sm text-muted">No samples in this family.</p>
 						{:else}
 							<Table label={family.name}>
 								<thead>
@@ -314,7 +314,7 @@
 		<div class="flex flex-wrap items-center gap-2">
 			<SectionHeading level={2}>Tenant destination</SectionHeading>
 			<span class="text-xs text-faint">
-				Where this tenant's own series are pushed, beside the instance's exporters.
+				Push this tenant's metrics to your own collector, in addition to the instance's exporters.
 			</span>
 		</div>
 
@@ -322,13 +322,13 @@
 			<GateNotice
 				gate={data.destination.gate}
 				title="Tenant destination"
-				absent="This build of the telemetry plugin does not serve tenant destinations."
+				absent="Tenant destinations need a newer version of the telemetry plugin."
 			/>
 		{:else}
 			{#if !licensed}
 				<p class="text-sm text-muted" id="destination-unlicensed">
-					Setting or changing a destination needs a license this install does not hold. A destination already
-					saved keeps receiving, and deleting it is always allowed.
+					Setting or changing a destination needs a license that includes it. A saved destination keeps
+					receiving metrics, and you can always delete it.
 				</p>
 			{/if}
 
@@ -357,10 +357,10 @@
 				>
 					<FormErrors message={hostMoved ? undefined : saveFailure?.destinationError} refused={saveRefusal} />
 					{#if hostMoved}
-						<Alert tone="warn" title="Send the headers again for the new host">
+						<Alert tone="warn" title="Enter the headers again for the new host">
 							<p>
-								The stored headers usually carry the collector's key, so they are never carried to a different host.
-								Choose to replace the headers and enter them for the new address. Nothing was saved.
+								Stored headers usually include the collector's key, so they never move to a different host.
+								Choose Replace them and enter the headers for the new address. Nothing was saved.
 							</p>
 						</Alert>
 					{/if}
@@ -399,8 +399,8 @@
 
 						{#if movesHost}
 							<Alert tone="warn">
-								This URL is on another host than the stored one, so the stored headers will not follow it. Replace
-								the headers to save.
+								This URL is on a different host, so the stored headers do not carry over. Replace the headers
+								to save.
 							</Alert>
 						{/if}
 
@@ -427,7 +427,7 @@
 									</Button>
 								</div>
 								{#if destination && destination.header_names.length > 0 && headers.length === 0}
-									<p class="text-xs text-muted">Saving with no header clears the stored ones.</p>
+									<p class="text-xs text-muted">Saving with no headers clears the stored ones.</p>
 								{/if}
 							</div>
 						{/if}
@@ -468,7 +468,7 @@
 			<div class="flex flex-wrap items-center gap-2">
 				<SectionHeading level={2}>Exporters</SectionHeading>
 				<span class="text-xs text-faint">
-					Configured through the plugin's metrics_* settings. The scheduled loop runs when the engine enables it, and the manual export runs on demand.
+					Set exporters in the plugin's metrics_* settings. Scheduled exports run when the engine enables them, and Export now runs one immediately.
 				</span>
 			</div>
 
@@ -482,12 +482,12 @@
 				<GateNotice
 					gate={data.exporters.gate}
 					title="Telemetry exporters"
-					absent="The telemetry plugin is not in this build, so no exporter is running."
+					absent="Telemetry is not included in this build."
 				/>
 			{:else if data.exporters.value.length === 0}
 				<EmptyState
 					iconSnippet={noExporters}
-					title="No exporter configured"
+					title="No exporters configured"
 					description="Set a Pushgateway URL, an OTLP endpoint, a StatsD address or a New Relic key in the plugin's settings and restart the engine."
 				/>
 			{:else}

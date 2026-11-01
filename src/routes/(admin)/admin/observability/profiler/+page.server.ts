@@ -41,10 +41,10 @@ export interface ProfilerPage {
 
 /** What each view says when its read failed for a reason it cannot name. */
 const FAILED = {
-	endpoints: 'The endpoint statistics could not be read. This is not a report that nothing was sampled.',
-	plugins: 'The per-plugin statistics could not be read. This is not a report that nothing was sampled.',
-	memory: 'The memory snapshots could not be read.',
-	detail: 'This endpoint could not be read. This is not a report that it has no samples.',
+	endpoints: 'Could not load endpoint statistics.',
+	plugins: 'Could not load per-plugin statistics.',
+	memory: 'Could not load memory snapshots.',
+	detail: 'Could not load this endpoint.',
 } as const;
 
 /**
@@ -93,7 +93,7 @@ export const actions: Actions = {
 			await resetProfiler(authedClient(event));
 			return { form: 'reset' as const, reset: true };
 		} catch (err) {
-			return fail(400, { form: 'reset' as const, error: actionError(err, 'The profiler could not be reset.') });
+			return fail(400, { form: 'reset' as const, error: actionError(err, 'Could not reset the profiler. Try again.') });
 		}
 	},
 
@@ -102,7 +102,7 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const endpoint = String(data.get('endpoint') ?? '').trim();
 		const seconds = clampSeconds(data.get('duration_sec'));
-		if (!endpoint) return fail(422, { form: 'flamegraph' as const, error: 'Name the endpoint the graph is labeled with.' });
+		if (!endpoint) return fail(422, { form: 'flamegraph' as const, error: 'Enter an endpoint to label the flamegraph.' });
 		try {
 			const graph = await captureFlamegraph(authedClient(event), endpoint, seconds);
 			return { form: 'flamegraph' as const, graph };
@@ -110,7 +110,7 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 403) {
 				return fail(403, { form: 'flamegraph' as const, error: 'Only a super admin can capture a profile.' });
 			}
-			return fail(400, { form: 'flamegraph' as const, error: actionError(err, 'The flamegraph could not be captured.') });
+			return fail(400, { form: 'flamegraph' as const, error: actionError(err, 'Could not capture the flamegraph. Try again.') });
 		}
 	},
 };

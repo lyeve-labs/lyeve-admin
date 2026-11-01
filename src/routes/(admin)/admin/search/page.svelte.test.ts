@@ -36,7 +36,7 @@ function data(overrides: Record<string, unknown> = {}) {
 		}),
 		publicSchemas: ok([]),
 		schemas: ok(['blog']),
-		analytics: { ok: false, gate: { state: 'error', message: 'Search analytics could not be read.' } },
+		analytics: { ok: false, gate: { state: 'error', message: 'Could not load search analytics.' } },
 		canReindex: false,
 		...overrides,
 	};
@@ -98,7 +98,7 @@ describe('Search page settings', () => {
 		});
 		expect(container.querySelector('input[type="hidden"][name="schemas"]')?.getAttribute('value')).toBe('blog');
 		expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-		expect(getByText('Search analytics could not be read.')).toBeTruthy();
+		expect(getByText('Could not load search analytics.')).toBeTruthy();
 	});
 
 	it('offers no weights and no Save when the ranking read failed', () => {
@@ -113,14 +113,14 @@ describe('Search page settings', () => {
 		const { getByText, queryByText, queryByRole } = render(SearchPage, {
 			props: {
 				data: data({
-					synonyms: { ok: false, gate: { state: 'error', message: 'The synonym groups could not be read.' } },
-					schemas: { ok: false, gate: { state: 'error', message: 'The schemas could not be read.' } },
+					synonyms: { ok: false, gate: { state: 'error', message: 'Could not load synonym groups.' } },
+					schemas: { ok: false, gate: { state: 'error', message: 'Could not load schemas.' } },
 				}) as never,
 				form: null,
 			},
 		});
-		expect(getByText('The synonym groups could not be read.')).toBeTruthy();
-		expect(getByText('The schemas could not be read.')).toBeTruthy();
+		expect(getByText('Could not load synonym groups.')).toBeTruthy();
+		expect(getByText('Could not load schemas.')).toBeTruthy();
 		expect(queryByText(/No synonym groups/)).toBeNull();
 		expect(queryByText('No schemas yet')).toBeNull();
 		expect(queryByRole('button', { name: /New synonym/ })).toBeNull();
@@ -185,7 +185,7 @@ describe('Search page counts', () => {
 		const { getByText } = render(SearchPage, {
 			props: { data: data({ synonyms: ok({ groups, total: 612 }) }) as never, form: null },
 		});
-		expect(getByText(/The first 1 of 612 groups are listed/)).toBeTruthy();
+		expect(getByText(/Showing the first 1 of 612 groups/)).toBeTruthy();
 	});
 
 	it('shows a failed delete beside the groups and not in the next New synonym drawer', () => {
@@ -193,11 +193,11 @@ describe('Search page counts', () => {
 		const { getByText, getAllByText } = render(SearchPage, {
 			props: {
 				data: data({ synonyms: ok({ groups, total: 1 }) }) as never,
-				form: { synonymDeleteError: 'The synonym could not be deleted.' } as never,
+				form: { synonymDeleteError: 'Could not delete the synonym. Try again.' } as never,
 			},
 		});
-		expect(getByText('The synonym could not be deleted.')).toBeTruthy();
-		expect(getAllByText('The synonym could not be deleted.')).toHaveLength(1);
+		expect(getByText('Could not delete the synonym. Try again.')).toBeTruthy();
+		expect(getAllByText('Could not delete the synonym. Try again.')).toHaveLength(1);
 	});
 });
 

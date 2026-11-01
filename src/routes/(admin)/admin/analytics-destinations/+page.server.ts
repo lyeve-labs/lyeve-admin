@@ -47,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			providers = await listProviders(client);
 		} catch (err) {
-			gate = gateOf(err, 'The destinations could not be read.');
+			gate = gateOf(err, 'Could not load destinations.');
 		}
 		if (gate.state === 'ok') {
 			try {
@@ -55,7 +55,7 @@ export const load: PageServerLoad = async (event) => {
 				moreDeliveries = read.data.length > DELIVERY_LIMIT;
 				deliveries = { ...read, data: read.data.slice(0, DELIVERY_LIMIT) };
 			} catch (err) {
-				deliveriesGate = gateOf(err, 'The deliveries could not be read. This is not a report that every event arrived.');
+				deliveriesGate = gateOf(err, 'Could not load deliveries.');
 			}
 		}
 	}
@@ -86,10 +86,10 @@ function retryFrom(form: FormData): { attempts: number; backoff: number } | { er
 	const attempts = Number(form.get('max_attempts') ?? 1);
 	const backoff = Number(form.get('backoff_seconds') ?? 0);
 	if (!Number.isInteger(attempts) || attempts < 1 || attempts > MAX_ATTEMPTS) {
-		return { error: `Attempts are 1 to ${MAX_ATTEMPTS}.` };
+		return { error: `Enter 1 to ${MAX_ATTEMPTS} attempts.` };
 	}
 	if (attempts > 1 && (!Number.isInteger(backoff) || backoff < 1 || backoff > MAX_BACKOFF_SECONDS)) {
-		return { error: `The first retry waits 1 to ${MAX_BACKOFF_SECONDS} seconds.` };
+		return { error: `Enter 1 to ${MAX_BACKOFF_SECONDS} seconds for the first retry.` };
 	}
 	return { attempts, backoff: attempts > 1 ? backoff : 0 };
 }
@@ -101,8 +101,8 @@ export const actions: Actions = {
 		const id = String(form.get('id') ?? '').trim();
 		const name = String(form.get('name') ?? '').trim();
 		const type = String(form.get('type') ?? '');
-		if (!name) return fail(400, { error: 'Name the destination.', drawer: true });
-		if (!isProviderType(type)) return fail(400, { error: 'Pick a destination type.', drawer: true });
+		if (!name) return fail(400, { error: 'Enter a name.', drawer: true });
+		if (!isProviderType(type)) return fail(400, { error: 'Choose a destination type.', drawer: true });
 		const retry = retryFrom(form);
 		if ('error' in retry) return fail(400, { error: retry.error, drawer: true });
 		const config = configFrom(type, form);
@@ -127,7 +127,7 @@ export const actions: Actions = {
 		try {
 			saved = id ? await updateProvider(authedClient(event), id, body) : await createProvider(authedClient(event), { ...body, type });
 		} catch (err) {
-			const failed = actionFailure(err, 'The destination could not be saved.');
+			const failed = actionFailure(err, 'Could not save the destination. Try again.');
 			return fail(failed.status, { ...failed.data, drawer: true });
 		}
 		return { saved: saved.name || name, signingSecret: saved.signing_secret ?? '' };
@@ -136,11 +136,11 @@ export const actions: Actions = {
 	delete: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
 		const id = String((await event.request.formData()).get('id') ?? '');
-		if (!id) return fail(400, { error: 'No destination was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its destination. Reload the page and try again.' });
 		try {
 			await deleteProvider(authedClient(event), id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The destination could not be deleted.') });
+			return fail(400, { error: actionError(err, 'Could not delete the destination. Try again.') });
 		}
 		return { deleted: id };
 	},
@@ -148,12 +148,12 @@ export const actions: Actions = {
 	replay: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
 		const id = String((await event.request.formData()).get('id') ?? '');
-		if (!id) return fail(400, { error: 'No delivery was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its delivery. Reload the page and try again.' });
 		try {
 			const out = await replayDelivery(authedClient(event), id);
 			return { replayed: id, delivered: out.delivered, lastError: out.delivery?.last_error ?? '' };
 		} catch (err) {
-			return actionFailure(err, 'The delivery could not be sent again.');
+			return actionFailure(err, 'Could not send the delivery again. Try again.');
 		}
 	},
 };

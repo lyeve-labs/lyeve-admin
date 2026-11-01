@@ -72,7 +72,7 @@ export const load: PageServerLoad = async (event) => {
 						const rows = p.data ?? [];
 						return { rows, total: Math.max(p.total_count ?? 0, rows.length) };
 					}),
-					'The replay runs could not be read. This is not a report that none were run.'
+					'Could not load replay runs.'
 				)
 			: NO_RUNS;
 
@@ -97,12 +97,12 @@ export const actions: Actions = {
 		}
 		const from = instantFromWallClock(since, String(form.get('since_offset') ?? ''));
 		if (!from) {
-			return fail(400, { error: 'That is not a time the log can be replayed from.' });
+			return fail(400, { error: 'Choose a date and time to replay from.' });
 		}
 		if (from.getTime() > Date.now()) {
 			// The log holds what was published, so a window that starts in the
 			// future matches nothing and reads as a silent no-op.
-			return fail(400, { error: 'A replay starts in the past. Nothing has been published yet after that point.' });
+			return fail(400, { error: 'Choose a time in the past. Nothing has been published after that point yet.' });
 		}
 
 		try {
@@ -113,7 +113,7 @@ export const actions: Actions = {
 			});
 			return { started: run.run_id, dryRun };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The replay could not be started.') });
+			return fail(400, { error: actionError(err, 'Could not start the replay. Try again.') });
 		}
 	},
 };

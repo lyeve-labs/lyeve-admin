@@ -90,7 +90,7 @@ export const load: PageServerLoad = async (event) => {
 					}))
 					.catch((err: unknown) => ({
 						...unread,
-						gate: gateOf(err, 'The providers could not be read. This is not a report that all of them are healthy.'),
+						gate: gateOf(err, 'Could not load providers.'),
 					}))
 			: { ...unread, gate: null };
 
@@ -109,7 +109,7 @@ export const load: PageServerLoad = async (event) => {
 		} catch (err) {
 			rules = {
 				...rules,
-				gate: gateOf(err, 'The response cache rules could not be read. This is not a report that there are none.'),
+				gate: gateOf(err, 'Could not load response cache rules.'),
 			};
 		}
 	}
@@ -128,7 +128,7 @@ export const load: PageServerLoad = async (event) => {
 			unlisted = typeof read?.note === 'string' && read.note !== '';
 			entries = pageOf(read, limit, offset);
 		} catch (err) {
-			entriesGate = gateOf(err, 'The stored entries could not be read. This is not a report that nothing is cached.');
+			entriesGate = gateOf(err, 'Could not load stored entries.');
 		}
 		if (!entriesGate) {
 			const back = pastEndOffset(entries.rows.length, limit, offset, entries.total);
@@ -161,15 +161,15 @@ export const load: PageServerLoad = async (event) => {
 function ruleBody(form: FormData) {
 	const pattern = String(form.get('pattern') ?? '').trim();
 	if (!patternIsSound(pattern)) {
-		return 'A pattern is a path under /api/v1/ such as /api/v1/content/{schema} or /api/v1/content/posts/**. ** may only end it, and it carries no query.';
+		return 'Enter a path under /api/v1/, such as /api/v1/content/{schema} or /api/v1/content/posts/**. ** can only come last, and the path cannot include a query.';
 	}
 	const ttl = Math.floor(Number(form.get('ttl_seconds')));
 	if (!Number.isFinite(ttl) || ttl < 1 || ttl > MAX_TTL_SECONDS) {
-		return 'The time to live is a whole number of seconds, at least one.';
+		return 'Enter a time to live of at least 1 second, as a whole number.';
 	}
 	const tags = parseTags(String(form.get('tags') ?? ''));
-	if (tags.length > 32) return 'A rule carries at most 32 tags.';
-	if (!tags.every(tagIsSound)) return 'Each tag is 1 to 64 letters, digits, dots, dashes or underscores.';
+	if (tags.length > 32) return 'Enter at most 32 tags.';
+	if (!tags.every(tagIsSound)) return 'Use 1 to 64 letters, digits, dots, dashes or underscores for each tag.';
 	return { pattern, ttl_seconds: ttl, tags, enabled: form.get('enabled') === 'true' };
 }
 
@@ -183,7 +183,7 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		const failed = actionFailure(err, 'The rule could not be saved.');
+		const failed = actionFailure(err, 'Could not save the rule. Try again.');
 		return fail(failed.status, { ...failed.data, drawer: 'rule' });
 	}
 	return { savedRule: body.pattern };
@@ -195,7 +195,7 @@ export const actions: Actions = {
 	updateRule: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.', drawer: 'rule' });
+		if (!id) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.', drawer: 'rule' });
 		return saveRule(event, id);
 	},
 
@@ -204,11 +204,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.' });
 		try {
 			await deleteRule(client, id);
 		} catch (err) {
-			return actionFailure(err, 'The rule could not be deleted.');
+			return actionFailure(err, 'Could not delete the rule. Try again.');
 		}
 		return { removedRule: id };
 	},
@@ -222,13 +222,13 @@ export const actions: Actions = {
 		const rule = String(form.get('rule') ?? '').trim();
 		const tag = String(form.get('tag') ?? '').trim();
 		if (tag && !tagIsSound(tag)) {
-			return fail(400, { error: 'A tag is 1 to 64 letters, digits, dots, dashes or underscores.' });
+			return fail(400, { error: 'Use 1 to 64 letters, digits, dots, dashes or underscores for the tag.' });
 		}
 		try {
 			const purged = rule ? await purgeRule(client, rule) : await purgeResponses(client, tag);
 			return { purged, purgedWhat: rule ? 'rule' : tag ? `tag ${tag}` : 'all' };
 		} catch (err) {
-			return actionFailure(err, 'The cached responses could not be purged.');
+			return actionFailure(err, 'Could not purge the cached responses. Try again.');
 		}
 	},
 
@@ -248,7 +248,7 @@ export const actions: Actions = {
 			if (tag) await flushTag(client, tag);
 			else await flushAll(client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The cache could not be flushed.') });
+			return fail(400, { error: actionError(err, 'Could not flush the cache. Try again.') });
 		}
 		return { flushed: tag || 'everything' };
 	},
@@ -258,11 +258,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
-		if (!name) return fail(400, { error: 'No provider was named.' });
+		if (!name) return fail(400, { error: 'This form is missing its provider. Reload the page and try again.' });
 		try {
 			await resetCircuit(client, name);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The circuit could not be reset.') });
+			return fail(400, { error: actionError(err, 'Could not reset the circuit. Try again.') });
 		}
 		return { reset: name };
 	},

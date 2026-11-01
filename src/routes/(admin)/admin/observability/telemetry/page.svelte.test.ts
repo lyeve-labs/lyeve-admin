@@ -106,7 +106,7 @@ describe('the role split', () => {
 		expect(queryByTestId('telemetry-metrics')).not.toBeNull();
 		expect(queryByTestId('telemetry-exporters')).toBeNull();
 		expect(queryByRole('button', { name: /Export .* now/ })).toBeNull();
-		expect(container.textContent).toContain('Only the series carrying your tenant label');
+		expect(container.textContent).toContain('Only series with your tenant label');
 		expect(container.textContent).toContain('{code="2xx",method="GET",plugin="core",tenant="acme"}');
 		expect(container.textContent).not.toContain('Exporters');
 	});
@@ -116,7 +116,7 @@ describe('the role split', () => {
 		expect(queryByTestId('telemetry-metrics')).not.toBeNull();
 		expect(queryByTestId('telemetry-exporters')).not.toBeNull();
 		expect(getAllByRole('button', { name: /Export .* now/ })).toHaveLength(2);
-		expect(container.textContent).toContain('Whole registry');
+		expect(container.textContent).toContain('every tenant');
 		expect(container.textContent).toContain('lyeve_db_pool_max_connections');
 		expect(container.textContent).toContain('Healthy');
 		expect(container.textContent).toContain('Unhealthy');
@@ -129,7 +129,7 @@ describe('the role split', () => {
 			props({ superAdmin: false, families: [REQUESTS], exporters: null, pluginStatus: statusSaying('beta') }),
 		);
 		expect(container.textContent).toContain('Beta');
-		expect(container.textContent).toContain('one exporter set');
+		expect(container.textContent).toContain('One exporter set');
 		expect(container.textContent).toContain('tenant slug');
 	});
 
@@ -166,7 +166,7 @@ describe('the metrics view', () => {
 	});
 
 	it('keeps the sentence of a failed scrape', () => {
-		const message = 'The metrics could not be read. This is not a report that no series exist.';
+		const message = 'Could not load metrics.';
 		const { container } = render(
 			TelemetryPage,
 			props({ superAdmin: true, families: failed({ state: 'error', message }), exporters: [] }),
@@ -215,18 +215,18 @@ describe('the exporters section', () => {
 	});
 
 	it('says the exporter list failed rather than that none is configured', () => {
-		const message = 'The exporters could not be read. This is not a report that none is configured.';
+		const message = 'Could not load exporters.';
 		const { container, queryByTestId } = render(
 			TelemetryPage,
 			props({ superAdmin: true, families: [], exporters: failed({ state: 'error', message }) }),
 		);
 		expect(queryByTestId('telemetry-exporters')?.textContent).toContain(message);
-		expect(container.textContent).not.toContain('No exporter configured');
+		expect(container.textContent).not.toContain('No exporters configured');
 	});
 
 	it('says no exporter is configured rather than rendering an empty table', () => {
 		const { container } = render(TelemetryPage, props({ superAdmin: true, families: [], exporters: [] }));
-		expect(container.textContent).toContain('No exporter configured');
+		expect(container.textContent).toContain('No exporters configured');
 	});
 
 	it('reads Never for an exporter that has not exported', () => {

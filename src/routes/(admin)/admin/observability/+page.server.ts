@@ -72,8 +72,8 @@ export interface LatencyResponse {
 // failed. A zeroed snapshot would read on screen as a pool with no connections
 // open, and an empty ranking as an engine that has timed nothing.
 const FAILED = {
-	pool: 'The pool health could not be read. This is not a report that the pool is unhealthy.',
-	latency: 'The latency rankings could not be read. This is not a report that nothing was timed.',
+	pool: 'Could not load pool health.',
+	latency: 'Could not load latency rankings.',
 } as const;
 
 /** Which of the three tunable forms an action answered for. */
@@ -156,20 +156,20 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const parsed = parsePoolForm(await event.request.formData());
 		if ('error' in parsed) return fail(422, { form: 'pool' as const, error: parsed.error });
-		return saveTunable<PoolView>('pool', 'Failed to resize the pool.', () => putPoolSize(authedClient(event), parsed.body));
+		return saveTunable<PoolView>('pool', 'Could not resize the pool. Try again.', () => putPoolSize(authedClient(event), parsed.body));
 	},
 
 	parallel: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const parsed = parseParallelForm(await event.request.formData());
 		if ('error' in parsed) return fail(422, { form: 'parallel' as const, error: parsed.error });
-		return saveTunable<ParallelView>('parallel', 'Failed to reconfigure the parallel engine.', () => putParallel(authedClient(event), parsed.body));
+		return saveTunable<ParallelView>('parallel', 'Could not save the parallel engine settings. Try again.', () => putParallel(authedClient(event), parsed.body));
 	},
 
 	asyncHooks: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const parsed = parseAsyncHooksForm(await event.request.formData());
 		if ('error' in parsed) return fail(422, { form: 'asyncHooks' as const, error: parsed.error });
-		return saveTunable<AsyncHooksView>('asyncHooks', 'Failed to reconfigure the async hooks.', () => putAsyncHooks(authedClient(event), parsed.body));
+		return saveTunable<AsyncHooksView>('asyncHooks', 'Could not save the async hook settings. Try again.', () => putAsyncHooks(authedClient(event), parsed.body));
 	},
 };

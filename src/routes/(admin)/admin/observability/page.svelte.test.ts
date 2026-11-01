@@ -391,7 +391,7 @@ describe('Live log tail filters', () => {
 
 		expect(StubEventSource.all).toHaveLength(1);
 		expect(badge(container)).toBe('Refused');
-		expect(container.textContent).toContain('The engine refused the log tail');
+		expect(container.textContent).toContain('Could not connect to the live log tail');
 
 		await fireEvent.click(getByRole('button', { name: /try again/i }));
 		await tick();
@@ -404,7 +404,7 @@ describe('Live log tail filters', () => {
 		await tick();
 
 		expect(StubEventSource.all).toHaveLength(0);
-		expect(container.textContent).toContain('The logging plugin is not running on this instance');
+		expect(container.textContent).toContain('The live log tail is not included in this build.');
 	});
 });
 
@@ -483,7 +483,7 @@ describe('Goroutine engine', () => {
 			props: props({ goroutineEngine: engine({ snapshot: { total: 3, runtime_total: 3 }, byOwner: [] }) }),
 		});
 		expect(section(container).querySelector('[data-testid="goroutine-owners"]')).toBeNull();
-		expect(section(container).textContent).toContain('No tracked goroutine has an owner yet');
+		expect(section(container).textContent).toContain('No goroutines with an owner yet');
 	});
 
 	it('opens the forms on the live values and enables them for a super admin', () => {
@@ -561,14 +561,14 @@ describe('Goroutine engine', () => {
 
 	it('renders a refusal inline on the form that asked, and nowhere else', () => {
 		const { container } = render(ObservabilityPage, {
-			props: props({}, { form: 'parallel', error: 'Failed to reconfigure the parallel engine.' }),
+			props: props({}, { form: 'parallel', error: 'Could not save the parallel engine settings. Try again.' }),
 		});
 		const forms = [...section(container).querySelectorAll('form')];
 		expect(forms).toHaveLength(3);
-		expect(forms[1].textContent).toContain('Failed to reconfigure');
+		expect(forms[1].textContent).toContain('Could not save the parallel engine settings');
 		// The failure arrives in a region mounted before it, which a screen
 		// reader announces reliably.
-		expect(forms[1].querySelector('.contents[aria-live="assertive"]')?.textContent).toContain('Failed to reconfigure');
+		expect(forms[1].querySelector('.contents[aria-live="assertive"]')?.textContent).toContain('Could not save the parallel engine settings');
 		expect(forms[0].textContent).not.toContain('Failed to');
 		expect(forms[2].textContent).not.toContain('Failed to');
 	});
@@ -599,8 +599,8 @@ describe('Goroutine engine', () => {
 		const form = [...section(container).querySelectorAll('form')][0];
 		const alert = () => [...form.querySelectorAll('[aria-live="polite"], [role="alert"]')].map((el) => el.textContent ?? '').join(' ');
 		await vi.waitFor(() => expect(alert()).toContain('Applied'));
-		expect(alert()).not.toContain('holds until the engine restarts');
-		expect(form.textContent).toContain('The change holds until the engine restarts.');
+		expect(alert()).not.toContain('lasts until the engine restarts');
+		expect(form.textContent).toContain('The change lasts until the engine restarts.');
 	});
 
 	it('says the engine did not answer instead of drawing empty tiles', () => {
@@ -621,9 +621,9 @@ describe('reads that failed', () => {
 
 	it('says the latency rankings could not be read', () => {
 		const { container } = render(ObservabilityPage, {
-			props: props({ latency: failed('The latency rankings could not be read.') }),
+			props: props({ latency: failed('Could not load latency rankings.') }),
 		});
-		expect(container.textContent).toContain('The latency rankings could not be read.');
+		expect(container.textContent).toContain('Could not load latency rankings.');
 		expect(container.textContent).not.toContain('No latency data yet');
 		expect(container.textContent).not.toContain('endpoints tracked');
 	});
@@ -633,7 +633,7 @@ describe('reads that failed', () => {
 			props: props({ poolHealth: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		expect(container.textContent).toContain('did not answer');
-		expect(container.textContent).not.toContain('The pooler may not be configured');
+		expect(container.textContent).not.toContain('may not have a connection pooler configured');
 		expect(container.textContent).not.toContain('No check time reported');
 	});
 });

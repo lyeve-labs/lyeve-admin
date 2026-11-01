@@ -283,7 +283,7 @@ describe('deleting a rule', () => {
 		api.deleteCaptureRule.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.deleteRule(formEvent({ id: 'r1' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('The rule could not be deleted.');
+		expect(out.data.error).toBe('Could not delete the rule. Try again.');
 	});
 });
 
@@ -317,6 +317,6 @@ describe('deleting a replay set', () => {
 		api.deleteReplaySet.mockRejectedValue(new TypeError('fetch failed'));
 		const out = (await actions.deleteSet(formEvent({ id: 's1' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('The replay set could not be deleted.');
+		expect(out.data.error).toBe('Could not delete the replay set. Try again.');
 	});
 });

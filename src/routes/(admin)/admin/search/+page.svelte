@@ -55,7 +55,7 @@
 	function confirmDelete(term: string): SubmitFunction {
 		return confirmed(
 			`Delete the synonyms of ${term}?`,
-			'Searches for it match only the term itself again.',
+			'Searches for it match only the term itself.',
 			{ confirmLabel: 'Delete' },
 		);
 	}
@@ -69,7 +69,7 @@
 
 <PageShell
 	title="Search"
-	description="Full-text search over content entries, what anyone may search on your site, and how results rank."
+	description="Search content entries, choose what anyone may search on your site, and tune how results rank."
 	width="wide"
 >
 	<!-- A native GET form re-runs the server load with ?q=, so a result page
@@ -97,7 +97,7 @@
 					{#snippet iconSnippet()}<Search size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else if !data.results.ok}
-				<GateNotice level={2} gate={data.results.gate} title="Search" absent="This build does not serve content search." />
+				<GateNotice level={2} gate={data.results.gate} title="Search" absent="Content search is not included in this build." />
 			{:else if data.results.value.results.length === 0}
 				<EmptyState
 					level={2}
@@ -160,9 +160,9 @@
 					<SectionHeading level={2}>Public search</SectionHeading>
 				{/snippet}
 				{#if !data.publicSchemas.ok}
-					<GateNotice gate={data.publicSchemas.gate} title="Public search" absent="This build does not serve public search." />
+					<GateNotice gate={data.publicSchemas.gate} title="Public search" absent="Public search is not included in this build." />
 				{:else if !data.schemas.ok}
-					<GateNotice gate={data.schemas.gate} title="The schemas" absent="This build does not list schemas." />
+					<GateNotice gate={data.schemas.gate} title="The schemas" absent="The schema list is not included in this build." />
 				{:else if data.schemas.value.length === 0}
 					<EmptyState title="No schemas yet" description="Build a schema, then choose here whether anyone may search it.">
 						{#snippet iconSnippet()}<Database size={ICON.lg} />{/snippet}
@@ -182,7 +182,7 @@
 						<MultiSelect
 							id="public-schemas"
 							label="Anyone may search"
-							hint="Published entries of a picked schema answer on your site's own host with no credential: title, slug, tags and a snippet. A query matches every field, and the snippet can quote any of them, so pick only schemas whose fields may all be public."
+							hint="Anyone can search the published entries of a chosen schema on your site's own host, without credentials, and see the title, slug, tags and a snippet. A query matches every field, and the snippet can quote any of them, so choose only schemas whose fields can all be public."
 							placeholder="Pick schemas"
 							searchable
 							options={data.schemas.value.map((n) => ({ value: n, label: n }))}
@@ -206,7 +206,7 @@
 				<!-- A failed read offers no Save: the boxes would hold weights nobody
 				     read, and saving them would overwrite the real ones. -->
 				{#if !data.ranking.ok}
-					<GateNotice gate={data.ranking.gate} title="Ranking weights" absent="This build does not serve ranking weights." />
+					<GateNotice gate={data.ranking.gate} title="Ranking weights" absent="Ranking weights are not included in this build." />
 				{:else}
 					{@const ranking = data.ranking.value}
 					<form method="POST" action="?/ranking" class="flex flex-col gap-3" use:enhance>
@@ -215,7 +215,7 @@
 						{:else if form && 'rankingSaved' in form}
 							<Alert tone="success" autoDismiss>Saved.</Alert>
 						{/if}
-						<p class="text-xs text-muted">How much a match in each field counts, for every schema with no weights of its own.</p>
+						<p class="text-xs text-muted">Set how much a match in each field counts. These weights apply to every schema without its own.</p>
 						<NumberInput id="w-title" name="title_weight" label="Title" min={0} max={10} step={0.1} value={ranking.title_weight} />
 						<NumberInput id="w-body" name="body_weight" label="Body" min={0} max={10} step={0.1} value={ranking.body_weight} />
 						<NumberInput id="w-tag" name="tag_weight" label="Tags" min={0} max={10} step={0.1} value={ranking.tag_weight} />
@@ -241,7 +241,7 @@
 					<Alert tone="danger">{form.synonymError}</Alert>
 				{/if}
 				{#if !data.synonyms.ok}
-					<GateNotice gate={data.synonyms.gate} title="Synonyms" absent="This build does not serve search synonyms." />
+					<GateNotice gate={data.synonyms.gate} title="Synonyms" absent="Search synonyms are not included in this build." />
 				{:else if data.synonyms.value.groups.length === 0}
 					<EmptyState title="No synonym groups yet" description="A group lets a search for one term also match the others.">
 						{#snippet iconSnippet()}<Shuffle size={ICON.lg} />{/snippet}
@@ -254,7 +254,7 @@
 				{:else}
 					{#if data.synonyms.value.total > data.synonyms.value.groups.length}
 						<p class="mb-2 text-xs text-muted">
-							The first {formatCount(data.synonyms.value.groups.length)} of {formatCount(data.synonyms.value.total)} groups are listed.
+							Showing the first {formatCount(data.synonyms.value.groups.length)} of {formatCount(data.synonyms.value.total)} groups.
 						</p>
 					{/if}
 					<ul class="space-y-2 text-xs">
@@ -280,7 +280,7 @@
 					<SectionHeading level={2}>Last 30 days</SectionHeading>
 				{/snippet}
 				{#if !data.analytics.ok}
-					<GateNotice gate={data.analytics.gate} title="Search analytics" absent="This build does not record search analytics." />
+					<GateNotice gate={data.analytics.gate} title="Search analytics" absent="Search analytics are not included in this build." />
 				{:else}
 					{@const analytics = data.analytics.value}
 					<div class="grid grid-cols-2 gap-3">
@@ -311,7 +311,7 @@
 						{:else if form && 'reindexed' in form}
 							<Alert tone="success" autoDismiss>{form.reindexMessage || `Rebuilt ${form.reindexed} entries.`}</Alert>
 						{/if}
-						<p class="text-xs text-muted">Rebuilds the index from every entry. Entries are indexed as they are saved, so this is for recovering from a change made behind the engine's back.</p>
+						<p class="text-xs text-muted">Rebuild the index from every entry. Entries are indexed when they are saved, so you only need this after data changed outside the engine.</p>
 						<div><Button variant="secondary" size="sm" type="submit">Rebuild index</Button></div>
 					</form>
 				</Card>
