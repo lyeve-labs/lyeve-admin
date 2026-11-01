@@ -56,7 +56,7 @@
 			</p>
 		{/if}
 		{#if failed}
-			<p class="text-sm text-muted">The releases could not be read, so this entry cannot be added to one. Reload the page to try again.</p>
+			<p class="text-sm text-muted">Could not load releases. Reload the page to try again.</p>
 		{:else if options.length === 0}
 			<p class="text-sm text-muted">
 				No release is open for changes. <a class="text-brand" href="/admin/releases">Create one</a> to publish this entry with others.

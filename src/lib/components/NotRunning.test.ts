@@ -26,7 +26,7 @@ describe('NotRunning', () => {
 		const { container, getByTestId } = mount({ state: 'withheld' }, false);
 		expect(getByTestId('not-running').dataset.state).toBe('withheld');
 		expect(said(container)).toContain('Withheld from this tenant');
-		expect(said(container)).toContain('withheld Search from this tenant');
+		expect(said(container)).toContain('turned off Search for this tenant');
 	});
 
 	it('shows the error of a plugin that failed to start, with the way to its details', () => {
@@ -66,7 +66,7 @@ describe('NotRunning', () => {
 	it('gives the engine\'s reason for a plugin it did not start', () => {
 		const { container } = mount({ state: 'not-started', reason: 'granted but not requested via LYEVE_PLUGINS' });
 		expect(said(container)).toContain('Not started');
-		expect(said(container)).toContain('The engine says: granted but not requested via LYEVE_PLUGINS.');
+		expect(said(container)).toContain('Reason: granted but not requested via LYEVE_PLUGINS.');
 	});
 
 	it('says a plugin is not part of this build, with nothing to click', () => {
@@ -77,7 +77,7 @@ describe('NotRunning', () => {
 
 	it('tells a reader without the status report who can say why, and offers no details', () => {
 		const { container, queryByRole } = mount({ state: 'unexplained' }, false);
-		expect(said(container)).toContain('An administrator of this instance can say why.');
+		expect(said(container)).toContain('Ask an administrator why.');
 		expect(queryByRole('link')).toBeNull();
 	});
 
@@ -103,12 +103,12 @@ describe('NotRunning', () => {
 		}
 		expect(text).toMatchInlineSnapshot(`
 			{
-			  "failed": "Failed to start The search plugin stopped with an error when the engine started it. Plugin details",
-			  "not-built": "Not part of this build This engine was built without the search plugin, so there is nothing to show here.",
+			  "failed": "Failed to start The search plugin stopped with an error at startup. Plugin details",
+			  "not-built": "Not part of this build The search plugin is not included in this build.",
 			  "not-enabled": "Search Not enabled on this instance.",
-			  "not-started": "Not started The search plugin is part of this build, and the engine did not start it. Plugin details",
-			  "unexplained": "Not running The plugin behind this page is not running, and the engine did not say why. Plugin details",
-			  "withheld": "Withheld from this tenant An administrator of this instance withheld Search from this tenant. Ask them to make it available again.",
+			  "not-started": "Not started The search plugin is included in this build but did not start. Plugin details",
+			  "unexplained": "Not running The plugin behind this page is not running. No reason was given. Plugin details",
+			  "withheld": "Withheld from this tenant An administrator turned off Search for this tenant. Ask them to turn it back on.",
 			}
 		`);
 	});

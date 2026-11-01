@@ -92,7 +92,7 @@ describe('schema builder canvas that could not be read', () => {
 		const d = { ...data(), canvas: { licensed: false, positions: {} }, canvasGate: { state: 'unavailable' } } as unknown as PageData;
 		render(SchemaPage, { props: { data: d, form: null } });
 		await fireEvent.click(screen.getByRole('radio', { name: 'Canvas' }));
-		expect(screen.getByTestId('schema-canvas-unread').textContent).toContain('did not answer');
+		expect(screen.getByTestId('schema-canvas-unread').textContent).toContain('is unavailable');
 		expect(screen.queryByTestId('schema-canvas-locked')).toBeNull();
 	});
 

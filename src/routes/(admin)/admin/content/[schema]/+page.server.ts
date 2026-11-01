@@ -40,8 +40,8 @@ function statusFrom(url: URL): EntryStatus | null {
 	return (ENTRY_STATUSES as readonly string[]).includes(asked ?? '') ? (asked as EntryStatus) : null;
 }
 
-const ENTRIES_FAILED = 'The entries could not be read. This is not a report that the collection is empty.';
-const SCHEMAS_FAILED = 'The other collections could not be read.';
+const ENTRIES_FAILED = 'Could not load entries.';
+const SCHEMAS_FAILED = 'Could not load the other collections.';
 
 /**
  * Entries are listed through the admin API, which holds every entry with its
@@ -170,12 +170,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await request.formData();
 		const id = form.get('id') as string;
-		if (!id) return fail(400, { error: 'Missing id.' });
+		if (!id) return fail(400, { error: 'This form is missing its entry. Reload the page and try again.' });
 		try {
 			await client.delete(`/api/admin/content/${encodeURIComponent(id)}`);
 			return { ok: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete entry') });
+			return fail(400, { error: actionError(err, 'Could not delete the entry. Try again.') });
 		}
 	},
 };

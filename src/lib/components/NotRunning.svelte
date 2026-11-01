@@ -47,7 +47,7 @@
 		<EmptyState
 			{level}
 			title="Withheld from this tenant"
-			description="An administrator of this instance withheld {title} from this tenant. Ask them to make it available again."
+			description="An administrator turned off {title} for this tenant. Ask them to turn it back on."
 		>
 			{#snippet iconSnippet()}<Ban size={ICON.lg} />{/snippet}
 		</EmptyState>
@@ -57,7 +57,7 @@
 		<EmptyState
 			{level}
 			title="Failed to start"
-			description="The {plugin} plugin stopped with an error when the engine started it."
+			description="The {plugin} plugin stopped with an error at startup."
 			action={detailsLink}
 		>
 			{#snippet iconSnippet()}<OctagonAlert size={ICON.lg} />{/snippet}
@@ -69,19 +69,19 @@
 		<EmptyState
 			{level}
 			title="Not started"
-			description="The {plugin} plugin is part of this build, and the engine did not start it."
+			description="The {plugin} plugin is included in this build but did not start."
 			action={detailsLink}
 		>
 			{#snippet iconSnippet()}<PowerOff size={ICON.lg} />{/snippet}
 			{#if reason.reason}
-				<p>The engine says: {reason.reason}.</p>
+				<p>Reason: {reason.reason}.</p>
 			{/if}
 		</EmptyState>
 	{:else if reason.state === 'not-built'}
 		<EmptyState
 			{level}
 			title="Not part of this build"
-			description="This engine was built without the {plugin} plugin, so there is nothing to show here."
+			description="The {plugin} plugin is not included in this build."
 		>
 			{#snippet iconSnippet()}<PackageX size={ICON.lg} />{/snippet}
 		</EmptyState>
@@ -90,8 +90,8 @@
 			{level}
 			title="Not running"
 			description={operator
-				? 'The plugin behind this page is not running, and the engine did not say why.'
-				: 'The plugin behind this page is not running on this instance. An administrator of this instance can say why.'}
+				? 'The plugin behind this page is not running. No reason was given.'
+				: 'The plugin behind this page is not running. Ask an administrator why.'}
 			action={operator ? detailsLink : undefined}
 		>
 			{#snippet iconSnippet()}<CircleSlash size={ICON.lg} />{/snippet}

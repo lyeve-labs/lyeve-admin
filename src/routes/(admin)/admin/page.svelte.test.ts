@@ -357,7 +357,7 @@ describe('traffic', () => {
 describe('the chosen home page', () => {
 	it('says the chosen home page could not be read, with a way to try again', () => {
 		render(DashboardPage, { props: { data: data({ homePage: null, homeBlocks: [], home: { slug: 'welcome', gate: { state: 'unavailable' } } }), form: null } });
-		expect(document.body.textContent).toContain('so the home page could not be read');
+		expect(document.body.textContent).toContain('so the home page did not load');
 		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin');
 	});
 
@@ -392,7 +392,7 @@ describe('the missing home page for each role', () => {
 	it('keeps Try again for a reader when the page could not be read', () => {
 		const down = { ...missing, home: { slug: 'welcome', gate: { state: 'unavailable' } } };
 		render(DashboardPage, { props: { data: data({ ...down, isAdmin: false, superAdmin: false }), form: null } });
-		expect(document.body.textContent).toContain('so the home page could not be read');
+		expect(document.body.textContent).toContain('so the home page did not load');
 		expect(screen.getByRole('link', { name: /Try again/ })).toBeTruthy();
 	});
 });

@@ -149,7 +149,7 @@ describe('a read that failed', () => {
 			props: props({ endpoints: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		const text = said(container);
-		expect(text).toContain('did not answer');
+		expect(text).toContain('is unavailable');
 		expect(text).not.toContain('No endpoint data yet');
 	});
 

@@ -94,7 +94,7 @@ describe('ReviewBar', () => {
 
 	it('says when the caller may not read the review at all', () => {
 		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [], forbidden: true } });
-		expect(screen.getByText("You may not read this entry's review")).toBeTruthy();
+		expect(screen.getByText("You cannot see this entry's review")).toBeTruthy();
 		expect(screen.queryByTestId('review-actions')).toBeNull();
 	});
 
@@ -123,7 +123,7 @@ describe('ReviewBar', () => {
 
 	it('reports a plugin that did not answer', () => {
 		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [], unavailable: true } });
-		expect(screen.getByText('The review plugin did not answer')).toBeTruthy();
+		expect(screen.getByText('Could not load the review')).toBeTruthy();
 	});
 });
 
@@ -214,7 +214,7 @@ describe('ReviewBar, picking the assignees', () => {
 describe('ReviewBar with no definitions to offer', () => {
 	it('says the definitions could not be read instead of hiding the start form', () => {
 		render(ReviewBar, { props: { entryId: 'e1', assignment: null, stages: [], definitionsFailed: true } });
-		expect(screen.getByText(/review definitions could not be read/)).toBeTruthy();
+		expect(screen.getByText(/Could not load the review definitions/)).toBeTruthy();
 	});
 
 	it('says nothing more for a reader who may not start a review', () => {

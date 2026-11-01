@@ -605,7 +605,7 @@ describe('flow editor page', () => {
 		const { getByRole, container } = setup(null, { runs: { ok: false, gate: { state: 'unavailable' } } });
 		await fireEvent.click(getByRole('tab', { name: /Runs/ }));
 		const drawer = container.querySelector('[data-testid="editor-drawer"]') as HTMLElement;
-		expect(drawer.textContent).toContain('the runs could not be read');
+		expect(drawer.textContent).toContain('the runs did not load');
 		expect(drawer.textContent).not.toContain('No runs yet.');
 	});
 

@@ -205,6 +205,6 @@
 			<Maximize2 size={ICON.sm} /> Fit
 		</Button>
 		<Button variant="secondary" size="sm" type="button" onclick={() => setScale(1)} disabled={Math.abs(scale - 1) < 0.001}>100%</Button>
-		<span class="ms-auto text-xs text-faint">Scroll to zoom, drag to pan, double click to toggle.</span>
+		<span class="ms-auto text-xs text-faint">Scroll to zoom, drag to pan, double click to switch between fit and 100%.</span>
 	</div>
 </div>

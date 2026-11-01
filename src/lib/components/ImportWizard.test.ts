@@ -26,12 +26,12 @@ const template = {
 describe('the import wizard', () => {
 	it('says why no content type is offered when the list was not read', () => {
 		render(ImportWizard, { props: { open: true, schemas: null, onstarted: vi.fn() } });
-		expect(document.body.textContent).toContain('The content types could not be read');
+		expect(document.body.textContent).toContain('Could not load the content types');
 	});
 
 	it('says there is no content type yet when the tenant has none', () => {
 		render(ImportWizard, { props: { open: true, schemas: [], onstarted: vi.fn() } });
-		expect(document.body.textContent).toContain('There is no content type yet');
+		expect(document.body.textContent).toContain('No content types yet');
 	});
 
 	it('takes a workbook and states the column and cell limits before the upload', () => {
@@ -39,7 +39,7 @@ describe('the import wizard', () => {
 		const text = document.body.textContent ?? '';
 		expect(text).toContain('an Excel workbook (XLSX)');
 		expect(text).toContain('1,024 columns');
-		expect(text).toContain("cells, its header's width times its rows");
+		expect(text).toContain('cells (columns times rows)');
 		expect((document.getElementById('import-file') as HTMLInputElement).accept).toContain('.xlsx');
 	});
 
@@ -106,7 +106,7 @@ describe('the import wizard', () => {
 			target: { value: 'https://example.com/orders.xlsx' },
 		});
 		await fireEvent.click(screen.getByRole('button', { name: 'Read the file' }));
-		await waitFor(() => expect(document.body.textContent).toContain('The workbook holds 2 sheets'));
+		await waitFor(() => expect(document.body.textContent).toContain('The workbook has 2 sheets'));
 		expect(sent[0].sheet).toBeUndefined();
 
 		await fireEvent.click(document.getElementById('import-sheet-read') as HTMLElement);

@@ -52,7 +52,7 @@ describe('SchemaRail', () => {
 		await fireEvent.input(filter, { target: { value: 'auth' } });
 		expect(screen.queryByRole('button', { name: 'Posts' })).toBeNull();
 		await fireEvent.input(filter, { target: { value: 'zzz' } });
-		expect(screen.getByText('No schema matches that filter.')).toBeTruthy();
+		expect(screen.getByText('No schemas match this filter.')).toBeTruthy();
 	});
 
 	it('draws a hundred rows at a time and starts again from the top on a new filter', async () => {

@@ -154,7 +154,7 @@ describe('DbStatus', () => {
 
 		await submit({ type: 'failure', status: 400, data: {} });
 
-		await waitFor(() => expect(screen.getByText('Migration failed')).toBeTruthy());
+		await waitFor(() => expect(screen.getByText('Could not apply the migrations. Try again.')).toBeTruthy());
 	});
 
 	it('reports a request that never arrived', async () => {
@@ -163,7 +163,7 @@ describe('DbStatus', () => {
 
 		await submit({ type: 'error', error: new Error('offline') });
 
-		await waitFor(() => expect(screen.getByText('Network error')).toBeTruthy());
+		await waitFor(() => expect(screen.getByText('Could not apply the migrations. Check your connection and try again.')).toBeTruthy());
 	});
 
 	/*
@@ -235,7 +235,7 @@ describe('DbStatus', () => {
 		await submit({ type: 'redirect', status: 303, location: '/admin/schema' });
 
 		expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
-		expect(screen.queryByText('Network error')).toBeNull();
+		expect(screen.queryByText('Could not apply the migrations. Check your connection and try again.')).toBeNull();
 	});
 });
 

@@ -125,7 +125,7 @@ describe('email triggers page', () => {
 		const { container } = render(TriggersPage, {
 			props: props({ triggers: { ok: false, gate: { state: 'unavailable' } } }),
 		});
-		expect(container.textContent).toContain('so email triggers could not be read');
+		expect(container.textContent).toContain('so email triggers did not load');
 		expect(screen.queryByText('No triggers yet')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'New trigger' })).toBeNull();
 	});

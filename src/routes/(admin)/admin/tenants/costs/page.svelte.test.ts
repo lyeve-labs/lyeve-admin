@@ -126,7 +126,7 @@ describe('tenant costs page', () => {
 		render(CostsPage, {
 			props: { data: data({ summary: { ok: false, gate: { state: 'unavailable' } } }), form: null },
 		});
-		expect(screen.getByText(/so the split by resource could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so the split by resource did not load/)).toBeTruthy();
 		expect(screen.getByTestId('cost-dashboard')).toBeTruthy();
 	});
 
@@ -159,7 +159,7 @@ describe('tenant cost prices that are not known', () => {
 		expect(screen.queryByTestId('cost-prices')).toBeNull();
 		expect(screen.queryAllByRole('form', { name: /Price for/ })).toHaveLength(0);
 		expect(screen.queryByText('Default')).toBeNull();
-		expect(screen.getByText(/so the prices could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so the prices did not load/)).toBeTruthy();
 	});
 
 });

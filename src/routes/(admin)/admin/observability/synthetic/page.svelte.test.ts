@@ -141,7 +141,7 @@ describe('alerts', () => {
 		const { container } = render(SyntheticPage, {
 			props: props({ alerts: { ok: false, gate: { state: 'unavailable' } } }),
 		});
-		expect(said(container)).toContain('did not answer');
+		expect(said(container)).toContain('is unavailable');
 		expect(said(container)).toContain('the open alerts');
 	});
 });

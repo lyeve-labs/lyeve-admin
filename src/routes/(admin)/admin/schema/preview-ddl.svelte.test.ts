@@ -77,6 +77,6 @@ describe('Preview DDL', () => {
 		expect(add.textContent).not.toContain('Queued');
 		expect(drop.getAttribute('data-destructive')).toBe('true');
 		expect(drop.textContent).toContain('Queued');
-		expect(drop.textContent).toContain('Drops data. The save queues it');
+		expect(drop.textContent).toContain('This statement drops data. Saving queues it');
 	});
 });

@@ -43,7 +43,7 @@ const drawerText = () => document.body.querySelector('form#member-form')?.textCo
 describe('tenant detail reads that failed', () => {
 	it('says the members could not be read and offers no new member', () => {
 		const { container } = render(TenantPage, { props: props({ members: { ok: false, gate: { state: 'unavailable' } } }) });
-		expect(container.textContent).toContain("so this tenant's members could not be read");
+		expect(container.textContent).toContain("so this tenant's members did not load");
 		expect(container.textContent).not.toContain('No members');
 		expect(screen.queryByRole('button', { name: /new member/i })).toBeNull();
 	});

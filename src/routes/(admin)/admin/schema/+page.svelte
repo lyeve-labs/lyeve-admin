@@ -82,7 +82,7 @@
 	}
 	const layoutSubmit: SubmitFunction = () => {
 		return async ({ result }) => {
-			if (result.type === 'failure') toast.error(String((result.data as { layoutError?: string })?.layoutError ?? 'The layout could not be saved.'));
+			if (result.type === 'failure') toast.error(String((result.data as { layoutError?: string })?.layoutError ?? 'Could not save the layout. Try again.'));
 		};
 	};
 
@@ -351,7 +351,7 @@
 				void invalidate(MIGRATIONS_DEPENDENCY);
 			} else if (result.type === 'failure') {
 				const d = (result.data ?? {}) as { error?: string; renamed?: { from: string; to: string }[]; version?: string; stale?: boolean };
-				saveError = d.error ?? 'The schema could not be saved.';
+				saveError = d.error ?? 'Could not save the schema. Try again.';
 				stale = d.stale === true;
 				// A rename the engine already ran is part of the saved side now, or
 				// the next save would ask it to rename a column that has moved. The
@@ -364,7 +364,7 @@
 					if (d.version) saved.version = d.version;
 				}
 			} else if (result.type === 'error') {
-				saveError = 'The admin could not reach the engine. Nothing was saved.';
+				saveError = 'Could not save the schema. Try again.';
 			}
 		};
 	};
@@ -389,7 +389,7 @@
 			open(fresh);
 			return;
 		}
-		saveError = data.loadGate ? 'The content type could not be read again. Try the reload again.' : `The content type ${name} no longer exists.`;
+		saveError = data.loadGate ? 'Could not reload the schema. Try again.' : `The schema ${name} no longer exists.`;
 	}
 
 	// The preview result, for the read-only dialog and for the save that asked.
@@ -409,7 +409,7 @@
 				ddlPreviewError =
 					result.type === 'failure' && result.data && 'error' in result.data
 						? String(result.data.error)
-						: 'The DDL could not be previewed.';
+						: 'Could not preview the DDL. Try again.';
 			}
 			if (previewIntent === 'save') riskOpen = true;
 		};
@@ -429,10 +429,10 @@
 		const ok = await confirm(
 			`Delete schema ${name}?`,
 			rows === undefined
-				? 'This deletes the definition, its table and every row in it. How many rows it holds could not be read. It cannot be undone.'
+				? 'This deletes the definition, its table and every row in it. Could not count the rows. This cannot be undone.'
 				: rows > 0
-					? `This deletes the definition, its table and all ${rows} ${rows === 1 ? 'row' : 'rows'} in it. It cannot be undone.`
-					: 'This deletes the definition and its table. It cannot be undone.',
+					? `This deletes the definition, its table and all ${rows} ${rows === 1 ? 'row' : 'rows'} in it. This cannot be undone.`
+					: 'This deletes the definition and its table. This cannot be undone.',
 			{ confirmLabel: 'Delete' },
 		);
 		if (ok) deleteForm?.requestSubmit();
@@ -448,7 +448,7 @@
 				// The last definition's delete clears its table's queued rows from the log.
 				void invalidate(MIGRATIONS_DEPENDENCY);
 			} else if (result.type === 'failure') {
-				saveError = String((result.data as { error?: string })?.error ?? 'The schema could not be deleted.');
+				saveError = String((result.data as { error?: string })?.error ?? 'Could not delete the schema. Try again.');
 			}
 		};
 	};
@@ -709,20 +709,20 @@
 					level={2}
 					gate={data.loadGate}
 					title="Schemas"
-					absent="The schema plugin does not run on this instance, so there are no schemas to show."
+					absent="Schemas are not included in this build."
 				/>
 			</div>
 		{/if}
 		{#if !canWrite && !data.loadGate}
 			<div class="shrink-0 px-3 pt-3">
-				<Alert tone="brand">Your role reads schemas. Changing one takes admin or super_admin.</Alert>
+				<Alert tone="brand">Your role can view schemas but not change them. Changing one needs the admin or super_admin role.</Alert>
 			</div>
 		{/if}
 		{#if presetCreated}
 			<div class="shrink-0 px-3 pt-3">
 				<Alert tone="success" title="Preset created" autoDismiss>
 					{#snippet children()}
-						{presetCreated.length === 1 ? 'One schema is' : `${presetCreated.length} schemas are`} in the list now: {presetCreated.join(', ')}. Pick one to see its fields.
+						{presetCreated.length === 1 ? 'Created one schema' : `Created ${presetCreated.length} schemas`}: {presetCreated.join(', ')}. Pick one to see its fields.
 					{/snippet}
 				</Alert>
 			</div>
@@ -775,14 +775,14 @@
 
 			{#if view === 'canvas' && SchemaCanvas && data.canvasGate}
 				<div class="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6" data-testid="schema-canvas-unread">
-					<GateNotice level={2} gate={data.canvasGate} title="Schema canvas" absent="This build does not serve the schema canvas. The list editor does everything." />
+					<GateNotice level={2} gate={data.canvasGate} title="Schema canvas" absent="The schema canvas is not included in this build. You can do everything in the list editor." />
 				</div>
 			{:else if view === 'canvas' && SchemaCanvas && !canvasLicensed}
 				<div class="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6" data-testid="schema-canvas-locked">
 					<NotEnabled
 						level={2}
 						title="Schema canvas"
-						description="The canvas draws every content type and its relations as a diagram you edit in place, and keeps the layout your team arranges. This instance's license does not include it. The list editor does everything else."
+						description="See every content type and its relations as a diagram you edit in place, with a layout your team shares. Your license does not include it. You can do everything else in the list editor."
 					/>
 				</div>
 			{:else if view === 'canvas' && SchemaCanvas}
@@ -855,7 +855,7 @@
 									? hasPresets
 										? 'Start one with New schema in the toolbar, or create a ready-made set from a preset.'
 										: 'Start one with New schema in the toolbar.'
-									: 'An admin creates the first one.'}
+									: 'Ask an admin to create one.'}
 							>
 								{#snippet iconSnippet()}
 									<Table2 size={ICON.lg} />

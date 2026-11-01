@@ -112,7 +112,7 @@ describe('a transport that did not answer', () => {
 			props: props({ socket: null, socketGate: { state: 'unavailable' } }),
 		});
 		const text = said(container);
-		expect(text).toContain('did not answer');
+		expect(text).toContain('is unavailable');
 		expect(text).not.toContain('No connections over this transport yet.');
 		expect(text).not.toContain('No connections yet');
 	});

@@ -147,7 +147,7 @@
 		]}
 		onchange={setMode}
 		hint={mode === 'json' && !pairable && value.trim() !== ''
-			? 'Keys and values edits a flat object. This value nests or is not an object, so it stays as JSON.'
+			? 'Keys and values works only for a flat object. This value is nested or is not an object, so edit it as JSON.'
 			: undefined}
 	/>
 

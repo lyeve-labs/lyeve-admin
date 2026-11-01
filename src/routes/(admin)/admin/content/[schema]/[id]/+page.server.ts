@@ -466,14 +466,14 @@ export const actions: Actions = {
 				const refused = fieldRefusalOf(err, shown);
 				if (refused) return fail(422, refused);
 			}
-			return fail(400, { error: actionError(err, 'Failed to save entry. Check all fields and try again.') });
+			return fail(400, { error: actionError(err, 'Could not save the entry. Check the fields and try again.') });
 		}
 
 		// The entry is saved by now, so a refused link is reported as such
 		// rather than as a failed save or a finished one.
 		if (links) {
 			const failed = await setEntryRelations(event, params.id, links);
-			if (failed) return fail(400, { error: `The entry was saved, but not every link was. ${failed}` });
+			if (failed) return fail(400, { error: `The entry was saved, but some links were not. ${failed}` });
 		}
 		redirect(303, `/admin/content/${params.schema}`);
 	},
@@ -485,7 +485,7 @@ export const actions: Actions = {
 		try {
 			await client.put(`/api/admin/content/${encodeURIComponent(params.id)}`, { status: 'published' });
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to publish entry.') });
+			return fail(400, { error: actionError(err, 'Could not publish the entry. Try again.') });
 		}
 		redirect(303, `/admin/content/${params.schema}/${params.id}`);
 	},
@@ -497,7 +497,7 @@ export const actions: Actions = {
 		try {
 			await client.put(`/api/admin/content/${encodeURIComponent(params.id)}`, { status: 'draft' });
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to unpublish entry.') });
+			return fail(400, { error: actionError(err, 'Could not unpublish the entry. Try again.') });
 		}
 		redirect(303, `/admin/content/${params.schema}/${params.id}`);
 	},
@@ -518,7 +518,7 @@ export const actions: Actions = {
 		const exists = form.get('exists') === 'true';
 		const status = form.get('translation_status');
 		if (!locale) {
-			return fail(400, { error: 'Pick a locale to translate into.', translationLocale: locale });
+			return fail(400, { error: 'Choose a locale first.', translationLocale: locale });
 		}
 		try {
 			const values = JSON.parse(String(form.get('data') ?? '{}')) as Record<string, unknown>;
@@ -546,7 +546,7 @@ export const actions: Actions = {
 			const refused = refusalOf(err);
 			if (refused) return fail(402, { error: refusalText(refused), refused, translationLocale: locale });
 			return fail(400, {
-				error: actionError(err, 'Failed to save the translation.'),
+				error: actionError(err, 'Could not save the translation. Try again.'),
 				translationLocale: locale,
 			});
 		}
@@ -561,13 +561,13 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const locale = String(form.get('locale') ?? '').trim();
 		if (!locale) {
-			return fail(400, { error: 'Pick a locale to mark.', translationLocale: locale });
+			return fail(400, { error: 'Choose a locale first.', translationLocale: locale });
 		}
 		try {
 			await updateTranslation(client, params.id, locale, { translation_status: 'translated' });
 		} catch (err) {
 			return fail(400, {
-				error: actionError(err, 'Failed to mark the translation.'),
+				error: actionError(err, 'Could not mark the translation as translated. Try again.'),
 				translationLocale: locale,
 			});
 		}
@@ -589,14 +589,14 @@ export const actions: Actions = {
 		const action = String(form.get('action') ?? '').trim();
 		const comment = String(form.get('comment') ?? '').trim();
 		if (!assignmentId || !isTransitionAction(action)) {
-			return fail(400, { error: 'Pick an action to apply.', review: true, reviewStatus: 400 });
+			return fail(400, { error: 'Choose an action first.', review: true, reviewStatus: 400 });
 		}
 		try {
 			await transitionAssignment(client, assignmentId, action, comment);
 		} catch (err) {
 			const status = err instanceof ApiError ? err.status : 400;
 			return fail(status === 403 ? 403 : 400, {
-				error: actionError(err, 'Failed to move the review.'),
+				error: actionError(err, 'Could not move the review. Try again.'),
 				review: true,
 				reviewStatus: status,
 			});
@@ -618,7 +618,7 @@ export const actions: Actions = {
 		const definitionId = String(form.get('definition_id') ?? '').trim();
 		const assigneeId = String(form.get('assignee_id') ?? '').trim();
 		if (!definitionId || !assigneeId) {
-			return fail(400, { error: 'Pick a definition and an assignee.', review: true, reviewStatus: 400 });
+			return fail(400, { error: 'Choose a definition and an assignee first.', review: true, reviewStatus: 400 });
 		}
 		// The picker posts one field per account and the typed fallback one
 		// field of ids, by line or by comma. Both read the same way.
@@ -638,7 +638,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const status = err instanceof ApiError ? err.status : 400;
 			return fail(status === 403 ? 403 : 400, {
-				error: actionError(err, 'Failed to start the review.'),
+				error: actionError(err, 'Could not start the review. Try again.'),
 				review: true,
 				reviewStatus: status,
 			});
@@ -662,7 +662,7 @@ export const actions: Actions = {
 				...(parentId ? { parent_id: parentId } : {}),
 			});
 		} catch (err) {
-			const failed = actionFailure(err, 'The comment could not be posted.');
+			const failed = actionFailure(err, 'Could not post the comment. Try again.');
 			return fail(failed.status, { ...failed.data, comments: true });
 		}
 		return { commented: true };
@@ -674,11 +674,11 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const commentId = String(form.get('comment_id') ?? '').trim();
 		const resolved = String(form.get('resolved') ?? '') === 'true';
-		if (!commentId) return fail(400, { error: 'No thread was named.', comments: true });
+		if (!commentId) return fail(400, { error: 'This form is missing its thread. Reload the page and try again.', comments: true });
 		try {
 			await setThreadResolved(authedClient(event), params.id, commentId, resolved);
 		} catch (err) {
-			const failed = actionFailure(err, 'The thread could not be updated.');
+			const failed = actionFailure(err, 'Could not update the thread. Try again.');
 			return fail(failed.status, { ...failed.data, comments: true });
 		}
 		return { threadResolved: resolved };
@@ -690,14 +690,14 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const releaseId = String(form.get('release_id') ?? '').trim();
 		const action = String(form.get('action') ?? '');
-		if (!releaseId) return fail(400, { error: 'Pick a release.', release: true });
+		if (!releaseId) return fail(400, { error: 'Choose a release first.', release: true });
 		if (action !== 'publish' && action !== 'unpublish') {
-			return fail(400, { error: 'An entry is either published or unpublished by the release.', release: true });
+			return fail(400, { error: 'Choose whether the release publishes or unpublishes this entry.', release: true });
 		}
 		try {
 			await addReleaseItem(authedClient(event), releaseId, params.id, action);
 		} catch (err) {
-			const failed = actionFailure(err, 'The entry could not be added to the release.');
+			const failed = actionFailure(err, 'Could not add the entry to the release. Try again.');
 			return fail(failed.status, { ...failed.data, release: true });
 		}
 		return { addedToRelease: releaseId };
@@ -713,7 +713,7 @@ export const actions: Actions = {
 		// is one nothing reads, so either would refuse every restore.
 		const toRevision = Number(data.get('rev_num') ?? 0);
 		if (!Number.isInteger(toRevision) || toRevision <= 0) {
-			return fail(400, { error: 'Pick a revision to restore.' });
+			return fail(400, { error: 'Choose a revision first.' });
 		}
 		try {
 			await client.post(`/api/admin/content/${encodeURIComponent(params.id)}/rollback`, {
@@ -722,7 +722,7 @@ export const actions: Actions = {
 		} catch (err) {
 			// A revision older than the window this install reads answers 402,
 			// and the history panel renders it.
-			const failed = actionFailure(err, 'Failed to restore revision.');
+			const failed = actionFailure(err, 'Could not restore the revision. Try again.');
 			return fail(failed.status, { ...failed.data, revision: true });
 		}
 		redirect(303, `/admin/content/${params.schema}/${params.id}`);
@@ -739,7 +739,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const num = Number(form.get('rev_num') ?? 0);
 		if (!Number.isInteger(num) || num <= 0) {
-			return fail(400, { error: 'Pick a revision to open.', revision: true });
+			return fail(400, { error: 'Choose a revision first.', revision: true });
 		}
 		let raw: Record<string, unknown>;
 		try {
@@ -747,7 +747,7 @@ export const actions: Actions = {
 				`/api/admin/content/${encodeURIComponent(params.id)}/revisions/${num}`,
 			);
 		} catch (err) {
-			const failed = actionFailure(err, 'The revision could not be opened.');
+			const failed = actionFailure(err, 'Could not open the revision. Try again.');
 			return fail(failed.status, { ...failed.data, revision: true });
 		}
 		return { openedRevision: toEditorRevision(raw) };

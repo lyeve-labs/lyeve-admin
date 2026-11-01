@@ -240,7 +240,7 @@ describe('figures that cover one page or failed', () => {
 			props: props({ runs: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		const text = said(container);
-		expect(text).toContain('did not answer');
+		expect(text).toContain('is unavailable');
 		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
 		expect(tile?.nextElementSibling?.textContent?.trim()).not.toBe('0');
 	});

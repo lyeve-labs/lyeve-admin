@@ -31,7 +31,7 @@ describe('MediaPicker', () => {
 	it('says the library could not be read rather than that nothing is published', async () => {
 		const { getByRole, findByText, queryByText } = render(MediaPicker, { props: { choices: null, onpick: vi.fn() } });
 		await fireEvent.click(getByRole('button', { name: 'Choose from library' }));
-		expect(await findByText('The library could not be read')).toBeTruthy();
+		expect(await findByText('Could not load the library')).toBeTruthy();
 		expect(queryByText('No published files')).toBeNull();
 	});
 });

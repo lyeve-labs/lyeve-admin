@@ -43,7 +43,7 @@ describe('releases load', () => {
 		engine.get.mockRejectedValue(new ApiError(500, 'internal error'));
 		const out = (await load(event())) as { gate: { state: string; message?: string } };
 		expect(out.gate.state).toBe('error');
-		expect(out.gate.message).toContain('not a report that there are none');
+		expect(out.gate.message).toBe('Could not load releases.');
 	});
 
 	it('sends a page past the end back to the last page that holds releases', async () => {
@@ -67,7 +67,7 @@ describe('releases create', () => {
 	it('asks for a name before it calls the engine', async () => {
 		const out = (await actions.create(event({ name: ' ' }))) as { status: number; data: { fields: Record<string, string> } };
 		expect(out.status).toBe(400);
-		expect(out.data.fields.name).toBe('Name is required');
+		expect(out.data.fields.name).toBe('Enter a name.');
 		expect(engine.post).not.toHaveBeenCalled();
 	});
 

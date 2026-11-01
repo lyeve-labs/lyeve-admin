@@ -141,7 +141,7 @@ describe('the job list when it could not be read', () => {
 		state.page.url = new URL('http://localhost/admin/jobs?offset=50');
 		const { container, queryByRole, getByRole } = failed({ state: 'unavailable' });
 		expect(container.textContent).toContain('Temporarily unavailable');
-		expect(container.textContent).toContain('so scheduled jobs could not be read. Nothing was changed.');
+		expect(container.textContent).toContain('so scheduled jobs did not load. Try again in a moment.');
 		expect(getByRole('link', { name: 'Try again' }).getAttribute('href')).toBe('/admin/jobs?offset=50');
 		expect(container.textContent).not.toContain('No jobs yet');
 		expect(queryByRole('button', { name: /new job/i })).toBeNull();
@@ -252,7 +252,7 @@ describe('a job link that opened nothing', () => {
 
 	it('says the linked job could not be read, with a way to try again', () => {
 		const { container, getByRole } = setup({ openGate: { state: 'unavailable' } });
-		expect(container.textContent).toContain('so the linked job could not be read');
+		expect(container.textContent).toContain('so the linked job did not load');
 		expect(getByRole('link', { name: /Try again/ })).toBeTruthy();
 	});
 });

@@ -121,7 +121,7 @@
 			const title = entryTitle(item, userFields);
 			const named =
 				title.source === 'none' ? `the untitled entry ${shortId(item.id)}` : title.label;
-			return confirmed(`Delete ${named}?`, 'Its revisions and translations go with it.', {
+			return confirmed(`Delete ${named}?`, 'Its revisions and translations are deleted too.', {
 				confirmLabel: 'Delete',
 				detail: item.id,
 				success: `Deleted ${named}`
@@ -178,7 +178,7 @@
 			/>
 		</form>
 	{:else if !data.schemas.ok}
-		<p class="text-sm text-muted">The other collections could not be read, so the collection picker is not shown.</p>
+		<p class="text-sm text-muted">Could not load the other collections. Reload the page to try again.</p>
 	{/if}
 
 	{#if form?.error}
@@ -211,7 +211,7 @@
 			<GateNotice
 				gate={data.items.gate}
 				title="Entries"
-				absent="This build does not serve content entries."
+				absent="Content entries are not included in this build."
 			/>
 		{:else if entries.length === 0 && data.status}
 			<EmptyState

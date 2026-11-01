@@ -268,7 +268,7 @@ describe('a refused or failed upload', () => {
 		vi.stubGlobal('fetch', vi.fn(async () => answer(413, { error: 'client intended to send too large body' })));
 		setup();
 		await pick();
-		await waitFor(() => expect(document.body.textContent).toContain('new.png was refused, so it was not stored.'));
+		await waitFor(() => expect(document.body.textContent).toContain('new.png was refused and was not uploaded.'));
 		expect(document.body.textContent).not.toContain('client intended');
 		vi.unstubAllGlobals();
 	});
@@ -280,7 +280,7 @@ describe('a refused or failed upload', () => {
 		vi.stubGlobal('fetch', vi.fn(async () => answer(503, { error: 'dial tcp 10.0.0.4:5432: connect: connection refused' })));
 		setup();
 		await pick();
-		await waitFor(() => expect(document.body.textContent).toContain('The engine did not confirm new.png. Check the library, then try again in a moment.'));
+		await waitFor(() => expect(document.body.textContent).toContain('Could not confirm that new.png uploaded. Check the library before you try again.'));
 		expect(document.body.textContent).not.toContain('dial tcp');
 		expect(document.body.textContent).not.toContain('Nothing was uploaded');
 		vi.unstubAllGlobals();
@@ -292,7 +292,7 @@ describe('a refused or failed upload', () => {
 		setup();
 		await pick('first.png', 'second.png');
 		await waitFor(() => expect(kit.success).toHaveBeenCalledWith('Uploaded 1 file'));
-		expect(document.body.textContent).toContain('The engine did not confirm second.png.');
+		expect(document.body.textContent).toContain('Could not confirm that second.png uploaded.');
 		expect(document.body.textContent).not.toContain('first.png');
 		expect(document.body.textContent).not.toContain('Nothing was uploaded');
 		vi.unstubAllGlobals();
@@ -334,8 +334,8 @@ describe('media library controls carry a name', () => {
 describe('media library read failures', () => {
 	it('says the library could not be read rather than that nothing was uploaded', () => {
 		failed({ state: 'unavailable' });
-		expect(screen.queryByText('No files uploaded yet.')).toBeNull();
-		expect(screen.getByText(/could not be read/)).toBeTruthy();
+		expect(screen.queryByText('No files yet')).toBeNull();
+		expect(screen.getByText(/did not load/)).toBeTruthy();
 		expect(screen.getByRole('link', { name: /Try again/ })).toBeTruthy();
 	});
 
@@ -349,7 +349,7 @@ describe('media library read failures', () => {
 	it('tells a role the engine refused that it cannot open the library', () => {
 		failed({ state: 'forbidden' });
 		expect(screen.getByText(/Your role cannot open media library/)).toBeTruthy();
-		expect(screen.queryByText('No files uploaded yet.')).toBeNull();
+		expect(screen.queryByText('No files yet')).toBeNull();
 	});
 });
 
@@ -368,20 +368,20 @@ describe('media library failures stay with their file and form', () => {
 	};
 
 	it('shows a failed save only in the drawer of the file it was for', async () => {
-		withForm({ detailsError: 'The details could not be saved.', detailsId: 'm-video' });
+		withForm({ detailsError: 'Could not save the details. Try again.', detailsId: 'm-video' });
 		await open(IMAGE.filename);
-		expect(screen.queryByText('The details could not be saved.')).toBeNull();
+		expect(screen.queryByText('Could not save the details. Try again.')).toBeNull();
 	});
 
 	it('shows a failed save in its own file drawer', async () => {
-		withForm({ detailsError: 'The details could not be saved.', detailsId: IMAGE.id });
+		withForm({ detailsError: 'Could not save the details. Try again.', detailsId: IMAGE.id });
 		await open(IMAGE.filename);
-		expect(screen.getByText('The details could not be saved.')).toBeTruthy();
+		expect(screen.getByText('Could not save the details. Try again.')).toBeTruthy();
 	});
 
 	it('shows a write that named no file at the top of the page', () => {
-		withForm({ error: 'No file was named.' });
-		expect(screen.getByText('No file was named.')).toBeTruthy();
+		withForm({ error: 'This form is missing its file. Reload the page and try again.' });
+		expect(screen.getByText('This form is missing its file. Reload the page and try again.')).toBeTruthy();
 	});
 
 	it('shows a failed delete in the drawer the delete was asked from', async () => {

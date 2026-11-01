@@ -192,7 +192,7 @@ describe('a panel that could not be read', () => {
 	it('says the variants could not be read and offers no new variant', () => {
 		const { container } = render(DetailPage, { props: props({ variants: down }) });
 		const text = said(container);
-		expect(text).toContain('the variants could not be read');
+		expect(text).toContain('the variants did not load');
 		expect(text).not.toContain('Add a control and at least one other variant');
 		expect(text).not.toContain('New variant');
 	});
@@ -200,7 +200,7 @@ describe('a panel that could not be read', () => {
 	it('says the metrics could not be read and offers no new metric', () => {
 		const { container } = render(DetailPage, { props: props({ metrics: down }) });
 		const text = said(container);
-		expect(text).toContain('the metrics could not be read');
+		expect(text).toContain('the metrics did not load');
 		expect(text).not.toContain('Without one, this experiment has no result.');
 		expect(text).not.toContain('New metric');
 	});
@@ -208,7 +208,7 @@ describe('a panel that could not be read', () => {
 	it('says the results could not be read and counts no exposure', () => {
 		const { container } = render(DetailPage, { props: props({ results: down }) });
 		const text = said(container);
-		expect(text).toContain('the results could not be read');
+		expect(text).toContain('the results did not load');
 		expect(text).not.toContain('Nobody has been exposed');
 		expect(text).toContain('Exposures unknown');
 	});

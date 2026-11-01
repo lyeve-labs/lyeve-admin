@@ -42,7 +42,7 @@ describe('publishing an entry', () => {
 	it('keeps outage detail out of the message', async () => {
 		engine.put.mockRejectedValue(new ApiError(503, 'pq: connection refused'));
 		const out = (await actions.publish(actionEvent())) as Failure;
-		expect(out.data.error).toBe('Failed to publish entry.');
+		expect(out.data.error).toBe('Could not publish the entry. Try again.');
 	});
 });
 
@@ -71,6 +71,6 @@ describe('moving a review', () => {
 	it('keeps outage detail out of the message', async () => {
 		engine.post.mockRejectedValue(new ApiError(503, 'pq: connection refused'));
 		const out = (await actions.reviewTransition(actionEvent({ assignment_id: 'a1', action: 'approve' }))) as Failure;
-		expect(out.data).toMatchObject({ error: 'Failed to move the review.', reviewStatus: 503 });
+		expect(out.data).toMatchObject({ error: 'Could not move the review. Try again.', reviewStatus: 503 });
 	});
 });

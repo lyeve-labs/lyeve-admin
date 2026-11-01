@@ -20,14 +20,14 @@ export type { MediaItem } from '$lib/api/media';
  */
 function describeFailure(err: unknown): string {
 	if (err instanceof ApiError && err.status === 503 && /no enabled ai provider/i.test(err.message)) {
-		return 'No AI provider is enabled, so no description can be written. A super admin can enable one under AI providers.';
+		return 'No AI provider is enabled. A super admin can enable one under AI providers.';
 	}
 	if (err instanceof ApiError && err.status === 402 && /budget/i.test(err.message)) {
-		return 'The AI budget for this billing period is spent, so no description can be written until it renews.';
+		return 'The AI budget for this billing period is used up. You can suggest alt text again when it renews.';
 	}
 	const refused = refusalOf(err);
 	if (refused) return refusalText(refused);
-	return actionError(err, 'No description came back.');
+	return actionError(err, 'Could not suggest alt text. Try again.');
 }
 
 /** The engine's own page size when a request names none. */
@@ -45,9 +45,9 @@ const MAX_LIMIT = 199;
  * A write that names no file belongs to no drawer, so it is said at the top
  * of the page with the other page-level failures.
  */
-const NO_FILE = 'No file was named.';
+const NO_FILE = 'This form is missing its file. Reload the page and try again.';
 
-const LIST_FAILED = 'The media library could not be read. This is not a report that it is empty.';
+const LIST_FAILED = 'Could not load the media library.';
 
 /**
  * The grid renders one window of the library. A library of ten thousand files
@@ -107,7 +107,7 @@ export const actions: Actions = {
 		} catch (err) {
 			// The delete is asked from the preview drawer, which stays open on a
 			// refusal, so the failure names its file and shows there.
-			return fail(400, { deleteError: actionError(err, 'The file could not be deleted.'), deleteId: id });
+			return fail(400, { deleteError: actionError(err, 'Could not delete the file. Try again.'), deleteId: id });
 		}
 	},
 
@@ -124,7 +124,7 @@ export const actions: Actions = {
 			});
 			return { updated: item };
 		} catch (err) {
-			return fail(400, { detailsError: actionError(err, 'The details could not be saved.'), detailsId: id });
+			return fail(400, { detailsError: actionError(err, 'Could not save the details. Try again.'), detailsId: id });
 		}
 	},
 
@@ -133,7 +133,7 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const url = String(data.get('url') ?? '').trim();
 		if (!/^https?:\/\/\S+$/i.test(url)) {
-			return fail(400, { importError: 'Give an http or https address.' });
+			return fail(400, { importError: 'Enter an http or https address.' });
 		}
 		try {
 			const item = await importMedia(authedClient(event), {
@@ -143,7 +143,7 @@ export const actions: Actions = {
 			});
 			return { imported: item };
 		} catch (err) {
-			return fail(400, { importError: importRefusal(actionError(err, 'The file could not be imported.')) });
+			return fail(400, { importError: importRefusal(actionError(err, 'Could not import the file. Try again.')) });
 		}
 	},
 
@@ -156,7 +156,7 @@ export const actions: Actions = {
 			const item = await setMediaPublic(authedClient(event), id, data.get('public') === 'true');
 			return { updated: item };
 		} catch (err) {
-			return fail(400, { detailsError: actionError(err, 'The file could not be published.'), detailsId: id });
+			return fail(400, { detailsError: actionError(err, data.get('public') === 'true' ? 'Could not publish the file. Try again.' : 'Could not unpublish the file. Try again.'), detailsId: id });
 		}
 	},
 
@@ -175,7 +175,7 @@ export const actions: Actions = {
 			const item = await setFocalPoint(authedClient(event), id, clear ? null : { x, y });
 			return { updated: item, focalSaved: id };
 		} catch (err) {
-			return fail(400, { focalError: actionError(err, 'The focal point could not be saved.'), focalId: id });
+			return fail(400, { focalError: actionError(err, 'Could not save the focal point. Try again.'), focalId: id });
 		}
 	},
 
@@ -190,7 +190,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const refused = refusalOf(err);
 			if (refused) return fail(402, { transformError: refusalText(refused), transformRefused: refused, transformId: id });
-			return fail(400, { transformError: actionError(err, 'The URL could not be built.'), transformId: id });
+			return fail(400, { transformError: actionError(err, 'Could not build the URL. Try again.'), transformId: id });
 		}
 	},
 

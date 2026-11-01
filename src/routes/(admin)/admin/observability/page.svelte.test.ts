@@ -632,7 +632,7 @@ describe('reads that failed', () => {
 		const { container } = render(ObservabilityPage, {
 			props: props({ poolHealth: { ok: false, gate: { state: 'unavailable' } } }),
 		});
-		expect(container.textContent).toContain('did not answer');
+		expect(container.textContent).toContain('is unavailable');
 		expect(container.textContent).not.toContain('may not have a connection pooler configured');
 		expect(container.textContent).not.toContain('No check time reported');
 	});

@@ -76,7 +76,7 @@ describe('content index chips', () => {
 		const { container } = render(ContentIndex, { props: { data: data() } });
 
 		const text = container.textContent ?? '';
-		expect(text).toContain('1 of 2 on this page holds no rows.');
+		expect(text).toContain('1 of 2 on this page has no entries.');
 		expect(container.querySelector('a[href*="filter=with-rows"]')).not.toBeNull();
 	});
 });
@@ -103,7 +103,7 @@ describe('content index read', () => {
 			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } }, total: 0 }) },
 		});
 
-		expect(container.textContent).toContain('so content could not be read');
+		expect(container.textContent).toContain('so content did not load');
 		expect(container.textContent).not.toContain('No schemas yet');
 	});
 

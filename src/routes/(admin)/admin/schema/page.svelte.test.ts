@@ -356,7 +356,7 @@ describe('schema builder saving', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /1 problem/ }));
 		const list = screen.getByTestId('schema-problems');
 		expect(list.textContent).toContain('New text field, row 2');
-		expect(list.textContent).toContain('Name the field.');
+		expect(list.textContent).toContain('Enter a field name.');
 	});
 
 	it('takes the reader from a problem to the control that fixes it', async () => {
@@ -405,7 +405,7 @@ describe('schema builder for a role that cannot write', () => {
 		expect(screen.queryByRole('button', { name: /^Save/ })).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Add field' })).toBeNull();
 		expect((screen.getByRole('textbox', { name: 'Field name' }) as HTMLInputElement).closest('fieldset')?.disabled).toBe(true);
-		expect(screen.getByText(/Changing one takes admin or super_admin/)).toBeTruthy();
+		expect(screen.getByText(/Changing one needs the admin or super_admin role/)).toBeTruthy();
 	});
 });
 
@@ -435,11 +435,11 @@ describe('schema builder localization flag', () => {
 		const box = screen.getByRole('checkbox', { name: /localization/ }) as HTMLInputElement;
 		expect(box.checked).toBe(true);
 		expect(box.disabled).toBe(true);
-		expect(view.container.textContent).toContain('Not read: translations are kept per entry and locale');
+		expect(view.container.textContent).toContain('Not used. Translations are stored per entry and locale.');
 		// The planned column stays listed with a note that nothing reads it, so
 		// nobody takes the row for a column in use.
 		expect(screen.getByText('_locale')).toBeTruthy();
-		expect(view.container.textContent).toContain('nothing reads this column');
+		expect(view.container.textContent).toContain('This column is not used.');
 	});
 });
 
@@ -462,7 +462,7 @@ describe('schema builder rail', () => {
 			target: { value: 'nothing' },
 		});
 
-		expect(screen.getByText('No schema matches that filter.')).toBeTruthy();
+		expect(screen.getByText('No schemas match this filter.')).toBeTruthy();
 	});
 });
 
@@ -605,7 +605,7 @@ describe('schema builder presets', () => {
 		});
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Presets' }));
-		expect(screen.getByText(/so presets could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so presets did not load/)).toBeTruthy();
 		expect(screen.queryByText('No presets')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Create' })).toBeNull();
 	});
@@ -648,7 +648,7 @@ describe('schema builder presets', () => {
 		});
 
 		expect(await screen.findByText('Preset created')).toBeTruthy();
-		expect(screen.getByText(/2 schemas are in the list now: notes, note_tags/)).toBeTruthy();
+		expect(screen.getByText(/Created 2 schemas: notes, note_tags/)).toBeTruthy();
 	});
 });
 
@@ -776,7 +776,7 @@ describe('schema builder read failures', () => {
 		render(SchemaPage, {
 			props: { data: data({ schemas: [], loadGate: { state: 'unavailable' } }), form: null },
 		});
-		expect(screen.getByText(/so schemas could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so schemas did not load/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: 'New schema' })).toBeNull();
 		expect(screen.queryByText('No schemas yet')).toBeNull();
 	});
@@ -828,7 +828,7 @@ describe('schema builder over a failed list read', () => {
 			props: { data: data({ schemas: [], canWrite: false, loadGate: { state: 'forbidden' } }), form: null },
 		});
 		expect(screen.getByText(/Your role cannot open schemas/)).toBeTruthy();
-		expect(screen.queryByText(/Your role reads schemas/)).toBeNull();
+		expect(screen.queryByText(/Your role can view schemas/)).toBeNull();
 	});
 });
 
