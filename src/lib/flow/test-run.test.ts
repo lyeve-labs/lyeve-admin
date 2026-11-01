@@ -33,7 +33,7 @@ describe('parseTrigger', () => {
 describe('testFailure', () => {
 	it('names the nodes a 402 refused', () => {
 		const out = testFailure(new FlowRefusal([{ node_id: 'orders', path: '/type', message: 'x' }]));
-		expect(out).toMatchObject({ kind: 'refused', text: 'One element uses a feature the license on this instance does not include: orders.' });
+		expect(out).toMatchObject({ kind: 'refused', text: 'One element uses a feature that is not enabled on this instance: orders.' });
 	});
 
 	it('reads the blocked message as the blocked state and a 422 list as problems', () => {
@@ -48,7 +48,7 @@ describe('testFailure', () => {
 });
 
 describe('testFailure for an answer that is not the engine speaking', () => {
-	const OUTAGE_TEXT = 'The test run did not finish. Try again in a moment.';
+	const OUTAGE_TEXT = 'The engine is unavailable, so the test run did not finish. Try again in a moment.';
 
 	// The client puts the raw body of a non-JSON answer in the message, so a
 	// proxy's error page would be printed as the run's failure.

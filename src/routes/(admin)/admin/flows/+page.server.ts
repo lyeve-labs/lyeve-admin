@@ -91,7 +91,7 @@ function validationFailure(err: unknown, fallback: string) {
 		return fail(422, { error: 'Fix the problems in the definition.', errors: validationErrors(err.body) });
 	}
 	if (err instanceof FlowRefusal) return refusalFailure(err);
-	if (isLocked(err)) return fail(402, { error: 'The license on this instance does not include flows.', locked: true });
+	if (isLocked(err)) return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
 	if (err instanceof ApiError && err.status === 403) return forbiddenFailure(err);
 	return fail(400, { error: actionError(err, fallback) });
 }
@@ -159,7 +159,7 @@ export const actions: Actions = {
 		} catch (err) {
 			if (err instanceof FlowRefusal) return tagged('import', refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {
-				return fail(402, { action: 'import', error: 'The license on this instance does not include flows.', locked: true });
+				return fail(402, { action: 'import', error: 'Flows are not enabled on this instance.', locked: true });
 			}
 			if (err instanceof ImportError) {
 				if (err.status === 422) return tagged('import', validationFailure(err, 'Could not import the flow. Try again.'));

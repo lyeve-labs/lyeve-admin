@@ -82,7 +82,7 @@
 		{#if data.status.degraded}
 			<Alert tone="warn">
 				The message broker plugin is not enabled on this instance, so events are dropped instead of
-				published. The broker itself is working.
+				published.
 			</Alert>
 		{:else if outbox?.enabled && outbox.available && (outbox.dead > 0 || data.status.failed > 0)}
 			<!-- With an outbox a refused event is retried, so the lost and the

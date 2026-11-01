@@ -9,7 +9,7 @@ describe('refusalFailure', () => {
 		const result = refusalFailure(new FlowRefusal([], 7, 7)) as unknown as Failure;
 		expect(result.status).toBe(402);
 		expect(result.data.refusal).toEqual({ nodeIds: [], limit: 7, current: 7, upgradeUrl: '' });
-		expect(result.data.error).toBe('7 of 7 flows are in use, the limit for this instance. A license that allows more lifts the limit. You can also delete a flow to make room.');
+		expect(result.data.error).toBe('7 of 7 flows are in use, the limit for this tenant. A license that allows more lifts the limit. You can also delete a flow to make room.');
 	});
 
 	it('carries the link a ceiling refusal names for more flows', () => {
@@ -20,7 +20,7 @@ describe('refusalFailure', () => {
 
 	it('quotes the limit alone when the refusal carries no count', () => {
 		const result = refusalFailure(new FlowRefusal([], 12)) as unknown as Failure;
-		expect(result.data.error).toBe('This instance is limited to 12 flows. A license that allows more lifts the limit. You can also delete a flow to make room.');
+		expect(result.data.error).toBe('This tenant is limited to 12 flows. A license that allows more lifts the limit. You can also delete a flow to make room.');
 	});
 
 	it('lists the nodes a definition refusal names and keeps their problems', () => {
@@ -30,7 +30,7 @@ describe('refusalFailure', () => {
 		];
 		const result = refusalFailure(new FlowRefusal(errors)) as unknown as Failure;
 		expect(result.data.refusal).toEqual({ nodeIds: ['trigger', 'rows'], limit: null, current: null, upgradeUrl: '' });
-		expect(result.data.error).toBe('2 elements use a feature the license on this instance does not include: the trigger, rows.');
+		expect(result.data.error).toBe('2 elements use a feature that is not enabled on this instance: the trigger, rows.');
 		expect(result.data.errors).toEqual(errors);
 	});
 

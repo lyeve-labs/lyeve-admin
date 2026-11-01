@@ -200,7 +200,7 @@
 	{:else}
 		<ListToolbar label="Filter tenants">
 			{#snippet search()}
-				<label for="tenant-search" class="sr-only">Filter this page</label>
+				<label for="tenant-search" class="sr-only">Search this page</label>
 				<SearchInput id="tenant-search" bind:value={query} placeholder="Slug, name or plan on this page" />
 			{/snippet}
 			{#snippet filters()}

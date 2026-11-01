@@ -468,7 +468,7 @@
 			<div class="flex flex-wrap items-center gap-2">
 				<SectionHeading level={2}>Exporters</SectionHeading>
 				<span class="text-xs text-faint">
-					Set exporters in the plugin's metrics_* settings. Scheduled exports run when the engine enables them, and Export now runs one immediately.
+					Set exporters in the plugin's metrics_* settings. Scheduled exports run when they are enabled, and Export now runs one immediately.
 				</span>
 			</div>
 

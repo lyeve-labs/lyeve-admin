@@ -249,6 +249,6 @@ describe('figures that cover one page or failed', () => {
 describe('the search box', () => {
 	it('is named for a screen reader', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Filter this page');
+		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Search this page');
 	});
 });

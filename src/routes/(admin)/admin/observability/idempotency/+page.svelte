@@ -138,7 +138,7 @@
 			{:else}
 				<ListToolbar label="Filter keys">
 					{#snippet search()}
-						<label for="key-narrow" class="sr-only">Filter this page</label>
+						<label for="key-narrow" class="sr-only">Search this page</label>
 						<SearchInput id="key-narrow" bind:value={narrow} placeholder="Key, method or path on this page" />
 					{/snippet}
 					{#snippet filters()}

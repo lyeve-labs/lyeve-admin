@@ -68,7 +68,7 @@ describe('why nothing is listening', () => {
 			props: props({ status: status({ degraded: true, listening: false, address: '' }) }),
 		});
 		const text = said(container);
-		expect(text).toContain('The port is not the problem');
+		expect(text).toContain('The gRPC plugin is not enabled on this instance, so no listener was started.');
 	});
 
 	it('points at the start-up log when it is enabled and still down', () => {

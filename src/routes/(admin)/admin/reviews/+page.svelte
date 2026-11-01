@@ -401,7 +401,7 @@
 				<EmptyState
 					title="Nothing under review"
 					description={data.status
-						? 'No assignments match this status.'
+						? 'No assignments have this status. Pick another status to see the rest.'
 						: 'Entries appear here when you start a review from the entry editor.'}
 				>
 					{#snippet iconSnippet()}<ClipboardCheck size={ICON.lg} />{/snippet}
@@ -409,7 +409,7 @@
 			{:else}
 				{#if !data.entriesNamed}
 					<p class="text-xs text-muted">
-						Entries, definitions and stages show by ID, because only an admin can see their names.
+						Entries, definitions and stages are shown by ID, because only an admin can see their names.
 					</p>
 				{/if}
 				<Table label="Review assignments">

@@ -50,7 +50,7 @@ export const actions: Actions = {
 			return fail(400, { scope: 'restore', error: aiActionError(err, 'Could not restore the version. Try again.') });
 		}
 		const body = version === 0 ? view.default : view.versions.find((v) => v.version === version)?.body;
-		if (body === undefined) return fail(404, { scope: 'restore', error: `Version ${version} no longer exists. Reload the page.` });
+		if (body === undefined) return fail(404, { scope: 'restore', error: `Version ${version} does not exist. Reload the page.` });
 		try {
 			const saved = await savePromptVersion(client, event.params.use_case, body);
 			return { scope: 'restore', version: saved.version, from: version };

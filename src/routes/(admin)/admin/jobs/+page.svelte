@@ -186,7 +186,7 @@
 	{:else}
 		<ListToolbar label="Filter jobs">
 			{#snippet search()}
-				<label for="job-search" class="sr-only">Filter this page</label>
+				<label for="job-search" class="sr-only">Search this page</label>
 				<SearchInput id="job-search" bind:value={query} placeholder="Name, schedule or endpoint on this page" />
 			{/snippet}
 			{#snippet filters()}

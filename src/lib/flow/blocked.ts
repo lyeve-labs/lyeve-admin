@@ -54,7 +54,7 @@ export function blockedText(plugin: string | null = null): string {
  * a test run each say it in these words.
  */
 export function notEnabledText(nodeIds: readonly string[]): string {
-	if (nodeIds.length === 0) return 'The license on this instance does not include flows.';
+	if (nodeIds.length === 0) return 'Flows are not enabled on this instance.';
 	const named = nodeIds.map((id) => (id === 'trigger' ? 'the trigger' : id)).join(', ');
-	return `${nodeIds.length === 1 ? 'One element uses' : `${nodeIds.length} elements use`} a feature the license on this instance does not include: ${named}.`;
+	return `${nodeIds.length === 1 ? 'One element uses' : `${nodeIds.length} elements use`} a feature that is not enabled on this instance: ${named}.`;
 }

@@ -219,7 +219,7 @@ describe('a refused import call', () => {
 	it('keeps the body of an outage off the page and says the engine did not answer', async () => {
 		const err = await refusal(503, { error: 'dial tcp 10.0.0.4:5432: connection refused' });
 		expect(err.message).not.toContain('10.0.0.4');
-		expect(err.message).toBe('Temporarily unavailable. Nothing was imported. Try again in a moment.');
+		expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
 	});
 
 	// The engine answers a start once it has stored the job and imports the
@@ -245,14 +245,14 @@ describe('a refused import call', () => {
 
 		it('says nothing was imported when the engine itself answered the 5xx', async () => {
 			const err = await started(new Response(JSON.stringify({ error: 'failed to create import job', code: 'service_unavailable' }), { status: 503 }));
-			expect(err.message).toBe('Temporarily unavailable. Nothing was imported. Try again in a moment.');
+			expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
 		});
 	});
 
 	it('says nothing was imported by a preview, which imports nothing, whoever answered', async () => {
 		const res = new Response('<html>504 Gateway Time-out</html>', { status: 504 });
 		const err = (await previewImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv' }).catch((e: unknown) => e)) as ApiError;
-		expect(err.message).toBe('Temporarily unavailable. Nothing was imported. Try again in a moment.');
+		expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
 	});
 
 	it('keeps the body of any other engine failure off the page', async () => {

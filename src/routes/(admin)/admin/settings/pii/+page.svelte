@@ -375,7 +375,7 @@
 
 				<ListToolbar label="Filter unmasked reads">
 					{#snippet search()}
-						<label for="pii-narrow" class="sr-only">Filter this page</label>
+						<label for="pii-narrow" class="sr-only">Search this page</label>
 						<SearchInput
 							id="pii-narrow"
 							bind:value={narrow}

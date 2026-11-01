@@ -72,4 +72,4 @@ export function testFailure(err: unknown): TestFailure {
 	return { kind: 'refused', errors: [], text: (worded && message) || 'The test run failed.' };
 }
 
-const TEST_OUTAGE = 'The test run did not finish. Try again in a moment.';
+const TEST_OUTAGE = 'The engine is unavailable, so the test run did not finish. Try again in a moment.';

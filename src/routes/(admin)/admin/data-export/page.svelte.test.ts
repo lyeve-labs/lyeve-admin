@@ -124,7 +124,7 @@ describe('Data export jobs', () => {
 
 	it('names the search box for a screen reader', () => {
 		const { getByLabelText } = render(ExportPage, { props: props() });
-		expect(getByLabelText('Filter this page')).toBeTruthy();
+		expect(getByLabelText('Search this page')).toBeTruthy();
 	});
 
 	it('states a size a person can read', () => {

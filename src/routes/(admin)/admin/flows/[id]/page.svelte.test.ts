@@ -766,7 +766,7 @@ describe('flow editor page', () => {
 		const { getByRole, getByTestId, container, queryByText } = setup(null, { flow: { ...fixtureFlow, status: 'active', version: 1 } });
 		await fireEvent.click(getByRole('button', { name: 'Test' }));
 		await vi.waitFor(() => expect(getByTestId('flow-problems')).toBeTruthy());
-		expect(container.textContent).toContain('One element uses a feature the license on this instance does not include: orders.');
+		expect(container.textContent).toContain('One element uses a feature that is not enabled on this instance: orders.');
 		expect(container.querySelector('[data-node-id="orders"]')?.className).toContain('border-danger');
 		expect(queryByText('payment_required')).toBeNull();
 	});
@@ -825,13 +825,13 @@ describe('flow editor page', () => {
 		const { container } = setup(null, { flow });
 		const field = container.querySelector('#test-trigger') as HTMLTextAreaElement;
 		expect(JSON.parse(field.value)).toEqual({ type: 'email.bounced' });
-		expect(field.parentElement?.parentElement?.textContent).toContain('next to type');
+		expect(field.parentElement?.parentElement?.textContent).toContain('beside the type key');
 	});
 
 	it('keeps the built-in hint under the test trigger of a built-in trigger', () => {
 		const { container } = setup();
 		const field = container.querySelector('#test-trigger') as HTMLTextAreaElement;
-		expect(field.parentElement?.parentElement?.textContent).not.toContain('next to type');
+		expect(field.parentElement?.parentElement?.textContent).not.toContain('beside the type key');
 	});
 
 	/** Opens the drawer's Assistant tab. */

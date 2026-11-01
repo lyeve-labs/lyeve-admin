@@ -53,7 +53,7 @@
 
 	async function askDelete(q: PersistedQuery) {
 		const ok = await confirm(
-			`Delete persisted query ${q.operation_name || q.query_hash.slice(0, 12)}`,
+			`Delete persisted query ${q.operation_name || q.query_hash.slice(0, 12)}?`,
 			'Clients that send only its hash will be refused.',
 			{ confirmLabel: 'Delete' },
 		);

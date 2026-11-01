@@ -722,7 +722,7 @@
 			<div class="shrink-0 px-3 pt-3">
 				<Alert tone="success" title="Preset created" autoDismiss>
 					{#snippet children()}
-						{presetCreated.length === 1 ? 'Created one schema' : `Created ${presetCreated.length} schemas`}: {presetCreated.join(', ')}. Pick one to see its fields.
+						{presetCreated.length === 1 ? 'Created one schema' : `Created ${presetCreated.length} schemas`}: {presetCreated.join(', ')}. {presetCreated.length === 1 ? 'Select it' : 'Select one'} to see its fields.
 					{/snippet}
 				</Alert>
 			</div>

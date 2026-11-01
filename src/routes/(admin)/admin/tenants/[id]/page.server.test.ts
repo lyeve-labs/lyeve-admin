@@ -136,7 +136,7 @@ describe('admin/tenants/[id] load', () => {
 	// database did not answer.
 	it('answers 404 only for the engine 404', async () => {
 		const missing = event({});
-		await expect(load(missing.event)).rejects.toMatchObject({ status: 404, body: { message: 'Tenant not found.' } });
+		await expect(load(missing.event)).rejects.toMatchObject({ status: 404, body: { message: 'This tenant does not exist.' } });
 
 		const down = event({ 'GET /api/admin/tenants/t1': json({ error: 'database unavailable' }, 503) });
 		await expect(load(down.event)).rejects.toMatchObject({ status: 503 });

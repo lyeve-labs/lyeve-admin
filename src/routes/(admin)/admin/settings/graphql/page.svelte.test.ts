@@ -137,7 +137,7 @@ describe('persisted query delete', () => {
 		const query = { query_hash: 'abc123', query: '{ posts { id } }', operation_name: 'Posts', description: '', enabled: true, auto_registered: false };
 		const { getByRole } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] } }) });
 		const out = await pressDelete(getByRole('button', { name: 'Delete Posts' }), 'hash');
-		expect(out.title).toBe('Delete persisted query Posts');
+		expect(out.title).toBe('Delete persisted query Posts?');
 		expect(out.sent).toBe('abc123');
 	});
 });

@@ -42,7 +42,7 @@
 			id="test-trigger"
 			label="Trigger"
 			hint={contributed
-				? 'The input the trigger sends the flow. Add the payload keys the flow reads next to type.'
+				? 'The input the trigger sends the flow. Add the payload keys the flow reads beside the type key.'
 				: 'The input the trigger sends the flow. Edit it to test another input.'}
 			rows={6}
 			bind:value={triggerJSON}

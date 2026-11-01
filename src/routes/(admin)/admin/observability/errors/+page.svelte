@@ -181,7 +181,7 @@
 					title={data.status ? `No ${STATUS_LABEL[data.status as AlertStatus].toLowerCase()} failures` : 'No failures yet'}
 					description={data.status
 						? 'No failures have this status. Choose All to see the rest.'
-						: 'No errors have been recorded. This is only meaningful once the instance has received traffic.'}
+						: 'Failures appear here once the instance receives traffic.'}
 				>
 					{#snippet iconSnippet()}
 						<BugOff size={ICON.lg} />

@@ -92,7 +92,7 @@ describe('what the numbers mean', () => {
 			props: props({ status: status({ degraded: true, dropped: 40, published: 0 }) }),
 		});
 		const text = said(container);
-		expect(text).toContain('The broker itself is working');
+		expect(text).toContain('The message broker plugin is not enabled on this instance, so events are dropped instead of published.');
 	});
 
 	// A counter reset by a restart is not a quiet week, and a reader comparing

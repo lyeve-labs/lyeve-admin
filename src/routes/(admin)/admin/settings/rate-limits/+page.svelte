@@ -342,7 +342,7 @@
 					     live. -->
 					<Alert tone="warn">
 						{stored}
-						{stored === 1 ? 'saved rule is' : 'saved rules are'} not enforced on this instance. They apply again when custom rules are enabled. You can still delete them.
+						{stored === 1 ? 'saved rule is' : 'saved rules are'} not enforced on this instance. They apply again when your license includes custom rules. You can still delete them.
 					</Alert>
 				{/if}
 			{/if}

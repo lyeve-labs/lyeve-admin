@@ -137,7 +137,7 @@
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.variables.length === 0 && data.q}
-			<EmptyState level={2} title="No variables match" description="No variables match this search. Secret values are not searched." />
+			<EmptyState level={2} title="No variables match" description="Secret values are not searched. Try another key or value." />
 		{:else if data.variables.length === 0}
 			<EmptyState level={2} title="No variables yet" description="Create a variable to use it in expressions as vars.<key>.">
 				{#snippet iconSnippet()}<VariableIcon size={ICON.lg} />{/snippet}
@@ -236,6 +236,6 @@
 	</form>
 {:else}
 	<PageShell title="Flows" documentTitle="Variables - Flows" width="wide">
-		<NotEnabled level={2} title="Flows" description="The license on this instance does not include flows." />
+		<NotEnabled level={2} title="Flows" description="Flows are not enabled on this instance." />
 	</PageShell>
 {/if}

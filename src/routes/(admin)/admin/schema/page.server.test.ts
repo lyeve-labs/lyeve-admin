@@ -441,7 +441,7 @@ describe('admin/schema history and queued changes', () => {
 		const { event } = formEvent({ '/posts/history': () => json({ error: 'not found' }, 404) }, { name: 'posts' });
 		const out = (await actions.history(event)) as { status: number; data: { error: string } };
 		expect(out.status).toBe(404);
-		expect(out.data.error).toMatch(/No history/);
+		expect(out.data.error).toBe('There is no saved schema named posts, so it has no history.');
 	});
 
 	it('applies the queue for that schema only', async () => {

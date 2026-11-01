@@ -27,7 +27,7 @@ const ROLES = ['viewer', 'editor', 'admin'];
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
-	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Only an admin can change customization.');
+	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Only an admin or a super admin can change customization.');
 	const locked = {
 		gate: GATE_OK as Gate,
 		entitled: false,

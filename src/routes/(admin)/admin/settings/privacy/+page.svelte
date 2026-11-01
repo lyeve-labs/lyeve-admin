@@ -194,7 +194,7 @@
 					<GateNotice
 						gate={data.exportSections.gate}
 						title="What a person may include"
-						absent="Choosing what to include is not included in this build."
+						absent="Choosing what an export contains is not included in this build."
 					/>
 				{:else}
 					<Card pad="md">

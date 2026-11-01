@@ -76,7 +76,7 @@
 			<!-- No listener was bound on purpose. Calling it a bind failure
 			     sends somebody to look at ports. -->
 			<Alert tone="warn">
-				The gRPC plugin is not enabled on this instance, so no listener was started. The port is not the problem.
+				The gRPC plugin is not enabled on this instance, so no listener was started.
 			</Alert>
 		{:else if !data.status.listening}
 			<Alert tone="danger">

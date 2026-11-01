@@ -16,7 +16,6 @@ import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import { csrfHeaders } from './csrf';
-import { OUTAGE } from '../outage';
 
 export const IMPORTS_URL = '/api/admin/imports';
 
@@ -423,7 +422,7 @@ function importFailure(status: number, starts: boolean, engineSaid: boolean): st
 		return 'Could not confirm whether the import started. Check the entries before you try again.';
 	}
 	if (status === 502 || status === 503 || status === 504) {
-		return `${OUTAGE.title}. Nothing was imported. Try again in a moment.`;
+		return 'The engine is unavailable. Nothing was imported. Try again in a moment.';
 	}
 	if (status >= 500) return 'Could not complete the request. Nothing was imported. Try again.';
 	return 'The request was refused.';

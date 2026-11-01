@@ -340,7 +340,7 @@ export const actions: Actions = {
 			return { scope: 'history' as const, name, entries: r.entries ?? [], pending: r.pending ?? 0, limit: r.limit ?? 200 };
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 404) {
-				return fail(404, { scope: 'history' as const, name, error: 'No history for this schema yet.' });
+				return fail(404, { scope: 'history' as const, name, error: `There is no saved schema named ${name}, so it has no history.` });
 			}
 			return fail(statusOf(err), { scope: 'history' as const, name, error: actionError(err, 'Try again in a moment.') });
 		}

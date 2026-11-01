@@ -247,7 +247,7 @@ describe('Setup page: create the first admin', () => {
 
 		await fireEvent.submit(container.querySelector('form')!);
 
-		expect(container.querySelector('#confirm-error')?.textContent).toContain('Passwords do not match');
+		expect(container.querySelector('#confirm-error')?.textContent).toContain('The passwords do not match.');
 		expect(container.querySelector('#email-error')).toBeNull();
 	});
 

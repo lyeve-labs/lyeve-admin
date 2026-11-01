@@ -404,7 +404,7 @@ describe('Live log tail filters', () => {
 		await tick();
 
 		expect(StubEventSource.all).toHaveLength(0);
-		expect(container.textContent).toContain('The live log tail is not included in this build.');
+		expect(container.textContent).toContain('The logging plugin is not running on this instance, so the live log tail is not available.');
 	});
 });
 

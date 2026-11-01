@@ -329,7 +329,7 @@ describe('email provider delete', () => {
 	it('names the provider and sends its id', async () => {
 		const { getByLabelText } = setup([smtp]);
 		const out = await pressDelete(getByLabelText('Delete Primary'), 'id');
-		expect(out.title).toBe('Delete provider Primary');
+		expect(out.title).toBe('Delete provider Primary?');
 		expect(out.sent).toBe('p1');
 	});
 });

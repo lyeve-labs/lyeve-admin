@@ -267,7 +267,7 @@ export function statusTone(status: number): StatusTone {
  * is not enabled, and no amount of retrying or re-authenticating changes it.
  */
 export const STATUS_HINTS: Readonly<Record<number, string>> = {
-	401: 'The request was not signed in. Sign in again.',
+	401: 'Your session expired. Sign in again.',
 	402: 'The plugin behind this route is not enabled on this instance. Changing the request does not help.',
 	403: 'You are signed in, but your role cannot call this route.',
 	404: 'The route or the record does not exist. A path parameter that matches nothing returns this.',

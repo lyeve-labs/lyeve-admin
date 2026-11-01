@@ -222,7 +222,7 @@
 	{:else}
 		<ListToolbar label="Filter users">
 			{#snippet search()}
-				<label for="user-search" class="sr-only">Filter this page</label>
+				<label for="user-search" class="sr-only">Search this page</label>
 				<SearchInput id="user-search" bind:value={query} placeholder="Email or role on this page" />
 			{/snippet}
 			{#snippet filters()}

@@ -152,7 +152,7 @@
 	let schIncludeSchemas = $state(false);
 	let schIncludeMedia = $state(false);
 	let schTemplate = $state('');
-	const cronOptions = [...CRON_PRESETS, { value: 'custom', label: 'Custom cron expression' }];
+	const cronOptions = [...CRON_PRESETS, { value: 'custom', label: 'A cron expression of my own' }];
 	function openSchedule() {
 		schName = '';
 		schCron = '0 2 * * *';
@@ -254,7 +254,7 @@
 			{:else}
 				<ListToolbar label="Filter exports">
 					{#snippet search()}
-						<label for="export-narrow" class="sr-only">Filter this page</label>
+						<label for="export-narrow" class="sr-only">Search this page</label>
 						<SearchInput
 							id="export-narrow"
 							bind:value={narrow}
@@ -264,7 +264,7 @@
 				</ListToolbar>
 
 				{#if visible.length === 0}
-					<EmptyState title="No exports match this search" description="Clear the filter to see the rest.">
+					<EmptyState title="No exports match this search" description="Clear the search to see the rest.">
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}

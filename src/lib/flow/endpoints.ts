@@ -70,7 +70,7 @@ export function flowEndpoints(origin: string, flowId: string, definition: Pick<F
 			key: 'admin',
 			label: 'Admin invoke URL',
 			value: `${origin}/api/admin/flows/${flowId}/invoke`,
-			hint: 'An admin flow runs only from this URL, with an admin session. REST, GraphQL, gRPC and realtime cannot reach it.',
+			hint: 'An admin flow runs only from this URL, with an admin session. It has no public URL, and GraphQL, gRPC and realtime cannot call it.',
 		});
 		return out;
 	}

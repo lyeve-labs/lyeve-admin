@@ -276,7 +276,7 @@
 	{:else}
 		<ListToolbar label="Filter admin tokens">
 			{#snippet search()}
-				<label for="token-search" class="sr-only">Filter this page</label>
+				<label for="token-search" class="sr-only">Search this page</label>
 				<SearchInput id="token-search" bind:value={query} placeholder="Name, prefix, owner or grant on this page" />
 			{/snippet}
 			{#snippet filters()}
@@ -288,7 +288,7 @@
 			<EmptyState
 				level={2}
 				title="No tokens on this page match these filters"
-				description="Clear the search or the status filter, or go to the next page."
+				description="Clear the search and the status filter, or go to another page."
 			/>
 		{:else}
 			<Table label="Admin tokens">

@@ -126,7 +126,7 @@ export const actions: Actions = {
 		const baseTerm = String(form.get('base_term') ?? '').trim();
 		const synonyms = parseTerms(String(form.get('synonyms') ?? ''));
 		const fields: Record<string, string> = {};
-		if (!baseTerm) fields.base_term = 'Required';
+		if (!baseTerm) fields.base_term = 'Enter a base term.';
 		if (synonyms.length === 0) fields.synonyms = 'Enter at least one term.';
 		if (Object.keys(fields).length > 0) return fail(400, { synonymError: 'Check the highlighted fields.', fields });
 		try {

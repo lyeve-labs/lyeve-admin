@@ -42,7 +42,7 @@ describe('the per-reader preview', () => {
 	it('asks for a reader when none was given', async () => {
 		const out = (await actions.preview(actionEvent({ user_id: '' }))) as Failure;
 		expect(out.status).toBe(400);
-		expect(String(out.data.error)).toContain('Choose a reader first');
+		expect(String(out.data.error)).toContain('Enter a user id.');
 	});
 
 	it('keeps a refusal as a failure', async () => {

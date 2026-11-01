@@ -600,6 +600,6 @@
 	</form>
 {:else}
 	<PageShell title="Flows" documentTitle="Datasources - Flows" width="wide">
-		<NotEnabled level={2} title="Flows" description="The license on this instance does not include flows." />
+		<NotEnabled level={2} title="Flows" description="Datasources are not enabled on this instance." />
 	</PageShell>
 {/if}

@@ -186,7 +186,7 @@ describe('admin dashboard applyMigrations action', () => {
 
 		const result = (await actions.applyMigrations(event)) as { data: { error: string } };
 
-		expect(result.data.error).toBe('Could not apply the queued changes. Try again.');
+		expect(result.data.error).toBe('Could not apply the migrations. Try again.');
 	});
 
 	it('refuses a session that may not apply migrations', async () => {

@@ -214,7 +214,7 @@
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(p: EmailProvider) {
-		const ok = await confirm(`Delete provider ${p.name}`, 'Mail that would go through it goes to the next provider instead.', {
+		const ok = await confirm(`Delete provider ${p.name}?`, 'Mail that would go through it goes to the next provider instead.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;

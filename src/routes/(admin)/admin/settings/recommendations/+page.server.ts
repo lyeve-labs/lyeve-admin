@@ -120,7 +120,7 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const userId = String(form.get('user_id') ?? '').trim();
-		if (!userId) return fail(400, { action: 'preview', error: 'Choose a reader first.' });
+		if (!userId) return fail(400, { action: 'preview', error: 'Enter a user id.' });
 		if (!isUserId(userId)) {
 			return fail(400, { action: 'preview', error: 'That is not a user id. Pick a reader by email, or paste the id from the Users page.' });
 		}

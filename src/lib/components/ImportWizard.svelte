@@ -116,7 +116,7 @@
 	// tenant with no content types, and neither leaves anything to import into.
 	const schemaHint = $derived(
 		schemas === null
-			? 'Could not load the content types. Close this and try again in a moment.'
+			? 'Could not load the content types. Reload the page to try again.'
 			: schemas.length === 0
 				? 'No content types yet. Create one before you import.'
 				: 'Each row becomes an entry of this type.',

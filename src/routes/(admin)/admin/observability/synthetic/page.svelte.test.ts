@@ -386,6 +386,6 @@ describe('editing a probe whose secrets no read returns', () => {
 describe('the probe search box', () => {
 	it('is named for a screen reader', () => {
 		const { container } = render(SyntheticPage, { props: props() });
-		expect(container.querySelector('label[for="probe-narrow"]')?.textContent).toBe('Filter this page');
+		expect(container.querySelector('label[for="probe-narrow"]')?.textContent).toBe('Search this page');
 	});
 });

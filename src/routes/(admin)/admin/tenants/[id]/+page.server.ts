@@ -37,7 +37,7 @@ export const load: PageServerLoad = async (event) => {
 	// Only the engine's 404 says the tenant does not exist. A refusal or an
 	// outage keeps a status of its own.
 	const tenant = await getTenant(event.params.id, client).catch((err: unknown) =>
-		readError(err, 'Tenant not found.'),
+		readError(err, 'This tenant does not exist.'),
 	);
 
 	// The members are paged rather than capped, so a tenant with more than one

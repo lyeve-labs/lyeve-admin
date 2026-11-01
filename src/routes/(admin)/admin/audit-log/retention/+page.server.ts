@@ -45,7 +45,7 @@ export const load: PageServerLoad = async (event) => {
 		gate.state === 'ok'
 			? await section(
 					listHolds(client).then((h) => rowsOf(h)),
-					'Could not load the legal holds.'
+					'Could not load the legal holds, so the policies above may not match what is actually deleted.'
 				)
 			: { ok: false, gate };
 

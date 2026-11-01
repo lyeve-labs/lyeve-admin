@@ -173,7 +173,7 @@
 
 	{#if !logTail}
 		<Alert tone="brand">
-			The live log tail is not included in this build.
+			The logging plugin is not running on this instance, so the live log tail is not available.
 		</Alert>
 	{:else}
 		{#if logState === 'refused'}

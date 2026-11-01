@@ -2,7 +2,6 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 import { httpStatusTone } from '../tones';
-import { OUTAGE } from '../outage';
 
 const TOKENS_URL = '/api/admin/admin-tokens';
 
@@ -391,6 +390,6 @@ export function describeRefusal(status: number, message: string, step: 'password
 	}
 	if (status === 409) return { error: msg || 'This token can no longer be rotated.', fields: {} };
 	if (status === 404) return { error: 'This token no longer exists. Reload the list.', fields: {} };
-	if (status === 503) return { error: `${OUTAGE.title}. Nothing was changed. Try again in a moment.`, fields: {} };
+	if (status === 503) return { error: 'The engine is unavailable. Nothing was changed. Try again in a moment.', fields: {} };
 	return { error: 'Could not issue the token. Try again.', fields: {} };
 }

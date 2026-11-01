@@ -49,7 +49,7 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	'api-access': 'See how external apps authenticate and what each role can do, and get a token to try it.',
 	'api-keys': 'Create machine-to-machine credentials for the content API and see their usage.',
 	'admin-tokens': 'Create scoped, expiring credentials for scripts that call the admin API, and see what each one did.',
-	grpc: 'Check the gRPC listener and the routes it serves.',
+	grpc: 'See where the gRPC listener runs and which services it serves.',
 	graphql: 'See the schema generated from your content types, its endpoint and the allowed queries.',
 	'message-broker': 'Choose where content events are published, and check that they arrive.',
 	storage: 'Choose where uploads are stored and which provider receives them.',

@@ -222,7 +222,7 @@
 			{:else}
 				<ListToolbar label="Filter captured statements">
 					{#snippet search()}
-						<label for="query-narrow" class="sr-only">Filter this page</label>
+						<label for="query-narrow" class="sr-only">Search this page</label>
 						<SearchInput
 							id="query-narrow"
 							bind:value={narrow}
@@ -234,13 +234,13 @@
 				{#if visible.length === 0}
 					<EmptyState
 						title="No statements on this page match this search"
-						description="Clear the filter to see the rest."
+						description="Clear the search to see the rest."
 					>
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}
 						{#snippet action()}
-							<Button variant="secondary" onclick={() => (narrow = '')}>Clear the filter</Button>
+							<Button variant="secondary" onclick={() => (narrow = '')}>Clear the search</Button>
 						{/snippet}
 					</EmptyState>
 				{:else}

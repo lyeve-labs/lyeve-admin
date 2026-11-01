@@ -258,7 +258,7 @@
 		{/if}
 		<ListToolbar label="Filter API keys">
 			{#snippet search()}
-				<label for="key-search" class="sr-only">Filter this page</label>
+				<label for="key-search" class="sr-only">Search this page</label>
 				<SearchInput id="key-search" bind:value={query} placeholder="Name, role or schema on this page" />
 			{/snippet}
 			{#snippet filters()}
@@ -269,7 +269,7 @@
 		{#if visible.length === 0}
 			<EmptyState
 				title="No keys on this page match these filters"
-				description="Clear the search or the status filter, or go to the next page."
+				description="Clear the search and the status filter, or go to another page."
 			/>
 		{:else}
 		<Table label="API keys">

@@ -35,6 +35,6 @@ export function refusalFailure(err: FlowRefusal) {
 }
 
 function ceilingText(limit: number, current: number | null): string {
-	const held = current === null ? `This instance is limited to ${limit} flows.` : `${current} of ${limit} flows are in use, the limit for this instance.`;
+	const held = current === null ? `This tenant is limited to ${limit} flows.` : `${current} of ${limit} flows are in use, the limit for this tenant.`;
 	return `${held} ${LIFTS} You can also delete a flow to make room.`;
 }

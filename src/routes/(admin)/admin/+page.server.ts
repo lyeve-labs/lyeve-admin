@@ -303,7 +303,7 @@ export const actions: Actions = {
 		} catch (err) {
 			// A migration that fails names the statement that failed, and that
 			// sentence is the whole value of the message.
-			return fail(400, { error: actionError(err, 'Could not apply the queued changes. Try again.') });
+			return fail(400, { error: actionError(err, 'Could not apply the migrations. Try again.') });
 		}
 
 		// Back where the reader was, with the shell's count read again on arrival.

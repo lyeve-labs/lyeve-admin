@@ -204,7 +204,7 @@
 			{:else}
 				<ListToolbar label="Filter connections">
 					{#snippet search()}
-						<label for="scim-search" class="sr-only">Filter this page</label>
+						<label for="scim-search" class="sr-only">Search this page</label>
 						<SearchInput id="scim-search" bind:value={query} placeholder="Connection name on this page" />
 					{/snippet}
 				</ListToolbar>

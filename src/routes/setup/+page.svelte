@@ -88,7 +88,7 @@
 		if (!password) found.password = 'Enter a password.';
 		else if (passwordTooLong(password)) found.password = passwordTooLong(password) ?? '';
 		if (!confirm) found.confirm = 'Enter the password again.';
-		else if (password && confirm !== password) found.confirm = 'Passwords do not match';
+		else if (password && confirm !== password) found.confirm = 'The passwords do not match.';
 
 		errors = found;
 		if (Object.keys(found).length === 0) return true;

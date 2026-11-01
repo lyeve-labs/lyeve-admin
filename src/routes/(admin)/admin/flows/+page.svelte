@@ -477,7 +477,7 @@
 		<NotEnabled
 			level={2}
 			title="Flows"
-			description="The license on this instance does not include flows."
+			description="Flows are not enabled on this instance."
 		/>
 	</PageShell>
 {/if}

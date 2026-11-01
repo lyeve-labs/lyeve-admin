@@ -145,7 +145,7 @@
 		const named = release?.name ?? '';
 		const copy = {
 			publish: [`Publish release ${named} now?`, 'Every entry in it is published or unpublished immediately.', 'Publish now'],
-			cancel: [`Cancel release ${named}?`, 'Its entries are not published, and you can no longer edit it.', 'Cancel release'],
+			cancel: [`Cancel release ${named}?`, 'Nothing in it is published or unpublished, and you can no longer edit it.', 'Cancel release'],
 			delete: [`Delete release ${named}?`, 'The release and its list of entries are removed. The entries themselves stay.', 'Delete'],
 		}[action];
 		if (!(await confirmDialog(copy[0], copy[1], { confirmLabel: copy[2] }))) return;

@@ -95,7 +95,7 @@ describe('PII masking access log', () => {
 
 	it('names the search box for a screen reader', () => {
 		const { getByLabelText } = render(PiiPage, { props: props() });
-		expect(getByLabelText('Filter this page')).toBeTruthy();
+		expect(getByLabelText('Search this page')).toBeTruthy();
 	});
 
 	it('reads an empty log as nobody having looked', () => {

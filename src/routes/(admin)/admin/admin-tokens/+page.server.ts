@@ -21,7 +21,7 @@ import {
 } from '$lib/api/admin-tokens';
 import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { forbiddenText, gateOf, section, type Section } from '$lib/api/gate';
-import { BUSY, OUTAGE } from '$lib/outage';
+import { BUSY } from '$lib/outage';
 
 /** The engine pages this list at fifty and refuses more than a hundred. */
 const PAGE = 50;
@@ -39,7 +39,7 @@ export interface RequestLog {
 
 function loadError(err: unknown, what: string): string {
 	const gate = gateOf(err, `Could not load the ${what}. Reload the page to try again.`);
-	if (gate.state === 'unavailable') return OUTAGE.body;
+	if (gate.state === 'unavailable') return `The engine is unavailable, so the ${what} did not load. Try again in a moment.`;
 	if (gate.state === 'busy') return BUSY.body;
 	if (gate.state === 'forbidden') return forbiddenText(`the ${what}`);
 	return `Could not load the ${what}. Reload the page to try again.`;
