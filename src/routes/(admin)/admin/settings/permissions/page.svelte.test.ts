@@ -715,7 +715,7 @@ describe('permissions page drawers', () => {
 		const { getAllByRole, rerender } = setupWith(null);
 		await fireEvent.click(newRoleButton(getAllByRole('button')));
 		await rerender({ data: dataWith(), form: { action: 'role', roleCapReached: true, refused } } as never);
-		expect(roleText()).toContain('3 of 3 roles are in use');
+		expect(roleText()).toContain("You're using 3 of 3 roles");
 	});
 
 	it('leaves newly opened drawers clean after a failed delete', async () => {

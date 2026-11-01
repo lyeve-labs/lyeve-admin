@@ -250,7 +250,7 @@ describe('reviews page, what the install allows', () => {
 		render(ReviewsPage, {
 			props: { data: data({ limits: { licensed: false, workflows: { limit: 1, current: 1 } } }), form: null },
 		});
-		expect(screen.getByTestId('refusal-notice').textContent).toContain('1 of 1 workflows are in use');
+		expect(screen.getByTestId('refusal-notice').textContent).toContain("You're using 1 of 1 workflows");
 		const create = screen.getByRole('button', { name: /New definition/ }) as HTMLButtonElement;
 		expect(create.disabled).toBe(true);
 	});
@@ -332,7 +332,7 @@ describe('reviews page, what the install allows', () => {
 				} as never,
 			},
 		});
-		expect(screen.getByTestId('refusal-notice').textContent).toContain('1 of 1 workflows are in use');
+		expect(screen.getByTestId('refusal-notice').textContent).toContain("You're using 1 of 1 workflows");
 	});
 });
 

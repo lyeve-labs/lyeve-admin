@@ -182,7 +182,7 @@ describe('Slow queries analysis', () => {
 			props: props({ dialect: 'postgres', analysis: read([entry({ plan_text: '[]' })], 1) }),
 		});
 
-		expect(container.textContent).toContain('Nothing to suggest in the plan the analyzer read');
+		expect(container.textContent).toContain('No suggestions from the plan analyzed');
 	});
 
 	it("lists SQL Server's own missing-index suggestions", () => {

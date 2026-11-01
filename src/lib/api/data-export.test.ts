@@ -48,7 +48,7 @@ describe('exportGate', () => {
 
 	it('says a failed read is not a report that none have run', () => {
 		const gate = exportGate(new Error('down'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that none have run');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load exports.');
 	});
 });
 

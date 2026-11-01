@@ -24,7 +24,7 @@ export interface ProviderWindow {
 }
 
 export function providerWindowGate(err: unknown): Gate {
-	return gateOf(err, 'The sign-in window could not be read. This is not a report that none is set.');
+	return gateOf(err, 'Could not load the sign-in window.');
 }
 
 export function readProviderWindow(client: HttpClient): Promise<ProviderWindow> {

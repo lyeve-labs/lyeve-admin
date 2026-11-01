@@ -34,7 +34,7 @@ describe('GateNotice', () => {
 	it('states a ceiling with the numbers the refusal carried', () => {
 		const { container } = mount({ state: 'full', limit: 7, current: 7, upgradeUrl: '' });
 		expect(container.textContent).toContain('Cache is at its limit');
-		expect(container.textContent).toContain('7 of 7 are in use');
+		expect(container.textContent).toContain("You're using 7 of 7");
 	});
 
 	it('reports a failed read as a failure', () => {

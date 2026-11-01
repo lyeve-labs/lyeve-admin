@@ -127,7 +127,7 @@ describe('the gate', () => {
 
 	it('never reports a failed read as nobody being over their limit', () => {
 		const gate = usageGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that nobody is over their limit');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load usage.');
 	});
 });
 

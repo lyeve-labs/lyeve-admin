@@ -113,6 +113,6 @@ describe('the gate sorts a refusal by what it means', () => {
 
 	it('never reports a failed read as nobody being recommended to', () => {
 		const gate = recommendationsGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that nobody is being recommended to');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the recommendation split.');
 	});
 });

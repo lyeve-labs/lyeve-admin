@@ -42,7 +42,7 @@ describe('RoleDrawer', () => {
 	it('shows the role ceiling refusal with its numbers', () => {
 		const refused = { kind: 'cap', cap: 'rbac.roles', limit: 3, current: 3, upgradeUrl: '' } as const;
 		render(RoleDrawer, { props: { open: true, refused: refused as never } });
-		expect(roleForm()?.textContent).toContain('3 of 3 roles are in use');
+		expect(roleForm()?.textContent).toContain("You're using 3 of 3 roles");
 	});
 
 	it('closes and clears the name on success, and stays open on a failure', async () => {

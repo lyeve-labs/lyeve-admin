@@ -52,7 +52,7 @@ describe('providers', () => {
 		});
 		expect(screen.getByTestId('provider-tier').textContent).toContain('runs one provider');
 		expect(said(container)).toContain('redis-1');
-		expect(said(container)).toContain('Left out: this install runs one provider');
+		expect(said(container)).toContain('Not running. Only one provider runs unless your license includes failover');
 	});
 
 	it('says every provider runs with failover when the install is licensed for it', () => {
@@ -64,7 +64,7 @@ describe('providers', () => {
 		const { container } = render(CachePage, {
 			props: props({ inactive: [{ name: 'redis-0', kind: 'redis', priority: 0, reason: 'networked_unavailable' }] }),
 		});
-		expect(said(container)).toContain('does not run networked cache providers');
+		expect(said(container)).toContain('Networked cache providers are not available on this instance');
 	});
 });
 
@@ -116,7 +116,7 @@ describe('response cache rules', () => {
 		render(CachePage, {
 			props: props({}, { error: 'x', refused: { kind: 'cap', cap: 'example.rules', limit: 10, current: 10, upgradeUrl: '' } }),
 		});
-		expect(screen.getAllByTestId('refusal-notice')[0].textContent).toContain('10 of 10 rules are in use');
+		expect(screen.getAllByTestId('refusal-notice')[0].textContent).toContain("You're using 10 of 10 rules");
 	});
 
 	it('offers purge by rule, by tag and for everything', () => {

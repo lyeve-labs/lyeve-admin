@@ -44,7 +44,7 @@ export const DEVICES_OK: DeviceGate = GATE_OK;
 
 /** What a refused devices read means, read the way every plugin's is. */
 export function deviceGate(err: unknown): DeviceGate {
-	return gateOf(err, 'Your devices could not be read. This is not a report that none are trusted.');
+	return gateOf(err, 'Could not load your devices.');
 }
 
 export async function listDevices(

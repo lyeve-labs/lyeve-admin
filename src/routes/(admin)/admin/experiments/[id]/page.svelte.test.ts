@@ -107,7 +107,7 @@ describe('the verdict', () => {
 		});
 		const text = said(container);
 		expect(text).toContain('Not conclusive yet');
-		expect(text).toContain('not a tie');
+		expect(text).toContain('Not conclusive yet. The difference so far could be chance.');
 		expect(text).not.toContain('Ahead');
 	});
 

@@ -24,7 +24,7 @@ export interface FormErasure {
 
 /** What the page says, once, when the session names no tenant. */
 export const NO_TENANT =
-	'These settings belong to a tenant, and this session is signed in to none. Sign in to a tenant to read or change them.';
+	"These settings belong to a tenant, and you're not signed in to one. Sign in to a tenant to view or change them.";
 
 /**
  * A setting as load data. Null while its route is not there, on an engine

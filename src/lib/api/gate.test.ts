@@ -3,7 +3,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { forbiddenText, fullText, gateOf, isOutage, section } from './gate';
 
-const FAILED = 'The list could not be read. This is not a report that it is empty.';
+const FAILED = 'Could not load the list.';
 
 /** What fetch rejects with when nothing answers at the engine's address. */
 function unreachable(): TypeError {
@@ -126,13 +126,13 @@ describe('section', () => {
 describe('fullText', () => {
 	it('states the count against the ceiling when both are known', () => {
 		expect(fullText({ state: 'full', limit: 7, current: 7, upgradeUrl: '' })).toBe(
-			'7 of 7 are in use, which is the most this instance allows.',
+			"You're using 7 of 7, the most this instance allows.",
 		);
 	});
 
 	it('states only what the refusal carried', () => {
 		expect(fullText({ state: 'full', limit: 5, current: null, upgradeUrl: '' })).toBe('This instance allows at most 5.');
-		expect(fullText({ state: 'full', limit: null, current: null, upgradeUrl: '' })).toBe('This instance allows no more.');
+		expect(fullText({ state: 'full', limit: null, current: null, upgradeUrl: '' })).toBe('This instance is at its limit.');
 	});
 });
 

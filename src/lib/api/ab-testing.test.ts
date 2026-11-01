@@ -102,7 +102,7 @@ describe('what the results support', () => {
 	it('refuses to call an inconclusive result a tie', () => {
 		const said = verdict(results({ significant: false, winner: null }));
 		expect(said).toContain('Not conclusive yet');
-		expect(said).toContain('not a tie');
+		expect(said).toBe('Not conclusive yet. The difference so far could be chance.');
 	});
 
 	it('names a winner only when the engine declared one and called it significant', () => {
@@ -211,6 +211,6 @@ describe('the gate sorts a refusal by what it means', () => {
 
 	it('never reports a failed read as an empty list', () => {
 		const gate = abGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that none are running');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load experiments.');
 	});
 });

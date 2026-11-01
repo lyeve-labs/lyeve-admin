@@ -62,7 +62,7 @@ export const SCIM_OK: ScimGate = GATE_OK;
 
 /** What a refused SCIM read means, read the way every plugin's is. */
 export function scimGate(err: unknown): ScimGate {
-	return gateOf(err, 'The connections could not be read. This is not a report that none are configured.');
+	return gateOf(err, 'Could not load SCIM connections.');
 }
 
 export async function listProviders(

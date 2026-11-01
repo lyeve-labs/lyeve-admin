@@ -69,7 +69,7 @@ export const STORAGE_OK: StorageGate = GATE_OK;
 
 /** What a refused storage read means, read the way every plugin's is. */
 export function storageGate(err: unknown): StorageGate {
-	return gateOf(err, 'The providers could not be read. This is not a report that uploads are working.');
+	return gateOf(err, 'Could not load storage providers.');
 }
 
 export async function listProviders(client: HttpClient): Promise<ListEnvelope<StorageProvider>> {
@@ -100,7 +100,7 @@ export function testPassed(result: TestResult | null | undefined): boolean {
 
 /** Why a provider failed its test. The plugin sends an empty error on a pass. */
 export function testMessage(result: TestResult | null | undefined): string {
-	return result?.error?.trim() || 'The provider did not say why.';
+	return result?.error?.trim() || 'No reason was given.';
 }
 
 /**
@@ -224,7 +224,7 @@ export const PROVIDER_FIELDS: Readonly<Record<ProviderType, readonly ProviderFie
 		{ key: 'endpoint', label: 'Endpoint', hint: 'Empty for Amazon S3. Set it for an S3-compatible service: Cloudflare R2, Wasabi, Backblaze B2 or DigitalOcean Spaces.', required: false, placeholder: 'https://<account>.r2.cloudflarestorage.com' },
 		{ key: 'access_key', label: 'Access key ID', hint: 'An IAM key allowed to put, get and delete in this bucket only.', required: true },
 		{ key: 'secret_key', label: 'Secret access key', hint: 'Stored encrypted and never shown again.', required: true, secret: true },
-		{ key: 'cdn_base_url', label: 'CDN base URL', hint: 'Optional. A CDN in front of the bucket; download links are built from it.', required: false, placeholder: 'https://cdn.example.com' },
+		{ key: 'cdn_base_url', label: 'CDN base URL', hint: 'Optional. A CDN in front of the bucket. Download links use it.', required: false, placeholder: 'https://cdn.example.com' },
 	],
 	minio: [
 		{ key: 'endpoint', label: 'Endpoint', hint: 'The MinIO server, reachable from the engine on a public address.', required: true, placeholder: 'https://minio.example.com' },

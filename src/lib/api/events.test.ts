@@ -48,7 +48,7 @@ describe('eventsGate', () => {
 
 	it('says a failed read is not a report that nothing was published', () => {
 		const gate = eventsGate(new Error('down'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that nothing was published');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the event log.');
 	});
 });
 
