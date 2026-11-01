@@ -109,7 +109,7 @@ describe('the report', () => {
 		});
 		const text = said(container);
 		expect(text).toContain('Your role cannot open the residency report.');
-		expect(text).not.toContain('did not answer');
+		expect(text).not.toContain('did not load');
 		expect(text).not.toContain('No tenants assigned yet');
 	});
 

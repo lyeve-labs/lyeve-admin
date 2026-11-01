@@ -157,10 +157,11 @@ describe('email trigger drawer', () => {
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
-		const { container } = render(TriggersPage, { props: props({}, { action: 'delete', error: 'Could not delete the trigger. Try again.' }) });
-		expect(container.textContent).toContain('Could not delete the trigger. Try again.');
+		const failed = 'Could not delete the trigger. Try again.';
+		const { container } = render(TriggersPage, { props: props({}, { action: 'delete', error: failed }) });
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
-		expect(drawerText()).not.toContain('could not be deleted');
+		expect(drawerText()).not.toContain(failed);
 	});
 });
 

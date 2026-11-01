@@ -165,10 +165,11 @@ describe('API keys page', () => {
 	it('warns that GraphQL reads every schema when the key is held to some', async () => {
 		const { getAllByRole, getByRole } = setup([key({})]);
 		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		const warning = 'GraphQL reads every schema, whatever you chose above.';
 		await fireEvent.click(getByRole('button', { name: /GraphQL/ }));
-		expect(document.body.textContent).not.toContain('reads every schema, whichever schemas are chosen');
+		expect(document.body.textContent).not.toContain(warning);
 		await fireEvent.click(getByRole('radio', { name: 'Chosen schemas' }));
-		expect(document.body.textContent).toContain('GraphQL reads every schema, whatever you chose above.');
+		expect(document.body.textContent).toContain(warning);
 	});
 
 	it('flags a flow name that cannot be part of a scope', async () => {
@@ -211,7 +212,7 @@ describe('API keys page', () => {
 		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
 		await fireEvent.click(getByRole('radio', { name: 'Chosen schemas' }));
 		expect(document.body.textContent).toContain('Could not load the schemas');
-		expect(document.body.textContent).not.toContain('This instance has no schemas yet');
+		expect(document.body.textContent).not.toContain('No schemas yet.');
 	});
 
 	it('names the key in the delete confirmation', async () => {

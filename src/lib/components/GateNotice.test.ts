@@ -56,7 +56,7 @@ describe('GateNotice for a role the engine refused', () => {
 
 	it('is not drawn as a failure', () => {
 		const { container } = mount({ state: 'forbidden' });
-		expect(container.textContent).not.toContain('could not be read');
+		expect(container.textContent).not.toContain('did not load');
 		expect(container.querySelector('.text-danger')).toBeNull();
 	});
 
@@ -126,7 +126,7 @@ describe('GateNotice for a read the engine refused for the rate', () => {
 
 	it('is not drawn as an outage or a failure', () => {
 		const { container } = mount({ state: 'busy' });
-		expect(container.textContent).not.toContain('did not answer');
+		expect(container.textContent).not.toContain('did not load');
 		expect(container.querySelector('.text-danger')).toBeNull();
 	});
 });

@@ -143,6 +143,8 @@ describe('the webhook list when it could not be read', () => {
  * only. An admin offered them meets a refusal after filling the form in.
  */
 describe('the webhook controls by role', () => {
+	const superAdminOnly = 'Only a super admin can create, change or delete them.';
+
 	it('offers an admin the reads and tests, and says who may change a webhook', () => {
 		const { container, queryByRole, getByRole } = setup(['admin']);
 		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
@@ -152,7 +154,7 @@ describe('the webhook controls by role', () => {
 		expect(queryByRole('button', { name: /rotate the signing secret/i })).toBeNull();
 		expect(getByRole('button', { name: 'Test Ship it' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Delivery history for Ship it' })).toBeTruthy();
-		expect(container.textContent).toContain('Only a super admin can create, change or delete them.');
+		expect(container.textContent).toContain(superAdminOnly);
 	});
 
 	it('offers a super admin every write', () => {
@@ -161,7 +163,7 @@ describe('the webhook controls by role', () => {
 		expect(getByRole('button', { name: 'Edit Ship it' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Delete Ship it' })).toBeTruthy();
 		expect(getByRole('button', { name: /rotate the signing secret/i })).toBeTruthy();
-		expect(container.textContent).not.toContain('takes a super admin');
+		expect(container.textContent).not.toContain(superAdminOnly);
 	});
 });
 

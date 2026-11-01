@@ -170,12 +170,13 @@ describe('Imports controls', () => {
 
 describe('Imports failures stay where they were made', () => {
 	it('shows a failed row action on the page and opens the template drawer clean', async () => {
+		const failed = 'Could not roll back the import. Try again.';
 		const { container } = render(ImportsPage, {
-			props: props({ templates: [], templatesRead: true }, { action: 'rollback', error: 'Could not roll back the import. Try again.' }),
+			props: props({ templates: [], templatesRead: true }, { action: 'rollback', error: failed }),
 		});
-		expect(said(container)).toContain('Could not roll back the import. Try again.');
+		expect(said(container)).toContain(failed);
 		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
-		expect((document.getElementById('template-form') as HTMLFormElement).textContent).not.toContain('could not be rolled back');
+		expect((document.getElementById('template-form') as HTMLFormElement).textContent).not.toContain(failed);
 	});
 
 	it('shows a refused template save in its drawer and not on the page', async () => {

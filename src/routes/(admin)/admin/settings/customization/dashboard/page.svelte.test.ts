@@ -106,7 +106,7 @@ describe('dashboard widget controls', () => {
 	it('keeps the schemas a widget names on screen when the schema list was not read', () => {
 		const { container } = mountWith([{ id: 'b', type: 'entry_counts', schemas: ['orders'] }], false, []);
 		expect(container.textContent).toContain('Could not load schemas');
-		expect(container.textContent).not.toContain('no schemas to count yet');
+		expect(container.textContent).not.toContain('No schemas to count yet');
 		expect(container.querySelector('#widget-b-schemas')?.closest('div')?.parentElement?.textContent).toContain('orders');
 	});
 });

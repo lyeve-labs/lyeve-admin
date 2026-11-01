@@ -173,14 +173,15 @@ describe('the confidence level', () => {
  */
 describe('where a failure shows', () => {
 	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
+		const failed = 'Could not delete the experiment. Try again.';
 		const { container, getAllByText } = render(ExperimentsPage, {
-			props: props({}, { action: 'delete', error: 'Could not delete the experiment. Try again.' }),
+			props: props({}, { action: 'delete', error: failed }),
 		});
-		expect(said(container)).toContain('Could not delete the experiment. Try again.');
+		expect(said(container)).toContain(failed);
 
 		await fireEvent.click(getAllByText('New experiment')[0]);
 		const drawer = container.ownerDocument.querySelector('#experiment-form') as HTMLElement;
-		expect(said(drawer)).not.toContain('could not be removed');
+		expect(said(drawer)).not.toContain(failed);
 	});
 
 	it('shows a failed save inside the open drawer', async () => {

@@ -165,7 +165,7 @@ describe('gRPC', () => {
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
 		expect(said(container)).toContain('Your role cannot open the gRPC listener.');
-		expect(said(container)).not.toContain('not part of this build');
+		expect(said(container)).not.toContain('turned off on this instance');
 	});
 
 	it('offers a retry when the status could not be read', async () => {
@@ -174,7 +174,7 @@ describe('gRPC', () => {
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
 		expect(said(container)).toContain('the gRPC listener did not load');
-		expect(said(container)).not.toContain('not part of this build');
+		expect(said(container)).not.toContain('turned off on this instance');
 		expect(said(container)).toContain('Try again');
 	});
 

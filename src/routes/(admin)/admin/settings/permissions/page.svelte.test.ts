@@ -719,12 +719,13 @@ describe('permissions page drawers', () => {
 	});
 
 	it('leaves newly opened drawers clean after a failed delete', async () => {
-		const { container, getAllByRole } = setupWith({ action: 'delete', error: 'Could not remove the rule. Try again.' });
-		expect(container.textContent).toContain('Could not remove the rule. Try again.');
+		const failed = 'Could not remove the rule. Try again.';
+		const { container, getAllByRole } = setupWith({ action: 'delete', error: failed });
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(newRoleButton(getAllByRole('button')));
-		expect(roleText()).not.toContain('could not be removed');
+		expect(roleText()).not.toContain(failed);
 		await fireEvent.click(editButton(getAllByRole('button')));
-		expect(ruleText()).not.toContain('could not be removed');
+		expect(ruleText()).not.toContain(failed);
 	});
 
 	it('keeps a failed rule save out of the role drawer', async () => {

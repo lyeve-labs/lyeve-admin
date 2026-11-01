@@ -118,21 +118,23 @@ describe('email templates page', () => {
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const failed = 'Could not delete the template. Try again.';
 		const { container } = render(TemplatesPage, {
-			props: { data: data(), form: { action: 'delete', error: 'Could not delete the template. Try again.' } as never },
+			props: { data: data(), form: { action: 'delete', error: failed } as never },
 		});
-		expect(container.textContent).toContain('Could not delete the template. Try again.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(screen.getByRole('button', { name: 'New template' }));
-		expect(drawerText()).not.toContain('could not be deleted');
+		expect(drawerText()).not.toContain(failed);
 	});
 
 	it('shows a failed preview above the list rather than in the drawer', async () => {
+		const failed = 'Could not render the template.';
 		const { container } = render(TemplatesPage, {
-			props: { data: data(), form: { action: 'preview', error: 'Could not render the template.' } as never },
+			props: { data: data(), form: { action: 'preview', error: failed } as never },
 		});
-		expect(container.textContent).toContain('Could not render the template.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit spring-sale' }));
-		expect(drawerText()).not.toContain('could not be rendered');
+		expect(drawerText()).not.toContain(failed);
 	});
 });
 

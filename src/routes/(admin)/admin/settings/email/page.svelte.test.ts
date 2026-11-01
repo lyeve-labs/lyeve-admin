@@ -236,10 +236,11 @@ describe('email providers page', () => {
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
-		const { getAllByText, container } = setup([smtp], {}, { action: 'delete', error: 'Could not delete the provider. Try again.' });
-		expect(container.textContent).toContain('Could not delete the provider. Try again.');
+		const failed = 'Could not delete the provider. Try again.';
+		const { getAllByText, container } = setup([smtp], {}, { action: 'delete', error: failed });
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(getAllByText('New provider')[0]);
-		expect(drawerText(container)).not.toContain('Failed to delete');
+		expect(drawerText(container)).not.toContain(failed);
 	});
 
 	it('keeps a mail setting failure out of the provider drawer', async () => {

@@ -69,7 +69,7 @@ describe('Data export gate', () => {
 	it('shows the not-enabled state when the engine refuses the routes', () => {
 		const { container } = render(ExportPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' } }) });
 		expect(said(container)).toContain('Not enabled on this instance');
-		expect(said(container)).not.toContain('Start an export');
+		expect(said(container)).not.toContain('New export');
 	});
 
 	it('says the plugin is absent rather than that nothing was exported', () => {
@@ -109,7 +109,7 @@ describe('Data export jobs', () => {
 		expect(said(container)).not.toContain('Stopped');
 		cleanup();
 		const under = render(ExportPage, { props: props({ jobs: [job({ rows_written: 9999 })] }) });
-		expect(said(under.container)).not.toContain('entry ceiling');
+		expect(said(under.container)).not.toContain('entry limit');
 	});
 
 	it('counts running and failed on this page once the list is paged', () => {
@@ -246,20 +246,22 @@ describe('Data export filter on this page', () => {
 
 describe('Data export failures stay where they were made', () => {
 	it('shows a failed row action on the page and opens the next drawer clean', async () => {
+		const failed = 'Could not cancel the export. Try again.';
 		const { getAllByRole, container } = render(ExportPage, {
-			props: props({}, { action: 'cancel', error: 'Could not cancel the export. Try again.' }),
+			props: props({}, { action: 'cancel', error: failed }),
 		});
-		expect(said(container)).toContain('Could not cancel the export. Try again.');
+		expect(said(container)).toContain(failed);
 		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
-		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('could not be canceled');
+		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain(failed);
 	});
 
 	it('keeps a refused schedule in its own drawer, not on the page or in the export drawer', async () => {
+		const refused = 'Choose when the schedule runs.';
 		const { getAllByRole, container } = render(ExportPage, {
-			props: props({}, { action: 'createSchedule', error: 'Choose when the schedule runs.' }),
+			props: props({}, { action: 'createSchedule', error: refused }),
 		});
-		expect(said(container)).not.toContain('Choose when the schedule runs.');
+		expect(said(container)).not.toContain(refused);
 		await fireEvent.click(getAllByRole('button', { name: /new export/i })[0]);
-		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain('Say when');
+		expect((document.getElementById('start-export-form') as HTMLFormElement).textContent).not.toContain(refused);
 	});
 });

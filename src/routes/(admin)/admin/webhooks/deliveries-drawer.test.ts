@@ -141,6 +141,6 @@ describe('the history and its own failures', () => {
 		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('Showing the newest 3 attempts.');
 		cleanup();
 		render(DeliveriesDrawer, { props: { form: listed(2, 3), history: named() } });
-		expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain('The newest');
+		expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain('Showing the newest');
 	});
 });

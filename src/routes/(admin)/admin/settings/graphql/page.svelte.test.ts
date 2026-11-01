@@ -123,12 +123,13 @@ describe('the register drawer', () => {
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const failed = 'Could not delete the query. Try again.';
 		const { container, getByRole } = render(GraphqlPage, {
-			props: props({ persisted: { ok: true, value: [query] } }, { action: 'delete', error: 'Could not delete the query. Try again.' }),
+			props: props({ persisted: { ok: true, value: [query] } }, { action: 'delete', error: failed }),
 		});
-		expect(container.textContent).toContain('Could not delete the query. Try again.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(getByRole('button', { name: 'New persisted query' }));
-		expect(drawerText()).not.toContain('could not be deleted');
+		expect(drawerText()).not.toContain(failed);
 	});
 });
 

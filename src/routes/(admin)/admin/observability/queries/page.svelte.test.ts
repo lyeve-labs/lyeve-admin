@@ -210,7 +210,7 @@ describe('Slow queries analysis', () => {
 		});
 
 		expect(container.textContent).toContain('Could not explain these statements as mssql');
-		expect(container.textContent).not.toContain('Nothing to suggest');
+		expect(container.textContent).not.toContain('SQL Server suggested no index');
 	});
 });
 

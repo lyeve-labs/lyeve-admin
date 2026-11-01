@@ -141,13 +141,14 @@ describe('Retention drawers', () => {
 
 describe('Retention failures stay where they were made', () => {
 	it('shows a failed row action on the page and opens the next drawer clean', async () => {
+		const failed = 'Could not delete the policy. Try again.';
 		const { getAllByRole, container } = render(RetentionPage, {
-			props: props(['super_admin'], {}, { action: 'deletePolicy', error: 'Could not delete the policy. Try again.' }),
+			props: props(['super_admin'], {}, { action: 'deletePolicy', error: failed }),
 		});
-		expect(container.textContent).toContain('Could not delete the policy. Try again.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
 		const form = document.getElementById('policy-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('could not be removed');
+		expect(form.textContent).not.toContain(failed);
 	});
 
 	it('keeps a refused hold out of the policy drawer and off the page', async () => {

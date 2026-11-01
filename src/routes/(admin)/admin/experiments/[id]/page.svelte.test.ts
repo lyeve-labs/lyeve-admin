@@ -220,14 +220,15 @@ describe('a panel that could not be read', () => {
  */
 describe('where a failure shows', () => {
 	it('shows a failed remove on the page and not in a drawer opened after it', async () => {
+		const failed = 'Could not remove the variant. Try again.';
 		const { container, getAllByText } = render(DetailPage, {
-			props: props({}, { action: 'removeVariant', error: 'Could not remove the variant. Try again.' }),
+			props: props({}, { action: 'removeVariant', error: failed }),
 		});
-		expect(said(container)).toContain('Could not remove the variant. Try again.');
+		expect(said(container)).toContain(failed);
 
 		await fireEvent.click(getAllByText('New variant')[0]);
 		const drawer = container.ownerDocument.querySelector('#variant-form') as HTMLElement;
-		expect(said(drawer)).not.toContain('could not be removed');
+		expect(said(drawer)).not.toContain(failed);
 	});
 
 	it('shows a failed add inside its drawer and not in the other', async () => {

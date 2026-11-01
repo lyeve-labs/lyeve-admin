@@ -89,13 +89,14 @@ describe('the customization controls', () => {
 	});
 
 	it('shows a failed page delete in the Pages card, not beside the dashboard form', () => {
+		const failed = 'Could not delete the page. Try again.';
 		render(CustomizationPage, {
-			props: props({ pages: [{ slug: 'welcome', title: 'Welcome', roles: [], blocks: [] }] }, { pageDeleteError: 'Could not delete the page. Try again.' }),
+			props: props({ pages: [{ slug: 'welcome', title: 'Welcome', roles: [], blocks: [] }] }, { pageDeleteError: failed }),
 		});
-		const alert = screen.getByText('Could not delete the page. Try again.');
+		const alert = screen.getByText(failed);
 		const pagesHeading = screen.getByRole('heading', { name: 'Pages' });
 		expect(pagesHeading.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-		expect(screen.getByTestId('dashboard-state').parentElement?.textContent).not.toContain('could not be deleted');
+		expect(screen.getByTestId('dashboard-state').parentElement?.textContent).not.toContain(failed);
 	});
 
 	it('gives each top section a level 2 heading under the page title', () => {
