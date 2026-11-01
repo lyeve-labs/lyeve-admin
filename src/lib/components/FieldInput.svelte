@@ -29,6 +29,7 @@
 		mediaChoices = [],
 		id,
 		error,
+		errorKey,
 	}: {
 		field: SchemaField;
 		value?: unknown;
@@ -52,6 +53,8 @@
 		 * would be an unreferenced paragraph that a screen reader never reaches.
 		 */
 		error?: string;
+		/** The key inside a json value that the error is about. */
+		errorKey?: string;
 	} = $props();
 
 	// A relation option's name, resolved the same way a listing row's is.
@@ -136,6 +139,7 @@
 	<JsonFieldEditor
 		{id}
 		{error}
+		{errorKey}
 		bind:value={() => jsonText, (next: string) => { value = next; }}
 		required={field.required}
 	/>
