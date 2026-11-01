@@ -95,8 +95,8 @@ describe('replaying events', () => {
 
 	it.each([
 		[{ since: '' }, 'Choose the point to replay from.'],
-		[{ since: 'yesterday' }, 'That is not a time the log can be replayed from.'],
-		[{ since: '2999-01-01T00:00', since_offset: '0' }, 'A replay starts in the past. Nothing has been published yet after that point.'],
+		[{ since: 'yesterday' }, 'Choose a date and time to replay from.'],
+		[{ since: '2999-01-01T00:00', since_offset: '0' }, 'Choose a time in the past. Nothing has been published after that point yet.'],
 	])('refuses %o without starting a run', async (fields, sentence) => {
 		const out = (await actions.replay(replayEvent(fields))) as Failure;
 		expect(out.status).toBe(400);
@@ -113,6 +113,6 @@ describe('replaying events', () => {
 	it('keeps outage detail off the page', async () => {
 		engine.post.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
 		const out = (await actions.replay(replayEvent({ since: '2026-10-01T09:30', since_offset: '0' }))) as Failure;
-		expect(out.data.error).toBe('The replay could not be started.');
+		expect(out.data.error).toBe('Could not start the replay. Try again.');
 	});
 });

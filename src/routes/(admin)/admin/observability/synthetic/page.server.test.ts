@@ -283,7 +283,7 @@ describe('editing a probe', () => {
 		const out = (await actions.update(requestEvent(fields({ secret: '' })))) as Failure;
 		expect(out.status).toBe(400);
 		expect(out.data).toMatchObject({ drawer: 'probe' });
-		expect(String(out.data.error)).toContain('Enter it again');
+		expect(String(out.data.error)).toContain('Enter the password again');
 		expect(engine.put).not.toHaveBeenCalled();
 	});
 
@@ -323,7 +323,7 @@ describe('editing a probe', () => {
 	it('says an outage failed the save', async () => {
 		engine.put.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.update(requestEvent(fields()))) as Failure;
-		expect(out.data).toMatchObject({ error: 'The probe could not be saved.', drawer: 'probe' });
+		expect(out.data).toMatchObject({ error: 'Could not save the probe. Try again.', drawer: 'probe' });
 	});
 });
 
@@ -349,7 +349,7 @@ describe('deleting a probe', () => {
 	it('says an outage failed the delete', async () => {
 		engine.delete.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.delete(actionEvent({ id: 'p1' }))) as Failure;
-		expect(out.data.error).toBe('The probe could not be removed.');
+		expect(out.data.error).toBe('Could not delete the probe. Try again.');
 	});
 });
 
@@ -374,6 +374,6 @@ describe('acknowledging an alert', () => {
 	it('says an outage failed the acknowledgment', async () => {
 		engine.post.mockRejectedValue(new TypeError('fetch failed'));
 		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
-		expect(out.data.error).toBe('The alert could not be acknowledged.');
+		expect(out.data.error).toBe('Could not acknowledge the alert. Try again.');
 	});
 });

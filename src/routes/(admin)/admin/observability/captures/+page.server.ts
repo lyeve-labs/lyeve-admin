@@ -91,14 +91,14 @@ export const load: PageServerLoad = async (event) => {
 				rows: [] as CaptureRule[],
 				read: false,
 				licensed: undefined,
-				gate: gateOf(err, 'The capture rules could not be read. This is not a report that there are none.'),
+				gate: gateOf(err, 'Could not load capture rules.'),
 			})),
 		listReplaySets(client)
 			.then((r) => ({ rows: r?.data ?? [], read: true, gate: null }))
 			.catch((err: unknown) => ({
 				rows: [] as ReplaySet[],
 				read: false,
-				gate: gateOf(err, 'The replay sets could not be read. This is not a report that there are none.'),
+				gate: gateOf(err, 'Could not load replay sets.'),
 			})),
 	]);
 	if (licensed === null && typeof rules.licensed === 'boolean') licensed = rules.licensed;
@@ -139,7 +139,7 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 	const pattern = String(form.get('route_pattern') ?? '').trim();
 	if (!capturePatternIsSound(pattern)) {
 		return fail(400, {
-			error: 'A route is an absolute path such as /api/v1/orders/{id} or /api/v1/**. A segment may be * or a {name}, and ** may only end it.',
+			error: 'Enter an absolute path, such as /api/v1/orders/{id} or /api/v1/**. A segment can be * or a {name}, and ** can only come last.',
 			drawer,
 		});
 	}
@@ -147,11 +147,11 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 	if (!m) return fail(400, { error: 'Choose a method, or every method.', drawer });
 	const percent = Number(form.get('sample_percent'));
 	if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
-		return fail(400, { error: 'The sample is a percentage from 0 to 100.', drawer });
+		return fail(400, { error: 'Enter a sample percentage from 0 to 100.', drawer });
 	}
 	const retention = Math.floor(Number(form.get('retention_seconds')));
 	if (!Number.isFinite(retention) || retention < MIN_RETENTION_SECONDS || retention > MAX_RETENTION_SECONDS) {
-		return fail(400, { error: 'A capture is kept for at least an hour and at most 30 days.', drawer });
+		return fail(400, { error: 'Choose a retention from an hour to 30 days.', drawer });
 	}
 
 	const body = {
@@ -165,7 +165,7 @@ async function saveRule(event: Parameters<Actions[string]>[0], id: string | null
 		if (id) await updateCaptureRule(client, id, body);
 		else await createCaptureRule(client, body);
 	} catch (err) {
-		const failed = actionFailure(err, 'The rule could not be saved.');
+		const failed = actionFailure(err, 'Could not save the rule. Try again.');
 		return fail(failed.status, { ...failed.data, drawer });
 	}
 	return { savedRule: pattern };
@@ -183,7 +183,7 @@ export const actions: Actions = {
 		// A rule switched off from its row was not saved from the drawer, so
 		// its failure is the page's to report.
 		const fromRow = form.get('from') === 'row';
-		if (!idOf(form)) return fail(400, { error: 'No rule was named.', drawer: fromRow ? null : 'rule' });
+		if (!idOf(form)) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.', drawer: fromRow ? null : 'rule' });
 		return saveRule(event, idOf(form), fromRow ? null : 'rule');
 	},
 
@@ -191,11 +191,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = idOf(form);
-		if (!id) return fail(400, { error: 'No rule was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.' });
 		try {
 			await deleteCaptureRule(authedClient(event), id);
 		} catch (err) {
-			return actionFailure(err, 'The rule could not be deleted.');
+			return actionFailure(err, 'Could not delete the rule. Try again.');
 		}
 		return { removedRule: id };
 	},
@@ -205,15 +205,15 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const ids = [...new Set(form.getAll('capture_id').map((v) => String(v).trim()).filter(Boolean))];
-		if (!name) return fail(400, { error: 'Name the set so a replay can say which one ran.', drawer: 'set' });
+		if (!name) return fail(400, { error: 'Enter a name for the set.', drawer: 'set' });
 		if (ids.length === 0) return fail(400, { error: 'Select at least one capture.', drawer: 'set' });
 		if (ids.length > MAX_SET_CAPTURES) {
-			return fail(400, { error: `A set holds at most ${MAX_SET_CAPTURES} captures, because a replay runs them in one request.`, drawer: 'set' });
+			return fail(400, { error: `Select at most ${MAX_SET_CAPTURES} captures. A replay runs them all in one request.`, drawer: 'set' });
 		}
 		try {
 			await createReplaySet(authedClient(event), { name, capture_ids: ids });
 		} catch (err) {
-			const failed = actionFailure(err, 'The replay set could not be created.');
+			const failed = actionFailure(err, 'Could not create the replay set. Try again.');
 			return fail(failed.status, { ...failed.data, drawer: 'set' });
 		}
 		return { savedSet: name };
@@ -223,11 +223,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = idOf(form);
-		if (!id) return fail(400, { error: 'No replay set was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its replay set. Reload the page and try again.' });
 		try {
 			await deleteReplaySet(authedClient(event), id);
 		} catch (err) {
-			return actionFailure(err, 'The replay set could not be deleted.');
+			return actionFailure(err, 'Could not delete the replay set. Try again.');
 		}
 		return { removedSet: id };
 	},
@@ -236,7 +236,7 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = idOf(form);
-		if (!id) return fail(400, { error: 'No replay set was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its replay set. Reload the page and try again.' });
 		const writes = form.get('confirm_mutating') === 'true';
 		try {
 			const out = await replaySet(authedClient(event), id, writes);
@@ -246,11 +246,11 @@ export const actions: Actions = {
 			// so asking again with the writes confirmed is safe.
 			if (!writes && errorCodeOf(err) === CONFIRM_WRITES) {
 				return fail(428, {
-					error: 'This set holds a request that writes. Replaying it repeats the write.',
+					error: 'This set includes a request that writes data. Replaying it repeats the write.',
 					needsWrites: id,
 				});
 			}
-			return actionFailure(err, 'The replay set could not be replayed.');
+			return actionFailure(err, 'Could not replay the set. Try again.');
 		}
 	},
 };

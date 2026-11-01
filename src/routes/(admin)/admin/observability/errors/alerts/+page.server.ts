@@ -56,9 +56,9 @@ export const actions: Actions = {
 		const minCount = custom ? threshold(form.get('spike_min_count'), true) : null;
 		const zScore = custom ? threshold(form.get('spike_z_score'), false) : null;
 		if (minCount === 'invalid') {
-			return fail(400, { error: 'The minimum count is a whole number of errors, 1 or more.' });
+			return fail(400, { error: 'Enter a minimum count of 1 or more errors, as a whole number.' });
 		}
-		if (zScore === 'invalid') return fail(400, { error: 'The z-score is a number above 0.' });
+		if (zScore === 'invalid') return fail(400, { error: 'Enter a z-score above 0.' });
 		let saved: AlertSettings;
 		try {
 			// Every member is sent, so the write states the whole setting. A
@@ -70,7 +70,7 @@ export const actions: Actions = {
 				spike_z_score: zScore,
 			});
 		} catch (err) {
-			return actionFailure(err, 'The alert settings could not be saved.');
+			return actionFailure(err, 'Could not save the alert settings. Try again.');
 		}
 		return { saved: true, signingSecret: saved.webhook_signing_secret ?? '' };
 	},

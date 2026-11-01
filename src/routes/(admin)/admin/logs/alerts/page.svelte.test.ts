@@ -53,12 +53,12 @@ describe('the volume alert rules', () => {
 		const { container, queryByRole } = setup({ superAdmin: false });
 		expect(queryByRole('button', { name: /new rule/i })).toBeNull();
 		expect(queryByRole('button', { name: 'Edit rule 1' })).toBeNull();
-		expect(container.textContent).toContain('A super admin writes them.');
+		expect(container.textContent).toContain('Only a super admin can change them.');
 	});
 
 	it('says there is no rule rather than that the read failed', () => {
 		const { container } = setup({ config: { ...CONFIG, thresholds: [] } });
-		expect(container.textContent).toContain('No volume rule');
+		expect(container.textContent).toContain('No volume rules yet');
 	});
 
 	it('renders a refusal from a write outside the drawer over the page', () => {

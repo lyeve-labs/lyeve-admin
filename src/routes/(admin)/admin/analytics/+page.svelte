@@ -28,7 +28,7 @@
 	const agents = $derived(data.agents.ok ? (data.agents.value.items ?? []) : []);
 	const anomalies = $derived(data.anomalies.ok ? (data.anomalies.value.anomalies ?? []) : []);
 
-	const ABSENT = 'The API analytics plugin is not part of this build, so requests are not counted.';
+	const ABSENT = 'API analytics is not included in this build.';
 
 	// A missing plugin, a license that does not include it or a role that may
 	// not read it refuses every read on the page alike. One notice says so,
@@ -134,7 +134,7 @@
 
 <PageShell
 	title="API analytics"
-	description="Request volume, latency and error rate across the Content API and the Admin API over the last 24 hours."
+	description="See request volume, latency and error rate for the Content API and the Admin API over the last 24 hours."
 	width="wide"
 >
 	{#if whole}
@@ -152,7 +152,7 @@
 					sub={serverErrorBand(serverErrorRate(summary))}
 					accent={serverErrorRate(summary) >= 0.001 ? 'neutral' : 'success'}
 				/>
-				<Stat size="sm" mono label="Client errors" value={fmtPct(clientErrorRate(summary))} sub="the caller's" />
+				<Stat size="sm" mono label="Client errors" value={fmtPct(clientErrorRate(summary))} sub="caused by callers" />
 				<Stat size="sm" mono label="P50 latency" value={fmtMs(summary.avg_latency_p50_ms)} />
 				<Stat size="sm" mono label="P95 latency" value={fmtMs(summary.avg_latency_p95_ms)} />
 				<Stat size="sm" mono label="P99 latency" value={fmtMs(summary.avg_latency_p99_ms)} />
@@ -239,7 +239,7 @@
 				<EmptyState
 					iconSnippet={noEndpoints}
 					title="No endpoint data yet"
-					description="Requests to either API show up here once the engine has recorded some."
+					description="Requests to the Content API and the Admin API appear here."
 				/>
 			{:else}
 				<Table label="Top endpoints">
@@ -287,7 +287,7 @@
 					<EmptyState
 						iconSnippet={noMethods}
 						title="No method data yet"
-						description="Requests are grouped by HTTP method once the engine has recorded some."
+						description="Requests appear here grouped by HTTP method."
 					/>
 				{:else}
 					<Card>
@@ -316,7 +316,7 @@
 					<EmptyState
 						iconSnippet={noAgents}
 						title="No user agent data yet"
-						description="Clients are grouped here once they have made a request."
+						description="Requests appear here grouped by user agent."
 					/>
 				{:else}
 					<Table label="Top user agents">
@@ -359,7 +359,7 @@
 				<EmptyState
 					iconSnippet={noAnomalies}
 					title="No anomalies detected"
-					description="Request volume, latency and error rate are all inside the expected band."
+					description="Request volume, latency and error rate are all inside the expected range."
 				/>
 			{:else}
 				<Table label="Anomalies">

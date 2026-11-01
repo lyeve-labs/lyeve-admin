@@ -122,7 +122,7 @@
 
 <PageShell
 	title="Errors"
-	description="Distinct failures the engine has recorded, grouped by where they came from."
+	description="Review recorded failures, grouped by where they came from."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -139,7 +139,7 @@
 			level={2}
 			gate={data.gate}
 			title="Errors"
-			absent="The error tracking plugin is not part of this build, so failures are logged and not grouped."
+			absent="Error tracking is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={assignFailed ? undefined : formError || undefined} refused={assignFailed ? null : refused} />
@@ -178,10 +178,10 @@
 			</ListToolbar>
 			{#if data.alerts.length === 0}
 				<EmptyState
-					title={data.status ? `No ${STATUS_LABEL[data.status as AlertStatus].toLowerCase()} failures` : 'Nothing has failed'}
+					title={data.status ? `No ${STATUS_LABEL[data.status as AlertStatus].toLowerCase()} failures` : 'No failures yet'}
 					description={data.status
-						? 'No failure has this status. Widen the filter to see the rest.'
-						: 'No error has been recorded, which on a running instance is worth believing only if traffic has reached it.'}
+						? 'No failures have this status. Choose All to see the rest.'
+						: 'No errors have been recorded. This is only meaningful once the instance has received traffic.'}
 				>
 					{#snippet iconSnippet()}
 						<BugOff size={ICON.lg} />
@@ -299,9 +299,9 @@
 					href={pageHref(base, data.limit, data.status ? { status: data.status } : {})}
 				/>
 				<p class="text-xs text-muted">
-					Ordered for triage: unacknowledged first, then whatever is still happening, then by
-					how recently it last did. A resolved failure opens again when it next occurs. An ignored
-					one stays ignored.
+					Sorted for triage: unacknowledged first, then failures still happening, then the most
+					recent. A resolved failure reopens when it happens again. An ignored failure stays
+					ignored.
 				</p>
 			{/if}
 		</section>
@@ -309,10 +309,10 @@
 		<section class="flex flex-col gap-4" aria-label="Recent events">
 			<SectionHeading level={2}>Recent events</SectionHeading>
 			{#if data.events === null}
-				<Alert tone="warn">The events could not be read. This is not a report that none have happened.</Alert>
+				<Alert tone="warn">Could not load recent events. Reload the page to try again.</Alert>
 			{:else}
 				{#if data.events.data.length === 0}
-					<p class="text-sm text-muted">No event in the window this instance reads.</p>
+					<p class="text-sm text-muted">No events in the current time window.</p>
 				{:else}
 					<Table label="Recent events">
 						<thead>

@@ -76,7 +76,7 @@ describe('the profiler page', () => {
 		};
 		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/api/v1/content', detail: ok(detail) })));
 		const section = getByTestId('profiler-detail');
-		expect(section.textContent).toContain('4 entries in the ring');
+		expect(section.textContent).toContain('4 samples recorded');
 		expect(section.textContent).toContain('Recent GET requests');
 		expect(section.textContent).toContain('503');
 	});

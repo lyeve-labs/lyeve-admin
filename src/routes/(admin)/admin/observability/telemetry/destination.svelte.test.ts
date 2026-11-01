@@ -79,7 +79,7 @@ describe('the tenant destination', () => {
 		render(TelemetryPage, props({ destination: STORED, licensed: true }));
 		const url = screen.getByLabelText(/^URL/) as HTMLInputElement;
 		await fireEvent.input(url, { target: { value: 'https://collector.example.net/v1/metrics' } });
-		expect(screen.getByTestId('telemetry-destination').textContent).toContain('the stored headers will not follow it');
+		expect(screen.getByTestId('telemetry-destination').textContent).toContain('the stored headers do not carry over');
 	});
 
 	it('explains the refusal to carry the headers to another host', () => {
@@ -94,7 +94,7 @@ describe('the tenant destination', () => {
 				},
 			),
 		);
-		expect(said(container)).toContain('Send the headers again for the new host');
+		expect(said(container)).toContain('Enter the headers again for the new host');
 	});
 
 	it('asks for headers directly when none are stored', () => {
@@ -106,7 +106,7 @@ describe('the tenant destination', () => {
 
 	it('says what an unlicensed install keeps', () => {
 		const { container } = render(TelemetryPage, props({ destination: STORED, licensed: false }));
-		expect(said(container)).toContain('needs a license this install does not hold');
+		expect(said(container)).toContain('needs a license that includes it');
 		expect(screen.getByRole('button', { name: 'Delete destination' })).toBeTruthy();
 	});
 
@@ -163,7 +163,7 @@ describe('the tenant destination', () => {
 	});
 
 	it('reports an unread destination as a failure with its own sentence', () => {
-		const message = 'The destination could not be read. This is not a report that none is set.';
+		const message = 'Could not load the destination.';
 		const { container } = render(TelemetryPage, props({ ok: false, gate: { state: 'error', message } }));
 		expect(said(container)).toContain(message);
 		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
@@ -180,10 +180,10 @@ describe('the destination failures', () => {
 	it('shows a failed save inside the save form', () => {
 		const { container } = render(
 			TelemetryPage,
-			props({ destination: STORED, licensed: true }, { destinationAction: 'save', destinationError: 'The destination could not be saved.' }),
+			props({ destination: STORED, licensed: true }, { destinationAction: 'save', destinationError: 'Could not save the destination. Try again.' }),
 		);
-		expect(formFor(container, '?/saveDestination').textContent).toContain('The destination could not be saved.');
-		expect(formFor(container, '?/removeDestination').textContent).not.toContain('could not be saved');
+		expect(formFor(container, '?/saveDestination').textContent).toContain('Could not save the destination. Try again.');
+		expect(formFor(container, '?/removeDestination').textContent).not.toContain('Could not save');
 	});
 
 	// The save and the delete share one form result, so a failed delete
@@ -193,19 +193,19 @@ describe('the destination failures', () => {
 			TelemetryPage,
 			props(
 				{ destination: STORED, licensed: true },
-				{ destinationAction: 'remove', destinationError: 'The destination could not be removed.' },
+				{ destinationAction: 'remove', destinationError: 'Could not delete the destination. Try again.' },
 			),
 		);
-		expect(formFor(container, '?/removeDestination').textContent).toContain('The destination could not be removed.');
-		expect(formFor(container, '?/saveDestination').textContent).not.toContain('could not be removed');
+		expect(formFor(container, '?/removeDestination').textContent).toContain('Could not delete the destination. Try again.');
+		expect(formFor(container, '?/saveDestination').textContent).not.toContain('Could not delete');
 	});
 
 	it('shows no destination failure for an export failure', () => {
 		const { container } = render(
 			TelemetryPage,
-			props({ destination: STORED, licensed: true }, { name: 'otlp', error: 'The otlp export failed.' }),
+			props({ destination: STORED, licensed: true }, { name: 'otlp', error: 'Could not export otlp. Try again.' }),
 		);
-		expect(screen.getByTestId('telemetry-destination').textContent).not.toContain('export failed');
+		expect(screen.getByTestId('telemetry-destination').textContent).not.toContain('Could not export');
 		expect(formFor(container, '?/saveDestination').querySelector('[role="alert"]')?.textContent ?? '').toBe('');
 	});
 });

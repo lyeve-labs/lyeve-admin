@@ -117,10 +117,10 @@ function keptFrom(raw: FormDataEntryValue | null): Kept {
 
 /** The one field each probe type cannot run without. */
 const REQUIRED_TARGET: Readonly<Record<string, { field: keyof ProbeConfig; says: string }>> = {
-	health_check: { field: 'url', says: 'A health check needs a URL to fetch.' },
-	api_canary: { field: 'endpoint_base', says: 'An API canary needs the endpoint it walks.' },
-	login_flow: { field: 'login_url', says: 'A sign-in probe needs the URL it signs in at.' },
-	webhook_delivery: { field: 'webhook_url', says: 'A webhook probe needs somewhere to deliver to.' },
+	health_check: { field: 'url', says: 'Enter a URL for the health check.' },
+	api_canary: { field: 'endpoint_base', says: 'Enter an endpoint base for the API canary.' },
+	login_flow: { field: 'login_url', says: 'Enter a sign-in URL for the probe.' },
+	webhook_delivery: { field: 'webhook_url', says: 'Enter a webhook URL for the probe.' },
 };
 
 export const load: PageServerLoad = async (event) => {
@@ -185,7 +185,7 @@ export const load: PageServerLoad = async (event) => {
 		gate.state === 'ok'
 			? await section(
 					listOpenAlerts(client).then((p) => rowsOf(p)),
-					'The open alerts could not be read. This is not a report that no probe is alerting.'
+					'Could not load open alerts.'
 				)
 			: NO_ALERTS;
 
@@ -198,7 +198,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			channelsFor = { probe, read: await getProbeChannels(client, probe.id), gate: { state: 'ok' } };
 		} catch (err) {
-			channelsFor = { probe, read: null, gate: gateOf(err, 'The notice channels could not be read.') };
+			channelsFor = { probe, read: null, gate: gateOf(err, 'Could not load notice channels.') };
 		}
 	}
 
@@ -216,7 +216,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 
 	const name = String(form.get('name') ?? '').trim();
 	const type = probeType(String(form.get('type') ?? ''));
-	if (!name) return fail(400, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' });
+	if (!name) return fail(400, { error: 'Enter a name for the probe.', drawer: 'probe' });
 	if (!type) return fail(400, { error: 'Choose a probe type.', drawer: 'probe' });
 
 	const kept = id ? keptFrom(form.get('kept')) : keptFrom(null);
@@ -226,10 +226,10 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	// the stored one.
 	const secret = String(form.get('secret') ?? '');
 	if (!secret && type === 'login_flow' && kept.masked.password) {
-		return fail(400, { error: 'This probe has a stored password that no read returns. Enter it again to save.', drawer: 'probe' });
+		return fail(400, { error: 'Enter the password again to save. The stored password is never shown.', drawer: 'probe' });
 	}
 	if (!secret && type === 'api_canary' && kept.masked.auth_token) {
-		return fail(400, { error: 'This canary has a stored auth token that no read returns. Enter it again to save.', drawer: 'probe' });
+		return fail(400, { error: 'Enter the auth token again to save. The stored auth token is never shown.', drawer: 'probe' });
 	}
 	if (secret && type === 'login_flow') config.password = secret;
 	if (secret && type === 'api_canary') config.auth_token = secret;
@@ -241,7 +241,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 	const interval = positive(form.get('interval_seconds'), 300);
 	const timeout = positive(form.get('timeout_seconds'), 10);
 	if (timeout < MIN_TIMEOUT_SECONDS || timeout >= interval) {
-		return fail(400, { error: 'The timeout has to be shorter than the interval.', drawer: 'probe' });
+		return fail(400, { error: 'Enter a timeout shorter than the interval.', drawer: 'probe' });
 	}
 
 	const body = {
@@ -259,7 +259,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateProbe(client, id, body);
 		else await createProbe(client, body);
 	} catch (err) {
-		const failed = actionFailure(err, 'The probe could not be saved.');
+		const failed = actionFailure(err, 'Could not save the probe. Try again.');
 		return fail(failed.status, { ...failed.data, drawer: 'probe' });
 	}
 	return { saved: name };
@@ -271,7 +271,7 @@ export const actions: Actions = {
 	update: async (event) => {
 		const form = await event.request.clone().formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No probe was named.', drawer: 'probe' });
+		if (!id) return fail(400, { error: 'This form is missing its probe. Reload the page and try again.', drawer: 'probe' });
 		return save(event, id);
 	},
 
@@ -280,11 +280,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No probe was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its probe. Reload the page and try again.' });
 		try {
 			await deleteProbe(client, id);
 		} catch (err) {
-			return actionFailure(err, 'The probe could not be removed.');
+			return actionFailure(err, 'Could not delete the probe. Try again.');
 		}
 		return { removed: id };
 	},
@@ -294,12 +294,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No probe was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its probe. Reload the page and try again.' });
 		try {
 			const run = runOutcome(await runProbeNow(client, id));
 			return { ran: id, status: run.status, ms: run.ms, failed: run.failed, regions: run.regions };
 		} catch (err) {
-			return actionFailure(err, 'The probe could not be run.');
+			return actionFailure(err, 'Could not run the probe. Try again.');
 		}
 	},
 
@@ -308,13 +308,13 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No probe was named.', channels: true });
+		if (!id) return fail(400, { error: 'This form is missing its probe. Reload the page and try again.', channels: true });
 		const next = channelsFrom(form, CHANNEL_PREFIX);
 		let saved: ProbeChannels;
 		try {
 			saved = await putProbeChannels(authedClient(event), id, hasChannels(next) ? next : null);
 		} catch (err) {
-			const failed = actionFailure(err, 'The notice channels could not be saved.');
+			const failed = actionFailure(err, 'Could not save the notice channels. Try again.');
 			return fail(failed.status, { ...failed.data, channels: true });
 		}
 		return { channelsSaved: id, signingSecret: saved.webhook_signing_secret ?? '' };
@@ -325,11 +325,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No alert was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its alert. Reload the page and try again.' });
 		try {
 			await acknowledgeAlert(client, id);
 		} catch (err) {
-			return actionFailure(err, 'The alert could not be acknowledged.');
+			return actionFailure(err, 'Could not acknowledge the alert. Try again.');
 		}
 		return { acknowledged: id };
 	},

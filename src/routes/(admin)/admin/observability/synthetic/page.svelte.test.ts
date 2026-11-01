@@ -72,7 +72,7 @@ describe('the gate', () => {
 			props: props({ gate: { state: 'locked', upgradeUrl: '' }, probes: [] }),
 		});
 		expect(said(container)).toContain('Not enabled on this instance');
-		expect(said(container)).not.toContain('No probe is configured');
+		expect(said(container)).not.toContain('No probes yet');
 	});
 
 	// The worst thing a monitoring page can do is report a failed read as
@@ -85,7 +85,7 @@ describe('the gate', () => {
 			}),
 		});
 		expect(said(container)).toContain('could not be read');
-		expect(said(container)).not.toContain('No probe is configured');
+		expect(said(container)).not.toContain('No probes yet');
 	});
 });
 
@@ -187,7 +187,7 @@ describe('the form', () => {
 
 	it('shows the action error where the form is', () => {
 		const { container } = render(SyntheticPage, {
-			props: props({}, { error: 'The timeout has to be shorter than the interval.' }),
+			props: props({}, { error: 'Enter a timeout shorter than the interval.' }),
 		});
 		expect(said(container)).toContain('shorter than the interval');
 	});
@@ -196,7 +196,7 @@ describe('the form', () => {
 describe('the empty state', () => {
 	it('says nothing is checking rather than that a read failed', () => {
 		const { container } = render(SyntheticPage, { props: props({ probes: [] }) });
-		expect(said(container)).toContain('Nothing is checking this instance');
+		expect(said(container)).toContain('Create a probe to check this instance');
 	});
 });
 
@@ -248,7 +248,7 @@ describe('notice channels', () => {
 		const { container } = render(SyntheticPage, {
 			props: props({ channelsFor: { probe: probe(), read: null, gate: { state: 'error', message: 'x' } } }),
 		});
-		expect(said(container.querySelector('[role="dialog"]') as HTMLElement)).toContain('could not be read');
+		expect(said(container.querySelector('[role="dialog"]') as HTMLElement)).toContain('Could not load notice channels.');
 	});
 
 	it('shows the webhook signing secret the save answered', () => {
@@ -309,10 +309,10 @@ describe('a failed save', () => {
 	// The message went to the page behind the drawer, so the open panel said
 	// nothing about why the save did not happen.
 	it('is said at the top of the open form', async () => {
-		render(SyntheticPage, { props: props({}, { error: 'Name the probe so an alert can say which one fired.', drawer: 'probe' }) });
+		render(SyntheticPage, { props: props({}, { error: 'Enter a name for the probe.', drawer: 'probe' }) });
 		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
 		const form = document.querySelector('#probe-form') as HTMLFormElement;
-		expect(form.textContent).toContain('Name the probe so an alert can say which one fired.');
+		expect(form.textContent).toContain('Enter a name for the probe.');
 	});
 });
 
@@ -320,11 +320,11 @@ describe('a failed row action', () => {
 	// A failed delete, run or acknowledge greeted the next New probe as that
 	// probe's failure.
 	it('is said on the page and not in the probe drawer', async () => {
-		const { container } = render(SyntheticPage, { props: props({}, { error: 'The probe could not be deleted.' }) });
-		expect(said(container)).toContain('The probe could not be deleted.');
+		const { container } = render(SyntheticPage, { props: props({}, { error: 'Could not delete the probe. Try again.' }) });
+		expect(said(container)).toContain('Could not delete the probe. Try again.');
 		await fireEvent.click(screen.getByRole('button', { name: /new probe/i }));
 		const form = document.querySelector('#probe-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('could not be deleted');
+		expect(form.textContent).not.toContain('Could not delete');
 	});
 });
 
@@ -332,7 +332,7 @@ describe('a filter that matches nothing', () => {
 	it('draws no table or pager above the empty state', async () => {
 		const { container } = render(SyntheticPage, { props: props() });
 		await fireEvent.input(container.querySelector('#probe-narrow') as HTMLInputElement, { target: { value: 'no such probe' } });
-		expect(said(container)).toContain('Nothing on this page matches');
+		expect(said(container)).toContain('No probes on this page match these filters');
 		expect(container.querySelector('table')).toBeNull();
 	});
 });
@@ -364,14 +364,14 @@ describe('editing a probe whose secrets no read returns', () => {
 		const form = document.querySelector('#probe-form') as HTMLFormElement;
 		const input = form.querySelector('input[name="secret"][type="password"]') as HTMLInputElement;
 		expect(input.required).toBe(true);
-		expect(said(form)).toContain('A save replaces the stored password');
+		expect(said(form)).toContain('Saving replaces the stored password');
 	});
 
 	it('names the headers the save drops', async () => {
 		render(SyntheticPage, { props: props({ probes: [signIn] }) });
 		await fireEvent.click(screen.getByLabelText('Edit Sign in'));
 		const form = document.querySelector('#probe-form') as HTMLFormElement;
-		expect(said(form)).toContain('Saving drops the header Authorization');
+		expect(said(form)).toContain('Saving removes the header Authorization');
 	});
 
 	// The plugin replaces the config and regions whole, so the read travels back.

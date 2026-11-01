@@ -55,7 +55,7 @@ export const load: PageServerLoad = async (event) => {
 					.catch((err: unknown) => ({
 						value: null,
 						read: false,
-						gate: gateOf(err, 'The counters could not be read. The list below is one page, not the whole store.'),
+						gate: gateOf(err, 'Could not load the counters.'),
 					}))
 			: { value: null, read: false, gate: null };
 
@@ -82,11 +82,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const key = String(form.get('key') ?? '');
-		if (!key) return fail(400, { error: 'No key was named.' });
+		if (!key) return fail(400, { error: 'This form is missing its key. Reload the page and try again.' });
 		try {
 			await releaseKey(client, key);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The key could not be released.') });
+			return fail(400, { error: actionError(err, 'Could not release the key. Try again.') });
 		}
 		return { released: key };
 	},

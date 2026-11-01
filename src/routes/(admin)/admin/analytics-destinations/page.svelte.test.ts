@@ -97,12 +97,12 @@ describe('analytics destinations', () => {
 
 	it('says a failed delivery read failed', () => {
 		setup({ deliveries: null });
-		expect(document.body.textContent).toContain('could not be read');
+		expect(document.body.textContent).toContain('Could not load deliveries.');
 	});
 
 	it('says more deliveries are owed than the list holds', () => {
 		setup({ moreDeliveries: true, deliveryLimit: 50 });
-		expect(screen.getByTestId('more-deliveries').textContent).toContain('The 50 newest are listed and more are owed');
+		expect(screen.getByTestId('more-deliveries').textContent).toContain('Showing the 50 newest deliveries. More are owed');
 	});
 
 	it('names an outage of the delivery read as an outage', () => {
@@ -112,7 +112,7 @@ describe('analytics destinations', () => {
 
 	it('says nothing is owed when the queue is empty', () => {
 		setup({ deliveries: { data: [], licensed: true } });
-		expect(document.body.textContent).toContain('Nothing is owed');
+		expect(document.body.textContent).toContain('No deliveries owed');
 	});
 
 	it('renders a refusal over the page', () => {

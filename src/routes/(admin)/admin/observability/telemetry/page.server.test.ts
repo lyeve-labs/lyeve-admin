@@ -195,7 +195,7 @@ describe('telemetry load', () => {
 		expect(result.families.ok && result.families.value).toHaveLength(2);
 		expect(result.exporters).toEqual({
 			ok: false,
-			gate: { state: 'error', message: 'The exporters could not be read. This is not a report that none is configured.' },
+			gate: { state: 'error', message: 'Could not load exporters.' },
 		});
 	});
 
@@ -209,11 +209,11 @@ describe('the export action', () => {
 	it('posts a manual export for the named exporter as a super admin', async () => {
 		const { event, calls } = actionEvent(
 			{ name: 'pushgateway' },
-			{ '/telemetry/exporters/pushgateway/export': () => json({ status: 'ok', message: 'export triggered for pushgateway' }) },
+			{ '/telemetry/exporters/pushgateway/export': () => json({ status: 'ok', message: 'Export started for pushgateway.' }) },
 			['super_admin'],
 		);
 		const result = await actions.export(event);
-		expect(result).toMatchObject({ name: 'pushgateway', exported: true, message: 'export triggered for pushgateway' });
+		expect(result).toMatchObject({ name: 'pushgateway', exported: true, message: 'Export started for pushgateway.' });
 		const post = calls.find((c) => c.url.includes('/exporters/pushgateway/export'));
 		expect(post?.init?.method).toBe('POST');
 	});
@@ -274,7 +274,7 @@ describe('the tenant destination', () => {
 		const result = (await load(event)) as Loaded;
 		expect(result.destination).toEqual({
 			ok: false,
-			gate: { state: 'error', message: 'The destination could not be read. This is not a report that none is set.' },
+			gate: { state: 'error', message: 'Could not load the destination.' },
 		});
 	});
 

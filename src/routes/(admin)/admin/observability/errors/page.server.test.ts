@@ -185,6 +185,6 @@ describe('acknowledging an alert', () => {
 	it('says an outage failed the acknowledgment', async () => {
 		engine.post.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
-		expect(out.data.error).toBe('The alert could not be acknowledged.');
+		expect(out.data.error).toBe('Could not acknowledge the alert. Try again.');
 	});
 });

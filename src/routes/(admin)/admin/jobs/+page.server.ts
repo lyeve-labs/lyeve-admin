@@ -36,7 +36,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
 
 /** What the page says for a list read that failed for no reason it can name. */
-const LIST_FAILED = 'The jobs could not be read. This is not a report that there are none.';
+const LIST_FAILED = 'Could not load jobs.';
 
 async function listJobs(
 	client: HttpClient,
@@ -97,7 +97,7 @@ async function readJob(client: HttpClient, id: string): Promise<Section<Job>> {
 	// GET /api/admin/jobs/{id} returns the job itself. Reading a `job`
 	// wrapper that is not there yields undefined, and the edit form would
 	// render every field blank for a job that exists.
-	const read = await section(client.get<Job | { job: Job }>(`/api/admin/jobs/${encodeURIComponent(id)}`), 'The linked job could not be read.');
+	const read = await section(client.get<Job | { job: Job }>(`/api/admin/jobs/${encodeURIComponent(id)}`), 'Could not load the linked job.');
 	if (!read.ok) return read;
 	const job = 'job' in read.value ? read.value.job : read.value;
 	return job?.id ? { ok: true, value: job } : { ok: false, gate: { state: 'absent' } };
@@ -127,7 +127,7 @@ function jobBody(form: FormData): { body: Record<string, unknown> } | { error: s
 		try {
 			body.payload = JSON.parse(payloadRaw);
 		} catch {
-			return { error: 'Payload must be valid JSON.' };
+			return { error: 'Enter the payload as valid JSON.' };
 		}
 	} else if (form.get('had_payload') === 'true') {
 		// The cron plugin reads a null payload as "leave it", so a cleared
@@ -136,7 +136,7 @@ function jobBody(form: FormData): { body: Record<string, unknown> } | { error: s
 		body.payload = {};
 	}
 	if (!body.name || !body.schedule || !body.endpoint) {
-		return { error: 'Name, schedule, and endpoint are required' };
+		return { error: 'Enter a name, a cron schedule and an endpoint URL.' };
 	}
 	const alerts = alertsFrom(form);
 	if (alerts !== undefined) body.alerts = alerts;
@@ -164,7 +164,7 @@ export const actions: Actions = {
 		try {
 			saved = await client.post<SavedJob>('/api/admin/jobs', parsed.body);
 		} catch (err) {
-			return failed('create', err, 'Failed to create job.');
+			return failed('create', err, 'Could not create the job. Try again.');
 		}
 		if (saved?.alert_signing_secret) return signingReveal(saved);
 		redirect(303, '/admin/jobs');
@@ -175,14 +175,14 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'Missing job id', action: 'update' as const });
+		if (!id) return fail(400, { error: 'This form is missing its job. Reload the page and try again.', action: 'update' as const });
 		const parsed = jobBody(form);
 		if ('error' in parsed) return fail(400, { error: parsed.error, action: 'update' as const });
 		let saved: SavedJob;
 		try {
 			saved = await client.put<SavedJob>(`/api/admin/jobs/${encodeURIComponent(id)}`, parsed.body);
 		} catch (err) {
-			return failed('update', err, 'Failed to update job.');
+			return failed('update', err, 'Could not save the job. Try again.');
 		}
 		if (saved?.alert_signing_secret) return signingReveal(saved);
 		redirect(303, '/admin/jobs');
@@ -194,11 +194,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await request.formData();
 		const id = form.get('id') as string;
-		if (!id) return fail(400, { error: 'Missing job id', action: 'delete' as const });
+		if (!id) return fail(400, { error: 'This form is missing its job. Reload the page and try again.', action: 'delete' as const });
 		try {
 			await client.delete(`/api/admin/jobs/${encodeURIComponent(id)}`);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to delete job.'), action: 'delete' as const });
+			return fail(400, { error: actionError(err, 'Could not delete the job. Try again.'), action: 'delete' as const });
 		}
 		redirect(303, '/admin/jobs');
 	},

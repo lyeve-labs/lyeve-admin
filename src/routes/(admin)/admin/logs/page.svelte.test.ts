@@ -213,7 +213,7 @@ describe('a search that failed', () => {
 		});
 
 		const text = container.textContent ?? '';
-		expect(text.split('not part of this build').length - 1).toBe(1);
+		expect(text.split('not included in this build').length - 1).toBe(1);
 		expect(text).not.toContain('Volume (24h)');
 	});
 });
@@ -223,13 +223,13 @@ describe('an empty log', () => {
 		const { container } = render(LogsPage, { props: props([]) });
 
 		expect(container.textContent).toContain('No log entries yet');
-		expect(container.textContent).not.toContain('match the current filter');
+		expect(container.textContent).not.toContain('match these filters');
 	});
 
 	it('says the filter matched nothing when there is one', () => {
 		const { container } = render(LogsPage, { props: props([], { level: 'ERROR' }) });
 
-		expect(container.textContent).toContain('No log entries match the current filter');
+		expect(container.textContent).toContain('No log entries match these filters');
 	});
 });
 

@@ -156,7 +156,7 @@ describe('the job list when it could not be read', () => {
 	});
 
 	it('states a failure in the page\'s words, with a way to try again', () => {
-		const message = 'The jobs could not be read. This is not a report that there are none.';
+		const message = 'Could not load jobs.';
 		const { container, getByRole, queryByRole } = failed({ state: 'error', message });
 		expect(container.textContent).toContain(message);
 		expect(getByRole('link', { name: 'Try again' })).toBeTruthy();
@@ -188,38 +188,38 @@ describe('a failure from one form', () => {
 	// A failed row delete read by the drawer greeted the next job as if its
 	// own save had failed.
 	it('keeps a failed delete out of the next job drawer', async () => {
-		const { getByRole, container } = setup({}, { error: 'Failed to delete job.', action: 'delete' });
-		expect(container.textContent).toContain('Failed to delete job.');
+		const { getByRole, container } = setup({}, { error: 'Could not delete the job. Try again.', action: 'delete' });
+		expect(container.textContent).toContain('Could not delete the job. Try again.');
 		await fireEvent.click(getByRole('button', { name: /New job/ }));
 		const form = document.querySelector('#job-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('Failed to delete job.');
+		expect(form.textContent).not.toContain('Could not delete the job. Try again.');
 	});
 
 	it('says a failed save inside the open drawer', async () => {
 		const rendered = setup();
 		await fireEvent.click(rendered.getByRole('button', { name: /New job/ }));
-		await rendered.rerender({ form: { error: 'Payload must be valid JSON.', action: 'create' } } as never);
+		await rendered.rerender({ form: { error: 'Enter the payload as valid JSON.', action: 'create' } } as never);
 		const form = document.querySelector('#job-form') as HTMLFormElement;
-		expect(form.textContent).toContain('Payload must be valid JSON.');
+		expect(form.textContent).toContain('Enter the payload as valid JSON.');
 	});
 
 	it('keeps a failed create out of the edit drawer opened after it', async () => {
 		const rendered = setup();
 		await fireEvent.click(rendered.getByRole('button', { name: /New job/ }));
-		await rendered.rerender({ form: { error: 'Payload must be valid JSON.', action: 'create' } } as never);
+		await rendered.rerender({ form: { error: 'Enter the payload as valid JSON.', action: 'create' } } as never);
 		await fireEvent.click(rendered.getByRole('button', { name: 'Cancel' }));
 		await fireEvent.click(rendered.getByRole('button', { name: 'Edit Nightly purge' }));
 		const form = document.querySelector('#job-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('Payload must be valid JSON.');
+		expect(form.textContent).not.toContain('Enter the payload as valid JSON.');
 	});
 
 	it('keeps a drawer failure off the page behind another drawer', async () => {
 		const rendered = setup();
 		await fireEvent.click(rendered.getByRole('button', { name: /New job/ }));
-		await rendered.rerender({ form: { error: 'Payload must be valid JSON.', action: 'create' } } as never);
+		await rendered.rerender({ form: { error: 'Enter the payload as valid JSON.', action: 'create' } } as never);
 		await fireEvent.click(rendered.getByRole('button', { name: 'Cancel' }));
 		await fireEvent.click(rendered.getByRole('button', { name: 'Edit Nightly purge' }));
-		expect(document.body.textContent).not.toContain('Payload must be valid JSON.');
+		expect(document.body.textContent).not.toContain('Enter the payload as valid JSON.');
 	});
 
 	it('keeps a failed update out of the next New job drawer', async () => {
@@ -239,7 +239,7 @@ describe('a job with a payload', () => {
 		const { getByLabelText } = setup();
 		await fireEvent.click(getByLabelText('Edit Nightly purge'));
 		const form = document.querySelector('#job-form') as HTMLFormElement;
-		expect(form.textContent).toContain('Clearing it sends an empty JSON object on each run.');
+		expect(form.textContent).toContain('If you clear it, each run sends an empty JSON object.');
 		expect((form.querySelector('input[name="had_payload"]') as HTMLInputElement).value).toBe('true');
 	});
 });
@@ -247,7 +247,7 @@ describe('a job with a payload', () => {
 describe('a job link that opened nothing', () => {
 	it('says the linked job was not found', () => {
 		const { container } = setup({ openGate: { state: 'absent' } });
-		expect(container.textContent).toContain('The job this link opens was not found. It may have been deleted.');
+		expect(container.textContent).toContain('This job no longer exists.');
 	});
 
 	it('says the linked job could not be read, with a way to try again', () => {

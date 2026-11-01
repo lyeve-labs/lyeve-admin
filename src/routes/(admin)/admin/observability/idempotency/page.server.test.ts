@@ -65,7 +65,7 @@ describe('a release the engine does not carry out', () => {
 
 	it('names nothing to release without a request', async () => {
 		const out = (await actions.release(actionEvent({}))) as Failure;
-		expect(out.data.error).toBe('No key was named.');
+		expect(out.data.error).toBe('This form is missing its key. Reload the page and try again.');
 		expect(engine.delete).not.toHaveBeenCalled();
 	});
 
@@ -78,7 +78,7 @@ describe('a release the engine does not carry out', () => {
 	it('keeps outage detail off the page', async () => {
 		engine.delete.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.9:6379: connection refused'));
 		const out = (await actions.release(actionEvent({ key: 'order-17' }))) as Failure;
-		expect(out.data.error).toBe('The key could not be released.');
+		expect(out.data.error).toBe('Could not release the key. Try again.');
 	});
 });
 
