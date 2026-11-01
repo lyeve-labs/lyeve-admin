@@ -109,9 +109,9 @@ describe('content listing states the collection total', () => {
 	it('disables the previous link on the first page', () => {
 		const { container } = render(ContentListPage, { props: { data: data(), form: null } });
 
-		const prev = container.querySelector('[aria-label="Previous page"]');
-		expect(prev?.getAttribute('aria-disabled')).toBe('true');
-		expect(prev?.hasAttribute('href')).toBe(false);
+		const prev = container.querySelector('[aria-label="Previous page"]') as HTMLButtonElement;
+		expect(prev.tagName).toBe('BUTTON');
+		expect(prev.disabled).toBe(true);
 	});
 });
 
