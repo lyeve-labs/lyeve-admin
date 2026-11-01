@@ -127,9 +127,9 @@ describe('Audit log pagination', () => {
 			},
 		});
 
-		const next = pager(container, 'Next');
-		expect(next?.getAttribute('aria-disabled')).toBe('true');
-		expect(next?.getAttribute('href')).toBeNull();
+		const next = container.querySelector('[aria-label="Next page"]') as HTMLButtonElement;
+		expect(next.tagName).toBe('BUTTON');
+		expect(next.disabled).toBe(true);
 	});
 });
 

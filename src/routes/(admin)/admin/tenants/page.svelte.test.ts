@@ -156,9 +156,9 @@ describe('Tenants pagination', () => {
 			props: props({ offset: 700, tenants: tenants(31, 700) }),
 		});
 
-		const next = container.querySelector('a[aria-label="Next page"]') as HTMLAnchorElement;
-		expect(next.getAttribute('aria-disabled')).toBe('true');
-		expect(next.getAttribute('href')).toBeNull();
+		const next = container.querySelector('[aria-label="Next page"]') as HTMLButtonElement;
+		expect(next.tagName).toBe('BUTTON');
+		expect(next.disabled).toBe(true);
 	});
 
 	it('says so when the instance has no tenants at all', () => {
