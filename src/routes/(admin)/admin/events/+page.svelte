@@ -219,7 +219,7 @@
 									{:else}
 										{run.replayed} replayed, {run.skipped} skipped, {run.failed} failed
 										{#if !didFire(run)}
-											<span class="text-faint">(nothing was published)</span>
+											<span class="text-faint">(nothing was posted)</span>
 										{/if}
 									{/if}
 								</td>

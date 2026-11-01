@@ -136,7 +136,7 @@ describe('Events replay', () => {
 			props: props({ runs: [run({ dry_run: true, replayed: 400 })] }),
 		});
 		expect(said(container)).toContain('rehearsal');
-		expect(said(container)).toContain('nothing was published');
+		expect(said(container)).toContain('nothing was posted');
 	});
 
 	it('states progress against the total rather than the replayed count alone', () => {
