@@ -187,7 +187,7 @@
 					loading={submitting === 'aggregate'}
 					title="Update this tenant's costs now"
 				>
-					<RefreshCw size={ICON.sm} /> Aggregate now
+					<RefreshCw size={ICON.sm} /> Update costs
 				</Button>
 			</form>
 			<!-- A budget list that could not be read offers no write against it. -->

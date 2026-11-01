@@ -181,7 +181,7 @@
 						     into a wall past a dozen. The picks travel as one field each. -->
 						<MultiSelect
 							id="public-schemas"
-							label="Anyone may search"
+							label="Searchable by anyone"
 							hint="Anyone can search the published entries of a chosen schema on your site's own host, without credentials, and see the title, slug, tags and a snippet. A query matches every field, and the snippet can quote any of them, so choose only schemas whose fields can all be public."
 							placeholder="Pick schemas"
 							searchable

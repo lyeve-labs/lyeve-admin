@@ -154,7 +154,7 @@
 	<FormErrors message={pageFailure} />
 
 	<section class="flex flex-col gap-4">
-		<SectionHeading level={2}>What the results support</SectionHeading>
+		<SectionHeading level={2}>Results</SectionHeading>
 		<!-- The sentence, not the number. "Not significant" is the most misread
 		     result in the product: it is not a tie, it is an experiment that has
 		     not answered, and reading it as a tie ships changes on noise. -->
@@ -182,7 +182,7 @@
 		</div>
 
 		{#if results && results.variants.length > 0}
-			<Table label="What the results support">
+			<Table label="Results">
 				<thead>
 					<tr>
 						<th scope="col">Variant</th>

@@ -219,7 +219,7 @@
 				{:else if release.status === 'draft'}
 					<form method="POST" action="?/schedule" use:enhance={schedule.enhance} class="flex flex-wrap items-end gap-3">
 						<input type="hidden" name="publish_at" value={publishAtUTC} />
-						<DateTimePicker id="release-at" label="Goes out at" bind:value={publishAt} error={errors.publish_at} />
+						<DateTimePicker id="release-at" label="Publish at" bind:value={publishAt} error={errors.publish_at} />
 						<Button variant="primary" size="sm" type="submit" disabled={!publishAtUTC || blocking.length > 0} loading={schedule.pending}>
 							Schedule
 						</Button>
@@ -364,7 +364,7 @@
 				hint="Could not load the entry list. Enter the ID shown under the entry's title on its page."
 			/>
 		{/if}
-		<SegmentedControl name="action" label="When the release goes out" options={ACTIONS} bind:value={itemAction} />
+		<SegmentedControl name="action" label="When the release publishes" options={ACTIONS} bind:value={itemAction} />
 	</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (addOpen = false)}>Cancel</Button>

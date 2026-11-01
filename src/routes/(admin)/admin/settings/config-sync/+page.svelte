@@ -253,7 +253,7 @@
 			/>
 			<Checkbox
 				id="sync-prune"
-				label="Delete what the bundle does not name"
+				label="Delete items not in the bundle"
 				description="Removes flows, permission rules and webhooks that exist only on this instance. Content types are never deleted."
 				bind:checked={prune}
 			/>

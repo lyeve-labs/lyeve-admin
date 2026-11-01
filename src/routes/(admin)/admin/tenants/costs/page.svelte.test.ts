@@ -91,7 +91,7 @@ describe('tenant costs page', () => {
 		expect(screen.getByRole('button', { name: /Use default/ })).toBeTruthy();
 		expect(screen.getAllByRole('form', { name: /Price for/ })).toHaveLength(5);
 		expect(fieldsets().every((f) => !f.disabled)).toBe(true);
-		expect(screen.getByRole('button', { name: /Aggregate now/ })).toHaveProperty('disabled', false);
+		expect(screen.getByRole('button', { name: /Update costs/ })).toHaveProperty('disabled', false);
 		expect(screen.getByRole('button', { name: /New budget/ })).toHaveProperty('disabled', false);
 		expect(screen.queryByTestId('not-enabled')).toBeNull();
 	});
@@ -104,7 +104,7 @@ describe('tenant costs page', () => {
 		expect(screen.queryByRole('region', { name: 'This month' })).toBeNull();
 		expect(screen.queryByRole('region', { name: 'Budgets' })).toBeNull();
 		expect(fieldsets()).toHaveLength(0);
-		expect(screen.queryByRole('button', { name: /Aggregate now/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Update costs/ })).toBeNull();
 		expect(screen.queryByRole('button', { name: /New budget/ })).toBeNull();
 		expect(screen.queryByText('Beta')).toBeNull();
 	});

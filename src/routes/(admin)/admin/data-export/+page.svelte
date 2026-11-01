@@ -152,7 +152,7 @@
 	let schIncludeSchemas = $state(false);
 	let schIncludeMedia = $state(false);
 	let schTemplate = $state('');
-	const cronOptions = [...CRON_PRESETS, { value: 'custom', label: 'A cron expression of my own' }];
+	const cronOptions = [...CRON_PRESETS, { value: 'custom', label: 'Custom cron expression' }];
 	function openSchedule() {
 		schName = '';
 		schCron = '0 2 * * *';

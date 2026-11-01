@@ -623,7 +623,7 @@
 									bind:value={stage.quorum}
 								/>
 								<SegmentedControl
-									label="On an SLA breach, hand it to"
+									label="Escalate to"
 									options={ESCALATE}
 									disabled={stagesLocked || stage.sla_hours === 0}
 									bind:value={stage.escalate_kind}
@@ -654,7 +654,7 @@
 								<div class="grid gap-2 sm:grid-cols-2">
 									<Input
 										id="stage-condition-field-{stage.key}"
-										label="Only when the field"
+										label="Condition field"
 										hint="Leave empty to run the stage for every entry."
 										disabled={stagesLocked}
 										bind:value={stage.condition_field}
