@@ -178,11 +178,32 @@ const statusOf = (err: unknown) => (err instanceof ApiError && err.status >= 400
 
 const path = (...parts: string[]) => parts.map(encodeURIComponent).join('/');
 
+/**
+ * The code the engine refuses a write with when the content type is no longer
+ * at the version the write names: someone saved it after the builder opened it.
+ */
+const VERSION_MISMATCH = 'SCHEMA_VERSION_MISMATCH';
+
+const refusedAs = (err: unknown, code: string) =>
+	err instanceof ApiError && err.status === 412 && (err.body as { code?: unknown } | undefined)?.code === code;
+
+/** What the builder says when the content type changed since it was opened. */
+const CHANGED_SINCE_OPENED =
+	'This content type changed since it was opened, so the save was refused. Reload it to see what it holds now, then make the change again.';
+
+/** The condition a write is sent on: only the definition at `version`. None when the read named no version. */
+const onlyAt = (version: string): RequestInit | undefined => (version ? { headers: { 'If-Match': `"${version}"` } } : undefined);
+
 export const actions: Actions = {
 	/**
 	 * Saves one schema. Renamed fields go through the engine's rename route
 	 * first, because the definition alone is diffed by name and a renamed field
 	 * would otherwise land as a new column beside a dropped one.
+	 *
+	 * Every write names the version of the definition the builder opened, and
+	 * each rename answers the version it stored, which the next write names. A
+	 * content type someone changed since it was opened is then refused rather
+	 * than overwritten with what the builder held.
 	 */
 	save: async (event) => {
 		await requireRole(event, WRITERS);
@@ -195,35 +216,47 @@ export const actions: Actions = {
 		}
 		const client = authedClient(event);
 
+		let version = String(data.get('version') ?? '');
 		const renamed: { from: string; to: string }[] = [];
 		const said = () => renamed.map((r) => `${r.from} to ${r.to}`).join(', ');
 		if (original) {
 			for (const r of parseRenames(data.get('renames'))) {
 				try {
-					await retryBusy(() =>
-						client.put(`/api/admin/schemas/${path(original, 'fields', r.from, 'rename')}`, { new_name: r.to }),
+					const answer = await retryBusy(() =>
+						client.put<{ version?: string }>(
+							`/api/admin/schemas/${path(original, 'fields', r.from, 'rename')}`,
+							{ new_name: r.to },
+							onlyAt(version),
+						),
 					);
 					renamed.push(r);
+					if (answer?.version) version = answer.version;
 				} catch (err) {
 					const done = renamed.length ? ` Already renamed: ${said()}.` : '';
+					const stale = refusedAs(err, VERSION_MISMATCH);
 					return fail(statusOf(err), {
 						scope: 'save' as const,
-						error: `${actionError(err, `The field ${r.from} could not be renamed.`)}${done}`,
+						error: `${stale ? CHANGED_SINCE_OPENED : actionError(err, `The field ${r.from} could not be renamed.`)}${done}`,
 						renamed,
+						version,
+						stale,
 					});
 				}
 			}
 		}
 
 		try {
-			const saved = await retryBusy(() => client.post<Schema>('/api/admin/schemas', schema));
+			const saved = await retryBusy(() => client.post<Schema>('/api/admin/schemas', schema, original ? onlyAt(version) : undefined));
 			return { scope: 'save' as const, saved };
 		} catch (err) {
 			const done = renamed.length ? ` The renames went through: ${said()}.` : '';
+			const stale = refusedAs(err, VERSION_MISMATCH);
 			return fail(statusOf(err), {
 				scope: 'save' as const,
-				error: `${actionError(err, 'The schema could not be saved.')}${done}`,
+				error: `${stale ? CHANGED_SINCE_OPENED : actionError(err, 'The schema could not be saved.')}${done}`,
 				renamed,
+				version,
+				stale,
 			});
 		}
 	},
