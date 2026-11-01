@@ -76,14 +76,14 @@ describe('testing a provider', () => {
 	it('names why an unhealthy provider failed', async () => {
 		const { event } = engine({ id: 'p1' }, { reply: ping(false, 'AccessDenied: access denied by bucket policy') });
 		const out = (await actions.test(event)) as Failure;
-		expect(out.data.error).toBe('The provider refused: AccessDenied: access denied by bucket policy');
+		expect(out.data.error).toBe('The provider test failed: AccessDenied: access denied by bucket policy');
 	});
 
 	it('relays a refusal and hides an outage', async () => {
 		const refused = engine({ id: 'p1' }, { reply: json({ error: 'provider not found' }, 404) });
 		expect(((await actions.test(refused.event)) as Failure).data.error).toBe('provider not found');
 		const down = engine({ id: 'p1' }, { reply: OUTAGE });
-		expect(((await actions.test(down.event)) as Failure).data.error).toBe('The provider could not be tested.');
+		expect(((await actions.test(down.event)) as Failure).data.error).toBe('Could not test the provider. Try again.');
 	});
 });
 
@@ -126,7 +126,7 @@ describe('creating a provider', () => {
 			providerError: 'region must be 1 to 32 lower-case letters, digits and hyphens for s3 providers',
 		});
 		const down = engine(S3, { reply: OUTAGE });
-		expect(((await actions.create(down.event)) as Failure).data).toEqual({ action: 'create', providerError: 'The provider could not be created.' });
+		expect(((await actions.create(down.event)) as Failure).data).toEqual({ action: 'create', providerError: 'Could not create the provider. Try again.' });
 	});
 });
 
@@ -143,7 +143,7 @@ describe('saving a provider', () => {
 
 	it('names nothing to save without a request', async () => {
 		const { event, calls } = engine(S3);
-		expect(((await actions.update(event)) as Failure).data).toEqual({ action: 'update', providerError: 'No provider was named.' });
+		expect(((await actions.update(event)) as Failure).data).toEqual({ action: 'update', providerError: 'This form is missing its provider. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -151,7 +151,7 @@ describe('saving a provider', () => {
 		const refused = engine({ id: 'p1', ...S3 }, { reply: json({ error: 'invalid provider ID' }, 400) });
 		expect(((await actions.update(refused.event)) as Failure).data).toEqual({ action: 'update', providerError: 'invalid provider ID' });
 		const down = engine({ id: 'p1', ...S3 }, { reply: OUTAGE });
-		expect(((await actions.update(down.event)) as Failure).data).toEqual({ action: 'update', providerError: 'The provider could not be saved.' });
+		expect(((await actions.update(down.event)) as Failure).data).toEqual({ action: 'update', providerError: 'Could not save the provider. Try again.' });
 	});
 });
 
@@ -166,6 +166,6 @@ describe('removing a provider', () => {
 		const refused = engine({ id: 'p1' }, { reply: json({ error: 'failed to delete provider' }, 404) });
 		expect(((await actions.delete(refused.event)) as Failure).data).toEqual({ error: 'failed to delete provider' });
 		const down = engine({ id: 'p1' }, { reply: OUTAGE });
-		expect(((await actions.delete(down.event)) as Failure).data).toEqual({ error: 'The provider could not be removed.' });
+		expect(((await actions.delete(down.event)) as Failure).data).toEqual({ error: 'Could not delete the provider. Try again.' });
 	});
 });

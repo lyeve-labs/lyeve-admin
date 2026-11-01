@@ -46,13 +46,13 @@ describe('audit sinks page', () => {
 
 	it('says nothing receives the log when there is no destination', () => {
 		const { container } = setup({});
-		expect(container.textContent).toContain('Nothing receives the audit log');
+		expect(container.textContent).toContain('No destinations yet');
 	});
 
 	it('shows a generated secret once, after the create', async () => {
 		const { container } = setup({ sinks: [sink] }, { created: 'Hook', secret: 'whsec_once' });
 		expect(document.body.textContent).toContain('It is not shown again');
-		await vi.waitFor(() => expect(container.textContent).toContain('Hook is streaming the audit log'));
+		await vi.waitFor(() => expect(container.textContent).toContain('Hook created. It now receives the audit log'));
 	});
 
 	it('renders a refused delete as the refusal notice', () => {
@@ -65,7 +65,7 @@ describe('audit sinks page', () => {
 
 	it('says why the page is empty when the plugin is not there', () => {
 		const { container } = setup({ gate: { state: 'absent' } });
-		expect(container.textContent).toContain('does not stream the audit log');
+		expect(container.textContent).toContain('Audit streaming is not included in this build');
 	});
 });
 
@@ -82,16 +82,16 @@ describe('audit sink controls', () => {
 		setup({ sinks: [sink] });
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Security SIEM' }));
 		const [title] = kit.confirm.mock.calls[0] as unknown as [string];
-		expect(title).toBe('Delete destination Security SIEM');
+		expect(title).toBe('Delete destination Security SIEM?');
 	});
 });
 
 describe('audit sink failures stay where they were made', () => {
 	it('shows a failed test on the page and opens the destination drawer clean', async () => {
-		const { container } = setup({ sinks: [sink] }, { action: 'test', error: 'The test could not be sent.' });
-		expect(container.textContent).toContain('The test could not be sent.');
+		const { container } = setup({ sinks: [sink] }, { action: 'test', error: 'Could not send the test. Try again.' });
+		expect(container.textContent).toContain('Could not send the test. Try again.');
 		await fireEvent.click(screen.getByRole('button', { name: /new destination/i }));
-		expect((document.getElementById('sink-form') as HTMLFormElement).textContent).not.toContain('could not be sent');
+		expect((document.getElementById('sink-form') as HTMLFormElement).textContent).not.toContain('Could not send the test');
 	});
 
 	it('keeps a refused create in the drawer and off the page', () => {

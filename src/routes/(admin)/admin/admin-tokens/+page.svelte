@@ -142,7 +142,7 @@
 	const pickedCount = $derived(Object.values(picked).reduce((n, list) => n + list.length, 0));
 	const ipProblem = $derived(allowedIPsProblem(ipText));
 	const tenantOptions = $derived([
-		{ value: '', label: 'The tenant you act in' },
+		{ value: '', label: 'Your current tenant' },
 		...tenants.map((t) => ({ value: t.slug, label: t.name && t.name !== t.slug ? `${t.name} (${t.slug})` : t.slug })),
 	]);
 
@@ -243,7 +243,7 @@
 
 <PageShell
 	title="Admin tokens"
-	description="Scoped credentials for scripts and CI jobs that call the admin API. Each one expires within {MAX_TOKEN_DAYS} days."
+	description="Create scoped credentials for scripts and CI jobs that call the admin API. Each one expires within {MAX_TOKEN_DAYS} days."
 	width="wide"
 >
 	{#snippet actions()}
@@ -257,12 +257,12 @@
 	<FormErrors message={pageFailure?.error} />
 
 	{#if !data.tokens.ok}
-		<GateNotice level={2} gate={data.tokens.gate} title="Admin tokens" absent="This engine does not serve admin tokens." />
+		<GateNotice level={2} gate={data.tokens.gate} title="Admin tokens" absent="Admin tokens are not included in this build." />
 	{:else if tokens.length === 0}
 		<EmptyState
 			level={2}
 			title="No admin tokens yet"
-			description="An admin token lets a script or a CI job call the admin API with only the grants you give it, and it stops working within {MAX_TOKEN_DAYS} days."
+			description="Create a token to let a script or CI job call the admin API with only the grants you choose. Tokens expire within {MAX_TOKEN_DAYS} days."
 		>
 			{#snippet iconSnippet()}
 				<KeySquare size={ICON.lg} />
@@ -276,7 +276,7 @@
 	{:else}
 		<ListToolbar label="Filter admin tokens">
 			{#snippet search()}
-				<label for="token-search" class="sr-only">Narrow this page</label>
+				<label for="token-search" class="sr-only">Search this page</label>
 				<SearchInput id="token-search" bind:value={query} placeholder="Name, prefix, owner or grant on this page" />
 			{/snippet}
 			{#snippet filters()}
@@ -287,8 +287,8 @@
 		{#if visible.length === 0}
 			<EmptyState
 				level={2}
-				title="No token on this page matches"
-				description="Clear the search or the status, or turn the page: the box narrows what is on screen."
+				title="No tokens on this page match these filters"
+				description="Clear the search and the status filter, or go to another page."
 			/>
 		{:else}
 			<Table label="Admin tokens">
@@ -400,7 +400,7 @@
 				required
 				bind:value={name}
 				placeholder="ci-deploy"
-				hint="Say what calls with it, so the list tells tokens apart."
+				hint="Name what uses this token, so you can tell tokens apart."
 				error={createFailure?.fields.name}
 			/>
 
@@ -408,14 +408,14 @@
 				<div class="flex flex-col gap-1">
 					<p id="token-grants-label" class="text-sm font-medium text-fg">Grants</p>
 					<p class="text-xs text-muted">
-						A token reaches only the routes its grants open. Everything else, users, keys and settings included, needs a signed-in session.
+						A token can call only the routes its grants cover. Everything else, including users, keys and settings, needs a signed-in session.
 					</p>
 					{#if createFailure?.fields.grants}
 						<p class="text-xs text-danger" role="alert">{createFailure.fields.grants}</p>
 					{/if}
 				</div>
 				{#if !data.grants.ok}
-					<GateNotice gate={data.grants.gate} title="Grants" absent="This engine lists no grants, so no token can be created." />
+					<GateNotice gate={data.grants.gate} title="Grants" absent="No grants are available, so you cannot create a token." />
 				{/if}
 				<div class="grid gap-4 sm:grid-cols-2">
 					{#each groups as group (group.id)}
@@ -429,7 +429,7 @@
 							/>
 							<Collapsible label="Routes" badge={routes.length}>
 								{#if routes.length === 0}
-									<p class="text-xs text-faint">No route on this instance declares these grants yet.</p>
+									<p class="text-xs text-faint">No routes use these grants yet.</p>
 								{:else}
 									<ul class="flex flex-col gap-1">
 										{#each routes as r (r.grant + r.method + r.pattern)}
@@ -460,8 +460,8 @@
 			/>
 
 			{#if superAdmin && !data.tenants.ok}
-				<Alert tone="warn" title="Tenants could not be read">
-					This form cannot name a tenant, so the token acts in the tenant you act in. Reload the page to choose another.
+				<Alert tone="warn" title="Could not load the tenants">
+					The token will act in your current tenant. Reload the page to choose another.
 				</Alert>
 			{:else if superAdmin && tenants.length > 1}
 				<Select
@@ -534,7 +534,7 @@
 				id="issued-example"
 				label="Try it"
 				value={curlExample(data.adminOrigin)}
-				hint="With the token in LYEVE_ADMIN_TOKEN, this reads the schemas when the token holds schemas:read."
+				hint="Set LYEVE_ADMIN_TOKEN to the token first. This lists the schemas if the token has schemas:read."
 				copyLabel="Copy the example"
 			/>
 		</div>
@@ -550,7 +550,7 @@
 		{#if log.error}
 			<Alert tone="danger">{log.error}</Alert>
 		{:else if log.rows.length === 0}
-			<EmptyState title="No requests yet" description="Every call made with this token is listed here, refusals included." />
+			<EmptyState title="No requests yet" description="Calls made with this token appear here, including refused ones." />
 		{:else}
 			<div class="flex flex-col gap-3">
 				<Table label="Requests made with this token">

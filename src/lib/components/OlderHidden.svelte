@@ -40,8 +40,8 @@
 		{label}
 	</p>
 	<p>
-		This instance reads {span} of them. The older ones are kept and are not enabled for reading on
-		this instance.
+		You can read {span} of them. The older ones are still stored, and your license does not include
+		reading them.
 	</p>
 	{#if children}
 		<div>{@render children()}</div>

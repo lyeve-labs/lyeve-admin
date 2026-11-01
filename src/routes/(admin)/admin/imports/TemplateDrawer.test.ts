@@ -75,7 +75,7 @@ describe('TemplateDrawer', () => {
 		const { component, getByLabelText, getByRole } = setup();
 		flushSync(() => component.edit(null));
 		await fireEvent.input(getByLabelText('Column in the file'), { target: { value: 'Ref' } });
-		expect(templateForm()?.textContent).toContain('Every row names a column in the file and the field it fills.');
+		expect(templateForm()?.textContent).toContain('Give every row a column in the file and the field it fills.');
 		expect((getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
@@ -97,7 +97,7 @@ describe('TemplateDrawer', () => {
 	it('says why it offers no content type when the list was not read', () => {
 		const { component } = setup({ schemas: null });
 		flushSync(() => component.edit(null));
-		expect(templateForm()?.textContent).toContain('The content types could not be read');
+		expect(templateForm()?.textContent).toContain('Could not load content types');
 	});
 
 	it('closes on success and stays open on a failure', async () => {

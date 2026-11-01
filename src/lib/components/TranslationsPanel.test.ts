@@ -114,7 +114,7 @@ describe('TranslationsPanel', () => {
 
 	it('says so when the plugin is entitled and not answering', () => {
 		mount([], { unavailable: true });
-		expect(screen.getByText('The localization plugin did not answer')).toBeTruthy();
+		expect(screen.getByText('Could not load translations')).toBeTruthy();
 		expect(screen.queryByRole('tab')).toBeNull();
 	});
 });
@@ -160,16 +160,16 @@ describe('TranslationsPanel progress and fallback', () => {
 	// while somebody is looking at it.
 	it('says an empty field falls through to the source', () => {
 		const { container } = panel();
-		expect(container.textContent).toContain('gets the source');
+		expect(container.textContent).toContain('see the source while this is empty');
 	});
 
 	it('says a new translation saves the source title as it is now when its title is empty', () => {
 		const { container } = panel();
 		const hint = container.querySelector('[data-field-name="title"]')?.textContent ?? '';
 		expect(hint).toContain(
-			'A new translation needs a title. Left empty, it saves the source title as it is now, and later changes to the source do not reach it.',
+			'A new translation needs a title. If you leave it empty, it copies the current source title, and later changes to the source do not update it.',
 		);
-		expect(hint).not.toContain('gets the source');
+		expect(hint).not.toContain('see the source while this is empty');
 	});
 
 	it('says a saved title stays, and an empty field reads from the source, once the locale has a translation', async () => {
@@ -182,11 +182,11 @@ describe('TranslationsPanel progress and fallback', () => {
 		});
 		await fireEvent.input(document.getElementById('translation-fr-title') as HTMLInputElement, { target: { value: '' } });
 		expect(container.querySelector('[data-field-name="title"]')?.textContent).toContain(
-			'Left empty, the title saved for fr stays as it is.',
+			'If you leave it empty, the title saved for fr stays as it is.',
 		);
 		// The reader of fr gets the fr row, so an empty body comes from the source, not from es.
 		const body = container.querySelector('[data-field-name="body"]')?.textContent ?? '';
-		expect(body).toContain('gets the source');
+		expect(body).toContain('see the source while this is empty');
 		expect(body).not.toContain('in es');
 	});
 

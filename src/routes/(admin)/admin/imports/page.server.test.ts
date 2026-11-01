@@ -202,7 +202,7 @@ describe('canceling an import', () => {
 		api.cancelJob.mockRejectedValue(new ApiError(503, 'pq: down'));
 		expect(((await actions.cancel(formEvent({ id: 'j1' }))) as Failure).data).toEqual({
 			action: 'cancel',
-			error: 'The import could not be canceled.',
+			error: 'Could not cancel the import. Try again.',
 		});
 	});
 

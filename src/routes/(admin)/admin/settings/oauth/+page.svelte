@@ -68,7 +68,7 @@
 	function deleteProvider(name: string): SubmitFunction {
 		return confirmed(
 			`Delete provider ${providerLabel(name)}?`,
-			'Everyone who signs in through it loses that way in.',
+			'People who sign in through it can no longer sign in this way.',
 			{ confirmLabel: 'Delete provider', success: `Deleted ${providerLabel(name)}` },
 		);
 	}
@@ -126,7 +126,7 @@
 
 <PageShell
 	title="OAuth providers"
-	description="External OpenID Connect and OAuth 2.0 providers people can sign in with."
+	description="Set up the OpenID Connect and OAuth 2.0 providers people can sign in with."
 	width="wide"
 >
 	{#snippet actions()}
@@ -149,10 +149,10 @@
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Providers</SectionHeading>
 		{#if !data.providers.ok}
-			<GateNotice gate={data.providers.gate} title="OAuth providers" absent="This engine does not serve OAuth sign-in." />
+			<GateNotice gate={data.providers.gate} title="OAuth providers" absent="OAuth sign-in is not included in this build." />
 		{:else if providers.length === 0}
 			<EmptyState
-				title="No OAuth providers configured"
+				title="No OAuth providers yet"
 				description="Add an OpenID Connect provider to offer single sign-on on the login page."
 			>
 				{#snippet iconSnippet()}
@@ -174,8 +174,8 @@
 
 			{#if visible.length === 0}
 				<EmptyState
-					title="No provider matches"
-					description="Nothing here is named or points at what you searched for."
+					title="No providers match this search"
+					description="The search covers each provider's name, issuer and client ID."
 				/>
 			{:else}
 				<Table label="Providers">

@@ -66,7 +66,7 @@
 
 <PageShell
 	title="Observability"
-	description="Pool health, goroutines and the engine's own instrumentation."
+	description="Check connection pool health, goroutines and endpoint latency."
 	width="wide"
 >
 	{#snippet actions()}
@@ -98,7 +98,7 @@
 			<GateNotice
 				gate={data.poolHealth.gate}
 				title="the pool health"
-				absent="This engine does not report pool health."
+				absent="Pool health is not included in this build."
 			/>
 		{:else if pool?.engine}
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-7" data-testid="pool-stats">
@@ -119,7 +119,7 @@
 			</div>
 			{#if pool.errors && pool.errors.length > 0}
 				<div class="mt-3">
-					<Alert tone="danger" title="Pool reported errors">
+					<Alert tone="danger" title="Pool errors">
 						<ul class="flex flex-col gap-1">
 							{#each pool.errors as err (err)}
 								<li>{err}</li>
@@ -132,7 +132,7 @@
 			<EmptyState
 				iconSnippet={noPoolHealth}
 				title="Pool health unavailable"
-				description="The engine did not answer with pool statistics. The pooler may not be configured on this deployment."
+				description="No pool statistics were returned. This deployment may not have a connection pooler configured."
 			/>
 		{/if}
 	</Card>
@@ -163,13 +163,13 @@
 			<GateNotice
 				gate={data.latency.gate}
 				title="the latency rankings"
-				absent="This engine does not time its endpoints."
+				absent="Latency rankings are not included in this build."
 			/>
 		{:else if data.latency.value.slowest.length === 0}
 			<EmptyState
 				iconSnippet={noLatency}
 				title="No latency data yet"
-				description="Endpoints appear here once the engine has timed some requests."
+				description="Endpoints appear here after they serve requests."
 			/>
 		{:else}
 			<Table label="Latency rankings">

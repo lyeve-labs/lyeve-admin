@@ -130,7 +130,7 @@ describe('the gate sorts a refusal by what it means', () => {
 	// outcome a monitoring page can produce.
 	it('never reports a failed read as everything passing', () => {
 		const gate = syntheticGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that everything is passing');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load probes.');
 	});
 });
 
@@ -205,10 +205,10 @@ describe('a run now', () => {
 
 	it('says where the results of a run still going appear', () => {
 		expect(runGoingOnText('Homepage', false)).toBe(
-			'Homepage is still running. Its results appear in the list when it ends.',
+			'Homepage is still running. Its results appear in the list when it finishes.',
 		);
 		expect(runGoingOnText('Homepage', true)).toBe(
-			'A run of Homepage is already going. Its results appear in the list when it ends.',
+			'Homepage is already running. Its results appear in the list when it finishes.',
 		);
 	});
 });
@@ -226,9 +226,9 @@ describe('the probe limits', () => {
 
 	it('puts the floor in the hint only when it is known', () => {
 		expect(intervalHint({ probes: { limit: 0, current: 0 }, minIntervalSeconds: 15 })).toBe(
-			'At least 15. A probe is this instance calling itself.',
+			'At least 15. Each probe sends a request to this instance.',
 		);
-		expect(intervalHint(null)).toBe('A probe is this instance calling itself.');
+		expect(intervalHint(null)).toBe('Each probe sends a request to this instance.');
 	});
 });
 

@@ -40,7 +40,7 @@ export const IDEMPOTENCY_OK: IdempotencyGate = GATE_OK;
 
 /** What a refused idempotency read means, read the way every plugin's is. */
 export function idempotencyGate(err: unknown): IdempotencyGate {
-	return gateOf(err, 'The keys could not be read. This is not a report that none are held.');
+	return gateOf(err, 'Could not load idempotency keys.');
 }
 
 export async function readStats(client: HttpClient): Promise<IdempotencyStats> {

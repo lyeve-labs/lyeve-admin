@@ -99,8 +99,8 @@
 	function deleteDestination(p: Provider): SubmitFunction {
 		return confirmed(
 			`Delete ${p.name}?`,
-			'Events stop going to it, and its queued deliveries go with it.',
-			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
+			'Events stop going to this destination, and its queued deliveries are deleted. This cannot be undone.',
+			{ confirmLabel: 'Delete', success: 'Destination deleted.' },
 		);
 	}
 
@@ -108,8 +108,8 @@
 		await update();
 		if (result.type !== 'success') return;
 		const out = result.data as { delivered?: boolean; lastError?: string } | undefined;
-		if (out?.delivered) toast.success('Delivered');
-		else toast.error(out?.lastError ? `Failed again: ${out.lastError}` : 'Failed again');
+		if (out?.delivered) toast.success('Delivery sent.');
+		else toast.error(out?.lastError ? `The delivery failed again: ${out.lastError}` : 'The delivery failed again.');
 	};
 
 	// A webhook's signing secret arrives once, in the answer to the write
@@ -124,7 +124,7 @@
 
 <PageShell
 	title="Analytics destinations"
-	description="Where this tenant's tracked events are sent, and the deliveries a destination has not accepted yet."
+	description="Send this tenant's tracked events to other services, and see the deliveries a destination has not accepted yet."
 	width="wide"
 >
 	{#snippet actions()}
@@ -140,7 +140,7 @@
 			level={2}
 			gate={data.gate}
 			title="Analytics destinations"
-			absent="The analytics plugin is not part of this build, so events are not sent anywhere."
+			absent="Analytics destinations are not included in this build."
 		/>
 	{:else}
 		{#if !inDrawer}
@@ -151,8 +151,8 @@
 			<SectionHeading level={2}>Destinations</SectionHeading>
 			{#if data.providers.length === 0}
 				<EmptyState
-					title="No destination yet"
-					description="Each tracked event goes to every destination that is on, once, and a failed delivery waits in the queue below."
+					title="No destinations yet"
+					description="Create a destination to send tracked events to another service. Each event goes once to every destination that is on."
 				>
 					{#snippet iconSnippet()}<Share2 size={ICON.lg} />{/snippet}
 					{#snippet action()}
@@ -204,8 +204,8 @@
 		<section class="flex flex-col gap-4" aria-label="Deliveries">
 			<SectionHeading level={2}>Deliveries owed</SectionHeading>
 			<p class="text-sm text-muted">
-				An event a destination refused waits here. A retrying one is tried again on its destination's policy,
-				and a failed one stays until it is sent again or ages out.
+				Events a destination refused wait here. A retrying delivery is tried again on its destination's retry policy.
+				A failed delivery stays until you send it again or it expires.
 			</p>
 			<ListToolbar label="Filter deliveries">
 				{#snippet filters()}
@@ -219,15 +219,15 @@
 			{/if}
 			{#if data.deliveries === null}
 				<GateNotice
-					gate={data.deliveriesGate ?? { state: 'error', message: 'The deliveries could not be read. This is not a report that every event arrived.' }}
+					gate={data.deliveriesGate ?? { state: 'error', message: 'Could not load deliveries.' }}
 					title="the deliveries"
-					absent="This version of the analytics plugin does not list the deliveries it owes."
+					absent="The delivery queue needs a newer version of the analytics plugin."
 				/>
 			{:else if data.deliveries.data.length === 0}
 				<EmptyState
-					title="Nothing is owed"
+					title="No deliveries owed"
 					description={data.status
-						? 'No delivery has this status. Widen the filter to see the rest.'
+						? 'No deliveries have this status. Choose All to see the rest.'
 						: 'Every destination has accepted every event sent to it.'}
 				>
 					{#snippet iconSnippet()}<Inbox size={ICON.lg} />{/snippet}
@@ -281,8 +281,8 @@
 				</Table>
 				{#if data.moreDeliveries}
 					<p class="text-xs text-muted" data-testid="more-deliveries">
-						The {data.deliveryLimit} newest are listed and more are owed. The plugin lists no older ones, so
-						filter by status to see a different set.
+						Showing the {data.deliveryLimit} newest deliveries. More are owed, but older ones are not listed.
+						Filter by status to see a different set.
 					</p>
 				{/if}
 			{/if}
@@ -305,15 +305,15 @@
 		{/if}
 		<div>
 			<input type="hidden" name="enabled" value={enabled ? 'true' : 'false'} />
-			<Toggle id="destination-enabled" label="On" hint="An off destination is kept and receives nothing." bind:checked={enabled} />
+			<Toggle id="destination-enabled" label="On" hint="When on, this destination receives tracked events. Turn it off to pause it without deleting it." bind:checked={enabled} />
 		</div>
 
 		<fieldset class="flex flex-col gap-4 border-t border-line pt-4">
 			<legend class="text-sm font-medium text-fg">Settings</legend>
 			{#if editing}
 				<p class="text-xs text-muted">
-					The stored settings are never shown. Leave every field empty to keep them, or fill them in to replace
-					all of them. A replacement also returns any setting this form does not show, such as a timeout set
+					Saved settings are never shown. Leave every field empty to keep them, or fill them in to replace
+					all of them. Replacing them also resets any setting this form does not show, such as a timeout set
 					through the API, to its default.
 				</p>
 			{/if}
@@ -344,7 +344,7 @@
 				<Checkbox
 					id="destination-rotate"
 					label="Make a new signing secret"
-					description="The old one stops verifying at once. The new one is shown once after you save."
+					description="Events are signed with the new secret immediately. It is shown once after you save."
 					bind:checked={rotate}
 				/>
 			{/if}
@@ -354,14 +354,14 @@
 			<legend class="text-sm font-medium text-fg">Retries</legend>
 			{#if retryLocked}
 				<NotEnabled compact title="A retry policy" />
-				<p class="text-xs text-muted">Each event gets one attempt, and a failed one waits in the queue.</p>
+				<p class="text-xs text-muted">Without it, each event is sent once and a failed delivery waits in the queue.</p>
 			{/if}
 			<div class="grid gap-4 sm:grid-cols-2">
 				<NumberInput
 					id="destination-attempts"
 					name="max_attempts"
 					label="Attempts"
-					hint="Counts the first, so 1 never retries."
+					hint="Includes the first attempt. 1 means no retries."
 					min={1}
 					max={MAX_ATTEMPTS}
 					step={1}

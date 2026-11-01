@@ -52,10 +52,10 @@ function isRefused(err: unknown): boolean {
 	return err instanceof ApiError && err.status === 402;
 }
 
-const REFUSED = { error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true };
+const REFUSED = { error: 'Datasources are not enabled on this instance.', refused: true };
 
 /** The plugin's name rule, in words a reader can act on. */
-const NAME_RULE = 'A name starts with a lower case letter and holds up to 40 lower case letters, digits, dashes and underscores.';
+const NAME_RULE = 'Start the name with a lower case letter, and use up to 40 lower case letters, digits, dashes and underscores.';
 
 /**
  * A save the plugin refused as invalid. The 422 body is a list of problems
@@ -69,7 +69,7 @@ function invalidFailure(err: unknown) {
 	const errors = validationErrors(err.message);
 	const nameError = errors.some((e) => e.path === '/name') ? NAME_RULE : '';
 	const rest = errors.filter((e) => e.path !== '/name').map((e) => e.message);
-	const error = [nameError, ...rest].filter(Boolean).join(' ') || 'The plugin refused the datasource as invalid.';
+	const error = [nameError, ...rest].filter(Boolean).join(' ') || 'Check the datasource settings and try again.';
 	return fail(422, { action: 'save', error, nameError });
 }
 
@@ -102,10 +102,10 @@ function bodyFrom(data: FormData): DatasourceBody | string {
 		config.ssl = ssl;
 		const password = text(data, 'password');
 		if (password) secret.password = password;
-		if (!config.host || !config.database) return 'Host and database are required.';
+		if (!config.host || !config.database) return 'Enter a host and a database.';
 	} else if (kind === 'http') {
 		config.base_url = text(data, 'base_url');
-		if (!config.base_url) return 'A base URL is required.';
+		if (!config.base_url) return 'Enter a base URL.';
 		const chatId = text(data, 'chat_id');
 		if (chatId) config.chat_id = chatId;
 		const keys = data.getAll('header_key').map(String);
@@ -158,7 +158,7 @@ export const actions: Actions = {
 			await createDatasource(client, body);
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
-			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Failed to create datasource') });
+			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Could not create the datasource. Try again.') });
 		}
 	},
 
@@ -173,7 +173,7 @@ export const actions: Actions = {
 			await updateDatasource(client, id, body);
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
-			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Failed to update datasource') });
+			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Could not save the datasource. Try again.') });
 		}
 	},
 
@@ -184,7 +184,7 @@ export const actions: Actions = {
 		try {
 			await deleteDatasource(client, text(data, 'id'));
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete datasource') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the datasource. Try again.') });
 		}
 	},
 
@@ -198,7 +198,7 @@ export const actions: Actions = {
 			return { testResult: { id, ...result } };
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'test' });
-			return fail(400, { action: 'test', error: actionError(err, 'Failed to test datasource') });
+			return fail(400, { action: 'test', error: actionError(err, 'Could not test the datasource. Try again.') });
 		}
 	},
 };

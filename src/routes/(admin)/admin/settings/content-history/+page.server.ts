@@ -28,12 +28,12 @@ export const load: PageServerLoad = async (event) => {
 	const [settings, usage, schemas] = await Promise.all([
 		section(
 			readHistorySettings(client),
-			'The content history settings could not be read. This is not a report that history is off.',
+			'Could not load content history settings.',
 		),
-		section(readHistoryUsage(client), 'What content history stores could not be read. This is not a report that it stores nothing.'),
+		section(readHistoryUsage(client), 'Could not load content history storage.'),
 		section(
 			getSchemas(client).then((rows) => rows.map((s) => ({ name: s.name, label: s.display_name || s.name }))),
-			'The content types could not be read, so the types that keep history cannot be chosen.',
+			'Could not load content types.',
 		),
 	]);
 	return { settings, usage, schemas, readsOlder: readsOlderVersions(entitlements) };
@@ -104,10 +104,10 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 409) {
 				return fail(409, {
 					action: 'save',
-					error: "The server's environment now fixes a setting this form changed. Nothing was saved. Reload the page to see the values in force.",
+					error: 'An environment variable now sets one of the settings you changed. Nothing was saved. Reload the page to see the current values.',
 				});
 			}
-			const failed = actionFailure(err, 'The content history settings could not be saved. Nothing was changed.');
+			const failed = actionFailure(err, 'Could not save content history settings. Try again.');
 			return fail(failed.status, { action: 'save', ...failed.data });
 		}
 	},
@@ -118,7 +118,7 @@ export const actions: Actions = {
 			const pruned = await pruneHistory(authedClient(event));
 			return { action: 'prune', pruned };
 		} catch (err) {
-			const failed = actionFailure(err, 'Retention could not run. Nothing was removed.');
+			const failed = actionFailure(err, 'Could not run retention. Nothing was removed. Try again.');
 			return fail(failed.status, { action: 'prune', ...failed.data });
 		}
 	},
@@ -126,12 +126,12 @@ export const actions: Actions = {
 	deleteType: async (event) => {
 		await requireRole(event, EDITORS);
 		const schema = String((await event.request.formData()).get('schema') ?? '').trim();
-		if (!schema) return fail(400, { action: 'deleteType', error: 'Choose the content type whose history to delete.' });
+		if (!schema) return fail(400, { action: 'deleteType', error: 'Choose a content type first.' });
 		try {
 			const { commits, held } = await deleteTypeHistory(authedClient(event), schema);
 			return { action: 'deleteType', deleted: schema, commits, held };
 		} catch (err) {
-			const failed = actionFailure(err, 'The history could not be deleted. Nothing was removed.');
+			const failed = actionFailure(err, 'Could not delete the history. Nothing was removed. Try again.');
 			return fail(failed.status, { action: 'deleteType', ...failed.data });
 		}
 	},

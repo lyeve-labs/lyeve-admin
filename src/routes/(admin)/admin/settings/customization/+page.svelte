@@ -90,7 +90,7 @@
 		const notes: string[] = [];
 		if (preview.light.adjusted) notes.push(`darkened to ${preview.light.base} on the light theme`);
 		if (preview.dark.adjusted) notes.push(`lightened to ${preview.dark.base} on the dark theme`);
-		return notes.length ? `Hard to read as chosen, so it is ${notes.join(' and ')}.` : '';
+		return notes.length ? `This color is hard to read as chosen, so it is ${notes.join(' and ')}.` : '';
 	});
 
 	const navOptions = $derived(
@@ -163,7 +163,7 @@
 
 <PageShell
 	title="Customization"
-	description="How this tenant's admin looks and what it offers: its name, logo, tab icon and colors, its dashboard, its menu, and pages of its own."
+	description="Set this tenant's name, logo, tab icon, colors, dashboard, menu and pages."
 	width="wide"
 >
 	{#snippet actions()}
@@ -175,13 +175,13 @@
 			level={2}
 			gate={data.gate}
 			title="Customization"
-			absent="The multitenant plugin does not serve customization on this instance."
+			absent="Customization is not included in this build."
 		/>
 	{:else if !data.entitled}
 		<NotEnabled
 			level={2}
 			title="Customization"
-			description="Give each tenant its own name, logo and colors, a dashboard and a menu shaped to what its team uses, and pages built for that team."
+			description="Give each tenant its own name, logo, colors, dashboard, menu and pages."
 		/>
 	{:else}
 		<!-- Every form on this page stacks the same way: label, control, hint,
@@ -197,7 +197,7 @@
 					{#if form?.brandError}
 						<Alert tone="danger">{form.brandError}</Alert>
 					{:else if form && 'brandSaved' in form}
-						<Alert tone="success" autoDismiss>Saved. Every page of this tenant's admin now carries it.</Alert>
+						<Alert tone="success" autoDismiss>Brand saved. Every page of this tenant's admin now uses it.</Alert>
 					{/if}
 					<Input id="brand-name" name="name" label="Name" hint="Replaces the product name in the sidebar, on the sign-in pages and in every tab title." bind:value={name} />
 					<div class="flex flex-col gap-2">
@@ -207,8 +207,8 @@
 							label="Accent color"
 							mono
 							placeholder="#0a7cff"
-							hint={accentNote || 'Written #RRGGBB. Buttons, links and highlights take it, adjusted per theme when needed to stay readable.'}
-							error={accent && accentOk === null ? 'Written #RRGGBB' : undefined}
+							hint={accentNote || 'Use the format #RRGGBB. Buttons, links and highlights use this color, adjusted per theme when needed to stay readable.'}
+							error={accent && accentOk === null ? 'Use the format #RRGGBB' : undefined}
 							bind:value={accent}
 						/>
 						{#if preview}
@@ -247,21 +247,21 @@
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted" data-testid="dashboard-state">
 						{#if data.dashboard?.custom}
-							The tenant opens on its own dashboard of {data.dashboard.widgets.length}
+							This tenant uses its own dashboard of {data.dashboard.widgets.length}
 							{data.dashboard.widgets.length === 1 ? 'widget' : 'widgets'}{#if data.dashboard.updated_at}, saved {formatDateTime(data.dashboard.updated_at)}{/if}.
 						{:else if data.dashboard}
-							The tenant opens on the stock dashboard. Compose one from widgets over its content, activity, media and API usage.
+							This tenant uses the stock dashboard. Build your own from widgets for content, activity, media and API usage.
 						{:else}
-							The dashboard layout could not be read.
+							Could not load the dashboard layout. Reload the page to try again.
 						{/if}
 					</p>
 					{#if form?.pagesError}
 						<Alert tone="danger">{form.pagesError}</Alert>
 					{:else if form && 'homeSaved' in form}
-						<Alert tone="success" autoDismiss>The dashboard follows it now.</Alert>
+						<Alert tone="success" autoDismiss>Dashboard page saved.</Alert>
 					{/if}
 					{#if data.pages.length === 0}
-						<p class="text-sm text-muted">A page of this tenant's own can also lead the dashboard. Build one under Pages first.</p>
+						<p class="text-sm text-muted">You can show one of this tenant's pages above the dashboard. Create one under Pages first.</p>
 					{:else}
 						<form method="POST" action="?/home" class="flex flex-col gap-4" use:enhance={keep}>
 							<input type="hidden" name="home_page" value={homePage} />
@@ -295,7 +295,7 @@
 					<Alert tone="danger">{form.pageDeleteError}</Alert>
 				{/if}
 				{#if data.pages.length === 0}
-					<EmptyState title="No pages yet" description="Build a page for the team from text, callouts, content lists, counts and links. It gets its own entry in the menu.">
+					<EmptyState title="No pages yet" description="Create a page from text, callouts, content lists, counts and links. Each page gets its own menu entry.">
 						{#snippet action()}
 							<Button variant="secondary" onclick={openPage}>
 								<Plus size={ICON.sm} /> New page
@@ -324,7 +324,7 @@
 											<Button variant="ghost" size="sm" href="/admin/settings/customization/pages/{p.slug}" aria-label="Edit {p.title}">
 												<Pencil size={ICON.sm} />
 											</Button>
-											<form method="POST" action="?/deletePage" use:enhance={confirmRemove(p.title, 'Its menu entry goes with it, and the dashboard stops showing it.')}>
+											<form method="POST" action="?/deletePage" use:enhance={confirmRemove(p.title, 'Its menu entry is removed too, and the dashboard stops showing it.')}>
 												<input type="hidden" name="slug" value={p.slug} />
 												<Button variant="ghost" size="sm" type="submit" aria-label="Delete {p.title}">
 													<Trash2 size={ICON.sm} class="text-danger" />
@@ -348,7 +348,7 @@
 				{#if form?.menuError}
 					<Alert tone="danger">{form.menuError}</Alert>
 				{:else if form && 'menuSaved' in form}
-					<Alert tone="success" autoDismiss>Saved.</Alert>
+					<Alert tone="success" autoDismiss>Menu saved.</Alert>
 				{/if}
 				<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
 					<!-- The menu holds dozens of entries, so each list is searched
@@ -358,7 +358,7 @@
 						id="menu-hidden"
 						label="Hidden"
 						placeholder="Nothing hidden"
-						hint="Entries this tenant's team never uses. Hiding one takes it off the menu only. The page stays guarded by its own access rules."
+						hint="Hide entries this tenant's team does not use. Hiding removes the entry from the menu only, and the page keeps its own access rules."
 						searchable
 						options={navOptions}
 						bind:value={hidden}
@@ -393,7 +393,7 @@
 				</div>
 			{/snippet}
 			{#if data.settings.menu.links.length === 0}
-				<p class="text-sm text-muted">No links yet. A link puts the team's own tools in the menu: a status page, a wiki, a report.</p>
+				<p class="text-sm text-muted">No links yet. Create a link to put your team's own tools in the menu, such as a status page or a wiki.</p>
 			{:else}
 				<ul class="flex flex-col divide-y divide-line">
 					{#each data.settings.menu.links as link, i (i)}
@@ -405,7 +405,7 @@
 							</span>
 							<span class="flex shrink-0 items-center gap-2">
 								{#if !link.url.startsWith('/admin/')}<ExternalLink size={ICON.sm} class="text-faint" aria-hidden="true" />{/if}
-								<form method="POST" action="?/removeLink" use:enhance={confirmRemove(link.label, 'It leaves the menu for everyone in this tenant.')}>
+								<form method="POST" action="?/removeLink" use:enhance={confirmRemove(link.label, 'It is removed from the menu for everyone in this tenant.')}>
 									<input type="hidden" name="index" value={i} />
 									<Button variant="ghost" size="sm" type="submit" aria-label="Delete {link.label}">
 										<Trash2 size={ICON.sm} class="text-danger" />

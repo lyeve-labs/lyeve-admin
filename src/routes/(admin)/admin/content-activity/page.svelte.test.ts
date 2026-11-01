@@ -88,7 +88,7 @@ describe('content activity', () => {
 
 	it('says an older engine does not record activity, instead of failing', () => {
 		const { container } = render(Page, { props: props({ activity: { ok: false, gate: { state: 'absent' } }, total: null }) });
-		expect(said(container)).toContain('This engine does not record content activity.');
+		expect(said(container)).toContain('Content activity needs a newer version of the engine.');
 		expect(container.querySelector('table')).toBeNull();
 	});
 
@@ -96,7 +96,7 @@ describe('content activity', () => {
 		const { container } = render(Page, {
 			props: props({ activity: { ok: false, gate: { state: 'unavailable' } }, total: null }),
 		});
-		expect(said(container)).toContain('did not answer');
+		expect(said(container)).toContain('is unavailable');
 		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin/content-activity');
 		expect(said(container)).not.toContain('No content changes yet');
 	});

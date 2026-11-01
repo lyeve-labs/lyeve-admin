@@ -60,13 +60,13 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			platform = await getPlatformMetrics(client);
 		} catch (err) {
-			platformGate = gateOf(err, 'The per-tenant roster could not be read. The counters above are unaffected.');
+			platformGate = gateOf(err, 'Could not load connections by tenant.');
 		}
 	}
 
 	// Each transport that did not answer keeps the reason, so the page reports
 	// it beside the other rather than calling it a transport nobody uses.
-	const failed = (what: string) => `The ${what} counters could not be read. This is not a report that nobody is connected.`;
+	const failed = (what: string) => `Could not load the ${what} counters.`;
 	const streamGate =
 		gate.state === 'ok' && streamRes.status === 'rejected' ? gateOf(streamRes.reason, failed('server-sent events')) : null;
 	const socketGate =

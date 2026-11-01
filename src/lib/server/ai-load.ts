@@ -21,8 +21,7 @@ export { AI_OK, type AiGate };
 
 /** The static engine banner for one resource, named in the plural. */
 export function aiBanner(plural: string): string {
-	const Plural = plural.charAt(0).toUpperCase() + plural.slice(1);
-	return `${Plural} could not be read from the engine. This is not a report that there are none.`;
+	return `Could not load ${plural}.`;
 }
 
 export function aiGate(err: unknown, session: SessionEvent, plural: string): AiGate {
@@ -103,7 +102,7 @@ export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRol
 			return msg;
 		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';
-		if (noProvider(err)) return 'No enabled AI provider can answer this. Add or enable a provider first.';
+		if (noProvider(err)) return 'No AI provider is enabled. Add or enable one first.';
 		if (err.status === 409) return 'No configured provider supports this operation.';
 		if (err.status >= 400 && err.status < 500) {
 			const msg = err.message?.trim();

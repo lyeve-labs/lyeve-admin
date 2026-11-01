@@ -208,7 +208,7 @@ describe('configuration save', () => {
 
 		expect(result.status).toBe(502);
 		expect(result.data.error).not.toContain('sys_config');
-		expect(result.data.error).toBe('The setting could not be saved. Nothing was changed.');
+		expect(result.data.error).toBe('Could not save the setting. Try again.');
 	});
 
 	it('relays a refusal written for the operator', async () => {

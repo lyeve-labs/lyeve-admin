@@ -27,7 +27,7 @@ export const load: PageServerLoad = async (event) => {
 	const { url, parent } = event;
 	const { user, plugins } = await parent();
 	if (!user.roles.includes('super_admin')) {
-		error(403, 'Requires super_admin role');
+		error(403, 'Only a super admin can open this page.');
 	}
 
 	const client = authedClient(event);
@@ -45,7 +45,7 @@ export const load: PageServerLoad = async (event) => {
 	const [rows, tenants] = await Promise.all([
 		section(
 			client.get<ListedUser[]>(`/api/admin/users?limit=${limit + 1}&offset=${offset}`),
-			'The accounts could not be read. This is not a report that there are none.'
+			'Could not load the accounts.'
 		),
 		// An account belongs to one tenant. With several, the engine cannot
 		// tell which one a new account is for unless the form names it.
@@ -53,7 +53,7 @@ export const load: PageServerLoad = async (event) => {
 			? Promise.resolve<Section<Tenant[]>>({ ok: true, value: [] })
 			: section(
 					listTenants(client, 500, 0).then((r) => (Array.isArray(r?.items) ? r.items : [])),
-					'The tenants could not be read, so this form cannot name the tenant a new account belongs to.'
+					'Could not load the tenants.'
 				),
 	]);
 	const page = rows.ok && Array.isArray(rows.value) ? rows.value : [];
@@ -125,7 +125,7 @@ export const actions: Actions = {
 					fields: { password: actionError(err, 'The password does not meet the policy') },
 				});
 			}
-			return fail(400, { action: 'create', error: actionError(err, 'Failed to create user') });
+			return fail(400, { action: 'create', error: actionError(err, 'Could not create the user. Try again.') });
 		}
 	},
 
@@ -148,7 +148,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const full = seatRefusal(err);
 			if (full) return fail(402, { action: 'updateRoles', error: refusalText(full), refused: full });
-			return fail(400, { action: 'updateRoles', error: actionError(err, 'Failed to update roles') });
+			return fail(400, { action: 'updateRoles', error: actionError(err, 'Could not save the roles. Try again.') });
 		}
 	},
 
@@ -162,7 +162,7 @@ export const actions: Actions = {
 			await deleteUser(id, client);
 			return { ok: true };
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete user') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the user. Try again.') });
 		}
 	},
 
@@ -201,7 +201,7 @@ export const actions: Actions = {
 					fields: { new_password: actionError(err, 'The password does not meet the policy') },
 				});
 			}
-			return fail(400, { action: 'setPassword', error: actionError(err, 'Failed to set password') });
+			return fail(400, { action: 'setPassword', error: actionError(err, 'Could not set the password. Try again.') });
 		}
 	},
 };

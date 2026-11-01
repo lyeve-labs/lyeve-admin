@@ -86,8 +86,8 @@ describe('switching and deleting a persisted query', () => {
 	});
 
 	it('names nothing to switch or delete without a query', async () => {
-		expect(await actions.toggle(post(''))).toMatchObject({ status: 400, data: { action: 'toggle', error: 'Choose a query.' } });
-		expect(await actions.delete(post(''))).toMatchObject({ status: 400, data: { action: 'delete', error: 'Choose a query.' } });
+		expect(await actions.toggle(post(''))).toMatchObject({ status: 400, data: { action: 'toggle', error: 'This form is missing its query. Reload the page and try again.' } });
+		expect(await actions.delete(post(''))).toMatchObject({ status: 400, data: { action: 'delete', error: 'This form is missing its query. Reload the page and try again.' } });
 	});
 
 	it('relays the plugin refusal under its action', async () => {
@@ -100,8 +100,8 @@ describe('switching and deleting a persisted query', () => {
 	it('keeps an outage body off the page', async () => {
 		togglePersisted.mockRejectedValue(new ApiError(503, 'dial tcp: connection refused'));
 		deletePersisted.mockRejectedValue(new ApiError(503, 'dial tcp: connection refused'));
-		expect(await actions.toggle(post('abc'))).toMatchObject({ data: { error: 'The query could not be switched.' } });
-		expect(await actions.delete(post('abc'))).toMatchObject({ data: { error: 'The query could not be deleted.' } });
+		expect(await actions.toggle(post('abc'))).toMatchObject({ data: { error: 'Could not enable or disable the query. Try again.' } });
+		expect(await actions.delete(post('abc'))).toMatchObject({ data: { error: 'Could not delete the query. Try again.' } });
 	});
 });
 

@@ -49,9 +49,9 @@ describe('Magic link verify page', () => {
 
 	it('states why a link was refused', () => {
 		const { container } = render(VerifyPage, {
-			props: props('abc', { error: 'This sign-in link is invalid or has expired. Request a new one.' }),
+			props: props('abc', { error: 'This sign-in link no longer works. Request a new one.' }),
 		});
 
-		expect(container.textContent).toContain('invalid or has expired');
+		expect(container.textContent).toContain('no longer works');
 	});
 });

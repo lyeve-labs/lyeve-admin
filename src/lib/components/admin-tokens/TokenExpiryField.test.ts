@@ -34,7 +34,7 @@ describe('TokenExpiryField', () => {
 		const out = sent();
 		expect(out.get('expiry')).toBe('custom');
 		expect(out.get('expires_at')).toBe('');
-		expect(screen.getByText(/The token stops working at the end of this day, your time/)).toBeTruthy();
+		expect(screen.getByText(/The token stops working at the end of this day, in your time zone/)).toBeTruthy();
 	});
 
 	it('shows the refusal the server gave for a preset', () => {

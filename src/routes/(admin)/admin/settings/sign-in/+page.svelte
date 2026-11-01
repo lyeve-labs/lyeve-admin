@@ -22,13 +22,13 @@
 
 	const save = tracked(() => async ({ result, update }) => {
 		await update({ reset: false });
-		if (result.type === 'success') toast.success('Saved the sign-in window');
+		if (result.type === 'success') toast.success('Sign-in window saved.');
 	});
 </script>
 
 <PageShell
 	title="Sign-in"
-	description="How accounts your identity provider created may sign in when they do not go through it."
+	description="Choose how long accounts from your identity provider can sign in without it."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -37,7 +37,7 @@
 			level={2}
 			gate={data.gate}
 			title="Sign-in"
-			absent="This engine does not serve the sign-in window. It arrives with an engine upgrade."
+			absent="The sign-in window needs a newer version of the engine."
 		/>
 	{:else}
 		<FormErrors message={formError} refused={refusal} />
@@ -46,9 +46,9 @@
 			<SectionHeading level={2}>Without the identity provider</SectionHeading>
 			<p class="text-sm text-muted">
 				An account your identity provider created can also sign in with a password, reset its password or ask for an
-				email link. It may do that only within this many days of its last sign-in through the provider. Removing
-				someone in your provider closes those ways in once the window passes. Provisioning through SCIM closes them at
-				once.
+				email link. It can do this only within this many days of its last sign-in through the provider. When you remove
+				someone in your provider, these options close once the window passes. With SCIM provisioning, they close
+				immediately.
 			</p>
 			<Card pad="md">
 				<form method="POST" action="?/save" use:enhance={save.enhance} class="flex flex-col gap-4">

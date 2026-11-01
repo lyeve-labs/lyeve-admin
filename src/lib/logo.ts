@@ -16,9 +16,9 @@ export const LOGO_MAX_BYTES = 500_000;
  * same files and passes its own noun.
  */
 export function logoProblem(file: { type: string; size: number }, noun = 'logo'): string | null {
-	if (!(LOGO_TYPES as readonly string[]).includes(file.type)) return `A ${noun} is a PNG, JPEG or WebP image.`;
+	if (!(LOGO_TYPES as readonly string[]).includes(file.type)) return `The ${noun} must be a PNG, JPEG or WebP image.`;
 	if (file.size === 0) return 'That file is empty.';
-	if (file.size > LOGO_MAX_BYTES) return `A ${noun} is at most 500 KB.`;
+	if (file.size > LOGO_MAX_BYTES) return `The ${noun} can be at most 500 KB.`;
 	return null;
 }
 

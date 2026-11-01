@@ -89,8 +89,8 @@ describe('the gate', () => {
 		const { container } = render(SamlPage, {
 			props: props({ gate: { state: 'absent' }, providers: [] }),
 		});
-		expect(said(container)).toContain('not part of this build');
-		expect(said(container)).not.toContain('No identity provider is configured');
+		expect(said(container)).toContain('not included in this build');
+		expect(said(container)).not.toContain('No identity providers yet');
 	});
 
 	it('reports a failed read as a failure, not as an empty list', () => {
@@ -98,7 +98,7 @@ describe('the gate', () => {
 			props: props({ gate: { state: 'error', message: 'The identity providers could not be read.' }, providers: [] }),
 		});
 		expect(said(container)).toContain('could not be read');
-		expect(said(container)).not.toContain('No identity provider is configured');
+		expect(said(container)).not.toContain('No identity providers yet');
 	});
 });
 
@@ -165,7 +165,7 @@ describe('links off the row', () => {
 describe('the empty state', () => {
 	it('says what a provider is for rather than that a read failed', () => {
 		const { container } = render(SamlPage, { props: props({ providers: [] }) });
-		expect(said(container)).toContain('No identity provider is configured');
+		expect(said(container)).toContain('No identity providers yet');
 		expect(said(container)).toContain('sign-in button on the login page');
 	});
 });
@@ -247,9 +247,9 @@ describe('the form', () => {
 
 	it('shows the action error where the form is', () => {
 		const { container } = render(SamlPage, {
-			props: props({}, { error: 'The provider could not be created.' }),
+			props: props({}, { error: 'Could not create the provider. Try again.' }),
 		});
-		expect(said(container)).toContain('The provider could not be created.');
+		expect(said(container)).toContain('Could not create the provider. Try again.');
 	});
 });
 
@@ -306,23 +306,23 @@ describe('the drawer', () => {
 	it('shows a refused save inside the open drawer', async () => {
 		const { rerender } = render(SamlPage, { props: props() });
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
-		await rerender(props({}, { action: 'create', error: 'The provider could not be created.' }));
-		expect(drawerText()).toContain('The provider could not be created.');
+		await rerender(props({}, { action: 'create', error: 'Could not create the provider. Try again.' }));
+		expect(drawerText()).toContain('Could not create the provider. Try again.');
 	});
 
 	it('leaves a newly opened create drawer clean after a failed delete', async () => {
 		const { container } = render(SamlPage, {
-			props: props({}, { action: 'delete', error: 'The provider could not be removed.' }),
+			props: props({}, { action: 'delete', error: 'Could not delete the provider. Try again.' }),
 		});
-		expect(said(container)).toContain('The provider could not be removed.');
+		expect(said(container)).toContain('Could not delete the provider. Try again.');
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
-		expect(drawerText()).not.toContain('could not be removed');
+		expect(drawerText()).not.toContain('Could not delete');
 	});
 
 	it('leaves a reopened drawer clean of the failure it showed before', async () => {
-		render(SamlPage, { props: props({}, { action: 'create', error: 'The provider could not be created.' }) });
+		render(SamlPage, { props: props({}, { action: 'create', error: 'Could not create the provider. Try again.' }) });
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New provider' })[0]);
-		expect(drawerText()).not.toContain('could not be created');
+		expect(drawerText()).not.toContain('Could not create');
 	});
 
 });
@@ -331,7 +331,7 @@ describe('the pager', () => {
 	it('stays when nothing on this page matches the search', async () => {
 		const { container } = render(SamlPage, { props: props({ total: 60, hasMore: true }) });
 		await fireEvent.input(screen.getByPlaceholderText('Search providers'), { target: { value: 'nothing like it' } });
-		expect(said(container)).toContain('No provider matches');
+		expect(said(container)).toContain('No providers match this search');
 		expect(container.querySelector('a[href="/admin/settings/saml?limit=25&offset=25"]')).toBeTruthy();
 	});
 });
@@ -339,7 +339,7 @@ describe('the pager', () => {
 describe('the delete', () => {
 	it('names the provider in the confirmation', async () => {
 		render(SamlPage, { props: props() });
-		expect(await deleteTitle()).toBe('Delete SAML provider Okta');
+		expect(await deleteTitle()).toBe('Delete SAML provider Okta?');
 	});
 });
 

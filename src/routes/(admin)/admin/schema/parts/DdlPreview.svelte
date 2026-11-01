@@ -43,7 +43,7 @@
 	</p>
 	{#if stmt.destructive}
 		<p class="mb-1 text-xs text-muted">
-			Drops data. The save queues it, and it runs only when a super admin applies it from History.
+			This statement drops data. Saving queues it, and it runs only when a super admin applies it from History.
 		</p>
 	{/if}
 {/snippet}
@@ -56,9 +56,9 @@
 			<Alert tone={change.drops.length + change.systemDrops.length > 0 ? 'danger' : 'warn'}>
 				{#snippet children()}
 					{#if rowsAtRisk === undefined}
-						How many rows {table ?? 'this table'} holds could not be read. Treat it as holding data.
+						Could not count the rows in {table ?? 'this table'}. Assume it has data.
 					{:else}
-						{table ?? 'This table'} holds {rowsAtRisk} {rowsAtRisk === 1 ? 'row' : 'rows'}.
+						{table ?? 'This table'} has {rowsAtRisk} {rowsAtRisk === 1 ? 'row' : 'rows'}.
 					{/if}
 					<ul class="mt-1 space-y-0.5">
 						{#each change.renames as r (r.from)}

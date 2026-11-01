@@ -88,7 +88,7 @@ describe('Events gate', () => {
 		const { container } = render(EventsPage, {
 			props: props({ gate: { state: 'absent' }, events: [] }),
 		});
-		expect(said(container)).toContain('not part of this build');
+		expect(said(container)).toContain('not included in this build');
 	});
 });
 
@@ -103,14 +103,14 @@ describe('Events replay', () => {
 
 	it('warns that a real replay cannot be taken back', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(said(container)).toContain('Nothing undoes that.');
+		expect(said(container)).toContain('This cannot be undone.');
 	});
 
 	it('says plainly that a rehearsal posted nothing', () => {
 		const { container } = render(EventsPage, {
 			props: props({}, { started: 'r9', dryRun: true }),
 		});
-		expect(said(container)).toContain('Rehearsed. Nothing was published.');
+		expect(said(container)).toContain('Rehearsal started. It publishes nothing');
 	});
 
 	// The plugin publishes a replay through the same path as a live change,
@@ -200,7 +200,7 @@ describe('starting a replay', () => {
 describe('Events log', () => {
 	it('reads an empty log as a quiet instance', () => {
 		const { container } = render(EventsPage, { props: props({ events: [], total: 0 }) });
-		expect(said(container)).toContain('quiet instance');
+		expect(said(container)).toContain('Events appear here when a plugin or a flow publishes one.');
 	});
 
 	it('marks an event that carries an error, which is why anyone replays', () => {
@@ -240,7 +240,7 @@ describe('figures that cover one page or failed', () => {
 			props: props({ runs: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		const text = said(container);
-		expect(text).toContain('did not answer');
+		expect(text).toContain('is unavailable');
 		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
 		expect(tile?.nextElementSibling?.textContent?.trim()).not.toBe('0');
 	});
@@ -249,6 +249,6 @@ describe('figures that cover one page or failed', () => {
 describe('the search box', () => {
 	it('is named for a screen reader', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Narrow this page');
+		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Search this page');
 	});
 });

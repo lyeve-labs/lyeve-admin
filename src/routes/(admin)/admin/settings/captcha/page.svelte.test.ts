@@ -74,7 +74,7 @@ describe('captcha settings', () => {
 		const { container } = render(CaptchaPage, {
 			props: props({ source: 'instance', tenant: null, instance, licensed: false }),
 		});
-		expect(said(container)).toContain('needs a license this install does not hold');
+		expect(said(container)).toContain('needs a license this install does not have');
 	});
 
 	it('turns the save off on an unlicensed install and points it at the reason', () => {
@@ -114,7 +114,7 @@ describe('a refused captcha write', () => {
 		const { rerender } = render(CaptchaPage, { props: props(settings) });
 		const region = document.querySelector('[aria-live="assertive"][aria-atomic="true"].contents');
 		expect(region).not.toBeNull();
-		rerender(props(settings, {}, { error: 'The captcha settings could not be saved.' }));
-		expect(region?.textContent).toContain('The captcha settings could not be saved.');
+		rerender(props(settings, {}, { error: 'Could not save the captcha settings. Try again.' }));
+		expect(region?.textContent).toContain('Could not save the captcha settings. Try again.');
 	});
 });

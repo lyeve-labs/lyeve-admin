@@ -79,7 +79,7 @@
 	async function askDelete(p: ModelPrice) {
 		const ok = await confirmDialog(
 			`Delete the price for ${p.model}?`,
-			'Its cost is estimated as zero until a row is added again.',
+			'Costs for this model are estimated as zero until you add a price again.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
@@ -112,7 +112,7 @@
 
 <PageShell
 	title="AI prices"
-	description="What a token costs, per kind and model. Every cost estimate on a transcript reads this table. It is per instance."
+	description="Set what tokens cost for each provider kind and model. Transcript cost estimates use these prices, which apply to the whole instance."
 	width="wide"
 >
 	{#snippet actions()}
@@ -136,7 +136,7 @@
 			<EmptyState
 				level={2}
 				title="No prices yet"
-				description="Without a row for a model its cost is estimated as zero. Prices are dollars per thousand tokens, and per call for an image."
+				description="A model with no price is estimated at zero cost. Prices are in dollars per thousand tokens, or per call for images."
 			>
 				{#snippet iconSnippet()}
 					<Coins size={ICON.lg} />

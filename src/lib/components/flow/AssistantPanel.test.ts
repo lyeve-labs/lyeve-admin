@@ -93,7 +93,7 @@ describe('AssistantPanel', () => {
 
 	it('accepts a draft the validator passes, and names the model and tokens it used', async () => {
 		const { getByRole, getByText, onaccept } = setup({ draft: draft() });
-		expect(getByText('The validator accepts this draft.')).toBeTruthy();
+		expect(getByText('This draft has no problems.')).toBeTruthy();
 		expect(getByText(/^small-model, 1,234 tokens/)).toBeTruthy();
 		await fireEvent.click(getByRole('button', { name: /accept/i }));
 		expect(onaccept).toHaveBeenCalledTimes(1);
@@ -109,7 +109,7 @@ describe('AssistantPanel', () => {
 	it('withholds Accept from a draft with no definition', () => {
 		const { getByRole, getByText } = setup({ draft: draft({ definition: null }) });
 		expect((getByRole('button', { name: /accept/i }) as HTMLButtonElement).disabled).toBe(true);
-		expect(getByText('The assistant produced no definition to accept. Ask again.')).toBeTruthy();
+		expect(getByText('The assistant did not return a flow. Ask again.')).toBeTruthy();
 	});
 
 	it('hands a clicked problem to the page', async () => {

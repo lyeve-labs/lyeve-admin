@@ -42,7 +42,7 @@ describe('the per-reader preview', () => {
 	it('asks for a reader when none was given', async () => {
 		const out = (await actions.preview(actionEvent({ user_id: '' }))) as Failure;
 		expect(out.status).toBe(400);
-		expect(String(out.data.error)).toContain('Name the user');
+		expect(String(out.data.error)).toContain('Enter a user id.');
 	});
 
 	it('keeps a refusal as a failure', async () => {
@@ -83,7 +83,7 @@ describe('the recompute', () => {
 	it('gives its own sentence for an outage, not the driver text', async () => {
 		engine.post.mockRejectedValue(new ApiError(503, 'dial tcp: connection refused', {}));
 		const out = (await actions.refresh(actionEvent({}))) as Failure;
-		expect(String(out.data.error)).toContain('The recompute could not be started.');
+		expect(String(out.data.error)).toContain('Could not start the recompute. Try again.');
 		expect(String(out.data.error)).not.toContain('dial tcp');
 	});
 

@@ -87,6 +87,6 @@ describe('deleting a job', () => {
 	it('says an outage failed the delete', async () => {
 		engine.delete.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.delete(event({ id: 'j1' }))) as Failure;
-		expect(out.data).toEqual({ error: 'Failed to delete job.', action: 'delete' });
+		expect(out.data).toEqual({ error: 'Could not delete the job. Try again.', action: 'delete' });
 	});
 });

@@ -38,7 +38,7 @@
 	{/if}
 {/snippet}
 
-<PageShell title="API access" description="How external apps authenticate to the content API, what each role may do there, and a token to try it with." width="wide">
+<PageShell title="API access" description="See how external apps authenticate to the content API and what each role can do, and get a token to try it." width="wide">
 	{#snippet actions()}
 		<Button variant="secondary" size="sm" href="/admin/api-reference">
 			<BookOpen size={ICON.sm} /> API reference
@@ -61,13 +61,13 @@
 			<div class="flex flex-col gap-4 text-sm">
 				<p class="text-fg">
 					External apps call the content API under <span class="font-mono">/api/v1</span> with a
-					<strong>Bearer JWT</strong>, issued for an account's email and password below, or with an API key in the
-					<span class="font-mono">X-API-Key</span> header, which a super admin issues on the API keys page.
+					<strong>Bearer JWT</strong>, which you can get for an account's email and password below, or with an API key in the
+					<span class="font-mono">X-API-Key</span> header. A super admin creates API keys on the API keys page.
 				</p>
 				<p class="text-muted">
-					A script that calls the admin API under <span class="font-mono">/api/admin</span> uses an
+					Scripts that call the admin API under <span class="font-mono">/api/admin</span> use an
 					{#if operator}<a href="/admin/admin-tokens" class="text-brand hover:underline">admin token</a>{:else}admin token{/if}:
-					a Bearer credential an admin issues with named grants, an expiry of at most 90 days and a log of every request it makes.
+					a Bearer credential that an admin creates with named grants. It expires within 90 days and logs every request it makes.
 				</p>
 				<div class="flex flex-col gap-2">
 					<p class="font-medium text-muted">Role capabilities</p>
@@ -92,7 +92,7 @@
 						</tbody>
 					</Table>
 					<p class="text-xs text-faint">
-						Row-level rules narrow these per schema and per flow on the
+						Narrow these per schema and per flow with row-level rules on the
 						<a href="/admin/settings/permissions" class="text-brand hover:underline">Permissions</a> page.
 					</p>
 				</div>
@@ -110,10 +110,10 @@
 		<Card>
 			<div class="flex flex-col gap-4">
 				<p class="text-sm text-muted">
-					An account's email and password exchange for a Bearer token, the way an external app gets one. Give service accounts the
+					Exchange an account's email and password for a Bearer token, the same way an external app gets one. Give service accounts the
 					<span class="font-mono text-xs">viewer</span> or
 					<span class="font-mono text-xs">editor</span> role on the
-					{#if superAdmin}<a href="/admin/users" class="text-brand hover:underline">Users</a>{:else}Users{/if} page, which a super admin opens.
+					{#if superAdmin}<a href="/admin/users" class="text-brand hover:underline">Users</a>{:else}Users{/if} page. Only a super admin can open it.
 				</p>
 				<form method="POST" action="?/token" use:enhance={issue.enhance} class="flex flex-col gap-4">
 					<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">

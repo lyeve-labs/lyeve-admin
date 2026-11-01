@@ -46,12 +46,12 @@
 	];
 	// The plugin stops an export at its row ceiling when the request names no
 	// limit, and lifting it risks the memory the ceiling protects.
-	const ceilingHint = `An export holds at most ${formatCount(EXPORT_ROW_CEILING)} entries. Pick fewer schemas or statuses to export more in parts.`;
+	const ceilingHint = `An export includes at most ${formatCount(EXPORT_ROW_CEILING)} entries. To export more, split it by schema or status.`;
 	// An unread list offers nothing to pick, and the hint says why rather than
 	// leaving an empty choice that reads as a tenant with no schemas.
 	const schemasHint = $derived.by(() => {
 		if (schemaNames === null) {
-			return 'The schema list could not be read, so none can be picked. Leave this empty to export every schema.';
+			return 'Could not load the schema list. Leave this empty to export every schema.';
 		}
 		if (schemas.length === 0) {
 			return `Every schema${schemaNames.length > 0 ? `, ${schemaNames.length} in this tenant` : ''}.`;
@@ -91,7 +91,7 @@
 	<CheckboxGroup
 		name="statuses"
 		label="Statuses"
-		hint={statuses.length === 0 ? 'None ticked exports every status.' : undefined}
+		hint={statuses.length === 0 ? 'Leave all unchecked to export every status.' : undefined}
 		orientation="horizontal"
 		options={statusOptions}
 		bind:value={statuses}
@@ -102,8 +102,8 @@
 		id="{idPrefix}-include-schemas"
 		label="Include the schema definitions"
 		hint={format === 'json' || format === 'yaml'
-			? 'Written into the document beside the entries.'
-			: 'Written to a schemas.json beside the data, so the download is a zip.'}
+			? 'Adds them to the document next to the entries.'
+			: 'Adds a schemas.json file next to the data, so the download becomes a zip.'}
 		bind:checked={includeSchemas}
 	/>
 
@@ -111,7 +111,7 @@
 	<Toggle
 		id="{idPrefix}-include-media"
 		label="Bundle referenced media"
-		hint="A zip with a folder per entry holding its content and the files it references."
+		hint="Downloads a zip with a folder for each entry, holding its content and the files it references."
 		bind:checked={includeMedia}
 	/>
 </div>

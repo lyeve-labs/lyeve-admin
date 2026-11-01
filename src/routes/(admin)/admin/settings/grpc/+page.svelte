@@ -45,7 +45,7 @@
 
 <PageShell
 	title="gRPC"
-	description="The listener this plugin serves on, and what answers there."
+	description="See where the gRPC listener runs and which services it serves."
 	width="wide"
 >
 	{#snippet actions()}
@@ -58,15 +58,14 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			The gRPC status names the addresses this process listens on, so it is a super admin's to
-			read.
+			Only a super admin can see the gRPC status, because it shows the addresses this server listens on.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
 			level={2}
 			gate={data.gate}
 			title="gRPC"
-			absent="The gRPC plugin is not part of this build, so nothing is listening."
+			absent="gRPC is not included in this build."
 		/>
 	{:else if data.status}
 		<div class="flex items-center gap-2">
@@ -77,13 +76,11 @@
 			<!-- No listener was bound on purpose. Calling it a bind failure
 			     sends somebody to look at ports. -->
 			<Alert tone="warn">
-				This instance does not enable the plugin, so no listener was started. Nothing is wrong
-				with the port.
+				The gRPC plugin is not enabled on this instance, so no listener was started.
 			</Alert>
 		{:else if !data.status.listening}
 			<Alert tone="danger">
-				The plugin is enabled and nothing is listening. Check the engine's start-up log for a
-				bind failure on the configured address.
+				The gRPC plugin is enabled, but no listener is running. Check the engine's start-up log for a bind failure on the configured address.
 			</Alert>
 		{/if}
 
@@ -93,9 +90,7 @@
 			     first is told it does not exist. -->
 			<Alert tone="warn">
 				{gaps.length}
-				{gaps.length === 1 ? 'service is' : 'services are'} registered on the server but unknown
-				to the health protocol. They answer calls, and a client that health checks before
-				calling is told they do not exist.
+				{gaps.length === 1 ? 'service is' : 'services are'} registered on the server but missing from the health service. They accept calls, but a client that runs a health check first is told they do not exist.
 			</Alert>
 		{/if}
 
@@ -151,8 +146,8 @@
 			<SectionHeading level={2}>Services</SectionHeading>
 			{#if data.status.services.length === 0}
 				<EmptyState
-					title="No service is registered"
-					description="The listener is up and nothing answers on it."
+					title="No services registered"
+					description="The listener is running with no services on it."
 				>
 					{#snippet iconSnippet()}
 						<Network size={ICON.lg} />
@@ -163,7 +158,7 @@
 					<thead>
 						<tr>
 							<th scope="col">Service</th>
-							<th scope="col">Health says</th>
+							<th scope="col">Health status</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -186,8 +181,7 @@
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>REST, without a gRPC client</SectionHeading>
 				<p class="text-xs text-muted">
-					Served on the health listener above, against the same service implementations. A
-					caller with no generated stubs can use these.
+					These routes run on the health listener above and call the same services. Use them from a client without generated stubs.
 				</p>
 				<ul class="flex flex-col gap-1">
 					{#each data.status.transcoded_routes as route (route)}

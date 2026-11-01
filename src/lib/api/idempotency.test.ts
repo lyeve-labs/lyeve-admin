@@ -95,6 +95,6 @@ describe('the gate', () => {
 
 	it('never reports a failed read as no keys being held', () => {
 		const gate = idempotencyGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that none are held');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load idempotency keys.');
 	});
 });

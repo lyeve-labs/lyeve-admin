@@ -76,7 +76,7 @@
 		<!-- The confirmation clears itself. The caveat is a standing fact about
 		     the value now in force, so it stays beside the form. -->
 		<Alert tone="success" autoDismiss>Applied.</Alert>
-		<p class="text-xs text-muted">The change holds until the engine restarts.</p>
+		<p class="text-xs text-muted">The change lasts until the engine restarts.</p>
 	{/if}
 {/snippet}
 
@@ -88,14 +88,14 @@
 	<div class="flex flex-wrap items-center gap-2">
 		<SectionHeading level={2}>Goroutine engine</SectionHeading>
 		<Badge tone="violet" size="sm">Beta</Badge>
-		<span class="text-xs text-faint">Tunables hold until the engine restarts.</span>
+		<span class="text-xs text-faint">Changes last until the engine restarts.</span>
 	</div>
 
 	{#if !geAnswered}
 		<EmptyState
 			iconSnippet={noGoroutineEngine}
 			title="Goroutine engine unavailable"
-			description="The engine did not answer with its pool, parallel or async hook state."
+			description="Could not load the worker pool, parallel engine or async hook state. Reload the page to try again."
 		/>
 	{:else}
 		<div class="grid gap-4 md:grid-cols-2" data-testid="goroutine-views">
@@ -111,7 +111,7 @@
 						<Stat size="sm" label="Leak threshold" mono value={formatGoDuration(ge.snapshot.leak_threshold)} />
 					</div>
 				{:else}
-					<p class="text-xs text-muted">The tracker did not answer.</p>
+					<p class="text-xs text-muted">Could not load the tracker.</p>
 				{/if}
 			</Card>
 
@@ -179,8 +179,8 @@
 			{/snippet}
 			{#if ge.byOwner.length === 0}
 				<p class="text-sm text-muted">
-					No tracked goroutine has an owner yet. Every goroutine a plugin or an engine
-					subsystem starts through the tracker is counted here under its name.
+					No goroutines with an owner yet. Goroutines that a plugin or an engine subsystem
+					starts through the tracker appear here under the owner's name.
 				</p>
 			{:else}
 				<div data-testid="goroutine-owners">
@@ -231,7 +231,7 @@
 							id="ge-pool-size"
 							name="size"
 							label="Pool size"
-							hint="Workers the pool runs at once, {POOL_SIZE.min} to {POOL_SIZE.max}."
+							hint="Workers running at the same time, {POOL_SIZE.min} to {POOL_SIZE.max}."
 							min={POOL_SIZE.min}
 							max={POOL_SIZE.max}
 							bind:value={poolSize}
@@ -254,7 +254,7 @@
 							id="ge-parallel-max"
 							name="max_concurrent"
 							label="Max concurrent"
-							hint="Items in flight at once, {PARALLEL_MAX_CONCURRENT.min} to {PARALLEL_MAX_CONCURRENT.max}."
+							hint="Items processed at the same time, {PARALLEL_MAX_CONCURRENT.min} to {PARALLEL_MAX_CONCURRENT.max}."
 							min={PARALLEL_MAX_CONCURRENT.min}
 							max={PARALLEL_MAX_CONCURRENT.max}
 							bind:value={parallelMax}
@@ -296,7 +296,7 @@
 							id="ge-async-queue"
 							name="queue_size"
 							label="Queue size"
-							hint="Hooks waiting for a worker before one runs inline, {ASYNC_QUEUE_SIZE.min} to {ASYNC_QUEUE_SIZE.max}."
+							hint="How many hooks can wait for a worker before the next one runs inline, {ASYNC_QUEUE_SIZE.min} to {ASYNC_QUEUE_SIZE.max}."
 							min={ASYNC_QUEUE_SIZE.min}
 							max={ASYNC_QUEUE_SIZE.max}
 							bind:value={asyncQueue}
@@ -315,7 +315,7 @@
 							id="ge-async-enabled"
 							name="enabled"
 							label="Run hooks asynchronously"
-							description="Off runs every hook inline on the request that fired it."
+							description="When on, hooks run in the background on the async workers. When off, each hook runs during the request that fired it."
 							bind:checked={asyncEnabled}
 						/>
 						<div>

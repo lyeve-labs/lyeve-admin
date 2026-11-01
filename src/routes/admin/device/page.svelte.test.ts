@@ -6,6 +6,7 @@ vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
 import DevicePage from './+page.svelte';
 import { outlineSkips } from '$lib/test-outline';
+import { OUTAGE } from '$lib/outage';
 
 afterEach(cleanup);
 
@@ -90,7 +91,7 @@ describe('the outcome of a decision', () => {
 
 	it('says the engine did not answer and retries the same code', () => {
 		render(DevicePage, { props: props({ view: 'error', code: 'WDJB-MJHT' }) });
-		expect(screen.getByText('The engine did not answer')).toBeTruthy();
+		expect(screen.getByText(OUTAGE.title)).toBeTruthy();
 		expect(screen.getByRole('link', { name: 'Try again' }).getAttribute('href')).toBe('/admin/device?code=WDJB-MJHT');
 	});
 });
@@ -99,14 +100,14 @@ describe('a refusal that is not an outage', () => {
 	it('says the engine is busy and retries the same code', () => {
 		render(DevicePage, { props: props({ view: 'busy', code: 'WDJB-MJHT' }) });
 		expect(screen.getByText('Too many requests')).toBeTruthy();
-		expect(screen.queryByText('The engine did not answer')).toBeNull();
+		expect(screen.queryByText(OUTAGE.title)).toBeNull();
 		expect(screen.getByRole('link', { name: 'Try again' }).getAttribute('href')).toBe('/admin/device?code=WDJB-MJHT');
 	});
 
 	it('shows the sentence a 402 carried', () => {
 		render(DevicePage, { props: props({ view: 'refused', code: 'WDJB-MJHT', refusal: 'The license does not include it.' }) });
 		expect(screen.getByText('The license does not include it.')).toBeTruthy();
-		expect(screen.queryByText('The engine did not answer')).toBeNull();
+		expect(screen.queryByText(OUTAGE.title)).toBeNull();
 	});
 });
 

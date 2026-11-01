@@ -42,14 +42,14 @@ function setup(over: Record<string, unknown> = {}, form: unknown = null) {
 describe('the incoming webhook list when it could not be read', () => {
 	it('says the engine did not answer and offers no first endpoint', () => {
 		const { container, queryByRole } = setup({ incomingWebhooks: { ok: false, gate: { state: 'unavailable' } } });
-		expect(container.textContent).toContain('so incoming webhooks could not be read. Nothing was changed.');
-		expect(container.textContent).not.toContain('No incoming webhooks');
+		expect(container.textContent).toContain('so incoming webhooks did not load. Try again in a moment.');
+		expect(container.textContent).not.toContain('No incoming webhooks yet');
 		expect(queryByRole('button', { name: /new incoming webhook/i })).toBeNull();
 	});
 
 	it('keeps the first-run state for a list that answered empty', () => {
 		const { container, getAllByRole } = setup({ incomingWebhooks: { ok: true, value: [] } });
-		expect(container.textContent).toContain('No incoming webhooks');
+		expect(container.textContent).toContain('No incoming webhooks yet');
 		expect(getAllByRole('button', { name: /new incoming webhook/i })).toHaveLength(2);
 	});
 });
@@ -65,7 +65,7 @@ describe('the incoming webhook controls by role', () => {
 		expect(queryByRole('button', { name: /new incoming webhook/i })).toBeNull();
 		expect(queryByRole('button', { name: 'Edit Stripe' })).toBeNull();
 		expect(queryByRole('button', { name: 'Delete Stripe' })).toBeNull();
-		expect(container.textContent).toContain('Creating, changing or deleting one takes a super admin.');
+		expect(container.textContent).toContain('Only a super admin can create, change or delete them.');
 	});
 
 	it('offers a super admin every write', () => {
@@ -85,10 +85,10 @@ describe('the incoming webhook drawer and the failures of other actions', () => 
 	const drawerText = () => document.body.querySelector('form#incoming-form')?.textContent ?? '';
 
 	it('leaves a newly opened create drawer clean after a failed delete', async () => {
-		const { container, getByRole } = setup({}, { action: 'delete', error: 'Failed to delete incoming webhook' });
-		expect(container.textContent).toContain('Failed to delete incoming webhook');
+		const { container, getByRole } = setup({}, { action: 'delete', error: 'Could not delete the incoming webhook. Try again.' });
+		expect(container.textContent).toContain('Could not delete the incoming webhook. Try again.');
 		await fireEvent.click(getByRole('button', { name: /new incoming webhook/i }));
-		expect(drawerText()).not.toContain('Failed to delete incoming webhook');
+		expect(drawerText()).not.toContain('Could not delete the incoming webhook. Try again.');
 	});
 
 	it('shows a failed save inside the open drawer, first in its form', async () => {

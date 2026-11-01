@@ -27,7 +27,7 @@ describe('realtimeGate', () => {
 
 	it('says a failed read is not a report that nobody is connected', () => {
 		const gate = realtimeGate(new Error('socket'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that nobody is connected');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load realtime metrics.');
 	});
 });
 

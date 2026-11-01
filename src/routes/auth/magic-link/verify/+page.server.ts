@@ -9,7 +9,7 @@ import { setRefreshCookie, setSessionCookie } from '$lib/server/session-cookie';
 import { LANDING } from '$lib/landing';
 import type { Actions, PageServerLoad } from './$types';
 
-const EXPIRED = 'This sign-in link is invalid or has expired. Request a new one.';
+const EXPIRED = 'This sign-in link no longer works. Request a new one.';
 
 // Opening the link only shows a button. Redeeming spends the token, and a mail
 // scanner that fetches every link in a message would spend it before the
@@ -21,7 +21,7 @@ export const load: PageServerLoad = ({ url }) => {
 export const actions: Actions = {
 	verify: async (event) => {
 		const limit = checkRateLimit(event.getClientAddress());
-		if (!limit.allowed) return fail(429, { error: 'Too many attempts. Please try again later.' });
+		if (!limit.allowed) return fail(429, { error: 'Too many attempts. Try again later.' });
 
 		const form = await event.request.formData();
 		const token = String(form.get('token') ?? '').trim();
@@ -44,14 +44,14 @@ export const actions: Actions = {
 
 	mfa: async (event) => {
 		const limit = checkRateLimit(event.getClientAddress());
-		if (!limit.allowed) return fail(429, { error: 'Too many attempts. Please try again later.' });
+		if (!limit.allowed) return fail(429, { error: 'Too many attempts. Try again later.' });
 
 		const form = await event.request.formData();
 		const challengeToken = String(form.get('challenge_token') ?? '');
 		const code = String(form.get('code') ?? '').trim();
 		if (!challengeToken) return fail(400, { error: EXPIRED });
 		if (!code) {
-			return fail(400, { error: 'Verification code is required.', mfa_required: true, challenge_token: challengeToken });
+			return fail(400, { error: 'Enter the verification code.', mfa_required: true, challenge_token: challengeToken });
 		}
 
 		try {

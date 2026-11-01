@@ -87,7 +87,7 @@ export const USAGE_OK: UsageGate = GATE_OK;
 
 /** What a refused usage read means, read the way every plugin's is. */
 export function usageGate(err: unknown): UsageGate {
-	return gateOf(err, 'Usage could not be read. This is not a report that nobody is over their limit.');
+	return gateOf(err, 'Could not load usage.');
 }
 
 export async function listQuotas(

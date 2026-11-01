@@ -23,7 +23,7 @@ export const load: PageServerLoad = async (event) => {
 		? { ok: false, stopped: whyNotRunning(PLUGIN.productAnalytics, plugins, pluginStatus) }
 		: await installSetting(
 				readStepUp(authedClient(event)),
-				'What a person proves before exporting could not be read. This is not a report that nothing is asked.',
+				'Could not load the export requirements.',
 			);
 	return { stepUp };
 };
@@ -41,7 +41,7 @@ export const actions: Actions = {
 			const result = await exportSubject(subject, client);
 			return { action: 'export', ok: true, subject, result };
 		} catch (err) {
-			return fail(400, { action: 'export', error: actionError(err, 'The export could not be made. Nothing was read for this subject.') });
+			return fail(400, { action: 'export', error: actionError(err, 'Could not export data for this subject. Try again.') });
 		}
 	},
 
@@ -59,17 +59,17 @@ export const actions: Actions = {
 			if (mailUnavailable(err)) {
 				return fail(422, {
 					action: 'stepUp' as const,
-					error: 'This install cannot send mail, so an emailed code cannot be required. Set up email first, or leave it unticked. Nothing was changed.',
+					error: 'Email is not set up, so an emailed code cannot be required. Set up email first, or leave it unticked. Nothing was saved.',
 				});
 			}
 			if (err instanceof ApiError && err.status === 400) {
-				return fail(400, { action: 'stepUp' as const, error: 'One of the steps is not one this install knows. Nothing was changed.' });
+				return fail(400, { action: 'stepUp' as const, error: 'One of the chosen steps is not available. Reload the page and try again.' });
 			}
 			// A license refusal answers 402 with its way forward, and an outage
 			// answers 503, never a client error.
 			const failed = actionFailure(
 				err,
-				'What a person proves before exporting could not be saved. Nothing was changed.',
+				'Could not save the export requirements. Try again.',
 				isOutage(err) ? 503 : 400,
 			);
 			return fail(failed.status, { action: 'stepUp' as const, ...failed.data });
@@ -97,7 +97,7 @@ export const actions: Actions = {
 		} catch (err) {
 			return fail(400, {
 				action: 'erase',
-				error: actionError(err, 'The erasure was not attempted, so nothing was erased. Try again in a moment.'),
+				error: actionError(err, 'Could not start the erasure. Nothing was erased. Try again.'),
 			});
 		}
 	},

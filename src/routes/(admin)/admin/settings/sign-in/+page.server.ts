@@ -33,7 +33,7 @@ export const actions: Actions = {
 			const saved = await saveProviderWindow(authedClient(event), days);
 			return { saved: true, days: String(saved.days) };
 		} catch (err) {
-			return actionFailure(err, 'The sign-in window could not be saved.');
+			return actionFailure(err, 'Could not save the sign-in window. Try again.');
 		}
 	},
 };

@@ -39,7 +39,7 @@ export const GRPC_OK: GrpcGate = GATE_OK;
 
 /** What a refused gRPC read means, read the way every plugin's is. */
 export function grpcGate(err: unknown): GrpcGate {
-	return gateOf(err, 'The gRPC status could not be read. This is not a report that the listener is up.');
+	return gateOf(err, 'Could not load the gRPC status.');
 }
 
 export async function readStatus(client: HttpClient): Promise<GrpcStatus> {
@@ -87,7 +87,7 @@ export function healthTone(h: GrpcHealth): StatusTone {
 export const SERVICE_STATUS_LABELS: Readonly<Record<string, string>> = {
 	SERVING: 'Serving',
 	NOT_SERVING: 'Refusing calls',
-	SERVICE_UNKNOWN: 'Registered, but health was never told about it',
+	SERVICE_UNKNOWN: 'Registered, but not reported to health checks',
 	UNKNOWN: 'Not started',
 };
 
@@ -118,8 +118,8 @@ export function undeclared(status: GrpcStatus | null): ServiceStatus[] {
 export function reflectionNote(status: GrpcStatus | null): string {
 	if (!status?.listening) return '';
 	return status.reflection
-		? 'Reflection is on, so any caller that can reach the port can enumerate every service and message. The plugin turns it off when the engine is running in production.'
-		: 'Reflection is off, so a client needs the generated stubs or a descriptor rather than discovering the API from the server.';
+		? 'Reflection is on, so anyone who can reach the port can list every service and message. It turns off automatically when the engine runs in production.'
+		: 'Reflection is off. A client needs the generated stubs or a descriptor to call the API.';
 }
 
 /**

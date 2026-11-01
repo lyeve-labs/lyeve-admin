@@ -183,8 +183,8 @@ describe('the load', () => {
 	});
 
 	it.each([
-		[502, 'did not answer'],
-		[504, 'did not answer'],
+		[502, 'The engine is unavailable'],
+		[504, 'The engine is unavailable'],
 		[429, 'Too many requests'],
 	])('says what a %i on the request log means', async (status, words) => {
 		const { ev } = loadEvent(

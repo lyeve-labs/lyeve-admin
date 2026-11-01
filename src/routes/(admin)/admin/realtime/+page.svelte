@@ -50,7 +50,7 @@
 
 <PageShell
 	title="Realtime"
-	description="Who is connected over server-sent events and WebSocket, and what has been pushed to them."
+	description="See who is connected over server-sent events and WebSocket, and what has been pushed to them."
 	width="wide"
 >
 	{#snippet actions()}
@@ -64,17 +64,16 @@
 			level={2}
 			gate={data.gate}
 			title="Realtime"
-			absent="The realtime plugin is not part of this build, so nothing is holding connections open."
+			absent="Realtime is not included in this build."
 		/>
 	{:else}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Server-sent events</SectionHeading>
 			{#if data.streamGate}
-				<GateNotice gate={data.streamGate} title="the server-sent events counters" absent="This build does not serve server-sent events." />
+				<GateNotice gate={data.streamGate} title="the server-sent events counters" absent="Server-sent events are not included in this build." />
 			{:else if !streamUsed}
 				<p class="text-sm text-muted">
-					Nothing has connected over this transport. That is a transport nobody is using, not a
-					fault.
+					No connections over this transport yet.
 				</p>
 			{/if}
 			{#if !data.streamGate}
@@ -105,11 +104,10 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>WebSocket</SectionHeading>
 			{#if data.socketGate}
-				<GateNotice gate={data.socketGate} title="the WebSocket counters" absent="This build does not serve WebSocket connections." />
+				<GateNotice gate={data.socketGate} title="the WebSocket counters" absent="WebSocket connections are not included in this build." />
 			{:else if !socketUsed}
 				<p class="text-sm text-muted">
-					Nothing has connected over this transport. That is a transport nobody is using, not a
-					fault.
+					No connections over this transport yet.
 				</p>
 			{/if}
 			{#if !data.socketGate}
@@ -143,12 +141,12 @@
 					<GateNotice
 						gate={data.platformGate}
 						title="the per-tenant roster"
-						absent="This version of the realtime plugin keeps no per-tenant roster."
+						absent="Connections by tenant need a newer version of the realtime plugin."
 					/>
 				{:else if loads.length === 0}
 					<EmptyState
-						title="No tenant has a connection open"
-						description="The roster lists a tenant only while it is holding a stream open."
+						title="No open connections"
+						description="A tenant appears here while it has a stream open."
 					>
 						{#snippet iconSnippet()}
 							<Users size={ICON.lg} />
@@ -179,8 +177,8 @@
 
 		{#if !data.streamGate && !data.socketGate && !streamUsed && !socketUsed}
 			<EmptyState
-				title="Nothing is connected"
-				description="The plugin is running and neither transport has been used. Open a stream from a client to see it here."
+				title="No connections yet"
+				description="Open a stream from a client to see it here."
 			>
 				{#snippet iconSnippet()}
 					<Satellite size={ICON.lg} />

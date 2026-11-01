@@ -87,7 +87,7 @@ describe('admin/ai/settings actions', () => {
 		expect(out).toMatchObject({ status: 400, data: { scope: 'switch' } });
 		expect(JSON.stringify(out)).not.toContain('pq:');
 		const gone = actionEvent({ '/api/admin/ai/settings': () => Promise.reject(new TypeError('fetch failed')) }, formOf({ enabled: 'false' }), { path });
-		expect(await actions.save(gone.event)).toMatchObject({ status: 400, data: { error: 'The setting could not be saved' } });
+		expect(await actions.save(gone.event)).toMatchObject({ status: 400, data: { error: 'Could not save the setting. Try again.' } });
 	});
 
 	it('names no raw text when the retention save meets an outage', async () => {
@@ -96,7 +96,7 @@ describe('admin/ai/settings actions', () => {
 		expect(out).toMatchObject({ status: 503, data: { scope: 'config' } });
 		expect(JSON.stringify(out)).not.toContain('pq:');
 		const gone = actionEvent({ '/api/admin/config': () => Promise.reject(new TypeError('fetch failed')) }, formOf({ key: 'ai_transcript_retention', value: '48h' }), { path });
-		expect(await actions.config(gone.event)).toMatchObject({ status: 500, data: { error: 'Could not save the setting' } });
+		expect(await actions.config(gone.event)).toMatchObject({ status: 500, data: { error: 'Could not save the setting. Try again.' } });
 	});
 
 	it('reads a save the engine refuses whole, which answers 409 with no error field', async () => {

@@ -22,15 +22,15 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 };
 
 const TOKEN_REFUSED =
-	'The engine did not accept that setup token. Copy it again from the place named under the field.';
+	'That setup token is wrong. Copy it again from the place shown under the field.';
 
-const ENGINE_SILENT = 'The engine did not answer. It may be restarting. Try again in a moment.';
+const ENGINE_SILENT = 'Could not reach the engine. If you just restarted it, wait a moment and try again.';
 
 function limited(ip: string) {
 	const limit = checkRateLimit(ip);
 	return limit.allowed
 		? null
-		: fail(429, { error: 'Too many attempts. Please try again later.', retryAfterSec: limit.retryAfterSec });
+		: fail(429, { error: 'Too many attempts. Try again later.', retryAfterSec: limit.retryAfterSec });
 }
 
 export const actions: Actions = {
@@ -44,7 +44,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const setupToken = String(form.get('setup_token') ?? '').trim();
 		if (!setupToken) {
-			return fail(400, { error: 'The setup token is required.' });
+			return fail(400, { error: 'Enter the setup token.' });
 		}
 		try {
 			const status = await getSetupModeStatus(setupToken, createClient(event.fetch));
@@ -77,10 +77,10 @@ export const actions: Actions = {
 		const setupToken = String(form.get('setup_token') ?? '').trim();
 
 		if (!setupToken) {
-			return { error: 'The setup token is required.' };
+			return { error: 'Enter the setup token.' };
 		}
 		if (!email || !password) {
-			return { error: 'Email and password are required.' };
+			return { error: 'Enter your email and password.' };
 		}
 		if (password !== confirm) {
 			return { error: 'Passwords do not match.' };
@@ -115,7 +115,7 @@ export const actions: Actions = {
 			if (!(err instanceof ApiError) || err.status >= 500) {
 				return fail(503, { error: ENGINE_SILENT });
 			}
-			return { error: 'Setup failed.' };
+			return { error: 'Could not finish setup. Try again.' };
 		}
 
 		redirect(303, LANDING);

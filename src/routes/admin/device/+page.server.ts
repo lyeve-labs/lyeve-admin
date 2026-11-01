@@ -36,7 +36,7 @@ function refusalView(e: ApiError): { view: View; refusal: string } {
 		const r = refusalOf(e);
 		return {
 			view: 'refused',
-			refusal: r ? refusalText(r) : 'This instance does not allow device sign-in right now. Nothing was changed.',
+			refusal: r ? refusalText(r) : 'This instance does not allow device sign-in right now.',
 		};
 	}
 	return { view: outcomeForRefusal(e.status, e.message), refusal: '' };
@@ -116,7 +116,7 @@ function stepUpOf(form: FormData): { step: 'password' | 'mfa_code'; stepUp?: Dev
 }
 
 /** What the form says when the engine refuses an approval without a sentence. */
-const APPROVAL_REFUSED = 'The engine refused to approve this sign-in. The request is still open.';
+const APPROVAL_REFUSED = 'Could not approve this sign-in. The request is still open.';
 
 /**
  * Whether the session's account may still approve. An account that cannot be

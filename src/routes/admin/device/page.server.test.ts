@@ -249,7 +249,7 @@ describe('admin/device actions', () => {
 		});
 		const result = (await actions.approve(actionEvent('WDJB-MJHT', fetch))) as { status: number; data: { stepUp: { error: string } } };
 		expect(result.status).toBe(400);
-		expect(result.data.stepUp.error).toBe('The engine refused to approve this sign-in. The request is still open.');
+		expect(result.data.stepUp.error).toBe('Could not approve this sign-in. The request is still open.');
 	});
 
 	it('reports a locked account on the form', async () => {

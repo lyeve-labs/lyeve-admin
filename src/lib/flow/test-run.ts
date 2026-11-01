@@ -64,7 +64,7 @@ export function testFailure(err: unknown): TestFailure {
 	const message = err instanceof Error ? err.message : '';
 	if (isBlockedMessage(message)) return { kind: 'blocked' };
 	const errors = validationErrors(message);
-	if (errors.length > 0) return { kind: 'refused', errors, text: 'The definition did not validate.' };
+	if (errors.length > 0) return { kind: 'refused', errors, text: 'Fix the problems in the definition.' };
 	// The client puts the raw body of an answer that was not JSON in the
 	// message, which may be a proxy's error page. Only a refusal the engine
 	// worded is relayed.
@@ -72,4 +72,4 @@ export function testFailure(err: unknown): TestFailure {
 	return { kind: 'refused', errors: [], text: (worded && message) || 'The test run failed.' };
 }
 
-const TEST_OUTAGE = 'The engine did not answer, so the test run did not finish. Try again in a moment.';
+const TEST_OUTAGE = 'The engine is unavailable, so the test run did not finish. Try again in a moment.';

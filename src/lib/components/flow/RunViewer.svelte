@@ -89,7 +89,7 @@
 		{#if withheld}
 			<div class="shrink-0 px-4 pt-3" data-testid="run-withheld">
 				<Alert tone="info" title="Values withheld">
-					{#snippet children()}Your access does not cover what this run read, so its inputs, outputs and errors are not shown.{/snippet}
+					{#snippet children()}Your role cannot see the data this run used, so its inputs, outputs and errors are hidden.{/snippet}
 				</Alert>
 			</div>
 		{/if}

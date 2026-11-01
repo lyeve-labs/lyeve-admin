@@ -202,8 +202,8 @@ describe('reading the answer', () => {
 
 	// 402 is the one a tester meets and misreads as a broken request.
 	it('says a 402 is the license and not the request', () => {
-		expect(statusHint(402)).toContain('Nothing about the request is wrong');
-		expect(statusHint(503)).toContain('never a bad request');
+		expect(statusHint(402)).toContain('Changing the request does not help');
+		expect(statusHint(503)).toContain('The request itself is not wrong');
 		expect(statusHint(418)).toBe('');
 	});
 });

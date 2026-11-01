@@ -58,7 +58,7 @@
 
 <PageShell
 	title="Spike alerts"
-	description="Where this tenant hears about a sudden rise in errors, and what counts as one."
+	description="Choose where to send alerts about a sudden rise in errors, and what counts as one."
 	width="wide"
 	back={{ href: '/admin/observability/errors', label: 'Errors' }}
 >
@@ -67,7 +67,7 @@
 			level={2}
 			gate={data.gate}
 			title="Spike alerts"
-			absent="The error tracking plugin is not part of this build, so there are no spike alerts to set."
+			absent="Spike alerts are not included in this build."
 		/>
 	{:else}
 		<form method="POST" action="?/save" id="spike-form" use:enhance={submit.enhance} class="flex flex-col gap-6">
@@ -82,8 +82,8 @@
 				{/snippet}
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted">
-						A spike is logged on every install. Each channel set here hears about it too, at most once
-						every fifteen minutes. Email is on every install.
+						A spike is always logged. Each channel you set here is also notified, at most once every
+						fifteen minutes. Email alerts work on every install.
 					</p>
 					<AlertChannelFields
 						prefix={SETTINGS_CHANNEL_PREFIX}
@@ -100,8 +100,8 @@
 				{/snippet}
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted">
-						The default flags a window of at least {settings.defaults.spike_min_count} errors whose
-						z-score against the windows before it passes {settings.defaults.spike_z_score}.
+						By default, a window is a spike when it has at least {settings.defaults.spike_min_count} errors
+						and its z-score against earlier windows is above {settings.defaults.spike_z_score}.
 					</p>
 					{#if thresholdLocked}
 						<div class="flex flex-col gap-1.5" data-testid="threshold-locked">
@@ -126,7 +126,7 @@
 									id="spike-z-score"
 									name="spike_z_score"
 									label="Z-score"
-									hint="How far above the windows before it, from 0.5 to 20."
+									hint="How far above earlier windows, from 0.5 to 20."
 									min={0.5}
 									max={20}
 									step={0.1}
@@ -145,7 +145,7 @@
 
 		{#if data.windowDays}
 			<p class="text-xs text-muted" data-testid="event-window">
-				The event lists on this instance read the last {data.windowDays} days. Older events are kept.
+				Event lists show the last {data.windowDays} days. Older events are kept.
 			</p>
 		{/if}
 	{/if}

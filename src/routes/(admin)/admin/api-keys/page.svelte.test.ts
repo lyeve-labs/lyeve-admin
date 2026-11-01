@@ -165,10 +165,11 @@ describe('API keys page', () => {
 	it('warns that GraphQL reads every schema when the key is held to some', async () => {
 		const { getAllByRole, getByRole } = setup([key({})]);
 		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
+		const warning = 'GraphQL reads every schema, whatever you chose above.';
 		await fireEvent.click(getByRole('button', { name: /GraphQL/ }));
-		expect(document.body.textContent).not.toContain('reads every schema, whichever schemas are chosen');
+		expect(document.body.textContent).not.toContain(warning);
 		await fireEvent.click(getByRole('radio', { name: 'Chosen schemas' }));
-		expect(document.body.textContent).toContain('GraphQL reads every schema, whichever schemas are chosen above.');
+		expect(document.body.textContent).toContain(warning);
 	});
 
 	it('flags a flow name that cannot be part of a scope', async () => {
@@ -177,7 +178,7 @@ describe('API keys page', () => {
 		await fireEvent.click(getByRole('button', { name: /Flows/ }));
 		const names = document.body.querySelector<HTMLInputElement>('#key-names-flows')!;
 		await fireEvent.input(names, { target: { value: 'order sync' } });
-		expect(document.body.textContent).toContain('"order sync" cannot name an endpoint.');
+		expect(document.body.textContent).toContain('"order sync" is not an endpoint name.');
 	});
 
 	it('edits a key\'s limits in a drawer with all three windows', async () => {
@@ -197,26 +198,26 @@ describe('API keys page', () => {
 	it('keeps the pager when nothing on this page matches the search', async () => {
 		const { container, getByPlaceholderText } = setup([key({})], { total: 120, offset: 0, limit: 50 });
 		await fireEvent.input(getByPlaceholderText('Name, role or schema on this page'), { target: { value: 'nothing like it' } });
-		expect(container.textContent).toContain('No key on this page matches');
+		expect(container.textContent).toContain('No keys on this page match these filters');
 		expect(container.querySelector('a[href="/admin/api-keys?limit=50&offset=50"]')).toBeTruthy();
 	});
 
 	it('says the usage is unknown when its read failed, not that there was none', () => {
 		const { container } = setup([key({})], { usageUnknown: ['k1'] });
-		expect(container.textContent).toContain('Unknown, the usage could not be read');
+		expect(container.textContent).toContain('Could not load usage');
 	});
 
 	it('says in the drawer that the schemas could not be read', async () => {
 		const { getAllByRole, getByRole } = setup([key({})], { schemaNames: [], schemasFailed: true });
 		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
 		await fireEvent.click(getByRole('radio', { name: 'Chosen schemas' }));
-		expect(document.body.textContent).toContain('The schemas could not be read');
-		expect(document.body.textContent).not.toContain('This instance has no schemas yet');
+		expect(document.body.textContent).toContain('Could not load the schemas');
+		expect(document.body.textContent).not.toContain('No schemas yet.');
 	});
 
 	it('names the key in the delete confirmation', async () => {
 		setup([key({})]);
-		expect(await deleteTitle()).toBe('Delete API key deploy');
+		expect(await deleteTitle()).toBe('Delete API key deploy?');
 	});
 
 	it('shows the new key once in a field that copies it and confirms', async () => {
@@ -268,10 +269,10 @@ describe('API keys failures stay with their own action', () => {
 	const dialog = () => document.body.querySelector('[role="dialog"]');
 
 	it('shows a failed revoke on the page and never inside the next New key drawer', async () => {
-		const { getAllByRole } = setup([key({})], {}, { action: 'revoke', error: 'Failed to revoke API key' });
-		expect(document.body.textContent).toContain('Failed to revoke API key');
+		const { getAllByRole } = setup([key({})], {}, { action: 'revoke', error: 'Could not revoke the API key. Try again.' });
+		expect(document.body.textContent).toContain('Could not revoke the API key. Try again.');
 		await fireEvent.click(getAllByRole('button', { name: /New key/ })[0]);
-		expect(dialog()?.textContent).not.toContain('Failed to revoke API key');
+		expect(dialog()?.textContent).not.toContain('Could not revoke the API key. Try again.');
 	});
 
 	it('keeps a failed create out of the request limits drawer', async () => {
@@ -286,8 +287,8 @@ describe('API keys failures stay with their own action', () => {
 		const rendered = setup([key({})]);
 		await fireEvent.click(rendered.getByRole('button', { name: 'Request limits for deploy' }));
 		const data = { keys: { ok: true, value: [key({})] }, usageMap: {}, usageUnknown: [], month: '2026-10', total: 1, limit: 50, offset: 0, schemaNames: [], catalog: null };
-		await rendered.rerender({ data, form: { action: 'limit', error: 'The request limits could not be saved.' } } as never);
-		expect(dialog()?.textContent).toContain('The request limits could not be saved.');
+		await rendered.rerender({ data, form: { action: 'limit', error: 'Could not save the request limits. Try again.' } } as never);
+		expect(dialog()?.textContent).toContain('Could not save the request limits. Try again.');
 	});
 });
 

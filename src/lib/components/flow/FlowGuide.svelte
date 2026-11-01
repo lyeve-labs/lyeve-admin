@@ -20,7 +20,7 @@
 
 	const TEMPLATE_NOTES: Record<string, string> = {
 		'join-three-tables-api':
-			'An HTTP trigger, two content queries and a join, ending in a response. The trigger caches the answer for 30 seconds per customer and rate-limits by API key. Start here when you want one endpoint that answers what three tables know.',
+			'An HTTP trigger, two content queries and a join, ending in a response. The trigger caches the answer for 30 seconds per customer and rate-limits by API key. Start here when you want one endpoint that returns data from three tables.',
 		'nightly-sheet-export':
 			'A cron trigger at 02:00, a content query and a sheets.append. It needs a google_sheets datasource named in the node. Start here for a scheduled export.',
 		'enrich-on-create':
@@ -34,9 +34,9 @@
 		<p class="text-muted">
 			A flow is a graph the tenant owns: one trigger, some nodes, the edges between them and a few
 			settings. The trigger decides when it runs. Each node does one unit of work with the config
-			you give it and hands its output down its edges. A flow is a draft until you publish it.
-			Publishing writes a numbered version and mounts the trigger. Disable it to unmount the trigger
-			without losing anything, and roll back to any earlier version from the settings panel.
+			you give it and passes its output along its edges. A flow is a draft until you publish it.
+			Publishing saves a numbered version and turns the trigger on. Disable the flow to turn the
+			trigger off without losing anything, and roll back to any earlier version from the settings panel.
 		</p>
 	</section>
 
@@ -48,10 +48,10 @@
 			defaults, and a node such as Join names its ports
 			<code class="font-mono text-xs">left</code> and <code class="font-mono text-xs">right</code>.
 			A node runs once every inbound edge has resolved. A node with no inbound edge is a root and
-			starts at once with the trigger payload as its input. The dashed line on the canvas shows
+			starts immediately with the trigger payload as its input. The dashed line on the canvas shows
 			that. Fan-out is allowed. A port that takes several edges receives them as a list in edge
-			order. The graph is a DAG: the canvas refuses an edge that would close a cycle, and so does
-			the engine.
+			order. The graph cannot loop back on itself, so the canvas does not let you draw an edge that
+			would create a cycle.
 		</p>
 	</section>
 
@@ -99,7 +99,7 @@
 	</section>
 
 	<section class="flex flex-col gap-1">
-		<SectionHeading level={3}>Test against live</SectionHeading>
+		<SectionHeading level={3}>Run a test</SectionHeading>
 		<p class="text-muted">
 			Run test executes the draft on the canvas, not the published version, with the trigger JSON
 			from the Test tab. A node with side effects (writes, HTTP calls other than GET, email, events)
@@ -114,8 +114,8 @@
 		<SectionHeading level={3}>Export and import</SectionHeading>
 		<p class="text-muted">
 			An export is the definition as JSON or YAML, positions included, so it re-imports as drawn.
-			It never carries a secret. A datasource is referenced by name, and the importer resolves that
-			name in the target tenant and lists the ones it could not find. Create them under Datasources
+			It never includes a secret. A datasource is referenced by name. An import looks for that name
+			in the target tenant and lists the ones it cannot find. Create them under Datasources
 			before publishing. Secret variables export as the key alone, marked secret, with no value.
 			Import creates a new flow, or replaces the draft of the flow whose slug you give.
 		</p>

@@ -101,7 +101,7 @@ describe('Users create', () => {
 
 		const dialog = container.querySelector('[role="dialog"]') as HTMLElement;
 		expect(dialog.textContent).toContain(
-			"The engine's password policy applies. By default that is at least 12 characters, with upper case, lower case and a digit, and not a common password."
+			'The password policy applies. By default it needs at least 12 characters, with upper case, lower case and a digit, and no common passwords.'
 		);
 	});
 
@@ -278,7 +278,7 @@ describe('Users set password', () => {
 
 		const dialog = container.querySelector('[role="dialog"]');
 		expect(dialog?.textContent).toContain('Set password for user0@b.co');
-		expect(dialog?.textContent).toContain('signed out of every session');
+		expect(dialog?.textContent).toContain('signs the user out of every session');
 		const form = dialog?.querySelector('form');
 		expect(form?.getAttribute('action')).toBe('?/setPassword');
 		expect((form?.querySelector('input[name="id"]') as HTMLInputElement).value).toBe('u0');
@@ -316,36 +316,36 @@ describe('Users set password', () => {
 // Every action answers into one `form`. A failure from one action must not
 // read as another form's failure.
 describe('Users failures stay with their own action', () => {
-	const deleteFailed = { action: 'delete', error: 'Failed to delete user' };
+	const deleteFailed = { action: 'delete', error: 'Could not delete the user. Try again.' };
 
 	it('shows a failed delete on the page and never inside the next New user drawer', async () => {
 		const { getAllByRole, container } = render(UsersPage, {
 			props: { data: data({ users: accounts(1) }) as never, form: deleteFailed as never },
 		});
-		expect(container.textContent).toContain('Failed to delete user');
+		expect(container.textContent).toContain('Could not delete the user. Try again.');
 		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
 		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
-		expect(dialog?.textContent).not.toContain('Failed to delete user');
+		expect(dialog?.textContent).not.toContain('Could not delete the user. Try again.');
 	});
 
 	it('keeps a failed password set out of the roles drawer', async () => {
-		const failed = { action: 'setPassword', error: 'Failed to set password' };
+		const failed = { action: 'setPassword', error: 'Could not set the password. Try again.' };
 		const { getByRole, container } = render(UsersPage, {
 			props: { data: data({ users: accounts(1) }) as never, form: failed as never },
 		});
 		await fireEvent.click(getByRole('button', { name: /edit roles for user0@b\.co/i }));
 		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
-		expect(dialog?.textContent).not.toContain('Failed to set password');
+		expect(dialog?.textContent).not.toContain('Could not set the password. Try again.');
 	});
 
 	it('drops a create failure from an earlier opening of the drawer', async () => {
-		const failed = { action: 'create', error: 'Failed to create user' };
+		const failed = { action: 'create', error: 'Could not create the user. Try again.' };
 		const { getAllByRole, container } = render(UsersPage, {
 			props: { data: data() as never, form: failed as never },
 		});
 		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
 		const dialog = container.ownerDocument.querySelector('[role="dialog"]');
-		expect(dialog?.textContent).not.toContain('Failed to create user');
+		expect(dialog?.textContent).not.toContain('Could not create the user. Try again.');
 	});
 });
 
@@ -366,10 +366,10 @@ describe('Users create, several tenants', () => {
 
 describe('Users read failures', () => {
 	it('says the accounts could not be read instead of inviting a first account', () => {
-		const failed = { ok: false, gate: { state: 'error', message: 'The accounts could not be read.' } };
+		const failed = { ok: false, gate: { state: 'error', message: 'Could not load the accounts.' } };
 		const { container, queryByRole } = render(UsersPage, { props: props({ users: failed }) });
 
-		expect(container.textContent).toContain('The accounts could not be read.');
+		expect(container.textContent).toContain('Could not load the accounts.');
 		expect(container.textContent).not.toContain('No users yet');
 		expect(queryByRole('button', { name: /new user/i })).toBeNull();
 	});
@@ -379,7 +379,7 @@ describe('Users read failures', () => {
 		const { getAllByRole, container } = render(UsersPage, { props: props({ tenants: failed }) });
 		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);
 
-		expect(container.ownerDocument.body.textContent).toContain('Tenants could not be read');
+		expect(container.ownerDocument.body.textContent).toContain('Could not load the tenants');
 	});
 });
 
@@ -405,7 +405,7 @@ describe('Users admin seat refusal', () => {
 		});
 
 		const dialog = within(rendered.container.ownerDocument.body.querySelector('[role="dialog"]') as HTMLElement);
-		expect(dialog.getByText(/3 of 3 are in use/)).toBeTruthy();
+		expect(dialog.getByText(/You're using 3 of 3,/)).toBeTruthy();
 		expect(dialog.getByText(/A license that allows more lifts the limit\./)).toBeTruthy();
 		const more = dialog.getByRole('link', { name: 'View the plan' });
 		expect(more.getAttribute('href')).toBe(link);

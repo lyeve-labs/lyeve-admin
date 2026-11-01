@@ -32,7 +32,7 @@
 	);
 	const entries = $derived(data.search.ok ? (data.search.value.results ?? []) : []);
 
-	const ABSENT = 'The logging plugin is not part of this build, so log entries are not kept.';
+	const ABSENT = 'Logs are not included in this build.';
 
 	// The first figure that could not be read, which speaks for the row. The
 	// three reads go to one plugin, so they fail for one reason.
@@ -72,7 +72,7 @@
 
 <PageShell
 	title="Logs"
-	description="Log entries, their levels and the volume behind them."
+	description="Search log entries and see log volume by level."
 	width="wide"
 >
 	{#snippet actions()}
@@ -91,7 +91,7 @@
 				<Stat
 					label="Volume (24h)"
 					value={volume ? formatCount(volume.total) : NO_VALUE}
-					sub={volume ? undefined : 'Not read'}
+					sub={volume ? undefined : 'Could not load'}
 					accent="brand"
 					mono
 				/>
@@ -99,14 +99,14 @@
 					label="Default level"
 					value={(levels && logLevelLabel(levels.default_level)) || NO_VALUE}
 					sub={overrideCount === null
-						? 'Not read'
+						? 'Could not load'
 						: `${overrideCount} tenant and plugin ${overrideCount === 1 ? 'override' : 'overrides'}`}
 					accent="brand"
 				/>
 				<Stat
 					label="Sinks"
 					value={sinks === null ? NO_VALUE : sinks.length > 0 ? sinks.map((sink) => sink.driver).join(', ') : 'None'}
-					sub={sinks === null ? 'Not read' : undefined}
+					sub={sinks === null ? 'Could not load' : undefined}
 					accent="brand"
 				/>
 			</div>
@@ -185,14 +185,14 @@
 			{:else if entries.length === 0 && filtered}
 				<EmptyState
 					iconSnippet={emptyIcon}
-					title="No log entries match the current filter"
-					description="Widen the level or clear the search to see more."
+					title="No log entries match these filters"
+					description="Choose All levels or clear the search to see more."
 				/>
 			{:else if entries.length === 0}
 				<EmptyState
 					iconSnippet={emptyIcon}
 					title="No log entries yet"
-					description="The engine writes an entry here for each request and each event it logs."
+					description="Entries appear here for each request and each logged event."
 				/>
 			{:else}
 				<div class="flex flex-col gap-2">

@@ -123,10 +123,10 @@ export async function section<T>(read: Promise<T>, failed: string): Promise<Sect
 /** The sentence a page shows for a gate at a ceiling. */
 export function fullText(gate: Extract<Gate, { state: 'full' }>): string {
 	if (gate.limit !== null && gate.current !== null) {
-		return `${gate.current} of ${gate.limit} are in use, which is the most this instance allows.`;
+		return `You're using ${gate.current} of ${gate.limit}, the most this instance allows.`;
 	}
 	if (gate.limit !== null) return `This instance allows at most ${gate.limit}.`;
-	return 'This instance allows no more.';
+	return 'This instance is at its limit.';
 }
 
 /**

@@ -59,7 +59,7 @@
 	let cpuSeconds = $state<number>(PROFILE_SECONDS.default);
 
 	const memory = $derived(data.memory.ok ? data.memory.value : null);
-	const ABSENT = 'The profiler plugin is not part of this build, so nothing is sampled.';
+	const ABSENT = 'The profiler is not included in this build.';
 	const latest = $derived(memory?.snapshots.at(-1) ?? null);
 	const detail = $derived(data.detail?.ok ? data.detail.value : null);
 
@@ -131,7 +131,7 @@
 
 <PageShell
 	title="Profiler"
-	description="Per-endpoint and per-plugin timings from the engine's request sampler, the memory trend, pprof exports and flamegraphs."
+	description="See request timings by endpoint and plugin, track memory, and capture CPU profiles."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -145,7 +145,7 @@
 			use:enhance={async ({ cancel }) => {
 				const confirmed = await confirmDialog(
 					'Reset the profiler?',
-					'The sampled requests and the memory snapshots are dropped and a fresh snapshot is taken.',
+					'Sampled requests and memory snapshots are deleted, and a new snapshot is taken. This cannot be undone.',
 					{ confirmLabel: 'Reset' },
 				);
 				if (!confirmed) {
@@ -169,7 +169,7 @@
 		{#if 'error' in form && form.error}
 			<Alert tone="danger">{form.error}</Alert>
 		{:else}
-			<Alert tone="success" autoDismiss>The profiler was reset.</Alert>
+			<Alert tone="success" autoDismiss>Profiler reset.</Alert>
 		{/if}
 	{/if}
 
@@ -188,9 +188,9 @@
 		{#if !data.memory.ok}
 			<GateNotice gate={data.memory.gate} title="the memory trend" absent={ABSENT} />
 		{:else if !memory}
-			<EmptyState iconSnippet={noMemory} title="No memory trend" description="The engine answered with no memory snapshots." />
+			<EmptyState iconSnippet={noMemory} title="No memory trend" description="No memory snapshots are available yet." />
 		{:else if !latest}
-			<EmptyState iconSnippet={noMemory} title="No snapshot yet" description="The sampler takes a snapshot on a schedule. The first one has not been taken." />
+			<EmptyState iconSnippet={noMemory} title="No snapshot yet" description="Snapshots are taken on a schedule. The first one has not been taken yet." />
 		{:else}
 			<Card>
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="memory-stats">
@@ -213,14 +213,14 @@
 		<div class="flex flex-wrap items-center gap-2">
 			<SectionHeading level={2}>Slowest endpoints</SectionHeading>
 			<span class="text-xs text-faint">
-				By p95, the twenty slowest.{#if data.endpoints.ok}
+				The 20 slowest, by p95.{#if data.endpoints.ok}
 					{data.endpoints.value.length} endpoints sampled.{/if}
 			</span>
 		</div>
 		{#if !data.slowest.ok}
 			<GateNotice gate={data.slowest.gate} title="the endpoint statistics" absent={ABSENT} />
 		{:else if data.slowest.value.length === 0}
-			<EmptyState iconSnippet={noEndpoints} title="Nothing sampled yet" description="Endpoints appear here once the sampler has timed some requests." />
+			<EmptyState iconSnippet={noEndpoints} title="Nothing sampled yet" description="Endpoints appear here after they serve requests." />
 		{:else}
 			{@render endpointRows(data.slowest.value, 'Slowest endpoints')}
 		{/if}
@@ -231,14 +231,14 @@
 			<div class="flex flex-wrap items-center gap-2">
 				<SectionHeading level={2}><span class="font-mono">{data.selected}</span></SectionHeading>
 				{#if detail}
-					<span class="text-xs text-faint">{detail.total_count} entries in the ring</span>
+					<span class="text-xs text-faint">{detail.total_count} samples recorded</span>
 				{/if}
 				<a href="/admin/observability/profiler" class="relative hit-area ms-auto text-xs text-muted underline-offset-2 transition-colors hover:text-fg hover:underline">Clear selection</a>
 			</div>
 			{#if data.detail && !data.detail.ok}
 				<GateNotice gate={data.detail.gate} title="this endpoint" absent={ABSENT} />
 			{:else if !detail || !detail.methods?.length}
-				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="The ring holds no sample for it. It may have been reset, or the path is not one the engine served." />
+				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="The profiler may have been reset, or this path has not served any requests." />
 			{:else}
 				{@render endpointRows(detail.methods.map((m) => m.stats), `Methods for ${data.selected}`)}
 				{#each detail.methods as method (method.method)}
@@ -286,7 +286,7 @@
 		{#if !data.plugins.ok}
 			<GateNotice gate={data.plugins.gate} title="the plugin breakdown" absent={ABSENT} />
 		{:else if data.plugins.value.length === 0}
-			<EmptyState iconSnippet={noPlugins} title="Nothing sampled yet" description="Plugins appear here once a request has been served through one." />
+			<EmptyState iconSnippet={noPlugins} title="Nothing sampled yet" description="Plugins appear here after they serve a request." />
 		{:else}
 			<Table label="By plugin">
 				<thead>
@@ -324,8 +324,8 @@
 			{/snippet}
 			<div class="flex flex-col gap-4" data-testid="profiler-exports">
 				<p class="text-xs text-muted">
-					Each download is a gzipped pprof profile. A heap or allocations profile carries raw
-					process memory and is logged when exported. An instance may refuse those two.
+					Each download is a gzipped pprof profile. Heap and allocations profiles contain raw
+					process memory and are logged when exported. This instance may not allow them.
 				</p>
 				<NumberInput
 					id="cpu-seconds"
@@ -372,8 +372,8 @@
 				}}
 			>
 				<p class="text-xs text-muted">
-					A CPU profile over the window, rendered as a graph. The endpoint is a label on the
-					result: the profile covers every goroutine in the process.
+					Captures a CPU profile over the window and draws it as a graph. The endpoint only
+					labels the result. The profile covers every goroutine in the process.
 				</p>
 				<Input
 					id="flame-endpoint"

@@ -46,7 +46,7 @@ describe('admin/ai/providers load', () => {
 	it('keeps the engine banner for a 500 and never its text', async () => {
 		const { event } = loadEvent({ '/api/admin/ai/providers': () => refused(500, 'pq: connection refused') });
 		const out = (await load(event)) as Loaded;
-		expect(out.gate).toEqual({ state: 'error', message: expect.stringContaining('could not be read') });
+		expect(out.gate).toEqual({ state: 'error', message: expect.stringContaining('Could not load') });
 		expect(JSON.stringify(out.gate)).not.toContain('pq:');
 	});
 });

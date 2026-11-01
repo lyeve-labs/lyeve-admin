@@ -19,7 +19,7 @@
 
 <PageTitle title="Reset your password" />
 
-<AuthShell title="Reset your password" description="We will email you a link to choose a new one.">
+<AuthShell title="Reset your password" description="Get a link by email to choose a new password.">
 	{#if form && 'sent' in form && form.sent}
 		<div class="space-y-5">
 			<Alert tone="success" announce>

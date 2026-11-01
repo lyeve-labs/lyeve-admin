@@ -67,7 +67,7 @@ export const BROKER_OK: BrokerGate = GATE_OK;
 
 /** What a refused broker read means, read the way every plugin's is. */
 export function brokerGate(err: unknown): BrokerGate {
-	return gateOf(err, 'The broker status could not be read. This is not a report that it is healthy.');
+	return gateOf(err, 'Could not load the broker status.');
 }
 
 export async function readStatus(client: HttpClient): Promise<BrokerStatus> {
@@ -140,9 +140,9 @@ export function brokerHealth(s: BrokerStatus | null): BrokerHealth {
 export const HEALTH_LABELS: Readonly<Record<BrokerHealth, string>> = {
 	publishing: 'Publishing',
 	refusing: 'The broker is refusing events',
-	retrying: 'The broker refused attempts, the outbox retries them',
-	lost: 'Events ran out of attempts',
-	undelivered: 'Events had nowhere to go',
+	retrying: 'The broker refused events, and the outbox is retrying them',
+	lost: 'Events failed after every retry',
+	undelivered: 'Some events were dropped',
 	disabled: 'Dropping events, not enabled on this instance',
 	discarding: 'No broker, events are discarded',
 	idle: 'Nothing published yet',

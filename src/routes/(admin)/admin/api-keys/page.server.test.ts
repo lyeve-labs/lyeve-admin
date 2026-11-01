@@ -152,8 +152,8 @@ describe('API keys revoke and delete', () => {
 	});
 
 	it.each([
-		['revoke', 'Failed to revoke API key'],
-		['delete', 'Failed to delete API key'],
+		['revoke', 'Could not revoke the API key. Try again.'],
+		['delete', 'Could not delete the API key. Try again.'],
 	] as const)('names %s on a refusal and keeps outage detail off the page', async (name, fallback) => {
 		const { actions } = await import('./+page.server');
 		const refused = write(['super_admin'], () => json({ error: 'api key not found' }, 404));

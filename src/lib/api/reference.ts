@@ -168,7 +168,7 @@ const adminSchemasGroup: EndpointGroup = {
 			method: 'DELETE',
 			path: '/api/admin/schemas/{name}',
 			summary: 'Delete schema',
-			description: 'Drops the underlying Postgres table and removes all schema metadata. Irreversible.',
+			description: "Deletes the schema definition and this tenant's rows. The table is dropped only when no other tenant defines the schema. This cannot be undone.",
 			auth: 'cookie',
 			roles: ['admin', 'super_admin'],
 			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Schema identifier' }],

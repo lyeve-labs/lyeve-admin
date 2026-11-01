@@ -19,8 +19,8 @@ describe('problemsOf', () => {
 	});
 
 	it('asks for a table name and refuses one the engine would not take', () => {
-		expect(problemsOf(schema('', []), [], true)[0]).toMatchObject({ target: 'schema-name', message: 'Name the table.' });
-		expect(problemsOf(schema('2posts', []), [], true)[0].message).toMatch(/cannot start with a digit/);
+		expect(problemsOf(schema('', []), [], true)[0]).toMatchObject({ target: 'schema-name', message: 'Enter a table name.' });
+		expect(problemsOf(schema('2posts', []), [], true)[0].message).toMatch(/do not start it with a digit/);
 	});
 
 	it('refuses a new schema whose name is taken, whatever its case', () => {
@@ -31,7 +31,7 @@ describe('problemsOf', () => {
 	it('refuses a column the engine adds itself', () => {
 		const [p] = problemsOf(schema('posts', [field('a', 'created_at')]), [], false);
 		expect(p).toMatchObject({ fieldId: 'a', target: 'field-name-a' });
-		expect(p.message).toMatch(/engine adds itself/);
+		expect(p.message).toMatch(/is a system column/);
 	});
 
 	it('refuses two fields that fold to one column', () => {
@@ -57,7 +57,7 @@ describe('problemsOf', () => {
 			field('b', '', { field_type: 'relation', relation_type: 'belongs_to' }),
 		]);
 		expect(problemsOf(fresh, [], false)).toEqual([
-			{ fieldId: 'b', target: 'field-name-b', where: 'New relation field, row 2', message: 'Name the field.' },
+			{ fieldId: 'b', target: 'field-name-b', where: 'New relation field, row 2', message: 'Enter a field name.' },
 			{ fieldId: 'b', target: 'relation-target-b', where: 'New relation field, row 2', message: 'Pick the schema this relation points at.' },
 		]);
 	});
@@ -65,7 +65,7 @@ describe('problemsOf', () => {
 	it('names a field that has a name by it, and keeps the message free of it', () => {
 		const [p] = problemsOf(schema('posts', [field('a', 'my title')]), [], false);
 		expect(p.where).toBe('Field my title');
-		expect(p.message).toMatch(/^The field name takes letters/);
+		expect(p.message).toMatch(/^Use only letters, digits and underscores in the field name/);
 	});
 
 	it('leaves the engine-owned rows alone', () => {
@@ -115,8 +115,8 @@ describe('appliedMessage', () => {
 		expect(appliedMessage(3, 0)).toBe('Applied 3 queued changes');
 	});
 	it('says which drops were kept and why', () => {
-		expect(appliedMessage(0, 1)).toBe('Applied 0 queued changes; one was canceled because a schema still uses its column');
-		expect(appliedMessage(2, 2)).toBe('Applied 2 queued changes; 2 were canceled because a schema still uses their columns');
+		expect(appliedMessage(0, 1)).toBe('Applied 0 queued changes. One was canceled because a schema still uses its column.');
+		expect(appliedMessage(2, 2)).toBe('Applied 2 queued changes. 2 were canceled because a schema still uses their columns.');
 	});
 });
 

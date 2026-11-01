@@ -119,7 +119,7 @@ describe('privacy settings: what a person may include', () => {
 		const { container } = render(PrivacyPage, {
 			props: props({ exportSections: { ok: false, gate: { state: 'unavailable' } } }),
 		});
-		expect(said(container)).toContain('could not be read');
+		expect(said(container)).toContain('did not load');
 		expect(container.querySelector('input[name="offered"]')).toBeNull();
 	});
 });

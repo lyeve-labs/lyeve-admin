@@ -30,11 +30,11 @@ export const load: PageServerLoad = async (event) => {
 				rows: rowsOf<ActivityRow>(res),
 				stated: statedTotal<ActivityRow>(res),
 			})),
-			'The content activity could not be read. This is not a report that nothing changed.',
+			'Could not load content activity.',
 		),
 		section(
 			getSchemas(client).then((rows) => rows.map((s) => ({ name: s.name, label: s.display_name || s.name }))),
-			'The content types could not be read, so the list cannot be narrowed to one.',
+			'Could not load the content types for the filter. Reload the page to try again.',
 		),
 		superAdmin && !notRunning(plugins, PLUGIN.multitenant)
 			? section(
@@ -42,7 +42,7 @@ export const load: PageServerLoad = async (event) => {
 						// Activity rows name their tenant by slug, the way the session does.
 						(Array.isArray(r?.items) ? r.items : []).map((t) => ({ slug: t.slug, label: t.name || t.slug })),
 					),
-					'The tenants could not be read, so the list cannot be narrowed to one.',
+					'Could not load the tenants for the filter. Reload the page to try again.',
 				)
 			: Promise.resolve<Section<{ slug: string; label: string }[]>>({ ok: true, value: [] }),
 	]);

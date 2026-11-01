@@ -90,7 +90,7 @@ export const SAML_OK: SamlGate = GATE_OK;
 
 /** What a refused SAML read means, read the way every plugin's is. */
 export function samlGate(err: unknown): SamlGate {
-	return gateOf(err, 'The identity providers could not be read. This is not a report that none are configured.');
+	return gateOf(err, 'Could not load identity providers.');
 }
 
 export async function listProviders(

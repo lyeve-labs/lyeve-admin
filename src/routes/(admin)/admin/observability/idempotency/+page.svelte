@@ -60,7 +60,7 @@
 	function release(k: IdempotencyKey): SubmitFunction {
 		return confirmed(
 			`Release the key ${k.key}?`,
-			'The next request carrying it runs the handler again. If the original request is still running, the write happens twice, which is what the key exists to prevent.',
+			'The next request with this key runs again. If the original request is still running, the write happens twice.',
 			{ confirmLabel: 'Release', success: 'Key released' },
 		);
 	}
@@ -68,7 +68,7 @@
 
 <PageShell
 	title="Idempotency"
-	description="Request keys the engine is holding, and the responses stored against them."
+	description="See the idempotency keys in use and the responses stored for them."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -77,7 +77,7 @@
 			level={2}
 			gate={data.gate}
 			title="Idempotency"
-			absent="The idempotency plugin is not part of this build, so a repeated request runs twice."
+			absent="Idempotency is not included in this build. Requests sent twice run twice."
 		/>
 	{:else}
 		{#if formError}
@@ -97,15 +97,15 @@
 				/>
 			</div>
 			<p class="text-xs text-muted">
-				{replays} repeated requests on this page were answered from a stored response instead
-				of running again.
+				{replays} repeated requests on this page got the stored response instead of running
+				again.
 			</p>
 		{:else if !data.statsRead}
 			{#if data.statsGate}
-				<GateNotice level={2} gate={data.statsGate} title="the counters" absent="This version of the idempotency plugin keeps no counters." />
+				<GateNotice level={2} gate={data.statsGate} title="the counters" absent="The counters need a newer version of the idempotency plugin." />
 			{:else}
 				<Alert tone="danger">
-					The counters could not be read. The list below is one page, not the whole store.
+					Could not load the counters. Reload the page to try again.
 				</Alert>
 			{/if}
 		{/if}
@@ -117,10 +117,10 @@
 			<Alert tone="danger">
 				{orphans.length}
 				{orphans.length === 1 ? 'key has' : 'keys have'} been open for more than
-				{ABANDONED_AFTER_SECONDS} seconds. No handler runs that long, so these are requests
-				whose process died before storing a response. Every retry carrying one of these keys
-				is refused until it expires, which reads to the caller as a write that was accepted
-				and never happened.
+				{ABANDONED_AFTER_SECONDS} seconds. No request takes that long, so the process handling
+				each one stopped before it stored a response. Every retry with one of these keys is
+				refused until the key expires, so the caller sees a write that was accepted but never
+				happened.
 			</Alert>
 		{/if}
 
@@ -128,7 +128,7 @@
 			<SectionHeading level={2}>Keys</SectionHeading>
 			{#if data.keys.length === 0}
 				<EmptyState
-					title="No key is held"
+					title="No idempotency keys"
 					description="No client has sent an idempotency key, or every one has expired."
 				>
 					{#snippet iconSnippet()}
@@ -138,7 +138,7 @@
 			{:else}
 				<ListToolbar label="Filter keys">
 					{#snippet search()}
-						<label for="key-narrow" class="sr-only">Narrow this page</label>
+						<label for="key-narrow" class="sr-only">Search this page</label>
 						<SearchInput id="key-narrow" bind:value={narrow} placeholder="Key, method or path on this page" />
 					{/snippet}
 					{#snippet filters()}
@@ -156,7 +156,7 @@
 					{/snippet}
 				</ListToolbar>
 				{#if visible.length === 0}
-					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
+					<EmptyState title="No keys on this page match these filters" description="Clear the filter to see the rest.">
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}

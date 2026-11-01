@@ -66,7 +66,7 @@
 	<!-- The page around this notice rendered, so unlike the full-page outage it
 	     names only the part that could not be read. -->
 	<Alert tone="warn" title={OUTAGE.title}>
-		<p>The engine or its database did not answer, so {subject} could not be read. Nothing was changed. Try again in a moment.</p>
+		<p>The engine is unavailable, so {subject} did not load. Try again in a moment.</p>
 		{@render retry()}
 	</Alert>
 {:else if gate.state === 'error'}

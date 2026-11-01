@@ -106,8 +106,8 @@
 	 */
 	function removeRegion(r: Region): SubmitFunction {
 		return confirmed(
-			`Delete region ${r.display_name}`,
-			'Tenants assigned to it are not moved. Move them first, or the report stops accounting for where their data is.',
+			`Delete region ${r.display_name}?`,
+			'Tenants in this region are not moved. Move them first, or the report can no longer show where their data is.',
 			{ confirmLabel: 'Delete', success: `Deleted ${r.display_name}` },
 		);
 	}
@@ -117,7 +117,7 @@
 
 <PageShell
 	title="Data residency"
-	description="The regions this instance runs in, and which tenant's data sits in each."
+	description="Manage the regions this instance runs in, and see where each tenant's data is."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -131,15 +131,14 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			Regions are instance infrastructure and the residency report covers every tenant, so both
-			are a super admin's to read.
+			Only a super admin can see regions and the residency report, because they cover the whole instance and every tenant.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
 			level={2}
 			gate={data.gate}
 			title="Data residency"
-			absent="The data residency plugin is not part of this build, so no region is recorded."
+			absent="Data residency is not included in this build."
 		/>
 	{:else}
 		{#if rowError}
@@ -155,7 +154,7 @@
 				<GateNotice
 					gate={data.reportGate}
 					title="The residency report"
-					absent="This instance serves no residency report, so it cannot say where tenants are."
+					absent="The residency report is not available on this instance."
 				/>
 			{:else if summary}
 				<div class="grid gap-4 sm:grid-cols-4">
@@ -176,15 +175,13 @@
 					     region is not in a compliant default, it is unaccounted for. -->
 					<Alert tone="danger">
 						{stranded}
-						{stranded === 1 ? 'tenant has' : 'tenants have'} no region assigned. That is not a
-						default placement: this report cannot say where that data is.
+						{stranded === 1 ? 'tenant has' : 'tenants have'} no region assigned. They are not in a default region, and this report cannot show where their data is.
 					</Alert>
 				{/if}
 
 				{#if partial}
 					<Alert tone="warn">
-						This report lists fewer tenants than it counts. It is a page of the data, not a
-						complete audit, so do not hand it over as one.
+						This report shows fewer tenants than its total. It covers one page of the data, not a complete audit, so do not share it as one.
 					</Alert>
 				{/if}
 
@@ -247,8 +244,8 @@
 				{/if}
 			{:else}
 				<EmptyState
-					title="Nothing to report yet"
-					description="No tenant has been assigned a region, so there is nothing to account for."
+					title="No tenants assigned yet"
+					description="Tenants appear here once they are assigned a region."
 				>
 					{#snippet iconSnippet()}
 						<Globe size={ICON.lg} />
@@ -262,8 +259,8 @@
 
 			{#if data.regions.length === 0}
 				<EmptyState
-					title="No region is defined"
-					description="Define at least one before a tenant can be placed anywhere."
+					title="No regions yet"
+					description="Create a region before you place a tenant in it."
 				>
 					{#snippet iconSnippet()}
 						<MapPin size={ICON.lg} />
@@ -277,7 +274,7 @@
 			{:else}
 				{#if data.more}
 					<p class="text-xs text-muted">
-						Showing the first 100 regions. Regions past the hundredth are not listed here.
+						Showing the first 100 regions. Any others are not listed here.
 					</p>
 				{/if}
 				<Table label="Regions">
@@ -355,7 +352,7 @@
 					id="region-slug-fixed"
 					label="Slug"
 					value={slug}
-					hint="Fixed once created. It is written onto every assignment and onto the report."
+					hint="A slug cannot be changed after the region is created."
 					readonly
 				/>
 			{:else}
@@ -363,7 +360,7 @@
 					id="region-slug"
 					name="slug"
 					label="Slug"
-					hint="Lower case, digits and hyphens, such as eu-west-1. It cannot be changed later."
+					hint="Lowercase letters, digits and hyphens, such as eu-west-1. You cannot change it later."
 					bind:value={slug}
 					required
 				/>
@@ -372,7 +369,7 @@
 				id="region-name"
 				name="display_name"
 				label="Name"
-				hint="What it is called on the report a person reads."
+				hint="The name shown on the residency report."
 				bind:value={displayName}
 				required
 			/>
@@ -380,7 +377,7 @@
 				id="region-provider"
 				name="provider"
 				label="Runs on"
-				hint="aws, gcp, azure, on-prem."
+				hint="For example aws, gcp, azure or on-prem."
 				bind:value={provider}
 				required
 			/>
@@ -390,7 +387,7 @@
 					name="lat"
 					label="Latitude"
 					hint={editing?.coordinates
-						? 'Used to route a client to its nearest region. A save cannot remove stored coordinates: emptied fields keep them. Type new ones to move the region.'
+						? 'Used to route a client to its nearest region. Saved coordinates cannot be removed, and empty fields keep them. Enter new ones to move the region.'
 						: 'Optional. Used to route a client to its nearest region.'}
 					bind:value={lat}
 				/>

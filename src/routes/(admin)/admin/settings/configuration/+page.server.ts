@@ -51,7 +51,7 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	const read = await section(
 		client.get<ConfigProvenance>('/api/admin/config'),
-		'The configuration could not be read. This is not a report that nothing is set.'
+		'Could not load the configuration.'
 	);
 
 	// Opened for one plugin, the page shows that plugin's settings: the ones
@@ -81,16 +81,16 @@ export const actions: Actions = {
 	// engine is told to unset one.
 	save: async (event) => {
 		const { request } = event;
-		if (!sessionToken(event)) return fail(401, { error: 'Not authenticated' });
+		if (!sessionToken(event)) return fail(401, { error: 'Your session has ended. Sign in again.' });
 
 		const data = await request.formData();
 		const key = data.get('key')?.toString()?.trim();
-		if (!key) return fail(400, { error: 'Setting name is required' });
+		if (!key) return fail(400, { error: 'This form is missing its setting. Reload the page and try again.' });
 
 		const value = data.get('value')?.toString() ?? '';
 		const secret = data.get('secret')?.toString() === 'true';
 		if (secret && value === '') {
-			return fail(400, { key, error: 'Enter a value, or use Clear to remove the stored one' });
+			return fail(400, { key, error: 'Enter a value, or use Clear to remove the stored one.' });
 		}
 
 		try {
@@ -110,7 +110,7 @@ export const actions: Actions = {
 			// A refusal keeps its status and its sentence. A failure of the engine
 			// keeps neither, because its text is not written for the operator.
 			const status = e instanceof ApiError && e.status < 500 ? e.status : 502;
-			return fail(status, { key, error: actionError(e, 'The setting could not be saved. Nothing was changed.') });
+			return fail(status, { key, error: actionError(e, 'Could not save the setting. Try again.') });
 		}
 	},
 };

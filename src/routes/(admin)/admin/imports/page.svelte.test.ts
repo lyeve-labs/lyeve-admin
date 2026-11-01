@@ -75,7 +75,7 @@ describe('Imports', () => {
 		expect(text).toContain('File upload');
 		expect(text).toContain('Web address');
 		expect(text).toContain('Another LyEve instance');
-		expect(text).toContain('Nothing has been imported');
+		expect(text).toContain('No imports yet');
 	});
 
 	it('offers the rejected rows for download only where rows were rejected', () => {
@@ -117,14 +117,14 @@ describe('Imports', () => {
 describe('Imports reads that failed', () => {
 	it('opens the rows panel with the reason when the job could not be read', () => {
 		render(ImportsPage, {
-			props: props({ detail: { ok: false, gate: { state: 'error', message: 'The rows of this import could not be read.' } } }),
+			props: props({ detail: { ok: false, gate: { state: 'error', message: 'Could not load the rows of this import.' } } }),
 		});
-		expect(document.body.textContent).toContain('The rows of this import could not be read.');
+		expect(document.body.textContent).toContain('Could not load the rows of this import.');
 	});
 
 	it('says an import that no longer exists is gone', () => {
 		render(ImportsPage, { props: props({ detail: { ok: false, gate: { state: 'absent' } } }) });
-		expect(document.body.textContent).toContain('That import no longer exists');
+		expect(document.body.textContent).toContain('This import no longer exists');
 	});
 
 	it('says why a new template offers no content type when the list was not read', async () => {
@@ -132,7 +132,7 @@ describe('Imports reads that failed', () => {
 			props: props({ templates: [], templatesRead: true, schemas: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
-		expect(document.body.textContent).toContain('The content types could not be read');
+		expect(document.body.textContent).toContain('Could not load content types');
 	});
 });
 
@@ -170,12 +170,13 @@ describe('Imports controls', () => {
 
 describe('Imports failures stay where they were made', () => {
 	it('shows a failed row action on the page and opens the template drawer clean', async () => {
+		const failed = 'Could not roll back the import. Try again.';
 		const { container } = render(ImportsPage, {
-			props: props({ templates: [], templatesRead: true }, { action: 'rollback', error: 'The import could not be rolled back.' }),
+			props: props({ templates: [], templatesRead: true }, { action: 'rollback', error: failed }),
 		});
-		expect(said(container)).toContain('The import could not be rolled back.');
+		expect(said(container)).toContain(failed);
 		await fireEvent.click(screen.getAllByRole('button', { name: /new template/i })[0]);
-		expect((document.getElementById('template-form') as HTMLFormElement).textContent).not.toContain('could not be rolled back');
+		expect((document.getElementById('template-form') as HTMLFormElement).textContent).not.toContain(failed);
 	});
 
 	it('shows a refused template save in its drawer and not on the page', async () => {

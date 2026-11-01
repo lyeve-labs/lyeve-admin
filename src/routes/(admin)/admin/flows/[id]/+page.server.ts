@@ -105,13 +105,13 @@ export const load: PageServerLoad = async (event) => {
 				(catalog): { catalog: NodeSpec[]; gate: Gate } => ({ catalog, gate: GATE_OK }),
 				(err: unknown) => ({
 					catalog: [] as NodeSpec[],
-					gate: gateOf(err, 'The node types could not be read, so the palette has nothing to offer.'),
+					gate: gateOf(err, 'Could not load node types.'),
 				}),
 			),
 			// A failed read of the names is kept, so the node form and the
 			// inspector never say a tenant has none when they were not read.
-			section(listDatasources(client).then((list) => list.rows), 'The datasources could not be read.'),
-			section(listVariables(client, 500, 0), 'The variables could not be read.'),
+			section(listDatasources(client).then((list) => list.rows), 'Could not load datasources.'),
+			section(listVariables(client, 500, 0), 'Could not load variables.'),
 			// The pickers read the content schemas, the published flows and the
 			// event types. A failed read leaves each picker as free text, which
 			// is the escape it carries anyway. An engine without the event-types
@@ -133,9 +133,9 @@ export const load: PageServerLoad = async (event) => {
 						return { rows, limit: RUNS_PER_PAGE, offset: runsOffset, total: p.total, hasMore };
 					},
 				),
-				'The runs could not be read. This is not a report that the flow never ran.',
+				'Could not load runs.',
 			),
-			section(listVersions(client, flow.id), 'The versions could not be read.'),
+			section(listVersions(client, flow.id), 'Could not load versions.'),
 			getTemplates(client).catch(() => []),
 			// The assistant's catalog decides whether the tab exists at all: a
 			// 402 there means the assistant is not enabled, and a tab that could
@@ -203,13 +203,13 @@ function importFailed<F extends ActionFailure<Record<string, unknown>>>(failure:
  */
 function conflictText(errors: ValidationError[]): string {
 	if (errors.some((e) => e.path === '/slug')) return 'Another flow already uses this slug. Choose another.';
-	if (errors.some((e) => e.path === '/config/path')) return 'Another flow already answers this HTTP path. Choose another path for the trigger.';
+	if (errors.some((e) => e.path === '/config/path')) return 'Another flow already uses this HTTP path. Choose another path for the trigger.';
 	return 'This conflicts with another flow.';
 }
 
 function refused(err: unknown, fallback: string) {
 	if (err instanceof ApiError && err.status === 422) {
-		return fail(422, { error: 'The definition did not validate.', errors: validationErrors(err.message) });
+		return fail(422, { error: 'Fix the problems in the definition.', errors: validationErrors(err.message) });
 	}
 	// A conflict comes in the validation shape with no error key, so the list
 	// is read the same way and marks what it names on the canvas.
@@ -265,7 +265,7 @@ export const actions: Actions = {
 			return fail(400, { error: 'The definition is not valid JSON.' });
 		}
 		const name = String(data.get('name') ?? definition.name ?? '').trim();
-		if (!name) return fail(400, { error: 'A flow needs a name.' });
+		if (!name) return fail(400, { error: 'Enter a name for the flow.' });
 		const slug = String(data.get('slug') ?? definition.slug ?? '').trim();
 		definition = { ...definition, name, ...(slug ? { slug } : {}) };
 		try {
@@ -277,7 +277,7 @@ export const actions: Actions = {
 			});
 			return { saved: { updated_at: flow.updated_at, status: flow.status, version: flow.version, slug: flow.slug } };
 		} catch (err) {
-			return refused(err, 'Failed to save the draft');
+			return refused(err, 'Could not save the draft. Try again.');
 		}
 	},
 
@@ -305,7 +305,7 @@ export const actions: Actions = {
 			const flow = await publishFlow(client, event.params.id);
 			return { published: { version: flow.version, status: flow.status, slug: flow.slug } };
 		} catch (err) {
-			return refused(err, 'Failed to publish');
+			return refused(err, 'Could not publish the flow. Try again.');
 		}
 	},
 
@@ -316,7 +316,7 @@ export const actions: Actions = {
 			const flow = await disableFlow(client, event.params.id);
 			return { disabled: { status: flow.status } };
 		} catch (err) {
-			return refused(err, 'Failed to disable');
+			return refused(err, 'Could not disable the flow. Try again.');
 		}
 	},
 
@@ -334,7 +334,7 @@ export const actions: Actions = {
 			const flow = await rollbackFlow(client, event.params.id, version);
 			return { reloaded: await reloaded(client, event.params.id, flow) };
 		} catch (err) {
-			return refused(err, 'Failed to roll back');
+			return refused(err, 'Could not roll back the flow. Try again.');
 		}
 	},
 
@@ -359,16 +359,16 @@ export const actions: Actions = {
 			};
 		} catch (err) {
 			if (err instanceof ImportError && err.status === 422) {
-				return fail(422, { action: 'import', error: 'The definition did not validate.', errors: validationErrors(err.body) });
+				return fail(422, { action: 'import', error: 'Fix the problems in the definition.', errors: validationErrors(err.body) });
 			}
 			if (err instanceof FlowRefusal) return importFailed(refusalFailure(err));
 			if (err instanceof ImportError && err.status === 402) {
 				return fail(402, { action: 'import', error: 'Flows are not enabled on this instance.', locked: true });
 			}
 			if (err instanceof ImportError) {
-				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Import failed' });
+				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Could not import the flow. Try again.' });
 			}
-			return importFailed(refused(err, 'Import failed'));
+			return importFailed(refused(err, 'Could not import the flow. Try again.'));
 		}
 	},
 
@@ -380,20 +380,20 @@ export const actions: Actions = {
 		const file = data.get('file');
 		let document = String(data.get('document') ?? '').trim();
 		if (!document && file instanceof File && file.size > 0) document = (await file.text()).trim();
-		if (!url && !document) return fail(400, { templateError: 'Give a URL, a file or a pasted definition.' });
-		if (url && document) return fail(400, { templateError: 'Give a URL or a definition, not both.' });
+		if (!url && !document) return fail(400, { templateError: 'Enter a URL, choose a file or paste a definition.' });
+		if (url && document) return fail(400, { templateError: 'Enter a URL or a definition, not both.' });
 		try {
 			const saved = await saveTemplate(client, url ? { url } : { document });
 			return { savedTemplate: saved.id };
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 409) {
-				return fail(409, { templateError: 'A built-in template already uses that slug. Give yours another.' });
+				return fail(409, { templateError: 'A built-in template already uses that slug. Choose another slug.' });
 			}
 			if (err instanceof ApiError && err.status === 502) {
-				return fail(502, { templateError: 'The URL did not answer with a flow definition.' });
+				return fail(502, { templateError: 'The URL did not return a flow definition.' });
 			}
-			if (err instanceof ApiError && err.status === 403) return fail(403, { templateError: 'You may not create flows here.' });
-			return fail(400, { templateError: actionError(err, 'The template could not be saved.') });
+			if (err instanceof ApiError && err.status === 403) return fail(403, { templateError: 'Your role cannot create flows.' });
+			return fail(400, { templateError: actionError(err, 'Could not save the template. Try again.') });
 		}
 	},
 
@@ -406,7 +406,7 @@ export const actions: Actions = {
 			await deleteTemplate(client, id);
 			return { deletedTemplate: id };
 		} catch (err) {
-			return fail(400, { templateError: actionError(err, 'The template could not be deleted.') });
+			return fail(400, { templateError: actionError(err, 'Could not delete the template. Try again.') });
 		}
 	},
 
@@ -416,7 +416,7 @@ export const actions: Actions = {
 		try {
 			await deleteFlow(client, event.params.id);
 		} catch (err) {
-			return refused(err, 'Failed to delete');
+			return refused(err, 'Could not delete the flow. Try again.');
 		}
 		redirect(303, '/admin/flows');
 	},
@@ -433,7 +433,7 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const data = await event.request.formData();
 		const prompt = String(data.get('prompt') ?? '').trim();
-		if (!prompt) return fail(400, { assistRefused: { state: 'error' as const, message: 'Say what the flow should do.' } });
+		if (!prompt) return fail(400, { assistRefused: { state: 'error' as const, message: 'Describe what the flow should do.' } });
 		const current = definitionField(data);
 		if (!current) return fail(400, { assistRefused: { state: 'error' as const, message: 'The definition is not valid JSON.' } });
 		const conversation = String(data.get('conversation_id') ?? '').trim();
@@ -509,7 +509,7 @@ export const actions: Actions = {
 			const run = await getRun(client, runId);
 			return { run };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Failed to load the run') });
+			return fail(400, { error: actionError(err, 'Could not load the run. Try again.') });
 		}
 	},
 };

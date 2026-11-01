@@ -81,7 +81,7 @@ describe('DdlPreview', () => {
 			statements: [{ description: 'drop column meta', sql: 'DROP meta', destructive: true }],
 		});
 		const dialog = screen.getByTestId('save-risk');
-		expect(dialog.textContent).toContain('How many rows posts holds could not be read.');
+		expect(dialog.textContent).toContain('Could not count the rows in posts.');
 		expect(dialog.textContent).toContain('Removes meta from the definition.');
 		await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 		expect(onsave).toHaveBeenCalledTimes(1);
@@ -95,7 +95,7 @@ describe('DdlPreview', () => {
 			statements: [{ description: 'add column c', sql: 'ADD c' }],
 		});
 		const dialog = screen.getByTestId('save-risk');
-		expect(dialog.textContent).toContain('posts holds 1 row.');
+		expect(dialog.textContent).toContain('posts has 1 row.');
 		expect(dialog.textContent).toContain('Renames a to b.');
 		expect(dialog.textContent).toContain('The renames run first. Then:');
 	});

@@ -64,7 +64,7 @@
 			const name = handler.trim() ? `the run name ${handler.trim()}` : 'the shared name';
 			const ok = await confirm(
 				`Replay every event since ${since.replace('T', ' ')} under ${name}?`,
-				'Each event is published again to every webhook, flow, the message broker, realtime clients and email triggers. Nothing undoes that.',
+				'Each event is published again to every webhook, flow, the message broker, realtime clients and email triggers. This cannot be undone.',
 				{ confirmLabel: 'Replay' },
 			);
 			if (!ok) {
@@ -95,7 +95,7 @@
 
 <PageShell
 	title="Events"
-	description="The durable log of what this instance published, and the replays run against it."
+	description="Browse the durable log of published events, and replay events from a point in time."
 	width="wide"
 >
 	{#snippet actions()}
@@ -109,15 +109,15 @@
 			level={2}
 			gate={data.gate}
 			title="Event log"
-			absent="The events plugin is not part of this build, so nothing is being recorded."
+			absent="The event log is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={form?.error} />
 		{#if form?.started}
 			<Alert tone={form.dryRun ? 'brand' : 'success'} autoDismiss={!form.dryRun}>
 				{form.dryRun
-					? 'Rehearsed. Nothing was published. Clear the rehearsal box to run it for real.'
-					: 'Replay started. It runs in the background and the panel below reports it.'}
+					? 'Rehearsal started. It publishes nothing, and its counts appear below. Clear the rehearsal checkbox to run the replay for real.'
+					: 'Replay started. It runs in the background, and its progress appears below.'}
 			</Alert>
 		{/if}
 
@@ -138,7 +138,7 @@
 				mono
 				label="Replays"
 				value={data.runs.ok ? data.runs.value.total : NO_VALUE}
-				sub={data.runs.ok ? undefined : 'Not read'}
+				sub={data.runs.ok ? undefined : 'Could not load'}
 			/>
 		</div>
 
@@ -156,7 +156,7 @@
 					<Input
 						name="handler"
 						label="Run name"
-						placeholder="One shared name when empty"
+						hint="Leave empty to use one shared name."
 						bind:value={handler}
 					/>
 					<input type="hidden" name="dry_run" value={String(dryRun)} />
@@ -169,8 +169,8 @@
 					<Checkbox bind:checked={dryRun} label="Rehearse first, posting nothing" />
 					<p class="mt-1 text-xs text-muted">
 						A replay publishes every event in the window again to everything that listens:
-						webhooks, flows, the message broker, realtime clients and email triggers. Nothing
-						undoes that. A later run under the same name skips the events that name already
+						webhooks, flows, the message broker, realtime clients and email triggers. This
+						cannot be undone. A later run under the same name skips the events that name already
 						replayed. The rehearsal reports the same counts and publishes nothing.
 					</p>
 				</div>
@@ -180,7 +180,7 @@
 				<GateNotice
 					gate={data.runs.gate}
 					title="the replay runs"
-					absent="This version of the events plugin keeps no list of replay runs."
+					absent="Replay runs need a newer version of the events plugin."
 				/>
 			{:else if data.runs.value.rows.length > 0}
 				<Table label="Replay">
@@ -235,8 +235,8 @@
 
 			{#if data.events.length === 0}
 				<EmptyState
-					title="Nothing has been published"
-					description="The log records an event when a plugin or a flow publishes one. An empty log is a quiet instance."
+					title="No events yet"
+					description="Events appear here when a plugin or a flow publishes one."
 				>
 					{#snippet iconSnippet()}
 						<Rss size={ICON.lg} />
@@ -245,7 +245,7 @@
 			{:else}
 				<ListToolbar label="Filter published events">
 					{#snippet search()}
-						<label for="event-narrow" class="sr-only">Narrow this page</label>
+						<label for="event-narrow" class="sr-only">Search this page</label>
 						<SearchInput
 							id="event-narrow"
 							bind:value={narrow}
@@ -297,7 +297,7 @@
 
 				{#if visible.length === 0}
 					<EmptyState
-						title="Nothing on this page matches"
+						title="No events on this page match these filters"
 						description="Clear the filter to see the rest."
 					>
 						{#snippet iconSnippet()}

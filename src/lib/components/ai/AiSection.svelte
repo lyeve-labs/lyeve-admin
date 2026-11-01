@@ -74,7 +74,7 @@
 		return async ({ result, update }) => {
 			if (result.type === 'failure') {
 				const said = (result.data as { error?: unknown } | undefined)?.error;
-				switchError = typeof said === 'string' && said ? said : 'The setting could not be saved.';
+				switchError = typeof said === 'string' && said ? said : 'Could not save the setting. Try again.';
 				return;
 			}
 			await update();
@@ -99,8 +99,7 @@
 {:else if effective.state === 'absent'}
 	<EmptyState
 		{level}
-		title="The AI plugin is not installed"
-		description="This instance does not carry the AI plugin, so there is nothing to configure here."
+		title="AI is not included in this build"
 	>
 		{#snippet iconSnippet()}
 			<Server size={ICON.lg} />
@@ -110,7 +109,7 @@
 	<EmptyState
 		{level}
 		title="AI is switched off for this tenant"
-		description="Every AI surface on this tenant is off: the providers, the editor assistant, the flow nodes and every call another plugin makes. Nothing is sent anywhere while it is off. The switch is the way back."
+		description="Providers, the editor assistant, flow nodes and calls from other plugins are all off. Nothing is sent to any provider while AI is off. Turn it on here to use it again."
 	>
 		{#snippet iconSnippet()}
 			<Power size={ICON.lg} />
@@ -132,8 +131,8 @@
 {:else if effective.state === 'no_provider'}
 	<EmptyState
 		{level}
-		title="AI has nothing to answer through"
-		description="The plugin answered 503: no enabled provider is configured, or its store did not answer. Add or enable a provider, then try again."
+		title="No AI provider is available"
+		description="No provider is turned on, or the AI plugin could not reach its storage. Add or turn on a provider, then try again."
 	>
 		{#snippet iconSnippet()}
 			<Server size={ICON.lg} />
@@ -143,5 +142,5 @@
 		{/snippet}
 	</EmptyState>
 {:else if effective.state === 'error'}
-	<Alert tone="danger" title="Could not read {noun}">{effective.message}</Alert>
+	<Alert tone="danger" title="Could not load {noun}">{effective.message}</Alert>
 {/if}

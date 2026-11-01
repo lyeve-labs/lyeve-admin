@@ -109,6 +109,6 @@ describe('the gate', () => {
 
 	it('never reports a failed read as a healthy cache', () => {
 		const gate = cacheGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that it is healthy');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the cache status.');
 	});
 });

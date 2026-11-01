@@ -121,7 +121,7 @@
 			if (result.type === 'success') previewOpen = true;
 			else if (result.type === 'failure') {
 				const said = (result.data as { error?: unknown } | undefined)?.error;
-				toast.error(typeof said === 'string' && said ? said : 'The template could not be rendered.');
+				toast.error(typeof said === 'string' && said ? said : 'Could not render the template.');
 			}
 		};
 	};
@@ -138,7 +138,7 @@
 <PageShell
 	title="Email templates"
 	documentTitle="Email templates - Settings"
-	description="The subject and body each mail is sent with. Edit every word, start from a ready-made template, and preview it with sample values before it goes out."
+	description="Write the subject and body of each mail. Start from a ready-made template and preview it with sample values before it goes out."
 	width="wide"
 	back={{ href: '/admin/settings/email', label: 'Email' }}
 >
@@ -159,14 +159,14 @@
 	<FormErrors message={formError} refused={pageRefusal} />
 	{#if atCeiling}
 		<Alert tone="info" title="Every template slot is in use">
-			{#snippet children()}This instance holds {limit} templates. Edit one, delete one you no longer send, or change the license to hold more.{/snippet}
+			{#snippet children()}This instance has reached its limit of {limit} templates. Edit one, delete one you no longer send, or change the license to allow more.{/snippet}
 		</Alert>
 	{/if}
 
 	{#if !data.templates.ok}
-		<GateNotice level={2} gate={data.templates.gate} title="Email templates" absent="This version of the email plugin keeps no templates." />
+		<GateNotice level={2} gate={data.templates.gate} title="Email templates" absent="Email templates need a newer version of the email plugin." />
 	{:else if templates.length === 0}
-		<EmptyState level={2} title="No templates yet" description="A template is the subject and body a mail is sent with.">
+		<EmptyState level={2} title="No templates yet" description="Create a template to set the subject and body of a mail.">
 			{#snippet iconSnippet()}<Mail size={ICON.lg} />{/snippet}
 			{#snippet action()}
 				<Button variant="secondary" onclick={openCreate} disabled={atCeiling}>
@@ -239,10 +239,10 @@
 				value={starter}
 				onvaluechange={pickStarter}
 				hint={data.starters.ok
-					? 'A ready-made template to copy. Everything it copies stays yours to change.'
-					: 'The ready-made templates could not be read, so only a blank one is offered.'}
+					? 'A ready-made template to copy. You can change everything it copies.'
+					: 'Could not load the ready-made templates, so only a blank one is available.'}
 			/>
-			<Input id="template-key" name="key" label="Name" required mono placeholder="order-shipped" hint="How a trigger or a flow names it. Lower case letters, digits and dashes." bind:value={key} />
+			<Input id="template-key" name="key" label="Name" required mono placeholder="order-shipped" hint="Triggers and flows use this name to send the template. Use lowercase letters, digits and dashes." bind:value={key} />
 		{/if}
 		{#if editing?.required}
 			<Alert tone="info" title="Required template">

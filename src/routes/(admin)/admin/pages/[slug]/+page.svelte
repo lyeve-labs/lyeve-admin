@@ -21,7 +21,7 @@
 		<EmptyState
 			level={2}
 			title="This page has no blocks yet"
-			description={canEdit ? 'Add blocks to show content here.' : 'An admin adds the blocks this page shows.'}
+			description={canEdit ? 'Add blocks to show content here.' : 'Ask an admin to add blocks to this page.'}
 		>
 			{#snippet iconSnippet()}
 				<LayoutGrid size={ICON.lg} />

@@ -67,7 +67,7 @@
 		return async ({ result, update, formElement }) => {
 			presetSaving = false;
 			if (result.type === 'failure') {
-				presetSaveError = String((result.data as { saveError?: string })?.saveError ?? 'The preset could not be saved.');
+				presetSaveError = String((result.data as { saveError?: string })?.saveError ?? 'Could not save the preset. Try again.');
 				return;
 			}
 			if (result.type === 'success') {
@@ -79,7 +79,7 @@
 	};
 
 	async function deletePreset(id: string, name: string) {
-		const ok = await confirm(`Delete the preset ${name}?`, 'The schemas it already created stay. Only the saved preset goes.', { confirmLabel: 'Delete' });
+		const ok = await confirm(`Delete the preset ${name}?`, 'Schemas it already created are kept. Only the saved preset is deleted.', { confirmLabel: 'Delete' });
 		if (!ok) return;
 		presetDeleteId = id;
 		await tick();
@@ -104,14 +104,14 @@
      is shown under the card it belongs to, with the drawer still open. -->
 <Drawer bind:open title="Use a preset" size="lg">
 	<div class="flex flex-col gap-4">
-		<p class="text-sm text-muted">A preset creates a set of content types together, with their fields and relations. Each is a schema like any other once it exists.</p>
+		<p class="text-sm text-muted">A preset creates a set of content types with their fields and relations. After that, each one is an ordinary schema.</p>
 		{#if canWrite}
 			{#if canSavePresets}
 				<Collapsible label="Save a preset from a URL or a file">
 					<form method="POST" action="?/savePreset" enctype="multipart/form-data" use:enhance={presetSave} class="flex flex-col gap-4 pt-2">
 						<FormErrors message={presetSaveError || undefined} />
-						<p class="text-sm text-muted">A preset document is JSON or YAML with an id, a name, a description and its schemas, each the body a new schema takes. Saved, it is listed here beside the built-in ones. Saving the same id again replaces it, so reading the URL again refreshes it.</p>
-						<Input id="preset-url" name="url" type="url" label="URL" placeholder="https://example.com/presets/blog.json" hint="Read over http or https. Private and loopback addresses are refused." />
+						<p class="text-sm text-muted">A preset document is JSON or YAML with an id, a name, a description and its schemas, each in the same shape as a new schema. Once saved, it appears here next to the built-in presets. Saving the same id again replaces it, so you can save the URL again to refresh it.</p>
+						<Input id="preset-url" name="url" type="url" label="URL" placeholder="https://example.com/presets/blog.json" hint="An http or https address. Private and loopback addresses are refused." />
 						<FileInput id="preset-file" name="file" label="Or a file" accept=".json,.yaml,.yml,application/json,application/yaml" />
 						<Textarea id="preset-document" name="document" label="Or paste the document" rows={6} class="[&_textarea]:text-xs" mono />
 						<div class="flex justify-end">
@@ -121,7 +121,7 @@
 				</Collapsible>
 			{:else}
 				<div class="flex flex-wrap items-center gap-2 text-sm text-muted" data-testid="preset-save-locked">
-					<span>Saving your own presets from a URL or a file is not included in this instance's license. The presets below are always available.</span>
+					<span>Your license does not include saving your own presets from a URL or a file. The presets below are always available.</span>
 					<NotEnabled title="Custom presets" compact />
 				</div>
 			{/if}
@@ -130,9 +130,9 @@
 			<Alert tone="danger">{deleteFailure}</Alert>
 		{/if}
 		{#if presetsGate}
-			<GateNotice gate={presetsGate} title="Presets" absent="This install ships no presets. Start from New schema instead." />
+			<GateNotice gate={presetsGate} title="Presets" absent="Presets are not included in this build. Start from New schema instead." />
 		{:else if (presets ?? []).length === 0}
-			<EmptyState title="No presets" description="The engine offered none. Start from New schema instead." />
+			<EmptyState title="No presets" description="Start from New schema instead." />
 		{:else}
 			<div class="grid gap-3 sm:grid-cols-2" data-testid="preset-gallery">
 				{#each presets ?? [] as preset (preset.id)}

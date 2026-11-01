@@ -49,11 +49,11 @@ describe('AI providers page', () => {
 
 	// A long form announces its failure at the top, where the reader is.
 	it('puts a failed create first in the drawer, above the fields', async () => {
-		const { container, getAllByText } = setup({}, { error: 'Failed to create the provider' });
+		const { container, getAllByText } = setup({}, { error: 'Could not create the provider. Try again.' });
 		await fireEvent.click(getAllByText('New provider')[0]);
 		const form = container.ownerDocument.querySelector('#provider-create') as HTMLFormElement;
 		const alert = form.querySelector('[aria-live]') as HTMLElement;
-		expect(alert.textContent).toContain('Failed to create the provider');
+		expect(alert.textContent).toContain('Could not create the provider. Try again.');
 		expect(form.firstElementChild).toBe(alert);
 	});
 
@@ -75,7 +75,7 @@ describe('AI providers page', () => {
 
 	it('hides the create control when the layout says the plugin is absent, even with an empty list answered', () => {
 		const { queryByText, getByText } = setup({ aiLayoutGate: { state: 'absent' } });
-		expect(getByText('The AI plugin is not installed')).toBeTruthy();
+		expect(getByText('AI is not included in this build')).toBeTruthy();
 		expect(queryByText('New provider')).toBeNull();
 	});
 
@@ -83,7 +83,7 @@ describe('AI providers page', () => {
 		['locked', 'Not enabled on this instance.'],
 		['forbidden', 'Your role cannot read AI providers.'],
 		['off', 'AI is switched off for this tenant'],
-		['no_provider', 'AI has nothing to answer through'],
+		['no_provider', 'No AI provider is available'],
 	])('paints the %s state and no table', (state, words) => {
 		const { getByText, container } = setup({ gate: { state }, providers: [] });
 		expect(getByText(words)).toBeTruthy();

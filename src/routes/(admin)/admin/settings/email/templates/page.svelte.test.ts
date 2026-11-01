@@ -80,9 +80,9 @@ describe('email templates page', () => {
 
 	it('says the list could not be read rather than drawing a first run', () => {
 		render(TemplatesPage, {
-			props: { data: data({ templates: { ok: false, gate: { state: 'error', message: 'The templates could not be read.' } } }), form: null },
+			props: { data: data({ templates: { ok: false, gate: { state: 'error', message: 'Could not load email templates.' } } }), form: null },
 		});
-		expect(screen.getByText('The templates could not be read.')).toBeTruthy();
+		expect(screen.getByText('Could not load email templates.')).toBeTruthy();
 		expect(screen.queryByText('No templates yet')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'New template' })).toBeNull();
 	});
@@ -118,21 +118,23 @@ describe('email templates page', () => {
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const failed = 'Could not delete the template. Try again.';
 		const { container } = render(TemplatesPage, {
-			props: { data: data(), form: { action: 'delete', error: 'The template could not be deleted.' } as never },
+			props: { data: data(), form: { action: 'delete', error: failed } as never },
 		});
-		expect(container.textContent).toContain('The template could not be deleted.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(screen.getByRole('button', { name: 'New template' }));
-		expect(drawerText()).not.toContain('could not be deleted');
+		expect(drawerText()).not.toContain(failed);
 	});
 
 	it('shows a failed preview above the list rather than in the drawer', async () => {
+		const failed = 'Could not render the template.';
 		const { container } = render(TemplatesPage, {
-			props: { data: data(), form: { action: 'preview', error: 'The template could not be rendered.' } as never },
+			props: { data: data(), form: { action: 'preview', error: failed } as never },
 		});
-		expect(container.textContent).toContain('The template could not be rendered.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(screen.getByRole('button', { name: 'Edit spring-sale' }));
-		expect(drawerText()).not.toContain('could not be rendered');
+		expect(drawerText()).not.toContain(failed);
 	});
 });
 
@@ -159,8 +161,8 @@ describe('a failed preview', () => {
 		const entry = forms.submits.find((f) => f.node.getAttribute('action') === '?/preview' && f.node.isConnected);
 		const submit = entry?.submit as () => (input: { result: unknown; update: () => Promise<void> }) => Promise<void>;
 		kit.toastError.mockClear();
-		await submit()({ result: { type: 'failure', status: 400, data: { action: 'preview', error: 'The template could not be rendered.' } }, update: async () => {} });
-		expect(kit.toastError).toHaveBeenCalledWith('The template could not be rendered.');
+		await submit()({ result: { type: 'failure', status: 400, data: { action: 'preview', error: 'Could not render the template.' } }, update: async () => {} });
+		expect(kit.toastError).toHaveBeenCalledWith('Could not render the template.');
 		expect(document.body.querySelector('[data-testid="template-preview"]')).toBeNull();
 	});
 });

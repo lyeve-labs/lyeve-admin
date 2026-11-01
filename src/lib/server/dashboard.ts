@@ -88,7 +88,7 @@ export function attentionOf(
 	if (d.license?.state === 'expired') {
 		out.push({
 			tone: 'danger',
-			text: 'The license has expired, so the licensed plugins are off.',
+			text: 'The license has expired. Licensed plugins are off.',
 			href: '/admin/settings/license',
 			action: 'Renew',
 		});
@@ -105,7 +105,7 @@ export function attentionOf(
 	if (d.controlFailures) {
 		out.push({
 			tone: 'danger',
-			text: `${plural(d.controlFailures, 'security control is', 'security controls are')} configured but not enforcing.`,
+			text: `${plural(d.controlFailures, 'security control is', 'security controls are')} configured but not in effect.`,
 			href: '/admin/settings/security',
 			action: 'Security',
 		});

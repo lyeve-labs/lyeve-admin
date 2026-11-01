@@ -431,7 +431,7 @@ describe('admin shell plugin gate', () => {
 	it('renders the page when the list could not be read, and says why the menu is short', async () => {
 		await mountWith('/admin/search', { plugins: { state: 'unread' } });
 		expect(screen.getByTestId('page')).toBeTruthy();
-		expect(document.body.textContent).toContain('The engine did not say which plugins run');
+		expect(document.body.textContent).toContain('Could not load the list of running plugins');
 		expect(linkNames()).not.toContain('Search');
 		expect(linkNames()).toContain('Users');
 	});

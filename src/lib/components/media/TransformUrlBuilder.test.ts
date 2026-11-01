@@ -70,7 +70,7 @@ describe('TransformUrlBuilder', () => {
 			props: { id: 'm1', published: true, focal: null, refused: { kind: 'cap', cap: 'example.items', limit: 9, current: 9, upgradeUrl: '' } },
 		});
 		const text = getByTestId('refusal-notice').textContent ?? '';
-		expect(text).toContain('9 of 9 items are in use');
+		expect(text).toContain("You're using 9 of 9 items");
 	});
 
 	it('keeps the size, quality and format it built the URL from', async () => {

@@ -67,7 +67,7 @@ export function authedClient(event: RequestEvent, extra: Record<string, string> 
 }
 
 const NO_SEAT = 'This instance has no admin seat left for this account.';
-const UNREACHABLE = 'This account or network cannot reach the admin right now.';
+const UNREACHABLE = 'Access to the admin is blocked for this account or network.';
 
 /**
  * The sentence for a 402 on the session check. The engine answers one when it
@@ -194,7 +194,7 @@ export async function requireRole(event: RequestEvent, roles: string[]): Promise
  */
 export function assertRole(user: User, roles: string[]): User {
 	if (!roles.some((r) => user.roles.includes(r))) {
-		error(403, `Requires one of roles: ${roles.join(', ')}`);
+		error(403, `This needs one of these roles: ${roles.join(', ')}.`);
 	}
 	return user;
 }

@@ -369,7 +369,7 @@ describe('deleting an entry', () => {
 	it('keeps outage detail out of the message', async () => {
 		const { event } = deleteEvent(async () => json({ error: 'pq: connection refused' }, 503));
 		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
-		expect(out.data.error).toBe('Failed to delete entry');
+		expect(out.data.error).toBe('Could not delete the entry. Try again.');
 	});
 });
 

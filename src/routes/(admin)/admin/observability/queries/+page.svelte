@@ -103,7 +103,7 @@
 
 <PageShell
 	title="Slow queries"
-	description="Statements the engine sampled because they took too long, with the plan behind them."
+	description="Review slow SQL statements and their query plans."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -116,8 +116,8 @@
 	{#if data.gate.state === 'capture_store'}
 		<Alert tone="warn">
 			<p>
-				The capture store did not answer. Sampling writes to its own table, which a pending
-				migration can leave absent.
+				Could not load the slow query log. Its table may be missing until a pending
+				migration runs.
 			</p>
 			<!-- A plain link to this address asks for a fresh document, as the
 			     shared notice's retry does, so it works before hydration. -->
@@ -132,7 +132,7 @@
 			level={2}
 			gate={data.gate}
 			title="Slow queries"
-			absent="The query monitor is not part of this build, so nothing is sampling statements."
+			absent="The query monitor is not included in this build."
 		/>
 	{:else}
 		<div class="grid gap-4 sm:grid-cols-3">
@@ -150,7 +150,7 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Index suggestions</SectionHeading>
 			<p class="text-xs text-muted">
-				Runs EXPLAIN against the live database, so it is asked for rather than automatic.
+				Analysis runs EXPLAIN against the live database, so it only runs when you ask.
 			</p>
 			<Card>
 				<div class="flex flex-wrap items-center gap-2">
@@ -170,8 +170,8 @@
 
 				{#if data.analyzeFailed}
 					<Alert tone="warn">
-						The analyzer could not explain these statements as {data.dialect}. An instance runs
-						one dialect, and EXPLAIN is a different grammar in each.
+						Could not explain these statements as {data.dialect}. Each instance uses one SQL
+						dialect, and EXPLAIN differs between dialects. Try the dialect this instance uses.
 					</Alert>
 				{:else if data.dialect && data.analysis && suggestions.length === 0}
 					<p class="text-sm text-muted">{noSuggestionText(data.dialect, data.analysis)}</p>
@@ -212,8 +212,8 @@
 
 			{#if data.entries.length === 0}
 				<EmptyState
-					title="Nothing has been slow"
-					description="The engine samples a statement once it passes the slow threshold. An empty log is a quiet instance, not a broken one."
+					title="No slow queries yet"
+					description="Statements appear here when they take longer than the slow query threshold."
 				>
 					{#snippet iconSnippet()}
 						<Timer size={ICON.lg} />
@@ -222,7 +222,7 @@
 			{:else}
 				<ListToolbar label="Filter captured statements">
 					{#snippet search()}
-						<label for="query-narrow" class="sr-only">Narrow this page</label>
+						<label for="query-narrow" class="sr-only">Search this page</label>
 						<SearchInput
 							id="query-narrow"
 							bind:value={narrow}
@@ -233,14 +233,14 @@
 
 				{#if visible.length === 0}
 					<EmptyState
-						title="Nothing on this page matches"
-						description="Clear the filter to see the rest."
+						title="No statements on this page match this search"
+						description="Clear the search to see the rest."
 					>
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}
 						{#snippet action()}
-							<Button variant="secondary" onclick={() => (narrow = '')}>Clear the filter</Button>
+							<Button variant="secondary" onclick={() => (narrow = '')}>Clear the search</Button>
 						{/snippet}
 					</EmptyState>
 				{:else}

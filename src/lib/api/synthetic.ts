@@ -145,7 +145,7 @@ export const SYNTHETIC_OK: SyntheticGate = GATE_OK;
 
 /** What a refused probe read means, read the way every plugin's is. */
 export function syntheticGate(err: unknown): SyntheticGate {
-	return gateOf(err, 'The probes could not be read. This is not a report that everything is passing.');
+	return gateOf(err, 'Could not load probes.');
 }
 
 export async function listProbes(
@@ -228,8 +228,8 @@ export function runAlreadyGoing(err: unknown): boolean {
 
 /** What Run now says when the run is still going, its own or an earlier one. */
 export function runGoingOnText(name: string, already: boolean): string {
-	const first = already ? `A run of ${name} is already going.` : `${name} is still running.`;
-	return `${first} Its results appear in the list when it ends.`;
+	const first = already ? `${name} is already running.` : `${name} is still running.`;
+	return `${first} Its results appear in the list when it finishes.`;
 }
 
 /** How one run went across its regions. */
@@ -292,7 +292,7 @@ export async function readProbeLimits(client: HttpClient): Promise<ProbeLimits |
 
 /** The interval field's hint, with the floor when the plugin said what it is. */
 export function intervalHint(limits: ProbeLimits | null): string {
-	const why = 'A probe is this instance calling itself.';
+	const why = 'Each probe sends a request to this instance.';
 	return limits ? `At least ${limits.minIntervalSeconds}. ${why}` : why;
 }
 

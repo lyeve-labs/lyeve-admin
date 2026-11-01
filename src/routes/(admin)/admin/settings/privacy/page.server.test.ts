@@ -110,7 +110,7 @@ describe('privacy settings: form erasure save', () => {
 		const result = (await actions.erasure(formEvent({ mode: 'auto' }))) as { status: number; data: { error: string } };
 		expect(result.status).toBe(503);
 		expect(result.data.error).not.toContain('pq');
-		expect(result.data.error).toContain('could not be saved');
+		expect(result.data.error).toContain('Could not save');
 	});
 });
 

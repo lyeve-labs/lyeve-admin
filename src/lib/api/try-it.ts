@@ -66,7 +66,7 @@ export function refuse(req: TryRequest): TryRefusal | null {
 	const method = req.method.toUpperCase();
 
 	if (!isRunnable(method)) {
-		return { reason: `${method} is not a method this page will send.` };
+		return { reason: `This page cannot send ${method} requests.` };
 	}
 	if (!req.path.startsWith('/')) {
 		return { reason: 'The path has to start with a slash.' };
@@ -81,7 +81,7 @@ export function refuse(req: TryRequest): TryRefusal | null {
 
 	if (isWriteMethod(method)) {
 		if (!req.canWrite) {
-			return { reason: `Sending a ${method} from this page is a super admin's.` };
+			return { reason: `Only a super admin can send a ${method} from this page.` };
 		}
 		if (!req.acknowledged) {
 			return {

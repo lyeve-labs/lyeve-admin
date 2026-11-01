@@ -5,7 +5,7 @@ import { getCustomPage, type CustomPage } from '$lib/api/customization';
 import { resolveBlocks } from '$lib/server/custom-blocks';
 import { readError } from '$lib/server/read-error';
 
-const NO_PAGE = 'No page has that address.';
+const NO_PAGE = 'This page does not exist.';
 
 export const load: PageServerLoad = async (event) => {
 	const { customization } = await event.parent();

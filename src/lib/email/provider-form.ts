@@ -36,11 +36,11 @@ export function parseProvider(
 	editing: boolean,
 ): { body: EmailProviderBody } | { error: string } {
 	const name = text(data, 'name');
-	if (!name) return { error: 'A provider needs a name.' };
+	if (!name) return { error: 'Enter a name.' };
 	const transport = text(data, 'transport') || 'smtp';
-	if (!isTransport(transport)) return { error: 'Transport must be SMTP or API.' };
+	if (!isTransport(transport)) return { error: 'Choose SMTP or API.' };
 	const from_addr = text(data, 'from_addr');
-	if (!from_addr) return { error: 'A from address is required.' };
+	if (!from_addr) return { error: 'Enter a from address.' };
 
 	const body: EmailProviderBody = {
 		name,
@@ -54,7 +54,7 @@ export function parseProvider(
 
 	if (transport === 'smtp') {
 		body.host = text(data, 'host');
-		if (!body.host) return { error: 'An SMTP host is required.' };
+		if (!body.host) return { error: 'Enter the SMTP host.' };
 		const port = Number(text(data, 'port'));
 		if (port) body.port = port;
 		body.username = text(data, 'username');
@@ -67,16 +67,16 @@ export function parseProvider(
 	const keyKept = editing && text(data, 'stored_transport') === 'api';
 	const api_key = text(data, 'api_key');
 	if (api_key) body.api_key = api_key;
-	else if (!keyKept) return { error: 'An API key is required.' };
+	else if (!keyKept) return { error: 'Enter the API key.' };
 	body.api_base_url = text(data, 'api_base_url');
-	if (!body.api_base_url) return { error: 'An API base URL is required.' };
+	if (!body.api_base_url) return { error: 'Enter the API base URL.' };
 	const webhook_secret = text(data, 'webhook_secret');
 	if (webhook_secret) body.webhook_secret = webhook_secret;
 	body.api_method = (text(data, 'api_method') || 'POST').toUpperCase();
-	if (!(API_METHODS as readonly string[]).includes(body.api_method)) return { error: 'Method must be POST, PUT or PATCH.' };
+	if (!(API_METHODS as readonly string[]).includes(body.api_method)) return { error: 'Choose POST, PUT or PATCH.' };
 	body.api_path = text(data, 'api_path');
-	if (body.api_path && !body.api_path.startsWith('/')) return { error: 'The path must start with /.' };
-	if (/[?#]/.test(body.api_path)) return { error: 'The path carries no query or fragment; put those in the body template.' };
+	if (body.api_path && !body.api_path.startsWith('/')) return { error: 'Start the path with /.' };
+	if (/[?#]/.test(body.api_path)) return { error: 'Leave the query and fragment out of the path. Put them in the body template.' };
 	body.api_headers = pairs(data, 'api_header_key', 'api_header_value');
 	body.api_body = String(data.get('api_body') ?? '').trim();
 	body.api_message_id_path = text(data, 'api_message_id_path');
@@ -86,7 +86,7 @@ export function parseProvider(
 	body.api_webhook_reason_path = text(data, 'api_webhook_reason_path');
 	const map = pairs(data, 'event_map_key', 'event_map_value');
 	const bad = Object.entries(map).find(([, v]) => !(WEBHOOK_EVENTS as string[]).includes(v));
-	if (bad) return { error: `"${bad[0]}" maps to ${bad[1] || 'nothing'}; pick one of ${WEBHOOK_EVENTS.join(', ')}.` };
+	if (bad) return { error: `"${bad[0]}" maps to ${bad[1] || 'nothing'}. Choose one of ${WEBHOOK_EVENTS.join(', ')}.` };
 	body.api_webhook_event_map = map;
 	return { body };
 }

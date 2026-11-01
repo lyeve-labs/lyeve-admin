@@ -49,7 +49,7 @@ describe('the releases list', () => {
 
 	it('says a filtered list is empty for its status, without a create offer of its own', () => {
 		render(ReleasesPage, { props: props({ releases: [], total: 0, status: 'scheduled' }) });
-		expect(screen.getByText('No release has this status')).toBeTruthy();
+		expect(screen.getByText('No releases with this status')).toBeTruthy();
 		expect(screen.getAllByRole('button', { name: /new release/i })).toHaveLength(1);
 	});
 

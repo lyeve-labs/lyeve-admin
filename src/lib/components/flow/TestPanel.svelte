@@ -42,13 +42,13 @@
 			id="test-trigger"
 			label="Trigger"
 			hint={contributed
-				? 'What the trigger hands the flow. The plugin puts its payload keys beside type. Add the ones the flow reads.'
-				: 'What the trigger hands the flow. Edit it to test another input.'}
+				? 'The input the trigger sends the flow. Add the payload keys the flow reads beside the type key.'
+				: 'The input the trigger sends the flow. Edit it to test another input.'}
 			rows={6}
 			bind:value={triggerJSON}
 			mono
 		/>
-		<Toggle id="test-live" label="Live side effects" hint="Off runs writes and calls as dry runs." bind:checked={live} />
+		<Toggle id="test-live" label="Live side effects" hint="Writes and outgoing calls take effect instead of running as dry runs." bind:checked={live} />
 		<Select id="test-until" label="Until node" options={nodeOptions} placeholder="Run to the end" searchable bind:value={untilNode} />
 		{#if error}
 			<Alert tone="danger">

@@ -6,15 +6,17 @@ import ExportConfigFields from './ExportConfigFields.svelte';
 afterEach(cleanup);
 
 describe('ExportConfigFields schema choice', () => {
+	const unread = 'Could not load the schema list';
+
 	it('says why there is nothing to pick when the schema list was not read', () => {
 		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: null } });
-		expect(container.textContent).toContain('The schema list could not be read');
+		expect(container.textContent).toContain(unread);
 	});
 
 	it('counts the schemas a read answered with', () => {
 		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: ['article', 'page'] } });
 		expect(container.textContent).toContain('Every schema, 2 in this tenant.');
-		expect(container.textContent).not.toContain('could not be read');
+		expect(container.textContent).not.toContain(unread);
 	});
 });
 
@@ -32,7 +34,7 @@ describe('ExportConfigFields format and status choice', () => {
 
 	it('states the row ceiling and promises no export of every entry', () => {
 		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: [] } });
-		expect(container.textContent).toContain('An export holds at most 10,000 entries.');
+		expect(container.textContent).toContain('An export includes at most 10,000 entries.');
 		expect(container.textContent).not.toContain('every entry');
 	});
 

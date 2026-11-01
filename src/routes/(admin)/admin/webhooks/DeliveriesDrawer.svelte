@@ -62,14 +62,14 @@
 			{/if}
 			{#if history.items.length === 0}
 				<EmptyState
-					title="No deliveries recorded yet"
+					title="No deliveries yet"
 					description="Every attempt this webhook makes is listed here."
 				>
 					{#snippet iconSnippet()}<History size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else}
 				{#if limit > 0 && history.items.length >= limit}
-					<p class="mb-2 text-xs text-muted">The newest {limit} attempts. Older attempts are kept, and this list does not reach them.</p>
+					<p class="mb-2 text-xs text-muted">Showing the newest {limit} attempts. Older attempts are stored but not shown here.</p>
 				{/if}
 				<Table label="Delivery history">
 					<thead>

@@ -18,7 +18,7 @@ import { readRelationChoices } from '$lib/server/relation-choices';
 /** One locale the new entry can be written in. */
 type LocaleChoice = { code: string; name: string; is_default: boolean };
 
-const LOCALES_FAILED = 'The locales could not be read, so no locale can be picked for this entry.';
+const LOCALES_FAILED = 'Could not load the locales.';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, parent } = event;
@@ -120,7 +120,7 @@ export const actions: Actions = {
 			const shown = (schemaDef?.fields ?? []).filter((f) => !f.system).map((f) => f.name);
 			const refused = fieldRefusalOf(err, shown);
 			if (refused) return fail(422, refused);
-			return fail(400, { error: actionError(err, 'Failed to create entry. Check all fields and try again.') });
+			return fail(400, { error: actionError(err, 'Could not create the entry. Check the fields and try again.') });
 		}
 
 		// The entry exists once the create answered, so a refused link is
@@ -129,7 +129,7 @@ export const actions: Actions = {
 		if (links && created) {
 			const failed = await setEntryRelations(event, created, links);
 			if (failed) {
-				return fail(400, { error: `The entry was created, but not every link was saved. ${failed}`, created });
+				return fail(400, { error: `The entry was created, but some links were not saved. ${failed}`, created });
 			}
 		}
 		redirect(303, `/admin/content/${params.schema}`);

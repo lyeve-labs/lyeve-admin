@@ -60,7 +60,7 @@ describe('capture rules', () => {
 		expect(said(container)).toContain('/api/v1/orders/**');
 		expect(said(container)).toContain('25%');
 		expect(said(container)).toContain('30 days');
-		expect(said(container)).toContain('keeps only the requests an enabled rule matches');
+		expect(said(container)).toContain('Only requests that match an enabled rule are kept');
 	});
 
 	it('says every request is kept for a day when no rule exists', () => {
@@ -94,7 +94,7 @@ describe('capture rules', () => {
 
 	it('reports a failed rules read as a failure', () => {
 		const { container } = render(CapturesPage, { props: props({ rules: [], rulesRead: false }) });
-		expect(said(container)).toContain('could not be read');
+		expect(said(container)).toContain('Could not load capture rules');
 		expect(said(container)).not.toContain('No capture rule');
 	});
 
@@ -143,7 +143,7 @@ describe('replay sets', () => {
 		expect(results.textContent).toContain('Changed');
 		expect(results.textContent).toContain('{"error":"conflict"}');
 		expect(results.textContent).toContain('it may have expired');
-		expect(said(container)).toContain('0 of 2 answered as they did');
+		expect(said(container)).toContain('0 of 2 returned the same response');
 	});
 
 	it('names each result by the method and path the replay answered', () => {
@@ -171,7 +171,7 @@ describe('replay sets', () => {
 		const { container } = render(CapturesPage, {
 			props: props({}, { error: 'writes', needsWrites: 's1' }),
 		});
-		expect(said(container)).toContain('This set holds a write');
+		expect(said(container)).toContain('This set includes a write');
 		expect(screen.getByRole('button', { name: 'Replay including writes' })).toBeTruthy();
 	});
 });
@@ -179,8 +179,8 @@ describe('replay sets', () => {
 describe('the gate', () => {
 	it('says the plugin is absent rather than showing an empty list', () => {
 		const { container } = render(CapturesPage, { props: props({ gate: { state: 'absent' }, captures: [] }) });
-		expect(said(container)).toContain('not part of this build');
-		expect(said(container)).not.toContain('No request is kept');
+		expect(said(container)).toContain('not included in this build');
+		expect(said(container)).not.toContain('No captures yet');
 	});
 });
 
@@ -197,18 +197,18 @@ describe('a failed rule save', () => {
 	// The rule and set drawers each showed the other's failures, and every
 	// row action's failure too.
 	it('keeps a failed set save out of the rule drawer', async () => {
-		render(CapturesPage, { props: props({}, { error: 'Name the set so a replay can say which one ran.', drawer: 'set' }) });
+		render(CapturesPage, { props: props({}, { error: 'Enter a name for the set.', drawer: 'set' }) });
 		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
 		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('Name the set');
+		expect(form.textContent).not.toContain('Enter a name for the set');
 	});
 
 	it('says a failed row action on the page and not in the drawer', async () => {
-		const { container } = render(CapturesPage, { props: props({}, { error: 'The replay set could not be deleted.' }) });
-		expect(said(container)).toContain('The replay set could not be deleted.');
+		const { container } = render(CapturesPage, { props: props({}, { error: 'Could not delete the replay set. Try again.' }) });
+		expect(said(container)).toContain('Could not delete the replay set. Try again.');
 		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
 		const form = document.querySelector('#capture-rule-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('could not be deleted');
+		expect(form.textContent).not.toContain('Could not delete');
 	});
 });
 
@@ -242,9 +242,9 @@ describe("a super admin's list", () => {
 		const { container } = render(CapturesPage, {
 			props: props({ superAdmin: true, captures: [{ ...capture, tenant_id: 'acme' }] }),
 		});
-		expect(said(container)).toContain('Requests every tenant sent');
+		expect(said(container)).toContain('requests every tenant sent');
 		expect(said(container)).toContain('Captures from every tenant');
-		expect(said(container)).toContain('A replay set holds only captures your own tenant sent');
+		expect(said(container)).toContain('A replay set can only include captures from your own tenant.');
 		expect(screen.getByRole('columnheader', { name: 'Tenant' })).toBeTruthy();
 		expect(screen.getByRole('cell', { name: 'acme' })).toBeTruthy();
 	});
@@ -264,7 +264,7 @@ describe("a super admin's list", () => {
 		});
 		const own = screen.getByRole('checkbox', { name: 'Select POST /api/v1/content/orders' }) as HTMLInputElement;
 		const other = screen.getByRole('checkbox', {
-			name: 'POST /api/v1/content/orders came from another tenant, so it cannot join a replay set',
+			name: 'POST /api/v1/content/orders is from another tenant and cannot be added to a replay set',
 		}) as HTMLInputElement;
 		expect(own.disabled).toBe(false);
 		expect(other.disabled).toBe(true);
@@ -272,7 +272,7 @@ describe("a super admin's list", () => {
 
 	it("keeps a tenant admin's list to the tenant", () => {
 		const { container } = render(CapturesPage, { props: props() });
-		expect(said(container)).toContain('Requests this tenant sent');
+		expect(said(container)).toContain('requests this tenant sent');
 		expect(screen.queryByRole('columnheader', { name: 'Tenant' })).toBeNull();
 	});
 });

@@ -53,7 +53,7 @@ export const REALTIME_OK: RealtimeGate = GATE_OK;
 
 /** What a refused realtime read means, read the way every plugin's is. */
 export function realtimeGate(err: unknown): RealtimeGate {
-	return gateOf(err, 'Realtime metrics could not be read. This is not a report that nobody is connected.');
+	return gateOf(err, 'Could not load realtime metrics.');
 }
 
 export async function getStreamMetrics(client: HttpClient): Promise<StreamMetrics> {

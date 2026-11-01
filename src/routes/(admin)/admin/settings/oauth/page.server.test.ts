@@ -118,9 +118,9 @@ describe('OAuth provider writes', () => {
 	});
 
 	it.each([
-		['create', 'The provider could not be created.'],
-		['update', 'The provider could not be saved.'],
-		['delete', 'The provider could not be deleted.'],
+		['create', 'Could not create the provider. Try again.'],
+		['update', 'Could not save the provider. Try again.'],
+		['delete', 'Could not delete the provider. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = write(PROVIDER, { reply: json({ error: 'dial tcp 10.0.0.4:5432' }, 503) });
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });

@@ -19,7 +19,7 @@ import { GATE_OK, section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, customization } = await event.parent();
-	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Requires the admin role');
+	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Only an admin or a super admin can change customization.');
 	// The plugin says whether this tenant may shape its admin, and the shell
 	// has read its answer. The customization page says why when it may not.
 	if (!customization.entitled) redirect(303, '/admin/settings/customization');
@@ -28,13 +28,13 @@ export const load: PageServerLoad = async (event) => {
 		// The editor has nothing to draw without the layout, so a failed read
 		// ends in the error page with a status of its own.
 		getDashboardLayout(client).catch((err: unknown) =>
-			readError(err, 'This instance does not serve a dashboard layout.'),
+			readError(err, 'The dashboard editor needs a newer version of the multitenant plugin.'),
 		),
 		// The gate says why the list is missing, so a role refusal and an
 		// outage are not one failure.
 		section(
 			Promise.resolve().then(() => listSchemaNames(client)),
-			'The schemas could not be read, so no schema can be picked below. A widget keeps the schemas it already names.',
+			'Could not load schemas. Widgets keep the schemas they already use.',
 		),
 	]);
 	return { layout, schemas: schemas.ok ? schemas.value : [], schemasGate: schemas.ok ? GATE_OK : schemas.gate };
@@ -54,18 +54,18 @@ export const actions: Actions = {
 	save: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
 		const widgets = postedWidgets(await event.request.formData());
-		if (!widgets) return fail(400, { error: 'The layout could not be read from the form.' });
+		if (!widgets) return fail(400, { error: 'This form is missing its layout. Reload the page and try again.' });
 		if (widgets.length === 0) {
 			return fail(400, { error: 'Add a widget first, or reset to go back to the stock dashboard.' });
 		}
-		if (widgets.length > MAX_WIDGETS) return fail(400, { error: `A dashboard holds at most ${MAX_WIDGETS} widgets.` });
+		if (widgets.length > MAX_WIDGETS) return fail(400, { error: `A dashboard can have at most ${MAX_WIDGETS} widgets.` });
 		try {
 			// The engine validates every widget and answers with the first
 			// problem it finds, numbered, which is what the editor shows.
 			await saveDashboardLayout(authedClient(event), widgets);
 			return { saved: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The dashboard could not be saved.') });
+			return fail(400, { error: actionError(err, 'Could not save the dashboard. Try again.') });
 		}
 	},
 
@@ -78,7 +78,7 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const widgets = postedWidgets(form);
-		if (!widgets) return fail(400, { error: 'The layout could not be read from the form.' });
+		if (!widgets) return fail(400, { error: 'This form is missing its layout. Reload the page and try again.' });
 		const asRole = String(form.get('as') ?? 'admin');
 		const roles = (ROLE_CHOICES as readonly string[]).includes(asRole) ? [asRole] : ['admin'];
 		const client = authedClient(event);
@@ -92,7 +92,7 @@ export const actions: Actions = {
 			await resetDashboardLayout(authedClient(event));
 			return { reset: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The dashboard could not be reset.') });
+			return fail(400, { error: actionError(err, 'Could not reset the dashboard. Try again.') });
 		}
 	},
 };

@@ -87,7 +87,7 @@ describe('datasources page', () => {
 		const radios = [...form.querySelectorAll('input[type="radio"][name="ssl"]')] as HTMLInputElement[];
 		expect(radios.map((r) => r.value)).toEqual(['require', 'prefer', 'disable']);
 		expect(getByRole('radio', { name: /Prefer TLS/ })).toBeTruthy();
-		expect(form.textContent).toContain('connects in the clear when it does not');
+		expect(form.textContent).toContain('connects without encryption when it does not');
 	});
 
 	it('says on edit that every blank secret keeps the stored ones and any typed one replaces them all', async () => {
@@ -95,13 +95,13 @@ describe('datasources page', () => {
 		await fireEvent.click(getByLabelText('Edit inventory'));
 		const rule = container.querySelector('[data-testid="secret-rule"]') as HTMLElement;
 		expect(rule.textContent).toContain('Leave every secret field empty to keep');
-		expect(rule.textContent).toContain('replaces all of them');
+		expect(rule.textContent).toContain('all stored secrets are replaced');
 	});
 
 	it('puts the name rule at the name field when the plugin refused the name', async () => {
 		const { getAllByText, container, rerender } = setup();
 		await fireEvent.click(getAllByText('New datasource')[0]);
-		const rule = 'A name starts with a lower case letter and holds up to 40 lower case letters, digits, dashes and underscores.';
+		const rule = 'Start the name with a lower case letter, and use up to 40 lower case letters, digits, dashes and underscores.';
 		await rerender({
 			data: { datasources: [warehouse, inventory], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed },
 			form: { action: 'save', error: rule, nameError: rule },
@@ -190,7 +190,7 @@ describe('datasources page', () => {
 		await chooseAuth(container, 'Bearer token');
 		const token = form.querySelector('[name="auth_token"]') as HTMLInputElement;
 		expect(token.required).toBe(true);
-		expect(getByTestId('auth-section').textContent).toContain('The scheme changed');
+		expect(getByTestId('auth-section').textContent).toContain('Enter the secret for the new scheme');
 	});
 
 	it('requires the secret on edit when the stored datasource holds none for that scheme', async () => {
@@ -269,8 +269,8 @@ describe('datasources page when the plugin says they are not enabled', () => {
 	});
 
 	it('renders a refused write as not enabled, naming no capability', () => {
-		const { container } = unavailable([], { action: 'test', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
-		expect(container.textContent).toContain('Datasources are not enabled on this instance, so nothing was changed.');
+		const { container } = unavailable([], { action: 'test', error: 'Datasources are not enabled on this instance.', refused: true });
+		expect(container.textContent).toContain('Datasources are not enabled on this instance.');
 		expect(container.textContent).not.toMatch(/capability|license/i);
 	});
 
@@ -290,13 +290,13 @@ describe('datasources page chat channels', () => {
 		const text = (setup().container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('chat.notify');
 		expect(text).toContain('chat-notify');
-		expect(text).toContain('Slack, Discord and Telegram');
+		expect(text).toContain('Slack, Discord or Telegram');
 	});
 
 	it('warns that EVENT_BUS never names a chat service', () => {
 		const text = (setup().container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('EVENT_BUS');
-		expect(text).toContain('stop the engine from starting');
+		expect(text).toContain('the engine from starting');
 	});
 });
 
@@ -328,12 +328,12 @@ describe('datasources page and the role of the reader', () => {
 // The drawer and the row actions share one form result.
 describe('where a datasource failure shows', () => {
 	it('shows a failed delete on the page and not in the drawer opened after it', async () => {
-		const { container, getAllByText } = setup([warehouse], { action: 'delete', error: 'Failed to delete datasource' });
-		expect(container.textContent).toContain('Failed to delete datasource');
+		const { container, getAllByText } = setup([warehouse], { action: 'delete', error: 'Could not delete the datasource. Try again.' });
+		expect(container.textContent).toContain('Could not delete the datasource. Try again.');
 
 		await fireEvent.click(getAllByText('New datasource')[0]);
 		const drawer = container.ownerDocument.querySelector('#datasource-form') as HTMLElement;
-		expect(drawer.textContent).not.toContain('Failed to delete datasource');
+		expect(drawer.textContent).not.toContain('Could not delete the datasource. Try again.');
 	});
 
 	it('shows a failed save inside the open drawer and not on the page behind it', async () => {
@@ -446,7 +446,7 @@ describe('the link that enables datasources', () => {
 
 	it('names a link to an add-on by what it opens and opens it in a new tab, on the page and in the drawer', async () => {
 		upgrade.link = { href: away, label: 'Manage the license' };
-		const refusal = { action: 'save', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true };
+		const refusal = { action: 'save', error: 'Datasources are not enabled on this instance.', refused: true };
 		const { getAllByText, container, rerender } = setup([]);
 		await fireEvent.click(getAllByText('New datasource')[0]);
 		await rerender({ data: { datasources: [], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed }, form: refusal } as never);
@@ -465,7 +465,7 @@ describe('the link that enables datasources', () => {
 
 	it('keeps a link on this console in the same tab', () => {
 		upgrade.link = { href: '/admin/settings/license', label: 'Manage the license' };
-		setup([], { action: 'delete', error: 'Datasources are not enabled on this instance, so nothing was changed.', refused: true });
+		setup([], { action: 'delete', error: 'Datasources are not enabled on this instance.', refused: true });
 		const a = document.body.querySelector('a[href="/admin/settings/license"]') as HTMLAnchorElement;
 		expect(a.textContent).toBe('Manage the license');
 		expect(a.getAttribute('target')).toBeNull();
@@ -484,6 +484,6 @@ describe('a stored header turned secret', () => {
 		const d = new FormData(form);
 		expect([d.getAll('header_key'), d.getAll('header_value'), d.getAll('header_secret')]).toEqual([['Accept'], ['application/json'], ['true']]);
 		const rule = container.querySelector('[data-testid="secret-rule"]') as HTMLElement;
-		expect(rule.textContent).toContain('Typing a secret, or turning Secret on for a header, replaces all of them');
+		expect(rule.textContent).toContain('If you type a secret or turn on Secret for a header, all stored secrets are replaced');
 	});
 });

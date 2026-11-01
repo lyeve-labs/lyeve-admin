@@ -57,8 +57,8 @@ describe('ProviderForm', () => {
 
 	it('says a higher priority is tried first, the order the engine picks a provider in', () => {
 		const { container } = setup();
-		expect(container.textContent).toContain('Higher is tried first when a call names no provider.');
-		expect(container.textContent).not.toContain('Lower is tried first');
+		expect(container.textContent).toContain('When a request does not name a provider, higher priority is tried first.');
+		expect(container.textContent).not.toContain('lower priority is tried first');
 	});
 
 	it('asks a compatible kind for its base URL and lets it run keyless', async () => {
@@ -109,7 +109,7 @@ describe('ProviderForm', () => {
 
 	it('asks for the key again when the stored one cannot be read', () => {
 		setup({ provider: { ...stored, kind: 'openai', needs_key: true } });
-		expect(screen.getByText(/The stored key could not be read after a key rotation/)).toBeTruthy();
+		expect(screen.getByText(/The saved key can no longer be decrypted after an encryption key change/)).toBeTruthy();
 	});
 });
 

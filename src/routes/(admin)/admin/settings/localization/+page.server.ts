@@ -17,7 +17,7 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		locales: await section(
 			getLocales(authedClient(event)),
-			'The locales could not be read. This is not a report that none are enabled.',
+			'Could not load locales.',
 		),
 	};
 };
@@ -31,7 +31,7 @@ export const actions: Actions = {
 			const locales = await putLocales(authedClient(event), parsed.prefs);
 			return { saved: true, error: null, locales };
 		} catch (err) {
-			const failed = actionFailure(err, 'Failed to save the locales.');
+			const failed = actionFailure(err, 'Could not save the locales. Try again.');
 			return fail(failed.status, { ...failed.data, saved: false });
 		}
 	},

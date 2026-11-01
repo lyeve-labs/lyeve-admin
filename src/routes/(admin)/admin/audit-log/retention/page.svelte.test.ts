@@ -111,7 +111,7 @@ describe('Retention policy delete', () => {
 		expect(submit).toBeTypeOf('function');
 		await submit?.({ cancel: vi.fn() } as never);
 		const [title] = kit.confirm.mock.calls[0] as unknown as [string];
-		expect(title).toBe('Delete the policy covering content.delete on article');
+		expect(title).toBe('Delete the policy covering content.delete on article?');
 	});
 });
 
@@ -120,12 +120,12 @@ describe('Retention drawers', () => {
 		const { getAllByRole } = render(RetentionPage, {
 			props: props(['super_admin'], {}, {
 				action: 'createPolicy',
-				error: 'A retention window is a whole number of days, and cannot be negative.',
+				error: 'Enter a whole number of days, 0 or more.',
 			}),
 		});
 		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
 		const form = document.getElementById('policy-form') as HTMLFormElement;
-		expect(form.textContent).toContain('A retention window is a whole number of days');
+		expect(form.textContent).toContain('Enter a whole number of days, 0 or more.');
 	});
 
 	// The engine stores a policy that does not mention archival with it off,
@@ -141,22 +141,23 @@ describe('Retention drawers', () => {
 
 describe('Retention failures stay where they were made', () => {
 	it('shows a failed row action on the page and opens the next drawer clean', async () => {
+		const failed = 'Could not delete the policy. Try again.';
 		const { getAllByRole, container } = render(RetentionPage, {
-			props: props(['super_admin'], {}, { action: 'deletePolicy', error: 'The policy could not be removed.' }),
+			props: props(['super_admin'], {}, { action: 'deletePolicy', error: failed }),
 		});
-		expect(container.textContent).toContain('The policy could not be removed.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
 		const form = document.getElementById('policy-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('could not be removed');
+		expect(form.textContent).not.toContain(failed);
 	});
 
 	it('keeps a refused hold out of the policy drawer and off the page', async () => {
 		const { getAllByRole, container } = render(RetentionPage, {
-			props: props(['super_admin'], {}, { action: 'createHold', error: 'Name the hold.' }),
+			props: props(['super_admin'], {}, { action: 'createHold', error: 'Enter a name for the hold.' }),
 		});
-		expect(container.textContent).not.toContain('Name the hold.');
+		expect(container.textContent).not.toContain('Enter a name for the hold.');
 		await fireEvent.click(getAllByRole('button', { name: /new policy/i })[0]);
-		expect((document.getElementById('policy-form') as HTMLFormElement).textContent).not.toContain('Name the hold.');
+		expect((document.getElementById('policy-form') as HTMLFormElement).textContent).not.toContain('Enter a name for the hold.');
 	});
 });
 
@@ -168,13 +169,13 @@ describe('Retention holds that could not be read', () => {
 					ok: false,
 					gate: {
 						state: 'error',
-						message: 'The holds could not be read, so the policies above cannot be trusted to describe what is actually being deleted.',
+						message: 'Could not load the legal holds.',
 					},
 				},
 			}),
 		});
-		expect(container.textContent).toContain('The holds could not be read');
-		expect(container.textContent).not.toContain('Nothing is held');
+		expect(container.textContent).toContain('Could not load the legal holds.');
+		expect(container.textContent).not.toContain('No legal holds yet');
 	});
 });
 

@@ -145,7 +145,7 @@
 	const enableLink = $derived(instance.upgradeLink(refusal?.upgradeUrl || null));
 
 	const MODES = [
-		{ value: 'create', label: 'Create a new flow', description: 'The definition becomes a flow of its own, under the slug it carries.' },
+		{ value: 'create', label: 'Create a new flow', description: 'Creates a new flow with the slug the definition gives.' },
 		{
 			value: 'replace',
 			label: 'Replace the draft of an existing flow',
@@ -181,7 +181,7 @@
 {#if enabled}
 	<PageShell
 		title="Flows"
-		description="Custom API endpoints and automations, built on a canvas."
+		description="Build custom API endpoints and automations on a canvas."
 		width="wide"
 	>
 		{#snippet actions()}
@@ -209,7 +209,7 @@
 		{/snippet}
 
 		{#if data.gate.state !== 'ok'}
-			<GateNotice level={2} gate={data.gate} title="flows" absent="The flow plugin does not serve its list on this instance." />
+			<GateNotice level={2} gate={data.gate} title="flows" absent="Flows are not included in this build." />
 		{/if}
 
 		{#if refusal}
@@ -289,11 +289,11 @@
 		{#if data.gate.state !== 'ok'}
 			<!-- Nothing: the empty state would say there are none. -->
 		{:else if data.flows.length === 0 && filtered}
-			<EmptyState title="No flows match" description="Widen the status or clear the search to see more." />
+			<EmptyState title="No flows match these filters" description="Clear the search or choose another status." />
 		{:else if data.flows.length === 0}
 			<EmptyState
 				title="No flows yet"
-				description="Name one to open the editor, where you can start from the palette, a template or an import."
+				description="Create a flow to open the editor. Start from the palette, a template or an import."
 			>
 				{#snippet iconSnippet()}<Workflow size={ICON.lg} />{/snippet}
 				{#snippet action()}
@@ -420,7 +420,7 @@
 				id="create-slug"
 				name="slug"
 				label="Slug"
-				hint="The URL segment: lower case letters, digits and underscores."
+				hint="Used in the flow URL. Use lower case letters, digits and underscores."
 				error={createFailure?.field === 'slug' ? createFailure.error : undefined}
 				bind:value={createSlug}
 				oninput={() => (slugTouched = true)}
@@ -477,7 +477,7 @@
 		<NotEnabled
 			level={2}
 			title="Flows"
-			description="The engine refused the flow routes."
+			description="Flows are not enabled on this instance."
 		/>
 	</PageShell>
 {/if}

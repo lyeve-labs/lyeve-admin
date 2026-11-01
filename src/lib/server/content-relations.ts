@@ -52,7 +52,7 @@ export async function setRelations(
 		headers,
 	});
 	if (!res.ok) {
-		throw new RelationWriteError(fieldName, `The links in ${fieldName} could not be read, so none were changed.`);
+		throw new RelationWriteError(fieldName, `Could not load the links in ${fieldName}. They were not changed.`);
 	}
 	const body = await res.json();
 	const current = (Array.isArray(body) ? body : (body?.data ?? [])) as {
@@ -120,7 +120,7 @@ export async function setEntryRelations(
 		if (result.status === 'fulfilled') return [];
 		return result.reason instanceof RelationWriteError
 			? [result.reason.message]
-			: [`The links in ${fields[i]} could not be saved.`];
+			: [`Could not save the links in ${fields[i]}. Try again.`];
 	});
 	return failures.length > 0 ? failures.join(' ') : null;
 }

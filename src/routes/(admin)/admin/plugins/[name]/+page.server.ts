@@ -39,7 +39,7 @@ export const load: PageServerLoad = async (event) => {
 		? { state: 'forbidden' }
 		: pluginStatus
 			? null
-			: { state: 'error', message: 'The plugin status could not be read. This is not a report that the plugin is stopped.' };
+			: { state: 'error', message: 'Could not load the plugin status.' };
 
 	return {
 		pluginName: name,

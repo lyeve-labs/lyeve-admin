@@ -58,7 +58,7 @@ describe('TablesPanel', () => {
 
 	it('tells an empty datasource apart from one not yet chosen', () => {
 		setup({ status: 'ready', tables: [] });
-		expect(screen.getByText('The datasource has no tables the engine can read.')).toBeTruthy();
+		expect(screen.getByText('This datasource has no readable tables.')).toBeTruthy();
 		cleanup();
 		setup({ status: 'idle', tables: [] });
 		expect(screen.getByText('Choose a SQL datasource to list its tables.')).toBeTruthy();

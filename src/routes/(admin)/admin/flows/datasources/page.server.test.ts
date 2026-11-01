@@ -132,7 +132,7 @@ describe('admin/flows/datasources actions', () => {
 		const result = (await actions.create(event)) as { status: number; data: { error: string; refused: boolean } };
 		expect(result.status).toBe(402);
 		expect(result.data.refused).toBe(true);
-		expect(result.data.error).toBe('Datasources are not enabled on this instance, so nothing was changed.');
+		expect(result.data.error).toBe('Datasources are not enabled on this instance.');
 		expect(result.data.error).not.toContain('example-capability');
 	});
 
@@ -337,7 +337,7 @@ describe('admin/flows/datasources actions', () => {
 		const { event } = actionEvent(httpForm({ name: 'Orders DB' }), { '/datasources': () => json(refused, 422) });
 		const result = (await actions.create(event)) as { status: number; data: { error: string; nameError: string } };
 		expect(result.status).toBe(422);
-		expect(result.data.nameError).toContain('starts with a lower case letter');
+		expect(result.data.nameError).toContain('Start the name with a lower case letter');
 		expect(result.data.error).not.toContain('{');
 	});
 
@@ -382,7 +382,7 @@ describe('admin/flows/datasources actions', () => {
 		const { event, calls } = actionEvent(form, {});
 		const result = (await actions.create(event)) as { status: number; data: { error: string } };
 		expect(result.status).toBe(400);
-		expect(result.data.error).toContain('Host');
+		expect(result.data.error).toContain('Enter a host');
 		expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
 	});
 

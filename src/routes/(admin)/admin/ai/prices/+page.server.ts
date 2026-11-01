@@ -36,13 +36,13 @@ export const actions: Actions = {
 		const output = money(data, 'output_per_1k');
 		const image = money(data, 'image_per_call');
 		if (input === null || output === null || image === null) {
-			return fail(400, { action: 'save', key, error: 'A price is a number of dollars, 0 or more.' });
+			return fail(400, { action: 'save', key, error: 'Enter a price in dollars, 0 or more.' });
 		}
 		try {
 			await putPrice(authedClient(event), kind, model, { input_per_1k: input, output_per_1k: output, image_per_call: image });
 			return { key, saved: true };
 		} catch (err) {
-			return fail(400, { action: 'save', key, error: aiActionError(err, 'Failed to save the price', 'super_admin') });
+			return fail(400, { action: 'save', key, error: aiActionError(err, 'Could not save the price. Try again.', 'super_admin') });
 		}
 	},
 
@@ -56,7 +56,7 @@ export const actions: Actions = {
 			await deletePrice(authedClient(event), kind, model);
 			return { key, deleted: true };
 		} catch (err) {
-			return fail(400, { action: 'delete', key, error: aiActionError(err, 'Failed to delete the price', 'super_admin') });
+			return fail(400, { action: 'delete', key, error: aiActionError(err, 'Could not delete the price. Try again.', 'super_admin') });
 		}
 	},
 };

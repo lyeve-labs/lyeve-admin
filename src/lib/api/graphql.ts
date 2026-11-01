@@ -64,7 +64,7 @@ function fieldsOf(t: IntrospectedType | undefined): RootField[] {
  */
 export function readRoots(answer: IntrospectionAnswer): { roots: SchemaRoots | null; refused: string | null } {
 	const schema = answer.data?.__schema;
-	if (!schema) return { roots: null, refused: answer.errors?.[0]?.message ?? 'The schema was not returned.' };
+	if (!schema) return { roots: null, refused: answer.errors?.[0]?.message ?? 'Could not load the GraphQL schema.' };
 	return {
 		roots: { query: fieldsOf(schema.queryType), mutation: fieldsOf(schema.mutationType), subscription: fieldsOf(schema.subscriptionType) },
 		refused: null,

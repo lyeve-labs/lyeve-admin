@@ -62,8 +62,8 @@
 	const failed = $derived(failedCount(rows));
 
 	const summary = $derived.by(() => {
-		if (data.gate.state !== 'ok') return 'The plugins this engine carries, and whether each one runs.';
-		if (counts.compiled === 0) return 'This engine carries no plugins.';
+		if (data.gate.state !== 'ok') return 'See the plugins in this build and whether each one is running.';
+		if (counts.compiled === 0) return 'This build has no plugins.';
 		const noun = counts.compiled === 1 ? 'plugin' : 'plugins';
 		return `${counts.running} of ${counts.compiled} ${noun} running`;
 	});
@@ -122,14 +122,14 @@
 	{#if data.gate.state !== 'ok'}
 		<!-- Every row comes from the status report, so no plugin is listed
 		     until the engine answers. -->
-		<GateNotice level={2} gate={data.gate} title="the plugin status" absent="This engine does not report its plugins." />
+		<GateNotice level={2} gate={data.gate} title="the plugin status" absent="Plugin status needs a newer version of the engine." />
 	{/if}
 
 	{#if failed > 0}
 		<Alert tone="danger" title={failed === 1 ? 'One plugin failed to start' : `${failed} plugins failed to start`}>
 			{#snippet children()}
-				Each is part of this build and enabled, and did not come up, so the routes it serves are
-				answering 404 right now.
+				Each one is in this build and enabled, but did not start. Its routes return 404 until it
+				starts.
 				<Button variant="secondary" size="sm" onclick={showFailedOnly}>Show them</Button>
 			{/snippet}
 		</Alert>
@@ -140,7 +140,7 @@
 			<EmptyState
 				level={2}
 				title="No plugins in this build"
-				description="This engine was built without plugins, so it serves only its own pages."
+				description="This engine was built without plugins, so only the built-in pages are available."
 			>
 				{#snippet iconSnippet()}<Puzzle size={ICON.lg} />{/snippet}
 			</EmptyState>
@@ -174,7 +174,7 @@
 		{#if filtered.length === 0}
 			<EmptyState
 				level={2}
-				title="No plugins match your filters"
+				title="No plugins match these filters"
 				description="Widen the search, choose a different category, or clear the state filter."
 			>
 				{#snippet iconSnippet()}<Filter size={ICON.lg} />{/snippet}

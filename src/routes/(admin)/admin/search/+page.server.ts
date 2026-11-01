@@ -51,7 +51,7 @@ export const load: PageServerLoad = async (event) => {
 	const results: Section<SearchPage> | null = q
 		? await section(
 				searchPage(client, q, limit, offset),
-				'The search could not be run. This is not a report that nothing matched.',
+				'Could not run the search.',
 			)
 		: null;
 	if (results?.ok) {
@@ -64,11 +64,11 @@ export const load: PageServerLoad = async (event) => {
 	// plugin answers its default weights when none are set, so a failed
 	// ranking read is a failure and never the defaults.
 	const [synonyms, ranking, publicSchemas, schemas, analytics] = await Promise.all([
-		section<SynonymList>(attempt(() => listSynonymGroups(client)), 'The synonym groups could not be read. This is not a report that there are none.'),
-		section<RankingConfig>(getRanking(client, '*'), 'The ranking weights could not be read, so they are not shown or offered for change.'),
-		section(attempt(() => getPublicSchemas(client)), 'The public schema list could not be read.'),
-		section(attempt(() => listSchemaNames(client)), 'The schemas could not be read. This is not a report that there are none.'),
-		section<SearchAnalytics>(attempt(() => getSearchAnalytics(client)), 'Search analytics could not be read.'),
+		section<SynonymList>(attempt(() => listSynonymGroups(client)), 'Could not load synonym groups.'),
+		section<RankingConfig>(getRanking(client, '*'), 'Could not load ranking weights.'),
+		section(attempt(() => getPublicSchemas(client)), 'Could not load the public schema list.'),
+		section(attempt(() => listSchemaNames(client)), 'Could not load schemas.'),
+		section<SearchAnalytics>(attempt(() => getSearchAnalytics(client)), 'Could not load search analytics.'),
 	]);
 
 	return {
@@ -94,7 +94,7 @@ export const actions: Actions = {
 			const saved = await setPublicSchemas(authedClient(event), schemas);
 			return { publicSaved: saved.length };
 		} catch (err) {
-			return fail(400, { publicError: actionError(err, 'The public schemas could not be saved.') });
+			return fail(400, { publicError: actionError(err, 'Could not save the public schemas. Try again.') });
 		}
 	},
 
@@ -105,7 +105,7 @@ export const actions: Actions = {
 		const body = parseWeight(form.get('body_weight'));
 		const tag = parseWeight(form.get('tag_weight'));
 		if (title === null || body === null || tag === null) {
-			return fail(400, { rankingError: 'Each weight is a number from 0 to 10.' });
+			return fail(400, { rankingError: 'Enter a weight from 0 to 10 for each field.' });
 		}
 		try {
 			// The plugin replaces the whole row, so the boost rules are read again
@@ -116,7 +116,7 @@ export const actions: Actions = {
 			await setDefaultRanking(client, { title_weight: title, body_weight: body, tag_weight: tag }, current.boost_rules ?? []);
 			return { rankingSaved: true };
 		} catch (err) {
-			return fail(400, { rankingError: actionError(err, 'The weights could not be saved.') });
+			return fail(400, { rankingError: actionError(err, 'Could not save the weights. Try again.') });
 		}
 	},
 
@@ -126,14 +126,14 @@ export const actions: Actions = {
 		const baseTerm = String(form.get('base_term') ?? '').trim();
 		const synonyms = parseTerms(String(form.get('synonyms') ?? ''));
 		const fields: Record<string, string> = {};
-		if (!baseTerm) fields.base_term = 'Required';
-		if (synonyms.length === 0) fields.synonyms = 'Name at least one term';
+		if (!baseTerm) fields.base_term = 'Enter a base term.';
+		if (synonyms.length === 0) fields.synonyms = 'Enter at least one term.';
 		if (Object.keys(fields).length > 0) return fail(400, { synonymError: 'Check the highlighted fields.', fields });
 		try {
 			await createSynonym(authedClient(event), baseTerm, baseTerm, synonyms);
 			return { synonymSaved: true };
 		} catch (err) {
-			return fail(400, { synonymError: actionError(err, 'The synonym could not be saved.') });
+			return fail(400, { synonymError: actionError(err, 'Could not save the synonym. Try again.') });
 		}
 	},
 
@@ -144,7 +144,7 @@ export const actions: Actions = {
 			await deleteSynonym(authedClient(event), String(form.get('id') ?? ''));
 			return { synonymDeleted: true };
 		} catch (err) {
-			return fail(400, { synonymDeleteError: actionError(err, 'The synonym could not be deleted.') });
+			return fail(400, { synonymDeleteError: actionError(err, 'Could not delete the synonym. Try again.') });
 		}
 	},
 
@@ -154,7 +154,7 @@ export const actions: Actions = {
 			const res = await reindexSearch(authedClient(event));
 			return { reindexed: res.indexed ?? 0, reindexMessage: res.message ?? '' };
 		} catch (err) {
-			return fail(400, { reindexError: actionError(err, 'The index could not be rebuilt.') });
+			return fail(400, { reindexError: actionError(err, 'Could not rebuild the index. Try again.') });
 		}
 	},
 };

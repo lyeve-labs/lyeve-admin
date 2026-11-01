@@ -35,7 +35,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			config = await getLogAlerts(authedClient(event));
 		} catch (err) {
-			gate = gateOf(err, 'The volume alert rules could not be read.');
+			gate = gateOf(err, 'Could not load volume alert rules.');
 		}
 	}
 	return { gate, config, superAdmin };
@@ -45,14 +45,14 @@ export const load: PageServerLoad = async (event) => {
 function ruleFrom(form: FormData): { key: string; rule: LogAlertRule } | { error: string } {
 	const level = String(form.get('level') ?? '').trim();
 	if (level && level !== 'ALL' && !(LOG_ALERT_LEVELS as readonly string[]).includes(level)) {
-		return { error: 'Pick a level the log writes, or every level.' };
+		return { error: 'Choose a level, or every level.' };
 	}
 	const maxCount = Number(form.get('max_count') ?? '');
 	if (!Number.isInteger(maxCount) || maxCount < 1) {
-		return { error: 'The ceiling is a whole number of entries, 1 or more.' };
+		return { error: 'Enter a ceiling of 1 or more entries, as a whole number.' };
 	}
 	const window = String(form.get('window') ?? '').trim();
-	if (!isWindow(window)) return { error: 'The window is a whole number and m, h or d, such as 5m.' };
+	if (!isWindow(window)) return { error: 'Enter the window as a whole number followed by m, h or d, such as 5m.' };
 	return {
 		key: String(form.get('key') ?? '').trim(),
 		rule: {
@@ -69,7 +69,7 @@ function ruleFrom(form: FormData): { key: string; rule: LogAlertRule } | { error
 }
 
 /** What the page says when a rule it showed is gone by the time it is written. */
-const RULE_GONE = 'That rule no longer exists. The list now shows the rules as they stand.';
+const RULE_GONE = 'This rule no longer exists. The list below is up to date.';
 
 export const actions: Actions = {
 	save: async (event) => {
@@ -86,7 +86,7 @@ export const actions: Actions = {
 				: await createLogAlertRule(client, parsed.rule);
 		} catch (err) {
 			if (errorCodeOf(err) === LOG_RULE_NOT_FOUND) return fail(404, { error: RULE_GONE });
-			const failed = actionFailure(err, 'The rule could not be saved.');
+			const failed = actionFailure(err, 'Could not save the rule. Try again.');
 			return fail(failed.status, { ...failed.data, drawer: true });
 		}
 		// The write that sets a new webhook URL answers its signing secret once.
@@ -96,14 +96,14 @@ export const actions: Actions = {
 	delete: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const key = String((await event.request.formData()).get('key') ?? '');
-		if (!key) return fail(400, { error: 'No rule was named.' });
+		if (!key) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.' });
 		try {
 			// Deleting a rule needs no license: the plugin asks for one only to
 			// add or change a paid channel.
 			await deleteLogAlertRule(authedClient(event), key);
 		} catch (err) {
 			if (errorCodeOf(err) === LOG_RULE_NOT_FOUND) return fail(404, { error: RULE_GONE });
-			return actionFailure(err, 'The rule could not be deleted.');
+			return actionFailure(err, 'Could not delete the rule. Try again.');
 		}
 		return { deleted: key };
 	},
@@ -111,13 +111,13 @@ export const actions: Actions = {
 	cooldown: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const cooldown = String((await event.request.formData()).get('cooldown') ?? '').trim();
-		if (!isWindow(cooldown)) return fail(400, { error: 'The cooldown is a whole number and m, h or d, such as 10m.' });
+		if (!isWindow(cooldown)) return fail(400, { error: 'Enter the cooldown as a whole number followed by m, h or d, such as 10m.' });
 		const client = authedClient(event);
 		try {
 			const current = await getLogAlerts(client);
 			await putLogAlerts(client, { thresholds: current.thresholds, cooldown });
 		} catch (err) {
-			return actionFailure(err, 'The cooldown could not be saved.');
+			return actionFailure(err, 'Could not save the cooldown. Try again.');
 		}
 		return { cooldownSaved: cooldown };
 	},

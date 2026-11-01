@@ -38,7 +38,7 @@ export const actions: Actions = {
 		try {
 			await updateProvider(client, event.params.id, read.input);
 		} catch (err) {
-			return fail(400, { scope: 'config', error: aiActionError(err, 'Failed to save the provider', 'super_admin') });
+			return fail(400, { scope: 'config', error: aiActionError(err, 'Could not save the provider. Try again.', 'super_admin') });
 		}
 		return { scope: 'config', saved: true };
 	},
@@ -48,7 +48,7 @@ export const actions: Actions = {
 		try {
 			await deleteProvider(authedClient(event), event.params.id);
 		} catch (err) {
-			return fail(400, { scope: 'delete', error: aiActionError(err, 'Failed to delete the provider', 'super_admin') });
+			return fail(400, { scope: 'delete', error: aiActionError(err, 'Could not delete the provider. Try again.', 'super_admin') });
 		}
 		redirect(303, '/admin/ai/providers');
 	},
@@ -61,7 +61,7 @@ export const actions: Actions = {
 			const models = await listModels(authedClient(event), event.params.id);
 			return { scope: 'models', models };
 		} catch (err) {
-			return fail(400, { scope: 'models', error: aiActionError(err, 'The provider did not answer with its models') });
+			return fail(400, { scope: 'models', error: aiActionError(err, 'Could not load the models from this provider. Try again.') });
 		}
 	},
 
@@ -73,7 +73,7 @@ export const actions: Actions = {
 			const capabilities = await getCapabilities(authedClient(event), event.params.id, model);
 			return { scope: 'capabilities', capabilities };
 		} catch (err) {
-			return fail(400, { scope: 'capabilities', error: aiActionError(err, 'The capabilities could not be read') });
+			return fail(400, { scope: 'capabilities', error: aiActionError(err, 'Could not load the capabilities. Try again.') });
 		}
 	},
 };

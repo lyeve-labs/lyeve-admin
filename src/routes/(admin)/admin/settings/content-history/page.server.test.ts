@@ -205,14 +205,14 @@ describe('content history save', () => {
 		engine.put.mockRejectedValue(new ApiError(409, 'history_mode is set by CONTENT_HISTORY'));
 		const out = (await actions.save(formEvent({ history_mode: 'all' }))) as Failed;
 		expect(out.status).toBe(409);
-		expect(out.data.error).toMatch(/environment now fixes a setting/);
+		expect(out.data.error).toMatch(/environment variable now sets one of the settings/);
 		expect(out.data.error).not.toContain('CONTENT_HISTORY');
 	});
 
 	it('keeps engine text off the page on a 5xx', async () => {
 		engine.put.mockRejectedValue(new ApiError(500, 'pq: deadlock detected'));
 		const out = (await actions.save(formEvent({ history_mode: 'all' }))) as Failed;
-		expect(out.data.error).toBe('The content history settings could not be saved. Nothing was changed.');
+		expect(out.data.error).toBe('Could not save content history settings. Try again.');
 	});
 
 	it('writes nothing when the form changed nothing', async () => {
@@ -244,7 +244,7 @@ describe('prune and delete', () => {
 	it('reports a prune that failed without engine text', async () => {
 		engine.post.mockRejectedValue(new ApiError(502, '<html>Bad Gateway</html>'));
 		const out = (await actions.prune(formEvent({}))) as Failed;
-		expect(out.data).toEqual({ action: 'prune', error: 'Retention could not run. Nothing was removed.' });
+		expect(out.data).toEqual({ action: 'prune', error: 'Could not run retention. Nothing was removed. Try again.' });
 	});
 
 	it("deletes one type's history by name", async () => {

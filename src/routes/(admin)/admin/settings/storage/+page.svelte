@@ -147,14 +147,14 @@
 		return () =>
 			async ({ result, update }) => {
 				await update();
-				if (result.type === 'success') toast.success(`${p.name} answered`);
+				if (result.type === 'success') toast.success(`${p.name} passed the test.`);
 			};
 	}
 
 	function remove(p: StorageProvider): SubmitFunction {
 		return confirmed(
-			`Delete provider ${p.name}`,
-			'Objects already stored there stay where they are, and nothing in this instance can read them afterwards.',
+			`Delete provider ${p.name}?`,
+			'Files already stored there stay where they are, but this instance can no longer read them.',
 			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
 		);
 	}
@@ -162,7 +162,7 @@
 
 <PageShell
 	title="Storage"
-	description="Where uploads are written, and which provider is receiving them."
+	description="Choose where uploads are stored, and see which provider receives them."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -179,7 +179,7 @@
 			level={2}
 			gate={data.gate}
 			title="Storage"
-			absent="The storage plugin is not part of this build, so uploads have nowhere to go."
+			absent="Storage is not included in this build. Uploads do not work without it."
 		/>
 	{:else}
 		{#if formError}
@@ -197,9 +197,7 @@
 			     here, so this is the only place it is named. -->
 			<Alert tone="danger">
 				{broken.length}
-				{broken.length === 1 ? 'provider has' : 'providers have'} credentials the engine can no
-				longer decrypt. They look configured and fail every upload, and that failure shows up
-				as a media error somewhere else entirely.
+				{broken.length === 1 ? 'provider has' : 'providers have'} credentials that can no longer be decrypted. They look configured but fail every upload, and the failure shows up elsewhere as a media error.
 			</Alert>
 		{/if}
 
@@ -208,9 +206,7 @@
 			     anywhere else. Either way it belongs on the page. -->
 			<Alert tone="warn">
 				{open.length}
-				{open.length === 1 ? 'provider hands' : 'providers hand'} out unsigned URLs that never
-				expire. Anyone holding a key can read the object. That is what a CDN in front of the
-				directory needs, and a leak if one is not there.
+				{open.length === 1 ? 'provider hands' : 'providers hand'} out unsigned URLs that never expire. Anyone who has an object's key can read it. A CDN in front of the directory needs this, but without one it is a data leak.
 			</Alert>
 		{/if}
 
@@ -222,8 +218,7 @@
 			</p>
 		{:else if data.providers.length > 0}
 			<Alert tone="danger">
-				No provider can take an upload. Every one is disabled or has credentials that will not
-				decrypt.
+				No provider can receive uploads. Each one is disabled or has credentials that cannot be decrypted.
 			</Alert>
 		{/if}
 
@@ -231,48 +226,37 @@
 			<div class="flex flex-col gap-3 text-sm text-muted">
 				<SectionHeading level={2}>How storage works</SectionHeading>
 				<p>
-					With nothing configured, uploads are written to a directory on the engine host, the one
-					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span> names (<span class="font-mono text-xs">./uploads</span>
-					by default). That is fine for one engine. With more than one replica the directory has to
-					be shared storage, or each replica keeps its own files.
+					With no provider configured, uploads are written to a directory on the engine host, set by
+					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span> (<span class="font-mono text-xs">./uploads</span>
+					by default). That works for one engine. With more than one replica, the directory must be shared storage, or each replica keeps its own files.
 				</p>
 				<p>
-					An object store holds the files instead: Amazon S3, any S3-compatible service (Cloudflare
+					You can store files in an object store instead: Amazon S3, any S3-compatible service (Cloudflare
 					R2, Wasabi, Backblaze B2, DigitalOcean Spaces) through S3 with its endpoint, MinIO, Google
 					Cloud Storage or Azure Blob Storage. Credentials are stored encrypted and never shown
-					again. Test a provider before enabling it: a provider with wrong credentials fails the
-					uploads it receives.
+					again. Test a provider before you enable it, because a provider with wrong credentials fails every upload it receives.
 				</p>
 				<p>
-					A tenant writes to the providers configured in that tenant. A tenant with none uses the
-					providers of the default tenant, and without those, the engine's directory. Among the
-					providers that can take a write, one given a cost weight through the API is preferred,
-					the lowest weight first. Without one, the lowest priority number receives it. Objects are kept
-					under a prefix per tenant in every store.
+					Each tenant uploads to its own providers. A tenant with none uses the default tenant's providers, and if there are none, the engine's directory. Among the providers that can take an upload, one with a cost weight set through the API is preferred, lowest weight first. Otherwise the lowest priority number receives it. Every store keeps each tenant's files under a separate prefix.
 				</p>
 				<p>
-					A provider is a row in this instance's database and never an environment variable. Adding
-					one here changes no variable, and changing a variable will not add one. While this page is
-					available, the engine's own
+					Providers are saved in this instance's database, not in environment variables. Adding one here changes no variable, and changing a variable does not add a provider. While this page is available,
 					<span class="font-mono text-xs">STORAGE_DRIVER</span> and
 					<span class="font-mono text-xs">STORAGE_S3_*</span>
-					are read by nobody: the providers below replace them rather than layering over them. The
-					one exception is
-					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span>, which still names the directory
-					the fallback writes to.
+					have no effect, because the providers below replace them. The one exception is
+					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span>, which still sets the directory the fallback writes to.
 				</p>
 				<p>
-					On the first boot that finds no providers at all, an instance that already had
+					On the first start with no providers, an instance that already had
 					<span class="font-mono text-xs">STORAGE_S3_BUCKET</span>
-					set gets one row built from those variables, so an install that was writing to a bucket
-					keeps writing to it. That happens once. After it, this page is where the answer lives.
+					set gets one provider built from those variables, so an install that was writing to a bucket keeps writing to it. This happens only once. After that, you manage providers on this page.
 				</p>
 			</div>
 		</Card>
 
 		{#if data.providers.length === 0}
 			<EmptyState
-				title="No provider configured"
+				title="No providers yet"
 				description="Uploads are written to the engine's own directory. Add an object store to keep them elsewhere."
 			>
 				{#snippet iconSnippet()}
@@ -416,7 +400,7 @@
 			<Toggle
 				id="provider-public"
 				label="Unsigned public URLs"
-				hint="Hand out the public base URL plus the key, with no signature or expiry. Only for a directory a CDN serves anyway."
+				hint="Serve files at the public base URL plus the key, with no signature or expiry. Use this only when a CDN serves the directory."
 				bind:checked={publicUnsigned}
 			/>
 		{/if}

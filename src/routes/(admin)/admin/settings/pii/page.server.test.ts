@@ -108,12 +108,12 @@ describe('pii rule writes', () => {
 	it('refuses a priority of 0 on create, which the plugin would store as 100', async () => {
 		const out = (await actions.create(formEvent({ ...RULE, priority: '0' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
-		expect(out.data.error).toContain('cannot take priority 0');
+		expect(out.data.error).toContain('cannot start at priority 0');
 		expect(api.createRule).not.toHaveBeenCalled();
 	});
 
 	it.each(['update', 'delete'] as const)('names nothing to %s without a request', async (name) => {
-		expect(((await actions[name](formEvent(RULE))) as Failure).data).toEqual({ action: name, error: 'Which rule?' });
+		expect(((await actions[name](formEvent(RULE))) as Failure).data).toEqual({ action: name, error: 'This form is missing its rule. Reload the page and try again.' });
 		expect(api.updateRule).not.toHaveBeenCalled();
 		expect(api.deleteRule).not.toHaveBeenCalled();
 	});
@@ -146,10 +146,10 @@ describe('pii rule writes', () => {
 	});
 
 	it.each([
-		['create', 'createRule', 'The rule could not be saved.'],
-		['update', 'updateRule', 'The rule could not be saved.'],
-		['delete', 'deleteRule', 'The rule could not be deleted.'],
-		['test', 'testRule', 'The pattern could not be run.'],
+		['create', 'createRule', 'Could not create the rule. Try again.'],
+		['update', 'updateRule', 'Could not save the rule. Try again.'],
+		['delete', 'deleteRule', 'Could not delete the rule. Try again.'],
+		['test', 'testRule', 'Could not run the pattern. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, fn, sentence) => {
 		api[fn].mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
 		expect(((await actions[name](formEvent({ id: 'r1', ...RULE }))) as Failure).data).toEqual({ action: name, error: sentence });

@@ -25,7 +25,7 @@
 </script>
 
 {#snippet unreadable(what: string)}
-	<p class="text-sm text-muted">{what} could not be read.</p>
+	<p class="text-sm text-muted">Could not load {what}. Reload the page to try again.</p>
 {/snippet}
 
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-6" data-testid="dashboard-widgets">
@@ -47,7 +47,7 @@
 					<div class="flex flex-col gap-3">
 						<SectionHeading level={3}>{w.heading}</SectionHeading>
 						{#if w.unavailable}
-							<p class="text-sm text-muted">This instance does not serve what this widget reads.</p>
+							<p class="text-sm text-muted">This widget needs a plugin that is not running on this instance.</p>
 						{:else if w.type === 'entry_counts'}
 							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 								{#each w.counts ?? [] as c (c.schema)}
@@ -69,7 +69,7 @@
 							</div>
 						{:else if w.type === 'latest_entries'}
 							{#if w.entries === null}
-								{@render unreadable('These entries')}
+								{@render unreadable('these entries')}
 							{:else if (w.entries ?? []).length === 0}
 								<p class="text-sm text-muted">No entries yet.</p>
 							{:else}
@@ -90,7 +90,7 @@
 							{/if}
 						{:else if w.type === 'status_breakdown'}
 							{#if !w.statuses}
-								{@render unreadable('The counts')}
+								{@render unreadable('the counts')}
 							{:else}
 								<div class="grid grid-cols-3 gap-3">
 									<Stat size="sm" label="Published" value={formatCount(w.statuses.published)} tone="success" />
@@ -101,9 +101,9 @@
 							{/if}
 						{:else if w.type === 'recent_activity'}
 							{#if w.audit === null}
-								{@render unreadable('The audit log')}
+								{@render unreadable('the audit log')}
 							{:else if (w.audit ?? []).length === 0}
-								<p class="text-sm text-muted">Nothing recorded yet.</p>
+								<p class="text-sm text-muted">No activity yet.</p>
 							{:else}
 								<ul class="divide-y divide-line">
 									{#each w.audit ?? [] as a (a.id)}
@@ -119,7 +119,7 @@
 							{/if}
 						{:else if w.type === 'media_usage'}
 							{#if !w.media}
-								{@render unreadable('The media library')}
+								{@render unreadable('the media library')}
 							{:else}
 								<div class="grid grid-cols-2 gap-3">
 									<Stat size="sm" label="Files" value={formatCount(w.media.files)} />

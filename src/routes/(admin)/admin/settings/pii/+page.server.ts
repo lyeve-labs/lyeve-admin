@@ -101,14 +101,14 @@ export const actions: Actions = {
 		if (draft.priority === 0) {
 			return fail(400, {
 				action: 'create',
-				error: 'A new rule cannot take priority 0, which the plugin reads as unset and stores as 100. Create it with 1, or set 0 by editing it once it exists.',
+				error: 'A new rule cannot start at priority 0, because it would be saved as 100. Create it with 1 or more, then edit it to set 0.',
 			});
 		}
 		try {
 			await createRule(authedClient(event), draft);
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { action: 'create', error: actionError(err, 'The rule could not be saved.') });
+			return fail(422, { action: 'create', error: actionError(err, 'Could not create the rule. Try again.') });
 		}
 	},
 
@@ -116,12 +116,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'update', error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'update', error: 'This form is missing its rule. Reload the page and try again.' });
 		try {
 			await updateRule(authedClient(event), id, draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { action: 'update', error: actionError(err, 'The rule could not be saved.') });
+			return fail(422, { action: 'update', error: actionError(err, 'Could not save the rule. Try again.') });
 		}
 	},
 
@@ -129,12 +129,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'Which rule?' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its rule. Reload the page and try again.' });
 		try {
 			await deleteRule(authedClient(event), id);
 			return { deleted: true };
 		} catch (err) {
-			return fail(422, { action: 'delete', error: actionError(err, 'The rule could not be deleted.') });
+			return fail(422, { action: 'delete', error: actionError(err, 'Could not delete the rule. Try again.') });
 		}
 	},
 
@@ -152,7 +152,7 @@ export const actions: Actions = {
 			);
 			return { test: result };
 		} catch (err) {
-			return fail(422, { action: 'test', error: actionError(err, 'The pattern could not be run.') });
+			return fail(422, { action: 'test', error: actionError(err, 'Could not run the pattern. Try again.') });
 		}
 	},
 };

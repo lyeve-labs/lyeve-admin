@@ -118,7 +118,7 @@ export type CaptureGate = Gate;
 export const CAPTURE_OK: CaptureGate = GATE_OK;
 
 export function captureGate(err: unknown): CaptureGate {
-	return gateOf(err, 'The captures could not be read. This is not a report that none were kept.');
+	return gateOf(err, 'Could not load captures.');
 }
 
 export async function listCaptures(client: HttpClient, limit: number, offset: number): Promise<CapturesRead> {

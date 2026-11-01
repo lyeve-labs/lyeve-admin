@@ -105,7 +105,7 @@
 			value={content}
 			placeholder={PLACEHOLDER[format]}
 			error={errorFor('content')}
-			hint={format === 'text' ? undefined : 'The node hands the parsed value on. Expressions in double braces are rendered first.'}
+			hint={format === 'text' ? undefined : 'The node passes on the parsed value. Expressions in double braces are filled in first.'}
 			oninput={(text) => set({ content: text || undefined })}
 		/>
 		{#if format === 'csv'}
@@ -118,7 +118,7 @@
 		{/if}
 		<p class="text-xs text-muted" data-testid="inline-preview">
 			{#if count === null}
-				Preview: not countable until the run renders the expressions.
+				Preview: rows cannot be counted until a run fills in the expressions.
 			{:else}
 				Preview: {count} row{count === 1 ? '' : 's'}
 			{/if}

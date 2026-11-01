@@ -125,7 +125,7 @@
 
 <PageShell
 	title="Privacy"
-	description="What happens to a person's data in this tenant when they ask for it to be erased, and what they may take when they export it themselves."
+	description="Choose what happens to a person's data when they ask to be erased, and what they can export themselves."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -135,7 +135,7 @@
 	{/if}
 
 	{#if nothingShown}
-		<Alert tone="brand">None of these settings apply to this instance as it runs now, so there is nothing to change here.</Alert>
+		<Alert tone="brand">None of these settings apply to this instance right now.</Alert>
 	{/if}
 
 	{#if data.formErasure}
@@ -153,7 +153,7 @@
 				<GateNotice
 					gate={data.formErasure.gate}
 					title="Form submissions on erasure"
-					absent="This instance does not keep form submissions."
+					absent="Form submissions are not included in this build."
 				/>
 			{:else}
 				<Card pad="md">
@@ -161,7 +161,7 @@
 						<RadioGroup
 							name="mode"
 							label="When a person's data is erased, their form submissions are"
-							hint="A form submission can name more than one person. This decides how much of it an erasure removes."
+							hint="A form submission can hold details of more than one person. Choose how much of it an erasure removes."
 							options={ERASURE_OPTIONS}
 							bind:value={mode}
 						/>
@@ -180,8 +180,7 @@
 			<div class="flex flex-col gap-1">
 				<SectionHeading level={2}>Exporting their own data</SectionHeading>
 				<p class="text-sm text-muted">
-					A person signed in to this tenant can download a copy of their own data. These settings decide what they
-					may include and who may do it.
+					People signed in to this tenant can download a copy of their own data. Choose what they may include and who may do it.
 				</p>
 			</div>
 
@@ -195,7 +194,7 @@
 					<GateNotice
 						gate={data.exportSections.gate}
 						title="What a person may include"
-						absent="This instance does not offer a choice of what to include."
+						absent="Choosing what an export contains is not included in this build."
 					/>
 				{:else}
 					<Card pad="md">
@@ -212,15 +211,14 @@
 								<CheckboxGroup
 									name="offered"
 									label="What a person may include"
-									hint="A person picks from these each time they export. With nothing ticked, no one in this tenant can export their own data."
+									hint="A person picks from these each time they export. If nothing is checked, no one in this tenant can export their own data."
 									options={sectionOptions}
 									bind:value={offered}
 								/>
 							{/if}
 							{#if kept.length > 0}
 								<p class="text-xs text-muted">
-									Also left out: {kept.map((s) => sectionOption(s).label).join(', ')}. That part of the instance
-									does not run now, and it stays left out when it runs again.
+									Also left out: {kept.map((s) => sectionOption(s).label).join(', ')}. These are not running now, and they stay left out when they run again.
 								</p>
 							{/if}
 							{@render saved(sectionsResult, 'Saved. The next export offers these.')}
@@ -237,7 +235,7 @@
 					<GateNotice
 						gate={data.exportRoles.gate}
 						title="Who may export"
-						absent="This instance lets every role export."
+						absent="Choosing who may export is not included in this build. Every role can export."
 					/>
 				{:else}
 					<Card pad="md">
@@ -253,7 +251,7 @@
 								<CheckboxGroup
 									name="roles"
 									label="Roles that may export"
-									hint="With no role ticked, only admins and super admins can export."
+									hint="If no role is checked, only admins and super admins can export."
 									orientation="horizontal"
 									options={roleOptions}
 									bind:value={roles}

@@ -21,8 +21,8 @@ describe('parseProvider', () => {
 	});
 
 	it('refuses an smtp row with no host and any row with no from address', () => {
-		expect(parseProvider(form({ ...smtp, host: '' }), false)).toEqual({ error: 'An SMTP host is required.' });
-		expect(parseProvider(form({ ...smtp, from_addr: '' }), false)).toEqual({ error: 'A from address is required.' });
+		expect(parseProvider(form({ ...smtp, host: '' }), false)).toEqual({ error: 'Enter the SMTP host.' });
+		expect(parseProvider(form({ ...smtp, from_addr: '' }), false)).toEqual({ error: 'Enter a from address.' });
 	});
 
 	const api = {
@@ -76,19 +76,19 @@ describe('parseProvider', () => {
 	});
 
 	it('requires the key and the base URL on a new api row and keeps the key on edit', () => {
-		expect(parseProvider(form({ ...api, api_key: '' }), false)).toEqual({ error: 'An API key is required.' });
-		expect(parseProvider(form({ ...api, api_base_url: '' }), false)).toEqual({ error: 'An API base URL is required.' });
+		expect(parseProvider(form({ ...api, api_key: '' }), false)).toEqual({ error: 'Enter the API key.' });
+		expect(parseProvider(form({ ...api, api_base_url: '' }), false)).toEqual({ error: 'Enter the API base URL.' });
 		const kept = parseProvider(form({ ...api, api_key: '', webhook_secret: '', stored_transport: 'api' }), true);
 		expect('body' in kept && !('api_key' in kept.body) && !('webhook_secret' in kept.body)).toBe(true);
 		// An smtp row holds no key, so moving it to api needs one typed.
-		expect(parseProvider(form({ ...api, api_key: '', stored_transport: 'smtp' }), true)).toEqual({ error: 'An API key is required.' });
+		expect(parseProvider(form({ ...api, api_key: '', stored_transport: 'smtp' }), true)).toEqual({ error: 'Enter the API key.' });
 	});
 
 	it('refuses a verb the plugin does not send with and a path that is not a path', () => {
-		expect(parseProvider(form({ ...api, api_method: 'GET' }), false)).toEqual({ error: 'Method must be POST, PUT or PATCH.' });
+		expect(parseProvider(form({ ...api, api_method: 'GET' }), false)).toEqual({ error: 'Choose POST, PUT or PATCH.' });
 		expect(parseProvider(form({ ...api, api_method: '' }), false)).toMatchObject({ body: { api_method: 'POST' } });
-		expect(parseProvider(form({ ...api, api_path: 'v3/messages' }), false)).toEqual({ error: 'The path must start with /.' });
-		expect(parseProvider(form({ ...api, api_path: '/v3/messages?x=1' }), false)).toMatchObject({ error: expect.stringContaining('no query') });
+		expect(parseProvider(form({ ...api, api_path: 'v3/messages' }), false)).toEqual({ error: 'Start the path with /.' });
+		expect(parseProvider(form({ ...api, api_path: '/v3/messages?x=1' }), false)).toMatchObject({ error: expect.stringContaining('Leave the query') });
 		expect(parseProvider(form({ ...api, api_path: '' }), false)).toMatchObject({ body: { api_path: '' } });
 	});
 

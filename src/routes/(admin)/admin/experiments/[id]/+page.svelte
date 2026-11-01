@@ -124,7 +124,7 @@
 	function removeVariant(v: Variant): SubmitFunction {
 		return confirmed(
 			`Remove variant ${v.name}?`,
-			'Exposures already recorded against it stay, so the results keep counting people who saw it.',
+			'Exposures already recorded for it are kept, and the results still count people who saw it.',
 			{ confirmLabel: 'Remove', success: `Removed ${v.name}` },
 		);
 	}
@@ -143,7 +143,7 @@
 
 <PageShell
 	title={exp.name}
-	description={exp.description || 'No description was written for this experiment.'}
+	description={exp.description || 'No description yet.'}
 	width="wide"
 	back={{ href: '/admin/experiments', label: 'Experiments' }}
 >
@@ -163,7 +163,7 @@
 				{verdict(results)}
 			</Alert>
 		{:else}
-			<GateNotice gate={data.results.gate} title="the results" absent="This experiment is no longer there, so it has no results." />
+			<GateNotice gate={data.results.gate} title="the results" absent="This experiment no longer exists. Reload the page." />
 		{/if}
 
 		{#if thin}
@@ -228,11 +228,11 @@
 		{/if}
 
 		{#if !data.variants.ok}
-			<GateNotice gate={data.variants.gate} title="the variants" absent="This experiment is no longer there, so it has no variants." />
+			<GateNotice gate={data.variants.gate} title="the variants" absent="This experiment no longer exists. Reload the page." />
 		{:else if variants.length === 0}
 			<EmptyState
-				title="No variant yet"
-				description="An experiment with no variants splits nothing. Add a control and at least one alternative."
+				title="No variants yet"
+				description="Add a control and at least one other variant to start splitting traffic."
 			>
 				{#snippet iconSnippet()}
 					<SplitSquareHorizontal size={ICON.lg} />
@@ -294,11 +294,11 @@
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Metrics</SectionHeading>
 		{#if !data.metrics.ok}
-			<GateNotice gate={data.metrics.gate} title="the metrics" absent="This experiment is no longer there, so it has no metrics." />
+			<GateNotice gate={data.metrics.gate} title="the metrics" absent="This experiment no longer exists. Reload the page." />
 		{:else if data.metrics.value.length === 0}
 			<EmptyState
-				title="No metric yet"
-				description="Nothing is being counted, so this experiment can never produce a result."
+				title="No metrics yet"
+				description="Add a metric to count conversions. Without one, this experiment has no result."
 			>
 				{#snippet iconSnippet()}
 					<Gauge size={ICON.lg} />
@@ -376,7 +376,7 @@
 				id="variant-config"
 				name="config"
 				label="Config the application reads"
-				hint="Handed back to whatever asks which variant a person is in."
+				hint="Returned to your application when it asks which variant a person is in."
 				rows={3}
 				bind:value={variantConfig}
 			/>
@@ -404,7 +404,7 @@
 				id="metric-event"
 				name="event_name"
 				label="Event name"
-				hint="Exactly what the application sends. A mismatch counts nothing and reports no error."
+				hint="Must match the event name your application sends exactly. A mismatch counts nothing and shows no error."
 				bind:value={metricEvent}
 				required
 			/>

@@ -74,7 +74,7 @@ describe('a service health was never told about', () => {
 	});
 
 	it('explains each status without assuming the reader knows the spec', () => {
-		expect(serviceStatusLabel('SERVICE_UNKNOWN')).toContain('health was never told about it');
+		expect(serviceStatusLabel('SERVICE_UNKNOWN')).toContain('not reported to health checks');
 		expect(serviceStatusLabel('NOT_SERVING')).toBe('Refusing calls');
 		expect(serviceStatusLabel('UNKNOWN')).toBe('Not started');
 		expect(serviceStatusLabel('WHATEVER')).toBe('WHATEVER');
@@ -107,7 +107,7 @@ describe('where the listener can be reached from', () => {
 
 describe('reflection', () => {
 	it('says what it means either way, and nothing when nothing is listening', () => {
-		expect(reflectionNote(status({ reflection: true }))).toContain('enumerate every service');
+		expect(reflectionNote(status({ reflection: true }))).toContain('list every service and message');
 		expect(reflectionNote(status({ reflection: false }))).toContain('generated stubs');
 		expect(reflectionNote(status({ listening: false }))).toBe('');
 		expect(reflectionNote(null)).toBe('');
@@ -124,6 +124,6 @@ describe('the gate sorts a refusal by what it means', () => {
 
 	it('never reports a failed read as a listener that is up', () => {
 		const gate = grpcGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that the listener is up');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the gRPC status.');
 	});
 });

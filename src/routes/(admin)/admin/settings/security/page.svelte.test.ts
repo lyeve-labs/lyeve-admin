@@ -74,6 +74,6 @@ describe('a report the engine did not give', () => {
 
 	it('says an engine that serves no report does not report its controls', () => {
 		page({ report: { ok: false, gate: { state: 'absent' } } });
-		expect(screen.getByText(/This engine does not report its controls/)).toBeTruthy();
+		expect(screen.getByText(/The security report is not included in this build/)).toBeTruthy();
 	});
 });

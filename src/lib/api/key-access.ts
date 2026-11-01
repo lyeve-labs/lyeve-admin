@@ -146,7 +146,7 @@ const NAME_RE = /^[a-z0-9_-]+$/;
 export function namesProblem(raw: string): string {
 	const bad = parseNames(raw).filter((n) => !NAME_RE.test(n));
 	if (bad.length === 0) return '';
-	return `${bad.map((n) => `"${n}"`).join(', ')} cannot name an endpoint. Use letters, digits, hyphens and underscores.`;
+	return `${bad.map((n) => `"${n}"`).join(', ')} is not an endpoint name. Use only letters, digits, hyphens and underscores.`;
 }
 
 /** Names from a comma list: trimmed, each once, empty ones dropped. */

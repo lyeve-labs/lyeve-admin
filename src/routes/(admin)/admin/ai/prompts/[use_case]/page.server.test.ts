@@ -76,6 +76,6 @@ describe('admin/ai/prompts/[use_case] actions', () => {
 
 	it('names a version that does not exist', async () => {
 		const { event } = actionEvent({ '/api/admin/ai/prompts/summarize': () => json(fixturePrompt) }, formOf({ version: '9' }), { path, params });
-		expect(await actions.restore(event)).toMatchObject({ status: 404, data: { error: 'Version 9 does not exist.' } });
+		expect(await actions.restore(event)).toMatchObject({ status: 404, data: { error: 'Version 9 does not exist. Reload the page.' } });
 	});
 });

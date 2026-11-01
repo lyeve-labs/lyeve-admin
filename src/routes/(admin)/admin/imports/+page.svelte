@@ -120,7 +120,7 @@
 	function cancel(j: ImportJob): SubmitFunction {
 		return confirmed(
 			`Cancel the import of ${j.source_name}?`,
-			'Rows already written stay written. Canceling stops the job where it is, it does not undo it.',
+			'The import stops where it is. Rows it already wrote stay, and canceling does not undo them.',
 			{ confirmLabel: 'Cancel import', success: 'Import canceled' },
 		);
 	}
@@ -145,7 +145,7 @@
 	function removeTemplate(t: MappingTemplate): SubmitFunction {
 		return confirmed(
 			`Delete template ${t.name}`,
-			'Imports that already ran with it keep their history. Nothing else changes.',
+			'Imports that already used it keep their history.',
 			{ confirmLabel: 'Delete', success: `Deleted ${t.name}` },
 		);
 	}
@@ -172,7 +172,7 @@
 			level={2}
 			gate={data.gate}
 			title="Imports"
-			absent="The bulk import plugin is not part of this build, so content is created one entry at a time."
+			absent="Imports are not included in this build."
 		/>
 	{:else}
 		<FormErrors message={formError} refused={refusal} />
@@ -182,14 +182,14 @@
 				<div class="flex flex-col gap-3">
 					<SectionHeading level={2}>How an import works</SectionHeading>
 					<p class="text-sm text-muted">
-						An import reads a file, matches its columns to the fields of one content type, and saves each
-						row as an entry: the same entries the content screens edit, with their history, and the same
-						ones an export writes out.
+						An import reads a file, matches its columns to the fields of one content type and saves each
+						row as an entry. These are ordinary entries with their history, which you can edit in the
+						content screens and export.
 					</p>
 					<p class="text-sm text-muted">
-						A dry run comes first. It checks every row against the content type and reports which would be
-						rejected and why, and writes nothing. A key field, such as the slug, decides whether a row is an
-						entry that already exists: create only leaves that entry alone, create and update overwrites it.
+						A dry run comes first. It checks every row against the content type, reports which rows would be
+						rejected and why, and writes nothing. A key field, such as the slug, matches a row to an entry
+						that already exists. Create only leaves that entry alone, and create and update overwrites it.
 					</p>
 					<p class="text-sm text-muted">
 						Every import stays in the history below with its counts. The rows it rejected can be downloaded
@@ -215,7 +215,7 @@
 							<div>
 								<div class="text-sm text-fg">Web address</div>
 								<div class="text-xs text-muted">
-									An http or https link the engine fetches. Private and internal addresses are refused.
+									An http or https link. Private and internal addresses are not allowed.
 								</div>
 							</div>
 						</li>
@@ -224,7 +224,7 @@
 							<div>
 								<div class="text-sm text-fg">Another LyEve instance</div>
 								<div class="text-xs text-muted">
-									Its data export in JSON, NDJSON, YAML or CSV imports as it is, by file or by the signed
+									Import its data export in JSON, NDJSON, YAML or CSV as it is, from a file or the signed
 									download link. Entries keep their slug, title and status.
 								</div>
 							</div>
@@ -255,14 +255,14 @@
 					<p class="flex items-center gap-2 text-xs text-muted" role="status">
 						<Spinner size={ICON.xs} />
 						{running.length === 1 ? 'One import is running.' : `${running.length} imports are running.`}
-						The history follows it until it finishes.
+						The history updates until every import finishes.
 					</p>
 				{/if}
 			</div>
 
 			{#if data.jobs.length === 0}
 				<EmptyState
-					title="Nothing has been imported"
+					title="No imports yet"
 					description="Each import appears here with what it wrote and what it rejected."
 				>
 					{#snippet iconSnippet()}
@@ -399,23 +399,23 @@
 				{/if}
 			</div>
 			<p class="text-sm text-muted">
-				A template keeps a mapping, with its transforms, key and mode, so an import of the same kind of file
-				chooses it rather than mapping each column again.
+				A template saves a column mapping with its transforms, key and mode. Choose it when you import the
+				same kind of file, instead of mapping each column again.
 			</p>
 			{#if data.licensed === false}
 				<Alert tone="brand">
-					Saving a template and the date, split and lookup transforms need a license this install does not hold.
-					Templates already saved keep applying with their transforms, and deleting one is always allowed.
+					Saving templates and the date, split and lookup transforms need a license this instance does not have.
+					Saved templates still apply with their transforms, and you can always delete one.
 				</Alert>
 			{/if}
 			{#if !data.templatesRead}
 				<GateNotice
-					gate={data.templatesGate ?? { state: 'error', message: 'The templates could not be read. This is not a report that there are none.' }}
+					gate={data.templatesGate ?? { state: 'error', message: 'Could not load templates.' }}
 					title="Templates"
-					absent="This build does not keep mapping templates."
+					absent="Mapping templates are not included in this build."
 				/>
 			{:else if data.templates.length === 0}
-				<EmptyState title="No mapping template" description="Each import maps its columns from scratch.">
+				<EmptyState title="No mapping templates yet" description="Create a template to reuse a column mapping across imports.">
 					{#snippet iconSnippet()}
 						<Rows3 size={ICON.lg} />
 					{/snippet}

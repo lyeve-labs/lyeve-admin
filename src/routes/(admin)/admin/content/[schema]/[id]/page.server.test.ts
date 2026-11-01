@@ -379,7 +379,7 @@ describe('content editor save, many_to_many fields', () => {
 
 		const failure = await runSave(saveEvent(fn, { tags: ['t1'] }));
 
-		expect(failure?.data?.error).toBe('The entry was saved, but not every link was. In tags, 1 link could not be added.');
+		expect(failure?.data?.error).toBe('The entry was saved, but some links were not. In tags, 1 link could not be added.');
 	});
 
 	it('leaves a set that has not changed alone', async () => {

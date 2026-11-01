@@ -119,20 +119,20 @@ export function refusalText(r: Refusal): string {
 		const noun = capNoun(r.cap);
 		let line: string;
 		if (r.limit !== null && r.current !== null) {
-			line = `${r.current} of ${r.limit} ${noun} are in use, which is the most this instance allows.`;
+			line = `You're using ${r.current} of ${r.limit} ${noun}, the most this instance allows.`;
 		} else if (r.limit !== null) {
 			line = `This instance allows at most ${r.limit} ${noun}.`;
 		} else {
-			line = `This instance allows no more ${noun}.`;
+			line = `This instance is at its limit for ${noun}.`;
 		}
 		if (r.cap === ADMIN_SEATS_CAP) {
 			// The heading already names the seats, so the count stands alone.
-			const held = line.replace(` ${noun} are in use`, ' are in use');
+			const held = line.replace(` ${noun},`, ',');
 			return `Every admin seat is taken. ${held} ${LIFTS} Removing the admin role from an account also frees a seat. Editors and viewers take no seat.`;
 		}
 		return `${line} ${LIFTS} Removing one also makes room.`;
 	}
-	if (!r.feature) return 'This needs a capability this license does not include. Nothing was changed.';
+	if (!r.feature) return 'This needs a capability the license on this instance does not include. Nothing was changed.';
 	return `The license on this instance does not include ${r.feature}. Nothing was changed.`;
 }
 

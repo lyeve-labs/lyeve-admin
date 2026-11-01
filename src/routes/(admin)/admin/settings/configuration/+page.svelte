@@ -46,8 +46,8 @@
 		if (setting.source === 'env') return 'Set by an environment variable, which always wins.';
 		if (setting.source === 'file') {
 			return setting.origin
-				? `Pinned by ${setting.origin}. Tag the value !overridable to edit it here.`
-				: 'Pinned by the configuration file. Tag the value !overridable to edit it here.';
+				? `Set in ${setting.origin}. Tag the value !overridable there to edit it here.`
+				: 'Set in the configuration file. Tag the value !overridable there to edit it here.';
 		}
 		return 'Not editable.';
 	}
@@ -55,7 +55,7 @@
 
 <PageShell
 	title="Configuration"
-	description="Every setting the engine reads and the layer it came from. An environment variable beats the configuration file, which beats anything saved here."
+	description="See every engine setting and where its value comes from. An environment variable overrides the configuration file, and the file overrides a value saved here."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -64,7 +64,7 @@
 			level={2}
 			gate={data.provenance.gate}
 			title="Configuration"
-			absent="This engine does not report where its settings come from."
+			absent="Configuration needs a newer version of the engine."
 		/>
 	{:else}
 		<section class="flex flex-col gap-4">
@@ -87,10 +87,10 @@
 			</div>
 
 			{#if suppressed.length > 0}
-				<Alert tone="warn" title="Held empty by an environment variable">
+				<Alert tone="warn" title="Set to empty by an environment variable">
 					<p>
-						A lower layer supplies these, but an empty variable pins them to empty. Usually a leftover
-						line in a .env file.
+						A file or this page sets these, but an empty environment variable overrides them. This is
+						usually a leftover line in a .env file.
 					</p>
 					<p class="mt-2 font-mono text-xs text-faint">{suppressed.join(', ')}</p>
 				</Alert>
@@ -103,11 +103,11 @@
 				<p>
 					<span class="font-medium text-fg">An environment variable</span>, such as
 					<code class="font-mono text-xs">JWT_EXPIRY_SECS=900</code>, wins over everything. Setting one to
-					empty turns the setting off. A lower layer does not fill it back in.
+					empty turns the setting off, even when a file or this page sets it.
 				</p>
 				<p>
 					<span class="font-medium text-fg">A YAML file</span> comes next. The engine reads the file or
-					directory <code class="font-mono text-xs">LYEVE_CONFIG</code> names, or else
+					directory set in <code class="font-mono text-xs">LYEVE_CONFIG</code>. Without it, the engine reads
 					<code class="font-mono text-xs">lyeve.yaml</code> (or <code class="font-mono text-xs">lyeve.yml</code>) in the
 					directory it runs in, then in <code class="font-mono text-xs">/etc/lyeve</code>, then the files of
 					<code class="font-mono text-xs">/etc/lyeve/conf.d</code> in name order. A key is the variable's name in
@@ -115,13 +115,13 @@
 					underscore a level: <code class="font-mono text-xs">database:</code> then
 					<code class="font-mono text-xs">url: ...</code> is <code class="font-mono text-xs">DATABASE_URL</code>. A
 					<code class="font-mono text-xs">$include</code> key pulls in other files. A value tagged
-					<code class="font-mono text-xs">!overridable</code> becomes a default this page may change. Any
-					other file value is fixed here.
+					<code class="font-mono text-xs">!overridable</code> becomes a default you can change on this page.
+					Any other file value is fixed here.
 				</p>
 				<p>
-					<span class="font-medium text-fg">This page</span> saves what neither of those sets. The
-					engine uses it at once, without a restart, except a setting it reads when it starts, which
-					applies at the next restart. A setting nobody sets takes the engine's default.
+					<span class="font-medium text-fg">This page</span> sets what neither of those sets. A saved
+					value applies immediately, without a restart, except for a setting read when the engine starts,
+					which applies at the next restart. A setting nobody sets uses its default.
 				</p>
 			</div>
 		</Card>
@@ -133,10 +133,10 @@
 					{#if data.plugin.found}
 						Showing the settings of the <span class="font-mono">{data.plugin.name}</span> plugin.
 					{:else if data.plugin.failed}
-						The settings the <span class="font-mono">{data.plugin.name}</span> plugin declares could not be
-						read, so the list below may miss some. Try again in a moment.
+						Could not load the settings of the <span class="font-mono">{data.plugin.name}</span> plugin, so
+						some may be missing below. Reload the page to try again.
 					{:else}
-						The <span class="font-mono">{data.plugin.name}</span> plugin declares no settings, or is not running.
+						The <span class="font-mono">{data.plugin.name}</span> plugin has no settings, or is not running.
 					{/if}
 					<a href="/admin/settings/configuration" class="ml-1 text-brand hover:underline">Show every setting</a>
 				</Alert>
@@ -152,13 +152,13 @@
 
 				{#if settings.length === 0}
 					<EmptyState
-						title="No settings reported"
-						description="The engine returned nothing for this session."
+						title="No settings to show"
+						description="Reload the page to try again."
 					/>
 				{:else if shown.length === 0}
 					<EmptyState
-						title="No setting matches that filter"
-						description="Clear the filter to see every setting the engine reads."
+						title="No settings match this search"
+						description="Clear the search to see every setting."
 					/>
 				{:else}
 					<Card pad="none">
@@ -201,7 +201,7 @@
 												secret={setting.secret}
 												saved={setting.read_at_start
 													? 'Saved. It applies when the engine next restarts.'
-													: 'Saved. The engine is using it now.'}
+													: 'Saved. It applies now.'}
 												{result}
 											/>
 										</div>

@@ -192,7 +192,7 @@ describe('license +page.server.ts actions.renew', () => {
 		mockedCreateClient.mockReturnValue({} as never);
 
 		const result = await actions.renew({ request, fetch, cookies } as never);
-		expect(result).toMatchObject({ status: 400, data: { error: 'License key is required' } });
+		expect(result).toMatchObject({ status: 400, data: { error: 'Enter a license token or key.' } });
 	});
 
 	it('returns success on valid renewal', async () => {
@@ -284,7 +284,7 @@ describe('license +page.server.ts actions.renew', () => {
 		});
 
 		const result = await actions.renew({ request, fetch, cookies } as never);
-		expect(result).toMatchObject({ status: 400, data: { error: 'License key is required' } });
+		expect(result).toMatchObject({ status: 400, data: { error: 'Enter a license token or key.' } });
 	});
 
 	it('returns error on ApiError', async () => {
@@ -312,8 +312,8 @@ describe('license +page.server.ts actions.renew', () => {
 
 	it.each([
 		[502, 'the license server could not be reached', 'Try again in a moment.'],
-		[502, 'the license server returned a token that does not verify', 'Applying the same key again gives the same answer.'],
-		[503, 'license key exchange is not configured on this instance', 'paste the license token instead'],
+		[502, 'the license server returned a token that does not verify', 'Trying the same key again fails the same way.'],
+		[503, 'license key exchange is not configured on this instance', 'Paste the license token instead'],
 	])('says what a %i exchange failure means for trying again', async (status, message, said) => {
 		const { actions } = await import('./+page.server');
 		mockedCreateClient.mockReturnValue({
@@ -342,7 +342,7 @@ describe('license +page.server.ts actions.renew', () => {
 		formData.set('license_key', 'some-key');
 		const request = new Request('http://localhost/admin/settings/license?/renew', { method: 'POST', body: formData });
 		const result = await actions.renew({ request, fetch: mockFetch({}), cookies: mockCookies({ '__Host-sys_session': 'valid' }) } as never);
-		expect(result).toMatchObject({ status: 502, data: { error: 'The engine did not confirm the license. Reload to see which license is in force.' } });
+		expect(result).toMatchObject({ status: 502, data: { error: 'Could not confirm the license. Reload the page to see which license is active.' } });
 	});
 
 	it('waits longer than the license server exchange before it gives up', async () => {
@@ -379,7 +379,7 @@ describe('license +page.server.ts actions.renew', () => {
 		const result = await actions.renew({ request, fetch, cookies } as never);
 		expect(result).toMatchObject({
 			status: 500,
-			data: { error: 'The engine did not confirm the license. Reload to see which license is in force.' },
+			data: { error: 'Could not confirm the license. Reload the page to see which license is active.' },
 		});
 	});
 
@@ -405,7 +405,7 @@ describe('license +page.server.ts actions.renew', () => {
 		} as never);
 		expect(result).toMatchObject({
 			status: 502,
-			data: { error: 'The engine did not confirm the license. Reload to see which license is in force.' },
+			data: { error: 'Could not confirm the license. Reload the page to see which license is active.' },
 		});
 	});
 });

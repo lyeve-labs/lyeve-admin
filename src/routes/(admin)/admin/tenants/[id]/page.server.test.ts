@@ -136,7 +136,7 @@ describe('admin/tenants/[id] load', () => {
 	// database did not answer.
 	it('answers 404 only for the engine 404', async () => {
 		const missing = event({});
-		await expect(load(missing.event)).rejects.toMatchObject({ status: 404, body: { message: 'No tenant has that id.' } });
+		await expect(load(missing.event)).rejects.toMatchObject({ status: 404, body: { message: 'This tenant does not exist.' } });
 
 		const down = event({ 'GET /api/admin/tenants/t1': json({ error: 'database unavailable' }, 503) });
 		await expect(load(down.event)).rejects.toMatchObject({ status: 503 });
@@ -216,7 +216,7 @@ describe('admin/tenants/[id] grant action', () => {
 			data: {
 				action: 'grant',
 				memberError:
-					'Every admin seat is taken. 7 of 7 are in use, which is the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.',
+					"Every admin seat is taken. You're using 7 of 7, the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.",
 				refused: { kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: 'https://shop.example.com/pricing?utm_campaign=admin.seats' },
 			},
 		});
@@ -261,7 +261,7 @@ describe('admin/tenants/[id] grant action', () => {
 		);
 		expect(await actions.grant(ev)).toMatchObject({
 			status: 409,
-			data: { action: 'grant', memberError: 'root@acme.io is a super admin whose home is this tenant. Its roles are set on the Users page.', fields: { email: 'A super admin at home' } },
+			data: { action: 'grant', memberError: 'root@acme.io is a super admin whose home tenant is this one. Change their roles on the Users page.', fields: { email: 'Managed on the Users page' } },
 		});
 		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
 	});
@@ -282,7 +282,7 @@ describe('admin/tenants/[id] grant action', () => {
 		);
 		expect(await actions.grant(ev)).toEqual({
 			status: 404,
-			data: { action: 'grant', memberError: 'The account could not be found, so nothing was saved.' },
+			data: { action: 'grant', memberError: 'This account no longer exists.' },
 		});
 		expect(calls.some((c) => c.method === 'PUT')).toBe(false);
 	});
@@ -365,7 +365,7 @@ describe('admin/tenants/[id] revoke, archive and restore', () => {
 			},
 			revokeForm(),
 		);
-		expect(await actions.revoke(ev)).toMatchObject({ data: { memberError: 'The membership could not be removed.' } });
+		expect(await actions.revoke(ev)).toMatchObject({ data: { memberError: 'Could not remove the membership. Try again.' } });
 	});
 
 	it('archives and restores a tenant the engine accepts', async () => {
@@ -379,9 +379,9 @@ describe('admin/tenants/[id] revoke, archive and restore', () => {
 		const refused = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': json({ error: 'tenant is already archived' }, 409) });
 		expect(await actions.archive(refused.event)).toEqual({ status: 400, data: { stateError: 'tenant is already archived' } });
 		const down = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': json({ error: 'pq: timeout' }, 503) });
-		expect(await actions.restore(down.event)).toEqual({ status: 400, data: { stateError: 'The tenant could not be restored.' } });
+		expect(await actions.restore(down.event)).toEqual({ status: 400, data: { stateError: 'Could not restore the tenant. Try again.' } });
 		const downArchive = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': json({ error: 'pq: timeout' }, 503) });
-		expect(await actions.archive(downArchive.event)).toEqual({ status: 400, data: { stateError: 'The tenant could not be archived.' } });
+		expect(await actions.archive(downArchive.event)).toEqual({ status: 400, data: { stateError: 'Could not archive the tenant. Try again.' } });
 		const refusedRestore = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': json({ error: 'tenant is not archived' }, 409) });
 		expect(await actions.restore(refusedRestore.event)).toEqual({ status: 400, data: { stateError: 'tenant is not archived' } });
 	});

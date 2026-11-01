@@ -39,7 +39,7 @@ describe('RunViewer', () => {
 			steps: steps.map((s) => ({ ...s, input: null, output: null, error: '' })),
 		};
 		const { container } = render(RunViewer, { props: { run: withheld } });
-		expect(screen.getByTestId('run-withheld').textContent).toContain('Your access does not cover what this run read');
+		expect(screen.getByTestId('run-withheld').textContent).toContain('Your role cannot see the data this run used');
 		expect(screen.getByTestId('run-failure').textContent).toContain('Run failed at join');
 		expect(container.textContent).toContain('Withheld from you.');
 		expect(container.textContent).not.toContain('null');

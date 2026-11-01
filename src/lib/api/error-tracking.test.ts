@@ -104,7 +104,7 @@ describe('the gate', () => {
 
 	it('never reports a failed read as nothing having failed', () => {
 		const gate = errorGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that none have happened');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load errors.');
 	});
 });
 

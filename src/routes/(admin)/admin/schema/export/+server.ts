@@ -17,11 +17,11 @@ export const GET: RequestHandler = async ({ cookies, url, fetch }) => {
 	try {
 		res = await fetch(`/api/admin/schemas/export${json ? '?format=json' : ''}`, { headers: auth });
 	} catch {
-		error(502, 'Engine unreachable');
+		error(502, 'Could not reach the engine. Try again in a moment.');
 	}
 	if (!res.ok) {
-		if (res.status === 403) error(403, 'Your role cannot export content types');
-		error(502, 'The content types could not be exported');
+		if (res.status === 403) error(403, 'Only an admin or a super admin can export schemas.');
+		error(502, 'Could not export the schemas. Try again.');
 	}
 	const headers = new Headers();
 	headers.set('Content-Type', res.headers.get('content-type') ?? (json ? 'application/json; charset=utf-8' : 'application/yaml; charset=utf-8'));

@@ -57,7 +57,7 @@ describe('mfa disable with no app set up', () => {
 		const { ev } = event({ '/api/admin/mfa/totp/disable': { status: 400, body: { error: 'MFA not enabled' } } }, { code: '123456' });
 		const r = (await actions.disable(ev)) as { status: number; data: Record<string, unknown> };
 		expect(r.status).toBe(400);
-		expect(r.data.error).toBe('No authenticator app is set up on this account, so there is nothing to turn off.');
+		expect(r.data.error).toBe('No authenticator app is set up on this account.');
 	});
 });
 
@@ -94,7 +94,7 @@ describe('mfa setup over an authenticator app already set up', () => {
 		expect(r.status).toBe(400);
 		expect(r.data).toEqual({
 			step: 'idle',
-			error: 'That code matches no second factor on this account.',
+			error: 'That code does not match this account.',
 		});
 	});
 
@@ -104,13 +104,13 @@ describe('mfa setup over an authenticator app already set up', () => {
 			throw new TypeError('fetch failed: connect ECONNREFUSED 10.0.0.7:3002');
 		});
 		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
-		expect(r.data).toEqual({ step: 'idle', error: 'The authenticator key could not be generated.' });
+		expect(r.data).toEqual({ step: 'idle', error: 'Could not create the authenticator key. Try again.' });
 	});
 
 	it('keeps a server failure body off the page', async () => {
 		const { ev } = event({ [setupPath]: { status: 503, body: { error: 'dial tcp: refused', code: 'mfa.totp.current_code_invalid' } } }, { code: '000000' });
 		const r = (await actions.setup(ev)) as { data: Record<string, unknown> };
-		expect(r.data).toMatchObject({ step: 'idle', error: 'The authenticator key could not be generated.' });
+		expect(r.data).toMatchObject({ step: 'idle', error: 'Could not create the authenticator key. Try again.' });
 	});
 });
 
@@ -158,7 +158,7 @@ describe('mfa verify and disable', () => {
 	it('never shows a server failure body', async () => {
 		const { ev } = event({ '/api/admin/mfa/totp/disable': { status: 500, body: { error: 'pq: relation missing' } } }, { code: '123456' });
 		const r = (await actions.disable(ev)) as { data: Record<string, unknown> };
-		expect(r.data.error).toBe('Two-factor authentication could not be turned off.');
+		expect(r.data.error).toBe('Could not turn off two-factor authentication. Try again.');
 	});
 });
 
@@ -182,7 +182,7 @@ describe('mfa setup proven by a passkey', () => {
 	it('keeps an outage of the proof off the page', async () => {
 		const { ev } = event({ [proofPath]: { status: 503, body: { error: 'dial tcp: refused' } } });
 		const r = (await actions.prove(ev)) as { data: Record<string, unknown> };
-		expect(r.data).toMatchObject({ step: 'idle', error: 'The passkey check could not be started.' });
+		expect(r.data).toMatchObject({ step: 'idle', error: 'Could not start the passkey check. Try again.' });
 	});
 
 	it('sends the signed assertion with the proof session', async () => {
@@ -203,7 +203,7 @@ describe('mfa setup proven by a passkey', () => {
 		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
 		expect(r.data).toEqual({
 			step: 'idle',
-			error: 'The passkey did not confirm a second factor on this account. Try again, or enter a code instead.',
+			error: 'Could not confirm the passkey. Try again, or enter a code instead.',
 		});
 	});
 });

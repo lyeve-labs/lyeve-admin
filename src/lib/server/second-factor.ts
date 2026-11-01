@@ -54,7 +54,7 @@ export function secondFactorFailure(e: unknown, again = 'sign in again'): Second
 		if (e.status === 401 && codeOf(e) === MFA_NOT_CONFIGURED) {
 			return {
 				status: 401,
-				error: 'This account has no authenticator app to check the code against. Ask an administrator to restore your access.',
+				error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',
 				restart: true,
 			};
 		}
@@ -62,8 +62,8 @@ export function secondFactorFailure(e: unknown, again = 'sign in again'): Second
 			return { status: 401, error: `This sign-in expired. ${again[0].toUpperCase()}${again.slice(1)}.`, restart: true };
 		}
 		if (e.status === 400 || e.status === 422) {
-			return { status: 400, error: 'Invalid code.' };
+			return { status: 400, error: 'That code did not match. Try again.' };
 		}
 	}
-	return { status: 503, error: 'The engine did not answer, so the code was not checked. Try again in a moment.' };
+	return { status: 503, error: 'Could not check the code. Try again in a moment.' };
 }
