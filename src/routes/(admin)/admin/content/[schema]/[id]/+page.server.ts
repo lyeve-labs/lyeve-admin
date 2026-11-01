@@ -61,7 +61,10 @@ type StoredEntry = {
 /**
  * Fetch the entry from the admin store and normalize it to the editor shape.
  * A refusal throws the client's error, so the load can tell an entry that is
- * not there from an engine that did not answer.
+ * not there from an engine that did not answer. The form holds the schema's
+ * fields, which live in the body, so meta stays out of it: a meta key named
+ * like a field would otherwise replace that field's value, and the next save
+ * would write it into the body.
  */
 async function getEntry(client: HttpClient, id: string) {
 	const e = await client.get<StoredEntry>(`/api/admin/content/${encodeURIComponent(id)}`);
@@ -73,7 +76,6 @@ async function getEntry(client: HttpClient, id: string) {
 		data: {
 			...(e.body && typeof e.body === 'object' ? e.body : {}),
 			...(e.title !== undefined ? { title: e.title } : {}),
-			...(e.meta && typeof e.meta === 'object' ? e.meta : {}),
 			_status: e.status ?? 'published',
 		} as Record<string, unknown>,
 	};
