@@ -18,7 +18,9 @@ import {
 	probeType,
 	putProbeChannels,
 	readProbeLimits,
+	runAlreadyGoing,
 	runOutcome,
+	runOutlastedTheWait,
 	runProbeNow,
 	syntheticGate,
 	updateProbe,
@@ -299,6 +301,8 @@ export const actions: Actions = {
 			const run = runOutcome(await runProbeNow(client, id));
 			return { ran: id, status: run.status, ms: run.ms, failed: run.failed, regions: run.regions };
 		} catch (err) {
+			if (runOutlastedTheWait(err)) return { running: id, already: false };
+			if (runAlreadyGoing(err)) return { running: id, already: true };
 			return actionFailure(err, 'The probe could not be run.');
 		}
 	},

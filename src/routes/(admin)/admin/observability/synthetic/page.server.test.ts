@@ -121,8 +121,33 @@ describe('running a probe now', () => {
 			{ id: 'r2', probe_id: 'p1', status: 'fail', response_time_ms: 3000, region: 'eu-west', created_at: '' },
 		]);
 		const out = await actions.run(actionEvent({ id: 'p1' }));
-		expect(engine.post).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1/run', {});
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1/run', {}, {
+			signal: expect.any(AbortSignal),
+		});
 		expect(out).toEqual({ ran: 'p1', status: 'fail', ms: 3000, failed: 1, regions: 2 });
+	});
+
+	// The run goes on after the wait ends, so no answer is not a failure.
+	it('reports a run that outlasted the wait as still going', async () => {
+		engine.post.mockRejectedValue(new DOMException('The operation timed out.', 'TimeoutError'));
+		expect(await actions.run(actionEvent({ id: 'p1' }))).toEqual({ running: 'p1', already: false });
+	});
+
+	it('reports a dropped connection as a run still going', async () => {
+		engine.post.mockRejectedValue(new TypeError('fetch failed'));
+		expect(await actions.run(actionEvent({ id: 'p1' }))).toEqual({ running: 'p1', already: false });
+	});
+
+	it('reports a conflict as a run of the probe already going', async () => {
+		engine.post.mockRejectedValue(new ApiError(409, 'probe run already in progress for this probe', {}));
+		expect(await actions.run(actionEvent({ id: 'p1' }))).toEqual({ running: 'p1', already: true });
+	});
+
+	it('keeps an engine failure a failure in the console\'s own words', async () => {
+		engine.post.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.run(actionEvent({ id: 'p1' }))) as unknown as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('The probe could not be run.');
 	});
 });
 
