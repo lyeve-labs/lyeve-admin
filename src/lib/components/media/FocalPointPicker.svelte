@@ -66,11 +66,11 @@
 
 <div class="flex flex-col gap-3" data-testid="focal-point">
 	<SectionHeading level={3}>Focal point</SectionHeading>
-	<p class="text-xs text-muted">Click where a cropped version should center. The arrow keys move the point.</p>
+	<p class="text-xs text-muted">Click where crops should center. You can also move the point with the arrow keys.</p>
 	{#if error}
 		<Alert tone="danger">{error}</Alert>
 	{:else if saved}
-		<Alert tone="success" autoDismiss>Focal point saved. Crops cut around the old one are made again.</Alert>
+		<Alert tone="success" autoDismiss>Focal point saved. Existing crops are made again around the new point.</Alert>
 	{/if}
 	<button
 		type="button"

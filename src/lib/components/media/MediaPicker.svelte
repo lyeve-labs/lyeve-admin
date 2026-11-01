@@ -41,8 +41,8 @@
 
 <Drawer bind:open title="Choose a file" size="lg">
 	{#if choices === null}
-		<Alert tone="warn" title="The library could not be read">
-			This is not a report that no file is published. Reload the page in a moment to try again.
+		<Alert tone="warn" title="Could not load the library">
+			Reload the page to try again.
 		</Alert>
 	{:else if choices.length === 0}
 		<EmptyState
@@ -54,7 +54,7 @@
 			<label for="media-picker-search" class="sr-only">Narrow the files</label>
 			<SearchInput id="media-picker-search" bind:value={query} placeholder="File name or alt text" />
 			{#if visible.length === 0}
-				<p class="text-sm text-muted">No published file matches.</p>
+				<p class="text-sm text-muted">No published files match this search.</p>
 			{:else}
 				<ul class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 					{#each visible as choice (choice.id)}

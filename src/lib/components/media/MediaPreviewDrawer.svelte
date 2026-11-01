@@ -120,7 +120,7 @@
 
 	async function askDelete() {
 		if (!item) return;
-		const ok = await confirm(`Delete ${item.filename}`, 'The file leaves the library, and any page that links to it stops loading it. This cannot be undone.', {
+		const ok = await confirm(`Delete ${item.filename}?`, 'The file is removed from the library, and any page that links to it can no longer load it. This cannot be undone.', {
 			confirmLabel: 'Delete',
 		});
 		if (ok) ondelete(item);
@@ -259,7 +259,7 @@
 					hint="What the image shows, for readers who cannot see it. Screen readers read it, and search engines index it."
 					bind:value={altText}
 				/>
-				<Input id="media-tags" name="tags" label="Tags" hint="Separated by commas. Search finds a file by its tags." bind:value={tags} />
+				<Input id="media-tags" name="tags" label="Tags" hint="Separated by commas. You can search files by tag." bind:value={tags} />
 				<Input id="media-folder" name="folder" label="Folder" mono hint="Lower-case letters, digits, _, - and /." bind:value={folder} />
 			</form>
 			{#if aiEnabled && kind === 'image'}
@@ -280,7 +280,7 @@
 						<Sparkles size={ICON.sm} /> Suggest alt text
 					</Button>
 					<Badge tone="violet" size="sm">Beta</Badge>
-					<span class="text-xs text-faint">An AI model reads the image. Review the text before you save it.</span>
+					<span class="text-xs text-faint">An AI model describes the image. Review the text before you save it.</span>
 				</form>
 			{/if}
 		</div>

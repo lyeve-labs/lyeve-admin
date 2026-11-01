@@ -88,10 +88,10 @@
 				importRenamed = d.renamed;
 			} else if (result.type === 'failure') {
 				const d = (result.data ?? {}) as { error?: string; plan?: ImportPlan | null };
-				importError = d.error ?? 'The definitions could not be imported.';
+				importError = d.error ?? 'Could not import the definitions. Try again.';
 				if (d.plan) importPlan = d.plan;
 			} else if (result.type === 'error') {
-				importError = 'The admin could not reach the engine. Nothing was imported.';
+				importError = 'Could not import the definitions. Try again.';
 			}
 		};
 	};
@@ -128,7 +128,7 @@
 			name="file"
 			label="Definition file"
 			accept=".json,.yaml,.yml,application/json,application/yaml"
-			hint="Up to 4 MB. A LyEve export is YAML or JSON. The others are the file that system writes."
+			hint="Up to 4 MB. A LyEve export is YAML or JSON. For another system, use the file it exports."
 			onchange={(files) => {
 				importFileName = files?.[0]?.name ?? '';
 				importEdited();
@@ -148,12 +148,12 @@
 			<div class="flex flex-col gap-3" data-testid="import-plan">
 				<SectionHeading level={3}>What importing does</SectionHeading>
 				{#if importChanges === 0}
-					<p class="text-sm text-muted">Every content type in the file is already here as written. Importing would change nothing.</p>
+					<p class="text-sm text-muted">Every content type in the file already matches. Importing changes nothing.</p>
 				{/if}
 				{#if importBlocked.length > 0}
 					<Alert tone="danger" title="Some content types point at ones that are not here">
 						{#snippet children()}
-							{importBlocked.join(', ')} {importBlocked.length === 1 ? 'depends' : 'depend'} on a schema neither the file nor this instance has. Add it to the file, or create it first.
+							{importBlocked.join(', ')} {importBlocked.length === 1 ? 'depends' : 'depend'} on a schema that is in neither the file nor this instance. Add it to the file, or create it first.
 						{/snippet}
 					</Alert>
 				{/if}
@@ -179,7 +179,7 @@
 				</ul>
 				{#if importRenames.length > 0}
 					<div>
-						<p class="mb-1 text-xs text-muted">Renamed to fit the engine's names</p>
+						<p class="mb-1 text-xs text-muted">Renamed to fit the naming rules</p>
 						<ul class="space-y-0.5 text-xs text-muted">
 							{#each importRenames as r (r.key)}
 								<li><span class="font-mono">{r.from}</span> to <span class="font-mono">{r.to}</span></li>

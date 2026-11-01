@@ -47,7 +47,7 @@ describe('Search page results panel', () => {
 		const { getByText, queryByText } = render(SearchPage, {
 			props: { data: data({ results: { ok: false, gate: { state: 'unavailable' } } }) as never, form: null },
 		});
-		expect(getByText(/search could not be read/)).toBeTruthy();
+		expect(getByText(/search did not load/)).toBeTruthy();
 		expect(queryByText('No results for "cats".')).toBeNull();
 	});
 
@@ -70,7 +70,7 @@ describe('Search page results panel', () => {
 			props: { data: data() as never, form: null },
 		});
 		expect(getByText('No results for "cats".')).toBeTruthy();
-		expect(queryByText(/search could not be read/)).toBeNull();
+		expect(queryByText(/search did not load/)).toBeNull();
 	});
 });
 
@@ -105,7 +105,7 @@ describe('Search page settings', () => {
 		const { getByText, queryByLabelText } = render(SearchPage, {
 			props: { data: data({ ranking: { ok: false, gate: { state: 'unavailable' } } }) as never, form: null },
 		});
-		expect(getByText(/ranking weights could not be read/)).toBeTruthy();
+		expect(getByText(/ranking weights did not load/)).toBeTruthy();
 		expect(queryByLabelText('Title')).toBeNull();
 	});
 

@@ -151,7 +151,7 @@ describe('the metrics view', () => {
 			TelemetryPage,
 			props({ superAdmin: false, families: failed({ state: 'unavailable' }), exporters: null }),
 		);
-		expect(container.textContent).toContain('so telemetry metrics could not be read');
+		expect(container.textContent).toContain('so telemetry metrics did not load');
 		expect(container.textContent).not.toContain('No series yet');
 		expect(queryByRole('searchbox', { name: 'Filter families' })).toBeNull();
 	});

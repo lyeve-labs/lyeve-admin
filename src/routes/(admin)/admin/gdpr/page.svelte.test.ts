@@ -165,7 +165,7 @@ describe('what a person proves before exporting', () => {
 		const { container, getByRole } = render(GdprPage, {
 			props: { data: { stepUp: { ok: false, gate: { state: 'unavailable' } } } as never, form: null as never },
 		});
-		expect(said(container)).toContain('could not be read');
+		expect(said(container)).toContain('did not load');
 		expect(getByRole('link', { name: /try again/i })).toBeTruthy();
 		expect(container.querySelector('input[name="factors"]')).toBeNull();
 	});

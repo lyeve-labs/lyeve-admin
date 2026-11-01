@@ -19,12 +19,12 @@ function strings(raw: FormDataEntryValue | null): string[] {
  */
 export function parsePreferences(form: FormData): { prefs: LocalePreferences } | { error: string } {
 	const default_locale = String(form.get('default_locale') ?? '').trim();
-	if (!default_locale) return { error: 'Set a default locale. It is the language the source fields are written in.' };
+	if (!default_locale) return { error: 'Choose a default locale, the language your source fields are written in.' };
 	const enabled = [...new Set([default_locale, ...strings(form.get('enabled_locales'))])];
 	const bad = enabled.find((l) => !LOCALE_CODE.test(l));
 	if (bad) return { error: `"${bad}" is not a locale code. Use a language tag such as fr or pt-BR.` };
 	const chain = [...new Set(strings(form.get('fallback_chain')))];
 	const unknown = chain.find((l) => !enabled.includes(l));
-	if (unknown) return { error: `The fallback chain names ${unknown}, which is not an enabled locale.` };
+	if (unknown) return { error: `The fallback chain includes ${unknown}, which is not an enabled locale.` };
 	return { prefs: { default_locale, enabled_locales: enabled, fallback_chain: chain } };
 }

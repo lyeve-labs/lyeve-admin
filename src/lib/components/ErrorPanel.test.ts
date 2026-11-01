@@ -27,7 +27,7 @@ describe('ErrorPanel', () => {
 		});
 
 		it('falls back to a plain refusal when the load gave no words', () => {
-			expect(mount(403).getByText('This account cannot open that page.')).toBeTruthy();
+			expect(mount(403).getByText('You do not have access to this page.')).toBeTruthy();
 		});
 
 		it('leads with the dashboard and never offers to sign in', () => {

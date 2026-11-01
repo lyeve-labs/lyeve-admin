@@ -84,7 +84,7 @@
 		</button>
 	{/each}
 	{#if visibleSchemas.length === 0 && schemas.length > 0}
-		<p class="px-3 py-2 text-sm text-muted">No schema matches that filter.</p>
+		<p class="px-3 py-2 text-sm text-muted">No schemas match this filter.</p>
 	{/if}
 	{#if visibleSchemas.length > shown}
 		<Button variant="ghost" size="sm" class="w-full" onclick={() => (shown += PAGE)}>

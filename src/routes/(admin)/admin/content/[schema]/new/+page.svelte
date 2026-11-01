@@ -91,7 +91,7 @@
 
 	{#if data.locales && !data.locales.ok}
 		<Alert tone="warn">
-			The locales could not be read, so no locale can be picked. The entry is saved without one. Reload the page to try again.
+			Could not load the locales. If you save now, the entry has no locale. Reload the page to try again.
 		</Alert>
 	{/if}
 

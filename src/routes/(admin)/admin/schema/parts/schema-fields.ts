@@ -82,12 +82,12 @@ export function inertFlags(field: SchemaField): { indexed: string | null; requir
 	return {
 		indexed:
 			kind.type === 'belongs_to'
-				? 'Indexed by its foreign key already.'
-				: 'No column here to index.',
+				? 'Already indexed by its foreign key.'
+				: 'This relation has no column here to index.',
 		required:
 			kind.type === 'belongs_to'
 				? null
-				: 'Nothing here to require. The key lives in ' + kind.storage + '.',
+				: 'This relation has no column here to require. Its key is stored in ' + kind.storage + '.',
 	};
 }
 

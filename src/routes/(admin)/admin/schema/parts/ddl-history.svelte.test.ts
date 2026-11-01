@@ -66,7 +66,7 @@ describe('DdlHistory', () => {
 		await answer(ddl.submit, { type: 'failure', data: { error: 'The engine did not answer.' } });
 		expect(ddl.error).toBe('The engine did not answer.');
 		await answer(ddl.submit, { type: 'error' });
-		expect(ddl.error).toBe('The admin could not reach the engine.');
+		expect(ddl.error).toBe('Try again in a moment.');
 		expect(ddl.view).toBeNull();
 	});
 
@@ -75,7 +75,7 @@ describe('DdlHistory', () => {
 		await answer(ddl.submit, { type: 'success', data: { name: 'posts', entries: [], pending: 1, limit: 200 } });
 		await ddl.applyQueued();
 		expect(kit.confirm.mock.calls[0][0]).toBe('Apply 1 queued change to posts?');
-		expect(kit.confirm.mock.calls[0][1]).toContain('The table holds 1 row');
+		expect(kit.confirm.mock.calls[0][1]).toContain('The table has 1 row');
 		expect(apply).toHaveBeenCalledTimes(1);
 	});
 
@@ -85,8 +85,8 @@ describe('DdlHistory', () => {
 		await ddl.applyQueued();
 		expect(kit.confirm.mock.calls[0][0]).toBe('Apply 2 queued changes to posts?');
 		const body = kit.confirm.mock.calls[0][1];
-		expect(body).toContain('How many rows the table holds could not be read. It may hold data');
-		expect(body).not.toMatch(/holds 0 rows/);
+		expect(body).toContain('Could not count the rows in the table. It may have data');
+		expect(body).not.toMatch(/has 0 rows/);
 		expect(apply).toHaveBeenCalledTimes(1);
 	});
 

@@ -202,7 +202,7 @@ describe('a search that failed', () => {
 			props: { data: { ...data([]), search: { ok: false, gate: { state: 'unavailable' } } } as never },
 		});
 
-		expect(container.textContent).toContain('did not answer');
+		expect(container.textContent).toContain('is unavailable');
 		expect(container.textContent).not.toContain('No log entries');
 	});
 

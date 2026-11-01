@@ -31,7 +31,7 @@
 		{#if ddl.error}
 			<!-- A failed read is not an empty history, and opening the
 			     section again does not read it again, so the retry is here. -->
-			<Alert tone="danger" title="The history could not be read">
+			<Alert tone="danger" title="Could not load the history">
 				{#snippet children()}
 					<p>{ddl.error}</p>
 					<div class="mt-3">
@@ -42,7 +42,7 @@
 		{/if}
 		{#if ddl.loading && !ddl.view && !ddl.error}
 			<div class="flex flex-col gap-2" aria-busy="true" data-testid="schema-history-loading">
-				<span class="sr-only">Reading the history.</span>
+				<span class="sr-only">Loading history</span>
 				<Skeleton height="3.5rem" rounded="rounded-lg" />
 				<Skeleton height="3.5rem" rounded="rounded-lg" />
 			</div>
@@ -51,14 +51,14 @@
 				<Alert tone="warn" title="{ddl.view.pending} queued {ddl.view.pending === 1 ? 'change' : 'changes'}">
 					{#snippet children()}
 						<div class="flex flex-wrap items-center justify-between gap-3">
-							<span>A save queued these changes instead of running them. The columns and their data stay in the table until they are applied.</span>
+							<span>Saving queued these changes instead of running them. The columns and their data stay in the table until you apply them.</span>
 							<Button variant="danger" size="sm" onclick={ddl.applyQueued} loading={ddl.applying}>Apply</Button>
 						</div>
 					{/snippet}
 				</Alert>
 			{/if}
 			{#if ddl.view.entries.length === 0}
-				<p class="text-sm text-muted">Nothing is recorded for this table yet.</p>
+				<p class="text-sm text-muted">No history for this table yet.</p>
 			{:else}
 				<ol class="flex flex-col gap-2">
 					{#each ddl.view.entries as e, i (e.version + ':' + i)}
@@ -84,7 +84,7 @@
 					{/each}
 				</ol>
 				{#if ddl.view.entries.length >= ddl.view.limit}
-					<p class="text-xs text-faint">The newest {ddl.view.limit} statements.</p>
+					<p class="text-xs text-faint">Showing the newest {ddl.view.limit} statements.</p>
 				{/if}
 			{/if}
 		{/if}

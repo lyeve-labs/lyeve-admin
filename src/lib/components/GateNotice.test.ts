@@ -93,7 +93,7 @@ describe('GateNotice with a heading-only title', () => {
 
 	it('names the subject in lower case inside the outage sentence', () => {
 		const { container } = named({ state: 'unavailable' });
-		expect(container.textContent).toContain('did not answer, so the schema list could not be read.');
+		expect(container.textContent).toContain('The engine is unavailable, so the schema list did not load.');
 	});
 
 	it('keeps the title as the heading', () => {
@@ -103,11 +103,11 @@ describe('GateNotice with a heading-only title', () => {
 });
 
 describe('GateNotice for a read nothing answered', () => {
-	it('says it is temporary, names what could not be read and that nothing changed', () => {
+	it('says it is temporary and names what did not load', () => {
 		const { container } = mount({ state: 'unavailable' });
 		expect(container.textContent).toContain('Temporarily unavailable');
 		expect(container.textContent).toContain(
-			'The engine or its database did not answer, so cache could not be read. Nothing was changed. Try again in a moment.',
+			'The engine is unavailable, so cache did not load. Try again in a moment.',
 		);
 	});
 

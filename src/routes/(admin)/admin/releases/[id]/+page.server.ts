@@ -81,7 +81,7 @@ async function entryLabel(client: HttpClient, id: string): Promise<EntryLabel | 
 }
 
 /** What the page says when the conflicts could not be read, which is never a report that there are none. */
-const CONFLICTS_FAILED = 'Conflicts could not be checked. The engine checks again before the release goes out.';
+const CONFLICTS_FAILED = 'Could not check for conflicts. They are checked again when the release publishes.';
 
 export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
@@ -90,7 +90,7 @@ export const load: PageServerLoad = async (event) => {
 		release = await getRelease(client, event.params.id);
 	} catch (err) {
 		if (err instanceof ApiError && err.status === 404) error(404, 'Release not found');
-		const gate = gateOf(err, 'The release could not be read.');
+		const gate = gateOf(err, 'Could not load the release.');
 		return {
 			release: null,
 			gate,
@@ -148,11 +148,11 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const description = String(form.get('description') ?? '').trim();
-		if (!name) return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { name: 'Name is required' } });
+		if (!name) return fail(400, { action: 'update', error: 'Check the highlighted fields.', fields: { name: 'Enter a name.' } });
 		try {
 			await updateRelease(authedClient(event), event.params.id, { name, description });
 		} catch (err) {
-			return failed('update', err, 'The release could not be saved.');
+			return failed('update', err, 'Could not save the release. Try again.');
 		}
 		return { saved: true };
 	},
@@ -162,14 +162,14 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const entryId = String(form.get('entry_id') ?? '').trim();
 		const action = String(form.get('action') ?? '');
-		if (!entryId) return fail(400, { action: 'addItem', error: 'Check the highlighted fields.', fields: { entry_id: 'Pick an entry' } });
+		if (!entryId) return fail(400, { action: 'addItem', error: 'Check the highlighted fields.', fields: { entry_id: 'Choose an entry.' } });
 		if (action !== 'publish' && action !== 'unpublish') {
-			return fail(400, { action: 'addItem', error: 'An entry is either published or unpublished by the release.' });
+			return fail(400, { action: 'addItem', error: 'Choose whether the release publishes or unpublishes this entry.' });
 		}
 		try {
 			await addReleaseItem(authedClient(event), event.params.id, entryId, action);
 		} catch (err) {
-			return failed('addItem', err, 'The entry could not be added.');
+			return failed('addItem', err, 'Could not add the entry. Try again.');
 		}
 		return { added: entryId };
 	},
@@ -178,11 +178,11 @@ export const actions: Actions = {
 		await requireUser(event);
 		const form = await event.request.formData();
 		const entryId = String(form.get('entry_id') ?? '').trim();
-		if (!entryId) return fail(400, { action: 'removeItem', error: 'No entry was named.' });
+		if (!entryId) return fail(400, { action: 'removeItem', error: 'This form is missing its entry. Reload the page and try again.' });
 		try {
 			await removeReleaseItem(authedClient(event), event.params.id, entryId);
 		} catch (err) {
-			return failed('removeItem', err, 'The entry could not be removed.');
+			return failed('removeItem', err, 'Could not remove the entry. Try again.');
 		}
 		return { removed: entryId };
 	},
@@ -194,12 +194,12 @@ export const actions: Actions = {
 		// does not know the operator's time zone.
 		const at = String(form.get('publish_at') ?? '').trim();
 		if (!at || Number.isNaN(Date.parse(at))) {
-			return fail(400, { action: 'schedule', error: 'Check the highlighted fields.', fields: { publish_at: 'Pick when the release goes out' } });
+			return fail(400, { action: 'schedule', error: 'Check the highlighted fields.', fields: { publish_at: 'Choose when the release publishes.' } });
 		}
 		try {
 			await scheduleRelease(authedClient(event), event.params.id, new Date(at).toISOString());
 		} catch (err) {
-			return goOutFailure('schedule', err, 'The release could not be scheduled.');
+			return goOutFailure('schedule', err, 'Could not schedule the release. Try again.');
 		}
 		return { scheduled: true };
 	},
@@ -209,7 +209,7 @@ export const actions: Actions = {
 		try {
 			await unscheduleRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return failed('unschedule', err, 'The schedule could not be removed.');
+			return failed('unschedule', err, 'Could not remove the schedule. Try again.');
 		}
 		return { unscheduled: true };
 	},
@@ -219,7 +219,7 @@ export const actions: Actions = {
 		try {
 			await publishRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return goOutFailure('publish', err, 'The release could not be published.');
+			return goOutFailure('publish', err, 'Could not publish the release. Try again.');
 		}
 		return { published: true };
 	},
@@ -229,7 +229,7 @@ export const actions: Actions = {
 		try {
 			await cancelRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return failed('cancel', err, 'The release could not be canceled.');
+			return failed('cancel', err, 'Could not cancel the release. Try again.');
 		}
 		return { canceled: true };
 	},
@@ -239,7 +239,7 @@ export const actions: Actions = {
 		try {
 			await deleteRelease(authedClient(event), event.params.id);
 		} catch (err) {
-			return failed('delete', err, 'The release could not be deleted.');
+			return failed('delete', err, 'Could not delete the release. Try again.');
 		}
 		redirect(303, '/admin/releases');
 	},

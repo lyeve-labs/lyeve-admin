@@ -167,17 +167,17 @@
 
 	<div class="flex flex-col gap-4" data-testid="translations-panel">
 		{#if unavailable}
-			<Alert tone="warn" title="The localization plugin did not answer">
-				The engine lists the plugin, but its routes are not responding. Translations cannot be
-				read or written until it is.
+			<Alert tone="warn" title="Could not load translations">
+				The localization plugin is included in this build but is not responding. You cannot see or
+				edit translations until it responds.
 			</Alert>
 		{:else if targets.length === 0}
 			<p class="text-sm text-muted">
-				No locale to translate into. Enable one under
+				No locales to translate into yet. Enable one under
 				<a href="/admin/settings/localization" class="text-brand underline-offset-2 hover:underline">
 					locales
 				</a>
-				and it appears here as a tab.
+				to add it here as a tab.
 			</p>
 		{:else if textFields.length === 0}
 			<p class="text-sm text-muted">This schema has no text field to translate.</p>
@@ -187,12 +187,12 @@
 				     text field rather than the ones somebody chose. Saying so
 				     stops the list reading as a decision nobody made. -->
 				<p class="text-xs text-faint">
-					No field on this schema is marked as translated, so every text field is offered. Mark
+					No field on this schema is marked as translated, so every text field is shown. Mark
 					the ones you translate in the
 					<a href="/admin/schema" class="text-brand underline-offset-2 hover:underline">
 						schema builder
 					</a>
-					and only those appear here.
+					to show only those.
 				</p>
 			{/if}
 
@@ -289,13 +289,13 @@
 									{@const from = t ? locales.default_locale : resolvedFrom(field.name, active)}
 									<p class="text-xs text-faint">
 										{#if field.name === 'title' && !t}
-											A new translation needs a title. Left empty, it saves the source title as it is now, and later changes to the source do not reach it.
+											A new translation needs a title. If you leave it empty, it copies the current source title, and later changes to the source do not update it.
 										{:else if field.name === 'title'}
-											Left empty, the title saved for {active} stays as it is.
+											If you leave it empty, the title saved for {active} stays as it is.
 										{:else if from === locales.default_locale}
-											Empty, so a reader of {active} gets the source.
+											Readers of {active} see the source while this is empty.
 										{:else}
-											Empty, so a reader of {active} gets this field in {from}.
+											Readers of {active} see this field in {from} while this is empty.
 										{/if}
 									</p>
 								{/if}

@@ -68,7 +68,7 @@ describe('schema confirmations with a row count nobody read', () => {
 		const [title, body] = kit.confirm.mock.calls[0] ?? [];
 		expect(title).toBe('Delete schema posts?');
 		expect(body).toContain('every row in it');
-		expect(body).toContain('could not be read');
+		expect(body).toContain('Could not count the rows');
 		expect(body).toContain('cannot be undone');
 	});
 
@@ -91,8 +91,8 @@ describe('schema confirmations with a row count nobody read', () => {
 		await fireEvent.click(await screen.findByRole('button', { name: 'Apply' }));
 		await waitFor(() => expect(kit.confirm).toHaveBeenCalled());
 		const body = kit.confirm.mock.calls[0]?.[1] ?? '';
-		expect(body).toContain('could not be read');
-		expect(body).not.toContain('holds 0 rows');
+		expect(body).toContain('Could not count the rows');
+		expect(body).not.toContain('has 0 rows');
 	});
 });
 
@@ -113,8 +113,8 @@ describe('schema history', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /History/ }));
 		await play('?/history', { type: 'failure', data: { error: 'The engine did not answer.' } });
 
-		expect(await screen.findByText('The history could not be read')).toBeTruthy();
-		expect(screen.queryByText('Nothing is recorded for this table yet.')).toBeNull();
+		expect(await screen.findByText('Could not load the history')).toBeTruthy();
+		expect(screen.queryByText('No history for this table yet.')).toBeNull();
 		const asked = vi.mocked(HTMLFormElement.prototype.requestSubmit).mock.calls.length;
 		await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 		expect(vi.mocked(HTMLFormElement.prototype.requestSubmit).mock.calls.length).toBe(asked + 1);

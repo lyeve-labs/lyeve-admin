@@ -8,7 +8,7 @@ afterEach(cleanup);
 describe('ExportConfigFields schema choice', () => {
 	it('says why there is nothing to pick when the schema list was not read', () => {
 		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: null } });
-		expect(container.textContent).toContain('The schema list could not be read');
+		expect(container.textContent).toContain('Could not load the schema list');
 	});
 
 	it('counts the schemas a read answered with', () => {
@@ -32,7 +32,7 @@ describe('ExportConfigFields format and status choice', () => {
 
 	it('states the row ceiling and promises no export of every entry', () => {
 		const { container } = render(ExportConfigFields, { props: { idPrefix: 'x', schemaNames: [] } });
-		expect(container.textContent).toContain('An export holds at most 10,000 entries.');
+		expect(container.textContent).toContain('An export includes at most 10,000 entries.');
 		expect(container.textContent).not.toContain('every entry');
 	});
 

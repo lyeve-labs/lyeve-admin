@@ -29,7 +29,7 @@
 					<SectionHeading level={3}>{block.title || `Latest in ${block.schema}`}</SectionHeading>
 				{/snippet}
 				{#if block.entries === null}
-					<p class="text-sm text-muted">These entries could not be read.</p>
+					<p class="text-sm text-muted">Could not load these entries. Reload the page to try again.</p>
 				{:else if block.entries.length === 0}
 					<p class="text-sm text-muted">No entries yet.</p>
 				{:else}

@@ -176,7 +176,7 @@ describe('content history settings', () => {
 
 	it('draws a failed read as a failure with a way to try again', () => {
 		render(Page, { props: props({ gate: { state: 'unavailable' } }) });
-		expect(screen.getByText(/did not answer/)).toBeTruthy();
+		expect(screen.getByText(/is unavailable/)).toBeTruthy();
 		expect(screen.getByRole('link', { name: /Try again/ }).getAttribute('href')).toBe('/admin/settings/content-history');
 	});
 

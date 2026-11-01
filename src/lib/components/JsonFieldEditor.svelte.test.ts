@@ -79,7 +79,7 @@ describe('JsonFieldEditor', () => {
 	it('opens a nested document as JSON text', () => {
 		const { container } = render(JsonFieldEditor, { props: { value: '{"a":{"b":1}}' } });
 		expect(container.querySelector('textarea')).toBeTruthy();
-		expect(container.textContent).toContain('stays as JSON');
+		expect(container.textContent).toContain('so edit it as JSON');
 	});
 
 	it('reports invalid JSON while it is typed', async () => {
@@ -97,6 +97,6 @@ describe('the note on a value that stays JSON', () => {
 		const group = container.querySelector('[role="radiogroup"]') as HTMLElement;
 		const ids = (group.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
 		const described = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
-		expect(described).toContain('stays as JSON');
+		expect(described).toContain('so edit it as JSON');
 	});
 });

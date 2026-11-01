@@ -211,7 +211,7 @@ describe('admin/schema preset action', () => {
 	it('names an unknown preset as one the install does not ship', async () => {
 		const { event } = actionEvent({ '/api/admin/schemas/presets/blog': () => json({ error: 'not found' }, 404) }, 'blog');
 		const out = await actions.preset(event);
-		expect(out).toMatchObject({ status: 404, data: { error: 'This install does not ship this preset.', preset: 'blog' } });
+		expect(out).toMatchObject({ status: 404, data: { error: 'This preset is not included in this build.', preset: 'blog' } });
 	});
 
 	it('refuses a role the plugin refuses before asking the engine', async () => {
@@ -290,7 +290,7 @@ describe('admin/schema save action', () => {
 		);
 		const out = (await actions.save(event)) as { status: number; data: { error: string; renamed: unknown[] } };
 		expect(out.status).toBe(422);
-		expect(out.data.error).toBe('invalid schema: field "x" The renames went through: title to headline.');
+		expect(out.data.error).toBe('invalid schema: field "x" These fields were renamed: title to headline.');
 		expect(out.data.renamed).toEqual([{ from: 'title', to: 'headline' }]);
 	});
 
@@ -331,7 +331,7 @@ describe('admin/schema preview, delete and rename actions', () => {
 	it('hides a server failure behind a sentence', async () => {
 		const { event } = formEvent({ '/api/admin/schemas/posts': () => json({ error: 'pq: relation missing' }, 500) }, { name: 'posts' });
 		const out = (await actions.delete(event)) as { data: { error: string } };
-		expect(out.data.error).toBe('The schema could not be deleted.');
+		expect(out.data.error).toBe('Could not delete the schema. Try again.');
 	});
 
 	it('moves the table through the rename route', async () => {
@@ -365,7 +365,7 @@ describe('admin/schema history and queued changes', () => {
 		const { event } = formEvent({ '/posts/history': () => json({ error: 'not found' }, 404) }, { name: 'posts' });
 		const out = (await actions.history(event)) as { status: number; data: { error: string } };
 		expect(out.status).toBe(404);
-		expect(out.data.error).toMatch(/no history/);
+		expect(out.data.error).toMatch(/No history/);
 	});
 
 	it('applies the queue for that schema only', async () => {
@@ -404,7 +404,7 @@ describe('admin/schema import', () => {
 		const bad = formEvent({ '/api/admin/schemas/import': () => json({ error: 'line 3: unknown field_type "strng"' }, 422) }, { text: 'x', source: 'lyeve' });
 		expect(((await actions.import(bad.event)) as { data: { error: string } }).data.error).toBe('line 3: unknown field_type "strng"');
 		const broken = formEvent({ '/api/admin/schemas/import': () => json({ error: 'pq: deadlock' }, 500) }, { text: 'x', source: 'lyeve' });
-		expect(((await actions.import(broken.event)) as { data: { error: string } }).data.error).toBe('The definitions could not be imported.');
+		expect(((await actions.import(broken.event)) as { data: { error: string } }).data.error).toBe('Could not import the definitions. Try again.');
 	});
 
 	it('refuses an empty form and an unknown source before calling the engine', async () => {

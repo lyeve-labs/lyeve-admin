@@ -129,10 +129,10 @@ describe('release writes', () => {
 	});
 
 	it.each([
-		['update', () => actions.update(event({ name: 'Launch' })), 'put', 'The release could not be saved.'],
-		['unschedule', () => actions.unschedule(event()), 'delete', 'The schedule could not be removed.'],
-		['cancel', () => actions.cancel(event()), 'post', 'The release could not be canceled.'],
-		['delete', () => actions.delete(event()), 'delete', 'The release could not be deleted.'],
+		['update', () => actions.update(event({ name: 'Launch' })), 'put', 'Could not save the release. Try again.'],
+		['unschedule', () => actions.unschedule(event()), 'delete', 'Could not remove the schedule. Try again.'],
+		['cancel', () => actions.cancel(event()), 'post', 'Could not cancel the release. Try again.'],
+		['delete', () => actions.delete(event()), 'delete', 'Could not delete the release. Try again.'],
 	] as const)('keeps outage detail out of %s', async (action, run, method, sentence) => {
 		engine[method].mockRejectedValue(new ApiError(503, 'pq: down'));
 		expect(((await run()) as Failure).data).toMatchObject({ action, error: sentence });

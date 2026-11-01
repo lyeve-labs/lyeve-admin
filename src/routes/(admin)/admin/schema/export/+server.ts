@@ -21,7 +21,7 @@ export const GET: RequestHandler = async ({ cookies, url, fetch }) => {
 	}
 	if (!res.ok) {
 		if (res.status === 403) error(403, 'Your role cannot export content types');
-		error(502, 'The content types could not be exported');
+		error(502, 'Could not export the content types. Try again.');
 	}
 	const headers = new Headers();
 	headers.set('Content-Type', res.headers.get('content-type') ?? (json ? 'application/json; charset=utf-8' : 'application/yaml; charset=utf-8'));

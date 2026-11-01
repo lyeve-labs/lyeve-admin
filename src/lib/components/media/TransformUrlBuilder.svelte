@@ -36,7 +36,7 @@
 	// Each fit changes the picture in a way its name does not say, so each
 	// carries its sentence beside it rather than inside a closed list.
 	const FITS = [
-		{ value: '', label: 'Engine default', description: 'The engine picks the fit.' },
+		{ value: '', label: 'Engine default', description: 'Uses the default fit.' },
 		{ value: 'cover', label: 'Cover', description: 'Fills the box and crops what falls outside it.' },
 		{ value: 'contain', label: 'Contain', description: 'Fits the whole image inside the box.' },
 		{ value: 'fill', label: 'Fill', description: 'Stretches the image to the box.' },
@@ -64,7 +64,7 @@
 
 <div class="flex flex-col gap-3" data-testid="transform-url">
 	<SectionHeading level={3}>Transform URL</SectionHeading>
-	<p class="text-xs text-muted">A signed address for a resized or converted copy. The copy is made on the first request and cached.</p>
+	<p class="text-xs text-muted">Build a signed URL for a resized or converted copy. The copy is made on the first request and then cached.</p>
 	{#if refused}
 		<RefusalNotice refusal={refused} />
 	{:else if error}

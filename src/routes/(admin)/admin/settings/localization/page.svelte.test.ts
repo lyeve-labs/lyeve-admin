@@ -38,7 +38,7 @@ describe('locales page', () => {
 
 	it('says the plugin did not answer, and draws no form', () => {
 		render(LocalesPage, { props: { data: data({ locales: { ok: false, gate: { state: 'unavailable' } } }), form: null } });
-		expect(screen.getByText(/so locales could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so locales did not load/)).toBeTruthy();
 		expect(screen.queryByText('No locale enabled yet.')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
 	});

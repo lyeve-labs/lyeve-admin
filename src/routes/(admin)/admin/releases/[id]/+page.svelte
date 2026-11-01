@@ -144,8 +144,8 @@
 	async function ask(action: 'publish' | 'cancel' | 'delete') {
 		const named = release?.name ?? '';
 		const copy = {
-			publish: [`Publish release ${named} now?`, 'Every entry in it is published or unpublished at once.', 'Publish now'],
-			cancel: [`Cancel release ${named}?`, 'Nothing in it goes out, and it can no longer change.', 'Cancel release'],
+			publish: [`Publish release ${named} now?`, 'Every entry in it is published or unpublished immediately.', 'Publish now'],
+			cancel: [`Cancel release ${named}?`, 'Its entries are not published, and you can no longer edit it.', 'Cancel release'],
 			delete: [`Delete release ${named}?`, 'The release and its list of entries are removed. The entries themselves stay.', 'Delete'],
 		}[action];
 		if (!(await confirmDialog(copy[0], copy[1], { confirmLabel: copy[2] }))) return;
@@ -190,7 +190,7 @@
 	{/snippet}
 
 	{#if !release}
-		<GateNotice level={2} gate={data.gate} title="Releases" absent="This build serves no content releases." />
+		<GateNotice level={2} gate={data.gate} title="Releases" absent="Releases are not included in this build." />
 	{:else}
 		<div class="flex flex-col gap-5">
 			{#if !drawerFailed}
@@ -200,7 +200,7 @@
 				<Alert tone="success" autoDismiss>{success}</Alert>
 			{/if}
 			{#if release.status === 'failed' && release.failure_reason}
-				<Alert tone="danger" title="The release did not go out">{release.failure_reason}</Alert>
+				<Alert tone="danger" title="The release did not publish">{release.failure_reason}</Alert>
 			{/if}
 
 			<Card>
@@ -226,13 +226,13 @@
 					</form>
 				{:else}
 					<p class="text-sm text-muted">
-						{release.published_at ? `Went out ${formatDateTime(release.published_at)}.` : 'This release no longer goes out.'}
+						{release.published_at ? `Published ${formatDateTime(release.published_at)}.` : 'This release will not be published.'}
 					</p>
 				{/if}
 			</Card>
 
 			{#if !data.conflictsRead && !(form && 'conflicts' in form)}
-				<GateNotice gate={data.conflictsGate} title="Conflicts" absent="This build does not check release conflicts. The engine checks again before the release goes out." />
+				<GateNotice gate={data.conflictsGate} title="Conflicts" absent="Conflict checks are not included in this build. Conflicts are still checked when the release publishes." />
 			{:else if conflicts.length > 0}
 				<Card>
 					{#snippet header()}
@@ -240,8 +240,8 @@
 					{/snippet}
 					<p class="mb-3 text-sm text-muted">
 						{blocking.length > 0
-							? `${blocking.length} ${blocking.length === 1 ? 'conflict stops' : 'conflicts stop'} this release from going out. Resolve each one or remove the entry.`
-							: 'Nothing here stops the release. Deleted entries are skipped when it goes out.'}
+							? `${blocking.length} ${blocking.length === 1 ? 'conflict stops' : 'conflicts stop'} this release from publishing. Resolve each one or remove the entry.`
+							: 'None of these conflicts stop the release. Deleted entries are skipped when it publishes.'}
 					</p>
 					<ul class="flex flex-col gap-2 coarse:gap-6" data-testid="release-conflicts">
 						{#each conflicts as c, i (`${c.entry_id}-${c.kind}-${i}`)}
@@ -349,7 +349,7 @@
 				required
 				bind:value={picked}
 				error={own.fields.entry_id}
-				hint="The most recently changed entries, by collection. Add an older one from its own page."
+				hint="Shows the most recently changed entries, by collection. Add an older one from its own page."
 			/>
 		{:else}
 			<!-- The entry list could not be read, so the drawer takes an id and
@@ -361,7 +361,7 @@
 				required
 				bind:value={entryId}
 				error={own.fields.entry_id}
-				hint="The entry list could not be read. Enter the ID shown under an entry's title on its page."
+				hint="Could not load the entry list. Enter the ID shown under the entry's title on its page."
 			/>
 		{/if}
 		<SegmentedControl name="action" label="When the release goes out" options={ACTIONS} bind:value={itemAction} />

@@ -173,7 +173,7 @@ describe('gRPC', () => {
 			props: props({ grpc: { listening: false, routes: [], gate: { state: 'unavailable' } } }),
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('the gRPC listener could not be read');
+		expect(said(container)).toContain('the gRPC listener did not load');
 		expect(said(container)).not.toContain('not part of this build');
 		expect(said(container)).toContain('Try again');
 	});

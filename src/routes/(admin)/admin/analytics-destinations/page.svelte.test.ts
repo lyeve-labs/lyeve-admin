@@ -107,7 +107,7 @@ describe('analytics destinations', () => {
 
 	it('names an outage of the delivery read as an outage', () => {
 		setup({ deliveries: null, deliveriesGate: { state: 'unavailable' } });
-		expect(document.body.textContent).toContain('did not answer');
+		expect(document.body.textContent).toContain('is unavailable');
 	});
 
 	it('says nothing is owed when the queue is empty', () => {

@@ -208,7 +208,7 @@
 					</Button>
 				{/if}
 				{#if data.revisionsFailed}
-					<span class="text-xs text-muted">The revision history could not be read.</span>
+					<span class="text-xs text-muted">Could not load the revision history. Reload the page to try again.</span>
 				{/if}
 				{#if historyOff}
 					<span class="text-xs text-muted" data-testid="history-off">
@@ -373,7 +373,7 @@
 						<div class="flex flex-col gap-3 border-t border-line p-3">
 							{#if olderUnlisted > 0 && !olderHidden}
 								<p class="text-xs text-muted">
-									The newest {revisions.length} of {revisionTotal} revisions are listed. Open an older one by number.
+									Showing the newest {revisions.length} of {revisionTotal} revisions. Open an older one by its number.
 								</p>
 								{#if nextOlder > 0}
 									{@render revisionOpener()}

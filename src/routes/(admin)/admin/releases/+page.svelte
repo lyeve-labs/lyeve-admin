@@ -43,7 +43,7 @@
 
 <PageShell
 	title="Releases"
-	description="Sets of entries that publish or unpublish together, now or at a scheduled time."
+	description="Group entries to publish or unpublish them together, now or at a scheduled time."
 	width="wide"
 >
 	{#snippet actions()}
@@ -59,7 +59,7 @@
 			level={2}
 			gate={data.gate}
 			title="Releases"
-			absent="This build serves no content releases, so entries publish one at a time."
+			absent="Releases are not included in this build."
 		/>
 	{:else}
 		{#if !open}
@@ -74,10 +74,10 @@
 		{#if data.releases.length === 0}
 			<EmptyState
 				level={2}
-				title={data.status ? 'No release has this status' : 'No releases yet'}
+				title={data.status ? 'No releases with this status' : 'No releases yet'}
 				description={data.status
 					? 'Pick another status to see the rest.'
-					: 'A release gathers entries so they go live together. Create one, then add entries to it.'}
+					: 'Create a release to publish several entries together.'}
 			>
 				{#snippet iconSnippet()}<CalendarClock size={ICON.lg} />{/snippet}
 				{#snippet action()}

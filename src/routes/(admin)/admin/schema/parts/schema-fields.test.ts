@@ -58,10 +58,10 @@ describe('schema field helpers', () => {
 	it('says why Req and Idx do nothing on each relation kind and on json', () => {
 		expect(inertFlags(field({ field_type: 'text' }))).toEqual({ indexed: null, required: null });
 		expect(inertFlags(field({ field_type: 'json' }))).toEqual({ indexed: 'A json field cannot be indexed.', required: null });
-		expect(inertFlags(field({ field_type: 'relation', relation_type: 'belongs_to' }))).toEqual({ indexed: 'Indexed by its foreign key already.', required: null });
+		expect(inertFlags(field({ field_type: 'relation', relation_type: 'belongs_to' }))).toEqual({ indexed: 'Already indexed by its foreign key.', required: null });
 		const many = inertFlags(field({ field_type: 'relation', relation_type: 'has_many' }));
-		expect(many.indexed).toBe('No column here to index.');
-		expect(many.required).toMatch(/^Nothing here to require\. The key lives in /);
+		expect(many.indexed).toBe('This relation has no column here to index.');
+		expect(many.required).toMatch(/^This relation has no column here to require\. Its key is stored in /);
 	});
 
 	it('clears the flags that would do nothing', () => {

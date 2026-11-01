@@ -171,7 +171,7 @@ describe('the tenant destination', () => {
 
 	it('says the engine did not answer the destination read', () => {
 		const { container } = render(TelemetryPage, props({ ok: false, gate: { state: 'unavailable' } }));
-		expect(said(container)).toContain('so tenant destination could not be read');
+		expect(said(container)).toContain('so tenant destination did not load');
 		expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
 	});
 });

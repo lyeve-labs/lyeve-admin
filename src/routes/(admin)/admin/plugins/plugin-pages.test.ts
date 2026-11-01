@@ -44,7 +44,7 @@ describe('plugin pages', () => {
 		const { container } = render(PluginsPage, {
 			props: { data: { plugins: [], gate: { state: 'unavailable' } } } as never
 		});
-		expect(container.textContent).toContain('the plugin status could not be read');
+		expect(container.textContent).toContain('the plugin status did not load');
 		expect(container.querySelector('a[href^="/admin/plugins/"]')).toBeNull();
 		expect(container.textContent).not.toContain('No plugins in this build');
 	});

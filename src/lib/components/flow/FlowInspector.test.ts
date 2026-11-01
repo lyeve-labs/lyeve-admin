@@ -372,7 +372,7 @@ describe('FlowInspector names that could not be read', () => {
 
 	it('says the datasources could not be read, with Try again, instead of hiding them', () => {
 		const { container, getByRole } = flowView({ variables: ['region'], datasourcesGate: { state: 'unavailable' } });
-		expect(container.textContent).toContain('so datasources could not be read');
+		expect(container.textContent).toContain('so datasources did not load');
 		expect(getByRole('link', { name: /Try again/ })).toBeTruthy();
 		expect(container.textContent).toContain('vars.region');
 	});

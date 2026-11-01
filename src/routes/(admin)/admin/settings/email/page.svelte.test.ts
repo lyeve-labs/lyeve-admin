@@ -110,7 +110,7 @@ async function chooseTransport(container: HTMLElement, label: string) {
 describe('email providers page', () => {
 	it('says the plugin did not answer, and offers nothing to create', () => {
 		const { container, queryByText } = setup([], { providers: down });
-		expect(container.textContent).toContain('so email providers could not be read');
+		expect(container.textContent).toContain('so email providers did not load');
 		expect(queryByText('No providers yet')).toBeNull();
 		expect(queryByText('New provider')).toBeNull();
 	});

@@ -56,7 +56,7 @@ describe('SchemaHistory', () => {
 		expect(section.textContent).toContain('Queued');
 		expect(section.textContent).toContain('Applied');
 		expect(section.textContent).toContain('1 queued change');
-		expect(section.textContent).toContain('The newest 2 statements.');
+		expect(section.textContent).toContain('Showing the newest 2 statements.');
 		expect(screen.getByRole('button', { name: 'Apply' })).toBeTruthy();
 	});
 
@@ -65,7 +65,7 @@ describe('SchemaHistory', () => {
 			d.open = true;
 			d.view = { name: 'posts', pending: 0, limit: 200, entries: [] };
 		});
-		expect(screen.getByText('Nothing is recorded for this table yet.')).toBeTruthy();
+		expect(screen.getByText('No history for this table yet.')).toBeTruthy();
 		expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
 	});
 

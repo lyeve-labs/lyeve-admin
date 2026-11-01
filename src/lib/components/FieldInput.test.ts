@@ -90,7 +90,7 @@ describe('FieldInput', () => {
 			props: { field: field('media'), value: '', mediaChoices: null },
 		});
 		await fireEvent.click(getByRole('button', { name: 'Choose from library' }));
-		expect(await findByText('The library could not be read')).toBeTruthy();
+		expect(await findByText('Could not load the library')).toBeTruthy();
 		expect(queryByText('No published files')).toBeNull();
 	});
 
@@ -103,7 +103,7 @@ describe('FieldInput', () => {
 		const input = container.querySelector('input') as HTMLInputElement;
 		expect(input.readOnly).toBe(true);
 		expect(input.value).toBe('ac91');
-		expect(getByText(/The server assigns this identifier/)).toBeTruthy();
+		expect(getByText(/Set automatically/)).toBeTruthy();
 	});
 
 	it('renders a date picker showing the field value for a date field', () => {
@@ -224,7 +224,7 @@ describe('FieldInput', () => {
 				relationFailed: true,
 			},
 		});
-		expect(getByText(/The entries in posts could not be read/)).toBeTruthy();
+		expect(getByText(/Could not load the entries in posts/)).toBeTruthy();
 		expect(queryByText(/no entries/)).toBeNull();
 	});
 
@@ -237,7 +237,7 @@ describe('FieldInput', () => {
 				relationTotal: 1200,
 			},
 		});
-		expect(getByText('Only the first 1 of 1,200 entries in posts are offered here.')).toBeTruthy();
+		expect(getByText('Showing the first 1 of 1,200 entries in posts.')).toBeTruthy();
 	});
 
 	it('says nothing about a cut when the picker holds the whole collection', () => {
@@ -317,7 +317,7 @@ describe('FieldInput', () => {
 				relationFailed: true,
 			},
 		});
-		expect(getByText(/could not be read, so none can be picked/)).toBeTruthy();
+		expect(getByText(/Could not load the entries in/)).toBeTruthy();
 		expect(queryByText(/has no entries yet/)).toBeNull();
 	});
 
@@ -336,7 +336,7 @@ describe('FieldInput', () => {
 		});
 		expect(queryByRole('combobox')).toBeNull();
 		expect(getByTestId('inverse-relation').textContent).toContain('Two');
-		expect(getByText(/Set it on that entry, not here/)).toBeTruthy();
+		expect(getByText(/Change it there, not here/)).toBeTruthy();
 	});
 
 	it('renders a has_one read-only with no control to type into', () => {
@@ -349,7 +349,7 @@ describe('FieldInput', () => {
 		});
 		expect(queryByRole('combobox')).toBeNull();
 		expect(queryByRole('textbox')).toBeNull();
-		expect(getByText('Nothing points here yet.')).toBeTruthy();
+		expect(getByText('No linked entries yet.')).toBeTruthy();
 	});
 });
 

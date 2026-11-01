@@ -44,7 +44,7 @@
 				toast.success(`Renamed ${from} to ${stored.name}`);
 				await invalidateAll();
 			} else if (result.type === 'failure') {
-				renameError = String((result.data as { error?: string })?.error ?? 'The schema could not be renamed.');
+				renameError = String((result.data as { error?: string })?.error ?? 'Could not rename the schema. Try again.');
 			}
 		};
 	};
@@ -59,7 +59,7 @@
 			name="to"
 			label="New machine name"
 			bind:value={renameTo}
-			hint="The table and the API path move. Every row comes with them."
+			hint="Renames the table and the API path. Every row moves with them."
 			error={renameError || undefined}
 			mono
 		/>

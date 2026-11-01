@@ -167,7 +167,7 @@ describe('variables page for a role the plugin refuses', () => {
 
 	it('offers nothing to create while the list could not be read', () => {
 		const { container, queryByText } = setup([], null, false, { state: 'unavailable' });
-		expect(container.textContent).toContain('flow variables could not be read');
+		expect(container.textContent).toContain('flow variables did not load');
 		expect(queryByText('New variable')).toBeNull();
 	});
 });

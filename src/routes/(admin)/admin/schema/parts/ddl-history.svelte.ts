@@ -69,9 +69,9 @@ export class DdlHistory {
 				const d = result.data as HistoryView;
 				this.view = { name: d.name, entries: d.entries, pending: d.pending, limit: d.limit };
 			} else if (result.type === 'failure') {
-				this.error = String((result.data as { error?: string })?.error ?? 'The history could not be read.');
+				this.error = String((result.data as { error?: string })?.error ?? 'Try again in a moment.');
 			} else if (result.type === 'error') {
-				this.error = 'The admin could not reach the engine.';
+				this.error = 'Try again in a moment.';
 			}
 		};
 	};
@@ -80,10 +80,10 @@ export class DdlHistory {
 		const table = this.#source.table();
 		if (!table || !this.view?.pending) return;
 		const rows = this.#source.rowCounts()[table];
-		const held = rows === undefined ? 'How many rows the table holds could not be read. It may hold data' : `The table holds ${rows} ${rows === 1 ? 'row' : 'rows'}`;
+		const held = rows === undefined ? 'Could not count the rows in the table. It may have data' : `The table has ${rows} ${rows === 1 ? 'row' : 'rows'}`;
 		const ok = await confirm(
 			`Apply ${this.view.pending} queued ${this.view.pending === 1 ? 'change' : 'changes'} to ${table}?`,
-			`A queued change is one a save recorded instead of running: a column or table drop, or clearing one tenant's values in a column other tenants keep. ${held}, and every tenant that defines ${table} shares it, so the data in a dropped column is gone for all of them. A change whose column a definition uses again is canceled rather than run.`,
+			`Saving queued these changes instead of running them: a column or table drop, or clearing one tenant's values in a column other tenants still use. ${held}, and every tenant that defines ${table} shares it, so the data in a dropped column is gone for all of them. If a definition uses a column again, its change is canceled instead of run.`,
 			{ confirmLabel: 'Apply' },
 		);
 		if (ok) this.applyForm?.requestSubmit();
@@ -98,7 +98,7 @@ export class DdlHistory {
 				toast.success(appliedMessage(Number(result.data.applied), Number((result.data as { canceled?: number }).canceled ?? 0)));
 				this.load();
 			} else if (result.type === 'failure') {
-				this.applyError = String((result.data as { error?: string })?.error ?? 'The queued changes could not be applied.');
+				this.applyError = String((result.data as { error?: string })?.error ?? 'Could not apply the queued changes. Try again.');
 				this.load();
 			}
 			// A failed apply can still have run the statements before the one that

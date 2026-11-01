@@ -53,7 +53,7 @@ describe('a write that names no file', () => {
 		for (const action of ['update', 'publish', 'focal', 'transformUrl', 'describe'] as const) {
 			const out = (await actions[action](event({}))) as Failure;
 			expect(out.status, action).toBe(400);
-			expect(out.data, action).toEqual({ error: 'No file was named.' });
+			expect(out.data, action).toEqual({ error: 'This form is missing its file. Reload the page and try again.' });
 		}
 		expect(engine.patch).not.toHaveBeenCalled();
 		expect(engine.post).not.toHaveBeenCalled();

@@ -89,7 +89,7 @@ describe('Slow queries gate', () => {
 			props: props({ gate: { state: 'unavailable' }, entries: [] }),
 		});
 
-		expect(container.textContent).toContain('did not answer');
+		expect(container.textContent).toContain('is unavailable');
 		expect(container.textContent).not.toContain('capture store');
 		expect(container.textContent).toContain('Try again');
 	});
