@@ -19,7 +19,7 @@ import {
 } from '$lib/api/goroutine-engine';
 import { refusalOf } from '$lib/api/refusal';
 import { RUNTIME_FORBIDDEN, parseRuntimeForm, positiveInt, putRuntimeSettings, readRuntime } from '$lib/api/runtime-settings';
-import { conflictText } from '$lib/api/runtime-words';
+import { conflictText, invalidText } from '$lib/api/runtime-words';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { goroutineCount } from '$lib/server/goroutines';
@@ -166,10 +166,10 @@ async function saveTunable<T>(
 }
 
 /**
- * A refused runtime write. A 402 travels as the license refusal. A 409 is
- * worded from its code, never from the route's English. A 4xx relays the
- * API's own sentence, and anything else makes no claim about whether the
- * change landed.
+ * A refused runtime write. A 402 travels as the license refusal. A 409 and
+ * a 422 are worded from their code and params, never from the route's
+ * English. Another 4xx relays the API's own sentence, and anything else
+ * makes no claim about whether the change landed.
  */
 function runtimeFailure(err: unknown) {
 	const form = 'runtime' as const;
@@ -177,6 +177,10 @@ function runtimeFailure(err: unknown) {
 	if (refused) return fail(402, { form, refused });
 	if (err instanceof ApiError && err.status === 409) {
 		return fail(409, { form, error: conflictText(err.body) });
+	}
+	if (err instanceof ApiError) {
+		const invalid = invalidText(err.status, err.body);
+		if (invalid !== null) return fail(err.status, { form, error: invalid });
 	}
 	if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
 		return fail(err.status, { form, error: actionError(err, 'Could not save the runtime settings. Try again.') });

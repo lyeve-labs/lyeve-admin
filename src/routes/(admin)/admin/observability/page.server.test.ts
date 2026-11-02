@@ -346,9 +346,26 @@ describe('the runtime action', () => {
 		expect(JSON.stringify(result)).not.toContain(body.error);
 	});
 
-	it('relays a bounds refusal and keeps transport failures to the console sentence', async () => {
-		const bounds = put(() => json({ error: 'a negative GC target needs a memory limit' }, 422));
-		expect(await actions.runtime(bounds.event)).toMatchObject({ status: 422, data: { form: 'runtime', error: 'a negative GC target needs a memory limit' } });
+	it.each([
+		[
+			422,
+			{ error: 'database_max_connections must be between 5 and 10000', code: 'setting_out_of_bounds', field: 'database_max_connections', min: 5, max: 10000 },
+			'Enter between 5 and 10,000 connections per replica.',
+		],
+		[
+			422,
+			{ error: 'the collector can be off only while a memory limit below the container\'s or the machine\'s memory is in force', code: 'gc_off_needs_memory_limit', gc_percent: -1 },
+			"A GC target of -1 turns garbage collection off, which needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of 0 or more.",
+		],
+		[422, { error: 'a refusal this console has not met', code: 'something_new' }, 'Could not save the settings with these values. Check them and try again.'],
+	])('words a %i from its code, never from its English', async (status, body, sentence) => {
+		const { event } = put(() => json(body, status));
+		const result = await actions.runtime(event);
+		expect(result).toMatchObject({ status, data: { form: 'runtime', error: sentence } });
+		expect(JSON.stringify(result)).not.toContain(body.error);
+	});
+
+	it('keeps transport failures to the console sentence', async () => {
 		const down = put(() => json({ error: 'pq: connection refused' }, 503));
 		expect(await actions.runtime(down.event)).toMatchObject({ status: 400, data: { form: 'runtime', error: 'Check whether your change was saved, then try again.' } });
 	});

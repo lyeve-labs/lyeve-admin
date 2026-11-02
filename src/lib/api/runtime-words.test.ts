@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK, conflictText, factText, recommendationText, warningText } from './runtime-words';
+import { FALLBACK, conflictText, factText, invalidText, recommendationText, warningText } from './runtime-words';
 
 const GIB = 1024 * 1024 * 1024;
 
@@ -83,6 +83,42 @@ describe('recommendationText', () => {
 		expect(recommendationText({ reason_code: 'something_new', params: {} })).toBe('This value fits the machine and the database this engine uses.');
 		expect(recommendationText({ reason_code: 'pool_share', params: {} })).toBe(FALLBACK.recommendation);
 		expect(recommendationText({})).toBe(FALLBACK.recommendation);
+	});
+});
+
+describe('invalidText', () => {
+	const mismatch =
+		'Could not save the settings, because this console and the engine are on different versions. Reload the page. If this happens again, update the console to match the engine.';
+
+	it.each([
+		[{ code: 'setting_out_of_bounds', field: 'database_max_connections', min: 5, max: 10000 }, 'Enter between 5 and 10,000 connections per replica.'],
+		[{ code: 'setting_out_of_bounds', field: 'gc_percent', min: -1 }, 'Enter a GC target of -1 or more.'],
+		[{ code: 'setting_out_of_bounds', field: 'cpu', min: 1 }, 'Enter 1 or more CPU threads.'],
+		[{ code: 'setting_out_of_bounds', field: 'memory', mode: 'ratio', min: 0.5, max: 0.95 }, 'Enter a share of the memory limit between 50 and 95%.'],
+		[{ code: 'setting_out_of_bounds', field: 'memory', mode: 'bytes', min: 67108864 }, 'Enter a soft memory limit of at least 64 MB.'],
+		[{ code: 'cpu_threads_above_cores', threads: 64, cores: 8 }, 'Enter at most 8 CPU threads, the number of CPUs available to the engine.'],
+		[
+			{ code: 'gc_off_needs_memory_limit', gc_percent: -1 },
+			"A GC target of -1 turns garbage collection off, which needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of 0 or more.",
+		],
+		[
+			{ code: 'gc_above_max_needs_memory_limit', gc_percent: 1001, max_gc_percent: 1000 },
+			"A GC target above 1000% needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of 1000 or less.",
+		],
+		[{ code: 'revision_required' }, 'This form is missing its revision. Reload the page and try again.'],
+		[{ code: 'nothing_to_change' }, 'Change a setting first.'],
+		[{ code: 'setting_mode_unknown', field: 'memory' }, mismatch],
+		[{ code: 'setting_shape_invalid', field: 'cpu' }, mismatch],
+		[{ code: 'setting_refused', field: 'database_max_connections' }, 'Could not save the database pool with this value. Enter a different value and try again.'],
+	])('words a 422 from its code and params (%o)', (body, sentence) => {
+		expect(invalidText(422, { error: 'English for an API reader', ...body })).toBe(sentence);
+	});
+
+	it('reads an unknown 422 code, or a known one missing its params, as the fallback', () => {
+		expect(invalidText(422, { code: 'something_new', error: 'English' })).toBe(FALLBACK.invalid);
+		expect(invalidText(422, { code: 'setting_out_of_bounds', field: 'database_max_connections' })).toBe(FALLBACK.invalid);
+		expect(invalidText(422, { code: 'setting_refused', field: 'threads' })).toBe(FALLBACK.invalid);
+		expect(invalidText(422, null)).toBe(FALLBACK.invalid);
 	});
 });
 

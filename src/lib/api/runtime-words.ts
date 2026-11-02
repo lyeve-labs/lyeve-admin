@@ -41,6 +41,7 @@ export const FALLBACK = {
 	recommendation: 'This value fits the machine and the database this engine uses.',
 	warning: 'Review these recommendations before you save them.',
 	conflict: 'Could not save the settings. Reload the page and try again.',
+	invalid: 'Could not save the settings with these values. Check them and try again.',
 } as const;
 
 const FACTS: Record<string, (f: { grant?: unknown }) => string | null> = {
@@ -202,4 +203,72 @@ export function conflictText(body: unknown): string {
 		default:
 			return FALLBACK.conflict;
 	}
+}
+
+/** The names a reader sees for the settings the PUT body names. */
+const SETTING_LABELS: Record<string, string> = {
+	cpu: 'CPU threads',
+	memory: 'soft memory limit',
+	gc_percent: 'GC target',
+	database_max_connections: 'database pool',
+};
+
+const MIB = 1024 * 1024;
+
+/** The console and the engine disagree about what a save may carry. */
+const VERSION_MISMATCH =
+	'Could not save the settings, because this console and the engine are on different versions. Reload the page. If this happens again, update the console to match the engine.';
+
+const outOfBounds = (b: Record<string, unknown>): string | null => {
+	const min = num(b, 'min');
+	const max = num(b, 'max');
+	if (min === null) return null;
+	switch (str(b.field)) {
+		case 'database_max_connections':
+			return max === null ? null : `Enter between ${count(min)} and ${count(max)} connections per replica.`;
+		case 'gc_percent':
+			return `Enter a GC target of ${min} or more.`;
+		case 'cpu':
+			return `Enter ${count(min)} or more CPU threads.`;
+		case 'memory':
+			if (b.mode === 'ratio' && max !== null) return `Enter a share of the memory limit between ${Math.round(min * 100)} and ${Math.round(max * 100)}%.`;
+			if (b.mode === 'bytes') return `Enter a soft memory limit of at least ${count(Math.ceil(min / MIB))} MB.`;
+			return null;
+		default:
+			return null;
+	}
+};
+
+const INVALID: Record<string, (b: Record<string, unknown>) => string | null> = {
+	revision_required: () => 'This form is missing its revision. Reload the page and try again.',
+	nothing_to_change: () => 'Change a setting first.',
+	setting_shape_invalid: () => VERSION_MISMATCH,
+	setting_mode_unknown: () => VERSION_MISMATCH,
+	setting_out_of_bounds: outOfBounds,
+	cpu_threads_above_cores: (b) => {
+		const c = num(b, 'cores');
+		return c === null ? null : `Enter at most ${count(c)} CPU threads, the number of CPUs available to the engine.`;
+	},
+	gc_off_needs_memory_limit: () =>
+		"A GC target of -1 turns garbage collection off, which needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of 0 or more.",
+	gc_above_max_needs_memory_limit: (b) => {
+		const max = num(b, 'max_gc_percent');
+		if (max === null) return null;
+		return `A GC target above ${max}% needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of ${max} or less.`;
+	},
+	setting_refused: (b) => {
+		const label = SETTING_LABELS[str(b.field)];
+		return label ? `Could not save the ${label} with this value. Enter a different value and try again.` : null;
+	},
+};
+
+/**
+ * Why a save met a 422, from its code and the params beside it. Null for any
+ * other status, which the caller words itself. A 422 code this file does not
+ * know reads as the fallback.
+ */
+export function invalidText(status: number, body: unknown): string | null {
+	const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+	if (status !== 422) return null;
+	return INVALID[str(b.code)]?.(b) || FALLBACK.invalid;
 }
