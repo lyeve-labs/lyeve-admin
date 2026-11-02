@@ -192,7 +192,7 @@
 	};
 
 	const revokeAll = tracked(
-		confirmed('Revoke every builder connection on this tenant?', 'Every connected browser stops editing at once.', {
+		confirmed('Revoke all builder connections?', 'Every connected browser stops editing immediately, and every waiting request is declined.', {
 			confirmLabel: 'Revoke all',
 			cancelLabel: 'Cancel',
 		}),
@@ -201,7 +201,7 @@
 	function revokeOne(c: Connection): SubmitFunction {
 		return confirmed(
 			`Revoke ${personOf(c)}'s builder connection?`,
-			'That browser stops editing at once.',
+			'That browser stops editing immediately.',
 			{ confirmLabel: 'Revoke' },
 		);
 	}
@@ -231,7 +231,7 @@
 	// else in the settings saves together under one Save.
 	async function allowedChanged(on: boolean) {
 		if (!on && settings?.allowed) {
-			const ok = await confirm('Turn off the site builder?', 'Every connected browser stops saving at once.', {
+			const ok = await confirm('Turn off the site builder?', 'Connected browsers stop saving immediately.', {
 				confirmLabel: 'Turn off',
 			});
 			if (!ok) {
@@ -251,21 +251,21 @@
 
 	/** Why Approve cannot be pressed, said beside it. Approval being unavailable has its own alert above. */
 	const approveBlocked = $derived(
-		!request ? 'Enter the code from the builder to find its request.' : !online ? 'You are offline.' : '',
+		!request ? 'Enter the code the builder shows, then choose Find request.' : !online ? "You're offline." : '',
 	);
 </script>
 
 {#snippet keyDetail()}
 	{#if request}
 		<span class="font-mono text-fg">{request.fingerprint}</span>
-		<span class="block text-xs text-muted">(check that the builder shows the same key)</span>
+		<span class="block text-xs text-muted">Check that the builder shows the same key.</span>
 	{/if}
 {/snippet}
 
 {#snippet fromDetail()}
 	{#if request}
 		<span class="break-all text-fg">{request.origin || 'No address reported'}</span>
-		<span class="block text-xs text-muted">(as the request reports it, unchecked)</span>
+		<span class="block text-xs text-muted">Sent by the browser and not verified.</span>
 	{/if}
 {/snippet}
 
@@ -277,32 +277,32 @@
 
 <PageShell
 	title="Builder connections"
-	description="Browsers you allowed to edit pages from the site builder, and a way to revoke them."
+	description="Approve and revoke the browsers that edit pages from the site builder."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
 	{#if !online}
-		<Banner tone="warn">You are offline. Approve and Revoke wait until the connection returns.</Banner>
+		<Banner tone="warn">You're offline. Approve and Revoke wait until you reconnect.</Banner>
 	{/if}
 
 	{#if data.gate.state === 'withheld'}
 		<NotEnabled
 			level={2}
 			title="Builder connections"
-			description="An administrator of this engine withheld builder connections from this tenant. Ask them to make builder connections available again."
+			description="A super admin turned off builder connections for this tenant. Ask them to turn it back on."
 		/>
 	{:else if data.gate.state !== 'ok'}
-		<GateNotice level={2} gate={data.gate} title="Builder connections" absent="Builder connections are not available on this engine." />
+		<GateNotice level={2} gate={data.gate} title="Builder connections" absent="Builder connections are not included in this build." />
 	{:else}
 		{#if answer.approved}
-			<Alert tone="success" autoDismiss>Approved. That browser can edit pages now.</Alert>
+			<Alert tone="success" autoDismiss>Connection approved. That browser can edit pages now.</Alert>
 		{:else if answer.declined}
-			<Alert tone="success" autoDismiss>Declined. That browser cannot edit.</Alert>
+			<Alert tone="success" autoDismiss>Request declined.</Alert>
 		{:else if answer.revoked !== undefined}
-			<Alert tone="success" autoDismiss>Revoked {answer.revoked}'s connection.</Alert>
+			<Alert tone="success" autoDismiss>{answer.revoked}'s connection revoked.</Alert>
 		{:else if answer.revokedAll !== undefined}
 			<Alert tone="success" autoDismiss>
-				Revoked {answer.revokedAll} builder connection{answer.revokedAll === 1 ? '' : 's'}.
+				{answer.revokedAll} builder connection{answer.revokedAll === 1 ? '' : 's'} revoked.
 			</Alert>
 		{:else if answer.revokeError}
 			<Alert tone="danger">{answer.revokeError}</Alert>
@@ -330,7 +330,7 @@
 					>
 						<Link2 size={ICON.sm} aria-hidden="true" /> Approve a connection
 					</Button>
-					<span class="text-sm text-muted">Type the code the builder shows you.</span>
+					<span class="text-sm text-muted">Enter the code the builder shows you.</span>
 				</div>
 				{#if data.owner}
 					<form id="revoke-all" method="POST" action="?/revokeAll" use:enhance={revokeAll.enhance}>
@@ -351,7 +351,7 @@
 				<EmptyState
 					level={2}
 					title="No builder connections yet"
-					description="A person connects from the site builder, then approves here with the code it shows."
+					description="Connect from the site builder, then approve the connection here with the code it shows."
 				>
 					{#snippet iconSnippet()}
 						<Link2 size={ICON.lg} />
@@ -435,7 +435,7 @@
 			<section class="flex flex-col gap-4" aria-label="Site builder settings">
 				<SectionHeading level={2}>Site builder</SectionHeading>
 				{#if !data.settings.ok}
-					<GateNotice gate={data.settings.gate} title="Site builder settings" absent="The site builder settings are not available on this engine." />
+					<GateNotice gate={data.settings.gate} title="Site builder settings" absent="Site builder settings need a newer version of the site builder plugin." />
 				{:else if loading}
 					<Card>
 						<div class="flex flex-col gap-3" data-testid="settings-loading">
@@ -453,11 +453,11 @@
 								<Alert tone="warn">The site builder is off. Connected browsers cannot save.</Alert>
 							{/if}
 							{#if savedField === 'allowed'}
-								<Alert tone="success" autoDismiss>Saved.</Alert>
+								<Alert tone="success" autoDismiss>Setting saved.</Alert>
 							{/if}
 							<Toggle
 								label="Allow the site builder"
-								hint="Applies at once. When it is off, connected browsers cannot save."
+								hint="Lets connected browsers save pages. Changes apply immediately."
 								bind:checked={allowedOn}
 								disabled={saveAllowed.pending || !online}
 								onchange={allowedChanged}
@@ -472,7 +472,7 @@
 						<form method="POST" action="?/setting" use:enhance={saveLimits.enhance} class="flex flex-col items-start gap-6">
 							<input type="hidden" name="field" value="limits" />
 							{#if savedField === 'limits'}
-								<Alert tone="success" autoDismiss>Saved.</Alert>
+								<Alert tone="success" autoDismiss>Settings saved.</Alert>
 							{/if}
 							{#if answer.saved?.settings.note}
 								<Alert tone="brand">{answer.saved.settings.note}</Alert>
@@ -487,13 +487,13 @@
 									{ value: '90', label: '90 days' },
 									{ value: '180', label: '180 days' },
 								]}
-								hint="For connections approved from now on."
+								hint="Applies to connections approved from now on."
 								error={errorOn('lifetime_days')}
 							/>
 
 							{#if data.schemasFailed}
 								<Alert tone="danger">
-									<p>The schemas could not be read, so pages keep showing the ones saved before.</p>
+									<p>Could not load schemas. Pages keep showing the schemas saved before.</p>
 									<div class="mt-3">
 										<Button variant="secondary" size="sm" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>
 											<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again
@@ -512,7 +512,7 @@
 										bind:value={shown}
 										options={schemaOptions}
 										orientation="horizontal"
-										hint="The schemas whose entries a page may show."
+										hint="Pages can show entries from the schemas you choose."
 										error={errorOn('show_schemas')}
 									/>
 								{:else}
@@ -522,7 +522,7 @@
 										bind:value={shown}
 										options={schemaOptions}
 										searchable
-										hint="The schemas whose entries a page may show."
+										hint="Pages can show entries from the schemas you choose."
 										error={errorOn('show_schemas')}
 									/>
 									{#each shown as name (name)}
@@ -538,7 +538,7 @@
 								bind:value={writes}
 								min={1}
 								max={settings.max_writes_per_minute}
-								hint="Past this, the builder waits a moment and saves again."
+								hint="When a connection reaches this limit, the builder waits and saves again."
 								error={errorOn('writes_per_minute')}
 							/>
 
@@ -558,8 +558,8 @@
 <Drawer bind:open title="Approve a connection" onclose={close}>
 	<div class="flex flex-col gap-4">
 		<p class="text-sm text-muted">
-			Approve only a code you started yourself in the site builder in the last 10 minutes. Someone who sends you a
-			code is asking for access to your pages.
+			Approve only a code you started in the site builder in the last 10 minutes. If someone sends you a code, they
+			are asking for access to your pages.
 		</p>
 
 		<form
@@ -607,7 +607,7 @@
 		{#if request}
 			{#if !request.same_network}
 				<Alert tone="warn">
-					This request came from another network than this browser. Approve only a code you started yourself.
+					This request came from a different network than this browser. Approve it only if you started it yourself.
 				</Alert>
 			{/if}
 
@@ -620,9 +620,9 @@
 					items={[
 						{ term: 'Key', value: request.fingerprint, detail: keyDetail },
 						{ term: 'From', value: request.origin, detail: fromDetail },
-						{ term: 'It may', value: 'read and write pages, sections and the theme, and listed data only with consent' },
+						{ term: 'Access', value: 'read and write pages, sections and the theme, and listed data only with consent' },
 						{
-							term: 'As',
+							term: 'Approved as',
 							value: `${data.email}, with the ${rolesLabel(data.roles)} role${data.roles.length === 1 ? '' : 's'}`,
 						},
 						...(data.tenant ? [{ term: 'Tenant', value: data.tenant }] : []),
@@ -630,7 +630,7 @@
 						{ term: 'Requested from', value: request.requester_network || 'Unknown address' },
 						{ term: 'Your address', value: request.approver_address || 'Unknown address' },
 						{ term: 'Code expires', value: expiresIn(request.code_expires_at) },
-						{ term: 'Name the browser gave', value: request.label, detail: nameDetail },
+						{ term: 'Browser name', value: request.label, detail: nameDetail },
 					]}
 				/>
 

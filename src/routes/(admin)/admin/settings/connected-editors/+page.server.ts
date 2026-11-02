@@ -79,7 +79,7 @@ export const load: PageServerLoad = async (event) => {
 		.catch(() => false);
 	// The settings route answers owners only, so nobody else asks and no 403
 	// from it reaches the page.
-	const settings = owner ? section(getSettings(client), 'The site builder settings could not be read.') : null;
+	const settings = owner ? section(getSettings(client), 'Could not load the site builder settings.') : null;
 	// A failed schema read is said as a failure, never offered as no schemas.
 	const schemas = owner
 		? listSchemaNames(client).then(
@@ -194,7 +194,7 @@ function setting(form: FormData): { field: string; patch?: SettingsPatch; error?
 			const raw = String(form.get('writes_per_minute') ?? '').trim();
 			const writes = Number(raw);
 			if (!raw || !Number.isInteger(writes)) {
-				return { field: 'writes_per_minute', error: 'Writes must be a whole number a minute.' };
+				return { field: 'writes_per_minute', error: 'Enter a whole number of writes a minute.' };
 			}
 			const patch: SettingsPatch = { lifetime_days: lifetime, writes_per_minute: writes };
 			// A form whose schema list failed to load offered none, and must not clear them.
@@ -202,7 +202,7 @@ function setting(form: FormData): { field: string; patch?: SettingsPatch; error?
 			return { field, patch };
 		}
 		default:
-			return { field: '', error: 'No setting was named.' };
+			return { field: '', error: 'This form is missing its setting. Reload the page and try again.' };
 	}
 }
 
@@ -222,7 +222,7 @@ export const actions: Actions = {
 			if (refusalCode(e) === WITHHELD) return fail(403, { drawer: { code, withheld: true } });
 			if (isOutage(e)) return fail(503, { drawer: { code, codeError: SAID.lookupOutage } });
 			return fail(e instanceof ApiError ? e.status : 400, {
-				drawer: { code, codeError: refusalSentence(e, 'The request could not be read. Try again.') },
+				drawer: { code, codeError: refusalSentence(e, 'Could not load this request. Try again.') },
 			});
 		}
 	},
@@ -268,7 +268,7 @@ export const actions: Actions = {
 			}
 			if (isOutage(e)) return fail(503, { drawer: { code, error: SAID.approveOutage } });
 			return fail(e instanceof ApiError ? e.status : 400, {
-				drawer: { code, error: refusalSentence(e, 'The connection could not be approved. Try again.') },
+				drawer: { code, error: refusalSentence(e, 'Could not approve the connection. Try again.') },
 			});
 		}
 	},
@@ -287,7 +287,7 @@ export const actions: Actions = {
 			if (reason === WITHHELD) return fail(403, { drawer: { code, withheld: true } });
 			if (isOutage(e)) return fail(503, { drawer: { code, error: SAID.declineOutage } });
 			return fail(e instanceof ApiError ? e.status : 400, {
-				drawer: { code, error: refusalSentence(e, 'The request could not be declined. Try again.') },
+				drawer: { code, error: refusalSentence(e, 'Could not decline the request. Try again.') },
 			});
 		}
 	},
@@ -296,14 +296,14 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
 		const person = String(form.get('person') ?? '');
-		if (!id) return fail(400, { revokeError: 'No connection was named.' });
+		if (!id) return fail(400, { revokeError: 'This form is missing its connection. Reload the page and try again.' });
 		try {
 			await revokeConnection(authedClient(event), id);
 		} catch (e) {
 			if (refusalCode(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
 			if (isOutage(e)) return fail(503, { revokeError: SAID.revokeOutage });
 			return fail(e instanceof ApiError ? e.status : 400, {
-				revokeError: refusalSentence(e, 'The connection could not be revoked. Try again.'),
+				revokeError: refusalSentence(e, 'Could not revoke the connection. Try again.'),
 			});
 		}
 		return { revoked: person };
@@ -330,7 +330,7 @@ export const actions: Actions = {
 			}
 			if (isOutage(e)) return fail(503, { settingError: { field, message: SAID.settingOutage } });
 			return fail(e instanceof ApiError ? e.status : 400, {
-				settingError: { field, message: refusalSentence(e, 'The setting could not be saved. Try again.') },
+				settingError: { field, message: refusalSentence(e, 'Could not save the setting. Try again.') },
 			});
 		}
 	},

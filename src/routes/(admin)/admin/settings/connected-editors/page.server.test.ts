@@ -106,7 +106,7 @@ describe('connected editors load', () => {
 		[refusal(403, 'TENANT_FEATURE_WITHHELD'), { state: 'withheld' }],
 		[refusal(429, 'too_many'), { state: 'busy' }],
 		[refusal(503, 'store_unavailable'), { state: 'unavailable' }],
-		[json({ error: 'boom' }, 500), { state: 'error', message: 'The connections could not be loaded.' }],
+		[json({ error: 'boom' }, 500), { state: 'error', message: 'Could not load builder connections.' }],
 	])('turns a refused list into its gate', async (reply, gate) => {
 		const { event } = loadEvent({ ...LISTED, [`GET ${BASE}/connections`]: reply });
 		const out = (await load(event)) as { gate: unknown; connections: unknown[] };

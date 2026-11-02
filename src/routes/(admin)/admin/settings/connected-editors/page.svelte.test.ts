@@ -103,7 +103,7 @@ describe('the list', () => {
 	it('shows the first-run words when no connection exists', () => {
 		render(Page, { props: props({ connections: [], total: 0 }) });
 		expect(said()).toContain('No builder connections yet');
-		expect(said()).toContain('A person connects from the site builder, then approves here with the code it shows.');
+		expect(said()).toContain('Connect from the site builder, then approve the connection here with the code it shows.');
 	});
 
 	it('shows five skeleton rows while the list loads', () => {
@@ -147,17 +147,17 @@ describe('the list', () => {
 
 describe('the gates', () => {
 	it.each([
-		[{ state: 'error', message: 'The connections could not be loaded.' }, 'The connections could not be loaded.'],
+		[{ state: 'error', message: 'Could not load builder connections.' }, 'Could not load builder connections.'],
 		[
 			{ state: 'unavailable' },
-			'The engine or its database did not answer, so builder connections could not be read. Nothing was changed. Try again in a moment.',
+			'The engine is unavailable, so builder connections did not load. Try again in a moment.',
 		],
 		[{ state: 'busy' }, 'Too many requests'],
-		[{ state: 'absent' }, 'Builder connections are not available on this engine.'],
+		[{ state: 'absent' }, 'Builder connections are not included in this build.'],
 		[{ state: 'forbidden' }, 'Your role cannot open builder connections.'],
 		[
 			{ state: 'withheld' },
-			'An administrator of this engine withheld builder connections from this tenant. Ask them to make builder connections available again.',
+			'A super admin turned off builder connections for this tenant. Ask them to turn it back on.',
 		],
 	])('draws a refused read as its gate, never as an empty list', (gate, words) => {
 		render(Page, { props: props({ gate, connections: [] }) });
@@ -183,7 +183,7 @@ describe('revoking', () => {
 		await (forms.submits.get('?/revoke') as Submit)({ cancel, action: new URL('http://a/?/revoke') });
 		expect(kit.confirm).toHaveBeenCalledWith(
 			"Revoke tom@example.com's builder connection?",
-			'That browser stops editing at once.',
+			'That browser stops editing immediately.',
 			{ confirmLabel: 'Revoke' },
 		);
 		expect(cancel).toHaveBeenCalled();
@@ -192,8 +192,8 @@ describe('revoking', () => {
 	it('says whose connection was revoked, and lets the words clear themselves', async () => {
 		render(Page, { props: props({}, { revoked: 'tom@example.com' }) });
 		await frames();
-		expect(said()).toContain("Revoked tom@example.com's connection.");
-		const alert = [...document.querySelectorAll('[aria-live="polite"]')].find((a) => a.textContent?.includes('Revoked'));
+		expect(said()).toContain("tom@example.com's connection revoked.");
+		const alert = [...document.querySelectorAll('[aria-live="polite"]')].find((a) => a.textContent?.includes('connection revoked'));
 		expect(alert).toBeTruthy();
 	});
 
@@ -223,8 +223,8 @@ describe('revoke all', () => {
 		const cancel = vi.fn();
 		await (forms.submits.get('?/revokeAll') as Submit)({ cancel, action: new URL('http://a/?/revokeAll') });
 		expect(kit.confirm).toHaveBeenCalledWith(
-			'Revoke every builder connection on this tenant?',
-			'Every connected browser stops editing at once.',
+			'Revoke all builder connections?',
+			'Every connected browser stops editing immediately, and every waiting request is declined.',
 			{ confirmLabel: 'Revoke all', cancelLabel: 'Cancel' },
 		);
 	});
@@ -232,12 +232,12 @@ describe('revoke all', () => {
 	it('counts what it revoked', async () => {
 		render(Page, { props: props({}, { revokedAll: 3 }) });
 		await frames();
-		expect(said()).toContain('Revoked 3 builder connections.');
+		expect(said()).toContain('3 builder connections revoked.');
 	});
 
 	it('keeps a failure on screen with a way to try again', () => {
 		render(Page, { props: props({}, { revokeAllFailed: true }) });
-		expect(said()).toContain('The connections could not be revoked.');
+		expect(said()).toContain('Could not revoke the connections. Check their status in the list, then try again.');
 		expect(said()).toContain('Try again');
 	});
 });
@@ -247,13 +247,13 @@ describe('offline', () => {
 		render(Page, { props: props() });
 		window.dispatchEvent(new Event('offline'));
 		await tick();
-		expect(said()).toContain('You are offline. Approve and Revoke wait until the connection returns.');
+		expect(said()).toContain("You're offline. Approve and Revoke wait until you reconnect.");
 		expect((document.querySelector('tbody button[aria-label^="Revoke"]') as HTMLButtonElement).disabled).toBe(true);
 		const all = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Revoke all') as HTMLButtonElement;
 		expect(all.disabled).toBe(true);
 		window.dispatchEvent(new Event('online'));
 		await tick();
-		expect(said()).not.toContain('You are offline.');
+		expect(said()).not.toContain("You're offline.");
 	});
 });
 
@@ -265,7 +265,7 @@ describe('the approve drawer', () => {
 		render(Page, { props: props({ openApprove: true }) });
 		await tick();
 		expect(said()).toContain(
-			'Approve only a code you started yourself in the site builder in the last 10 minutes. Someone who sends you a code is asking for access to your pages.',
+			'Approve only a code you started in the site builder in the last 10 minutes. If someone sends you a code, they are asking for access to your pages.',
 		);
 		expect(approve().disabled).toBe(true);
 		await waitFor(() => expect(document.activeElement?.id).toBe('connected-editors-code'));
@@ -274,7 +274,7 @@ describe('the approve drawer', () => {
 	it('says beside a disabled Approve what it waits for', async () => {
 		render(Page, { props: props({ openApprove: true }) });
 		await tick();
-		const reason = 'Enter the code from the builder to find its request.';
+		const reason = 'Enter the code the builder shows, then choose Find request.';
 		expect(said()).toContain(reason);
 		expect(document.getElementById(approve().getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason);
 		cleanup();
@@ -284,7 +284,7 @@ describe('the approve drawer', () => {
 		window.dispatchEvent(new Event('offline'));
 		await tick();
 		expect(approve().disabled).toBe(true);
-		expect(document.getElementById(approve().getAttribute('aria-describedby') ?? '')?.textContent).toBe('You are offline.');
+		expect(document.getElementById(approve().getAttribute('aria-describedby') ?? '')?.textContent).toBe("You're offline.");
 		window.dispatchEvent(new Event('online'));
 	});
 
@@ -301,10 +301,10 @@ describe('the approve drawer', () => {
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
 		await tick();
 		expect(said()).toContain('3FA2:9C11:5B07:E48D');
-		expect(said()).toContain('(check that the builder shows the same key)');
-		expect(said()).toContain('(as the request reports it, unchecked)');
+		expect(said()).toContain('Check that the builder shows the same key.');
+		expect(said()).toContain('Sent by the browser and not verified.');
 		expect(said()).toContain('read and write pages, sections and the theme, and listed data only with consent');
-		expect(said()).toContain('Name the browser gave');
+		expect(said()).toContain('Browser name');
 		expect(document.querySelector('#connected-editors-step-up-password')).not.toBeNull();
 		expect(approve().disabled).toBe(false);
 	});
@@ -330,7 +330,7 @@ describe('the approve drawer', () => {
 			props: props({}, { drawer: { code: 'K7F3-A2M9', request: { ...REQUEST, same_network: false, requester_network: '198.51.100.4' } } }),
 		});
 		await tick();
-		expect(said()).toContain('This request came from another network than this browser. Approve only a code you started yourself.');
+		expect(said()).toContain('This request came from a different network than this browser. Approve it only if you started it yourself.');
 		expect(said()).toContain('198.51.100.4');
 		expect(said()).toContain('203.0.113.7');
 		expect(approve().disabled).toBe(false);
@@ -374,7 +374,7 @@ describe('the approve drawer', () => {
 	it('says approval is unavailable in place of the confirmation', async () => {
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST, approvalUnavailable: true } }) });
 		await tick();
-		expect(said()).toContain('Approval is unavailable on this engine.');
+		expect(said()).toContain('Approving connections is not available on this engine.');
 		expect(document.querySelector('#connected-editors-step-up-password')).toBeNull();
 		expect(approve().disabled).toBe(true);
 	});
@@ -384,7 +384,7 @@ describe('the approve drawer', () => {
 		await tick();
 		expect(said()).toContain(SAID.checkUnavailable);
 		expect(said()).toContain('Try again');
-		expect(said()).not.toContain('Approval is unavailable on this engine.');
+		expect(said()).not.toContain('Approving connections is not available on this engine.');
 		cleanup();
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST, error: SAID.approveOutage } }) });
 		await tick();
@@ -417,14 +417,14 @@ describe('decisions', () => {
 	it('says an approval went through, and lets the words clear themselves', async () => {
 		render(Page, { props: props({}, { approved: { expires_at: '2027-01-28T00:00:00Z' } }) });
 		await frames();
-		expect(said()).toContain('Approved. That browser can edit pages now.');
-		expect([...document.querySelectorAll('[aria-live="polite"]')].some((a) => a.textContent?.includes('Approved.'))).toBe(true);
+		expect(said()).toContain('Connection approved. That browser can edit pages now.');
+		expect([...document.querySelectorAll('[aria-live="polite"]')].some((a) => a.textContent?.includes('Connection approved.'))).toBe(true);
 	});
 
 	it('says a decline went through', async () => {
 		render(Page, { props: props({}, { declined: true }) });
 		await frames();
-		expect(said()).toContain('Declined. That browser cannot edit.');
+		expect(said()).toContain('Request declined.');
 	});
 });
 
@@ -436,7 +436,7 @@ describe('the settings card', () => {
 
 	it('draws a refused settings read as a failure', () => {
 		render(Page, { props: props({ settings: { ok: false, gate: { state: 'unavailable' } } }) });
-		expect(said()).toContain('site builder settings could not be read');
+		expect(said()).toContain('site builder settings did not load');
 	});
 
 	it('states that the builder is off, and keeps saying it', () => {
@@ -470,7 +470,7 @@ describe('the settings card', () => {
 		await waitFor(() =>
 			expect(kit.confirm).toHaveBeenCalledWith(
 				'Turn off the site builder?',
-				'Every connected browser stops saving at once.',
+				'Connected browsers stop saving immediately.',
 				{ confirmLabel: 'Turn off' },
 			),
 		);
@@ -499,13 +499,13 @@ describe('the settings card', () => {
 		render(Page, { props: props() });
 		expect(said()).toContain('Valid for');
 		expect(said()).not.toContain('Lasts');
-		expect(said()).toContain('For connections approved from now on.');
-		expect(said()).toContain('Past this, the builder waits a moment and saves again.');
+		expect(said()).toContain('Applies to connections approved from now on.');
+		expect(said()).toContain('When a connection reaches this limit, the builder waits and saves again.');
 	});
 
 	it('draws a failed schema list as a failure, never as none to offer', () => {
 		render(Page, { props: props({ schemas: [], schemasFailed: true }) });
-		expect(said()).toContain('The schemas could not be read, so pages keep showing the ones saved before.');
+		expect(said()).toContain('Could not load schemas. Pages keep showing the schemas saved before.');
 		expect(said()).toContain('Try again');
 		expect(said()).not.toContain('Create a schema');
 		// Nothing offered, so a Save clears no stored schema.
@@ -528,7 +528,7 @@ describe('the settings card', () => {
 	it('says a setting saved, and lets the words clear themselves', async () => {
 		render(Page, { props: props({}, { saved: { field: 'limits', settings: SETTINGS } }) });
 		await frames();
-		expect(said()).toContain('Saved.');
+		expect(said()).toContain('Settings saved.');
 	});
 
 	it('lands a refused value on its field', () => {

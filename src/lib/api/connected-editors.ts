@@ -139,7 +139,7 @@ export type ConnectionsGate = Gate | { state: 'withheld' };
 /** What a refused read on this page means. */
 export function connectionsGate(err: unknown): ConnectionsGate {
 	if (err instanceof ApiError && err.status === 403 && refusalCode(err) === WITHHELD) return { state: 'withheld' };
-	return gateOf(err, 'The connections could not be loaded.');
+	return gateOf(err, 'Could not load builder connections.');
 }
 
 /** Schemas a page may show: the builder's own and the engine's are never offered. */
@@ -183,20 +183,20 @@ export function personOf(c: Pick<Connection, 'approver_email'>): string {
 
 /** The sentences the drawer shows, one per outcome the engine can answer. */
 export const SAID = {
-	malformed: 'A code is eight letters and digits from the builder, such as K7F3-A2M9.',
-	unknown: 'No waiting request has this code.',
-	expired: 'This request ran out. Connect again from the builder.',
+	malformed: 'Enter the eight-character code the builder shows, such as K7F3-A2M9.',
+	unknown: 'No request matches this code. Check the code the builder shows.',
+	expired: 'This code expired. Connect again from the builder to get a new one.',
 	decided: 'This request was already approved or declined.',
-	keyChanged: 'The key changed since you opened this request. Look the code up again.',
-	lifetime: 'An administrator of this engine shortened how long a connection may last. Choose again.',
+	keyChanged: 'The key changed after you opened this request. Find the request again.',
+	lifetime: 'An admin shortened how long a connection can last after you opened this request. Choose again.',
 	stepUpMissing: 'Enter your password or your MFA code.',
-	approvalUnavailable: 'Approval is unavailable on this engine.',
-	checkUnavailable: 'The engine could not check your answer, so nothing was approved. Try again in a moment.',
-	withheld: 'An administrator of this engine withheld builder connections from this tenant, so nothing was changed.',
-	lookupOutage: 'The engine or its database did not answer, so the request could not be read. Try again in a moment.',
-	approveOutage: 'The engine or its database did not answer, so nothing was approved. Try again in a moment.',
-	declineOutage: 'The engine or its database did not answer, so nothing was declined. Try again in a moment.',
-	revokeOutage: 'The engine or its database did not answer, so nothing was revoked. Try again in a moment.',
-	revokeAllFailed: 'The connections could not be revoked.',
-	settingOutage: 'The engine or its database did not answer, so the setting was not saved. Try again in a moment.',
+	approvalUnavailable: 'Approving connections is not available on this engine.',
+	checkUnavailable: 'Could not check your password or MFA code. The connection was not approved. Try again.',
+	withheld: 'A super admin turned off builder connections for this tenant.',
+	lookupOutage: 'Could not load this request. Try again.',
+	approveOutage: 'Could not confirm the approval. Check whether the connection shows in the list, then try again.',
+	declineOutage: 'Could not confirm the decline. Find the request again to see whether it is still waiting.',
+	revokeOutage: "Could not confirm the revoke. Check the connection's status in the list, then try again.",
+	revokeAllFailed: 'Could not revoke the connections. Check their status in the list, then try again.',
+	settingOutage: 'Could not confirm the setting was saved. Reload the page to check it, then try again.',
 } as const;

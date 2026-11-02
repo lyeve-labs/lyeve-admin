@@ -67,7 +67,7 @@ describe('connectionsGate', () => {
 	it('says the read failed in its own words', () => {
 		expect(connectionsGate(new ApiError(500, 'boom'))).toEqual({
 			state: 'error',
-			message: 'The connections could not be loaded.',
+			message: 'Could not load builder connections.',
 		});
 	});
 
