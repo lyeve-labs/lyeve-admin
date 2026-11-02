@@ -271,7 +271,7 @@ const INVALID: Record<string, (b: Record<string, unknown>) => string | null> = {
 	gc_above_max_needs_memory_limit: (b) => {
 		const max = num(b, 'max_gc_percent');
 		if (max === null) return null;
-		return `A GC target above ${max}% needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of ${max} or less.`;
+		return `A GC target above ${max}% needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of ${max}% or less.`;
 	},
 	setting_refused: (b) => {
 		const label = SETTING_LABELS[str(b.field)];
