@@ -217,7 +217,7 @@
 		{#if !read.licensed}
 			<div class="flex flex-wrap items-center gap-2" data-testid="runtime-license-note">
 				<p class="text-xs text-muted">
-					Changing these settings needs a license that includes tuning. The values in force stay visible.
+					Changing these settings and seeing recommendations for them needs a license that includes tuning. The values in force stay visible.
 				</p>
 				<Button variant="ghost" size="sm" href={LICENSE_PAGE}>View the license</Button>
 			</div>

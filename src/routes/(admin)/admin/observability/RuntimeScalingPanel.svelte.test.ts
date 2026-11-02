@@ -136,11 +136,11 @@ const posted = (c: HTMLElement) =>
 const SETTINGS = ['cpu', 'memory', 'gc_percent', 'database_max_connections'];
 
 describe('RuntimeScalingPanel', () => {
-	it('shows the values in force and their sources read-only on an unlicensed install', () => {
+	it('shows the values in force read-only on an unlicensed install and says the recommendations need the license too', () => {
 		const { container } = setup(runtime({ licensed: false }));
 		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(true);
 		expect(container.querySelector('[data-testid="runtime-license-note"]')?.textContent).toContain(
-			'Changing these settings needs a license that includes tuning. The values in force stay visible.',
+			'Changing these settings and seeing recommendations for them needs a license that includes tuning. The values in force stay visible.',
 		);
 		expect(container.textContent).toContain('View the license');
 		expect(container.textContent).toContain('Container limit');
