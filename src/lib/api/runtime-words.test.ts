@@ -125,7 +125,7 @@ describe('invalidText', () => {
 			{ code: 'gc_above_max_needs_memory_limit', gc_percent: 1001, max_gc_percent: 1000 },
 			"A GC target above 1000% needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of 1000 or less.",
 		],
-		[{ code: 'revision_required' }, 'This form is missing its revision. Reload the page and try again.'],
+		[{ code: 'revision_required' }, 'Could not save the settings. Reload the page and try again.'],
 		[{ code: 'nothing_to_change' }, 'Change a setting first.'],
 		[{ code: 'setting_mode_unknown', field: 'memory' }, mismatch],
 		[{ code: 'setting_shape_invalid', field: 'cpu' }, mismatch],

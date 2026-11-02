@@ -365,7 +365,7 @@ function whole(data: FormData, field: string, min: number, max: number | undefin
 export function parseRuntimeForm(data: FormData): { body: RuntimeSettingsBody } | RuntimeFormError {
 	const rawRevision = text(data, 'revision');
 	const revision = Number(rawRevision);
-	if (!rawRevision || !Number.isInteger(revision) || revision < 0) return { error: 'This form is missing its revision. Reload the page and try again.' };
+	if (!rawRevision || !Number.isInteger(revision) || revision < 0) return { error: 'Could not save the settings. Reload the page and try again.' };
 	const body: RuntimeSettingsBody = { revision };
 
 	const cpuMode = text(data, 'cpu_mode');

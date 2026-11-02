@@ -40,7 +40,7 @@ describe('parseRuntimeForm', () => {
 	});
 
 	it('refuses a form with no revision or no change', () => {
-		expect(parseRuntimeForm(form({ gc_percent: '100' }))).toEqual({ error: 'This form is missing its revision. Reload the page and try again.' });
+		expect(parseRuntimeForm(form({ gc_percent: '100' }))).toEqual({ error: 'Could not save the settings. Reload the page and try again.' });
 		expect(parseRuntimeForm(form({ revision: '2' }))).toEqual({ error: 'Change a setting first.' });
 	});
 });

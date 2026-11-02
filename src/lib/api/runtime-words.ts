@@ -257,7 +257,7 @@ const outOfBounds = (b: Record<string, unknown>): string | null => {
 };
 
 const INVALID: Record<string, (b: Record<string, unknown>) => string | null> = {
-	revision_required: () => 'This form is missing its revision. Reload the page and try again.',
+	revision_required: () => 'Could not save the settings. Reload the page and try again.',
 	nothing_to_change: () => 'Change a setting first.',
 	setting_shape_invalid: () => VERSION_MISMATCH,
 	setting_mode_unknown: () => VERSION_MISMATCH,
