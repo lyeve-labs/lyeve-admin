@@ -13,14 +13,18 @@ const ROOT = '/api/admin/runtime';
  * Where a value in force came from. The panel words each one, and a source
  * it does not know is shown without a line rather than guessed.
  */
-export type SettingSource = 'environment' | 'console' | 'container' | 'machine' | 'default' | 'running';
+export type SettingSource = 'environment' | 'file' | 'console' | 'container' | 'machine' | 'default' | 'running';
 
 /** One setting as the engine runs it. */
 export interface RuntimeSetting {
-	/** A number for the counts and sizes, a string for the pooler. */
+	/** A number for the counts and sizes, a string for the pooler, null where none is in force. */
 	value: unknown;
+	/** The CPU or memory setting's mode, absent for the others. */
+	mode?: CpuChoice['mode'] | MemoryChoice['mode'];
+	/** The share of the memory limit in ratio and automatic mode. */
+	ratio?: number;
 	source: SettingSource | string;
-	/** The variable that set it, when the source is the environment. */
+	/** The environment variable or configuration file key that set it. */
 	variable?: string;
 	/** The deployment holds the value, so a write for it is refused. */
 	pinned: boolean;
@@ -79,15 +83,27 @@ export type MemoryChoice =
 	| { mode: 'bytes'; bytes: number }
 	| { mode: 'none' };
 
+/** What a rule read to reach its value. Absent when it read nothing. */
+export interface RecommendationRuleInputs {
+	replicas?: number;
+	connection_limit?: number;
+	share?: number;
+	database_cores?: number;
+	database_cores_typed?: boolean;
+	cpu_limit?: number;
+	limit?: number;
+	limit_source?: string;
+}
+
 /** One recommended value with the rule that produced it and why. */
 export interface Recommended<T> {
 	value: T;
 	rule: string;
 	reason: string;
-	inputs?: Record<string, unknown>;
+	inputs?: RecommendationRuleInputs;
 }
 
-/** The four values a preset or a recommendation fills, in the shapes the PUT takes. */
+/** The four values a preset or a recommendation fills, in the shapes the PUT takes. The pool is absent on an engine with no database. */
 export interface PresetValues {
 	cpu?: Recommended<CpuChoice>;
 	memory?: Recommended<MemoryChoice>;
@@ -99,11 +115,11 @@ export type PresetKey = 'one_server' | 'several_replicas';
 
 /** What GET /api/admin/runtime/recommendations returns. */
 export interface RecommendationsAnswer {
-	facts?: Record<string, RuntimeFact>;
+	facts: Record<string, RuntimeFact>;
 	presets: Partial<Record<PresetKey, PresetValues>>;
 	recommended: PresetValues;
-	/** Cautions with no number attached, written for the reader. */
-	warnings?: string[];
+	/** Cautions with no number attached, written for the reader. Empty when there are none. */
+	warnings: string[];
 }
 
 /** What PUT /api/admin/runtime/settings takes. A key left out is not changed. */
@@ -145,6 +161,7 @@ export const FACTS: { key: string; label: string; kind: 'count' | 'cores' | 'byt
 ];
 
 const SOURCE_LABELS: Record<string, string> = {
+	file: 'Configuration file',
 	console: 'Console setting',
 	container: 'Container limit',
 	machine: 'This machine',
@@ -156,11 +173,20 @@ const SOURCE_LABELS: Record<string, string> = {
 export function sourceLabel(s: RuntimeSetting | undefined): string {
 	if (!s) return '';
 	if (s.source === 'environment') return s.variable ? `Environment variable ${s.variable}` : 'Environment variable';
+	if (s.source === 'file' && s.variable) return `Configuration file key ${s.variable}`;
 	return SOURCE_LABELS[s.source] ?? '';
 }
 
-/** The hint on a field the deployment holds. */
-export function pinnedText(variable: string | undefined): string {
+/**
+ * The hint on a field the deployment holds. A 409 names only the variable,
+ * so without a source the hint points at the deployment as a whole.
+ */
+export function pinnedText(variable: string | undefined, source?: string): string {
+	if (source === 'file') {
+		return variable
+			? `Set by ${variable} in the configuration file. Change it there, then restart the engine.`
+			: 'Set in the configuration file. Change it there, then restart the engine.';
+	}
 	return variable
 		? `Set by ${variable}. Change it where the engine is deployed, then restart the engine.`
 		: 'Set where the engine is deployed. Change it there, then restart the engine.';
@@ -169,6 +195,7 @@ export function pinnedText(variable: string | undefined): string {
 /** The hint on a value that takes effect only at start, with where it came from. */
 export function startOnlyText(s: RuntimeSetting | undefined): string {
 	if (s?.source === 'environment' && s.variable) return `Set by ${s.variable}. Applies when the engine starts.`;
+	if (s?.source === 'file' && s.variable) return `Set by ${s.variable} in the configuration file. Applies when the engine starts.`;
 	const from = sourceLabel(s);
 	return from ? `${from}. Applies when the engine starts.` : 'Applies when the engine starts.';
 }
@@ -225,30 +252,28 @@ export function formatMemoryChoice(c: MemoryChoice): string {
 	return 'Automatic';
 }
 
-/** The memory form's opening state, read back from the value in force. */
+const MEMORY_MODES: readonly MemoryChoice['mode'][] = ['automatic', 'ratio', 'bytes', 'none'];
+
+/** The CPU form's opening mode, as the value in force reports it. */
+export function cpuModeOf(s: RuntimeSetting | undefined): CpuChoice['mode'] {
+	return s?.mode === 'fixed' ? 'fixed' : 'automatic';
+}
+
+/** The memory form's opening state, read from the value in force. */
 export interface MemoryFields {
 	mode: MemoryChoice['mode'];
 	percent: number;
 	mb: number;
 }
 
-/**
- * The view does not carry the stored choice, so the form reads it back: a
- * console value that follows the machine is a share of the limit, one that
- * does not is a fixed size or none, and anything else is automatic.
- */
-export function memoryFields(s: RuntimeSetting | undefined, limit: RuntimeFact | undefined): MemoryFields {
+/** The memory form's opening state: the mode and share in force, and the size when one is. */
+export function memoryFields(s: RuntimeSetting | undefined): MemoryFields {
 	const bytes = num(s?.value);
-	const total = limit?.known ? num(limit.value) : null;
-	const share = bytes !== null && total ? Math.round((bytes / total) * 100) : 85;
+	const ratio = num(s?.ratio);
+	const share = ratio !== null && ratio > 0 ? Math.round(ratio * 100) : 85;
 	const percent = Math.min(MEMORY_PERCENT.max, Math.max(MEMORY_PERCENT.min, share));
 	const mb = bytes !== null && bytes < NO_LIMIT ? Math.max(MEMORY_MB_MIN, Math.round(bytes / MIB)) : 1024;
-	let mode: MemoryChoice['mode'] = 'automatic';
-	if (s?.source === 'console') {
-		if (s.live) mode = 'ratio';
-		else if (bytes !== null && bytes >= NO_LIMIT) mode = 'none';
-		else mode = 'bytes';
-	}
+	const mode = MEMORY_MODES.find((m) => m === s?.mode) ?? 'automatic';
 	return { mode, percent, mb };
 }
 

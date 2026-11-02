@@ -214,7 +214,7 @@ const RUNTIME = {
 	facts: {},
 	replicas: { count: 1, known: false, attached: false, applied: 1 },
 };
-const RECOMMENDATIONS = { presets: {}, recommended: {} };
+const RECOMMENDATIONS = { facts: {}, presets: {}, recommended: {}, warnings: [] };
 
 describe('the runtime settings read', () => {
 	function loadAt(search: string, routes: Record<string, Route>) {
@@ -286,7 +286,7 @@ describe('the runtime action', () => {
 	});
 
 	it('maps a stale revision to the reload sentence', async () => {
-		const { event } = put(() => json({ error: 'revision is stale' }, 409));
+		const { event } = put(() => json({ error: 'the runtime settings changed since they were read', code: 'conflict', request_id: 'r1' }, 409));
 		expect(await actions.runtime(event)).toMatchObject({
 			status: 409,
 			data: { form: 'runtime', error: 'Someone changed these settings after you opened them. Reload them to see the latest version.' },
@@ -294,7 +294,7 @@ describe('the runtime action', () => {
 	});
 
 	it('maps a pinned field to the sentence that names its variable', async () => {
-		const { event } = put(() => json({ error: 'setting is pinned', variable: 'GOGC' }, 409));
+		const { event } = put(() => json({ error: 'this setting is pinned by the deployment: GOGC sets it', code: 'conflict', variable: 'GOGC' }, 409));
 		expect(await actions.runtime(event)).toMatchObject({
 			status: 409,
 			data: { form: 'runtime', error: 'Set by GOGC. Change it where the engine is deployed, then restart the engine.' },

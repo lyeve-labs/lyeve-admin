@@ -28,8 +28,8 @@ function answer(over: Record<string, unknown> = {}) {
 		stored: true,
 		revision: 4,
 		settings: {
-			cpu: setting(2, { source: 'container', live: true }),
-			memory: setting(0.85 * GIB, { source: 'container', live: true }),
+			cpu: setting(2, { mode: 'automatic', source: 'container', live: true }),
+			memory: setting(0.85 * GIB, { mode: 'automatic', ratio: 0.85, source: 'container', live: true }),
 			gc_percent: setting(100),
 			database_max_connections: setting(25),
 			replica_max_connections: setting(30, { start_only: true }),
@@ -53,6 +53,7 @@ function answer(over: Record<string, unknown> = {}) {
 }
 
 const RECOMMENDATIONS = {
+	facts: {},
 	presets: {
 		one_server: {
 			cpu: { value: { mode: 'automatic' }, rule: 'R1', reason: '' },
@@ -160,6 +161,39 @@ describe('RuntimeScalingPanel', () => {
 			'Set by DATABASE_MAX_CONNECTIONS. Change it where the engine is deployed, then restart the engine.',
 		);
 		expect(container.textContent).toContain('Environment variable DATABASE_MAX_CONNECTIONS');
+	});
+
+	it('says a configuration file pins a field and where to change it', () => {
+		const { container } = setup(
+			runtime({
+				settings: {
+					...answer().settings,
+					gc_percent: setting(150, { source: 'file', variable: 'runtime.gc_percent', pinned: true }),
+				},
+			}),
+		);
+		expect(fieldset(container, 'gc_percent').disabled).toBe(true);
+		expect(container.querySelector('[data-testid="runtime-pinned-gc_percent"]')?.textContent).toBe(
+			'Set by runtime.gc_percent in the configuration file. Change it there, then restart the engine.',
+		);
+		expect(container.textContent).toContain('Configuration file key runtime.gc_percent');
+	});
+
+	it('opens the CPU and memory fields on the modes in force', () => {
+		const { container, getByRole } = setup(
+			runtime({
+				settings: {
+					...answer().settings,
+					cpu: setting(4, { mode: 'fixed', source: 'console' }),
+					memory: setting(0.7 * GIB, { mode: 'ratio', ratio: 0.7, source: 'console', live: true }),
+				},
+			}),
+		);
+		expect(getByRole('radio', { name: 'Fixed' }).getAttribute('aria-checked')).toBe('true');
+		expect((container.querySelector('#rt-cpu-threads') as HTMLInputElement).value).toBe('4');
+		expect(getByRole('radio', { name: 'Share of limit' }).getAttribute('aria-checked')).toBe('true');
+		expect((container.querySelector('#rt-memory-percent') as HTMLInputElement).value).toBe('70');
+		expect(posted(container)).toEqual(['revision']);
 	});
 
 	it('shows the values that apply only at start as read-only', () => {

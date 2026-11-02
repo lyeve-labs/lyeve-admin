@@ -8,6 +8,7 @@
 		MEMORY_PERCENT,
 		POOL_CONNECTIONS,
 		GC_PERCENT_MIN,
+		cpuModeOf,
 		formatCpuChoice,
 		formatFact,
 		formatMemoryChoice,
@@ -50,9 +51,9 @@
 	// svelte-ignore state_referenced_locally
 	const seedRead = runtime.settings.ok ? runtime.settings.value : null;
 	const seed = {
-		cpuMode: (seedRead?.settings.cpu?.source === 'console' ? 'fixed' : 'automatic') as 'automatic' | 'fixed',
+		cpuMode: cpuModeOf(seedRead?.settings.cpu),
 		cpuThreads: numberOf(seedRead?.settings.cpu?.value) ?? 1,
-		memory: memoryFields(seedRead?.settings.memory, seedRead?.facts?.memory_limit),
+		memory: memoryFields(seedRead?.settings.memory),
 		gc: numberOf(seedRead?.settings.gc_percent?.value) ?? 100,
 		pool: numberOf(seedRead?.settings.database_max_connections?.value) ?? POOL_CONNECTIONS.min,
 	};
@@ -169,7 +170,7 @@
 		<p class="text-xs text-muted">{text}</p>
 	{/if}
 	{#if s?.pinned}
-		<p class="text-xs text-muted" data-testid="runtime-pinned-{key}">{pinnedText(s.variable)}</p>
+		<p class="text-xs text-muted" data-testid="runtime-pinned-{key}">{pinnedText(s.variable, s.source)}</p>
 	{/if}
 {/snippet}
 
@@ -214,7 +215,7 @@
 					<SectionHeading level={3}>Recommendations</SectionHeading>
 				{/snippet}
 				<div class="flex flex-col gap-4" data-testid="runtime-recommendations">
-					{#if recs.warnings && recs.warnings.length > 0}
+					{#if recs.warnings.length > 0}
 						<Alert tone="warn">
 							{#each recs.warnings as warning (warning)}
 								<p>{warning}</p>

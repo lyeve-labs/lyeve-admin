@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatFact, formatSetting, memoryFields, parseRuntimeForm, positiveInt, sourceLabel } from './runtime-settings';
+import { cpuModeOf, formatFact, formatSetting, memoryFields, parseRuntimeForm, pinnedText, pinnedVariableOf, positiveInt, sourceLabel, startOnlyText } from './runtime-settings';
 
 const MIB = 1024 * 1024;
 
@@ -40,6 +40,8 @@ describe('parseRuntimeForm', () => {
 describe('how values read', () => {
 	it('words each source, and names the variable for the environment', () => {
 		expect(sourceLabel(setting({ source: 'environment', variable: 'GOMAXPROCS' }))).toBe('Environment variable GOMAXPROCS');
+		expect(sourceLabel(setting({ source: 'file', variable: 'database.max_connections' }))).toBe('Configuration file key database.max_connections');
+		expect(sourceLabel(setting({ source: 'file' }))).toBe('Configuration file');
 		expect(sourceLabel(setting({ source: 'console' }))).toBe('Console setting');
 		expect(sourceLabel(setting({ source: 'container' }))).toBe('Container limit');
 		expect(sourceLabel(setting({ source: 'machine' }))).toBe('This machine');
@@ -62,12 +64,31 @@ describe('how values read', () => {
 		expect(formatFact('flag', { value: true, known: true })).toBe('Yes');
 	});
 
-	it('opens the memory form on the choice the value in force implies', () => {
-		const limit = { value: 1024 * MIB, known: true };
-		expect(memoryFields(setting({ value: 870 * MIB, source: 'container', live: true }), limit)).toMatchObject({ mode: 'automatic', percent: 85 });
-		expect(memoryFields(setting({ value: 717 * MIB, source: 'console', live: true }), limit)).toMatchObject({ mode: 'ratio', percent: 70 });
-		expect(memoryFields(setting({ value: 512 * MIB, source: 'console' }), limit)).toMatchObject({ mode: 'bytes', mb: 512 });
-		expect(memoryFields(setting({ value: 9223372036854775807, source: 'console' }), limit)).toMatchObject({ mode: 'none' });
+	it('says where a file pins a value, in the pattern of the environment', () => {
+		expect(pinnedText('database.max_connections', 'file')).toBe(
+			'Set by database.max_connections in the configuration file. Change it there, then restart the engine.',
+		);
+		expect(pinnedText('GOGC', 'environment')).toBe('Set by GOGC. Change it where the engine is deployed, then restart the engine.');
+		expect(pinnedText('GOGC')).toBe('Set by GOGC. Change it where the engine is deployed, then restart the engine.');
+		expect(startOnlyText(setting({ source: 'file', variable: 'database.pooler' }))).toBe(
+			'Set by database.pooler in the configuration file. Applies when the engine starts.',
+		);
+	});
+
+	it('reads the variable from the pinned 409 body', () => {
+		expect(pinnedVariableOf({ error: 'this setting is pinned by the deployment: GOGC sets it', code: 'conflict', variable: 'GOGC' })).toBe('GOGC');
+		expect(pinnedVariableOf({ error: 'the runtime settings changed since they were read', code: 'conflict', request_id: 'r1' })).toBe('');
+	});
+
+	it('opens the CPU and memory forms on the mode in force, whatever its source', () => {
+		expect(cpuModeOf(setting({ value: 2, mode: 'fixed', source: 'environment', variable: 'GOMAXPROCS' }))).toBe('fixed');
+		expect(cpuModeOf(setting({ value: 2, mode: 'automatic', source: 'console' }))).toBe('automatic');
+		expect(cpuModeOf(undefined)).toBe('automatic');
+		expect(memoryFields(setting({ value: 870 * MIB, mode: 'automatic', ratio: 0.85, source: 'container', live: true }))).toMatchObject({ mode: 'automatic', percent: 85 });
+		expect(memoryFields(setting({ value: 717 * MIB, mode: 'ratio', ratio: 0.7, source: 'console', live: true }))).toMatchObject({ mode: 'ratio', percent: 70 });
+		expect(memoryFields(setting({ value: 512 * MIB, mode: 'bytes', source: 'file', variable: 'runtime.memory' }))).toMatchObject({ mode: 'bytes', mb: 512 });
+		expect(memoryFields(setting({ value: 9223372036854775807, mode: 'none', source: 'console' }))).toMatchObject({ mode: 'none' });
+		expect(memoryFields(setting({ value: 512 * MIB, mode: 'something-new' }))).toMatchObject({ mode: 'automatic' });
 	});
 
 	it('takes only a positive whole number from the address', () => {
