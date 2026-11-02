@@ -162,10 +162,27 @@ describe('RuntimeScalingPanel', () => {
 		expect((getByRole('button', { name: 'Save settings' }) as HTMLButtonElement).disabled).toBe(false);
 	});
 
-	it('keeps the fields read-only for an admin who is not a super admin', () => {
-		const { container } = setup(runtime({}, { superAdmin: false }));
-		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(true);
-		expect(container.querySelector('[data-testid="runtime-role-note"]')?.textContent).toContain('Only a super admin can change these.');
+	it('shows one sentence and no settings to an admin who is not a super admin', () => {
+		const { container } = setup({ settings: { ok: false, gate: { state: 'forbidden' } }, recommendations: null, inputs: {}, superAdmin: false });
+		expect(container.querySelector('[data-testid="runtime-forbidden"]')?.textContent).toBe('Only a super admin can see the runtime settings.');
+		expect(container.querySelector('form')).toBeNull();
+		expect(container.querySelector('[data-testid="runtime-facts"]')).toBeNull();
+		expect(container.querySelector('[data-testid="runtime-start-only"]')).toBeNull();
+	});
+
+	it('draws a 403 from either read as the same sentence', () => {
+		const forbidden = { ok: false, gate: { state: 'forbidden' } };
+		for (const rt of [
+			{ settings: forbidden, recommendations: null, inputs: {}, superAdmin: true },
+			runtime({}, { recommendations: forbidden }),
+		]) {
+			const { container } = setup(rt);
+			expect(container.querySelector('[data-testid="runtime-forbidden"]')?.textContent).toBe('Only a super admin can see the runtime settings.');
+			expect(container.querySelector('form')).toBeNull();
+			expect(container.querySelector('[data-testid="runtime-facts"]')).toBeNull();
+			expect(container.textContent).not.toContain('Your role cannot open');
+			cleanup();
+		}
 	});
 
 	it('asks for the replica count when no roster reports it', () => {

@@ -18,7 +18,7 @@ import {
 	type PoolView,
 } from '$lib/api/goroutine-engine';
 import { refusalOf } from '$lib/api/refusal';
-import { parseRuntimeForm, positiveInt, putRuntimeSettings, readRuntime } from '$lib/api/runtime-settings';
+import { RUNTIME_FORBIDDEN, parseRuntimeForm, positiveInt, putRuntimeSettings, readRuntime } from '$lib/api/runtime-settings';
 import { conflictText } from '$lib/api/runtime-words';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
@@ -101,6 +101,7 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
+	const superAdmin = user.roles.includes('super_admin');
 
 	// The row count is a query parameter, so the ranking a person is looking at
 	// is a link, and refreshing the page keeps the depth they chose.
@@ -117,20 +118,21 @@ export const load: PageServerLoad = async (event) => {
 		section(client.get<PoolHealth>('/api/admin/pool/health'), FAILED.pool),
 		section(client.get<LatencyResponse>(`/api/admin/debug/latency?top=${top}`), FAILED.latency),
 		readGoroutineEngine(client),
-		readRuntime(client, runtimeInputs),
+		// Both runtime reads are for a super admin alone, so no other role makes them.
+		superAdmin ? readRuntime(client, runtimeInputs) : RUNTIME_FORBIDDEN,
 	]);
 
 	const goroutineEngine: GoroutineEnginePanel = {
 		...views,
 		byOwner: byOwnerRows(views.snapshot),
-		superAdmin: user.roles.includes('super_admin'),
+		superAdmin,
 	};
 
 	// The tail is the logging plugin's stream. Without the plugin the stream is
 	// refused on every attempt, so the page says so rather than opening it.
 	const logTail = !notRunning(plugins, PLUGIN.logging);
 
-	const runtime = { ...runtimeRead, inputs: runtimeInputs, superAdmin: goroutineEngine.superAdmin };
+	const runtime = { ...runtimeRead, inputs: runtimeInputs, superAdmin };
 
 	return { poolHealth, latency, top, goroutines: goroutineCount(views.snapshot), goroutineEngine, runtime, logTail };
 };

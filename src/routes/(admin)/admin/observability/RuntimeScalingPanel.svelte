@@ -46,6 +46,13 @@
 	// The writes need super_admin and a license that lets them through. A form
 	// that could only ever be refused is shown disabled with the reason.
 	const canEdit = $derived(Boolean(read?.available && read.licensed) && runtime.superAdmin);
+	// Only a super admin may make either read. Another role makes neither, and
+	// a 403 from either is drawn the same way.
+	const forbidden = $derived(
+		!runtime.superAdmin ||
+			(!runtime.settings.ok && runtime.settings.gate.state === 'forbidden') ||
+			(runtime.recommendations?.ok === false && runtime.recommendations.gate.state === 'forbidden'),
+	);
 
 	// The fields open on the values in force and are seeded once, so a refresh
 	// never overwrites an edit in progress.
@@ -178,25 +185,25 @@
 {/snippet}
 
 <!-- How the engine sizes itself for the machine it runs on and the replicas
-     beside it. Every admin reads the values in force and where each came
-     from. Changing them needs a super admin and a license that lets the
-     writes through, and a form that cannot succeed says why. -->
+     beside it, with the values in force and where each came from. Only a
+     super admin can see or change them, and changing them
+     needs a license that lets the writes through. A form that cannot
+     succeed says why. -->
 <section class="flex flex-col gap-4" data-testid="runtime-scaling">
 	<div class="flex flex-wrap items-center gap-2">
 		<SectionHeading level={2}>Runtime and scaling</SectionHeading>
-		{#if read?.available && read.replicas?.known && read.replicas.count > 1}
+		{#if !forbidden && read?.available && read.replicas?.known && read.replicas.count > 1}
 			<span class="text-xs text-faint" data-testid="runtime-replicas">{formatCount(read.replicas.count)} replicas are running.</span>
 		{/if}
 	</div>
 
-	{#if !runtime.settings.ok}
+	{#if forbidden}
+		<p class="text-sm text-muted" data-testid="runtime-forbidden">Only a super admin can see the runtime settings.</p>
+	{:else if !runtime.settings.ok}
 		<GateNotice gate={runtime.settings.gate} title="Runtime settings" absent="Runtime settings are not included in this build." />
 	{:else if !read?.available}
 		<p class="text-sm text-muted" data-testid="runtime-unavailable">Runtime settings are not available on this engine.</p>
 	{:else}
-		{#if !runtime.superAdmin}
-			<p class="text-xs text-muted" data-testid="runtime-role-note">Only a super admin can change these.</p>
-		{/if}
 		{#if !read.licensed}
 			<div class="flex flex-wrap items-center gap-2" data-testid="runtime-license-note">
 				<p class="text-xs text-muted">

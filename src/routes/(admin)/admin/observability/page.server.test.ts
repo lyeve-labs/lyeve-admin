@@ -217,13 +217,13 @@ const RUNTIME = {
 const RECOMMENDATIONS = { facts: {}, presets: {}, recommended: {}, warnings: [] };
 
 describe('the runtime settings read', () => {
-	function loadAt(search: string, routes: Record<string, Route>) {
-		const { fetch, calls } = fetchFor(routes);
+	function loadAt(search: string, routes: Record<string, Route>, roles = ['super_admin']) {
+		const { fetch, calls } = fetchFor(routes, roles);
 		const event = {
 			fetch,
 			cookies: mockCookies(),
 			url: new URL(`http://localhost/admin/observability${search}`),
-			parent: async () => ({ user: { id: 'u1', roles: ['super_admin'] }, entitlements: NO_ENTITLEMENTS, plugins: null }),
+			parent: async () => ({ user: { id: 'u1', roles }, entitlements: NO_ENTITLEMENTS, plugins: null }),
 		} as never;
 		return { event, calls };
 	}
@@ -248,6 +248,31 @@ describe('the runtime settings read', () => {
 			expect(result.runtime.recommendations).toBeNull();
 			expect(calls.some((c) => c.url.includes('/runtime/recommendations'))).toBe(false);
 		}
+	});
+
+	it('makes no runtime read for an admin who is not a super admin', async () => {
+		const { event, calls } = loadAt('?replicas=3', {
+			...views,
+			'/runtime/settings': () => json(RUNTIME),
+			'/runtime/recommendations': () => json(RECOMMENDATIONS),
+		}, ['admin']);
+		const result = (await load(event)) as Loaded;
+		expect(result.runtime.settings).toEqual({ ok: false, gate: { state: 'forbidden' } });
+		expect(result.runtime.recommendations).toBeNull();
+		expect(result.runtime.superAdmin).toBe(false);
+		expect(calls.some((c) => c.url.includes('/api/admin/runtime/'))).toBe(false);
+		expect(result.goroutineEngine.pool).toEqual(POOL);
+	});
+
+	it('keeps a 403 from either runtime read as the forbidden gate', async () => {
+		const settings = loadAt('', { ...views, '/runtime/settings': () => json({ error: 'forbidden' }, 403) });
+		expect(((await load(settings.event)) as Loaded).runtime.settings).toEqual({ ok: false, gate: { state: 'forbidden' } });
+		const recs = loadAt('', {
+			...views,
+			'/runtime/settings': () => json(RUNTIME),
+			'/runtime/recommendations': () => json({ error: 'forbidden' }, 403),
+		});
+		expect(((await load(recs.event)) as Loaded).runtime.recommendations).toEqual({ ok: false, gate: { state: 'forbidden' } });
 	});
 
 	it('keeps a failed settings read as a gate and leaves the other panels', async () => {

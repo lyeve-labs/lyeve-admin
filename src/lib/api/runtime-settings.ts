@@ -306,6 +306,12 @@ export interface RuntimeRead {
 }
 
 /**
+ * What the panel gets for a reader who is not a super admin. Both runtime
+ * reads are refused to every other role, so the load makes neither.
+ */
+export const RUNTIME_FORBIDDEN: RuntimeRead = { settings: { ok: false, gate: { state: 'forbidden' } }, recommendations: null };
+
+/**
  * The settings, and the recommendations when the settings say the license
  * lets them through. The recommendations take the typed replica count and
  * database cores, so a reader can refine them.
