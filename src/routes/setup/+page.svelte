@@ -57,7 +57,7 @@
 	const tokenHint = $derived(
 		data.tokenSource === 'env'
 			? "The value of LYEVE_SETUP_TOKEN in the engine's environment."
-			: 'The engine printed it to its log when it started, on the line beginning "setup: no account exists yet". Copy the setup_token value, for example with: docker logs <engine container> 2>&1 | grep setup_token',
+			: 'Find it in the output the engine wrote when it started, on the line that holds setup_token, for example with: docker logs <engine container> 2>&1 | grep setup_token. Copy the value that follows setup_token.',
 	);
 
 	const formError = $derived(form && 'error' in form ? (form.error as string) : null);
