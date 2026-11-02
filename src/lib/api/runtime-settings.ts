@@ -1,6 +1,7 @@
 import type { HttpClient } from '@lyeve-labs/client';
 import { section, type Section } from '$lib/api/gate';
 import { NO_VALUE, formatBytes, formatCount } from '$lib/format';
+import type { Params, RecommendationWarning } from '$lib/api/runtime-words';
 
 /**
  * The engine's runtime and scaling settings, as served under
@@ -34,12 +35,18 @@ export interface RuntimeSetting {
 	start_only: boolean;
 }
 
-/** One fact about the machine or the database. Unknown carries the reason, never a zero. */
+/**
+ * One fact about the machine or the database. Unknown carries a reason code,
+ * never a zero. The route's English reason is left out, because the panel
+ * words the code itself.
+ */
 export interface RuntimeFact {
 	value: unknown;
 	known: boolean;
 	source?: string;
-	reason?: string;
+	reason_code?: string;
+	/** The grant the database account lacks, on `missing_grant`. */
+	grant?: string;
 }
 
 export interface RuntimeReplicas {
@@ -97,11 +104,13 @@ export interface RecommendationRuleInputs {
 	limit_source?: string;
 }
 
-/** One recommended value with the rule that produced it and why. */
+/** One recommended value with the rule that produced it and the code that says why. */
 export interface Recommended<T> {
 	value: T;
 	rule: string;
-	reason: string;
+	reason_code?: string;
+	/** The numbers the code's sentence states, empty when it states none. */
+	params?: Params;
 	inputs?: RecommendationRuleInputs;
 }
 
@@ -120,8 +129,8 @@ export interface RecommendationsAnswer {
 	facts: Record<string, RuntimeFact>;
 	presets: Partial<Record<PresetKey, PresetValues>>;
 	recommended: PresetValues;
-	/** Cautions with no number attached, written for the reader. Empty when there are none. */
-	warnings: string[];
+	/** Cautions, each a code and the numbers its sentence states. Empty when there are none. */
+	warnings: RecommendationWarning[];
 }
 
 /** What PUT /api/admin/runtime/settings takes. A key left out is not changed. */
@@ -179,10 +188,7 @@ export function sourceLabel(s: RuntimeSetting | undefined): string {
 	return SOURCE_LABELS[s.source] ?? '';
 }
 
-/**
- * The hint on a field the deployment holds. A 409 names only the variable,
- * so without a source the hint points at the deployment as a whole.
- */
+/** The hint on a field the deployment holds, saying where to change it by source. */
 export function pinnedText(variable: string | undefined, source?: string): string {
 	if (source === 'file') {
 		return variable
@@ -384,11 +390,4 @@ export function parseRuntimeForm(data: FormData): { body: RuntimeSettingsBody } 
 
 	if (Object.keys(body).length === 1) return { error: 'Change a setting first.' };
 	return { body };
-}
-
-/** The variable a 409 names when the deployment holds the field, or empty. */
-export function pinnedVariableOf(body: unknown): string {
-	if (!body || typeof body !== 'object') return '';
-	const v = (body as { variable?: unknown }).variable;
-	return typeof v === 'string' ? v.trim() : '';
 }

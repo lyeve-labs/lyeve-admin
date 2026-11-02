@@ -44,7 +44,16 @@ function answer(over: Record<string, unknown> = {}) {
 				value: null,
 				known: false,
 				source: 'database',
-				reason: 'PostgreSQL does not report its CPU count. Enter it to refine the connection recommendation.',
+				reason: 'this database does not report its CPU count to a client',
+				reason_code: 'not_over_sql',
+			},
+			connection_limit: {
+				value: null,
+				known: false,
+				source: 'database',
+				reason: 'the database account is not a member of pg_read_all_stats',
+				reason_code: 'missing_grant',
+				grant: 'pg_read_all_stats',
 			},
 		},
 		replicas: { count: 1, known: false, attached: false, applied: 1 },
@@ -69,10 +78,46 @@ const RECOMMENDATIONS = {
 		},
 	},
 	recommended: {
-		gc_percent: { value: 200, rule: 'R3', reason: 'A soft limit is in force, so the collector can run less often.' },
+		cpu: { value: { mode: 'automatic' }, rule: 'R1', reason: "Automatic uses Go's default.", reason_code: 'cpu_automatic', params: {} },
+		memory: {
+			value: { mode: 'ratio', ratio: 0.85 },
+			rule: 'R2',
+			reason: 'Leaves 15% of the memory limit for memory the Go runtime does not count.',
+			reason_code: 'memory_share',
+			params: { share_percent: 85, headroom_percent: 15, limit_bytes: GIB, limit_source: 'container' },
+		},
+		gc_percent: {
+			value: 200,
+			rule: 'R3',
+			reason: 'One server with a soft memory limit can collect half as often, and the limit bounds the heap.',
+			reason_code: 'gc_one_server_with_limit',
+			params: { gc_percent: 200, default_percent: 100 },
+		},
+		database_max_connections: {
+			value: 22,
+			rule: 'R4',
+			reason: "Each replica takes an equal share of 80% of the database's connections, within what its cores can serve.",
+			reason_code: 'pool_share',
+			params: { pool: 22, server_share_percent: 80, connection_limit: 30, replicas: 1, reserved_sessions: 2 },
+		},
 	},
-	warnings: ['Lockouts and rate limits count per replica without a shared cache.'],
+	warnings: [
+		{
+			code: 'pool_crowds_database',
+			params: { pool: 22, connection_limit: 30 },
+			message: 'This pool takes more than a third of the connections the database accepts, which leaves little room for other clients.',
+		},
+		{ code: 'cache_per_replica', params: { replicas: 3 }, message: 'Each replica keeps its own cache, so sign-in lockouts and rate limits count per replica.' },
+	],
 };
+
+/** Every English sentence the fixtures carry, none of which may reach the page. */
+const ENGLISH = [
+	answer().facts.database_cores.reason,
+	answer().facts.connection_limit.reason,
+	...Object.values(RECOMMENDATIONS.recommended).map((r) => r.reason),
+	...RECOMMENDATIONS.warnings.map((w) => w.message),
+];
 
 function runtime(over: Record<string, unknown> = {}, opts: { superAdmin?: boolean; recommendations?: unknown } = {}) {
 	const a = answer(over);
@@ -108,8 +153,12 @@ describe('RuntimeScalingPanel', () => {
 		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(false);
 		expect(getByRole('radio', { name: 'One large server' })).toBeTruthy();
 		expect(getByRole('radio', { name: 'Several replicas' })).toBeTruthy();
-		expect(container.textContent).toContain('Recommended: 200%. A soft limit is in force, so the collector can run less often.');
-		expect(container.textContent).toContain('Lockouts and rate limits count per replica without a shared cache.');
+		expect(container.textContent).toContain(
+			'Recommended: 200%. On one server with a soft memory limit, 200% collects less often than the default of 100%, and the limit still caps memory use.',
+		);
+		expect(container.textContent).toContain(
+			'Your 3 replicas each have their own cache, so sign-in lockouts and rate limits count separately on each one.',
+		);
 		expect((getByRole('button', { name: 'Save settings' }) as HTMLButtonElement).disabled).toBe(false);
 	});
 
@@ -141,7 +190,8 @@ describe('RuntimeScalingPanel', () => {
 		const { container } = setup(runtime());
 		const facts = container.querySelector('[data-testid="runtime-facts"]') as HTMLElement;
 		expect(facts.textContent).toContain('Not available');
-		expect(facts.textContent).toContain('PostgreSQL does not report its CPU count.');
+		expect(facts.textContent).toContain('This database does not report this value.');
+		expect(facts.textContent).toContain('Grant pg_read_all_stats to the database account to show this value.');
 		expect(facts.textContent).not.toContain('Host memory');
 		expect(container.querySelector('#rt-database-cores')?.getAttribute('name')).toBe('database_cores');
 	});
@@ -238,19 +288,58 @@ describe('RuntimeScalingPanel', () => {
 
 	it('shows no pool warning after a save that raised none', () => {
 		const { container } = setup(runtime(), { form: 'runtime', saved: true, stored: true, poolWarning: false });
-		expect(container.textContent).not.toContain('more than a third');
+		expect(container.textContent).not.toContain("The database pool now uses more than a third of your database's connection limit.");
 	});
 
-	it('says a change on an engine without a database lasts until it restarts', () => {
+	it('says a change on an engine without a database lasts until it restarts, until you dismiss it', async () => {
+		const sentence = 'Applied. This engine runs without a database, so the change lasts until the engine restarts.';
 		const { container } = setup(runtime({ stored: false }), { form: 'runtime', saved: true, stored: false });
-		expect(container.textContent).toContain('Applied. This engine runs without a database, so the change lasts until it restarts.');
+		expect(container.textContent).toContain(sentence);
 		expect(container.textContent).not.toContain('Settings saved.');
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(container.textContent).toContain(sentence);
+		const dismiss = [...container.querySelectorAll('button[aria-label="Dismiss"]')].find((b) => b.parentElement?.textContent?.includes(sentence));
+		await fireEvent.click(dismiss as HTMLButtonElement);
+		await vi.waitFor(() => expect(container.textContent).not.toContain(sentence));
 	});
 
 	it('shows the stale revision sentence the action returns', () => {
 		const stale = 'Someone changed these settings after you opened them. Reload them to see the latest version.';
 		const { container } = setup(runtime(), { form: 'runtime', error: stale });
 		expect(container.textContent).toContain(stale);
+	});
+
+	it('words every recommendation, warning and fact from its code', () => {
+		const { container } = setup(runtime());
+		for (const sentence of [
+			'Recommended: Automatic. Automatic matches the threads to the CPUs available to the engine and follows them as they change.',
+			"Recommended: 85% of the limit. Using 85% of the container's 1.0 GB memory limit leaves 15% for memory the garbage collector does not count.",
+			"Recommended: 22. The engine gets 80% of the database's 30 connections, minus 2 for the engine's own sessions.",
+			"A pool of 22 uses more than a third of the database's 30 connections. Lower it if other applications need to connect.",
+		]) {
+			expect(container.textContent).toContain(sentence);
+		}
+	});
+
+	it('never shows the English the routes send beside each code', () => {
+		const { container } = setup(runtime());
+		for (const english of ENGLISH) expect(container.textContent).not.toContain(english);
+	});
+
+	it('shows the fallback for each kind when a code is unknown', () => {
+		const recommendations = {
+			...RECOMMENDATIONS,
+			recommended: { gc_percent: { value: 150, rule: 'R9', reason: 'A rule from a newer plugin.', reason_code: 'gc_something_new', params: {} } },
+			warnings: [{ code: 'something_new', params: {}, message: 'A caution from a newer plugin.' }],
+		};
+		const facts = { cpu_limit: { value: null, known: false, reason: 'A reason from a newer host.', reason_code: 'something_new' } };
+		const { container } = setup(runtime({ facts }, { recommendations: { ok: true, value: recommendations } }));
+		expect(container.textContent).toContain('Recommended: 150%. This value fits the machine and the database this engine uses.');
+		expect(container.textContent).toContain('Review these recommendations before you save them.');
+		expect(container.querySelector('[data-testid="runtime-facts"]')?.textContent).toContain('Could not read this value.');
+		for (const english of ['A rule from a newer plugin.', 'A caution from a newer plugin.', 'A reason from a newer host.']) {
+			expect(container.textContent).not.toContain(english);
+		}
 	});
 
 	it('ignores an answer meant for another form', () => {
@@ -289,6 +378,7 @@ describe('the observability page names no capability', () => {
 		'src/routes/(admin)/admin/observability/RuntimeScalingPanel.svelte',
 		'src/routes/(admin)/admin/observability/GoroutineEnginePanel.svelte',
 		'src/lib/api/runtime-settings.ts',
+		'src/lib/api/runtime-words.ts',
 		'src/lib/api/goroutine-engine.ts',
 	];
 

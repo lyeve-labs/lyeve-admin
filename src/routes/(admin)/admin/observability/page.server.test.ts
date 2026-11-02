@@ -292,20 +292,33 @@ describe('the runtime action', () => {
 		expect(result.data.error).toBeUndefined();
 	});
 
-	it('maps a stale revision to the reload sentence', async () => {
-		const { event } = put(() => json({ error: 'the runtime settings changed since they were read', code: 'conflict', request_id: 'r1' }, 409));
-		expect(await actions.runtime(event)).toMatchObject({
-			status: 409,
-			data: { form: 'runtime', error: 'Someone changed these settings after you opened them. Reload them to see the latest version.' },
-		});
-	});
-
-	it('maps a pinned field to the sentence that names its variable', async () => {
-		const { event } = put(() => json({ error: 'this setting is pinned by the deployment: GOGC sets it', code: 'conflict', variable: 'GOGC' }, 409));
-		expect(await actions.runtime(event)).toMatchObject({
-			status: 409,
-			data: { form: 'runtime', error: 'Set by GOGC. Change it where the engine is deployed, then restart the engine.' },
-		});
+	it.each([
+		[
+			{ error: 'the runtime settings changed since they were read', code: 'stale_revision' },
+			'Someone changed these settings after you opened them. Reload them to see the latest version.',
+		],
+		[
+			{ error: 'this install runs without runtime settings', code: 'runtime_settings_unavailable' },
+			'Could not save the settings, because runtime settings are not available on this engine. Reload the page to see what changed.',
+		],
+		[
+			{ error: 'this install runs without that scaling primitive', code: 'scaling_primitive_missing' },
+			'Could not save the settings, because this engine has no database pool to resize. Leave the pool unchanged and save again.',
+		],
+		[
+			{ error: 'this setting is pinned by the deployment: GOGC sets it', code: 'setting_pinned', variable: 'GOGC', source: 'environment' },
+			'Could not save the settings, because the environment variable GOGC sets one of them. Change GOGC where the engine is deployed, then restart the engine.',
+		],
+		[
+			{ error: 'this setting is pinned by the deployment: runtime.gc_percent sets it', code: 'setting_pinned', variable: 'runtime.gc_percent', source: 'file' },
+			'Could not save the settings, because the configuration file key runtime.gc_percent sets one of them. Change it in the configuration file, then restart the engine.',
+		],
+		[{ error: 'a conflict this console has not met', code: 'something_new' }, 'Could not save the settings. Reload the page and try again.'],
+	])('words a 409 from its code, never from its English (%o)', async (body, sentence) => {
+		const { event } = put(() => json(body, 409));
+		const result = await actions.runtime(event);
+		expect(result).toMatchObject({ status: 409, data: { form: 'runtime', error: sentence } });
+		expect(JSON.stringify(result)).not.toContain(body.error);
 	});
 
 	it('relays a bounds refusal and keeps transport failures to the console sentence', async () => {

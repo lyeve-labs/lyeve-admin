@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cpuModeOf, formatFact, formatSetting, memoryFields, parseRuntimeForm, pinnedText, pinnedVariableOf, positiveInt, sourceLabel, startOnlyText } from './runtime-settings';
+import { cpuModeOf, formatFact, formatSetting, memoryFields, parseRuntimeForm, pinnedText, positiveInt, sourceLabel, startOnlyText } from './runtime-settings';
 
 const MIB = 1024 * 1024;
 
@@ -58,7 +58,7 @@ describe('how values read', () => {
 	});
 
 	it('reads an unknown fact as not available, never as zero', () => {
-		expect(formatFact('count', { value: 0, known: false, reason: 'no database' })).toBe('Not available');
+		expect(formatFact('count', { value: 0, known: false, reason_code: 'no_database' })).toBe('Not available');
 		expect(formatFact('count', undefined)).toBe('Not available');
 		expect(formatFact('cores', { value: 1.5, known: true })).toBe('1.5');
 		expect(formatFact('flag', { value: true, known: true })).toBe('Yes');
@@ -73,11 +73,6 @@ describe('how values read', () => {
 		expect(startOnlyText(setting({ source: 'file', variable: 'database.pooler' }))).toBe(
 			'Set by database.pooler in the configuration file. Applies when the engine starts.',
 		);
-	});
-
-	it('reads the variable from the pinned 409 body', () => {
-		expect(pinnedVariableOf({ error: 'this setting is pinned by the deployment: GOGC sets it', code: 'conflict', variable: 'GOGC' })).toBe('GOGC');
-		expect(pinnedVariableOf({ error: 'the runtime settings changed since they were read', code: 'conflict', request_id: 'r1' })).toBe('');
 	});
 
 	it('opens the CPU and memory forms on the mode in force, whatever its source', () => {

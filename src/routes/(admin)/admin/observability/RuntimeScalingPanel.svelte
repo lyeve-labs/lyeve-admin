@@ -24,6 +24,7 @@
 		type RuntimeSetting,
 		type RuntimeSettingsMap,
 	} from '$lib/api/runtime-settings';
+	import { factText, recommendationText, warningText } from '$lib/api/runtime-words';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formatCount } from '$lib/format';
@@ -145,7 +146,7 @@
 		else if (key === 'memory') value = formatMemoryChoice(r.value as Parameters<typeof formatMemoryChoice>[0]);
 		else if (key === 'gc_percent') value = `${r.value}%`;
 		else value = formatCount(numberOf(r.value));
-		return r.reason ? `Recommended: ${value}. ${r.reason}` : `Recommended: ${value}.`;
+		return `Recommended: ${value}. ${recommendationText(r)}`;
 	}
 
 	const note = $derived(form?.form === 'runtime' ? form : null);
@@ -219,8 +220,8 @@
 				<div class="flex flex-col gap-4" data-testid="runtime-recommendations">
 					{#if recs.warnings.length > 0}
 						<Alert tone="warn">
-							{#each recs.warnings as warning (warning)}
-								<p>{warning}</p>
+							{#each recs.warnings as warning, i (`${warning.code}-${i}`)}
+								<p>{warningText(warning)}</p>
 							{/each}
 						</Alert>
 					{/if}
@@ -239,7 +240,7 @@
 									<NumberInput id="rt-replicas" name="replicas" label="Replicas" min={1} bind:value={replicas} />
 								{/if}
 								{#if coresFact && !coresFact.known}
-									<NumberInput id="rt-database-cores" name="database_cores" label="Database cores" min={0} hint={coresFact.reason || undefined} bind:value={databaseCores} />
+									<NumberInput id="rt-database-cores" name="database_cores" label="Database cores" min={0} hint={factText(coresFact)} bind:value={databaseCores} />
 								{/if}
 							</div>
 							<div>
@@ -391,8 +392,8 @@
 					{#if note.stored}
 						<Alert tone="success" autoDismiss>Settings saved.</Alert>
 					{:else}
-						<!-- A warning stays: the change is in force but will not survive a restart. -->
-						<Alert tone="warn">Applied. This engine runs without a database, so the change lasts until it restarts.</Alert>
+						<!-- A warning stays until it is dismissed: the change is in force but will not survive a restart. -->
+						<Alert tone="warn" dismissible>Applied. This engine runs without a database, so the change lasts until the engine restarts.</Alert>
 					{/if}
 					{#if note.poolWarning}
 						<!-- The engine's own caution never reaches the page, so the console words it. -->
@@ -421,7 +422,7 @@
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4" data-testid="runtime-facts">
 					{#each FACTS.filter((fact) => read.facts?.[fact.key]) as fact (fact.key)}
 						{@const f = read.facts[fact.key]}
-						<Stat size="sm" label={fact.label} mono value={formatFact(fact.kind, f)} sub={f && !f.known && f.reason ? f.reason : undefined} />
+						<Stat size="sm" label={fact.label} mono value={formatFact(fact.kind, f)} sub={f && !f.known ? factText(f) : undefined} />
 					{/each}
 				</div>
 			</Card>

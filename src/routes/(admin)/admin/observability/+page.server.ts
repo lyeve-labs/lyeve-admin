@@ -18,7 +18,8 @@ import {
 	type PoolView,
 } from '$lib/api/goroutine-engine';
 import { refusalOf } from '$lib/api/refusal';
-import { pinnedText, pinnedVariableOf, parseRuntimeForm, positiveInt, putRuntimeSettings, readRuntime } from '$lib/api/runtime-settings';
+import { parseRuntimeForm, positiveInt, putRuntimeSettings, readRuntime } from '$lib/api/runtime-settings';
+import { conflictText } from '$lib/api/runtime-words';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { goroutineCount } from '$lib/server/goroutines';
@@ -162,21 +163,18 @@ async function saveTunable<T>(
 	}
 }
 
-const RUNTIME_STALE = 'Someone changed these settings after you opened them. Reload them to see the latest version.';
-
 /**
  * A refused runtime write. A 402 travels as the license refusal. A 409 is
- * either a field the deployment holds, which names its variable, or a
- * revision someone else replaced. A 4xx relays the API's own sentence, and
- * anything else makes no claim about whether the change landed.
+ * worded from its code, never from the route's English. A 4xx relays the
+ * API's own sentence, and anything else makes no claim about whether the
+ * change landed.
  */
 function runtimeFailure(err: unknown) {
 	const form = 'runtime' as const;
 	const refused = refusalOf(err);
 	if (refused) return fail(402, { form, refused });
 	if (err instanceof ApiError && err.status === 409) {
-		const variable = pinnedVariableOf(err.body);
-		return fail(409, { form, error: variable ? pinnedText(variable) : RUNTIME_STALE });
+		return fail(409, { form, error: conflictText(err.body) });
 	}
 	if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
 		return fail(err.status, { form, error: actionError(err, 'Could not save the runtime settings. Try again.') });
