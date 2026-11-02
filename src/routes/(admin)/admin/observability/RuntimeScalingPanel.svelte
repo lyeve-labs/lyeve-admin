@@ -29,6 +29,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { formatCount } from '$lib/format';
+	import { fieldErrors } from '$lib/forms.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	interface Props {
@@ -168,6 +169,7 @@
 	const POOL_WARNING =
 		"The database pool now uses more than a third of your database's connection limit. Lower it if other applications need to connect.";
 	const refusal = $derived(formRefusal(note));
+	const errors = $derived(fieldErrors(note));
 
 	function submit() {
 		saving = true;
@@ -267,7 +269,9 @@
 			</Card>
 		{/if}
 
-		<form method="POST" action="?/runtime" use:enhance={submit} class="flex flex-col gap-4" aria-label="Runtime settings">
+		<!-- novalidate: the console's own check runs and words the bounds, where
+		     the browser's bubble named one bound and left nothing on the page. -->
+		<form method="POST" action="?/runtime" novalidate use:enhance={submit} class="flex flex-col gap-4" aria-label="Runtime settings">
 			<input type="hidden" name="revision" value={read.revision} />
 			{#if recs && presetOptions.length > 1}
 				<SegmentedControl
@@ -304,6 +308,7 @@
 									min={1}
 									max={hostCores}
 									hint={hostCores ? `1 to ${formatCount(hostCores)}.` : undefined}
+									error={errors.cpu_threads}
 									bind:value={cpuThreads}
 								/>
 							{/if}
@@ -335,6 +340,7 @@
 									min={MEMORY_PERCENT.min}
 									max={MEMORY_PERCENT.max}
 									hint="{MEMORY_PERCENT.min} to {MEMORY_PERCENT.max} percent of the memory limit."
+									error={errors.memory_percent}
 									bind:value={memoryPercent}
 								/>
 							{:else if memoryMode === 'bytes'}
@@ -344,6 +350,7 @@
 									label="Size (MB)"
 									min={MEMORY_MB_MIN}
 									hint="At least {MEMORY_MB_MIN} MB."
+									error={errors.memory_mb}
 									bind:value={memoryMb}
 								/>
 							{/if}
@@ -365,6 +372,7 @@
 								label="Target (%)"
 								min={GC_PERCENT_MIN}
 								hint="100 is the default. Enter -1 to turn collection off, which needs a soft memory limit."
+								error={errors.gc_percent}
 								bind:value={gcPercent}
 							/>
 						</fieldset>
@@ -390,6 +398,7 @@
 								min={POOL_CONNECTIONS.min}
 								max={POOL_CONNECTIONS.max}
 								hint="{POOL_CONNECTIONS.min} to {formatCount(POOL_CONNECTIONS.max)}."
+								error={errors.database_max_connections}
 								bind:value={pool}
 							/>
 						</fieldset>
@@ -402,7 +411,7 @@
 				<div>
 					<Button type="submit" variant="primary" size="sm" loading={saving} disabled={!canEdit}>Save settings</Button>
 				</div>
-				<FormErrors message={note?.error} refused={refusal} />
+				<FormErrors message={note?.error} fields={errors} refused={refusal} />
 				{#if note?.saved}
 					{#if note.stored}
 						<Alert tone="success" autoDismiss>Settings saved.</Alert>

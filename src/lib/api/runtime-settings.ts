@@ -342,10 +342,14 @@ const text = (data: FormData, key: string): string | null => {
 	return v === null ? null : String(v).trim();
 };
 
-/** A whole number within the bounds, or the one sentence that says what to enter. */
-function whole(raw: string, min: number, max: number | undefined, message: string): { n: number } | { error: string } {
+/** A refusal of the form, with the posted field it belongs to when it belongs to one. */
+export type RuntimeFormError = { error: string; field?: string };
+
+/** A whole number within the bounds, or the one sentence that says what to enter in that field. */
+function whole(data: FormData, field: string, min: number, max: number | undefined, message: string): { n: number } | RuntimeFormError {
+	const raw = text(data, field) ?? '';
 	const n = Number(raw);
-	if (!raw || !Number.isInteger(n) || n < min || (max !== undefined && n > max)) return { error: message };
+	if (!raw || !Number.isInteger(n) || n < min || (max !== undefined && n > max)) return { error: message, field };
 	return { n };
 }
 
@@ -354,7 +358,7 @@ function whole(raw: string, min: number, max: number | undefined, message: strin
  * value they left alone keeps its source rather than becoming a console
  * setting.
  */
-export function parseRuntimeForm(data: FormData): { body: RuntimeSettingsBody } | { error: string } {
+export function parseRuntimeForm(data: FormData): { body: RuntimeSettingsBody } | RuntimeFormError {
 	const rawRevision = text(data, 'revision');
 	const revision = Number(rawRevision);
 	if (!rawRevision || !Number.isInteger(revision) || revision < 0) return { error: 'This form is missing its revision. Reload the page and try again.' };
@@ -363,7 +367,7 @@ export function parseRuntimeForm(data: FormData): { body: RuntimeSettingsBody } 
 	const cpuMode = text(data, 'cpu_mode');
 	if (cpuMode === 'automatic') body.cpu = { mode: 'automatic' };
 	else if (cpuMode === 'fixed') {
-		const t = whole(text(data, 'cpu_threads') ?? '', 1, undefined, 'Enter a whole number of threads, 1 or more.');
+		const t = whole(data, 'cpu_threads', 1, undefined, 'Enter a whole number of threads, 1 or more.');
 		if ('error' in t) return t;
 		body.cpu = { mode: 'fixed', threads: t.n };
 	}
@@ -371,25 +375,29 @@ export function parseRuntimeForm(data: FormData): { body: RuntimeSettingsBody } 
 	const memoryMode = text(data, 'memory_mode');
 	if (memoryMode === 'automatic' || memoryMode === 'none') body.memory = { mode: memoryMode };
 	else if (memoryMode === 'ratio') {
-		const p = whole(text(data, 'memory_percent') ?? '', MEMORY_PERCENT.min, MEMORY_PERCENT.max, `Enter a share between ${MEMORY_PERCENT.min} and ${MEMORY_PERCENT.max}.`);
+		const p = whole(data, 'memory_percent', MEMORY_PERCENT.min, MEMORY_PERCENT.max, `Enter a share between ${MEMORY_PERCENT.min} and ${MEMORY_PERCENT.max}.`);
 		if ('error' in p) return p;
 		body.memory = { mode: 'ratio', ratio: p.n / 100 };
 	} else if (memoryMode === 'bytes') {
-		const m = whole(text(data, 'memory_mb') ?? '', MEMORY_MB_MIN, undefined, `Enter a size of at least ${MEMORY_MB_MIN} MB.`);
+		const m = whole(data, 'memory_mb', MEMORY_MB_MIN, undefined, `Enter a size of at least ${MEMORY_MB_MIN} MB.`);
 		if ('error' in m) return m;
 		body.memory = { mode: 'bytes', bytes: m.n * MIB };
 	}
 
-	const gc = text(data, 'gc_percent');
-	if (gc !== null) {
-		const g = whole(gc, GC_PERCENT_MIN, undefined, `Enter a GC target of ${GC_PERCENT_MIN} or more.`);
+	if (text(data, 'gc_percent') !== null) {
+		const g = whole(data, 'gc_percent', GC_PERCENT_MIN, undefined, `Enter a GC target of ${GC_PERCENT_MIN} or more.`);
 		if ('error' in g) return g;
 		body.gc_percent = g.n;
 	}
 
-	const pool = text(data, 'database_max_connections');
-	if (pool !== null) {
-		const p = whole(pool, POOL_CONNECTIONS.min, POOL_CONNECTIONS.max, `Enter between ${POOL_CONNECTIONS.min} and ${POOL_CONNECTIONS.max} connections.`);
+	if (text(data, 'database_max_connections') !== null) {
+		const p = whole(
+			data,
+			'database_max_connections',
+			POOL_CONNECTIONS.min,
+			POOL_CONNECTIONS.max,
+			`Enter between ${formatCount(POOL_CONNECTIONS.min)} and ${formatCount(POOL_CONNECTIONS.max)} connections.`,
+		);
 		if ('error' in p) return p;
 		body.database_max_connections = p.n;
 	}

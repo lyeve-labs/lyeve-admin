@@ -310,6 +310,17 @@ describe('RuntimeScalingPanel', () => {
 		expect(gc().value).toBe('200');
 	});
 
+	it('leaves the bounds to its own check and shows a refused value on its field', () => {
+		const sentence = 'Enter between 5 and 10,000 connections.';
+		const { container } = setup(runtime(), { form: 'runtime', fields: { database_max_connections: sentence } });
+		expect(container.querySelector('form[action="?/runtime"]')?.hasAttribute('novalidate')).toBe(true);
+		const pool = container.querySelector('#rt-pool') as HTMLInputElement;
+		expect(pool.getAttribute('aria-invalid')).toBe('true');
+		expect(container.querySelector(`#${pool.getAttribute('aria-describedby')}`)?.textContent).toBe(sentence);
+		expect(container.textContent).toContain('1 field needs attention.');
+		expect((container.querySelector('#rt-gc-percent') as HTMLInputElement).hasAttribute('aria-invalid')).toBe(false);
+	});
+
 	it('confirms a save that is stored', async () => {
 		const { container } = setup(runtime(), { form: 'runtime', saved: true, stored: true });
 		await vi.waitFor(() => expect(container.textContent).toContain('Settings saved.'));

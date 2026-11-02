@@ -25,15 +25,16 @@ describe('parseRuntimeForm', () => {
 	});
 
 	it('refuses a value outside the bounds before the round trip', () => {
-		expect(parseRuntimeForm(form({ revision: '1', memory_mode: 'ratio', memory_percent: '99' }))).toEqual({ error: 'Enter a share between 50 and 95.' });
-		expect(parseRuntimeForm(form({ revision: '1', memory_mode: 'bytes', memory_mb: '32' }))).toEqual({ error: 'Enter a size of at least 64 MB.' });
-		expect(parseRuntimeForm(form({ revision: '1', database_max_connections: '0' }))).toEqual({ error: 'Enter between 5 and 10000 connections.' });
-		expect(parseRuntimeForm(form({ revision: '1', gc_percent: '1.5' }))).toEqual({ error: 'Enter a GC target of -1 or more.' });
+		expect(parseRuntimeForm(form({ revision: '1', memory_mode: 'ratio', memory_percent: '99' }))).toEqual({ error: 'Enter a share between 50 and 95.', field: 'memory_percent' });
+		expect(parseRuntimeForm(form({ revision: '1', memory_mode: 'bytes', memory_mb: '32' }))).toEqual({ error: 'Enter a size of at least 64 MB.', field: 'memory_mb' });
+		expect(parseRuntimeForm(form({ revision: '1', database_max_connections: '0' }))).toEqual({ error: 'Enter between 5 and 10,000 connections.', field: 'database_max_connections' });
+		expect(parseRuntimeForm(form({ revision: '1', gc_percent: '1.5' }))).toEqual({ error: 'Enter a GC target of -1 or more.', field: 'gc_percent' });
+		expect(parseRuntimeForm(form({ revision: '1', cpu_mode: 'fixed', cpu_threads: '0' }))).toEqual({ error: 'Enter a whole number of threads, 1 or more.', field: 'cpu_threads' });
 	});
 
 	it('refuses a pool below the five connections the engine accepts', () => {
 		for (const n of ['1', '4']) {
-			expect(parseRuntimeForm(form({ revision: '1', database_max_connections: n }))).toEqual({ error: 'Enter between 5 and 10000 connections.' });
+			expect(parseRuntimeForm(form({ revision: '1', database_max_connections: n }))).toEqual({ error: 'Enter between 5 and 10,000 connections.', field: 'database_max_connections' });
 		}
 		expect(parseRuntimeForm(form({ revision: '1', database_max_connections: '5' }))).toEqual({ body: { revision: 1, database_max_connections: 5 } });
 	});

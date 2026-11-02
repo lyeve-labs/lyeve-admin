@@ -375,6 +375,15 @@ describe('the runtime action', () => {
 		expect(await actions.runtime(down.event)).toMatchObject({ status: 400, data: { form: 'runtime', error: 'Check whether your change was saved, then try again.' } });
 	});
 
+	it('puts a value the form refuses on its own field before the round trip', async () => {
+		const { event, calls } = put(() => json(RUNTIME), { revision: '4', database_max_connections: '3' });
+		expect(await actions.runtime(event)).toMatchObject({
+			status: 422,
+			data: { form: 'runtime', fields: { database_max_connections: 'Enter between 5 and 10,000 connections.' } },
+		});
+		expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
+	});
+
 	it('refuses a form that changes nothing before the round trip', async () => {
 		const { event, calls } = put(() => json(RUNTIME), { revision: '4' });
 		expect(await actions.runtime(event)).toMatchObject({ status: 422, data: { form: 'runtime', error: 'Change a setting first.' } });

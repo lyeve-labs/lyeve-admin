@@ -193,7 +193,11 @@ export const actions: Actions = {
 	runtime: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const parsed = parseRuntimeForm(await event.request.formData());
-		if ('error' in parsed) return fail(422, { form: 'runtime' as const, error: parsed.error });
+		if ('error' in parsed) {
+			// A value the form refuses is shown on its own field.
+			if (parsed.field) return fail(422, { form: 'runtime' as const, fields: { [parsed.field]: parsed.error } });
+			return fail(422, { form: 'runtime' as const, error: parsed.error });
+		}
 		try {
 			const view = await putRuntimeSettings(authedClient(event), parsed.body);
 			// The engine's warning is a caution about the pool's share of the
