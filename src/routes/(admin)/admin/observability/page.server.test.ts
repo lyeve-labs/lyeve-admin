@@ -204,3 +204,119 @@ describe('observability reads that fail', () => {
 		expect(result.logTail).toBe(true);
 	});
 });
+
+const RUNTIME = {
+	available: true,
+	licensed: true,
+	stored: true,
+	revision: 4,
+	settings: {},
+	facts: {},
+	replicas: { count: 1, known: false, attached: false, applied: 1 },
+};
+const RECOMMENDATIONS = { presets: {}, recommended: {} };
+
+describe('the runtime settings read', () => {
+	function loadAt(search: string, routes: Record<string, Route>) {
+		const { fetch, calls } = fetchFor(routes);
+		const event = {
+			fetch,
+			cookies: mockCookies(),
+			url: new URL(`http://localhost/admin/observability${search}`),
+			parent: async () => ({ user: { id: 'u1', roles: ['super_admin'] }, entitlements: NO_ENTITLEMENTS, plugins: null }),
+		} as never;
+		return { event, calls };
+	}
+
+	it('reads the recommendations with the typed inputs when the settings say they are licensed', async () => {
+		const { event, calls } = loadAt('?replicas=3&database_cores=8&top=nope', {
+			...views,
+			'/runtime/settings': () => json(RUNTIME),
+			'/runtime/recommendations': () => json(RECOMMENDATIONS),
+		});
+		const result = (await load(event)) as Loaded;
+		expect(result.runtime.settings).toEqual({ ok: true, value: RUNTIME });
+		expect(result.runtime.recommendations).toEqual({ ok: true, value: RECOMMENDATIONS });
+		expect(result.runtime.inputs).toEqual({ replicas: 3, database_cores: 8 });
+		expect(calls.find((c) => c.url.includes('/runtime/recommendations'))?.url).toContain('?replicas=3&database_cores=8');
+	});
+
+	it('does not ask for recommendations on an unlicensed or unavailable engine', async () => {
+		for (const over of [{ licensed: false }, { available: false }]) {
+			const { event, calls } = loadAt('', { ...views, '/runtime/settings': () => json({ ...RUNTIME, ...over }) });
+			const result = (await load(event)) as Loaded;
+			expect(result.runtime.recommendations).toBeNull();
+			expect(calls.some((c) => c.url.includes('/runtime/recommendations'))).toBe(false);
+		}
+	});
+
+	it('keeps a failed settings read as a gate and leaves the other panels', async () => {
+		const { event } = loadAt('', { ...views, '/runtime/settings': () => json({ error: 'boom' }, 500) });
+		const result = (await load(event)) as Loaded;
+		expect(result.runtime.settings).toEqual({ ok: false, gate: { state: 'error', message: 'Could not load runtime settings.' } });
+		expect(result.goroutineEngine.pool).toEqual(POOL);
+	});
+});
+
+describe('the runtime action', () => {
+	const put = (route: Route, fields: Record<string, string> = { revision: '4', gc_percent: '200' }, roles = ['super_admin']) =>
+		actionEvent(form(fields), { '/runtime/settings': route }, roles);
+
+	it('puts only the changed fields with the revision', async () => {
+		const { event, calls } = put(() => json(RUNTIME));
+		const result = await actions.runtime(event);
+		expect(result).toEqual({ form: 'runtime', saved: true, stored: true });
+		const sent = calls.find((c) => c.url.includes('/runtime/settings'));
+		expect(sent?.init?.method).toBe('PUT');
+		expect(JSON.parse(String(sent?.init?.body))).toEqual({ revision: 4, gc_percent: 200 });
+	});
+
+	it('says when the change was applied but not stored', async () => {
+		const { event } = put(() => json({ ...RUNTIME, stored: false }));
+		expect(await actions.runtime(event)).toEqual({ form: 'runtime', saved: true, stored: false });
+	});
+
+	it('returns a 402 as the license refusal', async () => {
+		const { event } = put(() => json({ error: 'payment_required', plugin: 'example', feature: 'feature:example_feature' }, 402));
+		const result = (await actions.runtime(event)) as { status: number; data: { form: string; refused: unknown; error?: string } };
+		expect(result.status).toBe(402);
+		expect(result.data.form).toBe('runtime');
+		expect(result.data.refused).toMatchObject({ kind: 'feature', feature: 'example-feature' });
+		expect(result.data.error).toBeUndefined();
+	});
+
+	it('maps a stale revision to the reload sentence', async () => {
+		const { event } = put(() => json({ error: 'revision is stale' }, 409));
+		expect(await actions.runtime(event)).toMatchObject({
+			status: 409,
+			data: { form: 'runtime', error: 'Someone changed these settings after you opened them. Reload them to see the latest version.' },
+		});
+	});
+
+	it('maps a pinned field to the sentence that names its variable', async () => {
+		const { event } = put(() => json({ error: 'setting is pinned', variable: 'GOGC' }, 409));
+		expect(await actions.runtime(event)).toMatchObject({
+			status: 409,
+			data: { form: 'runtime', error: 'Set by GOGC. Change it where the engine is deployed, then restart the engine.' },
+		});
+	});
+
+	it('relays a bounds refusal and keeps transport failures to the console sentence', async () => {
+		const bounds = put(() => json({ error: 'a negative GC target needs a memory limit' }, 422));
+		expect(await actions.runtime(bounds.event)).toMatchObject({ status: 422, data: { form: 'runtime', error: 'a negative GC target needs a memory limit' } });
+		const down = put(() => json({ error: 'pq: connection refused' }, 503));
+		expect(await actions.runtime(down.event)).toMatchObject({ status: 400, data: { form: 'runtime', error: 'Check whether your change was saved, then try again.' } });
+	});
+
+	it('refuses a form that changes nothing before the round trip', async () => {
+		const { event, calls } = put(() => json(RUNTIME), { revision: '4' });
+		expect(await actions.runtime(event)).toMatchObject({ status: 422, data: { form: 'runtime', error: 'Change a setting first.' } });
+		expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
+	});
+
+	it('refuses an admin who is not super admin before the round trip', async () => {
+		const { event, calls } = put(() => json(RUNTIME), undefined, ['admin']);
+		await expect(actions.runtime(event)).rejects.toMatchObject({ status: 403 });
+		expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
+	});
+});

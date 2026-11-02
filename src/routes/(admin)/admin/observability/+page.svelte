@@ -10,6 +10,7 @@
 	import { ICON } from '$lib/icon';
 	import GoroutineEnginePanel from './GoroutineEnginePanel.svelte';
 	import LiveLogTail from './LiveLogTail.svelte';
+	import RuntimeScalingPanel from './RuntimeScalingPanel.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -138,6 +139,8 @@
 	</Card>
 
 	<GoroutineEnginePanel engine={data.goroutineEngine} {form} />
+
+	<RuntimeScalingPanel runtime={data.runtime} {form} top={data.top} />
 
 	<section class="flex flex-col gap-4">
 		<div class="flex items-center gap-2">

@@ -1,0 +1,259 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { readFileSync } from 'node:fs';
+import { tick } from 'svelte';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import RuntimeScalingPanel from './RuntimeScalingPanel.svelte';
+
+vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/observability') } }));
+
+afterEach(cleanup);
+
+const GIB = 1024 * 1024 * 1024;
+
+const setting = (value: unknown, over: Record<string, unknown> = {}) => ({
+	value,
+	source: 'default',
+	pinned: false,
+	live: false,
+	start_only: false,
+	...over,
+});
+
+function answer(over: Record<string, unknown> = {}) {
+	return {
+		available: true,
+		licensed: true,
+		stored: true,
+		revision: 4,
+		settings: {
+			cpu: setting(2, { source: 'container', live: true }),
+			memory: setting(0.85 * GIB, { source: 'container', live: true }),
+			gc_percent: setting(100),
+			database_max_connections: setting(25),
+			replica_max_connections: setting(30, { start_only: true }),
+			backpressure: setting(512, { source: 'environment', variable: 'BACKPRESSURE_MAX_INFLIGHT', start_only: true }),
+			pooler: setting('none', { start_only: true }),
+		},
+		facts: {
+			cpu_limit: { value: 1.5, known: true, source: 'container' },
+			host_cores: { value: 8, known: true, source: 'machine' },
+			memory_limit: { value: GIB, known: true, source: 'container' },
+			database_cores: {
+				value: null,
+				known: false,
+				source: 'database',
+				reason: 'PostgreSQL does not report its CPU count. Enter it to refine the connection recommendation.',
+			},
+		},
+		replicas: { count: 1, known: false, attached: false, applied: 1 },
+		...over,
+	};
+}
+
+const RECOMMENDATIONS = {
+	presets: {
+		one_server: {
+			cpu: { value: { mode: 'automatic' }, rule: 'R1', reason: '' },
+			memory: { value: { mode: 'ratio', ratio: 0.85 }, rule: 'R2', reason: '' },
+			gc_percent: { value: 200, rule: 'R3', reason: '' },
+			database_max_connections: { value: 40, rule: 'R4', reason: '' },
+		},
+		several_replicas: {
+			cpu: { value: { mode: 'automatic' }, rule: 'R1', reason: '' },
+			memory: { value: { mode: 'ratio', ratio: 0.85 }, rule: 'R2', reason: '' },
+			gc_percent: { value: 100, rule: 'R3', reason: '' },
+			database_max_connections: { value: 12, rule: 'R4', reason: '' },
+		},
+	},
+	recommended: {
+		gc_percent: { value: 200, rule: 'R3', reason: 'A soft limit is in force, so the collector can run less often.' },
+	},
+	warnings: ['Lockouts and rate limits count per replica without a shared cache.'],
+};
+
+function runtime(over: Record<string, unknown> = {}, opts: { superAdmin?: boolean; recommendations?: unknown } = {}) {
+	const a = answer(over);
+	const recommendations =
+		'recommendations' in opts ? opts.recommendations : a.licensed ? { ok: true, value: RECOMMENDATIONS } : null;
+	return { settings: { ok: true, value: a }, recommendations, inputs: {}, superAdmin: opts.superAdmin ?? true };
+}
+
+function setup(rt: unknown, form: Record<string, unknown> | null = null) {
+	return render(RuntimeScalingPanel, { props: { runtime: rt as never, form: form as never, top: 20 } });
+}
+
+const fieldset = (c: HTMLElement, key: string) => c.querySelector(`[data-testid="runtime-field-${key}"]`) as HTMLFieldSetElement;
+const posted = (c: HTMLElement) =>
+	[...c.querySelectorAll('form[action="?/runtime"] [name]')].map((el) => el.getAttribute('name'));
+const SETTINGS = ['cpu', 'memory', 'gc_percent', 'database_max_connections'];
+
+describe('RuntimeScalingPanel', () => {
+	it('shows the values in force and their sources read-only on an unlicensed install', () => {
+		const { container } = setup(runtime({ licensed: false }));
+		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(true);
+		expect(container.querySelector('[data-testid="runtime-license-note"]')?.textContent).toContain(
+			'Changing these settings needs a license that includes tuning. The values in force stay visible.',
+		);
+		expect(container.textContent).toContain('View the license');
+		expect(container.textContent).toContain('Container limit');
+		expect(container.textContent).not.toContain('Start from');
+		expect(container.querySelector('[data-testid="runtime-recommendations"]')).toBeNull();
+	});
+
+	it('offers presets, recommendations and editable fields to a licensed super admin', () => {
+		const { container, getByRole } = setup(runtime());
+		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(false);
+		expect(getByRole('radio', { name: 'One large server' })).toBeTruthy();
+		expect(getByRole('radio', { name: 'Several replicas' })).toBeTruthy();
+		expect(container.textContent).toContain('Recommended: 200%. A soft limit is in force, so the collector can run less often.');
+		expect(container.textContent).toContain('Lockouts and rate limits count per replica without a shared cache.');
+		expect((getByRole('button', { name: 'Save settings' }) as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('keeps the fields read-only for an admin who is not a super admin', () => {
+		const { container } = setup(runtime({}, { superAdmin: false }));
+		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(true);
+		expect(container.querySelector('[data-testid="runtime-role-note"]')?.textContent).toContain('Only a super admin can change these.');
+	});
+
+	it('asks for the replica count when no roster reports it', () => {
+		const { container } = setup(runtime());
+		expect(container.querySelector('[data-testid="runtime-replicas-unknown"]')?.textContent).toContain(
+			'Recommendations assume one replica. Enter the number of replicas you run if you run more.',
+		);
+		const replicas = container.querySelector('#rt-replicas') as HTMLInputElement;
+		expect(replicas.getAttribute('name')).toBe('replicas');
+		expect(replicas.closest('form')?.getAttribute('method')).toBe('GET');
+		expect(container.querySelector('[data-testid="runtime-replicas"]')).toBeNull();
+	});
+
+	it('says how many replicas run and how many hold the latest change', async () => {
+		const { container } = setup(runtime({ replicas: { count: 3, known: true, attached: true, applied: 2 } }));
+		expect(container.querySelector('[data-testid="runtime-replicas"]')?.textContent).toContain('3 replicas are running.');
+		await vi.waitFor(() => expect(container.textContent).toContain('Applied on 2 of 3 replicas.'));
+		expect(container.querySelector('#rt-replicas')).toBeNull();
+	});
+
+	it('draws a fact that cannot be read as not available, with its reason', () => {
+		const { container } = setup(runtime());
+		const facts = container.querySelector('[data-testid="runtime-facts"]') as HTMLElement;
+		expect(facts.textContent).toContain('Not available');
+		expect(facts.textContent).toContain('PostgreSQL does not report its CPU count.');
+		expect(facts.textContent).not.toContain('Host memory');
+		expect(container.querySelector('#rt-database-cores')?.getAttribute('name')).toBe('database_cores');
+	});
+
+	it('disables a field the deployment pins and says where to change it', () => {
+		const { container } = setup(
+			runtime({
+				settings: {
+					...answer().settings,
+					database_max_connections: setting(10, { source: 'environment', variable: 'DATABASE_MAX_CONNECTIONS', pinned: true }),
+				},
+			}),
+		);
+		expect(fieldset(container, 'database_max_connections').disabled).toBe(true);
+		expect(fieldset(container, 'gc_percent').disabled).toBe(false);
+		expect(container.querySelector('[data-testid="runtime-pinned-database_max_connections"]')?.textContent).toBe(
+			'Set by DATABASE_MAX_CONNECTIONS. Change it where the engine is deployed, then restart the engine.',
+		);
+		expect(container.textContent).toContain('Environment variable DATABASE_MAX_CONNECTIONS');
+	});
+
+	it('shows the values that apply only at start as read-only', () => {
+		const { container } = setup(runtime());
+		const start = container.querySelector('[data-testid="runtime-start-only"]') as HTMLElement;
+		expect(start.querySelector('input')).toBeNull();
+		expect(start.textContent).toContain('Set by BACKPRESSURE_MAX_INFLIGHT. Applies when the engine starts.');
+		expect(start.textContent).toContain('Default. Applies when the engine starts.');
+	});
+
+	it('posts nothing but the revision until a field changes', () => {
+		const { container } = setup(runtime());
+		expect(posted(container)).toEqual(['revision']);
+	});
+
+	it('fills the fields from a preset without saving', async () => {
+		const { container, getByRole } = setup(runtime());
+		await fireEvent.click(getByRole('radio', { name: 'Several replicas' }));
+		await tick();
+		expect((container.querySelector('#rt-pool') as HTMLInputElement).value).toBe('12');
+		expect(posted(container)).toContain('database_max_connections');
+		expect(container.textContent).not.toContain('Settings saved.');
+		await fireEvent.click(getByRole('radio', { name: 'Values in force' }));
+		await tick();
+		expect((container.querySelector('#rt-pool') as HTMLInputElement).value).toBe('25');
+		expect(posted(container)).toEqual(['revision']);
+	});
+
+	it('confirms a save that is stored', async () => {
+		const { container } = setup(runtime(), { form: 'runtime', saved: true, stored: true });
+		await vi.waitFor(() => expect(container.textContent).toContain('Settings saved.'));
+	});
+
+	it('says a change on an engine without a database lasts until it restarts', () => {
+		const { container } = setup(runtime({ stored: false }), { form: 'runtime', saved: true, stored: false });
+		expect(container.textContent).toContain('Applied. This engine runs without a database, so the change lasts until it restarts.');
+		expect(container.textContent).not.toContain('Settings saved.');
+	});
+
+	it('shows the stale revision sentence the action returns', () => {
+		const stale = 'Someone changed these settings after you opened them. Reload them to see the latest version.';
+		const { container } = setup(runtime(), { form: 'runtime', error: stale });
+		expect(container.textContent).toContain(stale);
+	});
+
+	it('ignores an answer meant for another form', () => {
+		const { container } = setup(runtime(), { form: 'pool', error: 'Pool size must be between 1 and 4096.' });
+		expect(container.textContent).not.toContain('Pool size must be');
+	});
+
+	it('says a failed read failed instead of drawing empty settings', () => {
+		const { container } = setup({
+			settings: { ok: false, gate: { state: 'error', message: 'Could not load runtime settings.' } },
+			recommendations: null,
+			inputs: {},
+			superAdmin: true,
+		});
+		expect(container.textContent).toContain('Could not load runtime settings.');
+		expect(container.querySelector('[data-testid="runtime-settings"]')).toBeNull();
+	});
+
+	it('shows only a sentence on an engine that offers no runtime settings', () => {
+		const { container } = setup(runtime({ available: false }, { recommendations: null }));
+		expect(container.querySelector('[data-testid="runtime-unavailable"]')?.textContent).toBe(
+			'Runtime settings are not available on this engine.',
+		);
+		expect(container.querySelector('form')).toBeNull();
+		expect(container.querySelector('[data-testid="runtime-facts"]')).toBeNull();
+		expect(container.querySelector('[data-testid="runtime-license-note"]')).toBeNull();
+	});
+});
+
+// The console is open source and gates on the plugin's own boolean or its
+// 402, so no file behind this page names what a license sells.
+describe('the observability page names no capability', () => {
+	const files = [
+		'src/routes/(admin)/admin/observability/+page.svelte',
+		'src/routes/(admin)/admin/observability/+page.server.ts',
+		'src/routes/(admin)/admin/observability/RuntimeScalingPanel.svelte',
+		'src/routes/(admin)/admin/observability/GoroutineEnginePanel.svelte',
+		'src/lib/api/runtime-settings.ts',
+		'src/lib/api/goroutine-engine.ts',
+	];
+
+	it.each(files)('%s', (file) => {
+		const src = readFileSync(file, 'utf8');
+		expect(src).not.toMatch(/[a-z]-pro\b|_pro\b|HasFeature|hasFeature|feature:[a-z]/);
+	});
+
+	it('renders no capability name on a licensed or an unlicensed install', () => {
+		for (const licensed of [true, false]) {
+			const { container } = setup(runtime({ licensed }));
+			expect(container.textContent).not.toMatch(/[a-z]-pro\b|_pro\b/);
+			cleanup();
+		}
+	});
+});
