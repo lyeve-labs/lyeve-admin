@@ -120,6 +120,12 @@ describe('invalidText', () => {
 		expect(invalidText(422, { code: 'setting_refused', field: 'threads' })).toBe(FALLBACK.invalid);
 		expect(invalidText(422, null)).toBe(FALLBACK.invalid);
 	});
+
+	it('words an unknown field as a version mismatch and leaves any other 400 to the caller', () => {
+		expect(invalidText(400, { code: 'unknown_field', field: 'threads', error: 'this route does not take the field threads' })).toBe(mismatch);
+		expect(invalidText(400, { code: 'bad_request', error: 'invalid JSON' })).toBeNull();
+		expect(invalidText(409, { code: 'unknown_field' })).toBeNull();
+	});
 });
 
 describe('warningText', () => {

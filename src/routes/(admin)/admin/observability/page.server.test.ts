@@ -358,6 +358,11 @@ describe('the runtime action', () => {
 			"A GC target of -1 turns garbage collection off, which needs a soft memory limit below the container's or the machine's memory. Set a lower soft memory limit, or enter a GC target of 0 or more.",
 		],
 		[422, { error: 'a refusal this console has not met', code: 'something_new' }, 'Could not save the settings with these values. Check them and try again.'],
+		[
+			400,
+			{ error: 'this route does not take the field threads', code: 'unknown_field', field: 'threads' },
+			'Could not save the settings, because this console and the engine are on different versions. Reload the page. If this happens again, update the console to match the engine.',
+		],
 	])('words a %i from its code, never from its English', async (status, body, sentence) => {
 		const { event } = put(() => json(body, status));
 		const result = await actions.runtime(event);

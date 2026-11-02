@@ -166,10 +166,11 @@ async function saveTunable<T>(
 }
 
 /**
- * A refused runtime write. A 402 travels as the license refusal. A 409 and
- * a 422 are worded from their code and params, never from the route's
- * English. Another 4xx relays the API's own sentence, and anything else
- * makes no claim about whether the change landed.
+ * A refused runtime write. A 402 travels as the license refusal. A 409, a
+ * 422 and a 400 naming an unknown field are worded from their code and
+ * params, never from the route's English. Another 4xx relays the API's own
+ * sentence, and anything else makes no claim about whether the change
+ * landed.
  */
 function runtimeFailure(err: unknown) {
 	const form = 'runtime' as const;

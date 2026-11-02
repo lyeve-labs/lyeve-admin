@@ -263,12 +263,15 @@ const INVALID: Record<string, (b: Record<string, unknown>) => string | null> = {
 };
 
 /**
- * Why a save met a 422, from its code and the params beside it. Null for any
- * other status, which the caller words itself. A 422 code this file does not
- * know reads as the fallback.
+ * Why a save met a 422, or a 400 naming a field the engine does not take,
+ * from its code and the params beside it. Null for a 400 of any other kind,
+ * which the caller words itself. A 422 code this file does not know reads as
+ * the fallback.
  */
 export function invalidText(status: number, body: unknown): string | null {
 	const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+	const code = str(b.code);
+	if (status === 400) return code === 'unknown_field' ? VERSION_MISMATCH : null;
 	if (status !== 422) return null;
-	return INVALID[str(b.code)]?.(b) || FALLBACK.invalid;
+	return INVALID[code]?.(b) || FALLBACK.invalid;
 }
