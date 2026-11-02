@@ -289,6 +289,27 @@ describe('RuntimeScalingPanel', () => {
 		expect(posted(container)).toEqual(['revision']);
 	});
 
+	it('compares the fields against the values in force after a save', async () => {
+		const gcAt = (gc: number, revision: number) => runtime({ revision, settings: { ...answer().settings, gc_percent: setting(gc, { source: 'console' }) } });
+		const { container, rerender } = setup(gcAt(200, 9));
+		const gc = () => container.querySelector('#rt-gc-percent') as HTMLInputElement;
+		await fireEvent.input(gc(), { target: { value: '120' } });
+		expect(posted(container)).toContain('gc_percent');
+
+		// The save reloads the page data at the next revision.
+		await rerender({ runtime: gcAt(120, 10) as never, form: { form: 'runtime', saved: true, stored: true } as never, top: 20 });
+		expect(gc().value).toBe('120');
+		expect(posted(container)).toEqual(['revision']);
+
+		// The value the page opened with is a change again, and only it is posted.
+		await fireEvent.input(gc(), { target: { value: '200' } });
+		expect(posted(container)).toEqual(['revision', 'gc_percent']);
+
+		// A reload at the same revision keeps the edit in progress.
+		await rerender({ runtime: gcAt(120, 10) as never, form: null as never, top: 20 });
+		expect(gc().value).toBe('200');
+	});
+
 	it('confirms a save that is stored', async () => {
 		const { container } = setup(runtime(), { form: 'runtime', saved: true, stored: true });
 		await vi.waitFor(() => expect(container.textContent).toContain('Settings saved.'));

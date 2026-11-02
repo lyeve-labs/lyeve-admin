@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Alert, Button, Card, NumberInput, SectionHeading, SegmentedControl, Stat } from '@lyeve-labs/ui-kit';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { LICENSE_PAGE, formRefusal } from '$lib/api/refusal';
 	import {
@@ -54,25 +55,32 @@
 			(runtime.recommendations?.ok === false && runtime.recommendations.gate.state === 'forbidden'),
 	);
 
-	// The fields open on the values in force and are seeded once, so a refresh
+	// The fields open on the values in force and take them again only when the
+	// revision moves, as it does after a save. A reload of the same revision
 	// never overwrites an edit in progress.
-	// svelte-ignore state_referenced_locally
-	const seedRead = runtime.settings.ok ? runtime.settings.value : null;
-	const seed = {
-		cpuMode: cpuModeOf(seedRead?.settings.cpu),
-		cpuThreads: numberOf(seedRead?.settings.cpu?.value) ?? 1,
-		memory: memoryFields(seedRead?.settings.memory),
-		gc: numberOf(seedRead?.settings.gc_percent?.value) ?? 100,
-		pool: numberOf(seedRead?.settings.database_max_connections?.value) ?? POOL_CONNECTIONS.min,
-	};
-	let cpuMode = $state(seed.cpuMode);
-	let cpuThreads = $state(seed.cpuThreads);
-	let memoryMode = $state(seed.memory.mode);
-	let memoryPercent = $state(seed.memory.percent);
-	let memoryMb = $state(seed.memory.mb);
-	let gcPercent = $state(seed.gc);
-	let pool = $state(seed.pool);
-	let preset = $state<'current' | PresetKey>('current');
+	const revision = $derived(read?.revision ?? 0);
+	const seed = $derived.by(() => {
+		void revision;
+		const s = untrack(() => read)?.settings;
+		return {
+			cpuMode: cpuModeOf(s?.cpu),
+			cpuThreads: numberOf(s?.cpu?.value) ?? 1,
+			memory: memoryFields(s?.memory),
+			gc: numberOf(s?.gc_percent?.value) ?? 100,
+			pool: numberOf(s?.database_max_connections?.value) ?? POOL_CONNECTIONS.min,
+		};
+	});
+	let cpuMode = $derived(seed.cpuMode);
+	let cpuThreads = $derived(seed.cpuThreads);
+	let memoryMode = $derived(seed.memory.mode);
+	let memoryPercent = $derived(seed.memory.percent);
+	let memoryMb = $derived(seed.memory.mb);
+	let gcPercent = $derived(seed.gc);
+	let pool = $derived(seed.pool);
+	let preset = $derived.by<'current' | PresetKey>(() => {
+		void seed;
+		return 'current';
+	});
 	let saving = $state(false);
 
 	// svelte-ignore state_referenced_locally
