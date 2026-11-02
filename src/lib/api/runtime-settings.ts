@@ -152,7 +152,7 @@ export interface RecommendationInputs {
 export const MEMORY_PERCENT = { min: 50, max: 95 } as const;
 export const MEMORY_MB_MIN = 64;
 export const GC_PERCENT_MIN = -1;
-export const POOL_CONNECTIONS = { min: 1, max: 10000 } as const;
+export const POOL_CONNECTIONS = { min: 5, max: 10000 } as const;
 
 const MIB = 1024 * 1024;
 
