@@ -265,7 +265,7 @@ describe('the runtime action', () => {
 	it('puts only the changed fields with the revision', async () => {
 		const { event, calls } = put(() => json(RUNTIME));
 		const result = await actions.runtime(event);
-		expect(result).toEqual({ form: 'runtime', saved: true, stored: true });
+		expect(result).toEqual({ form: 'runtime', saved: true, stored: true, poolWarning: false });
 		const sent = calls.find((c) => c.url.includes('/runtime/settings'));
 		expect(sent?.init?.method).toBe('PUT');
 		expect(JSON.parse(String(sent?.init?.body))).toEqual({ revision: 4, gc_percent: 200 });
@@ -273,7 +273,14 @@ describe('the runtime action', () => {
 
 	it('says when the change was applied but not stored', async () => {
 		const { event } = put(() => json({ ...RUNTIME, stored: false }));
-		expect(await actions.runtime(event)).toEqual({ form: 'runtime', saved: true, stored: false });
+		expect(await actions.runtime(event)).toEqual({ form: 'runtime', saved: true, stored: false, poolWarning: false });
+	});
+
+	it('carries only that the engine warned about the pool, never its words', async () => {
+		const { event } = put(() => json({ ...RUNTIME, warning: 'pool takes 40 of 100 connections' }), { revision: '4', database_max_connections: '40' });
+		const result = await actions.runtime(event);
+		expect(result).toEqual({ form: 'runtime', saved: true, stored: true, poolWarning: true });
+		expect(JSON.stringify(result)).not.toContain('pool takes');
 	});
 
 	it('returns a 402 as the license refusal', async () => {

@@ -149,6 +149,8 @@
 	}
 
 	const note = $derived(form?.form === 'runtime' ? form : null);
+	const POOL_WARNING =
+		"The database pool now uses more than a third of your database's connection limit. Lower it if other applications need to connect.";
 	const refusal = $derived(formRefusal(note));
 
 	function submit() {
@@ -391,6 +393,10 @@
 					{:else}
 						<!-- A warning stays: the change is in force but will not survive a restart. -->
 						<Alert tone="warn">Applied. This engine runs without a database, so the change lasts until it restarts.</Alert>
+					{/if}
+					{#if note.poolWarning}
+						<!-- The engine's own caution never reaches the page, so the console words it. -->
+						<Alert tone="warn" dismissible>{POOL_WARNING}</Alert>
 					{/if}
 				{/if}
 			</div>

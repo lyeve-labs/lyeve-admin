@@ -73,6 +73,8 @@ export interface RuntimeSettingsAnswer {
 	settings: RuntimeSettingsMap;
 	facts: Record<string, RuntimeFact>;
 	replicas: RuntimeReplicas;
+	/** Set on a PUT answer when the new pool takes more than a third of the database's connections. */
+	warning?: string;
 }
 
 export type CpuChoice = { mode: 'automatic' } | { mode: 'fixed'; threads: number };

@@ -191,7 +191,10 @@ export const actions: Actions = {
 		if ('error' in parsed) return fail(422, { form: 'runtime' as const, error: parsed.error });
 		try {
 			const view = await putRuntimeSettings(authedClient(event), parsed.body);
-			return { form: 'runtime' as const, saved: true, stored: view.stored !== false };
+			// The engine's warning is a caution about the pool's share of the
+			// database's connections. Only whether it came travels, so the
+			// panel words it in the console's own sentence.
+			return { form: 'runtime' as const, saved: true, stored: view.stored !== false, poolWarning: Boolean(view.warning) };
 		} catch (err) {
 			return runtimeFailure(err);
 		}

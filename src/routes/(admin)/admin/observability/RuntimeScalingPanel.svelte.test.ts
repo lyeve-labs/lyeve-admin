@@ -227,6 +227,20 @@ describe('RuntimeScalingPanel', () => {
 		await vi.waitFor(() => expect(container.textContent).toContain('Settings saved.'));
 	});
 
+	it('warns in its own words when the saved pool takes a large share of the database', async () => {
+		const sentence = "The database pool now uses more than a third of your database's connection limit. Lower it if other applications need to connect.";
+		const { container } = setup(runtime(), { form: 'runtime', saved: true, stored: true, poolWarning: true });
+		await vi.waitFor(() => expect(container.textContent).toContain(sentence));
+		const dismiss = [...container.querySelectorAll('button[aria-label="Dismiss"]')].find((b) => b.parentElement?.textContent?.includes(sentence));
+		await fireEvent.click(dismiss as HTMLButtonElement);
+		await vi.waitFor(() => expect(container.textContent).not.toContain(sentence));
+	});
+
+	it('shows no pool warning after a save that raised none', () => {
+		const { container } = setup(runtime(), { form: 'runtime', saved: true, stored: true, poolWarning: false });
+		expect(container.textContent).not.toContain('more than a third');
+	});
+
 	it('says a change on an engine without a database lasts until it restarts', () => {
 		const { container } = setup(runtime({ stored: false }), { form: 'runtime', saved: true, stored: false });
 		expect(container.textContent).toContain('Applied. This engine runs without a database, so the change lasts until it restarts.');
