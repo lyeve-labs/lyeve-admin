@@ -67,8 +67,28 @@ describe('recommendationText', () => {
 		],
 		[
 			'pool_share',
-			{ pool: 18, server_share_percent: 80, connection_limit: 100, replicas: 3, reserved_sessions: 2, database_cores: 16 },
-			"Each of the 3 replicas gets an equal share of 80% of the database's 100 connections, minus 2 for the engine's own sessions, up to what the database's 16 cores can serve.",
+			{ pool: 18, server_share_percent: 80, connection_limit: 100, replicas: 3, reserved_sessions: 2 },
+			"Each of the 3 replicas gets an equal share of 80% of the database's 100 connections, minus 2 for the engine's own sessions.",
+		],
+		[
+			'pool_cores_cap',
+			{ pool: 17, share: 395, database_cores: 8, replicas: 1 },
+			"The database's 8 cores can serve fewer connections than the 395 its connection limit leaves the engine, so the pool is 17.",
+		],
+		[
+			'pool_cores_cap',
+			{ pool: 6, share: 130, database_cores: 8, replicas: 3 },
+			"The database's 8 cores can serve fewer connections than the 130 its connection limit leaves each of the 3 replicas, so each replica's pool is 6.",
+		],
+		[
+			'pool_default_cap',
+			{ pool: 25, share: 395, replicas: 1 },
+			"The database's connection limit leaves the engine 395 connections, but its cores are unknown, so the pool keeps its default of 25. Enter the database cores to refine it.",
+		],
+		[
+			'pool_default_cap',
+			{ pool: 25, share: 130, replicas: 3 },
+			"The database's connection limit leaves each of the 3 replicas 130 connections, but its cores are unknown, so the pool keeps its default of 25. Enter the database cores to refine it.",
 		],
 		[
 			'pool_share',

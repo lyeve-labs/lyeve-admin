@@ -127,9 +127,26 @@ const RECOMMENDATIONS: Record<string, (p: Params) => string | null> = {
 		const reserved = num(p, 'reserved_sessions');
 		if (share === null || limit === null || replicas === null || reserved === null) return null;
 		const who = replicas > 1 ? `Each of the ${count(replicas)} replicas gets an equal share of` : 'The engine gets';
+		return `${who} ${share}% of the database's ${count(limit)} connections, minus ${count(reserved)} for the engine's own sessions.`;
+	},
+	pool_cores_cap: (p) => {
+		const pool = num(p, 'pool');
+		const share = num(p, 'share');
 		const c = num(p, 'database_cores');
-		const capped = c === null ? '' : `, up to what the database's ${count(c)} cores can serve`;
-		return `${who} ${share}% of the database's ${count(limit)} connections, minus ${count(reserved)} for the engine's own sessions${capped}.`;
+		const replicas = num(p, 'replicas');
+		if (pool === null || share === null || c === null || replicas === null) return null;
+		if (replicas > 1) {
+			return `The database's ${count(c)} cores can serve fewer connections than the ${count(share)} its connection limit leaves each of the ${count(replicas)} replicas, so each replica's pool is ${count(pool)}.`;
+		}
+		return `The database's ${count(c)} cores can serve fewer connections than the ${count(share)} its connection limit leaves the engine, so the pool is ${count(pool)}.`;
+	},
+	pool_default_cap: (p) => {
+		const pool = num(p, 'pool');
+		const share = num(p, 'share');
+		const replicas = num(p, 'replicas');
+		if (pool === null || share === null || replicas === null) return null;
+		const leaves = replicas > 1 ? `each of the ${count(replicas)} replicas` : 'the engine';
+		return `The database's connection limit leaves ${leaves} ${count(share)} connections, but its cores are unknown, so the pool keeps its default of ${count(pool)}. Enter the database cores to refine it.`;
 	},
 };
 
