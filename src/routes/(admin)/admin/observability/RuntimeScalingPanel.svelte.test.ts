@@ -286,6 +286,17 @@ describe('RuntimeScalingPanel', () => {
 		expect(posted(container)).toEqual(['revision']);
 	});
 
+	it('draws an unknown fact as a note, never in the figure face', () => {
+		const { container } = setup(runtime());
+		const facts = container.querySelector('[data-testid="runtime-facts"]') as HTMLElement;
+		for (const figure of facts.querySelectorAll('.font-mono')) expect(figure.textContent).not.toContain('Not available');
+		const notes = [...facts.querySelectorAll('[data-testid="runtime-fact-unknown"]')].map((n) => n.textContent?.replace(/\s+/g, ' ').trim());
+		expect(notes).toEqual([
+			'Database connection limit Not available. Grant pg_read_all_stats to the database account to show this value.',
+			'Database cores Not available. This database does not report this value.',
+		]);
+	});
+
 	it('shows the values that apply only at start as read-only', () => {
 		const { container } = setup(runtime());
 		const start = container.querySelector('[data-testid="runtime-start-only"]') as HTMLElement;

@@ -452,7 +452,17 @@
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4" data-testid="runtime-facts">
 					{#each FACTS.filter((fact) => read.facts?.[fact.key]) as fact (fact.key)}
 						{@const f = read.facts[fact.key]}
-						<Stat size="sm" label={fact.label} mono value={formatFact(fact.kind, f)} sub={f && !f.known ? factText(f) : undefined} />
+						{#if f?.known}
+							<Stat size="sm" label={fact.label} mono value={formatFact(fact.kind, f)} />
+						{:else}
+							<!-- An unknown fact is a note, not a value: the Stat's large figure
+							     face broke "Not available" over two lines in a narrow cell. The
+							     frame and the label match the Stat beside it. -->
+							<div class="rounded-xl border border-line bg-surface p-4" data-testid="runtime-fact-unknown">
+								<p class="text-xs font-medium uppercase tracking-wide text-faint">{fact.label}</p>
+								<p class="mt-1 text-xs text-muted">Not available. {factText(f)}</p>
+							</div>
+						{/if}
 					{/each}
 				</div>
 			</Card>
