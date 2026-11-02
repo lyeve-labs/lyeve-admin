@@ -104,9 +104,10 @@
 	const hostCores = $derived(read?.facts?.host_cores?.known ? (numberOf(read.facts.host_cores.value) ?? undefined) : undefined);
 	const coresFact = $derived(read?.facts?.database_cores);
 
-	const PRESET_LABELS: Record<PresetKey, string> = { one_server: 'One large server', several_replicas: 'Several replicas' };
+	// Short enough that the row keeps each label on one line at 390 pixels.
+	const PRESET_LABELS: Record<PresetKey, string> = { one_server: 'One server', several_replicas: 'Replicas' };
 	const presetOptions = $derived([
-		{ value: 'current' as const, label: 'Values in force' },
+		{ value: 'current' as const, label: 'In force' },
 		...(['one_server', 'several_replicas'] as const)
 			.filter((k) => recs?.presets?.[k])
 			.map((k) => ({ value: k, label: PRESET_LABELS[k] })),
@@ -118,8 +119,8 @@
 	];
 	const memoryOptions = [
 		{ value: 'automatic' as const, label: 'Automatic' },
-		{ value: 'ratio' as const, label: 'Share of limit' },
-		{ value: 'bytes' as const, label: 'Fixed size' },
+		{ value: 'ratio' as const, label: 'Share' },
+		{ value: 'bytes' as const, label: 'Fixed' },
 		{ value: 'none' as const, label: 'None' },
 	];
 

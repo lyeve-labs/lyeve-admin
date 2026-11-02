@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, within } from '@testing-library/svelte';
 import { readFileSync } from 'node:fs';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -163,11 +163,19 @@ describe('RuntimeScalingPanel', () => {
 		}
 	});
 
+	it('keeps every segmented label short enough for one line at 390 pixels', () => {
+		const { getByRole } = setup(runtime());
+		const labels = (name: string) => [...getByRole('radiogroup', { name }).querySelectorAll('[role="radio"]')].map((r) => r.querySelector('span > span:not([aria-hidden])')?.textContent);
+		expect(labels('Start from')).toEqual(['In force', 'One server', 'Replicas']);
+		expect(labels('CPU threads')).toEqual(['Automatic', 'Fixed']);
+		expect(labels('Soft memory limit')).toEqual(['Automatic', 'Share', 'Fixed', 'None']);
+	});
+
 	it('offers presets, recommendations and editable fields to a licensed super admin', () => {
 		const { container, getByRole } = setup(runtime());
 		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(false);
-		expect(getByRole('radio', { name: 'One large server' })).toBeTruthy();
-		expect(getByRole('radio', { name: 'Several replicas' })).toBeTruthy();
+		expect(getByRole('radio', { name: 'One server' })).toBeTruthy();
+		expect(getByRole('radio', { name: 'Replicas' })).toBeTruthy();
 		expect(container.textContent).toContain(
 			'Recommended: 200%. On one server with a soft memory limit, 200% collects less often than the default of 100%, and the limit still caps memory use.',
 		);
@@ -271,9 +279,9 @@ describe('RuntimeScalingPanel', () => {
 				},
 			}),
 		);
-		expect(getByRole('radio', { name: 'Fixed' }).getAttribute('aria-checked')).toBe('true');
+		expect(within(fieldset(container, 'cpu')).getByRole('radio', { name: 'Fixed' }).getAttribute('aria-checked')).toBe('true');
 		expect((container.querySelector('#rt-cpu-threads') as HTMLInputElement).value).toBe('4');
-		expect(getByRole('radio', { name: 'Share of limit' }).getAttribute('aria-checked')).toBe('true');
+		expect(getByRole('radio', { name: 'Share' }).getAttribute('aria-checked')).toBe('true');
 		expect((container.querySelector('#rt-memory-percent') as HTMLInputElement).value).toBe('70');
 		expect(posted(container)).toEqual(['revision']);
 	});
@@ -293,12 +301,12 @@ describe('RuntimeScalingPanel', () => {
 
 	it('fills the fields from a preset without saving', async () => {
 		const { container, getByRole } = setup(runtime());
-		await fireEvent.click(getByRole('radio', { name: 'Several replicas' }));
+		await fireEvent.click(getByRole('radio', { name: 'Replicas' }));
 		await tick();
 		expect((container.querySelector('#rt-pool') as HTMLInputElement).value).toBe('12');
 		expect(posted(container)).toContain('database_max_connections');
 		expect(container.textContent).not.toContain('Settings saved.');
-		await fireEvent.click(getByRole('radio', { name: 'Values in force' }));
+		await fireEvent.click(getByRole('radio', { name: 'In force' }));
 		await tick();
 		expect((container.querySelector('#rt-pool') as HTMLInputElement).value).toBe('25');
 		expect(posted(container)).toEqual(['revision']);
