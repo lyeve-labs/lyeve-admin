@@ -65,6 +65,13 @@ describe('how values read', () => {
 		expect(formatSetting('gc_percent', setting({ value: 200 }))).toBe('200%');
 	});
 
+	it('words every value of the connection pooler', () => {
+		expect(formatSetting('pooler', setting({ value: 'none' }))).toBe('None');
+		expect(formatSetting('pooler', setting({ value: 'pgbouncer' }))).toBe('PgBouncer');
+		expect(formatSetting('pooler', setting({ value: 'proxysql' }))).toBe('ProxySQL');
+		expect(formatSetting('pooler', setting({ value: '' }))).toBe('-');
+	});
+
 	it('reads an unknown fact as not available, never as zero', () => {
 		expect(formatFact('count', { value: 0, known: false, reason_code: 'no_database' })).toBe('Not available');
 		expect(formatFact('count', undefined)).toBe('Not available');

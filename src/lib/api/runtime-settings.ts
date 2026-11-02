@@ -220,6 +220,9 @@ export function formatMemory(v: unknown): string {
 	return formatBytes(n);
 }
 
+/** The connection pooler's values as a reader sees them. Another value is a name and shows as sent. */
+const POOLERS: Record<string, string> = { none: 'None', pgbouncer: 'PgBouncer', proxysql: 'ProxySQL' };
+
 /** A setting's value in force as the panel shows it. */
 export function formatSetting(key: keyof RuntimeSettingsMap, s: RuntimeSetting | undefined): string {
 	if (!s) return NO_VALUE;
@@ -235,6 +238,7 @@ export function formatSetting(key: keyof RuntimeSettingsMap, s: RuntimeSetting |
 		if (v === null || v === false || n === 0) return 'Off';
 		return n === null ? NO_VALUE : formatCount(n);
 	}
+	if (key === 'pooler' && typeof v === 'string' && v) return POOLERS[v] ?? v;
 	if (typeof v === 'string') return v || NO_VALUE;
 	return formatCount(num(v));
 }

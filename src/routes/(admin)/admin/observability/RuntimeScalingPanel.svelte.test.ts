@@ -292,6 +292,8 @@ describe('RuntimeScalingPanel', () => {
 		expect(start.querySelector('input')).toBeNull();
 		expect(start.textContent).toContain('Set by BACKPRESSURE_MAX_INFLIGHT. Applies when the engine starts.');
 		expect(start.textContent).toContain('Default. Applies when the engine starts.');
+		expect(start.textContent).toContain('None');
+		expect(start.textContent).not.toContain('none');
 	});
 
 	it('posts nothing but the revision until a field changes', () => {
