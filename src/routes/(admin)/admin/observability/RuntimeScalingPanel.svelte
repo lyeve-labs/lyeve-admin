@@ -124,6 +124,9 @@
 	];
 
 	const pinned = (s: RuntimeSetting | undefined) => Boolean(s?.pinned);
+	// The kit's controls draw their disabled state only from their own prop, not
+	// from the fieldset around them, so each control takes this as well.
+	const locked = (s: RuntimeSetting | undefined) => !canEdit || !s || pinned(s);
 
 	/** A preset fills the fields it covers and saves nothing. A pinned field keeps its value. */
 	function applyPreset(key: 'current' | PresetKey) {
@@ -291,12 +294,13 @@
 					{/snippet}
 					<div class="flex flex-col gap-4">
 						{@render inForce('cpu', read.settings.cpu)}
-						<fieldset disabled={!canEdit || !read.settings.cpu || pinned(read.settings.cpu)} class="flex flex-col gap-4" data-testid="runtime-field-cpu">
+						<fieldset disabled={locked(read.settings.cpu)} class="flex flex-col gap-4" data-testid="runtime-field-cpu">
 							<SegmentedControl
 								label="CPU threads"
 								labelHidden
 								name={cpuDirty ? 'cpu_mode' : undefined}
 								options={cpuOptions}
+								disabled={locked(read.settings.cpu)}
 								bind:value={cpuMode}
 								hint="Automatic follows the CPU limit of the container or machine."
 							/>
@@ -323,12 +327,13 @@
 					{/snippet}
 					<div class="flex flex-col gap-4">
 						{@render inForce('memory', read.settings.memory)}
-						<fieldset disabled={!canEdit || !read.settings.memory || pinned(read.settings.memory)} class="flex flex-col gap-4" data-testid="runtime-field-memory">
+						<fieldset disabled={locked(read.settings.memory)} class="flex flex-col gap-4" data-testid="runtime-field-memory">
 							<SegmentedControl
 								label="Soft memory limit"
 								labelHidden
 								name={memoryDirty ? 'memory_mode' : undefined}
 								options={memoryOptions}
+								disabled={locked(read.settings.memory)}
 								bind:value={memoryMode}
 								hint="Automatic uses 85% of the memory limit and follows it when it changes."
 							/>
@@ -365,7 +370,7 @@
 					{/snippet}
 					<div class="flex flex-col gap-4">
 						{@render inForce('gc_percent', read.settings.gc_percent)}
-						<fieldset disabled={!canEdit || !read.settings.gc_percent || pinned(read.settings.gc_percent)} class="flex flex-col gap-4" data-testid="runtime-field-gc_percent">
+						<fieldset disabled={locked(read.settings.gc_percent)} class="flex flex-col gap-4" data-testid="runtime-field-gc_percent">
 							<NumberInput
 								id="rt-gc-percent"
 								name={gcDirty ? 'gc_percent' : undefined}
@@ -387,7 +392,7 @@
 					<div class="flex flex-col gap-4">
 						{@render inForce('database_max_connections', read.settings.database_max_connections)}
 						<fieldset
-							disabled={!canEdit || !read.settings.database_max_connections || pinned(read.settings.database_max_connections)}
+							disabled={locked(read.settings.database_max_connections)}
 							class="flex flex-col gap-4"
 							data-testid="runtime-field-database_max_connections"
 						>

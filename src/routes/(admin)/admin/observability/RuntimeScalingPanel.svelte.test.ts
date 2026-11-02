@@ -148,6 +148,21 @@ describe('RuntimeScalingPanel', () => {
 		expect(container.querySelector('[data-testid="runtime-recommendations"]')).toBeNull();
 	});
 
+	it('draws the CPU and memory controls disabled with the fields around them', () => {
+		const segments = (c: HTMLElement, key: string) => [...fieldset(c, key).querySelectorAll('[role="radio"]')];
+		const { container } = setup(runtime({ licensed: false }));
+		for (const key of ['cpu', 'memory']) {
+			expect(segments(container, key).length).toBeGreaterThan(0);
+			for (const radio of segments(container, key)) expect(radio.hasAttribute('disabled')).toBe(true);
+			expect(fieldset(container, key).querySelector('[role="radiogroup"]')?.classList.contains('opacity-50')).toBe(true);
+		}
+		cleanup();
+		const open = setup(runtime());
+		for (const key of ['cpu', 'memory']) {
+			for (const radio of segments(open.container, key)) expect(radio.hasAttribute('disabled')).toBe(false);
+		}
+	});
+
 	it('offers presets, recommendations and editable fields to a licensed super admin', () => {
 		const { container, getByRole } = setup(runtime());
 		for (const key of SETTINGS) expect(fieldset(container, key).disabled).toBe(false);
