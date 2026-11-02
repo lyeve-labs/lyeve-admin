@@ -188,7 +188,7 @@ export const SAID = {
 	expired: 'This code expired. Connect again from the builder to get a new one.',
 	decided: 'This request was already approved or declined.',
 	keyChanged: 'The key changed after you opened this request. Find the request again.',
-	lifetime: 'An admin shortened how long a connection can last after you opened this request. Choose again.',
+	lifetime: 'An administrator shortened how long a connection can last after you opened this request. Choose again.',
 	stepUpMissing: 'Enter your password or your MFA code.',
 	approvalUnavailable: 'Approving connections is not available on this engine.',
 	checkUnavailable: 'Could not check your password or MFA code. The connection was not approved. Try again.',
