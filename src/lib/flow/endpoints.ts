@@ -40,7 +40,7 @@ export function triggerProtocols(config: Record<string, unknown>): Protocol[] {
 /** Why a slug is refused, or undefined when the engine will take it. */
 export function slugError(slug: string): string | undefined {
 	if (SLUG_PATTERN.test(slug)) return undefined;
-	return 'Lowercase letters, digits, - and _, starting with a letter, at most 40 characters.';
+	return 'Use up to 40 lower case letters, digits, - and _, starting with a letter.';
 }
 
 /**
@@ -70,7 +70,7 @@ export function flowEndpoints(origin: string, flowId: string, definition: Pick<F
 			key: 'admin',
 			label: 'Admin invoke URL',
 			value: `${origin}/api/admin/flows/${flowId}/invoke`,
-			hint: 'An admin flow answers here only, with an admin session. No transport reaches it.',
+			hint: 'An admin flow runs only from this URL, with an admin session. It has no public URL, and GraphQL, gRPC and realtime cannot call it.',
 		});
 		return out;
 	}
@@ -82,7 +82,7 @@ export function flowEndpoints(origin: string, flowId: string, definition: Pick<F
 			hint: 'With a signed-in user or an API key.',
 		});
 		if (auth === 'public') {
-			out.push({ key: 'public', label: 'Public URL', value: `${origin}/api/v1/flows/p/${flowId}`, hint: 'No credentials. Named by id, so a rename leaves it as it is.' });
+			out.push({ key: 'public', label: 'Public URL', value: `${origin}/api/v1/flows/p/${flowId}`, hint: 'No credentials. The URL uses the flow id, so renaming the flow does not change it.' });
 			if (path) out.push({ key: 'path', label: 'Custom path', value: `${origin}${path}`, hint: 'No credentials.', option: 'path' });
 		}
 	}
@@ -109,7 +109,7 @@ export function flowEndpoints(origin: string, flowId: string, definition: Pick<F
 			key: 'realtime',
 			label: 'Realtime message',
 			value: `{"type":"flow.run","ref":"1","slug":"${slug}","input":{}}`,
-			hint: `Sent on a socket open at ${origin.replace(/^http/, 'ws')}/api/v1/ws/connect; the answer comes back as flow.result.`,
+			hint: `Sent on a socket open at ${origin.replace(/^http/, 'ws')}/api/v1/ws/connect. The result comes back as flow.result.`,
 			option: 'protocols',
 		});
 	}

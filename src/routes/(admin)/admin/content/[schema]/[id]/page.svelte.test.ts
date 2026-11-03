@@ -192,7 +192,7 @@ describe('content entry editor, revision count', () => {
 		render(EntryPage, { props: { data: data({ revisions, revisionTotal: 600 }), form: null } });
 		const toggle = screen.getByRole('button', { name: /History \(600\)/ });
 		await fireEvent.click(toggle);
-		expect(screen.getByText(/The newest 2 of 600 revisions are listed/)).toBeTruthy();
+		expect(screen.getByText(/Showing the newest 2 of 600 revisions/)).toBeTruthy();
 		const open = screen.getByLabelText('Revision number') as HTMLInputElement;
 		expect(open.name).toBe('rev_num');
 		expect(open.closest('form')?.getAttribute('action')).toBe('?/openRevision');
@@ -252,6 +252,6 @@ describe('content entry editor, history off', () => {
 			props: { data: data({ historyEnabled: null, revisionsFailed: true, canManageHistory: true }), form: null },
 		});
 		expect(screen.queryByTestId('history-off')).toBeNull();
-		expect(screen.getByText('The revision history could not be read.')).toBeTruthy();
+		expect(screen.getByText('Could not load the revision history. Reload the page to try again.')).toBeTruthy();
 	});
 });

@@ -137,7 +137,7 @@ describe('config sync diff and apply', () => {
 		const out = (await actions.apply(event(sync))) as { status: number; data: Record<string, unknown> };
 		expect(out.status).toBe(409);
 		expect(out.data.result).toEqual(result);
-		expect(out.data.error).toContain('stopped part way');
+		expect(out.data.error).toContain('stopped partway');
 	});
 
 	it('says nothing was written when the engine did not answer', async () => {

@@ -291,7 +291,7 @@ describe('rotating a webhook signing secret', () => {
 		const down = postEvent({ id: 'w1' }, () => json({ error: 'pq: timeout' }, 503), ['super_admin']);
 		expect(await actions['rotate-secret'](down.event)).toEqual({
 			status: 400,
-			data: { action: 'rotate-secret', error: 'Failed to rotate webhook secret' },
+			data: { action: 'rotate-secret', error: 'Could not rotate the signing secret. Try again.' },
 		});
 	});
 });
@@ -303,16 +303,16 @@ describe('rotating a webhook signing secret', () => {
  */
 describe('the delivery and dead-letter actions each report their own outcome', () => {
 	const cases = {
-		test: { fields: { id: 'w1' }, ok: { success: true, status_code: 200, message: 'OK' }, fallback: 'Failed to test webhook' },
-		deliveries: { fields: { id: 'w1' }, ok: [], fallback: 'Failed to load deliveries' },
+		test: { fields: { id: 'w1' }, ok: { success: true, status_code: 200, message: 'OK' }, fallback: 'Could not test the webhook. Try again.' },
+		deliveries: { fields: { id: 'w1' }, ok: [], fallback: 'Could not load deliveries. Try again.' },
 		'retry-delivery': {
 			fields: { id: 'w1', delivery_id: 'd1' },
 			ok: { delivery_id: 'd1', success: true, message: 'Delivered' },
-			fallback: 'Failed to retry delivery',
+			fallback: 'Could not retry the delivery. Try again.',
 		},
-		'dead-letter-replay': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'replayed', http_status: 200 }, fallback: 'Failed to replay dead letter' },
-		'dead-letter-dismiss': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'dismissed' }, fallback: 'Failed to dismiss dead letter' },
-		'dead-letter-delete': { fields: { id: 'dl1' }, ok: null, fallback: 'Failed to delete dead letter' },
+		'dead-letter-replay': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'replayed', http_status: 200 }, fallback: 'Could not replay the dead letter. Try again.' },
+		'dead-letter-dismiss': { fields: { id: 'dl1' }, ok: { id: 'dl1', status: 'dismissed' }, fallback: 'Could not dismiss the dead letter. Try again.' },
+		'dead-letter-delete': { fields: { id: 'dl1' }, ok: null, fallback: 'Could not delete the dead letter. Try again.' },
 	} as const;
 	const names = Object.keys(cases) as (keyof typeof cases)[];
 

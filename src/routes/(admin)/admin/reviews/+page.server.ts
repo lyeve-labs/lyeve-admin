@@ -58,9 +58,9 @@ export type ReviewsPage = {
 	people: Record<string, string>;
 };
 
-const DEFINITIONS_FAILED = 'The review definitions could not be read. This is not a report that there are none.';
-const ASSIGNMENTS_FAILED = 'The review assignments could not be read. This is not a report that nothing is under review.';
-const SCHEMAS_FAILED = 'The content schemas could not be read.';
+const DEFINITIONS_FAILED = 'Could not load review definitions.';
+const ASSIGNMENTS_FAILED = 'Could not load review assignments.';
+const SCHEMAS_FAILED = 'Could not load content schemas.';
 
 /**
  * The title each listed entry is known by. The assignment list carries only
@@ -182,7 +182,7 @@ export const actions: Actions = {
 		const slug = String(form.get('slug') ?? '').trim();
 		const contentSchema = String(form.get('content_schema') ?? '').trim();
 		const publishOnApprove = form.get('publish_on_approve') !== 'false';
-		if (!name) return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: { name: 'Name is required' } });
+		if (!name) return fail(400, { action: 'create', error: 'Check the highlighted fields.', fields: { name: 'Enter a name.' } });
 		const parsed = parseStages(String(form.get('stages') ?? '[]'));
 		if ('error' in parsed) return fail(400, { action: 'create', error: parsed.error });
 		try {
@@ -196,7 +196,7 @@ export const actions: Actions = {
 		} catch (err) {
 			// A 402 is the workflow ceiling or a paid stage setting, and the
 			// drawer renders the plugin's own numbers or capability.
-			const failed = actionFailure(err, 'Failed to create the definition.');
+			const failed = actionFailure(err, 'Could not create the definition. Try again.');
 			return fail(failed.status, { ...failed.data, action: 'create' });
 		}
 		return { created: true };
@@ -206,11 +206,11 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '').trim();
-		if (!id) return fail(400, { action: 'delete', error: 'Pick a definition to delete.' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its definition. Reload the page and try again.' });
 		try {
 			await deleteDefinition(authedClient(event), id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Failed to delete the definition.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the definition. Try again.') });
 		}
 		return { deleted: true };
 	},

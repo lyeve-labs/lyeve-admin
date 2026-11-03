@@ -97,7 +97,7 @@ describe('Content entry delete confirmation', () => {
 			{ confirmLabel?: string; detail?: string },
 		];
 		expect(title).toBe('Delete The launch post?');
-		expect(message).toBe('Its revisions and translations go with it.');
+		expect(message).toBe('Its revisions and translations are deleted too.');
 		expect(message).not.toContain('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
 		expect(options.confirmLabel).toBe('Delete');
 		expect(options.detail).toBe('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');

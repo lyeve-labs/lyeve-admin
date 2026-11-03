@@ -152,7 +152,7 @@
 	let schIncludeSchemas = $state(false);
 	let schIncludeMedia = $state(false);
 	let schTemplate = $state('');
-	const cronOptions = [...CRON_PRESETS, { value: 'custom', label: 'A cron expression of my own' }];
+	const cronOptions = [...CRON_PRESETS, { value: 'custom', label: 'Custom cron expression' }];
 	function openSchedule() {
 		schName = '';
 		schCron = '0 2 * * *';
@@ -171,8 +171,8 @@
 
 	function removeSchedule(s: ExportSchedule): SubmitFunction {
 		return confirmed(
-			`Delete schedule ${s.name}`,
-			'It stops starting exports. The exports it already started stay in the list.',
+			`Delete schedule ${s.name}?`,
+			'No new exports start from it. Exports it already started stay in the list.',
 			{ confirmLabel: 'Delete' },
 		);
 	}
@@ -180,7 +180,7 @@
 
 <PageShell
 	title="Data export"
-	description="Exports that have run, what a running one is doing, and the schedules that start them."
+	description="Export your data, follow running exports and schedule recurring ones."
 	width="wide"
 >
 	{#snippet actions()}
@@ -199,17 +199,17 @@
 			level={2}
 			gate={data.gate}
 			title="Data export"
-			absent="The data export plugin is not part of this build, so nothing can be exported from here."
+			absent="Data export is not included in this build."
 		/>
 	{:else}
 		<FormErrors message={rowError} />
 		{#if form?.started}
 			<Alert tone="success" autoDismiss>
-				Export started. It runs in the background, and the list below follows it until it finishes.
+				Export started. It runs in the background, and the list below updates until it finishes.
 			</Alert>
 		{/if}
 		{#if form?.canceled}
-			<Alert tone="brand" autoDismiss>Export canceled. It wrote no file.</Alert>
+			<Alert tone="brand" autoDismiss>Export canceled. No file was created.</Alert>
 		{/if}
 		{#if form?.scheduled}
 			<Alert tone="success" autoDismiss>Schedule created.</Alert>
@@ -234,15 +234,15 @@
 					<p class="flex items-center gap-2 text-xs text-muted" role="status">
 						<Spinner size={ICON.xs} />
 						{running.length === 1 ? 'One export is running.' : `${running.length} exports are running.`}
-						This list follows it until it finishes.
+						This list updates until every export finishes.
 					</p>
 				{/if}
 			</div>
 
 			{#if data.jobs.length === 0}
 				<EmptyState
-					title="Nothing has been exported"
-					description="An export runs in the background and appears here while it works."
+					title="No exports yet"
+					description="Exports appear here while they run and after they finish."
 				>
 					{#snippet iconSnippet()}
 						<Download size={ICON.lg} />
@@ -254,7 +254,7 @@
 			{:else}
 				<ListToolbar label="Filter exports">
 					{#snippet search()}
-						<label for="export-narrow" class="sr-only">Narrow this page</label>
+						<label for="export-narrow" class="sr-only">Search this page</label>
 						<SearchInput
 							id="export-narrow"
 							bind:value={narrow}
@@ -264,7 +264,7 @@
 				</ListToolbar>
 
 				{#if visible.length === 0}
-					<EmptyState title="Nothing on this page matches" description="Clear the filter to see the rest.">
+					<EmptyState title="No exports match this search" description="Clear the search to see the rest.">
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}
@@ -322,7 +322,7 @@
 										{#if job.rows_total > 0}<span class="text-faint"> of {formatCount(job.rows_total)}</span>{/if}
 										{#if atCeiling(job)}
 											<div class="text-warn">
-												Reached the {formatCount(EXPORT_ROW_CEILING)} entry ceiling. Entries past it are not in the file.
+												Reached the {formatCount(EXPORT_ROW_CEILING)} entry limit. Entries past it are not in the file.
 											</div>
 										{/if}
 									</td>
@@ -380,12 +380,12 @@
 				<GateNotice
 					gate={data.schedules.gate}
 					title="Export schedules"
-					absent="This build does not run exports on a schedule."
+					absent="Scheduled exports are not included in this build."
 				/>
 			{:else if data.schedules.value.length === 0}
 				<EmptyState
-					title="No recurring export"
-					description="A schedule starts an export on a timetable, in UTC, and each run appears in the list above."
+					title="No schedules yet"
+					description="Create a schedule to run an export on a timetable, in UTC. Each run appears in the list above."
 				>
 					{#snippet iconSnippet()}
 						<CalendarClock size={ICON.lg} />
@@ -467,7 +467,7 @@
 <Drawer
 	bind:open={startOpen}
 	title="New export"
-	description="The export runs in the background. This page follows it and offers the file when it finishes."
+	description="The export runs in the background. You can download the file here when it finishes."
 >
 	<form id="start-export-form" method="post" action="?/start" use:enhance={start.enhance}>
 		<div class="flex flex-col gap-4">
@@ -494,7 +494,7 @@
 <Drawer
 	bind:open={scheduleOpen}
 	title="New schedule"
-	description="Starts the same export on a timetable, in UTC. A run that falls behind runs once, not once per missed time."
+	description="Run this export on a timetable, in UTC. Missed runs are caught up with a single run."
 >
 	<form id="schedule-form" method="post" action="?/createSchedule" use:enhance={createSchedule.enhance}>
 		<div class="flex flex-col gap-4">

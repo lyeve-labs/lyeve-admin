@@ -53,8 +53,8 @@
 
 	async function askDelete(q: PersistedQuery) {
 		const ok = await confirm(
-			`Delete persisted query ${q.operation_name || q.query_hash.slice(0, 12)}`,
-			'A client that sends only its hash is refused from then on.',
+			`Delete persisted query ${q.operation_name || q.query_hash.slice(0, 12)}?`,
+			'Clients that send only its hash will be refused.',
 			{ confirmLabel: 'Delete' },
 		);
 		if (!ok) return;
@@ -86,7 +86,7 @@
 <PageShell
 	title="GraphQL"
 	documentTitle="GraphQL - Settings"
-	description="The schema this instance generates from your content types, where it answers, and the queries it allows by hash."
+	description="See the GraphQL schema built from your content types, its endpoints and the queries clients can call by hash."
 	width="wide"
 >
 	{#snippet actions()}
@@ -104,28 +104,28 @@
 			level={2}
 			gate={data.gate}
 			title="GraphQL"
-			absent="The GraphQL plugin is not part of this build, so nothing answers on these paths."
+			absent="GraphQL is not included in this build."
 		/>
 	{:else}
 		<section class="flex flex-col gap-3">
-			<SectionHeading level={2}>Where it answers</SectionHeading>
+			<SectionHeading level={2}>Endpoints</SectionHeading>
 			<Table label="GraphQL endpoints">
 				<tbody>
 					<tr>
 						<th scope="row" class="text-sm">Queries and mutations</th>
 						<td data-cell="nowrap" class="font-mono text-xs">POST {GRAPHQL_HTTP}</td>
-						<td class="min-w-48 text-xs text-muted">A GET on the same path answers only that the endpoint is ready.</td>
+						<td class="min-w-48 text-xs text-muted">A GET on the same path only reports whether the endpoint is ready.</td>
 					</tr>
 					<tr>
 						<th scope="row" class="text-sm">Subscriptions</th>
 						<td data-cell="nowrap" class="font-mono text-xs">GET {GRAPHQL_WS}</td>
-						<td class="min-w-48 text-xs text-muted">WebSocket, the graphql-ws protocol: send the token in connection_init.</td>
+						<td class="min-w-48 text-xs text-muted">WebSocket with the graphql-ws protocol. Send the token in connection_init.</td>
 					</tr>
 				</tbody>
 			</Table>
 			<p class="text-xs text-muted">
-				Both take the same credentials as the REST API: a bearer token or an API key. A client that sends a
-				persisted query's hash instead of its text needs it on the list below.
+				Both accept the same credentials as the REST API, a bearer token or an API key. To send a persisted
+				query's hash instead of its text, the query must be on the list below.
 			</p>
 			<div class="flex flex-col gap-2">
 				<div class="flex items-center justify-between gap-2">
@@ -139,17 +139,17 @@
 		<section class="flex flex-col gap-3">
 			<SectionHeading level={2}>Schema</SectionHeading>
 			{#if !data.schema.ok}
-				<GateNotice gate={data.schema.gate} title="GraphQL schema" absent="This version of the GraphQL plugin does not describe its schema." />
+				<GateNotice gate={data.schema.gate} title="GraphQL schema" absent="The schema view needs a newer version of the GraphQL plugin." />
 			{:else if refused}
 				<Alert tone="warn">
-					The engine refused to describe its schema: {refused} The graphql.introspection setting limits
-					introspection to admins by default and can turn it off. The schema is served either way.
+					Introspection was refused: {refused} By default the graphql.introspection setting allows it only for
+					admins, and the setting can turn it off. The schema is served either way.
 				</Alert>
 			{:else if !schemaRoots}
-				<Alert tone="danger">The schema could not be read. This is not a report that it is empty.</Alert>
+				<Alert tone="danger">Could not load the GraphQL schema. Reload the page to try again.</Alert>
 			{:else}
 				<p class="text-xs text-muted">
-					Generated from the content types, so a schema you add in the Schema builder appears here as its own
+					Built from your content types. A schema you add in the Schema builder appears here as its own
 					fields.
 				</p>
 				<div class="grid gap-4 xl:grid-cols-3">
@@ -196,13 +196,13 @@
 				{/if}
 			</div>
 			<p class="text-xs text-muted">
-				A client sends the hash of a query instead of its text. Queries on this list answer by hash. One a client
-				registered itself is marked automatic, and a disabled one is refused until it is switched back on.
+				Clients can send the hash of a query instead of its text. Only queries on this list run by hash. A query a
+				client registered itself is marked automatic, and a disabled query is refused until you enable it again.
 			</p>
 			{#if !data.persisted.ok}
-				<GateNotice gate={data.persisted.gate} title="Persisted queries" absent="This version of the GraphQL plugin keeps no persisted queries." />
+				<GateNotice gate={data.persisted.gate} title="Persisted queries" absent="Persisted queries need a newer version of the GraphQL plugin." />
 			{:else if persisted.length === 0}
-				<EmptyState title="No persisted queries" description="Register a query to let clients call it by hash.">
+				<EmptyState title="No persisted queries yet" description="Register a query to let clients call it by hash.">
 					{#snippet iconSnippet()}<Braces size={ICON.lg} />{/snippet}
 					{#snippet action()}
 						<Button variant="secondary" onclick={openRegister}>

@@ -37,7 +37,7 @@ function startError(err: unknown): string {
 		const said = (err.body as { error?: unknown } | undefined)?.error;
 		if (said === EXPORTS_BUSY) return 'Too many exports are running. Try again in a moment.';
 	}
-	return actionError(err, 'The export could not be started.');
+	return actionError(err, 'Could not start the export. Try again.');
 }
 
 const DEFAULT_LIMIT = 50;
@@ -82,11 +82,11 @@ export const load: PageServerLoad = async (event) => {
 			? await Promise.all([
 					section(
 						listSchedules(client).then((p) => p.data),
-						'The schedules could not be read. This is not a report that there are none.'
+						'Could not load the schedules.'
 					),
 					section(
 						getSchemas(client).then((rows) => rows.map((s) => s.name).sort((a, b) => a.localeCompare(b))),
-						'The schema list could not be read.'
+						'Could not load the schemas.'
 					),
 				])
 			: [unread(), unread()];
@@ -102,7 +102,7 @@ export const actions: Actions = {
 
 		const name = String(form.get('name') ?? '').trim();
 		if (!name) {
-			return fail(400, { action: 'start' as const, error: 'Name the export so it can be told apart in the list.' });
+			return fail(400, { action: 'start' as const, error: 'Enter a name for the export.' });
 		}
 		const config = exportConfigFrom(form);
 		if ('error' in config) return fail(400, { action: 'start' as const, error: config.error });
@@ -120,12 +120,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'cancel' as const, error: 'No export was named.' });
+		if (!id) return fail(400, { action: 'cancel' as const, error: 'This form is missing its export. Reload the page and try again.' });
 		try {
 			await cancelJob(client, id);
 			return { canceled: id };
 		} catch (err) {
-			return fail(400, { action: 'cancel' as const, error: actionError(err, 'The export could not be canceled.') });
+			return fail(400, { action: 'cancel' as const, error: actionError(err, 'Could not cancel the export. Try again.') });
 		}
 	},
 
@@ -136,8 +136,8 @@ export const actions: Actions = {
 
 		const name = String(form.get('name') ?? '').trim();
 		const cron = String(form.get('cron_expression') ?? '').trim();
-		if (!name) return fail(400, { action: 'createSchedule' as const, error: 'Name the schedule so its exports can be told apart.' });
-		if (!cron) return fail(400, { action: 'createSchedule' as const, error: 'Say when the schedule runs.' });
+		if (!name) return fail(400, { action: 'createSchedule' as const, error: 'Enter a name for the schedule.' });
+		if (!cron) return fail(400, { action: 'createSchedule' as const, error: 'Choose when the schedule runs.' });
 		const config = exportConfigFrom(form);
 		if ('error' in config) return fail(400, { action: 'createSchedule' as const, error: config.error });
 
@@ -150,7 +150,7 @@ export const actions: Actions = {
 			});
 			return { scheduled: name };
 		} catch (err) {
-			return fail(400, { action: 'createSchedule' as const, error: actionError(err, 'The schedule could not be created.') });
+			return fail(400, { action: 'createSchedule' as const, error: actionError(err, 'Could not create the schedule. Try again.') });
 		}
 	},
 
@@ -159,13 +159,13 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'toggleSchedule' as const, error: 'No schedule was named.' });
+		if (!id) return fail(400, { action: 'toggleSchedule' as const, error: 'This form is missing its schedule. Reload the page and try again.' });
 		const enabled = form.get('enabled') === 'true';
 		try {
 			await setScheduleEnabled(client, id, enabled);
 			return { toggled: id, enabled };
 		} catch (err) {
-			return fail(400, { action: 'toggleSchedule' as const, error: actionError(err, 'The schedule could not be changed.') });
+			return fail(400, { action: 'toggleSchedule' as const, error: actionError(err, 'Could not save the schedule. Try again.') });
 		}
 	},
 
@@ -174,12 +174,12 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'deleteSchedule' as const, error: 'No schedule was named.' });
+		if (!id) return fail(400, { action: 'deleteSchedule' as const, error: 'This form is missing its schedule. Reload the page and try again.' });
 		try {
 			await deleteSchedule(client, id);
 			return { deleted: id };
 		} catch (err) {
-			return fail(400, { action: 'deleteSchedule' as const, error: actionError(err, 'The schedule could not be deleted.') });
+			return fail(400, { action: 'deleteSchedule' as const, error: actionError(err, 'Could not delete the schedule. Try again.') });
 		}
 	},
 };

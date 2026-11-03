@@ -30,7 +30,7 @@ function catchRedirect(fn: () => unknown): Promise<{ status: number; location: s
 	);
 }
 
-const ENGINE_SILENT = 'The engine did not answer. It may be restarting. Try again in a moment.';
+const ENGINE_SILENT = 'Could not reach the engine. If you just restarted it, wait a moment and try again.';
 
 function fetchReturning(body: unknown, status = 200) {
 	return vi.fn(async (_url: string, _init?: RequestInit) => json(body, status)) as unknown as typeof globalThis.fetch;
@@ -151,13 +151,13 @@ describe('setup actions.create', () => {
 		const fetch = vi.fn();
 		const { setup_token: _omit, ...rest } = valid;
 		const result = await actions.create(actionEvent(rest, fetch));
-		expect(result).toEqual({ error: 'The setup token is required.' });
+		expect(result).toEqual({ error: 'Enter the setup token.' });
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
 	it('returns error when email is missing', async () => {
 		const result = await actions.create(actionEvent({ setup_token: 't', password: 'pw', confirm: 'pw' }, vi.fn()));
-		expect(result).toEqual({ error: 'Email and password are required.' });
+		expect(result).toEqual({ error: 'Enter your email and password.' });
 	});
 
 	it('returns error when passwords do not match', async () => {
@@ -239,7 +239,7 @@ describe('setup actions.create', () => {
 
 	it('keeps the plain failure for a refusal it has no words for', async () => {
 		const result = await actions.create(actionEvent(valid, fetchReturning({ error: 'forbidden' }, 403)));
-		expect(result).toEqual({ error: 'Setup failed.' });
+		expect(result).toEqual({ error: 'Could not finish setup. Try again.' });
 	});
 });
 

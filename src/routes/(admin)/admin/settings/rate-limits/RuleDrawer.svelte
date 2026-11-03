@@ -126,7 +126,7 @@
 			<Autocomplete
 				id="rl-route"
 				label="Pick a route"
-				hint="Every route this instance serves, including plugin routes such as the realtime stream and GraphQL, and the URLs your flows answer. Picking one fills the endpoint below."
+				hint="Choose from every route on this instance, including plugin routes such as the realtime stream and GraphQL, and your flow URLs. Your choice fills in the endpoint below."
 				placeholder="Search by path, method or name"
 				options={routes}
 				onchange={(v) => {
@@ -151,7 +151,7 @@
 					hint={!editing
 						? 'Leave empty to apply the rule to every tenant.'
 						: editing.tenant_id
-							? 'Name another tenant to move the rule there. A rule cannot move to every tenant on an edit: delete it and create it again.'
+							? 'Enter another tenant to move the rule there. To apply it to every tenant, delete it and create it again.'
 							: 'Leave empty to keep the rule on every tenant, or name a tenant to move it there.'}
 					placeholder={editing && !editing.tenant_id ? 'Every tenant' : undefined}
 					required={!!editing?.tenant_id}
@@ -171,7 +171,7 @@
 					id="rl-rate"
 					name="rate"
 					label="Requests per second"
-					hint="Sustained. How fast the allowance refills."
+					hint="The sustained rate, which is how fast the allowance refills."
 					bind:value={rate}
 				/>
 				<Input

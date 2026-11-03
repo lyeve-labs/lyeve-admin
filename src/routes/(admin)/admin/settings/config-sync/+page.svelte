@@ -125,8 +125,8 @@
 		const ok = await confirm(
 			'Apply this bundle?',
 			prune
-				? 'This instance will match the bundle. Flows, permission rules and webhooks the bundle does not name are deleted. Content types are never deleted.'
-				: 'This instance will match the bundle. Nothing the bundle does not name is deleted.',
+				? 'This instance will match the bundle. Flows, permission rules and webhooks that are not in the bundle will be deleted. Content types are never deleted.'
+				: 'This instance will match the bundle. Nothing missing from the bundle is deleted.',
 			{ confirmLabel: 'Apply' },
 		);
 		if (!ok || !syncForm) return;
@@ -192,7 +192,7 @@
 				required
 				bind:value={exportPass}
 				error={scope === 'export' ? errors.passphrase : undefined}
-				hint="At least {MIN_PASSPHRASE} characters. It seals every webhook secret and header in the bundle, and the target needs it to open them. Keep it apart from the file."
+				hint="At least {MIN_PASSPHRASE} characters. It encrypts every webhook secret and header in the bundle, and you need it to apply the bundle on another instance. Store it separately from the file."
 			/>
 			{#if exportMessage}
 				<Alert tone="danger">{exportMessage}</Alert>
@@ -234,7 +234,7 @@
 				id="bundle-file"
 				label="Bundle file"
 				accept=".json,application/json"
-				hint="The JSON file an export downloaded."
+				hint="The JSON file you downloaded from an export."
 				error={bundleError || (scope === 'sync' ? errors.bundle : undefined)}
 				onchange={chooseFile}
 			/>
@@ -253,8 +253,8 @@
 			/>
 			<Checkbox
 				id="sync-prune"
-				label="Delete what the bundle does not name"
-				description="Removes flows, permission rules and webhooks that only this instance holds. Content types are never deleted."
+				label="Delete items not in the bundle"
+				description="Removes flows, permission rules and webhooks that exist only on this instance. Content types are never deleted."
 				bind:checked={prune}
 			/>
 			{#if syncMessage}
@@ -295,8 +295,8 @@
 				]}
 			/>
 			<p class="text-sm text-muted">
-				A content type is committed as it is written, so the ones listed as applied stay. Every other section was rolled
-				back together. Fix the cause and apply the same bundle again: what already matches is left as it is.
+				Content types listed as applied were saved and stay. Every other section was rolled back. Fix the cause and
+				apply the same bundle again. Anything that already matches is left unchanged.
 			</p>
 		</div>
 	{/if}
@@ -309,7 +309,7 @@
 			{/if}
 			{#if blocked}
 				<Alert tone="danger" title="{plan.problems} {plan.problems === 1 ? 'problem stops' : 'problems stop'} the apply">
-					Nothing is written until every problem below is fixed, here or in the bundle.
+					Fix every problem below, here or in the bundle, before you apply. Nothing is written until then.
 				</Alert>
 			{:else if plan.changes === 0}
 				<Alert tone="success">This instance already matches the bundle.</Alert>

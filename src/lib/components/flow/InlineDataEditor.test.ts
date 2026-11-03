@@ -40,7 +40,7 @@ describe('InlineDataEditor', () => {
 
 	it('says a template cannot be counted', () => {
 		const { getByTestId } = setup({ format: 'json', content: '{{ trigger.body }}' });
-		expect(getByTestId('inline-preview').textContent).toContain('not countable');
+		expect(getByTestId('inline-preview').textContent).toContain('cannot be counted');
 	});
 
 	it('renders the grid for a table and writes columns and rows', async () => {

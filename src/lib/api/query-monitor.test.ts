@@ -125,7 +125,7 @@ describe('noSuggestionText', () => {
 
 	it('counts the plans it read when none needs an index', () => {
 		expect(noSuggestionText('postgres', readAnalysis('postgres', { entries: [], plans_read: 3 }))).toBe(
-			'Nothing to suggest in the 3 plans the analyzer read.',
+			'No suggestions from the 3 plans analyzed.',
 		);
 	});
 });

@@ -74,7 +74,7 @@ export const actions: Actions = {
 			return { scope: 'switch', settings };
 		} catch (err) {
 			const status = err instanceof ApiError && err.status === 403 ? 403 : 400;
-			return fail(status, { scope: 'switch', error: aiActionError(err, 'The setting could not be saved') });
+			return fail(status, { scope: 'switch', error: aiActionError(err, 'Could not save the setting. Try again.') });
 		}
 	},
 
@@ -82,10 +82,10 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const data = await event.request.formData();
 		const key = String(data.get('key') ?? '').trim();
-		if (!INSTANCE_KEYS.includes(key)) return fail(400, { scope: 'config', key, error: 'Not a setting this page edits.' });
+		if (!INSTANCE_KEYS.includes(key)) return fail(400, { scope: 'config', key, error: 'This page cannot change that setting.' });
 		const value = String(data.get('value') ?? '').trim();
 		if (key === 'ai_transcript_retention' && !/^\d+(?:\.\d+)?(?:h|m|s)$/.test(value)) {
-			return fail(400, { scope: 'config', key, error: 'Retention is a Go duration such as 720h; the minimum is 1h.' });
+			return fail(400, { scope: 'config', key, error: 'Enter a duration in hours, minutes or seconds, such as 720h. The minimum is 1h.' });
 		}
 		try {
 			const result = await authedClient(event).put<ConfigRefusal>('/api/admin/config', {
@@ -99,8 +99,8 @@ export const actions: Actions = {
 			// refused list, with no error field to relay.
 			const whole = err instanceof ApiError && err.status === 409 ? refusalOf(err.body) : null;
 			if (whole) return fail(409, { scope: 'config', key, error: whole });
-			if (err instanceof ApiError) return fail(err.status, { scope: 'config', key, error: aiActionError(err, 'Could not save the setting', 'super_admin') });
-			return fail(500, { scope: 'config', key, error: 'Could not save the setting' });
+			if (err instanceof ApiError) return fail(err.status, { scope: 'config', key, error: aiActionError(err, 'Could not save the setting. Try again.', 'super_admin') });
+			return fail(500, { scope: 'config', key, error: 'Could not save the setting. Try again.' });
 		}
 	},
 };

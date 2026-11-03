@@ -144,7 +144,7 @@
 		return (input) =>
 			confirmed(
 				`Archive ${tenant.name}?`,
-				'Reads keep working and every write is refused until the tenant is restored.',
+				'The tenant stays readable, but every change is refused until you restore it.',
 				{ confirmLabel: 'Archive' },
 			)(input);
 	}
@@ -152,7 +152,7 @@
 
 <PageShell
 	title={tenant.name}
-	description="What this tenant may use, and who may act in it."
+	description="Choose what this tenant can use and who can work in it."
 	width="wide"
 	back={{ href: '/admin/tenants', label: 'Tenants' }}
 >
@@ -175,20 +175,20 @@
 	<DescriptionList items={facts} />
 
 	<section class="flex flex-col gap-4">
-		<SectionHeading level={2}>What this tenant may use</SectionHeading>
+		<SectionHeading level={2}>Features</SectionHeading>
 		{#if !data.choices.ok}
 			<GateNotice
 				gate={data.choices.gate}
 				title="this tenant's features"
-				absent="This instance does not serve per-tenant features."
+				absent="Per-tenant features are not included in this build."
 			/>
 		{:else if data.choices.value.length === 0}
-			<EmptyState title="Nothing to withhold" description="This instance serves no plugin this tenant could be refused." />
+			<EmptyState title="No plugins to choose from" description="This build has no plugins that can be turned off for one tenant." />
 		{:else}
 			{#if form?.featuresError}
 				<Alert tone="danger">{form.featuresError}</Alert>
 			{:else if form && 'featuresSaved' in form}
-				<Alert tone="success" autoDismiss>Saved. The tenant's next request follows it.</Alert>
+				<Alert tone="success" autoDismiss>Features saved. They apply from the tenant's next request.</Alert>
 			{/if}
 			<form
 				method="post"
@@ -209,7 +209,7 @@
 					id="tenant-features"
 					label="Available to this tenant"
 					placeholder="Nothing"
-					hint="What the instance serves is the ceiling for every tenant. Removing a plugin here takes it away from this tenant only: its routes answer 403, its screens leave the tenant's admin, and every capability it owns goes with it."
+					hint="Tenants can only use plugins this instance runs. Removing a plugin here affects this tenant only: its routes return 403, its screens leave the tenant's admin, and its capabilities are turned off."
 					searchable
 					options={featureOptions}
 					bind:value={available}
@@ -236,22 +236,22 @@
 		{/if}
 		{#if data.homeSuperAdmins === null}
 			<Alert tone="warn">
-				The accounts could not be read, so this page cannot say whether a home member signs in here without super admin.
+				Could not load the accounts. Reload the page to see whether a home member signs in here without super admin.
 			</Alert>
 		{/if}
 		{#each lostSuperAdmin as m (m.id)}
 			<Alert tone="warn" title="{m.email} signs in here without super admin">
-				This is the account's home tenant, and its membership here sets roles that leave super admin out. The engine signs it in here with those roles. Neither this page nor the Users page changes a home membership.
+				This is the account's home tenant, and its roles here do not include super admin, so it signs in here with those roles. A home membership cannot be changed on this page or on the Users page.
 			</Alert>
 		{/each}
 		{#if !data.members.ok}
 			<GateNotice
 				gate={data.members.gate}
 				title="this tenant's members"
-				absent="The multitenant plugin does not serve tenant members on this instance."
+				absent="Tenant members are not included in this build."
 			/>
 		{:else if data.members.value.length === 0}
-			<EmptyState title="No members" description="No account calls this tenant home or holds a membership in it.">
+			<EmptyState title="No members yet" description="Add an account to give it access to this tenant.">
 				{#snippet action()}
 					<Button variant="secondary" onclick={openNewMember}><Plus size={ICON.sm} /> New member</Button>
 				{/snippet}
@@ -286,7 +286,7 @@
 							<td>
 								<div class="flex items-center justify-end gap-2">
 									{#if lostSuperAdmin.includes(m)}
-										<span class="text-xs text-muted">Neither this page nor the Users page changes this home membership.</span>
+										<span class="text-xs text-muted">This home membership cannot be changed here or on the Users page.</span>
 									{:else if superHome(m)}
 										<span class="text-xs text-muted">A super admin's home roles are managed on the Users page.</span>
 									{/if}
@@ -338,7 +338,7 @@
 				type="email"
 				label="Account email"
 				required
-				hint="An existing account. It keeps its home tenant and gains this one."
+				hint="Enter an existing account. It keeps its home tenant and gains access to this one."
 				bind:value={memberEmail}
 			/>
 		{/if}
@@ -346,8 +346,8 @@
 			name="roles"
 			label="Roles in this tenant"
 			hint={editingMember?.home
-				? "Roles set here replace the account's own roles while it acts in its home tenant."
-				: 'What the account may do while it acts in this tenant.'}
+				? "These roles replace the account's own roles in its home tenant."
+				: 'What the account can do in this tenant.'}
 			options={MEMBER_ROLES}
 			bind:value={memberRoles}
 		/>

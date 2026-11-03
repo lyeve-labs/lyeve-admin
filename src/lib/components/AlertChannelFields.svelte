@@ -57,11 +57,11 @@
 			<NotEnabled
 				compact
 				title="Chat, webhook and PagerDuty alerts"
-				description="Slack, Discord, a signed webhook and PagerDuty."
+				description="Send alerts to Slack, Discord, a signed webhook or PagerDuty."
 			/>
 			<p class="text-xs text-muted">
-				New Slack, Discord, webhook and PagerDuty channels are not enabled on this instance. A channel
-				already set keeps sending, and you can remove it.
+				You cannot add new Slack, Discord, webhook or PagerDuty channels. A channel you already set keeps
+				sending, and you can remove it.
 			</p>
 		</div>
 	{/if}

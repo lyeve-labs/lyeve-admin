@@ -29,13 +29,13 @@ function isKind(k: string): k is ProviderKind {
 export function readProviderForm(data: FormData, existing: AiProvider | null, superAdmin: boolean): ProviderFormResult {
 	const name = str(data, 'name');
 	const kind = str(data, 'kind');
-	if (!name) return { error: 'Name is required.' };
+	if (!name) return { error: 'Enter a name.' };
 	if (!isKind(kind)) return { error: 'Choose a provider kind.' };
 
 	const apiKey = String(data.get('api_key') ?? '');
 	const baseUrl = str(data, 'base_url');
-	if (isCompatibleKind(kind) && !baseUrl) return { error: `The ${providerKindLabel(kind)} kind needs a base URL.` };
-	if (!isCompatibleKind(kind) && !apiKey && !existing?.has_key) return { error: 'An API key is required for this kind.' };
+	if (isCompatibleKind(kind) && !baseUrl) return { error: `Enter a base URL. The ${providerKindLabel(kind)} kind needs one.` };
+	if (!isCompatibleKind(kind) && !apiKey && !existing?.has_key) return { error: 'Enter an API key. This kind needs one.' };
 
 	const allowPrivate = str(data, 'allow_private') === 'true';
 	if (allowPrivate && !superAdmin) return { error: 'Only a super admin may allow a private address.' };
@@ -44,12 +44,12 @@ export function readProviderForm(data: FormData, existing: AiProvider | null, su
 	if (modalities.length === 0) return { error: 'Choose at least one modality.' };
 
 	const priority = int(data, 'priority', 100);
-	if (priority === null || priority < -1000 || priority > 1000) return { error: 'Priority is a whole number between -1000 and 1000.' };
+	if (priority === null || priority < -1000 || priority > 1000) return { error: 'Enter a priority from -1000 to 1000, as a whole number.' };
 	const rpm = int(data, 'rate_limit_rpm', 0);
-	if (rpm === null || rpm < 0) return { error: 'Rate limit is a whole number of requests per minute, 0 for none.' };
+	if (rpm === null || rpm < 0) return { error: 'Enter the rate limit as whole requests per minute, or 0 for no limit.' };
 	const budgetRaw = str(data, 'max_budget_usd');
 	const budget = budgetRaw ? Number(budgetRaw) : 0;
-	if (!Number.isFinite(budget) || budget < 0) return { error: 'Monthly budget is a number of dollars, 0 for none.' };
+	if (!Number.isFinite(budget) || budget < 0) return { error: 'Enter the monthly budget in dollars, or 0 for no budget.' };
 
 	const input: ProviderInput = {
 		name,

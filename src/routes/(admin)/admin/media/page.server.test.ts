@@ -270,12 +270,12 @@ describe('deleting a file', () => {
 
 	it('keeps outage detail out of the message', async () => {
 		const { event } = actionEvent({ id: 'm1' }, () => json({ error: 'pq: down' }, 503));
-		expect(((await actions.delete(event)) as Failure).data).toEqual({ deleteError: 'The file could not be deleted.', deleteId: 'm1' });
+		expect(((await actions.delete(event)) as Failure).data).toEqual({ deleteError: 'Could not delete the file. Try again.', deleteId: 'm1' });
 	});
 
 	it('names no file at the top of the page when none was sent', async () => {
 		const { event, calls } = actionEvent({});
-		expect(((await actions.delete(event)) as Failure).data).toEqual({ error: 'No file was named.' });
+		expect(((await actions.delete(event)) as Failure).data).toEqual({ error: 'This form is missing its file. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 });
@@ -289,7 +289,7 @@ describe('importing a file from an address', () => {
 
 	it('refuses an address that is not http or https before it reaches the plugin', async () => {
 		const { event, calls } = actionEvent({ url: 'file:///etc/passwd' });
-		expect(((await actions.importUrl(event)) as Failure).data).toEqual({ importError: 'Give an http or https address.' });
+		expect(((await actions.importUrl(event)) as Failure).data).toEqual({ importError: 'Enter an http or https address.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -300,7 +300,7 @@ describe('importing a file from an address', () => {
 
 	it('keeps outage detail out of the message', async () => {
 		const { event } = actionEvent({ url: 'https://example.com/a.png' }, () => json({ error: 'pq: down' }, 503));
-		expect(((await actions.importUrl(event)) as Failure).data.importError).toBe('The file could not be imported.');
+		expect(((await actions.importUrl(event)) as Failure).data.importError).toBe('Could not import the file. Try again.');
 	});
 });
 
@@ -316,7 +316,7 @@ describe('describing an image', () => {
 
 	it('tells a spent budget from a license that leaves AI out', async () => {
 		const budget = actionEvent({ id: 'm1' }, () => json({ error: 'ai budget exhausted for this billing period' }, 402));
-		expect(((await actions.describe(budget.event)) as Failure).data.detailsError).toMatch(/budget for this billing period is spent/);
+		expect(((await actions.describe(budget.event)) as Failure).data.detailsError).toMatch(/budget for this billing period is used up/);
 
 		const license = actionEvent({ id: 'm1' }, () =>
 			json({ error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' }, 402),
@@ -328,7 +328,7 @@ describe('describing an image', () => {
 
 	it('still says the outage plainly when the engine itself is down', async () => {
 		const { event } = actionEvent({ id: 'm1' }, () => json({ error: 'database unavailable' }, 503));
-		expect(((await actions.describe(event)) as Failure).data.detailsError).toBe('No description came back.');
+		expect(((await actions.describe(event)) as Failure).data.detailsError).toBe('Could not suggest alt text. Try again.');
 	});
 });
 

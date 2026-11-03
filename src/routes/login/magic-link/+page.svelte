@@ -19,7 +19,7 @@
 
 <PageTitle title="Email a sign-in link" />
 
-<AuthShell title="Sign in with an email link" description="We will email you a link that signs you in.">
+<AuthShell title="Sign in with an email link" description="Get a link by email that signs you in.">
 	{#if form && 'sent' in form && form.sent}
 		<div class="space-y-5">
 			<Alert tone="success" announce>
@@ -49,7 +49,9 @@
 				autofocus
 			/>
 
-			<OrganizationField carried={data.carried} {typed} />
+			{#if data.organization}
+				<OrganizationField carried={data.carried} {typed} />
+			{/if}
 
 			<Button type="submit" variant="primary" full loading={send.pending}>Email me a link</Button>
 

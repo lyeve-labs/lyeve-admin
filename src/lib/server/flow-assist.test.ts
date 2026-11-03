@@ -37,7 +37,7 @@ describe('assistRefusal', () => {
 	it('reads a missing catalog route as unavailable and a 402 on it as locked', () => {
 		expect(assistRefusal(new CatalogError(404, 'not found'))).toMatchObject({ state: 'unavailable' });
 		expect(assistRefusal(new CatalogError(402, 'ai is not enabled'))).toEqual({ state: 'locked' });
-		expect(assistRefusal(new CatalogError(500, 'pq: x'))).toEqual({ state: 'error', message: 'The node catalog could not be read.' });
+		expect(assistRefusal(new CatalogError(500, 'pq: x'))).toEqual({ state: 'error', message: 'Could not load the node catalog. Try again.' });
 	});
 
 	it('names a timed-out model', () => {

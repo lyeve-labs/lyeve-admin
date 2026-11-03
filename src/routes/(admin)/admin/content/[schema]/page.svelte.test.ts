@@ -109,9 +109,9 @@ describe('content listing states the collection total', () => {
 	it('disables the previous link on the first page', () => {
 		const { container } = render(ContentListPage, { props: { data: data(), form: null } });
 
-		const prev = container.querySelector('[aria-label="Previous page"]');
-		expect(prev?.getAttribute('aria-disabled')).toBe('true');
-		expect(prev?.hasAttribute('href')).toBe(false);
+		const prev = container.querySelector('[aria-label="Previous page"]') as HTMLButtonElement;
+		expect(prev.tagName).toBe('BUTTON');
+		expect(prev.disabled).toBe(true);
 	});
 });
 
@@ -226,7 +226,7 @@ describe('content listing reads', () => {
 			props: { data: data({ items: { ok: false, gate: { state: 'unavailable' } }, total: 0 }), form: null },
 		});
 
-		expect(screen.getByText(/entries could not be read/)).toBeTruthy();
+		expect(screen.getByText(/entries did not load/)).toBeTruthy();
 		expect(screen.queryByText('No entries yet')).toBeNull();
 		expect(screen.queryByRole('link', { name: /New entry/ })).toBeNull();
 	});
@@ -245,7 +245,7 @@ describe('content listing reads', () => {
 			props: { data: data({ schemas: { ok: false, gate: { state: 'unavailable' } } }), form: null },
 		});
 
-		expect(screen.getByText(/other collections could not be read/)).toBeTruthy();
+		expect(screen.getByText(/Could not load the other collections/)).toBeTruthy();
 	});
 });
 

@@ -82,7 +82,7 @@ export const load: PageServerLoad = async (event) => {
 	// A failed read is said as one, not drawn as an instance with no schemas:
 	// the empty state offers to create the first one, and a table the engine
 	// could not list is not a table that is not there.
-	const read = await section(getSchemas(client), 'The schemas could not be read. This is not a report that there are none.');
+	const read = await section(getSchemas(client), 'Could not load schemas.');
 	if (!read.ok) {
 		return {
 			schemas: [] as Schema[],
@@ -112,7 +112,7 @@ export const load: PageServerLoad = async (event) => {
 	let presetsGate: Gate | null = null;
 	let canSavePresets = false;
 	if (canWrite) {
-		const offered = await section(readSchemaPresets(client), 'The presets could not be read. This is not a report that there are none.');
+		const offered = await section(readSchemaPresets(client), 'Could not load presets.');
 		if (offered.ok) ({ presets, canSave: canSavePresets } = offered.value);
 		else presetsGate = offered.gate;
 	}
@@ -128,7 +128,7 @@ export const load: PageServerLoad = async (event) => {
 	let canvas: CanvasLayout = NO_CANVAS;
 	let canvasGate: Gate | null = { state: 'forbidden' };
 	if (canWrite) {
-		const layout = await section(readCanvasLayout(client), 'The canvas layout could not be read, so the canvas is not drawn.');
+		const layout = await section(readCanvasLayout(client), 'Could not load the canvas layout.');
 		if (layout.ok) {
 			canvas = layout.value;
 			canvasGate = null;
@@ -178,52 +178,96 @@ const statusOf = (err: unknown) => (err instanceof ApiError && err.status >= 400
 
 const path = (...parts: string[]) => parts.map(encodeURIComponent).join('/');
 
+/**
+ * The code the engine refuses a write with when the content type is no longer
+ * at the version the write names: someone saved it after the builder opened it.
+ */
+const VERSION_MISMATCH = 'SCHEMA_VERSION_MISMATCH';
+
+/** The code the engine refuses a create with when a content type of that name exists. */
+const ALREADY_EXISTS = 'SCHEMA_EXISTS';
+
+const refusedAs = (err: unknown, code: string) =>
+	err instanceof ApiError && err.status === 412 && (err.body as { code?: unknown } | undefined)?.code === code;
+
+/** What the builder says when the schema changed after the reader opened it. */
+const CHANGED_SINCE_OPENED = 'Someone changed this schema after you opened it. Reload it to see the latest version, then make your change again.';
+
+/** The condition a write is sent on: only the definition at `version`. None when the read named no version. */
+const onlyAt = (version: string): RequestInit | undefined => (version ? { headers: { 'If-Match': `"${version}"` } } : undefined);
+
+/** The condition a new content type is sent on: create it, never replace one of that name. */
+const createOnly: RequestInit = { headers: { 'If-None-Match': '*' } };
+
 export const actions: Actions = {
 	/**
 	 * Saves one schema. Renamed fields go through the engine's rename route
 	 * first, because the definition alone is diffed by name and a renamed field
 	 * would otherwise land as a new column beside a dropped one.
+	 *
+	 * Every write names the version of the definition the builder opened, and
+	 * each rename answers the version it stored, which the next write names. A
+	 * content type someone changed since it was opened is then refused rather
+	 * than overwritten with what the builder held. A new content type is sent
+	 * as a create only, so it never replaces one that already has its name.
 	 */
 	save: async (event) => {
 		await requireRole(event, WRITERS);
 		const data = await event.request.formData();
 		const schema = parseSchema(data.get('schema'));
-		if (!schema) return fail(400, { scope: 'save' as const, error: 'The schema could not be read.' });
+		if (!schema) return fail(400, { scope: 'save' as const, error: 'This form is missing its schema. Reload the page and try again.' });
 		const original = String(data.get('original') ?? '');
 		if (original && original !== schema.name) {
-			return fail(400, { scope: 'save' as const, error: 'A saved schema is renamed with Rename, not by editing its machine name.' });
+			return fail(400, { scope: 'save' as const, error: 'To change the machine name of a saved schema, use Rename.' });
 		}
 		const client = authedClient(event);
 
+		let version = String(data.get('version') ?? '');
 		const renamed: { from: string; to: string }[] = [];
 		const said = () => renamed.map((r) => `${r.from} to ${r.to}`).join(', ');
 		if (original) {
 			for (const r of parseRenames(data.get('renames'))) {
 				try {
-					await retryBusy(() =>
-						client.put(`/api/admin/schemas/${path(original, 'fields', r.from, 'rename')}`, { new_name: r.to }),
+					const answer = await retryBusy(() =>
+						client.put<{ version?: string }>(
+							`/api/admin/schemas/${path(original, 'fields', r.from, 'rename')}`,
+							{ new_name: r.to },
+							onlyAt(version),
+						),
 					);
 					renamed.push(r);
+					if (answer?.version) version = answer.version;
 				} catch (err) {
-					const done = renamed.length ? ` Already renamed: ${said()}.` : '';
+					const done = renamed.length ? ` These fields were renamed: ${said()}.` : '';
+					const stale = refusedAs(err, VERSION_MISMATCH);
 					return fail(statusOf(err), {
 						scope: 'save' as const,
-						error: `${actionError(err, `The field ${r.from} could not be renamed.`)}${done}`,
+						error: `${stale ? CHANGED_SINCE_OPENED : actionError(err, `Could not rename the field ${r.from}. Try again.`)}${done}`,
 						renamed,
+						version,
+						stale,
 					});
 				}
 			}
 		}
 
 		try {
-			const saved = await retryBusy(() => client.post<Schema>('/api/admin/schemas', schema));
+			const saved = await retryBusy(() => client.post<Schema>('/api/admin/schemas', schema, original ? onlyAt(version) : createOnly));
 			return { scope: 'save' as const, saved };
 		} catch (err) {
-			const done = renamed.length ? ` The renames went through: ${said()}.` : '';
+			const done = renamed.length ? ` These fields were renamed: ${said()}.` : '';
+			const stale = refusedAs(err, VERSION_MISMATCH);
+			const message = refusedAs(err, ALREADY_EXISTS)
+				? `A schema named ${schema.name} already exists. Open it from the list, or give this one another machine name.`
+				: stale
+					? CHANGED_SINCE_OPENED
+					: actionError(err, 'Could not save the schema. Try again.');
 			return fail(statusOf(err), {
 				scope: 'save' as const,
-				error: `${actionError(err, 'The schema could not be saved.')}${done}`,
+				error: `${message}${done}`,
 				renamed,
+				version,
+				stale,
 			});
 		}
 	},
@@ -249,19 +293,19 @@ export const actions: Actions = {
 			);
 			return { scope: 'preview' as const, intent, statements: r.statements ?? [] };
 		} catch (err) {
-			return fail(statusOf(err), { scope: 'preview' as const, intent, error: actionError(err, 'The DDL could not be previewed.') });
+			return fail(statusOf(err), { scope: 'preview' as const, intent, error: actionError(err, 'Could not preview the DDL. Try again.') });
 		}
 	},
 
 	delete: async (event) => {
 		await requireRole(event, WRITERS);
 		const name = String((await event.request.formData()).get('name') ?? '');
-		if (!name) return fail(400, { scope: 'delete' as const, error: 'Pick a schema to delete.' });
+		if (!name) return fail(400, { scope: 'delete' as const, error: 'Choose a schema first.' });
 		try {
 			await retryBusy(() => authedClient(event).delete(`/api/admin/schemas/${path(name)}`));
 			return { scope: 'delete' as const, deleted: name };
 		} catch (err) {
-			return fail(statusOf(err), { scope: 'delete' as const, error: actionError(err, 'The schema could not be deleted.') });
+			return fail(statusOf(err), { scope: 'delete' as const, error: actionError(err, 'Could not delete the schema. Try again.') });
 		}
 	},
 
@@ -278,7 +322,7 @@ export const actions: Actions = {
 			);
 			return { scope: 'rename' as const, from, saved };
 		} catch (err) {
-			return fail(statusOf(err), { scope: 'rename' as const, error: actionError(err, 'The schema could not be renamed.') });
+			return fail(statusOf(err), { scope: 'rename' as const, error: actionError(err, 'Could not rename the schema. Try again.') });
 		}
 	},
 
@@ -288,7 +332,7 @@ export const actions: Actions = {
 		// by every tenant that defines it, so its history is theirs too.
 		await requireRole(event, ['super_admin']);
 		const name = String((await event.request.formData()).get('name') ?? '');
-		if (!name) return fail(400, { scope: 'history' as const, error: 'Pick a schema.' });
+		if (!name) return fail(400, { scope: 'history' as const, error: 'Choose a schema first.' });
 		try {
 			const r = await authedClient(event).get<{ entries: HistoryEntry[]; pending: number; limit: number }>(
 				`/api/admin/schemas/${path(name)}/history`,
@@ -296,9 +340,9 @@ export const actions: Actions = {
 			return { scope: 'history' as const, name, entries: r.entries ?? [], pending: r.pending ?? 0, limit: r.limit ?? 200 };
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 404) {
-				return fail(404, { scope: 'history' as const, name, error: 'The engine answered no history for this schema. It may not serve one yet.' });
+				return fail(404, { scope: 'history' as const, name, error: `There is no saved schema named ${name}, so it has no history.` });
 			}
-			return fail(statusOf(err), { scope: 'history' as const, name, error: actionError(err, 'The history could not be read.') });
+			return fail(statusOf(err), { scope: 'history' as const, name, error: actionError(err, 'Try again in a moment.') });
 		}
 	},
 
@@ -306,14 +350,14 @@ export const actions: Actions = {
 	applyPending: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const name = String((await event.request.formData()).get('name') ?? '');
-		if (!name) return fail(400, { scope: 'applyPending' as const, error: 'Pick a schema.' });
+		if (!name) return fail(400, { scope: 'applyPending' as const, error: 'Choose a schema first.' });
 		try {
 			const r = await retryBusy(() =>
 				authedClient(event).post<{ applied: number; canceled?: number }>(`/api/admin/schemas/${path(name)}/apply-pending`, {}),
 			);
 			return { scope: 'applyPending' as const, name, applied: r.applied ?? 0, canceled: r.canceled ?? 0 };
 		} catch (err) {
-			return fail(statusOf(err), { scope: 'applyPending' as const, name, error: actionError(err, 'The queued changes could not be applied.') });
+			return fail(statusOf(err), { scope: 'applyPending' as const, name, error: actionError(err, 'Could not apply the queued changes. Try again.') });
 		}
 	},
 
@@ -329,7 +373,7 @@ export const actions: Actions = {
 		if (!body) return fail(400, { scope: 'import' as const, error: 'Choose a file or paste the definitions.' });
 		const source = String(data.get('source') ?? 'lyeve');
 		if (!IMPORT_SOURCES.some((s) => s.value === source)) {
-			return fail(400, { scope: 'import' as const, error: 'Pick where the definitions come from.' });
+			return fail(400, { scope: 'import' as const, error: 'Choose where the definitions come from.' });
 		}
 		const apply = data.get('apply') === 'true';
 		const query = new URLSearchParams({ from: source, ...(apply ? { apply: 'true' } : {}) });
@@ -344,7 +388,7 @@ export const actions: Actions = {
 				body: payload,
 			});
 		} catch {
-			return fail(502, { scope: 'import' as const, error: 'The engine did not answer. Nothing was imported.' });
+			return fail(502, { scope: 'import' as const, error: 'Could not import the definitions. Try again.' });
 		}
 		const reply = (await res.json().catch(() => ({}))) as {
 			error?: string;
@@ -359,7 +403,7 @@ export const actions: Actions = {
 			const relay = res.status >= 400 && res.status < 500 && reply.error ? reply.error : '';
 			return fail(res.status, {
 				scope: 'import' as const,
-				error: relay || 'The definitions could not be imported.',
+				error: relay || 'Could not import the definitions. Try again.',
 				plan: reply.plan ?? null,
 			});
 		}
@@ -390,9 +434,9 @@ export const actions: Actions = {
 				return fail(409, { action: 'preset' as const, error: actionError(err, 'A schema this preset creates already exists.'), preset: id });
 			}
 			if (err instanceof ApiError && err.status === 404) {
-				return fail(404, { action: 'preset' as const, error: 'This install does not ship this preset.', preset: id });
+				return fail(404, { action: 'preset' as const, error: 'This preset is not included in this build.', preset: id });
 			}
-			return fail(400, { action: 'preset' as const, error: actionError(err, 'The preset could not be created.'), preset: id });
+			return fail(400, { action: 'preset' as const, error: actionError(err, 'Could not create the schemas from this preset. Try again.'), preset: id });
 		}
 	},
 
@@ -404,8 +448,8 @@ export const actions: Actions = {
 		const file = data.get('file');
 		let document = String(data.get('document') ?? '').trim();
 		if (!document && file instanceof File && file.size > 0) document = (await file.text()).trim();
-		if (!url && !document) return fail(400, { saveError: 'Give a URL, a file or a pasted preset.' });
-		if (url && document) return fail(400, { saveError: 'Give a URL or a document, not both.' });
+		if (!url && !document) return fail(400, { saveError: 'Enter a URL, choose a file or paste a preset.' });
+		if (url && document) return fail(400, { saveError: 'Enter a URL or a document, not both.' });
 		try {
 			const saved = await saveSchemaPreset(client, url ? { url } : { document });
 			return { savedPreset: saved.id };
@@ -413,12 +457,12 @@ export const actions: Actions = {
 			const refused = refusalOf(err);
 			if (refused) return fail(402, { saveError: refusalText(refused), refused });
 			if (err instanceof ApiError && err.status === 409) {
-				return fail(409, { saveError: 'A built-in preset already uses that id. Give yours another.' });
+				return fail(409, { saveError: 'A built-in preset already uses that id. Choose another id.' });
 			}
 			if (err instanceof ApiError && err.status === 502) {
-				return fail(502, { saveError: 'The URL did not answer with a preset document.' });
+				return fail(502, { saveError: 'The URL did not return a preset document.' });
 			}
-			return fail(400, { saveError: actionError(err, 'The preset could not be saved.') });
+			return fail(400, { saveError: actionError(err, 'Could not save the preset. Try again.') });
 		}
 	},
 
@@ -431,7 +475,7 @@ export const actions: Actions = {
 		try {
 			positions = parsePositions(JSON.parse(String((await event.request.formData()).get('positions') ?? '{}')));
 		} catch {
-			return fail(400, { layoutError: 'The layout could not be read.' });
+			return fail(400, { layoutError: 'Could not save the layout. Reload the page and try again.' });
 		}
 		try {
 			await saveCanvasLayout(client, positions);
@@ -439,7 +483,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const refused = refusalOf(err);
 			if (refused) return fail(402, { layoutError: refusalText(refused), refused });
-			return fail(400, { layoutError: actionError(err, 'The layout could not be saved.') });
+			return fail(400, { layoutError: actionError(err, 'Could not save the layout. Try again.') });
 		}
 	},
 
@@ -452,7 +496,7 @@ export const actions: Actions = {
 			await deleteSchemaPreset(client, id);
 			return { deletedPreset: id };
 		} catch (err) {
-			return fail(400, { action: 'deletePreset' as const, error: actionError(err, 'The preset could not be deleted.'), preset: id });
+			return fail(400, { action: 'deletePreset' as const, error: actionError(err, 'Could not delete the preset. Try again.'), preset: id });
 		}
 	},
 };

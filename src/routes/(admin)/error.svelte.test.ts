@@ -44,9 +44,9 @@ describe('Admin error page', () => {
 	// The reader of a 403 is signed in. The way out is the dashboard, and the
 	// load's own words say which role the page needs.
 	it('renders the access-denied face for 403 with the reason and the dashboard', () => {
-		const { getByText, getByRole, queryByRole } = renderAt(403, 'Requires super_admin role');
+		const { getByText, getByRole, queryByRole } = renderAt(403, 'Only a super admin can open this page.');
 		expect(getByText('Access denied')).toBeTruthy();
-		expect(getByText('Requires super_admin role')).toBeTruthy();
+		expect(getByText('Only a super admin can open this page.')).toBeTruthy();
 		expect(getByRole('link', { name: /dashboard/i }).getAttribute('href')).toBe('/admin');
 		expect(queryByRole('link', { name: /sign in/i })).toBeNull();
 	});

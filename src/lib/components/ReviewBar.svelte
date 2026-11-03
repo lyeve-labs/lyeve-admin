@@ -152,14 +152,14 @@
 
 	<div class="flex flex-col gap-4" data-testid="review-bar">
 		{#if unavailable}
-			<Alert tone="warn" title="The review plugin did not answer">
-				It is compiled into this instance, but its routes are not responding. The review cannot be
-				read or moved until it is.
+			<Alert tone="warn" title="Could not load the review">
+				The review plugin is included in this build but is not responding. You cannot see or move
+				this review until it responds.
 			</Alert>
 		{:else if forbidden}
-			<Alert tone="warn" title="You may not read this entry's review">
-				The permission rules grant no read on reviews to your roles. Ask for a rule on
-				<span class="font-mono">reviews</span> or the definition's own resource.
+			<Alert tone="warn" title="You cannot see this entry's review">
+				Your roles have no read permission on reviews. Ask an admin for a rule on
+				<span class="font-mono">reviews</span> or on the definition's own resource.
 			</Alert>
 		{:else if !assignment}
 			<p class="text-sm text-muted" data-testid="review-none">Not under review.</p>
@@ -221,7 +221,7 @@
 						<MultiSelect
 							id="review-other-assignees"
 							label="More assignees"
-							hint="A stage that needs several approvals takes them from the assignees, so name at least as many as it needs."
+							hint="A stage that needs several approvals gets them from these assignees, so pick at least as many people as it needs."
 							placeholder="Pick users"
 							options={otherOptions}
 							searchable
@@ -232,7 +232,7 @@
 							id="review-other-assignees"
 							name="other_assignees"
 							label="More assignees"
-							hint="One user id per line. A stage that needs several approvals takes them from the assignees, so name at least as many as it needs."
+							hint="One user id per line. A stage that needs several approvals gets them from these assignees, so add at least as many people as it needs."
 							rows={2}
 						/>
 					{/if}
@@ -246,7 +246,7 @@
 					</div>
 				</form>
 			{:else if definitionsFailed}
-				<p class="text-sm text-muted">The review definitions could not be read, so a review cannot be started here. Reload the page to try again.</p>
+				<p class="text-sm text-muted">Could not load the review definitions. Reload the page to try again.</p>
 			{:else if error}
 				<Alert tone="danger">{error}</Alert>
 			{/if}
@@ -321,7 +321,7 @@
 						id="review-comment"
 						name="comment"
 						label="Comment"
-						hint="Recorded on the stage log and carried by the transition event."
+						hint="Saved in the stage log and sent with the transition event."
 						rows={2}
 						bind:value={comment}
 					/>

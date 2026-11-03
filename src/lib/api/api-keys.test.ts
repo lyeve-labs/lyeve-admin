@@ -133,8 +133,8 @@ describe('request limits', () => {
 	it('names each field that is not a whole number', () => {
 		expect(parseLimits(form({ hourly_limit: '1.5', daily_limit: '-1' }))).toEqual({
 			fields: {
-				hourly_limit: 'A whole number of requests, or 0 for no ceiling',
-				daily_limit: 'A whole number of requests, or 0 for no ceiling',
+				hourly_limit: 'Enter a whole number of requests, or 0 for no limit',
+				daily_limit: 'Enter a whole number of requests, or 0 for no limit',
 			},
 		});
 	});

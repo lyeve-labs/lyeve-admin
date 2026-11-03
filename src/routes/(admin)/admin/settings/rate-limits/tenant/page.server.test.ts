@@ -180,7 +180,7 @@ describe('removing an address entry', () => {
 	it('keeps an outage body off the page', async () => {
 		api.deleteAddressEntry.mockRejectedValue(new ApiError(503, 'dial tcp: connection refused'));
 		expect(await actions.deleteAddress(formEvent({ id: 'a1' }))).toMatchObject({
-			data: { action: 'deleteAddress', error: 'The entry could not be removed.' },
+			data: { action: 'deleteAddress', error: 'Could not remove the entry. Try again.' },
 		});
 	});
 

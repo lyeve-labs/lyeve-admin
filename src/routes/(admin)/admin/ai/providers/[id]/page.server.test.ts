@@ -55,7 +55,7 @@ describe('admin/ai/providers/[id] actions', () => {
 	// is not the tenant missing a provider.
 	it('says the provider did not answer when the model list answers 503', async () => {
 		const { event } = actionEvent({ [`/providers/${id}/models`]: () => refused(503, 'failed to list models') }, new FormData(), { path, params: { id } });
-		expect(await actions.models(event)).toMatchObject({ status: 400, data: { scope: 'models', error: 'The provider did not answer with its models' } });
+		expect(await actions.models(event)).toMatchObject({ status: 400, data: { scope: 'models', error: 'Could not load the models from this provider. Try again.' } });
 	});
 
 	it('asks capabilities for the model named in the form', async () => {

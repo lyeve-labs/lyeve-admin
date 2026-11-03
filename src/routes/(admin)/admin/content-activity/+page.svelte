@@ -75,7 +75,7 @@
 <PageShell
 	title="Content activity"
 	description={data.total === null
-		? 'Who changed which entry, when and from where.'
+		? 'See who changed which entry, when and from where.'
 		: `${formatCount(data.total)} ${data.total === 1 ? 'change' : 'changes'}`}
 	width="wide"
 	back={{ href: '/admin/content', label: 'Content' }}
@@ -118,7 +118,7 @@
 			</p>
 		{/if}
 		{#if data.superAdmin && !data.tenants.ok}
-			<p class="text-xs text-muted">The tenants could not be read, so the list cannot be narrowed to one.</p>
+			<p class="text-xs text-muted">Could not load the tenants for the filter. Reload the page to try again.</p>
 		{/if}
 	{/if}
 
@@ -127,13 +127,13 @@
 			level={2}
 			gate={data.activity.gate}
 			title="Content activity"
-			absent="This engine does not record content activity. It arrives with an engine upgrade."
+			absent="Content activity needs a newer version of the engine."
 		/>
 	{:else if rows.length === 0 && (data.total ?? 0) > 0}
 		<EmptyState
 			iconSnippet={emptyIcon}
 			title="Nothing on this page"
-			description={`The list holds ${formatCount(data.total)} changes, but this page came back empty. Retention may have removed some since the count was taken.`}
+			description={`There are ${formatCount(data.total)} changes, but none on this page. Retention may have removed some since the count was taken.`}
 		>
 			{#snippet action()}
 				<Button variant="secondary" href={pageHref(0)}>Go to the first page</Button>
@@ -145,7 +145,7 @@
 		<EmptyState
 			iconSnippet={emptyIcon}
 			title="No content changes yet"
-			description="Every create, change, publish and delete of an entry is recorded here while activity is on."
+			description="Each time someone creates, changes, publishes or deletes an entry, it appears here while activity is on."
 		/>
 	{:else}
 		<div class="flex flex-col gap-4">

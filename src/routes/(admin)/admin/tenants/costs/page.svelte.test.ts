@@ -91,7 +91,7 @@ describe('tenant costs page', () => {
 		expect(screen.getByRole('button', { name: /Use default/ })).toBeTruthy();
 		expect(screen.getAllByRole('form', { name: /Price for/ })).toHaveLength(5);
 		expect(fieldsets().every((f) => !f.disabled)).toBe(true);
-		expect(screen.getByRole('button', { name: /Aggregate now/ })).toHaveProperty('disabled', false);
+		expect(screen.getByRole('button', { name: /Update costs/ })).toHaveProperty('disabled', false);
 		expect(screen.getByRole('button', { name: /New budget/ })).toHaveProperty('disabled', false);
 		expect(screen.queryByTestId('not-enabled')).toBeNull();
 	});
@@ -104,7 +104,7 @@ describe('tenant costs page', () => {
 		expect(screen.queryByRole('region', { name: 'This month' })).toBeNull();
 		expect(screen.queryByRole('region', { name: 'Budgets' })).toBeNull();
 		expect(fieldsets()).toHaveLength(0);
-		expect(screen.queryByRole('button', { name: /Aggregate now/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Update costs/ })).toBeNull();
 		expect(screen.queryByRole('button', { name: /New budget/ })).toBeNull();
 		expect(screen.queryByText('Beta')).toBeNull();
 	});
@@ -126,7 +126,7 @@ describe('tenant costs page', () => {
 		render(CostsPage, {
 			props: { data: data({ summary: { ok: false, gate: { state: 'unavailable' } } }), form: null },
 		});
-		expect(screen.getByText(/so the split by resource could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so the split by resource did not load/)).toBeTruthy();
 		expect(screen.getByTestId('cost-dashboard')).toBeTruthy();
 	});
 
@@ -137,7 +137,7 @@ describe('tenant costs page', () => {
 				form: { form: 'aggregate', saved: true, result: { tenant_id: 't', entries_saved: 3, budget_events: 1, anomalies: 0 } } as never,
 			},
 		});
-		expect(await screen.findByText('The feed ran')).toBeTruthy();
+		expect(await screen.findByText('Costs updated')).toBeTruthy();
 		expect(screen.getByText(/3 cost lines written, 1 budget events published/)).toBeTruthy();
 		cleanup();
 		render(CostsPage, {
@@ -159,7 +159,7 @@ describe('tenant cost prices that are not known', () => {
 		expect(screen.queryByTestId('cost-prices')).toBeNull();
 		expect(screen.queryAllByRole('form', { name: /Price for/ })).toHaveLength(0);
 		expect(screen.queryByText('Default')).toBeNull();
-		expect(screen.getByText(/so the prices could not be read/)).toBeTruthy();
+		expect(screen.getByText(/so the prices did not load/)).toBeTruthy();
 	});
 
 });
@@ -173,10 +173,10 @@ describe('the budget drawer and the failures of other actions', () => {
 	const drawerText = () => document.body.querySelector('form#budget-form')?.textContent ?? '';
 
 	it('leaves a newly opened budget drawer clean after a failed delete', async () => {
-		render(CostsPage, { props: { data: data(), form: { form: 'budget', error: 'Failed to delete the budget.', locked: false } as never } });
-		expect(screen.getAllByText('Failed to delete the budget.')).toHaveLength(1);
+		render(CostsPage, { props: { data: data(), form: { form: 'budget', error: 'Could not delete the budget. Try again.', locked: false } as never } });
+		expect(screen.getAllByText('Could not delete the budget. Try again.')).toHaveLength(1);
 		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
-		expect(drawerText()).not.toContain('Failed to delete the budget.');
+		expect(drawerText()).not.toContain('Could not delete the budget. Try again.');
 	});
 
 	it('keeps the warn tone of a refusal for a ledger that is not enabled', async () => {
@@ -219,7 +219,7 @@ describe('the budget controls', () => {
 		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Storage cap' }));
 		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
-		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap', expect.any(String), { confirmLabel: 'Delete' });
+		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap?', expect.any(String), { confirmLabel: 'Delete' });
 		expect(new FormData(form).get('id')).toBe('b1');
 	});
 });

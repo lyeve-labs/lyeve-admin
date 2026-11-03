@@ -49,15 +49,15 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No provider was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its provider. Reload the page and try again.' });
 		try {
 			const result = await testProvider(client, id);
 			if (!testPassed(result)) {
-				return fail(400, { error: `The provider refused: ${testMessage(result)}` });
+				return fail(400, { error: `The provider test failed: ${testMessage(result)}` });
 			}
 			return { tested: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The provider could not be tested.') });
+			return fail(400, { error: actionError(err, 'Could not test the provider. Try again.') });
 		}
 	},
 
@@ -69,7 +69,7 @@ export const actions: Actions = {
 			const created = await createProvider(authedClient(event), parsed.body);
 			return { saved: created.name ?? parsed.body.name };
 		} catch (err) {
-			return fail(400, { action: 'create', providerError: actionError(err, 'The provider could not be created.') });
+			return fail(400, { action: 'create', providerError: actionError(err, 'Could not create the provider. Try again.') });
 		}
 	},
 
@@ -77,14 +77,14 @@ export const actions: Actions = {
 		await requireRole(event, ['super_admin']);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'update', providerError: 'No provider was named.' });
+		if (!id) return fail(400, { action: 'update', providerError: 'This form is missing its provider. Reload the page and try again.' });
 		const parsed = providerBodyFrom(form, false);
 		if ('error' in parsed) return fail(400, { action: 'update', providerError: parsed.error });
 		try {
 			await updateProvider(authedClient(event), id, parsed.body);
 			return { saved: parsed.body.name };
 		} catch (err) {
-			return fail(400, { action: 'update', providerError: actionError(err, 'The provider could not be saved.') });
+			return fail(400, { action: 'update', providerError: actionError(err, 'Could not save the provider. Try again.') });
 		}
 	},
 
@@ -93,11 +93,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'No provider was named.' });
+		if (!id) return fail(400, { error: 'This form is missing its provider. Reload the page and try again.' });
 		try {
 			await deleteProvider(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'The provider could not be removed.') });
+			return fail(400, { error: actionError(err, 'Could not delete the provider. Try again.') });
 		}
 		return { removed: id };
 	},

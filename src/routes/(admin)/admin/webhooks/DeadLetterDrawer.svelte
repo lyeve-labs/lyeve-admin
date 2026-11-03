@@ -56,7 +56,7 @@
 	function replayOutcome(code: unknown): Outcome {
 		if (typeof code !== 'number') return { text: 'Replayed. The receiver sent no status.', done: false };
 		if (code >= 200 && code < 300) return { text: `Delivered (HTTP ${code})`, done: true };
-		return { text: `The receiver answered HTTP ${code}. The entry is still pending.`, done: false };
+		return { text: `The receiver returned HTTP ${code}. The entry is still pending.`, done: false };
 	}
 
 	// The map is read untracked: an effect that tracks the map it rewrites
@@ -76,8 +76,8 @@
 	function deletePermanently(dl: DeadLetter): SubmitFunction {
 		return async ({ cancel }) => {
 			const ok = await confirm(
-				`Delete the dead letter from ${dl.webhook_name}`,
-				`The ${dl.event_type} delivery that died ${formatDateTime(dl.dead_at)} is removed for good and cannot be replayed.`,
+				`Delete the dead letter from ${dl.webhook_name}?`,
+				`The ${dl.event_type} delivery that died at ${formatDateTime(dl.dead_at)} is deleted permanently. It cannot be replayed.`,
 				{ confirmLabel: 'Delete' },
 			);
 			if (!ok) {
@@ -109,15 +109,15 @@
 			<FormErrors message={failure?.error || undefined} refused={formRefusal(failure)} />
 			{#if deadLetterItems.length === 0}
 				<EmptyState
-					title="No dead letter entries"
-					description="Exhausted deliveries appear here when retries are depleted."
+					title="No dead letters"
+					description="Deliveries that fail after every retry appear here."
 				>
 					{#snippet iconSnippet()}<Skull size={ICON.lg} />{/snippet}
 				</EmptyState>
 			{:else}
 				{#if held}
 					<p class="mb-2 text-xs text-muted" data-testid="replay-held">
-						{refusalText(held)} Replaying and dismissing need it. Deleting stays open.
+						{refusalText(held)} Replaying and dismissing need it. You can still delete entries.
 					</p>
 				{/if}
 				<Table label="Dead letters">

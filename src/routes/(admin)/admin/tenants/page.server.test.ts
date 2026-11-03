@@ -276,7 +276,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 			status: 402,
 			data: { refused: { kind: 'cap', cap: 'tenants', limit: null, current: null, upgradeUrl: link } },
 		});
-		expect((result as { data: { error: string } }).data.error).toContain('This instance allows no more tenants.');
+		expect((result as { data: { error: string } }).data.error).toContain('This instance is at its limit for tenants.');
 	});
 
 	it('sends the plan as typed', async () => {
@@ -455,7 +455,19 @@ describe('admin/tenants update, toggle and delete', () => {
 
 	it('keeps driver text out of an outage on delete', async () => {
 		const result = await actions.delete(writeEvent({ id: 't1' }, () => json({ error: 'pq: connection refused' }, 503)));
-		expect(result).toEqual({ status: 400, data: { action: 'delete', error: 'Failed to delete tenant' } });
+		expect(result).toEqual({ status: 400, data: { action: 'delete', error: 'Could not delete the tenant. Try again.' } });
+	});
+
+	it('names the direction of a toggle that failed', async () => {
+		const outage = () => json({ error: 'pq: connection refused' }, 503);
+		expect(await actions.toggle(writeEvent({ id: 't1', enabled: 'true' }, outage))).toEqual({
+			status: 400,
+			data: { action: 'toggle', error: 'Could not disable the tenant. Try again.' },
+		});
+		expect(await actions.toggle(writeEvent({ id: 't1', enabled: 'false' }, outage))).toEqual({
+			status: 400,
+			data: { action: 'toggle', error: 'Could not enable the tenant. Try again.' },
+		});
 	});
 
 	it('deletes a tenant the engine accepts', async () => {

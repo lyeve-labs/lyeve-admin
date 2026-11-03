@@ -35,15 +35,15 @@ describe('parseBudget', () => {
 
 	it('names the control that is wrong', () => {
 		const base = { name: 'x', amount: '1', period: 'monthly', period_start: '2026-09-01', period_end: '2026-09-30' };
-		expect(parseBudget(form({ ...base, name: '' }))).toEqual({ error: 'The budget needs a name.' });
-		expect(parseBudget(form({ ...base, amount: 'ten' }))).toEqual({ error: 'The amount is a decimal number, such as 250 or 99.50.' });
-		expect(parseBudget(form({ ...base, period: 'weekly' }))).toEqual({ error: 'Pick a period: monthly, quarterly or annual.' });
-		expect(parseBudget(form({ ...base, resource_type: 'gpu' }))).toEqual({ error: 'Pick a resource type, or leave it for every resource.' });
+		expect(parseBudget(form({ ...base, name: '' }))).toEqual({ error: 'Enter a name.' });
+		expect(parseBudget(form({ ...base, amount: 'ten' }))).toEqual({ error: 'Enter the amount as a number, such as 250 or 99.50.' });
+		expect(parseBudget(form({ ...base, period: 'weekly' }))).toEqual({ error: 'Choose monthly, quarterly or annual.' });
+		expect(parseBudget(form({ ...base, resource_type: 'gpu' }))).toEqual({ error: 'Choose a resource type, or leave it empty for every resource.' });
 		expect(parseBudget(form({ ...base, alert_thresholds: '50, high' }))).toEqual({
-			error: 'Alert thresholds are whole percentages, comma separated, such as 50, 80, 100.',
+			error: 'Enter whole percentages separated by commas, such as 50, 80, 100.',
 		});
-		expect(parseBudget(form({ ...base, period_end: '2026-08-01' }))).toEqual({ error: 'The window ends before it starts.' });
-		expect(parseBudget(form({ ...base, period_start: '' }))).toEqual({ error: 'Pick the first and last day of the budget window.' });
+		expect(parseBudget(form({ ...base, period_end: '2026-08-01' }))).toEqual({ error: 'Choose an end date after the start date.' });
+		expect(parseBudget(form({ ...base, period_start: '' }))).toEqual({ error: 'Choose the first and last day of the budget window.' });
 	});
 });
 
@@ -56,8 +56,8 @@ describe('parsePrice', () => {
 	});
 
 	it('refuses what the ledger would refuse', () => {
-		expect(parsePrice(form({ resource_type: 'gpu', unit_price: '1', per_units: '1' }))).toEqual({ error: 'Pick a resource type.' });
-		expect(parsePrice(form({ resource_type: 'ai', unit_price: '-1', per_units: '1' }))).toEqual({ error: 'The unit price is a decimal number, such as 0.09.' });
-		expect(parsePrice(form({ resource_type: 'ai', unit_price: '1', per_units: '0' }))).toEqual({ error: 'The block is a whole number of units, at least 1.' });
+		expect(parsePrice(form({ resource_type: 'gpu', unit_price: '1', per_units: '1' }))).toEqual({ error: 'Choose a resource type.' });
+		expect(parsePrice(form({ resource_type: 'ai', unit_price: '-1', per_units: '1' }))).toEqual({ error: 'Enter the unit price as a number, such as 0.09.' });
+		expect(parsePrice(form({ resource_type: 'ai', unit_price: '1', per_units: '0' }))).toEqual({ error: 'Enter the block size as a whole number of units, at least 1.' });
 	});
 });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { actions, load } from './+page.server';
 import { resetRateLimitStore } from '$lib/server/rate-limit';
 
@@ -19,6 +19,8 @@ function submit(fields: Record<string, string>, fetch: typeof globalThis.fetch) 
 const STRONG = 'correct horse battery';
 
 describe('reset-password load', () => {
+	afterEach(() => vi.unstubAllEnvs());
+
 	it('reads the token from the link', () => {
 		expect(load({ url: new URL('http://admin.test/reset-password?token=t1') } as never)).toEqual({
 			token: 't1',
@@ -28,12 +30,19 @@ describe('reset-password load', () => {
 	});
 
 	it('carries the organization its link names, and drops one the engine would not read', () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', 'true');
 		const named = load({ url: new URL('http://admin.test/reset-password?token=t1&tenant=acme') } as never) as { carried: string };
 		expect(named.carried).toBe('acme');
 		const malformed = load({ url: new URL('http://admin.test/reset-password?token=t1&tenant=Acme%20Co') } as never) as {
 			carried: string;
 		};
 		expect(malformed.carried).toBe('');
+	});
+
+	it('carries no organization on while the console does not ask for one', () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', '');
+		const named = load({ url: new URL('http://admin.test/reset-password?token=t1&tenant=acme') } as never) as { carried: string };
+		expect(named.carried).toBe('');
 	});
 });
 
@@ -48,7 +57,7 @@ describe('reset-password action', () => {
 		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
 		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG }, fetch)) as { status: number; data: { error: string } };
 		expect(result.status).toBeGreaterThanOrEqual(500);
-		expect(result.data.error).toBe('Password reset is unavailable right now. Please try again shortly.');
+		expect(result.data.error).toBe('Password reset is unavailable right now. Try again in a moment.');
 	});
 
 	beforeEach(() => resetRateLimitStore());

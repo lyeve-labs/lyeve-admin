@@ -100,13 +100,13 @@ describe('Persisted queries', () => {
 			props: props({ persisted: { ok: false, gate: { state: 'forbidden' } } }),
 		});
 		expect(container.textContent).toContain('Your role cannot open persisted queries');
-		expect(queryByText('No persisted queries')).toBeNull();
+		expect(queryByText('No persisted queries yet')).toBeNull();
 		expect(queryByRole('button', { name: 'New persisted query' })).toBeNull();
 	});
 
 	it('offers the create from the first-run state', () => {
 		const { getByText, getAllByRole } = render(GraphqlPage, { props: props() });
-		expect(getByText('No persisted queries')).toBeTruthy();
+		expect(getByText('No persisted queries yet')).toBeTruthy();
 		expect(getAllByRole('button', { name: 'New persisted query' })).toHaveLength(2);
 	});
 });
@@ -118,17 +118,18 @@ describe('the register drawer', () => {
 	it('shows a refused register inside the open drawer', async () => {
 		const { getAllByRole, rerender } = render(GraphqlPage, { props: props() });
 		await fireEvent.click(getAllByRole('button', { name: 'New persisted query' })[0]);
-		await rerender(props({}, { action: 'register', error: 'The query could not be registered.' }));
-		expect(drawerText()).toContain('The query could not be registered.');
+		await rerender(props({}, { action: 'register', error: 'Could not register the query. Try again.' }));
+		expect(drawerText()).toContain('Could not register the query. Try again.');
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
+		const failed = 'Could not delete the query. Try again.';
 		const { container, getByRole } = render(GraphqlPage, {
-			props: props({ persisted: { ok: true, value: [query] } }, { action: 'delete', error: 'The query could not be deleted.' }),
+			props: props({ persisted: { ok: true, value: [query] } }, { action: 'delete', error: failed }),
 		});
-		expect(container.textContent).toContain('The query could not be deleted.');
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(getByRole('button', { name: 'New persisted query' }));
-		expect(drawerText()).not.toContain('could not be deleted');
+		expect(drawerText()).not.toContain(failed);
 	});
 });
 
@@ -137,7 +138,7 @@ describe('persisted query delete', () => {
 		const query = { query_hash: 'abc123', query: '{ posts { id } }', operation_name: 'Posts', description: '', enabled: true, auto_registered: false };
 		const { getByRole } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] } }) });
 		const out = await pressDelete(getByRole('button', { name: 'Delete Posts' }), 'hash');
-		expect(out.title).toBe('Delete persisted query Posts');
+		expect(out.title).toBe('Delete persisted query Posts?');
 		expect(out.sent).toBe('abc123');
 	});
 });
@@ -175,7 +176,7 @@ describe('layout on narrow and medium screens', () => {
 	// on a phone and ran forty lines tall.
 	it('gives each endpoint note a minimum width, so the table scrolls in its box', () => {
 		const { getByText } = render(GraphqlPage, { props: props() });
-		for (const text of [/A GET on the same path/, /WebSocket, the graphql-ws protocol/]) {
+		for (const text of [/A GET on the same path/, /WebSocket with the graphql-ws protocol/]) {
 			expect((getByText(text).closest('td') as HTMLElement).className).toContain('min-w-48');
 		}
 	});

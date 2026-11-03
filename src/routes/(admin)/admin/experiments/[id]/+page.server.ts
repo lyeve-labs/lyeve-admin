@@ -53,9 +53,9 @@ export const load: PageServerLoad = async (event) => {
 	// and keeps its failure, so a panel that could not be read never offers
 	// to add the first row of a list that may already have rows.
 	const [variants, metrics, results] = await Promise.all([
-		section<Variant[]>(listVariants(client, id), 'The variants could not be read. This is not a report that there are none.'),
-		section<Metric[]>(listMetrics(client, id), 'The metrics could not be read. This is not a report that there are none.'),
-		section<ExperimentResults>(readResults(client, id), 'The results could not be read.'),
+		section<Variant[]>(listVariants(client, id), 'Could not load the variants.'),
+		section<Metric[]>(listMetrics(client, id), 'Could not load the metrics.'),
+		section<ExperimentResults>(readResults(client, id), 'Could not load the results.'),
 	]);
 
 	const gate: AbGate = AB_OK;
@@ -69,11 +69,11 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 
 		const name = String(form.get('name') ?? '').trim();
-		if (!name) return fail(400, { action: 'addVariant', error: 'Name the variant. It is what a result is reported against.' });
+		if (!name) return fail(400, { action: 'addVariant', error: 'Enter a name for the variant.' });
 
 		const share = Number(form.get('traffic_percentage'));
 		if (!Number.isFinite(share) || share <= 0 || share > 100) {
-			return fail(400, { action: 'addVariant', error: 'A variant takes a share of traffic above 0 and no more than 100.' });
+			return fail(400, { action: 'addVariant', error: 'Enter a share of traffic above 0 and up to 100.' });
 		}
 
 		try {
@@ -85,7 +85,7 @@ export const actions: Actions = {
 				is_control: form.get('is_control') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { action: 'addVariant', error: actionError(err, 'The variant could not be added.') });
+			return fail(400, { action: 'addVariant', error: actionError(err, 'Could not add the variant. Try again.') });
 		}
 		return { saved: name };
 	},
@@ -95,11 +95,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const vid = String(form.get('vid') ?? '');
-		if (!vid) return fail(400, { action: 'removeVariant', error: 'No variant was named.' });
+		if (!vid) return fail(400, { action: 'removeVariant', error: 'This form is missing its variant. Reload the page and try again.' });
 		try {
 			await deleteVariant(client, event.params.id, vid);
 		} catch (err) {
-			return fail(400, { action: 'removeVariant', error: actionError(err, 'The variant could not be removed.') });
+			return fail(400, { action: 'removeVariant', error: actionError(err, 'Could not remove the variant. Try again.') });
 		}
 		return { removed: vid };
 	},
@@ -112,11 +112,11 @@ export const actions: Actions = {
 		const name = String(form.get('name') ?? '').trim();
 		const eventName = String(form.get('event_name') ?? '').trim();
 		const kind = metricType(String(form.get('metric_type') ?? ''));
-		if (!name) return fail(400, { action: 'addMetric', error: 'Name the metric.' });
+		if (!name) return fail(400, { action: 'addMetric', error: 'Enter a name for the metric.' });
 		if (!eventName) {
 			return fail(400, {
 				action: 'addMetric',
-				error: 'Name the event this metric counts, or nothing the application sends will match it.',
+				error: 'Enter the event name this metric counts.',
 			});
 		}
 		if (!kind) return fail(400, { action: 'addMetric', error: 'Choose a metric type.' });
@@ -129,7 +129,7 @@ export const actions: Actions = {
 				metric_type: kind,
 			});
 		} catch (err) {
-			return fail(400, { action: 'addMetric', error: actionError(err, 'The metric could not be added.') });
+			return fail(400, { action: 'addMetric', error: actionError(err, 'Could not add the metric. Try again.') });
 		}
 		return { saved: name };
 	},
@@ -139,11 +139,11 @@ export const actions: Actions = {
 		const client = authedClient(event);
 		const form = await event.request.formData();
 		const mid = String(form.get('mid') ?? '');
-		if (!mid) return fail(400, { action: 'removeMetric', error: 'No metric was named.' });
+		if (!mid) return fail(400, { action: 'removeMetric', error: 'This form is missing its metric. Reload the page and try again.' });
 		try {
 			await deleteMetric(client, event.params.id, mid);
 		} catch (err) {
-			return fail(400, { action: 'removeMetric', error: actionError(err, 'The metric could not be removed.') });
+			return fail(400, { action: 'removeMetric', error: actionError(err, 'Could not remove the metric. Try again.') });
 		}
 		return { removed: mid };
 	},

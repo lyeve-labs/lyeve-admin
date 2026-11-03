@@ -35,14 +35,14 @@ describe('RoleDrawer', () => {
 	});
 
 	it('shows the failure it is given first in its form', () => {
-		render(RoleDrawer, { props: { open: true, error: 'The rule could not be saved.' } });
-		expect(roleForm()?.firstElementChild?.textContent).toContain('The rule could not be saved.');
+		render(RoleDrawer, { props: { open: true, error: 'Could not save the rule. Try again.' } });
+		expect(roleForm()?.firstElementChild?.textContent).toContain('Could not save the rule. Try again.');
 	});
 
 	it('shows the role ceiling refusal with its numbers', () => {
 		const refused = { kind: 'cap', cap: 'rbac.roles', limit: 3, current: 3, upgradeUrl: '' } as const;
 		render(RoleDrawer, { props: { open: true, refused: refused as never } });
-		expect(roleForm()?.textContent).toContain('3 of 3 roles are in use');
+		expect(roleForm()?.textContent).toContain("You're using 3 of 3 roles");
 	});
 
 	it('closes and clears the name on success, and stays open on a failure', async () => {

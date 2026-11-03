@@ -125,7 +125,7 @@ describe('plugins page', () => {
 
 	it('says so when the engine carries no plugins', () => {
 		const { container } = renderPage([]);
-		expect(screen.getByText('This engine carries no plugins.')).toBeTruthy();
+		expect(screen.getByText('This build has no plugins.')).toBeTruthy();
 		expect(screen.getByText('No plugins in this build')).toBeTruthy();
 		expect(container.querySelector('[data-testid="plugin-row"]')).toBeNull();
 		expect(screen.queryByRole('searchbox')).toBeNull();

@@ -66,7 +66,7 @@
 
 	const KIND_OPTIONS = SINK_KINDS.map((k) => ({ value: k, label: SINK_KIND_LABELS[k] }));
 	const URL_HINTS: Record<SinkKind, string> = {
-		https: 'Receives JSON lines, signed with HMAC-SHA256 over the timestamp and the body.',
+		https: 'The endpoint receives JSON lines, signed with HMAC-SHA256 over the timestamp and the body.',
 		splunk: 'The collector URL, ending in /services/collector/event.',
 		datadog: 'The logs intake of your Datadog site.',
 	};
@@ -104,7 +104,7 @@
 		editing
 			? 'Leave blank to keep the current one.'
 			: kind === 'https'
-				? 'Leave blank and one is generated and shown once.'
+				? 'Leave blank to generate one. It is shown only once.'
 				: 'Required.',
 	);
 
@@ -118,9 +118,9 @@
 
 	const success = $derived.by(() => {
 		if (!form) return '';
-		if ('created' in form) return `${form.created} is streaming the audit log.`;
+		if ('created' in form) return `${form.created} created. It now receives the audit log.`;
 		if ('saved' in form) return `${form.saved} saved.`;
-		if ('deleted' in form) return 'Destination deleted. It receives nothing more.';
+		if ('deleted' in form) return 'Destination deleted.';
 		return '';
 	});
 	const tested = $derived(
@@ -130,7 +130,7 @@
 	let targetId = $state('');
 	let deleteForm = $state<HTMLFormElement>();
 	async function askDelete(s: AuditSink) {
-		const ok = await confirmDialog(`Delete destination ${s.name}`, 'The destination stops receiving the audit log. Entries already sent stay where they are.', {
+		const ok = await confirmDialog(`Delete destination ${s.name}?`, 'The destination stops receiving the audit log. Entries already sent stay where they are.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
@@ -158,7 +158,7 @@
 	<AuditTabs active="sinks" sinks={data.gate.state === 'ok' ? data.sinks.length : undefined} />
 
 	{#if data.gate.state !== 'ok'}
-		<GateNotice level={2} gate={data.gate} title="Audit streaming" absent="This build does not stream the audit log anywhere." />
+		<GateNotice level={2} gate={data.gate} title="Audit streaming" absent="Audit streaming is not included in this build." />
 	{:else}
 		<div class="flex flex-col gap-4">
 			<FormErrors message={rowFailure ? String(rowFailure.error) : undefined} refused={formRefusal(rowFailure)} />
@@ -169,8 +169,8 @@
 			{#if data.sinks.length === 0}
 				<EmptyState
 					level={2}
-					title="Nothing receives the audit log"
-					description="Add an HTTPS endpoint, a Splunk collector or Datadog, and every entry is sent there as it is written."
+					title="No destinations yet"
+					description="Create a destination to send every audit entry to an HTTPS endpoint, Splunk or Datadog as it is written."
 				>
 					{#snippet iconSnippet()}<Radio size={ICON.lg} />{/snippet}
 					{#snippet action()}
@@ -240,7 +240,7 @@
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input id="sink-name" name="name" label="Name" required bind:value={name} error={errors.name} placeholder="Security team SIEM" />
 		{#if editing}
-			<Input id="sink-kind" label="Destination" value={SINK_KIND_LABELS[kind]} disabled hint="A destination keeps its kind. Create a new one to change it." />
+			<Input id="sink-kind" label="Destination" value={SINK_KIND_LABELS[kind]} disabled hint="The destination type cannot be changed. Create a new destination instead." />
 		{:else}
 			<SegmentedControl
 				name="kind"
@@ -263,7 +263,7 @@
 		<Toggle id="sink-enabled" label="Enabled" bind:checked={enabled} />
 		{#if !editing}
 			<input type="hidden" name="backfill" value={backfill ? 'true' : 'false'} />
-			<Checkbox id="sink-backfill" label="Send the existing log too" hint="Off, the destination receives entries written from now on." bind:checked={backfill} />
+			<Checkbox id="sink-backfill" label="Send the existing log too" hint="When on, existing entries are sent as well as new ones. When off, only new entries are sent." bind:checked={backfill} />
 		{/if}
 	</form>
 	{#snippet footer()}
@@ -278,7 +278,7 @@
 	<Modal open title="Signing secret" onclose={() => (reveal = null)}>
 		<div class="flex flex-col gap-3">
 			<p class="text-sm text-fg">
-				{reveal.name} signs every delivery with this secret. Copy it to the receiver now. It is not shown again.
+				Every delivery to {reveal.name} is signed with this secret. Copy it to the receiver now. It is not shown again.
 			</p>
 			<CopyField value={reveal.secret} label="Signing secret" mono secret />
 		</div>

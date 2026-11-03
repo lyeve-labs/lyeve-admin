@@ -84,7 +84,9 @@
 				required
 			/>
 
-			<OrganizationField carried={data.carried} typed={typedOrganization} />
+			{#if data.organization}
+				<OrganizationField carried={data.carried} typed={typedOrganization} />
+			{/if}
 
 			{#if data.passwordReset}
 				<div class="flex justify-end">

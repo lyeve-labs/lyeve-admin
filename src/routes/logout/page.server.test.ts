@@ -138,3 +138,40 @@ describe('logout/+page.server.ts actions.default', () => {
 		expect(cookies.delete).toHaveBeenCalledWith('__Host-console_refresh', expect.objectContaining({ path: '/', secure: true }));
 	});
 });
+
+describe('logout clears the CSRF cookie itself', () => {
+	// The engine clears its own CSRF cookie on logout, but only under the name
+	// its own scheme setting gives it, and only when the call reaches it. A
+	// cookie the console minted must not outlive the session either way.
+	it('deletes the CSRF cookie when the engine never answered', async () => {
+		const fetch = vi.fn(async () => {
+			throw new Error('ECONNREFUSED');
+		}) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies({ '__Host-sys_session': 'session-token', '__Host-csrf': 'minted' });
+
+		await catchRedirect(() => actions.default({ fetch, cookies } as never));
+
+		expect(cookies.delete).toHaveBeenCalledWith('__Host-csrf', expect.objectContaining({ path: '/', secure: true }));
+		expect(cookies.get('__Host-csrf')).toBeUndefined();
+	});
+
+	it("deletes both names when the engine's name differs from the console's", async () => {
+		const fetch = vi.fn(async () => json({}, 204)) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies({ '__Host-sys_session': 'session-token', '__Host-csrf': 'minted', csrf: 'engine' });
+
+		await catchRedirect(() => actions.default({ fetch, cookies } as never));
+
+		expect(cookies.get('__Host-csrf')).toBeUndefined();
+		expect(cookies.get('csrf')).toBeUndefined();
+	});
+
+	it('deletes the plain name over plain HTTP', async () => {
+		const fetch = vi.fn(async () => json({}, 204)) as unknown as typeof globalThis.fetch;
+		const cookies = mockCookies({ sys_session: 'session-token', csrf: 'minted' });
+		const url = new URL('http://localhost:5173/logout');
+
+		await catchRedirect(() => actions.default({ fetch, cookies, url } as never));
+
+		expect(cookies.delete).toHaveBeenCalledWith('csrf', expect.objectContaining({ path: '/', secure: false }));
+	});
+});

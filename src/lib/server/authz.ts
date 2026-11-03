@@ -2,17 +2,19 @@ import { error, redirect, type RequestEvent } from '@sveltejs/kit';
 import { ApiError, createClient, type HttpClient } from '@lyeve-labs/client';
 import { getMe } from '@lyeve-labs/client-rest';
 import type { User } from '@lyeve-labs/client';
-import { clearSessionCookie, sessionToken, type SessionRead } from '$lib/server/session-cookie';
+import {
+	CSRF_COOKIE,
+	CSRF_COOKIE_INSECURE,
+	clearSessionCookie,
+	sessionToken,
+	type SessionRead,
+} from '$lib/server/session-cookie';
 import { sessionEndedTarget } from '$lib/server/session-refresh';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { BUSY, OUTAGE } from '$lib/outage';
 
 /** The headers that carry the session, in lower case. Only `authedHeaders` sets them. */
 const SESSION_HEADERS = new Set(['authorization', 'x-csrf-token']);
-
-// The engine's double-submit CSRF cookie, secure name first.
-const CSRF_COOKIE = '__Host-csrf';
-const CSRF_COOKIE_INSECURE = 'csrf';
 
 /**
  * The headers a server-side request to the engine has to carry.
@@ -65,7 +67,7 @@ export function authedClient(event: RequestEvent, extra: Record<string, string> 
 }
 
 const NO_SEAT = 'This instance has no admin seat left for this account.';
-const UNREACHABLE = 'This account or network cannot reach the admin right now.';
+const UNREACHABLE = 'Access to the admin is blocked for this account or network.';
 
 /**
  * The sentence for a 402 on the session check. The engine answers one when it
@@ -192,7 +194,7 @@ export async function requireRole(event: RequestEvent, roles: string[]): Promise
  */
 export function assertRole(user: User, roles: string[]): User {
 	if (!roles.some((r) => user.roles.includes(r))) {
-		error(403, `Requires one of roles: ${roles.join(', ')}`);
+		error(403, `This needs one of these roles: ${roles.join(', ')}.`);
 	}
 	return user;
 }

@@ -95,7 +95,7 @@
 
 			{#if schema === null}
 				{#if flowsFailed}
-					<Alert tone="warn">The flows could not be read, so only schemas are offered here. Reload the page to try again.</Alert>
+					<Alert tone="warn">Could not load flows, so only schemas are listed. Reload the page to try again.</Alert>
 				{/if}
 				<!-- The combobox posts whatever text is in its box, so the write reads
 				     the chosen option instead. A typed fragment nobody picked would
@@ -104,7 +104,7 @@
 					label="Resource"
 					bind:value={editSchema}
 					options={rules.unruledSchemas(role)}
-					placeholder="Type to search schemas and flows"
+					placeholder="Search schemas and flows"
 					required
 				/>
 				<input type="hidden" name="schema_name" value={editSchema} />
@@ -115,8 +115,8 @@
 			{#if resource !== '' && inherited.length > 0}
 				<Alert tone="warn" title="This rule replaces the {parentLabel(resource)} on {schemaLabel(resource)}">
 					{#snippet children()}
-						The {parentLabel(resource)} grants {role} {inherited.join(', ')}. The engine reads this rule alone
-						on {schemaLabel(resource)}, so an action left clear is denied on {schemaLabel(resource)}.
+						The {parentLabel(resource)} grants {role} {inherited.join(', ')}. On {schemaLabel(resource)} only this
+						rule applies, so any action you leave clear is denied there.
 					{/snippet}
 				</Alert>
 			{/if}
@@ -132,7 +132,7 @@
 					label: ACTION_LABEL[action],
 					description:
 						inherited.includes(action)
-							? `The ${parentLabel(resource)} grants it. Left clear, it is denied here.`
+							? `The ${parentLabel(resource)} grants it. If you leave it clear, it is denied here.`
 							: undefined
 				}))}
 				bind:value={editActions}
@@ -151,14 +151,14 @@
 			{#if emptyWrite}
 				<Alert tone="warn" title="This rule would do nothing">
 					{#snippet children()}
-						A rule with no action and no field mask grants nothing and revokes nothing here, and it
-						still counts against the role ceiling.
+						A rule with no action and no field mask changes nothing here, but it still counts against the
+						role ceiling.
 					{/snippet}
 				</Alert>
 			{:else if noGrant}
-				<Alert tone="warn" title="This rule shuts {role} out">
+				<Alert tone="warn" title="This rule blocks {role}">
 					{#snippet children()}
-						It names no action, so {role} is denied every action on {schemaLabel(resource)}.
+						With no action selected, {role} is denied every action on {schemaLabel(resource)}.
 					{/snippet}
 				</Alert>
 			{/if}

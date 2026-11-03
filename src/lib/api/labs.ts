@@ -267,14 +267,14 @@ export function statusTone(status: number): StatusTone {
  * is not enabled, and no amount of retrying or re-authenticating changes it.
  */
 export const STATUS_HINTS: Readonly<Record<number, string>> = {
-	401: 'The session did not authenticate. Sign in again.',
-	402: 'The plugin behind this route is not enabled on this instance. Nothing about the request is wrong.',
-	403: 'Authenticated, but this role may not call it.',
-	404: 'No route, or no row. A path parameter that names nothing gives this.',
-	409: 'The engine refused a state change it considers invalid from where it is now.',
-	422: 'The body reached validation and failed it. The response names the field.',
-	429: 'A rate limit fired. Retry-After says when.',
-	503: 'The database or a replica is unavailable. This is never a bad request.',
+	401: 'Your session expired. Sign in again.',
+	402: 'The plugin behind this route is not enabled on this instance. Changing the request does not help.',
+	403: 'You are signed in, but your role cannot call this route.',
+	404: 'The route or the record does not exist. A path parameter that matches nothing returns this.',
+	409: 'The change is not allowed from the current state.',
+	422: 'The body failed validation. The response says which field.',
+	429: 'A rate limit was reached. The Retry-After header says when to try again.',
+	503: 'The database or a replica is unavailable. The request itself is not wrong.',
 };
 
 export function statusHint(status: number): string {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, render, within } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, within } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it } from 'vitest';
 import JsonFieldEditor, { cellValue, pairsOf, parseError, textOf } from './JsonFieldEditor.svelte';
 
 describe('pairsOf', () => {
@@ -79,7 +79,7 @@ describe('JsonFieldEditor', () => {
 	it('opens a nested document as JSON text', () => {
 		const { container } = render(JsonFieldEditor, { props: { value: '{"a":{"b":1}}' } });
 		expect(container.querySelector('textarea')).toBeTruthy();
-		expect(container.textContent).toContain('stays as JSON');
+		expect(container.textContent).toContain('so edit it as JSON');
 	});
 
 	it('reports invalid JSON while it is typed', async () => {
@@ -97,6 +97,44 @@ describe('the note on a value that stays JSON', () => {
 		const group = container.querySelector('[role="radiogroup"]') as HTMLElement;
 		const ids = (group.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
 		const described = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
-		expect(described).toContain('stays as JSON');
+		expect(described).toContain('so edit it as JSON');
+	});
+});
+
+describe('a refusal that names a key', () => {
+	// A label finds its input by id across the whole document, so an editor
+	// left from an earlier test under the same id would answer instead.
+	beforeEach(cleanup);
+
+	const props = {
+		id: 'field-data',
+		value: '{"name":"Ada","email":"[redacted-email]"}',
+		error: 'The key email holds a masked value.',
+		errorKey: 'email',
+	};
+
+	it('marks the value of that key and points it at the message', () => {
+		const { getAllByLabelText } = within(render(JsonFieldEditor, { props }).container);
+		const values = getAllByLabelText('Value');
+
+		expect(values[1].getAttribute('aria-invalid')).toBe('true');
+		const ids = (values[1].getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+		const described = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+		expect(described).toContain('The key email holds a masked value.');
+		expect(values[0].getAttribute('aria-invalid')).toBeNull();
+		expect(getAllByLabelText('Key').every((k) => k.getAttribute('aria-invalid') === null)).toBe(true);
+	});
+
+	it('shows the message once, under the row it marks', () => {
+		const { container } = render(JsonFieldEditor, { props });
+		expect(container.textContent?.split('The key email holds a masked value.').length).toBe(2);
+	});
+
+	it('marks the editor and points at the message when no row holds the key', () => {
+		const { getAllByLabelText } = within(render(JsonFieldEditor, { props: { ...props, errorKey: 'phone' } }).container);
+		const first = getAllByLabelText('Key')[0];
+		expect(first.getAttribute('aria-invalid')).toBe('true');
+		const ids = (first.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+		expect(ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ')).toContain('masked value');
 	});
 });

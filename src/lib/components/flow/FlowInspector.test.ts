@@ -219,7 +219,7 @@ describe('FlowInspector event trigger', () => {
 			},
 		});
 		expect((getByLabelText(/^Hook/) as HTMLInputElement).tagName).toBe('INPUT');
-		expect(container.textContent).toContain('The engine listed no hooks');
+		expect(container.textContent).toContain('No hooks to choose from');
 	});
 
 	it('shows a validation error on the hook under its field', () => {
@@ -339,7 +339,7 @@ describe('FlowInspector slug and endpoints', () => {
 			props: { definition: renamed, catalog: fixtureCatalog, selected: null, flowId: 'f1', savedSlug: joinFlow.slug, origin, onchange, onselect: vi.fn() },
 		});
 		expect(container.textContent).toContain(`/api/v1/flows/${joinFlow.slug}`);
-		expect(container.textContent).toContain('stop answering');
+		expect(container.textContent).toContain('stop working');
 		expect((getByLabelText('REST URL') as HTMLInputElement).value).toBe(`${origin}/api/v1/flows/orders-v2`);
 		await fireEvent.input(getByLabelText('Slug'), { target: { value: 'orders-v3' } });
 		expect(onchange).toHaveBeenCalledWith(expect.objectContaining({ slug: 'orders-v3' }));
@@ -372,15 +372,15 @@ describe('FlowInspector names that could not be read', () => {
 
 	it('says the datasources could not be read, with Try again, instead of hiding them', () => {
 		const { container, getByRole } = flowView({ variables: ['region'], datasourcesGate: { state: 'unavailable' } });
-		expect(container.textContent).toContain('so datasources could not be read');
+		expect(container.textContent).toContain('so datasources did not load');
 		expect(getByRole('link', { name: /Try again/ })).toBeTruthy();
 		expect(container.textContent).toContain('vars.region');
 	});
 
 	it('draws the section for a failed read even when nothing else was read', () => {
-		const { container } = flowView({ variablesGate: { state: 'error', message: 'The variables could not be read.' } });
+		const { container } = flowView({ variablesGate: { state: 'error', message: 'Could not load variables.' } });
 		expect(container.textContent).toContain('Available names');
-		expect(container.textContent).toContain('The variables could not be read.');
+		expect(container.textContent).toContain('Could not load variables.');
 	});
 
 	// The names are admin routes, so a role refused them sees no section, as

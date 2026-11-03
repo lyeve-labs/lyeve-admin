@@ -3,7 +3,7 @@
 	import type { FieldType, Schema, SchemaField, TransportMode, TransportName } from '@lyeve-labs/client';
 	import { dndzone, type DndEvent } from 'svelte-dnd-action';
 	import type { Action } from 'svelte/action';
-	import { BookOpen, Code, GripVertical, Link2, Pencil, Plus, Trash2, TriangleAlert } from '@lucide/svelte';
+	import { BookOpen, Code, GripVertical, Link2, Pencil, Plus, RefreshCw, Trash2, TriangleAlert } from '@lucide/svelte';
 	import { collectionRoutes } from '$lib/api/collection-api';
 	import { curlFor } from '$lib/api/request-preview';
 	import { RELATION_KINDS, planRelation, planSchemaRelations, tableName, type RelationType } from '$lib/relations';
@@ -31,6 +31,8 @@
 		isNewSchema,
 		dirty,
 		saveError,
+		onreload,
+		reloading = false,
 		problems,
 		isSuperAdmin,
 		ddl,
@@ -44,6 +46,9 @@
 		isNewSchema: boolean;
 		dirty: boolean;
 		saveError: string;
+		/** Set when the failed save can be fixed by opening the content type again. */
+		onreload?: () => void;
+		reloading?: boolean;
 		problems: Problem[];
 		isSuperAdmin: boolean;
 		ddl: DdlHistory;
@@ -273,7 +278,16 @@
 	<div aria-live="assertive" aria-atomic="true">
 		{#if saveError}
 			<div data-testid="save-error">
-				<Alert tone="danger">{saveError}</Alert>
+				<Alert tone="danger">
+					<p>{saveError}</p>
+					{#if onreload}
+						<div class="mt-3">
+							<Button variant="secondary" size="sm" loading={reloading} onclick={onreload}>
+								<RefreshCw size={ICON.sm} aria-hidden="true" /> Reload
+							</Button>
+						</div>
+					{/if}
+				</Alert>
 			</div>
 		{/if}
 	</div>
@@ -358,17 +372,17 @@
 						label="localization"
 						checked={true}
 						disabled
-						hint="Not read: translations are kept per entry and locale"
+						hint="Not used. Translations are stored per entry and locale."
 					/>
 				{/if}
-				<span class="text-xs text-faint">System columns the engine maintains.</span>
+				<span class="text-xs text-faint">System columns, set automatically.</span>
 			</div>
 			<div class="border-t border-line pt-4">
 				<div class="mb-3">
 					<SectionHeading level={3}>Transports</SectionHeading>
 					<span class="mt-1 block text-xs text-faint">
-						Where this schema is served. A new schema is read and write on all
-						three until it is narrowed here.
+						Choose where this schema is served. A new schema is read and write on all
+						three until you narrow it here.
 					</span>
 				</div>
 				<div class="flex flex-col gap-3">
@@ -399,8 +413,8 @@
 					<span>
 						{brokenRelations.length}
 						{brokenRelations.length === 1 ? 'relation' : 'relations'} on this schema
-						will not resolve as configured. An inverse relation depends on a field of
-						the other schema, which is the one thing its own row cannot show.
+						will not work as configured. An inverse relation depends on a field in
+						the other schema, which this row cannot show.
 						<span class="mt-1 block space-y-0.5">
 							{#each brokenRelations as r (r.field.id ?? r.field.name)}
 								<span class="block">
@@ -594,7 +608,7 @@
 							<dd class="text-muted">{plan.kind.cardinality}</dd>
 							<dt class="text-faint">Stored as</dt>
 							<dd class="font-mono text-muted">{plan.kind.type}</dd>
-							<dt class="text-faint">Key lives in</dt>
+							<dt class="text-faint">Key stored in</dt>
 							<dd class="text-muted">{plan.kind.storage}</dd>
 							<dt class="text-faint">Read through</dt>
 							<dd class="font-mono text-muted">{plan.reads}</dd>
@@ -613,7 +627,7 @@
 							</div>
 						{:else}
 							<p class="text-xs text-faint">
-								Saving creates nothing here. This side of the relation is read
+								Saving adds nothing to this table. This side of the relation comes
 								from the other schema.
 							</p>
 						{/if}
@@ -631,8 +645,8 @@
 						{/if}
 					{:else}
 						<p class="text-xs text-faint">
-							Pick a target schema to see which table this relation writes and
-							what saving it creates.
+							Pick a target schema to see which table stores this relation and
+							what saving creates.
 						</p>
 					{/if}
 				</div>
@@ -654,7 +668,7 @@
 		{@render plannedField('deleted_at', 'datetime', 'Set when a row is soft-deleted. NULL for active rows.', 'system, soft delete')}
 	{/if}
 	{#if schema.with_localization}
-		{@render plannedField('_locale', 'text', 'The localization plugin keeps a translation per entry and per locale, and nothing reads this column.', 'system, not read')}
+		{@render plannedField('_locale', 'text', 'Translations are stored per entry and locale. This column is not used.', 'system, not read')}
 	{/if}
 </div>
 
@@ -682,8 +696,8 @@
 		<p>
 			Add one with <span class="font-medium text-fg">Add relation</span>, or
 			set any field's type to <span class="font-mono">relation</span>. The row
-			grows a panel that asks for the kind and the target schema, then says
-			which table the relation writes and what saving it creates. The kinds:
+			then shows a panel where you choose the kind and the target schema, and
+			it shows which table stores the relation and what saving creates. The kinds:
 		</p>
 
 		<div class="overflow-x-auto">
@@ -692,7 +706,7 @@
 					<tr class="border-b border-line text-faint">
 						<th scope="col" class="py-2 pe-4 font-medium">Kind</th>
 						<th scope="col" class="py-2 pe-4 font-medium">Cardinality</th>
-						<th scope="col" class="py-2 pe-4 font-medium">Key lives in</th>
+						<th scope="col" class="py-2 pe-4 font-medium">Key stored in</th>
 						<th scope="col" class="py-2 font-medium">What saving creates</th>
 					</tr>
 				</thead>
@@ -720,24 +734,23 @@
 			<span class="font-mono">articles</span> resolves through
 			<span class="font-mono">author_id</span> on
 			<span class="font-mono">_article</span>, so the field can be called
-			anything and renaming it moves nothing in the database. What it does
-			need is a <span class="font-mono">belongs_to</span> field named
+			anything and renaming it moves nothing in the database. It does need
+			a <span class="font-mono">belongs_to</span> field named
 			<span class="font-mono">author</span> on the other schema.
 		</p>
 
 		<p>
 			A relation is not a column you fill in. Only
 			<span class="font-mono">belongs_to</span> adds one here. The other
-			three are answered from somewhere else, so a schema whose relations
-			all point outward has no relation columns of its own and that is
-			correct.
+			three are stored elsewhere, so a schema whose relations all point
+			outward has no relation columns of its own. That is expected.
 		</p>
 
 		<p>
 			Required changes what a delete does. A required
 			<span class="font-mono">belongs_to</span> deletes this row when the
-			row it points at goes. An optional one keeps this row and empties the
-			key.
+			row it points at is deleted. An optional one keeps this row and clears
+			the key.
 		</p>
 	</div>
 </Collapsible>
@@ -746,10 +759,10 @@
 	<Collapsible label="This collection's API" icon={Code}>
 		<div class="space-y-3 text-sm text-muted">
 			<p>
-				The content API routes this collection by its machine name. Reads take a
-				bearer token. Writes need the editor, admin or super_admin role. Every
-				parameter is in the
-				<a href="/admin/api-reference" class="text-brand hover:underline">API reference</a>.
+				The content API serves this collection at its machine name. Reads need a
+				bearer token. Writes need the editor, admin or super_admin role. See the
+				<a href="/admin/api-reference" class="text-brand hover:underline">API reference</a>
+				for every parameter.
 			</p>
 			<ul class="space-y-2">
 				{#each collectionRoutes(schema.name) as route (route.method + route.path)}

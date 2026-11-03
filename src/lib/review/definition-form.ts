@@ -38,7 +38,7 @@ function conditionOf(r: Record<string, unknown>, n: number): { condition?: Stage
 		const values = conditionValues(raw);
 		if (values.length === 0) return { error: `Stage ${n}: list at least one value for the condition.` };
 		if (values.length > MAX_CONDITION_VALUES) {
-			return { error: `Stage ${n}: a condition lists at most ${MAX_CONDITION_VALUES} values.` };
+			return { error: `Stage ${n}: a condition can list up to ${MAX_CONDITION_VALUES} values.` };
 		}
 		return { condition: { field, op, values } };
 	}
@@ -58,7 +58,7 @@ export function parseStages(raw: string): { stages: StageInput[] } | { error: st
 	try {
 		parsed = JSON.parse(raw || '[]');
 	} catch {
-		return { error: 'The stages could not be read.' };
+		return { error: 'Could not read the stages. Reload the page and try again.' };
 	}
 	if (!Array.isArray(parsed) || parsed.length === 0) {
 		return { error: 'A definition needs at least one stage.' };
@@ -71,23 +71,23 @@ export function parseStages(raw: string): { stages: StageInput[] } | { error: st
 		if (!name) return { error: `Stage ${n} needs a name.` };
 		const sla = Number(r.sla_duration_seconds ?? 0);
 		if (!Number.isInteger(sla) || sla < 0 || sla > MAX_SLA_SECONDS) {
-			return { error: `Stage ${n}: the SLA is 0 to 240 hours.` };
+			return { error: `Stage ${n}: enter an SLA from 0 to 240 hours.` };
 		}
 		const stage: StageInput = { name, required_role: text(r.required_role), sla_duration_seconds: sla };
 
 		const quorum = Number(r.quorum ?? 0);
 		if (!Number.isInteger(quorum) || quorum < 0 || quorum > MAX_QUORUM) {
-			return { error: `Stage ${n}: the quorum is 0 to ${MAX_QUORUM} approvals.` };
+			return { error: `Stage ${n}: enter from 0 to ${MAX_QUORUM} approvals.` };
 		}
 		if (quorum > 1) stage.quorum = quorum;
 
 		const kind = text(r.escalate_kind);
 		const target = text(r.escalate_to);
 		if (kind === 'user' || kind === 'role') {
-			if (!target) return { error: `Stage ${n}: name who a breach escalates to.` };
+			if (!target) return { error: `Stage ${n}: choose who to hand an SLA breach to.` };
 			if (sla === 0) return { error: `Stage ${n}: escalation follows an SLA breach, so set an SLA.` };
 			if (kind === 'user') {
-				if (!UUID.test(target)) return { error: `Stage ${n}: escalate to a user by their user id.` };
+				if (!UUID.test(target)) return { error: `Stage ${n}: enter the id of the user to hand it to.` };
 				stage.escalate_to_user_id = target;
 			} else {
 				stage.escalate_to_role = target;

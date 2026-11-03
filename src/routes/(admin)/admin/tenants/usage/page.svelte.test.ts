@@ -76,12 +76,12 @@ describe('Quotas when the usage could not be read', () => {
 
 	it('says so over the table rather than drawing rows that used nothing', () => {
 		const { container } = render(UsagePage, {
-			props: props({ quotas: [quota], quotaTotal: 1, usage: { ok: false, gate: { state: 'error', message: 'What each tenant used could not be read. This is not a report that nothing was used.' } } }),
+			props: props({ quotas: [quota], quotaTotal: 1, usage: { ok: false, gate: { state: 'error', message: 'Could not load usage per tenant.' } } }),
 		});
-		expect(said(container)).toContain('What each tenant used could not be read');
+		expect(said(container)).toContain('Could not load usage per tenant');
 		cleanup();
 		const answered = render(UsagePage, { props: props({ quotas: [quota], quotaTotal: 1 }) });
-		expect(said(answered.container)).not.toContain('could not be read');
+		expect(said(answered.container)).not.toContain('Could not load usage per tenant');
 	});
 });
 
@@ -95,11 +95,11 @@ describe('the quota drawer and the failures of other actions', () => {
 
 	it('leaves a newly opened quota drawer clean after a failed review', async () => {
 		const { container, getAllByRole } = render(UsagePage, {
-			props: { ...props(), form: { action: 'review', error: 'The request could not be reviewed.' } as never },
+			props: { ...props(), form: { action: 'review', error: 'Could not review the request. Try again.' } as never },
 		});
-		expect(said(container)).toContain('The request could not be reviewed.');
+		expect(said(container)).toContain('Could not review the request. Try again.');
 		await fireEvent.click(getAllByRole('button', { name: /new quota/i })[0]);
-		expect(drawerText()).not.toContain('could not be reviewed');
+		expect(drawerText()).not.toContain('Could not review the request');
 	});
 
 	// The two warning switches sat 16px apart, so the second one's touch hit
@@ -119,8 +119,8 @@ describe('the quota drawer and the failures of other actions', () => {
 	it('shows a failed save inside the open drawer', async () => {
 		const { getAllByRole, rerender } = render(UsagePage, { props: props() });
 		await fireEvent.click(getAllByRole('button', { name: /new quota/i })[0]);
-		await rerender({ ...props(), form: { action: 'quota', error: 'The quota could not be saved.' } as never });
-		expect(drawerText()).toContain('The quota could not be saved.');
+		await rerender({ ...props(), form: { action: 'quota', error: 'Could not save the quota. Try again.' } as never });
+		expect(drawerText()).toContain('Could not save the quota. Try again.');
 	});
 });
 
@@ -173,7 +173,7 @@ describe('the page for an admin', () => {
 		const { container, queryAllByRole } = render(UsagePage, { props: props({ ...admin, quotas: [own], quotaTotal: 1 }) });
 		expect(said(container)).toContain('acme');
 		expect(said(container)).toContain('Launch traffic in November');
-		expect(said(container)).toContain('Setting a quota or reviewing a request takes a super admin.');
+		expect(said(container)).toContain('Only a super admin can set a quota or review a request.');
 		expect(queryAllByRole('button', { name: /new quota/i })).toHaveLength(0);
 		expect(queryAllByRole('button', { name: /edit the quota/i })).toHaveLength(0);
 		expect(queryAllByRole('button', { name: /approve|deny/i })).toHaveLength(0);
@@ -205,7 +205,7 @@ describe('a license without paid quotas', () => {
 		await rerender({ ...props({ quotas: [stored], quotaTotal: 1 }), form: refused as never });
 		expect((getByRole('button', { name: /approve the request/i }) as HTMLButtonElement).disabled).toBe(true);
 		expect((getByRole('button', { name: /deny the request/i }) as HTMLButtonElement).disabled).toBe(false);
-		expect(said(document.body)).toContain('approving a request need it');
+		expect(said(document.body)).toContain('turn on enforcement or approve a request');
 
 		await fireEvent.click(getByRole('button', { name: 'Edit the quota for acme' }));
 		const field = (id: string) => document.body.querySelector<HTMLInputElement>(`#${id}`);

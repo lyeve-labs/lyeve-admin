@@ -82,8 +82,8 @@
 		Subscribe to the realtime plugin's events as a client would. A content write reaches
 		<span class="font-mono">content:&lt;schema&gt;</span>, a schema change reaches
 		<span class="font-mono">schema:changed</span>, a flow's publish node reaches the topic it names, and
-		<span class="font-mono">*</span> is everything. Events the broker or the Redis relay carry from another
-		node arrive here the same way, so this is where a multi-node setup is tested too.
+		<span class="font-mono">*</span> is everything. Events that the broker or the Redis relay bring from another
+		node arrive here too, so you can test a multi-node setup here.
 	</p>
 
 	<SegmentedControl
@@ -98,7 +98,7 @@
 		id="stream-topics"
 		label="Topics"
 		mono
-		hint="Separated by commas, at most 20. Empty is every topic."
+		hint="Separated by commas, at most 20. Leave it empty for every topic."
 		bind:value={topics}
 	/>
 	<CopyField label="Stream URL" value={url} copyLabel="Copy the stream URL" />
@@ -116,18 +116,18 @@
 
 	{#if status === 'failed'}
 		<Alert tone="danger">
-			The stream was refused. The realtime plugin must be enabled and running, and the engine must see this page's
-			origin as its own host or in its CORS origins.
+			The stream was refused. Check that the realtime plugin is running, and that this page's origin is the
+			engine's own host or one of its CORS origins.
 		</Alert>
 	{/if}
 
 	<SectionHeading level={3}>What arrives</SectionHeading>
 	<p class="text-xs text-muted">
-		Each event carries its topic, a per-topic id a reconnecting client resumes from, and the payload: for a
-		content write, the record and the action.
+		Each event has its topic, a per-topic id that a reconnecting client resumes from, and the payload. For a
+		content write, the payload is the record and the action.
 	</p>
 	{#if received.length === 0}
-		<p class="text-sm text-faint">Nothing yet. Write an entry in another tab to see one arrive.</p>
+		<p class="text-sm text-faint">No events yet. Save an entry in another tab to see one arrive.</p>
 	{:else}
 		<div class="max-h-96 overflow-auto rounded border border-line">
 			<Table label="Events received">

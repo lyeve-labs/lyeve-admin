@@ -29,6 +29,7 @@
 		mediaChoices = [],
 		id,
 		error,
+		errorKey,
 	}: {
 		field: SchemaField;
 		value?: unknown;
@@ -52,6 +53,8 @@
 		 * would be an unreferenced paragraph that a screen reader never reaches.
 		 */
 		error?: string;
+		/** The key inside a json value that the error is about. */
+		errorKey?: string;
 	} = $props();
 
 	// A relation option's name, resolved the same way a listing row's is.
@@ -63,7 +66,7 @@
 	// cannot find an entry, and it says so rather than reading as the whole set.
 	const relationCutNote = $derived(
 		relationTotal !== undefined && relationTotal > relationItems.length
-			? `Only the first ${formatCount(relationItems.length)} of ${formatCount(relationTotal)} entries in ${field.relation_to} are offered here.`
+			? `Showing the first ${formatCount(relationItems.length)} of ${formatCount(relationTotal)} entries in ${field.relation_to}.`
 			: undefined,
 	);
 
@@ -136,6 +139,7 @@
 	<JsonFieldEditor
 		{id}
 		{error}
+		{errorKey}
 		bind:value={() => jsonText, (next: string) => { value = next; }}
 		required={field.required}
 	/>
@@ -154,17 +158,17 @@
 					{/each}
 				</ul>
 			{:else}
-				<p class="text-faint">Nothing points here yet.</p>
+				<p class="text-faint">No linked entries yet.</p>
 			{/if}
 			<p class="mt-1 text-xs text-faint">
-				Read from <code class="text-muted">{field.relation_to}</code>, which holds the key.
-				Set it on that entry, not here.
+				This link is set on the <code class="text-muted">{field.relation_to}</code> entry.
+				Change it there, not here.
 			</p>
 		</div>
 	{:else if field.relation_type === 'many_to_many'}
 		{#if relationFailed}
 			<p class="text-xs text-danger">
-				The entries in <code>{field.relation_to}</code> could not be read, so none can be picked. Reload the page to try again.
+				Could not load the entries in <code>{field.relation_to}</code>. Reload the page to try again.
 			</p>
 		{:else if relationItems.length > 0}
 			<MultiSelect
@@ -184,7 +188,7 @@
 			</p>
 		{:else}
 			<p class="text-xs text-faint">
-				No entries of <code class="text-muted">{field.relation_to}</code> were handed to this form.
+				No entries of <code class="text-muted">{field.relation_to}</code> to choose from.
 			</p>
 		{/if}
 	{:else if relationItems.length > 0}
@@ -207,9 +211,9 @@
 			type="text"
 			value={String(value ?? '')}
 			oninput={(e: InputEv) => { value = e.currentTarget.value; }}
-			placeholder="Enter related item ID (UUID)"
+			placeholder="UUID"
 			hint={relationFailed
-				? `The entries in ${field.relation_to} could not be read. Enter an ID by hand, or reload the page to try again.`
+				? `Could not load the entries in ${field.relation_to}. Enter an ID by hand, or reload the page to try again.`
 				: relationTotal === 0
 					? `${field.relation_to} has no entries yet. Enter an ID by hand.`
 					: `Enter the ID of an entry in ${field.relation_to}.`}
@@ -298,7 +302,7 @@
 		readonly
 		value={String(value ?? '')}
 		placeholder="Assigned on save"
-		hint="The server assigns this identifier. It cannot be edited."
+		hint="Set automatically. It cannot be edited."
 		autocomplete="off"
 		mono
 	/>

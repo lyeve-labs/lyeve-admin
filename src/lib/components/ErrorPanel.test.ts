@@ -21,13 +21,13 @@ function mount(status: number, message = '', at = 'http://admin.test/admin') {
 describe('ErrorPanel', () => {
 	describe('a reader the engine knows and refuses', () => {
 		it('says why, in the words the load gave', () => {
-			const { getByText } = mount(403, 'Requires super_admin role');
+			const { getByText } = mount(403, 'Only a super admin can open this page.');
 			expect(getByText('Access denied')).toBeTruthy();
-			expect(getByText('Requires super_admin role')).toBeTruthy();
+			expect(getByText('Only a super admin can open this page.')).toBeTruthy();
 		});
 
 		it('falls back to a plain refusal when the load gave no words', () => {
-			expect(mount(403).getByText('This account cannot open that page.')).toBeTruthy();
+			expect(mount(403).getByText('You do not have access to this page.')).toBeTruthy();
 		});
 
 		it('leads with the dashboard and never offers to sign in', () => {
@@ -42,7 +42,7 @@ describe('ErrorPanel', () => {
 	// No admin seat left is a refusal too: the engine knows the account and
 	// the instance is full, so the page says why and offers no sign-in.
 	it('reads a 402 as a refusal in the words the load gave', () => {
-		const seats = 'Every admin seat is taken. 5 of 5 are in use, which is the most this instance allows.';
+		const seats = "Every admin seat is taken. You're using 5 of 5, the most this instance allows.";
 		const { getByText, getAllByRole, queryByRole } = mount(402, seats);
 		expect(getByText('Access denied')).toBeTruthy();
 		expect(getByText(seats)).toBeTruthy();

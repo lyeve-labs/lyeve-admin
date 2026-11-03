@@ -10,9 +10,10 @@ import { clearSessionCookie, setRefreshCookie, setSessionCookie, sessionToken } 
 import { adminReturnPath } from '$lib/server/local-path';
 import { LANDING } from '$lib/landing';
 import { challengeFrom } from '$lib/captcha';
-import { organizationFromForm, organizationFromUrl } from '$lib/organization';
+import { organizationFromUrl } from '$lib/organization';
+import { askedOrganization, asksOrganization } from '$lib/server/sign-in-organization';
 
-const SIGN_IN_UNAVAILABLE = 'Sign-in is unavailable right now. Please try again shortly.';
+const SIGN_IN_UNAVAILABLE = 'Sign-in is unavailable right now. Try again in a moment.';
 
 /**
  * The page a sign-in returns to: the `next` query when it is an admin page,
@@ -112,14 +113,17 @@ export const load: PageServerLoad = async (event) => {
 		recovery('/api/admin/auth/magic-link/request'),
 	]);
 
+	// A link that names the organization fills the field in, and the reader can
+	// change or clear it. A console that does not ask for one carries none on.
+	const organization = asksOrganization();
 	return {
 		oauthProviders,
 		samlProviders,
 		passwordReset,
 		magicLink,
 		ended: event.url?.searchParams.has('ended') === true,
-		// A link that names the organization fills the field in, and the reader can change or clear it.
-		carried: organizationFromUrl(event.url),
+		organization,
+		carried: organization ? organizationFromUrl(event.url) : '',
 	};
 };
 
@@ -131,7 +135,7 @@ export const actions: Actions = {
 		const ip = clientAddressOf(event);
 		const limit = checkRateLimit(ip);
 		if (!limit.allowed) {
-			return fail(429, { error: 'Too many attempts. Please try again later.', retryAfterSec: limit.retryAfterSec });
+			return fail(429, { error: 'Too many attempts. Try again later.', retryAfterSec: limit.retryAfterSec });
 		}
 
 		const form = await request.formData();
@@ -140,7 +144,7 @@ export const actions: Actions = {
 		// Step 2: MFA verification
 		if (challengeToken) {
 			const code = form.get('code') as string;
-			if (!code) return { error: 'Verification code is required.', mfa_required: true, challenge_token: challengeToken };
+			if (!code) return { error: 'Enter the verification code.', mfa_required: true, challenge_token: challengeToken };
 			try {
 				const res: { token: string; refresh_token?: string } = await mfaVerify(challengeToken, code, createClient(fetch));
 				setSessionCookie(event, res.token);
@@ -159,12 +163,12 @@ export const actions: Actions = {
 
 		const typed = String(form.get('tenant') ?? '').trim();
 		if (!email || !password) {
-			return { error: 'Email and password are required.', tenant: typed };
+			return { error: 'Enter your email and password.', tenant: typed };
 		}
 		// Only the shape is checked. Whether the organization exists is never
 		// asked, and a wrong one is refused by the engine exactly as a wrong
 		// password is.
-		const organization = organizationFromForm(form);
+		const organization = askedOrganization(form);
 		if (!organization.ok) return fail(400, { error: organization.error, tenant: typed });
 
 		// The captcha plugin reads the token from the login body itself, so it
@@ -201,7 +205,7 @@ export const actions: Actions = {
 					return fail(e.status === 401 ? 401 : 400, {
 						error:
 							e.status === 401
-								? 'Invalid email or password. Complete the security check to try again.'
+								? 'Incorrect email or password. Complete the security check to try again.'
 								: 'Complete the security check to sign in.',
 						captcha,
 						email,
@@ -209,7 +213,7 @@ export const actions: Actions = {
 					});
 				}
 				if (e.status === 429) {
-					return fail(429, { error: 'Too many attempts. Please try again in a moment.' });
+					return fail(429, { error: 'Too many attempts. Try again in a moment.' });
 				}
 				if (e.status >= 500) {
 					return fail(e.status, { error: SIGN_IN_UNAVAILABLE });
@@ -217,7 +221,7 @@ export const actions: Actions = {
 			} else {
 				return fail(503, { error: SIGN_IN_UNAVAILABLE });
 			}
-			return { error: 'Invalid email or password.', tenant: typed };
+			return { error: 'Incorrect email or password.', tenant: typed };
 		}
 
 		redirect(302, returnTo(event.url));

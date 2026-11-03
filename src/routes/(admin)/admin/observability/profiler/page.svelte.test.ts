@@ -76,7 +76,7 @@ describe('the profiler page', () => {
 		};
 		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/api/v1/content', detail: ok(detail) })));
 		const section = getByTestId('profiler-detail');
-		expect(section.textContent).toContain('4 entries in the ring');
+		expect(section.textContent).toContain('4 samples recorded');
 		expect(section.textContent).toContain('Recent GET requests');
 		expect(section.textContent).toContain('503');
 	});
@@ -90,15 +90,15 @@ describe('the profiler page', () => {
 	it('says the selection could not be read rather than that it has no data', () => {
 		const { getByTestId } = render(ProfilerPage, props(page({ selected: '/api/v1/content', detail: down })));
 		const text = getByTestId('profiler-detail').textContent ?? '';
-		expect(text).toContain('did not answer');
+		expect(text).toContain('is unavailable');
 		expect(text).not.toContain('No data for this endpoint');
 	});
 
 	it('says which view the engine did not answer instead of rendering zeros', () => {
 		const { container, getByTestId } = render(ProfilerPage, props(page({ memory: down, slowest: down, plugins: down, endpoints: down })));
-		expect(getByTestId('profiler-memory').textContent).toContain('did not answer');
-		expect(getByTestId('profiler-slowest').textContent).toContain('did not answer');
-		expect(getByTestId('profiler-plugins').textContent).toContain('did not answer');
+		expect(getByTestId('profiler-memory').textContent).toContain('is unavailable');
+		expect(getByTestId('profiler-slowest').textContent).toContain('is unavailable');
+		expect(getByTestId('profiler-plugins').textContent).toContain('is unavailable');
 		expect(container.textContent).not.toContain('0 endpoints sampled');
 	});
 

@@ -29,9 +29,9 @@ describe('AI settings page', () => {
 		expect(getByLabelText('AI for this tenant').getAttribute('aria-checked')).toBe('true');
 		expect(getByLabelText('Store transcripts').getAttribute('aria-checked')).toBe('true');
 		const words = getByTestId('what-never-leaves').textContent ?? '';
-		expect(words).toContain('The only bytes that leave are the request to the endpoint you configured');
+		expect(words).toContain('Only the request to the endpoint you configured leaves this instance');
 		expect(words).toContain('LyEve Labs never sees your prompts');
-		expect(words).toContain('Nothing is anonymized');
+		expect(words).toContain('They are not anonymized');
 	});
 
 	it('posts the opposite of the current value for the one switch named', () => {
@@ -54,20 +54,20 @@ describe('AI settings page', () => {
 	it('offers the retention row to a super admin when the value is editable', () => {
 		const { getByLabelText, getByText } = setup();
 		expect((getByLabelText('Retention') as HTMLInputElement).value).toBe('720h');
-		expect(getByText(/thirty days/)).toBeTruthy();
+		expect(getByText(/720h \(30 days\)/)).toBeTruthy();
 	});
 
 	it('tells a tenant admin the instance settings are for super admins and shows no default as a value', () => {
 		const { getByText, queryByLabelText, queryByText } = setup({ isSuperAdmin: false, instanceReadable: false });
 		expect(queryByLabelText('Retention')).toBeNull();
-		expect(getByText(/The instance settings are visible to super admins/)).toBeTruthy();
+		expect(getByText(/Only a super admin can see and change the retention window/)).toBeTruthy();
 		expect(queryByText('720h (default)')).toBeNull();
 		expect(queryByText('true (default)')).toBeNull();
 	});
 
 	it('shows no value when a super admin could not read the instance configuration', () => {
 		const { getByText, queryByText } = setup({ instanceReadable: false, instance: instance.map((s) => ({ ...s, editable: false })) });
-		expect(getByText(/could not be read/)).toBeTruthy();
+		expect(getByText(/Could not load the retention window/)).toBeTruthy();
 		expect(queryByText('720h (default)')).toBeNull();
 	});
 
@@ -77,6 +77,6 @@ describe('AI settings page', () => {
 		expect(locked.queryByLabelText('AI for this tenant')).toBeNull();
 		cleanup();
 		const absent = setup({ aiSettings: null, aiLayoutGate: { state: 'absent' } });
-		expect(absent.getByText('The AI plugin is not installed')).toBeTruthy();
+		expect(absent.getByText('AI is not included in this build')).toBeTruthy();
 	});
 });

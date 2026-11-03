@@ -37,9 +37,9 @@ export const actions: Actions = {
 
 		if (!isCaptchaProvider(provider)) return fail(400, { error: 'Choose Turnstile, hCaptcha or reCAPTCHA.' });
 		if (!siteKey || siteKey.length > 255) {
-			return fail(400, { error: 'The site key is required and at most 255 characters.' });
+			return fail(400, { error: 'Enter a site key of at most 255 characters.' });
 		}
-		if (secret.length > 4096) return fail(400, { error: 'The secret key is at most 4096 characters.' });
+		if (secret.length > 4096) return fail(400, { error: 'Enter a secret key of at most 4096 characters.' });
 
 		// The score floor is reCAPTCHA's alone. Sent for another provider the
 		// plugin refuses the save, so it is dropped rather than carried over.
@@ -47,7 +47,7 @@ export const actions: Actions = {
 		if (provider === 'recaptcha' && floorRaw !== '') {
 			const n = Number(floorRaw);
 			if (!Number.isFinite(n) || n < 0 || n > 1) {
-				return fail(400, { error: 'The score floor is a number from 0 to 1.' });
+				return fail(400, { error: 'Enter a score floor from 0 to 1.' });
 			}
 			scoreFloor = n;
 		}
@@ -68,7 +68,7 @@ export const actions: Actions = {
 				failure_threshold: failureThreshold,
 			});
 		} catch (err) {
-			return actionFailure(err, 'The captcha settings could not be saved.');
+			return actionFailure(err, 'Could not save the captcha settings. Try again.');
 		}
 		return { saved: true };
 	},
@@ -80,7 +80,7 @@ export const actions: Actions = {
 		try {
 			await clearCaptchaSettings(authedClient(event));
 		} catch (err) {
-			return actionFailure(err, 'The captcha settings could not be cleared.');
+			return actionFailure(err, 'Could not clear the captcha settings. Try again.');
 		}
 		return { cleared: true };
 	},

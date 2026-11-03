@@ -80,7 +80,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
 
 /** What the index says when the collections could not be read. */
-const LIST_FAILED = 'The collections could not be read. This is not a report that there are none.';
+const LIST_FAILED = 'Could not load collections.';
 
 /**
  * The roles the content plugin serves. Every one of its routes refuses the

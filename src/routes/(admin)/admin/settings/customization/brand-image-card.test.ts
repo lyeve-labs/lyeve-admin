@@ -12,7 +12,7 @@ describe('the brand image card', () => {
 	it('hands the picker a library that could not be read, which says so rather than that it is empty', async () => {
 		render(BrandImageCard, { props: { kind: 'logo', current: '', mediaChoices: null } });
 		await fireEvent.click(screen.getByRole('button', { name: /choose from the library/i }));
-		expect(document.body.textContent).toContain('The library could not be read');
+		expect(document.body.textContent).toContain('Could not load the library');
 		expect(document.body.textContent).not.toContain('No published files');
 	});
 

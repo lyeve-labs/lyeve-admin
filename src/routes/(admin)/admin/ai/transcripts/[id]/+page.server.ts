@@ -31,7 +31,7 @@ export const actions: Actions = {
 			return { recap: result.recap };
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 422) return fail(422, { error: 'The transcript has no messages to recap.' });
-			return fail(400, { error: aiActionError(err, 'The recap could not be written') });
+			return fail(400, { error: aiActionError(err, 'Could not create the recap. Try again.') });
 		}
 	},
 };

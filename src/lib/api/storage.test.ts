@@ -112,8 +112,8 @@ describe('the credentials test', () => {
 
 	it('relays the reason the plugin gives, and says when it gave none', () => {
 		expect(testMessage({ healthy: false, error: 'access denied' })).toBe('access denied');
-		expect(testMessage({ healthy: false, error: '' })).toContain('did not say why');
-		expect(testMessage({})).toContain('did not say why');
+		expect(testMessage({ healthy: false, error: '' })).toBe('No reason was given.');
+		expect(testMessage({})).toBe('No reason was given.');
 	});
 });
 
@@ -142,7 +142,7 @@ describe('the gate', () => {
 
 	it('never reports a failed read as uploads working', () => {
 		const gate = storageGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that uploads are working');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load storage providers.');
 	});
 });
 

@@ -20,7 +20,7 @@
 	const create = submitter(() => (open = false));
 </script>
 
-<PageShell title="AI providers" description="The models this tenant may call, and the keys they are called with." width="wide">
+<PageShell title="AI providers" description="Set up the models this tenant can call and the keys used to call them." width="wide">
 	{#snippet actions()}
 		{#if canWrite}
 			<Button variant="primary" size="sm" onclick={() => (open = true)}>
@@ -44,8 +44,8 @@
 				level={2}
 				title="No providers yet"
 				description={data.isSuperAdmin
-					? 'Nothing is sent anywhere until a provider is added. Add one with your own key or point at a server on your network.'
-					: 'Nothing is sent anywhere until a super admin adds a provider.'}
+					? 'No AI request is sent until you add a provider. Use your own key or point at a server on your network.'
+					: 'No AI request is sent until a super admin adds a provider.'}
 			>
 				{#snippet iconSnippet()}
 					<Server size={ICON.lg} />

@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import {
 	everyLabel,
 	intervalHint,
 	listOpenAlerts,
 	readProbeLimits,
+	runAlreadyGoing,
+	runGoingOnText,
 	runOutcome,
+	runOutlastedTheWait,
 	runProbeNow,
 	probeHealth,
 	probeTarget,
@@ -127,7 +130,7 @@ describe('the gate sorts a refusal by what it means', () => {
 	// outcome a monitoring page can produce.
 	it('never reports a failed read as everything passing', () => {
 		const gate = syntheticGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that everything is passing');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load probes.');
 	});
 });
 
@@ -174,6 +177,40 @@ describe('a run now', () => {
 	it('says nothing passed when no result was recorded', () => {
 		expect(runOutcome([]).status).toBeNull();
 	});
+
+	// A run that fails in several regions outlasts the client's default wait,
+	// so Run now names a wait of its own that ends past the engine's.
+	it('waits past the default for a long run', async () => {
+		const post = vi.fn(async () => []);
+		await runProbeNow({ post } as never, 'p1');
+		expect(post).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1/run', {}, {
+			signal: expect.any(AbortSignal),
+		});
+	});
+
+	it('reads a request that got no answer as a run still going', () => {
+		expect(runOutlastedTheWait(new DOMException('The operation timed out.', 'TimeoutError'))).toBe(true);
+		expect(runOutlastedTheWait(new DOMException('This operation was aborted', 'AbortError'))).toBe(true);
+		expect(runOutlastedTheWait(new TypeError('fetch failed'))).toBe(true);
+		expect(runOutlastedTheWait(new ApiError(503, 'down', {}))).toBe(false);
+		expect(runOutlastedTheWait(new ApiError(409, 'busy', {}))).toBe(false);
+		expect(runOutlastedTheWait(new SyntaxError('Unexpected token'))).toBe(false);
+	});
+
+	it('reads a conflict as a run of the probe already going', () => {
+		expect(runAlreadyGoing(new ApiError(409, 'busy', {}))).toBe(true);
+		expect(runAlreadyGoing(new ApiError(503, 'down', {}))).toBe(false);
+		expect(runAlreadyGoing(new TypeError('fetch failed'))).toBe(false);
+	});
+
+	it('says where the results of a run still going appear', () => {
+		expect(runGoingOnText('Homepage', false)).toBe(
+			'Homepage is still running. Its results appear in the list when it finishes.',
+		);
+		expect(runGoingOnText('Homepage', true)).toBe(
+			'Homepage is already running. Its results appear in the list when it finishes.',
+		);
+	});
 });
 
 describe('the probe limits', () => {
@@ -189,9 +226,9 @@ describe('the probe limits', () => {
 
 	it('puts the floor in the hint only when it is known', () => {
 		expect(intervalHint({ probes: { limit: 0, current: 0 }, minIntervalSeconds: 15 })).toBe(
-			'At least 15. A probe is this instance calling itself.',
+			'At least 15. Each probe sends a request to this instance.',
 		);
-		expect(intervalHint(null)).toBe('A probe is this instance calling itself.');
+		expect(intervalHint(null)).toBe('Each probe sends a request to this instance.');
 	});
 });
 

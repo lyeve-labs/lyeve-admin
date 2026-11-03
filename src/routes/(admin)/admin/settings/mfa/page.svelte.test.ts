@@ -101,7 +101,7 @@ describe('confirming with a passkey', () => {
 		});
 		const { getByRole, findByText } = setup(true, proving, true);
 		await fireEvent.click(getByRole('button', { name: /Use a passkey/ }));
-		expect(await findByText(/The passkey did not answer, or the request was canceled/)).toBeTruthy();
+		expect(await findByText(/The passkey request timed out or was canceled/)).toBeTruthy();
 	});
 
 	it('says so when the browser has no passkey support', async () => {
@@ -183,8 +183,8 @@ describe('two-factor authentication page', () => {
 
 	it('says the state could not be read instead of offering to turn it on', () => {
 		const { container, queryByRole } = setup({ ok: false, gate: { state: 'unavailable' } });
-		expect(container.textContent).toContain('could not be read');
-		expect(container.textContent).not.toContain('is off for this account');
+		expect(container.textContent).toContain('Could not load the two-factor status');
+		expect(container.textContent).not.toContain('Not enabled on this account');
 		expect(queryByRole('button', { name: /Turn on/ })).toBeNull();
 		expect(queryByRole('button', { name: /Turn off/ })).toBeNull();
 	});

@@ -169,7 +169,7 @@ describe('admin/jobs/+page.server.ts load when the list cannot be read', () => {
 		const result = (await load(failing(() => json({ error: 'pq: relation "sys_jobs" does not exist' }, 500)))) as Loaded;
 		expect(result.jobs).toEqual({
 			ok: false,
-			gate: { state: 'error', message: 'The jobs could not be read. This is not a report that there are none.' },
+			gate: { state: 'error', message: 'Could not load jobs.' },
 		});
 		expect(JSON.stringify(result)).not.toContain('pq:');
 	});

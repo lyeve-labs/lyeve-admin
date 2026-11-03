@@ -146,8 +146,8 @@
 	async function askDelete(rule: CustomRule) {
 		deleteId = rule.id;
 		const ok = await confirm(
-			`Delete rule ${rule.name}`,
-			'Anything it was hiding is served unmasked from the next request.',
+			`Delete rule ${rule.name}?`,
+			'Values it masks appear unmasked from the next request.',
 			{ confirmLabel: 'Delete' },
 		).catch(() => false);
 		if (ok) deleteForm?.requestSubmit();
@@ -166,7 +166,7 @@
 
 <PageShell
 	title="PII masking"
-	description="What is redacted from responses and logs, and who has read it unmasked."
+	description="Choose what is masked in responses and logs, and see who read data unmasked."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -188,17 +188,17 @@
 			level={2}
 			gate={data.gate}
 			title="PII masking"
-			absent="The masking plugin is not part of this build, so responses are served as they are stored."
+			absent="PII masking is not included in this build. Responses are not masked."
 		/>
 	{:else}
 		{#if rowError}
 			<Alert tone="danger">{rowError}</Alert>
 		{/if}
 		{#if form && 'saved' in form && form.saved}
-			<Alert tone="success" autoDismiss>Saved. It applies from the next request.</Alert>
+			<Alert tone="success" autoDismiss>Rule saved. It applies from the next request.</Alert>
 		{/if}
 		{#if form && 'deleted' in form && form.deleted}
-			<Alert tone="success" autoDismiss>Deleted.</Alert>
+			<Alert tone="success" autoDismiss>Rule deleted.</Alert>
 		{/if}
 
 		<div class="grid gap-4 sm:grid-cols-4">
@@ -220,17 +220,13 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Your own rules</SectionHeading>
 			<p class="text-xs text-muted">
-				Patterns this tenant adds, in RE2, which is the syntax Go's regular expressions use. RE2
-				does not backtrack, so a pattern here cannot be made to run away with a response, and it
-				has no backreferences and no lookahead. A rule named after a preset takes that preset's
-				place, which is how one is narrowed or turned off. Every enabled rule is another pass
-				over every response body, so twenty of them roughly halve how fast masking runs.
+				Add patterns for this tenant in RE2, the regular expression syntax Go uses. RE2 does not backtrack, so a pattern cannot slow a response down without limit. It has no backreferences and no lookahead. Give a rule a preset's name to replace that preset, which is how you narrow one or turn it off. Each enabled rule is another pass over every response body, so twenty rules make masking about half as fast.
 			</p>
 
 			{#if custom.length === 0}
 				<EmptyState
 					title="No rules of your own"
-					description="The presets below are masking. Add a pattern for the identifiers only you use, such as an account or order number."
+					description="The presets below still apply. Add a pattern for identifiers only you use, such as an account or order number."
 				>
 					{#snippet iconSnippet()}
 						<ShieldCheck size={ICON.lg} />
@@ -294,16 +290,13 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Presets, in the order they run</SectionHeading>
 			<p class="text-xs text-muted">
-				Priority decides which rule wins where two patterns match the same text, and lower runs
-				first. These ship with the plugin and cannot be edited, so a mistake in one of your own
-				rules cannot break email masking for everyone. Write a rule with a preset's name to take
-				its place.
+				Priority decides which rule wins when two patterns match the same text. Lower runs first. Presets come with the plugin and cannot be edited, so a mistake in one of your own rules cannot break email masking for everyone. Create a rule with a preset's name to replace that preset.
 			</p>
 
 			{#if rules.length === 0}
 				<EmptyState
-					title="No rule is loaded"
-					description="The plugin is running with no pattern, so nothing is being redacted."
+					title="No rules loaded"
+					description="Nothing is being masked."
 				>
 					{#snippet iconSnippet()}
 						<ShieldCheck size={ICON.lg} />
@@ -359,13 +352,12 @@
 
 			{#if data.logFailed}
 				<Alert tone="warn">
-					The access log did not answer. The rules above are unaffected and masking is still
-					running.
+					Could not load the unmasked reads. Masking is still running.
 				</Alert>
 			{:else if data.entries.length === 0}
 				<EmptyState
-					title="Nobody has read unmasked data"
-					description="A row is written when someone with the right to see it reads a field in the clear."
+					title="No unmasked reads yet"
+					description="A read appears here when someone allowed to see a field views it unmasked."
 				>
 					{#snippet iconSnippet()}
 						<Eye size={ICON.lg} />
@@ -383,7 +375,7 @@
 
 				<ListToolbar label="Filter unmasked reads">
 					{#snippet search()}
-						<label for="pii-narrow" class="sr-only">Narrow this page</label>
+						<label for="pii-narrow" class="sr-only">Search this page</label>
 						<SearchInput
 							id="pii-narrow"
 							bind:value={narrow}
@@ -394,8 +386,8 @@
 
 				{#if visible.length === 0}
 					<EmptyState
-						title="Nothing on this page matches"
-						description="Clear the filter to see the rest."
+						title="No unmasked reads match this search"
+						description="The search covers this page only. Clear it to see every read on this page."
 					>
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
@@ -472,7 +464,7 @@
 			name="name"
 			label="Name"
 			required
-			hint="What a masked value is reported as in the access log. Use a preset's name to take its place."
+			hint="How a masked value is labeled in the access log. Use a preset's name to replace that preset."
 			bind:value={editing.name}
 		/>
 		<Input
@@ -504,7 +496,7 @@
 			type="number"
 			hint={editing.id
 				? 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them, and 0 before them.'
-				: 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them. A new rule starts at 1 or more: set 0 by editing it.'}
+				: 'Lower runs first. The presets run between 5 and 50, so 100 puts yours after all of them. A new rule needs 1 or more. Edit it later to set 0.'}
 			bind:value={priorityText}
 		/>
 		<!-- The kit's Toggle is a button and serializes nothing, so the value
@@ -552,7 +544,7 @@
 				<!-- The commonest way a rule is wrong. It saves, it enables, and
 				     it hides nothing, and no other screen would ever say so. -->
 				<Alert tone="warn">
-					The pattern is valid and matched nothing in this sample, so it would redact nothing.
+					The pattern matched nothing in this sample, so it would mask nothing.
 				</Alert>
 			{:else}
 				<Alert tone="success">

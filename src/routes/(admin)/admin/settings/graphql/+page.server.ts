@@ -47,13 +47,13 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, PERSISTED_PAGE, PERSISTED_PAGE_MAX);
 	let persistedTotal = 0;
 	const [schema, persisted] = await Promise.all([
-		section(introspect(client), 'The schema could not be read. This is not a report that it is empty.'),
+		section(introspect(client), 'Could not load the GraphQL schema.'),
 		section(
 			listPersisted(client, limit, offset).then((r) => {
 				persistedTotal = r.total;
 				return r.data;
 			}),
-			'The persisted queries could not be read. This is not a report that there are none.',
+			'Could not load persisted queries.',
 		),
 	]);
 	// Both refused is the plugin's answer as a whole, so the page says it once.
@@ -81,31 +81,31 @@ export const actions: Actions = {
 			});
 			return { registered: true };
 		} catch (err) {
-			return fail(400, { action: 'register', error: actionError(err, 'The query could not be registered.') });
+			return fail(400, { action: 'register', error: actionError(err, 'Could not register the query. Try again.') });
 		}
 	},
 
 	toggle: async (event) => {
 		await requireUser(event);
 		const hash = await hashOf(event);
-		if (!hash) return fail(400, { action: 'toggle', error: 'Choose a query.' });
+		if (!hash) return fail(400, { action: 'toggle', error: 'This form is missing its query. Reload the page and try again.' });
 		try {
 			await togglePersisted(authedClient(event), hash);
 			return { toggled: hash };
 		} catch (err) {
-			return fail(400, { action: 'toggle', error: actionError(err, 'The query could not be switched.') });
+			return fail(400, { action: 'toggle', error: actionError(err, 'Could not enable or disable the query. Try again.') });
 		}
 	},
 
 	delete: async (event) => {
 		await requireUser(event);
 		const hash = await hashOf(event);
-		if (!hash) return fail(400, { action: 'delete', error: 'Choose a query.' });
+		if (!hash) return fail(400, { action: 'delete', error: 'This form is missing its query. Reload the page and try again.' });
 		try {
 			await deletePersisted(authedClient(event), hash);
 			return { deleted: hash };
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'The query could not be deleted.') });
+			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the query. Try again.') });
 		}
 	},
 };

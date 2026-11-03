@@ -50,7 +50,7 @@ describe('FlowExportModal', () => {
 			throw new Error('down');
 		});
 		await show();
-		await vi.waitFor(() => expect(dialog()?.textContent).toContain('The export could not be loaded. Save the draft and try again.'));
+		await vi.waitFor(() => expect(dialog()?.textContent).toContain('Could not load the export. Save the draft and try again.'));
 		expect(dialog()?.textContent).not.toContain('Loading the export.');
 		expect(document.body.querySelector('pre')).toBeNull();
 		expect(document.body.querySelector('a[download]')).toBeNull();

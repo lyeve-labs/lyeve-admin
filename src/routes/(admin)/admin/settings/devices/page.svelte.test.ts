@@ -51,7 +51,7 @@ describe('the gate', () => {
 			props: props({ gate: { state: 'locked', upgradeUrl: '' }, devices: [] }),
 		});
 		expect(said(container)).toContain('Not enabled on this instance');
-		expect(said(container)).not.toContain('No device is remembered');
+		expect(said(container)).not.toContain('No trusted devices yet');
 	});
 
 	it('reports a failed read as a failure, not as no trusted devices', () => {
@@ -59,7 +59,7 @@ describe('the gate', () => {
 			props: props({ gate: { state: 'error', message: 'Your devices could not be read.' }, devices: [] }),
 		});
 		expect(said(container)).toContain('could not be read');
-		expect(said(container)).not.toContain('No device is remembered');
+		expect(said(container)).not.toContain('No trusted devices yet');
 	});
 });
 
@@ -69,7 +69,7 @@ describe('this browser', () => {
 	// trusted would create a second row for one device.
 	it('offers to trust when this browser is not remembered', () => {
 		const { container } = render(DevicesPage, { props: props() });
-		expect(said(container)).toContain('remembers the browser you are reading this in');
+		expect(said(container)).toContain("remembers the browser you're using now");
 	});
 
 	it('says so instead when this browser is already remembered', () => {
@@ -77,7 +77,7 @@ describe('this browser', () => {
 			props: props({ userAgent: CHROME_MAC }),
 		});
 		expect(said(container)).toContain('already trusted, as Work laptop');
-		expect(said(container)).not.toContain('remembers the browser you are reading this in');
+		expect(said(container)).not.toContain("remembers the browser you're using now");
 	});
 
 	// It states a standing condition, so it stays. A confirmation that clears
@@ -127,7 +127,7 @@ describe('the rows', () => {
 describe('the empty state', () => {
 	it('says what having no remembered device means', () => {
 		const { container } = render(DevicesPage, { props: props({ devices: [] }) });
-		expect(said(container)).toContain('treated as coming from somewhere new');
+		expect(said(container)).toContain('treated as coming from a new device');
 	});
 });
 
@@ -145,7 +145,7 @@ describe('the search', () => {
 		expect(said(container)).not.toContain('Work laptop');
 
 		await fireEvent.input(getByPlaceholderText('Name or browser on this page'), { target: { value: 'nothing like it' } });
-		expect(said(container)).toContain('No device on this page matches');
+		expect(said(container)).toContain('No devices match this search');
 		expect(container.querySelector('a[href="/admin/settings/devices?limit=25&offset=25"]')).toBeTruthy();
 	});
 });

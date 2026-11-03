@@ -4,7 +4,32 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
-## [0.23.0] - 2026-11-02
+## [0.24.0] - 2026-11-04
+
+### Changed
+
+- The sign-in, password reset and email link pages ask for an organization only when the console runs with `SIGN_IN_ORGANIZATION` set to true, and the field is off by default. Before, they asked every visitor, although only a console that serves more than one organization on an address that names none needs it. While the field is off, the console neither fills it in from a link nor sends an organization it did not ask for.
+- The New provider form for OAuth sign-in opens with Enabled off, as every other way of adding a provider creates it disabled. Before, saving the form as it opened put the provider on the sign-in page before anyone had tried its client id and secret. Editing a provider still shows its own setting.
+- The console's failures, empty states, confirmations, hints and page descriptions are written to the reader in plain words, with one wording for each situation. Limits, defaults, warnings and what was or was not saved are kept, and a few notices that blamed the license or the build for a plugin that is only stopped now name the real cause.
+- Sixteen field labels, buttons and section headings name the field or the action in plain words, such as "Publish at" where the label read "Goes out at", "Rehearse without publishing" where it read "Rehearse first, posting nothing" and "Endpoints" where it read "Where it answers". A script or a guide that finds these controls by their text needs the new names.
+- The console moves to ui-kit 0.45.0. A tab strip is one stop in the tab order: Left and Right move between tabs, Home and End go to the ends, and Enter, Space or a click chooses one. Between the medium and large widths the sidebar rail opens only once the pointer rests on it, so a pointer crossing it no longer covers the control beside it. The scroll fade on tables and tab strips shows in the dark theme, a pager step with nowhere to go is a disabled button, the account menu has an accessible name on a phone, and a table row's hover ring fades in with its tint.
+
+### Fixed
+
+- After a sign-in by emailed link, OAuth or SAML, every change saves again. The engine opened such a session without the cookie that guards writes, so the console could read everything and every change was refused. The console now gives any signed-in browser that lacks that cookie one, which also repairs a session that is already open, and signing out clears it.
+- Saving a new content type in the schema builder under a name that already exists no longer replaces that type. The builder sends a new type as a create only and says a content type of that name exists. Before, the fields the new type left out were queued for removal with their data.
+- The schema builder refuses to save over a content type that changed since it was opened, such as one that had drafts turned on through the API, and offers to reload it. Before, the save wrote the older definition back and queued the status column for removal with every entry's status. Both schema builder fixes need the schema plugin release that reports versions. Against an engine that does not report them, saves behave as before.
+- The entry editor fills its form from the entry's title and fields only, so a field shows and saves its own value. Before, a meta key that shared a name with a field showed the meta value in that field, and saving the entry wrote that value into the field.
+- When the API refuses a save because of one key inside a JSON field, the content editor shows the message under that key's value, marks it invalid and moves focus there. Before, it printed the message under the field and marked nothing. When no row holds the named key, the message stays under the field and the field's first input points at it.
+- Run now on a synthetic monitor waits a little past the longest the engine answers a request, and when no answer arrives it says the run goes on and its results appear in the list when it ends. Before, it gave up after 15 seconds and reported a failure for a run that was still going. A run refused because another run of the same probe is going is described in the console's own words.
+- A failed migration apply is read out once in Firefox. The header's migration button always counts the pending migrations, and the message below it alone says what failed. Before, a screen reader heard the failure twice when focus returned to the button.
+- The first-run setup page points to the line of the engine's startup output that holds the setup token, which works with engines before and after 0.58.0. Before, it pointed to a log line that newer engines no longer use for the token.
+
+### Upgrade notes
+
+- A console that serves several organizations on an address that names none needs `SIGN_IN_ORGANIZATION=true` after upgrading, or its sign-in pages stop asking for the organization.
+
+## [0.23.0] - 2026-11-01
 
 ### Added
 

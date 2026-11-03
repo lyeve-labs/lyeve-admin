@@ -192,6 +192,20 @@ describe('ContentForm failures', () => {
 		expect(document.activeElement).toBe(container.querySelector('#field-summary'));
 	});
 
+	it('moves focus to the key a refused submit names inside a json field', async () => {
+		const jsonFields = [field('text', { name: 'status' }), field('json', { name: 'data' })];
+		const formValues = $state({ status: 'new', data: '{"name":"Ada","email":"[redacted-email]"}' });
+		const { getAllByLabelText, rerender } = render(ContentForm, { props: { fields: jsonFields, formValues } });
+		await rerender({
+			fields: jsonFields,
+			formValues,
+			validationErrors: { data: 'The key email holds a masked value.' },
+			errorKeys: { data: 'email' },
+		});
+		await tick();
+		expect(document.activeElement).toBe(getAllByLabelText('Value')[1]);
+	});
+
 	it('leaves focus where it is when the fields are derived again under the same refusal', async () => {
 		// One props object, the way a page holds them: the refusal stays the
 		// same object while the page's data is read again and its fields are

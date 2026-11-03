@@ -229,14 +229,14 @@ describe('logo upload', () => {
 		const broken = uploadEvent(new File([PNG], 'logo.png', { type: 'image/png' }), {
 			upload: Response.json({ error: 'pq: boom' }, { status: 503 }),
 		});
-		expect(((await actions.uploadLogo(broken.ev)) as { data: { logoError: string } }).data.logoError).toBe('The logo could not be uploaded.');
+		expect(((await actions.uploadLogo(broken.ev)) as { data: { logoError: string } }).data.logoError).toBe('Could not upload the logo. Try again.');
 		expect(api.saveCustomization).not.toHaveBeenCalled();
 	});
 
 	it('says the file is in the library when it could not be published there', async () => {
 		const { ev } = uploadEvent(new File([PNG], 'logo.png', { type: 'image/png' }), { publish: new Response('', { status: 503 }) });
 		const res = (await actions.uploadLogo(ev)) as { data: { logoError: string } };
-		expect(res.data.logoError).toMatch(/uploaded to the media library but could not be published/);
+		expect(res.data.logoError).toMatch(/Could not publish the logo. It was uploaded to the media library/);
 		expect(api.saveCustomization).not.toHaveBeenCalled();
 	});
 });
@@ -262,7 +262,7 @@ describe('tab icon', () => {
 		expect(await actions.favicon(event({ favicon_url: 'https://images.example.com/icon.png' }))).toEqual({ faviconSaved: true, faviconImported: true });
 		const refused = (await actions.favicon(event({ favicon_url: 'javascript:alert(1)' }))) as { status: number; data: { faviconError: string; fields: Record<string, string> } };
 		expect(refused.status).toBe(400);
-		expect(refused.data.faviconError).toMatch(/tab icon address/);
+		expect(refused.data.faviconError).toMatch(/for the tab icon/);
 		expect(refused.data.fields.favicon_url).toBeTruthy();
 	});
 
@@ -277,7 +277,7 @@ describe('tab icon', () => {
 		const svg = uploadEvent(new File(['<svg/>'], 'icon.svg', { type: 'image/svg+xml' }), {}, 'favicon');
 		const res = (await actions.uploadFavicon(svg.ev)) as { status: number; data: { faviconError: string } };
 		expect(res.status).toBe(400);
-		expect(res.data.faviconError).toBe('A tab icon is a PNG, JPEG or WebP image.');
+		expect(res.data.faviconError).toBe('The tab icon must be a PNG, JPEG or WebP image.');
 	});
 });
 
@@ -311,8 +311,8 @@ describe('menu link, dashboard page and page delete', () => {
 
 	it('keeps an outage body off the page', async () => {
 		api.getCustomization.mockRejectedValue(outage);
-		expect(await actions.removeLink(event({ index: '0' }))).toMatchObject({ data: { menuError: 'The link could not be removed.' } });
-		expect(await actions.home(event({ home_page: 'x' }))).toMatchObject({ data: { pagesError: 'The dashboard page could not be saved.' } });
+		expect(await actions.removeLink(event({ index: '0' }))).toMatchObject({ data: { menuError: 'Could not remove the link. Try again.' } });
+		expect(await actions.home(event({ home_page: 'x' }))).toMatchObject({ data: { pagesError: 'Could not save the dashboard page. Try again.' } });
 	});
 
 	it.each(['removeLink', 'home', 'deletePage'] as const)('holds %s to an admin', async (name) => {
@@ -330,6 +330,6 @@ describe('a failed page delete', () => {
 		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found'));
 		expect(await actions.deletePage(event({ slug: 'gone' }))).toMatchObject({ status: 400, data: { pageDeleteError: 'page not found' } });
 		api.deleteCustomPage.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
-		expect(await actions.deletePage(event({ slug: 'x' }))).toMatchObject({ data: { pageDeleteError: 'The page could not be deleted.' } });
+		expect(await actions.deletePage(event({ slug: 'x' }))).toMatchObject({ data: { pageDeleteError: 'Could not delete the page. Try again.' } });
 	});
 });

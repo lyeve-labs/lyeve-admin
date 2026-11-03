@@ -49,7 +49,7 @@ const UNREAD: Section<never> = { ok: false, gate: { state: 'absent' } };
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
 	if (!user.roles.some((role) => OPERATOR_ROLES.includes(role))) {
-		error(403, 'Requires admin or super_admin role');
+		error(403, 'Only an admin or a super admin can open this page.');
 	}
 	const page: CostsPage = {
 		enabled: true,
@@ -76,10 +76,10 @@ export const load: PageServerLoad = async (event) => {
 		);
 	const client = authedClient(event);
 	const [summary, dashboard, budgets, prices] = await Promise.all([
-		read(getSummary(client, monthStart(new Date())), 'The split by resource could not be read.'),
-		read(getDashboard(client), "This month's costs could not be read."),
-		read(listBudgets(client), 'The budgets could not be read. This is not a report that there are none.'),
-		read(listPrices(client), 'The prices could not be read. No price is shown rather than a guess.'),
+		read(getSummary(client, monthStart(new Date())), 'Could not load the split by resource.'),
+		read(getDashboard(client), "Could not load this month's costs."),
+		read(listBudgets(client), 'Could not load the budgets.'),
+		read(listPrices(client), 'Could not load the prices.'),
 	]);
 	if (refused.upgradeUrl !== null) return { ...page, enabled: false, upgradeUrl: refused.upgradeUrl };
 	return { ...page, summary, dashboard, budgets, prices };
@@ -103,7 +103,7 @@ export const actions: Actions = {
 		try {
 			await createBudget(authedClient(event), parsed.budget);
 		} catch (err) {
-			return refusal('budget-new', err, 'Failed to create the budget.');
+			return refusal('budget-new', err, 'Could not create the budget. Try again.');
 		}
 		return { form: 'budget', saved: true };
 	},
@@ -112,11 +112,11 @@ export const actions: Actions = {
 		await requireRole(event, OPERATOR_ROLES);
 		const form = await event.request.formData();
 		const id = String(form.get('id') ?? '').trim();
-		if (!id) return fail(400, { form: 'budget', error: 'Pick a budget to delete.', locked: false });
+		if (!id) return fail(400, { form: 'budget', error: 'This form is missing its budget. Reload the page and try again.', locked: false });
 		try {
 			await deleteBudget(authedClient(event), id);
 		} catch (err) {
-			return refusal('budget', err, 'Failed to delete the budget.');
+			return refusal('budget', err, 'Could not delete the budget. Try again.');
 		}
 		return { form: 'budget', saved: true };
 	},
@@ -128,7 +128,7 @@ export const actions: Actions = {
 		try {
 			await putPrice(authedClient(event), parsed.resourceType, parsed.price);
 		} catch (err) {
-			return refusal('price', err, 'Failed to save the price.');
+			return refusal('price', err, 'Could not save the price. Try again.');
 		}
 		return { form: 'price', saved: true };
 	},
@@ -138,12 +138,12 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const resourceType = form.get('resource_type');
 		if (!isResourceType(resourceType)) {
-			return fail(400, { form: 'price', error: 'Pick a resource type.', locked: false });
+			return fail(400, { form: 'price', error: 'This form is missing its resource type. Reload the page and try again.', locked: false });
 		}
 		try {
 			await deletePrice(authedClient(event), resourceType);
 		} catch (err) {
-			return refusal('price', err, 'Failed to reset the price.');
+			return refusal('price', err, 'Could not reset the price. Try again.');
 		}
 		return { form: 'price', saved: true };
 	},
@@ -154,7 +154,7 @@ export const actions: Actions = {
 			const result = await aggregateNow(authedClient(event));
 			return { form: 'aggregate', saved: true, result };
 		} catch (err) {
-			return refusal('aggregate', err, 'The feed did not run.');
+			return refusal('aggregate', err, 'Could not update the costs. Try again.');
 		}
 	},
 };

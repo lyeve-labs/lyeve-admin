@@ -25,7 +25,7 @@ const PAGE_SIZE = 50;
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const user = await loadUser(event);
-	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) error(403, 'Requires admin role');
+	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) error(403, 'Only an admin or a super admin can open this page.');
 	const client = authedClient(event);
 	const limit = PAGE_SIZE;
 	// The offset comes from the address, so it is clamped and snapped to a page
@@ -58,14 +58,14 @@ export const load: PageServerLoad = async (event) => {
 
 	const log = await section(
 		readLog(),
-		'The audit log could not be read. This is not a report that it is empty.'
+		'Could not load the audit log.'
 	);
 	const isSuperAdmin = user.roles.includes('super_admin');
 	// The plugin stops an export that names no limit at its ceiling, and it
 	// cannot narrow a file by user or record id.
 	const exportNote =
-		`An export holds the entries the dates, action and resource type match, at most ${formatCount(AUDIT_EXPORT_CEILING)}.` +
-		(UUID.test(filter.q) ? ' The id in the search is not applied to the file.' : '');
+		`Exports include the entries that match the dates, action and resource type, up to ${formatCount(AUDIT_EXPORT_CEILING)}.` +
+		(UUID.test(filter.q) ? ' Searching by id does not filter the export.' : '');
 
 	if (!log.ok) {
 		return { entries: log, total: null, offset, limit, isSuperAdmin, filter, actions: [] as string[], exportNote };
@@ -103,7 +103,7 @@ export const actions: Actions = {
 		const olderThanRaw = form.get('older_than') as string;
 
 		if (!olderThanRaw) {
-			return fail(400, { error: 'Missing cut-off date.' });
+			return fail(400, { error: 'Choose a date first.' });
 		}
 
 		const olderThan = `${olderThanRaw}T00:00:00Z`;
@@ -122,7 +122,7 @@ export const actions: Actions = {
 			// and the reason reaches the page. A 5xx body stays on the server.
 			const body = (await res.json().catch(() => undefined)) as { error?: unknown } | undefined;
 			const message = typeof body?.error === 'string' ? body.error : '';
-			return actionFailure(new ApiError(res.status, message, body), 'The audit log could not be pruned.', res.status);
+			return actionFailure(new ApiError(res.status, message, body), 'Could not prune the audit log. Try again.', res.status);
 		}
 
 		const result = (await res.json()) as { deleted: number };

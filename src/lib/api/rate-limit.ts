@@ -100,7 +100,7 @@ export const RATE_LIMIT_OK: RateLimitGate = GATE_OK;
 
 /** What a refused rate limit read means, read the way every plugin's is. */
 export function rateLimitGate(err: unknown): RateLimitGate {
-	return gateOf(err, 'The rules could not be read. This is not a report that nothing is limited.');
+	return gateOf(err, 'Could not load the rate limit rules.');
 }
 
 export async function listRules(

@@ -43,7 +43,7 @@
 		if (status === 'grace') {
 			return ent?.grace_ends_at ? `Renew before ${formatDate(ent.grace_ends_at)}.` : 'Renew the license to keep what it grants.';
 		}
-		if (status === 'expired') return 'What the license granted is off until it is renewed.';
+		if (status === 'expired') return 'Features from the license are off until you renew it.';
 		return '';
 	});
 
@@ -88,8 +88,8 @@
 <PageShell
 	title="License"
 	description={licensing.renew
-		? 'The license this instance runs on, and where a new key is activated.'
-		: 'The license this instance runs on.'}
+		? "See this instance's license and activate a new key."
+		: "See this instance's license."}
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -130,7 +130,7 @@
 						<DescriptionList items={facts} />
 					</div>
 				{:else}
-					<Alert tone="danger">The license could not be read. Reload the page to ask again.</Alert>
+					<Alert tone="danger">Could not load the license. Reload the page to try again.</Alert>
 				{/if}
 
 				{#if links.length > 0}
@@ -183,7 +183,7 @@
 							hint={none
 								? 'Only needed for what a license grants. Paste the token or key you were issued.'
 								: unread
-									? 'Paste the license token or key you were issued. It replaces any license this instance holds.'
+									? 'Paste the license token or key you were issued. It replaces the current license, if there is one.'
 									: 'Paste the license token or key you were issued.'}
 							bind:value={licenseKey}
 							rows={3}
@@ -203,7 +203,7 @@
 							<Alert tone="danger">{renewError}</Alert>
 						{/if}
 						{#if renewed}
-							<Alert tone="success" autoDismiss>License applied. Plugins are hot-reloading.</Alert>
+							<Alert tone="success" autoDismiss>License applied. Plugins are reloading.</Alert>
 						{/if}
 					</form>
 				{:else}

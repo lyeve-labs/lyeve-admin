@@ -116,9 +116,9 @@
 	// tenant with no content types, and neither leaves anything to import into.
 	const schemaHint = $derived(
 		schemas === null
-			? 'The content types could not be read, so none can be chosen. Close this and try again in a moment.'
+			? 'Could not load the content types. Reload the page to try again.'
 			: schemas.length === 0
-				? 'There is no content type yet. Create one before importing into it.'
+				? 'No content types yet. Create one before you import.'
 				: 'Each row becomes an entry of this type.',
 	);
 	const formatOptions = [
@@ -142,7 +142,7 @@
 		...(preview?.columns ?? []).map((c) => ({ value: c, label: c })),
 	]);
 	const keyOptions = $derived([
-		{ value: '', label: mode === 'upsert' ? 'Choose the field that finds the entry' : 'No key: every row is a new entry' },
+		{ value: '', label: mode === 'upsert' ? 'Choose the field that matches an entry' : 'No key: every row is a new entry' },
 		{ value: 'entry.slug', label: 'Entry slug' },
 		...targets.filter((t) => !t.value.startsWith('entry.')).map((t) => ({ value: t.value, label: t.value })),
 	]);
@@ -253,13 +253,13 @@
 				// The engine stores a start's job before it answers, so a start
 				// whose answer never came back may already be importing.
 				error = starts
-					? 'The engine did not confirm the import. Check the entries before trying again.'
+					? 'Could not confirm whether the import started. Check the entries before you try again.'
 					: 'The request did not reach the engine. Nothing was imported. Try again in a moment.';
 				return null;
 			}
 			refusal = refusalOf(e);
 			if (!refusal) {
-				error = e.message || 'The request failed.';
+				error = e.message || 'Could not complete the request. Try again.';
 				hint = parseRefusalHint(error, errorCodeOf(e));
 			}
 			return null;
@@ -325,7 +325,7 @@
 			return;
 		}
 		if (mode === 'upsert' && !key) {
-			error = 'Choose the key field that finds the entry to update.';
+			error = 'Choose the key field that matches rows to entries.';
 			return;
 		}
 		const own = mappings();
@@ -357,7 +357,7 @@
 <Drawer
 	bind:open
 	title="New import"
-	description="Nothing is written until the last step. The dry run reports what would be rejected and why."
+	description="Nothing is imported until the last step. The dry run shows which rows would be rejected and why."
 >
 	<div class="flex flex-col gap-5">
 		<StepIndicator steps={STEPS} current={step + 1} />
@@ -394,7 +394,7 @@
 					id="import-url"
 					label="Address"
 					placeholder="https://example.com/export.json"
-					hint="An http or https link the engine fetches. For another LyEve instance, paste the signed download link of a finished export. Private and internal addresses are refused."
+					hint="An http or https link. To import from another LyEve instance, paste the signed download link of a finished export. Private and internal addresses are refused."
 					bind:value={url}
 				/>
 			{/if}
@@ -414,13 +414,13 @@
 					id="import-sheet"
 					label="Sheet"
 					placeholder="Sheet1"
-					hint="The worksheet to read, matched exactly. Empty reads the first, and the next step lists every sheet the workbook holds. Its first row is the header."
+					hint="The exact worksheet name. Leave it empty to use the first sheet. The next step lists every sheet in the workbook. Its first row is the header."
 					bind:value={sheet}
 				/>
 			{/if}
 			<p class="text-xs text-muted">
-				A CSV file or a sheet is read up to {formatCount(MAX_IMPORT_COLUMNS)} columns and {formatCount(MAX_IMPORT_CELLS)}
-				cells, its header's width times its rows. A wider or larger one is refused before any row is read.
+				A CSV file or a sheet can have up to {formatCount(MAX_IMPORT_COLUMNS)} columns and {formatCount(MAX_IMPORT_CELLS)}
+				cells (columns times rows). A larger file is refused before any row is imported.
 			</p>
 			{#if templates.length > 0}
 				<Select
@@ -444,7 +444,7 @@
 				<Select
 					id="import-sheet-read"
 					label="Sheet"
-					hint={`The workbook holds ${formatCount(sheets.length)} sheets. Choosing another reads it instead, and its columns are mapped again.`}
+					hint={`The workbook has ${formatCount(sheets.length)} sheets. If you choose another, its columns are mapped again.`}
 					searchable={sheets.length > 10}
 					value={sheetRead}
 					onvaluechange={chooseSheet}
@@ -453,7 +453,7 @@
 			{/if}
 			{#if otherSchemas.length > 0}
 				<Alert tone="brand">
-					The export also holds {otherSchemas.map(([n, c]) => `${formatCount(c)} ${n}`).join(', ')}. Only its {contentType}
+					The export also has {otherSchemas.map(([n, c]) => `${formatCount(c)} ${n}`).join(', ')}. Only its {contentType}
 					entries are imported. Import the others into their own content types.
 				</Alert>
 			{/if}
@@ -526,11 +526,11 @@
 
 			<RadioGroup
 				label="When an entry already exists"
-				hint="The key field decides which entry a row is. Without one, every row is a new entry."
+				hint="The key field matches a row to an existing entry. Without one, every row is a new entry."
 				bind:value={mode}
 				options={[
-					{ value: 'create', label: 'Create only', description: 'Leave an entry the key finds alone and report the row as skipped.' },
-					{ value: 'upsert', label: 'Create and update', description: 'Overwrite the fields of an entry the key finds, and create the rest.' },
+					{ value: 'create', label: 'Create only', description: 'Skip a row that matches an existing entry, and report it as skipped.' },
+					{ value: 'upsert', label: 'Create and update', description: 'Update the entry a row matches, and create the rest.' },
 				]}
 			/>
 			<Select id="import-key" label="Key field" searchable bind:value={key} options={keyOptions} />
@@ -564,11 +564,11 @@
 					</tbody>
 				</Table>
 				<p class="text-xs text-muted">
-					Importing now writes the {formatCount(checked.valid_rows)} good rows and records the rest with their
-					reasons, so they can be downloaded, fixed and imported again.
+					Import now to add the {formatCount(checked.valid_rows)} good rows. The rest are kept with their reasons,
+					so you can download them, fix them and import them again.
 				</p>
 			{:else}
-				<Alert tone="success" announce>Every row passes. {mode === 'upsert' ? 'Rows the key finds are updated.' : ''}</Alert>
+				<Alert tone="success" announce>Every row passes. {mode === 'upsert' ? 'Rows that match an existing entry are updated.' : ''}</Alert>
 			{/if}
 			<p class="flex items-center gap-2 text-xs text-muted">
 				<Badge tone="neutral">{mode === 'upsert' ? 'Create and update' : 'Create only'}</Badge>

@@ -67,7 +67,7 @@ describe('readError', () => {
 			new Error('Cannot read properties of undefined'),
 			new SyntaxError('Unexpected token < in JSON at position 0'),
 		]) {
-			expect(thrown(err)).toEqual({ status: 502, message: 'The engine could not return this record.' });
+			expect(thrown(err)).toEqual({ status: 502, message: 'Could not load this record.' });
 		}
 	});
 

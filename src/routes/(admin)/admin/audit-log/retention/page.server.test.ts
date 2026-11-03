@@ -87,14 +87,14 @@ describe('creating a retention policy', () => {
 		const { event, calls } = engine({ retention_days: days });
 		const out = (await actions.createPolicy(event)) as Failure;
 		expect(out.status).toBe(400);
-		expect(out.data).toEqual({ action: 'createPolicy', error: 'A retention window is a whole number of days, and cannot be negative.' });
+		expect(out.data).toEqual({ action: 'createPolicy', error: 'Enter a whole number of days, 0 or more.' });
 		expect(calls).toEqual([]);
 	});
 
 	it('refuses archival with nowhere to archive to', async () => {
 		const { event, calls } = engine({ retention_days: '30', archival_enabled: 'true', archival_storage: ' ' });
 		const out = (await actions.createPolicy(event)) as Failure;
-		expect(out.data.error).toContain('no storage backend is named');
+		expect(out.data.error).toContain('Enter a storage backend to archive to');
 		expect(calls).toEqual([]);
 	});
 
@@ -107,7 +107,7 @@ describe('creating a retention policy', () => {
 	it('keeps outage detail off the page', async () => {
 		const { event } = engine({ retention_days: '30' }, { reply: OUTAGE });
 		const out = (await actions.createPolicy(event)) as Failure;
-		expect(out.data).toEqual({ action: 'createPolicy', error: 'The policy could not be created.' });
+		expect(out.data).toEqual({ action: 'createPolicy', error: 'Could not create the policy. Try again.' });
 	});
 });
 
@@ -120,7 +120,7 @@ describe('removing a retention policy', () => {
 
 	it('names nothing to delete without a request', async () => {
 		const { event, calls } = engine({});
-		expect(((await actions.deletePolicy(event)) as Failure).data).toEqual({ action: 'deletePolicy', error: 'No policy was named.' });
+		expect(((await actions.deletePolicy(event)) as Failure).data).toEqual({ action: 'deletePolicy', error: 'This form is missing its policy. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -128,7 +128,7 @@ describe('removing a retention policy', () => {
 		const refused = engine({ id: 'p1' }, { reply: json({ error: 'failed to delete retention policy' }, 404) });
 		expect(((await actions.deletePolicy(refused.event)) as Failure).data.error).toBe('failed to delete retention policy');
 		const down = engine({ id: 'p1' }, { reply: OUTAGE });
-		expect(((await actions.deletePolicy(down.event)) as Failure).data.error).toBe('The policy could not be removed.');
+		expect(((await actions.deletePolicy(down.event)) as Failure).data.error).toBe('Could not delete the policy. Try again.');
 	});
 });
 
@@ -156,7 +156,7 @@ describe('placing a legal hold', () => {
 		const { event, calls } = engine({ name: '  ' });
 		const out = (await actions.createHold(event)) as Failure;
 		expect(out.data.action).toBe('createHold');
-		expect(out.data.error).toContain('Name the hold');
+		expect(out.data.error).toContain('Enter a name for the hold');
 		expect(calls).toEqual([]);
 	});
 
@@ -164,7 +164,7 @@ describe('placing a legal hold', () => {
 		const refused = engine({ name: 'Litigation' }, { reply: json({ error: 'name is required' }, 400) });
 		expect(((await actions.createHold(refused.event)) as Failure).data.error).toBe('name is required');
 		const down = engine({ name: 'Litigation' }, { reply: OUTAGE });
-		expect(((await actions.createHold(down.event)) as Failure).data.error).toBe('The hold could not be created.');
+		expect(((await actions.createHold(down.event)) as Failure).data.error).toBe('Could not create the hold. Try again.');
 	});
 });
 
@@ -177,7 +177,7 @@ describe('releasing a legal hold', () => {
 
 	it('names nothing to release without a request', async () => {
 		const { event, calls } = engine({});
-		expect(((await actions.releaseHold(event)) as Failure).data).toEqual({ action: 'releaseHold', error: 'No hold was named.' });
+		expect(((await actions.releaseHold(event)) as Failure).data).toEqual({ action: 'releaseHold', error: 'This form is missing its hold. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -186,7 +186,7 @@ describe('releasing a legal hold', () => {
 		const refused = engine({ id: 'h1' }, { reply: json({ error: 'failed to delete legal hold' }, 404) });
 		expect(((await actions.releaseHold(refused.event)) as Failure).data).toEqual({ action: 'releaseHold', error: 'failed to delete legal hold' });
 		const down = engine({ id: 'h1' }, { reply: OUTAGE });
-		expect(((await actions.releaseHold(down.event)) as Failure).data.error).toBe('The hold could not be released.');
+		expect(((await actions.releaseHold(down.event)) as Failure).data.error).toBe('Could not release the hold. Try again.');
 	});
 });
 
@@ -229,7 +229,7 @@ describe('enforcing retention now', () => {
 	it('says a failed run failed, without the engine text', async () => {
 		for (const reply of [OUTAGE, json({ error: 'retention enforcement failed' }, 500)]) {
 			const { event } = engine({}, { reply });
-			expect(((await actions.enforce(event)) as Failure).data).toEqual({ action: 'enforce', error: 'Retention could not be enforced.' });
+			expect(((await actions.enforce(event)) as Failure).data).toEqual({ action: 'enforce', error: 'Could not enforce retention. Try again.' });
 		}
 	});
 });

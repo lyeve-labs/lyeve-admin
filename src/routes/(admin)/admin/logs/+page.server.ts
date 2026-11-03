@@ -19,11 +19,11 @@ export const load: PageServerLoad = async (event) => {
 	const [search, levels, config, volume] = await Promise.all([
 		section(
 			searchLogEntries(client, { q, level, limit, offset }),
-			'The log entries could not be read. This is not a report that none match.'
+			'Could not load log entries.'
 		),
-		section(getLoggingLevels(client), 'The log levels could not be read.'),
-		section(getLoggingConfig(client), 'The log sinks could not be read.'),
-		section(getLogVolume(client, '24h'), 'The log volume could not be read.')
+		section(getLoggingLevels(client), 'Could not load log levels.'),
+		section(getLoggingConfig(client), 'Could not load log sinks.'),
+		section(getLogVolume(client, '24h'), 'Could not load log volume.')
 	]);
 
 	// The stated count is trusted as it is. Raising it to offset plus rows read,

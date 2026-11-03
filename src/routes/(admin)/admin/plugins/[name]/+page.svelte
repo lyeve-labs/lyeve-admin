@@ -81,7 +81,7 @@
 <PageShell
 	{title}
 	documentTitle={`${title} - Plugins`}
-	description={plugin?.description || 'What this plugin is and what it serves on this instance.'}
+	description={plugin?.description || 'See what this plugin does and the routes it serves on this instance.'}
 	width="wide"
 	{back}
 >
@@ -134,8 +134,8 @@
 			{#if plugin.state !== 'running'}
 				<EmptyState
 					iconSnippet={noRoutes}
-					title="Serves nothing yet"
-					description="A plugin mounts its routes when it starts. This one is not running."
+					title="Not running"
+					description="This plugin is not running, so its routes are not available."
 				/>
 			{:else if routeCount === 0}
 				<EmptyState
@@ -181,13 +181,13 @@
 				<EmptyState
 					iconSnippet={noTraffic}
 					title="Request statistics unavailable"
-					description="They come from the Profiler plugin, which is not running or did not answer."
+					description="Could not load statistics from the Profiler plugin. Check that it is running."
 				/>
 			{:else if !data.traffic}
 				<EmptyState
 					iconSnippet={noTraffic}
 					title="Nothing sampled yet"
-					description="The profiler has not timed a request served through this plugin since it started."
+					description="The profiler has not sampled a request to this plugin since it started."
 				/>
 			{:else}
 				<div class="grid grid-cols-2 gap-4 lg:grid-cols-4" data-testid="traffic-stats">
@@ -197,7 +197,7 @@
 					<Stat size="sm" label="Allocated" mono value={formatSignedBinaryBytes(data.traffic.total_alloc_bytes)} />
 				</div>
 				<p class="text-xs text-faint">
-					Across every tenant, from the profiler's recent sample. Resetting the profiler starts the count again.
+					Across every tenant, from the profiler's recent sample. Resetting the profiler restarts the count.
 				</p>
 			{/if}
 		</section>

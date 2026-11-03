@@ -268,7 +268,7 @@ describe('cache flush', () => {
 		api.flushAll.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.flush(formEvent({}))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('The cache could not be flushed.');
+		expect(out.data.error).toBe('Could not flush the cache. Try again.');
 	});
 });
 
@@ -309,7 +309,7 @@ describe('cache rule update', () => {
 		api.updateRule.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.updateRule(formEvent(fields))) as { status: number; data: Record<string, unknown> };
 		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('The rule could not be saved.');
+		expect(out.data.error).toBe('Could not save the rule. Try again.');
 		expect(out.data.drawer).toBe('rule');
 	});
 });
@@ -341,7 +341,7 @@ describe('cache circuit reset', () => {
 		api.resetCircuit.mockRejectedValue(new TypeError('fetch failed'));
 		const out = (await actions.resetCircuit(formEvent({ name: 'redis-1' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('The circuit could not be reset.');
+		expect(out.data.error).toBe('Could not reset the circuit. Try again.');
 	});
 });
 

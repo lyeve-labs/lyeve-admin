@@ -21,7 +21,7 @@
 	async function askDelete(name: string) {
 		const ok = await confirmDialog(
 			`Delete provider ${name}?`,
-			'Calls that named it fall back to the next row by priority. The key goes with it.',
+			'Requests that named it fall back to the next provider by priority. Its key is deleted too.',
 			{ confirmLabel: 'Delete' }
 		);
 		if (!ok) return;
@@ -44,7 +44,7 @@
 			? [
 					{ term: 'Kind', value: providerKindLabel(p.kind) },
 					{ term: 'Base URL', value: p.base_url || (p.kind === 'openai_compatible' ? 'none' : "the vendor's") },
-					{ term: 'Key', value: p.needs_key ? 'stored, cannot be read: enter it again' : p.has_key ? 'stored' : 'none' },
+					{ term: 'Key', value: p.needs_key ? 'stored, cannot be decrypted: enter it again' : p.has_key ? 'stored' : 'none' },
 					{ term: 'Private address', value: p.allow_private ? 'allowed' : 'refused' },
 					{ term: 'Created', value: formatDateTime(p.created_at) },
 					{ term: 'Updated', value: formatDateTime(p.updated_at) },
@@ -78,7 +78,7 @@
 			<DescriptionList items={facts} />
 
 			<section class="grid gap-4 md:grid-cols-2">
-				<Card heading="Models" headingLevel={2} description="Ask the provider which models it serves. Nothing is stored.">
+				<Card heading="Models" headingLevel={2} description="See which models this provider offers. The list is not saved.">
 					<form method="POST" action="?/models" use:enhance class="flex flex-col gap-3">
 						<div>
 							<Button variant="secondary" size="sm" type="submit">
@@ -88,7 +88,7 @@
 						{#if form?.scope === 'models' && form.error}
 							<Alert tone="danger">{form.error}</Alert>
 						{:else if models && models.length === 0}
-							<p class="text-xs text-muted">The provider answered with no models.</p>
+							<p class="text-xs text-muted">This provider returned no models.</p>
 						{:else if models}
 							<ul class="flex flex-wrap gap-1" aria-label="Models">
 								{#each models as m (m)}
@@ -99,7 +99,7 @@
 					</form>
 				</Card>
 
-				<Card heading="Capabilities" headingLevel={2} description="What one model on this row can do, from the driver's own table and this row's modalities. The key is not needed.">
+				<Card heading="Capabilities" headingLevel={2} description="Check what one model on this provider can do, based on the model and this provider's modalities. No key is needed.">
 					<form method="POST" action="?/capabilities" use:enhance={saveCaps.enhance} class="flex flex-col gap-3">
 						<Input id="cap-model" name="model" label="Model" bind:value={capModel} placeholder={p.default_model || 'the default model'} />
 						<div>

@@ -88,7 +88,7 @@ describe('Events gate', () => {
 		const { container } = render(EventsPage, {
 			props: props({ gate: { state: 'absent' }, events: [] }),
 		});
-		expect(said(container)).toContain('not part of this build');
+		expect(said(container)).toContain('not included in this build');
 	});
 });
 
@@ -103,14 +103,14 @@ describe('Events replay', () => {
 
 	it('warns that a real replay cannot be taken back', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(said(container)).toContain('Nothing undoes that.');
+		expect(said(container)).toContain('This cannot be undone.');
 	});
 
 	it('says plainly that a rehearsal posted nothing', () => {
 		const { container } = render(EventsPage, {
 			props: props({}, { started: 'r9', dryRun: true }),
 		});
-		expect(said(container)).toContain('Rehearsed. Nothing was published.');
+		expect(said(container)).toContain('Rehearsal started. It publishes nothing');
 	});
 
 	// The plugin publishes a replay through the same path as a live change,
@@ -161,7 +161,7 @@ describe('starting a replay', () => {
 
 	it('asks before a real replay and names the window and the run', async () => {
 		const { getByLabelText, getByRole } = render(EventsPage, { props: props() });
-		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse first, posting nothing' }));
+		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse without publishing' }));
 		await fill(getByLabelText, 'backfill-oct');
 		const { cancel } = await press();
 		expect(kit.confirm).toHaveBeenCalledTimes(1);
@@ -173,7 +173,7 @@ describe('starting a replay', () => {
 
 	it('names the shared run when no run name was given', async () => {
 		const { getByRole } = render(EventsPage, { props: props() });
-		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse first, posting nothing' }));
+		await fireEvent.click(getByRole('checkbox', { name: 'Rehearse without publishing' }));
 		await press();
 		const [question] = kit.confirm.mock.calls[0] as unknown as [string];
 		expect(question).toContain('the shared name');
@@ -200,7 +200,7 @@ describe('starting a replay', () => {
 describe('Events log', () => {
 	it('reads an empty log as a quiet instance', () => {
 		const { container } = render(EventsPage, { props: props({ events: [], total: 0 }) });
-		expect(said(container)).toContain('quiet instance');
+		expect(said(container)).toContain('Events appear here when a plugin or a flow publishes one.');
 	});
 
 	it('marks an event that carries an error, which is why anyone replays', () => {
@@ -214,7 +214,7 @@ describe('Events log', () => {
 		const { container } = render(EventsPage, {
 			props: props({ events: [row(), row({ id: 'e2', error: 'boom' })], total: 2 }),
 		});
-		expect(said(container)).toContain('Carrying an error');
+		expect(said(container)).toContain('With errors');
 	});
 });
 
@@ -240,7 +240,7 @@ describe('figures that cover one page or failed', () => {
 			props: props({ runs: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		const text = said(container);
-		expect(text).toContain('did not answer');
+		expect(text).toContain('is unavailable');
 		const tile = [...container.querySelectorAll('p')].find((p) => p.textContent?.trim() === 'Replays');
 		expect(tile?.nextElementSibling?.textContent?.trim()).not.toBe('0');
 	});
@@ -249,6 +249,6 @@ describe('figures that cover one page or failed', () => {
 describe('the search box', () => {
 	it('is named for a screen reader', () => {
 		const { container } = render(EventsPage, { props: props() });
-		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Narrow this page');
+		expect(container.querySelector('label[for="event-narrow"]')?.textContent).toBe('Search this page');
 	});
 });

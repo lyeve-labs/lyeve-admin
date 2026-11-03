@@ -15,6 +15,7 @@
  * session would then stay, and /login and the admin layout would redirect to
  * each other.
  */
+import { randomBytes } from 'node:crypto';
 import type { Cookies } from '@sveltejs/kit';
 
 export const SESSION_COOKIE = '__Host-sys_session';
@@ -117,4 +118,61 @@ export function clearRefreshCookie(event: SessionEvent): void {
 	}
 	event.cookies.delete(REFRESH_COOKIE_INSECURE, attrs(false));
 	if (event.cookies.get(REFRESH_COOKIE)) event.cookies.delete(REFRESH_COOKIE, attrs(true));
+}
+
+/*
+ * The engine's double-submit CSRF cookie. The engine holds a write that
+ * carries a session cookie to an X-CSRF-Token header equal to this cookie,
+ * and reads the prefixed name first. It sets the cookie on a password,
+ * second-factor or setup sign-in and on a refresh, never on a sign-in by
+ * emailed link, OAuth or SAML.
+ */
+export const CSRF_COOKIE = '__Host-csrf';
+export const CSRF_COOKIE_INSECURE = 'csrf';
+
+/**
+ * Gives a signed-in browser a CSRF cookie when it has none, so a session the
+ * engine opened without one can still change anything. The provider sign-ins
+ * set their session cookie from the engine and never pass through a console
+ * action, so this runs for every request rather than at sign-in, which also
+ * repairs a session that is already open.
+ *
+ * The engine checks only that the cookie and the header are equal, so a token
+ * minted here protects exactly as one it mints does when it is as hard to
+ * guess and as hard to plant. It is 32 random bytes, as the engine's are,
+ * under the engine's name and attributes: readable by the page that echoes
+ * it, host-only and SameSite=Strict, and over HTTPS Secure behind the
+ * `__Host-` prefix, which no other host can set. It mints only when the name
+ * it reads first is missing, and it never overwrites a cookie. Over HTTPS
+ * that name is `__Host-csrf`, so behind an engine whose secure-cookie setting
+ * is off it adds `__Host-csrf` beside the engine's `csrf`, and every reader
+ * takes `__Host-csrf` first. Nothing in the request chooses the value.
+ */
+export function ensureCsrfCookie(event: SessionEvent): void {
+	if (!sessionToken(event)) return;
+	const secure = isSecure(event);
+	const present = secure
+		? event.cookies.get(CSRF_COOKIE)
+		: event.cookies.get(CSRF_COOKIE_INSECURE) || event.cookies.get(CSRF_COOKIE);
+	if (present) return;
+	event.cookies.set(secure ? CSRF_COOKIE : CSRF_COOKIE_INSECURE, randomBytes(32).toString('base64url'), {
+		path: '/',
+		httpOnly: false,
+		secure,
+		sameSite: 'strict',
+		maxAge: 86400,
+	});
+}
+
+/**
+ * Clears the CSRF cookie at sign-out under both names. The engine clears its
+ * own only when the call reaches it, and only under the name its secure-cookie
+ * setting gives it, which need not be the one the console minted.
+ */
+export function clearCsrfCookie(event: SessionEvent): void {
+	const attrs = (secure: boolean) => ({ path: '/', httpOnly: false, secure, sameSite: 'strict' }) as const;
+	const secure = isSecure(event);
+	event.cookies.delete(secure ? CSRF_COOKIE : CSRF_COOKIE_INSECURE, attrs(secure));
+	const other = secure ? CSRF_COOKIE_INSECURE : CSRF_COOKIE;
+	if (event.cookies.get(other)) event.cookies.delete(other, attrs(other === CSRF_COOKIE));
 }

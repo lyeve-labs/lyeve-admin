@@ -47,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
 	const { fetch } = event;
 	const user = await loadUser(event);
 	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
-		error(403, 'Requires admin or super_admin role');
+		error(403, 'Only an admin or a super admin can open this page.');
 	}
 	const superAdmin = user.roles.includes('super_admin');
 	const client = authedClient(event);
@@ -55,12 +55,12 @@ export const load: PageServerLoad = async (event) => {
 	const [families, exporters, destination] = await Promise.all([
 		section(
 			readMetricsText(fetch, authedHeaders(event)).then(parseExposition),
-			'The metrics could not be read. This is not a report that no series exist.',
+			'Could not load metrics.',
 		),
 		superAdmin
-			? section(listExporters(client), 'The exporters could not be read. This is not a report that none is configured.')
+			? section(listExporters(client), 'Could not load exporters.')
 			: Promise.resolve(null),
-		section(readDestination(client), 'The destination could not be read. This is not a report that none is set.'),
+		section(readDestination(client), 'Could not load the destination.'),
 	]);
 
 	const page: TelemetryPage = { superAdmin, families, exporters, destination };
@@ -109,7 +109,7 @@ export const actions: Actions = {
 			parsed = null;
 		}
 		if (!parsed || !['http:', 'https:'].includes(parsed.protocol) || url.length > 2048) {
-			return saveRefused('The URL is an absolute http or https address.');
+			return saveRefused('Enter a full http or https URL.');
 		}
 		if (parsed.username || parsed.password) {
 			return saveRefused('Put credentials in a header, not in the URL.');
@@ -129,12 +129,12 @@ export const actions: Actions = {
 					return saveRefused(`${name} is set by the exporter itself.`);
 				}
 				if (/[\r\n]/.test(values[i] ?? '')) {
-					return saveRefused('A header value is a single line.');
+					return saveRefused('Enter each header value on a single line.');
 				}
 				headers[name] = values[i] ?? '';
 			}
 			if (Object.keys(headers).length > MAX_HEADERS) {
-				return saveRefused(`A destination carries at most ${MAX_HEADERS} headers.`);
+				return saveRefused(`Enter at most ${MAX_HEADERS} headers.`);
 			}
 			body.headers = headers;
 		}
@@ -142,7 +142,7 @@ export const actions: Actions = {
 		try {
 			await saveDestination(authedClient(event), body);
 		} catch (err) {
-			return destinationFailure('save', err, 'The destination could not be saved.');
+			return destinationFailure('save', err, 'Could not save the destination. Try again.');
 		}
 		return { savedDestination: true };
 	},
@@ -153,7 +153,7 @@ export const actions: Actions = {
 		try {
 			await removeDestination(authedClient(event));
 		} catch (err) {
-			return destinationFailure('remove', err, 'The destination could not be removed.');
+			return destinationFailure('remove', err, 'Could not delete the destination. Try again.');
 		}
 		return { removedDestination: true };
 	},
@@ -165,12 +165,12 @@ export const actions: Actions = {
 		if (!name) return fail(400, { name, error: 'Choose an exporter.' });
 		try {
 			const result = await triggerExport(authedClient(event), name);
-			return { name, exported: true, message: result?.message ?? `export triggered for ${name}` };
+			return { name, exported: true, message: result?.message ?? `Export started for ${name}.` };
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 429) {
 				return fail(429, { name, error: `${name} exported a moment ago. Wait five seconds and try again.` });
 			}
-			return fail(400, { name, error: actionError(err, `The ${name} export failed.`) });
+			return fail(400, { name, error: actionError(err, `Could not export ${name}. Try again.`) });
 		}
 	},
 };

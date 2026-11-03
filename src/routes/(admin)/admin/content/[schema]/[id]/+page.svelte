@@ -43,6 +43,7 @@
 		formValues = buildFromData(data.schemaDef?.fields ?? [], data.item?.data ?? {});
 	});
 	let validationErrors = $state<Record<string, string>>({});
+	let errorKeys = $state<Record<string, string>>({});
 	let submitting = $state(false);
 
 	let serialized = $derived(serialize(userFields, formValues));
@@ -57,7 +58,10 @@
 	// A value the plugin refused comes back by field, so each control marks its
 	// own message the way a value refused before sending does.
 	$effect(() => {
-		if (form && 'fieldErrors' in form && form.fieldErrors) validationErrors = form.fieldErrors as Record<string, string>;
+		if (form && 'fieldErrors' in form && form.fieldErrors) {
+			validationErrors = form.fieldErrors as Record<string, string>;
+			errorKeys = ('errorKeys' in form && form.errorKeys ? form.errorKeys : {}) as Record<string, string>;
+		}
 	});
 
 	function handleSubmit(e: SubmitEvent) {
@@ -65,6 +69,7 @@
 		if (Object.keys(errors).length > 0) {
 			e.preventDefault();
 			validationErrors = errors;
+			errorKeys = {};
 		}
 	}
 
@@ -208,7 +213,7 @@
 					</Button>
 				{/if}
 				{#if data.revisionsFailed}
-					<span class="text-xs text-muted">The revision history could not be read.</span>
+					<span class="text-xs text-muted">Could not load the revision history. Reload the page to try again.</span>
 				{/if}
 				{#if historyOff}
 					<span class="text-xs text-muted" data-testid="history-off">
@@ -275,6 +280,7 @@
 							fields={userFields}
 							{formValues}
 							{validationErrors}
+							{errorKeys}
 							relations={data.relations}
 							mediaChoices={data.mediaChoices}
 							error={translationError || reviewError || commentError || releaseError || revisionError ? null : form?.error}
@@ -373,7 +379,7 @@
 						<div class="flex flex-col gap-3 border-t border-line p-3">
 							{#if olderUnlisted > 0 && !olderHidden}
 								<p class="text-xs text-muted">
-									The newest {revisions.length} of {revisionTotal} revisions are listed. Open an older one by number.
+									Showing the newest {revisions.length} of {revisionTotal} revisions. Open an older one by its number.
 								</p>
 								{#if nextOlder > 0}
 									{@render revisionOpener()}

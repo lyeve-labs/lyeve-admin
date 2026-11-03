@@ -57,18 +57,18 @@ describe('Realtime gate', () => {
 		const { container } = render(RealtimePage, {
 			props: props({ gate: { state: 'absent' }, stream: null, socket: null }),
 		});
-		expect(said(container)).toContain('not part of this build');
+		expect(said(container)).toContain('not included in this build');
 	});
 
 	it('says a failed read is not a report that nobody is connected', () => {
 		const { container } = render(RealtimePage, {
 			props: props({
-				gate: { state: 'error', message: 'Realtime metrics could not be read. This is not a report that nobody is connected.' },
+				gate: { state: 'error', message: 'Could not load realtime metrics.' },
 				stream: null,
 				socket: null,
 			}),
 		});
-		expect(said(container)).toContain('not a report that nobody is connected');
+		expect(said(container)).toContain('Could not load realtime metrics.');
 	});
 });
 
@@ -77,7 +77,7 @@ describe('Realtime transports', () => {
 		const { container } = render(RealtimePage, {
 			props: props({ socket: socket({ total_connections: 0, events_dispatched: 0 }) }),
 		});
-		expect(said(container)).toContain('not a fault');
+		expect(said(container)).toContain('No connections over this transport yet.');
 	});
 
 	it('states the window a cumulative total covers', () => {
@@ -100,7 +100,7 @@ describe('Realtime transports', () => {
 				socket: socket({ total_connections: 0, events_dispatched: 0 }),
 			}),
 		});
-		expect(said(container)).toContain('Nothing is connected');
+		expect(said(container)).toContain('No connections yet');
 	});
 });
 
@@ -112,9 +112,9 @@ describe('a transport that did not answer', () => {
 			props: props({ socket: null, socketGate: { state: 'unavailable' } }),
 		});
 		const text = said(container);
-		expect(text).toContain('did not answer');
-		expect(text).not.toContain('not a fault');
-		expect(text).not.toContain('Nothing is connected');
+		expect(text).toContain('is unavailable');
+		expect(text).not.toContain('No connections over this transport yet.');
+		expect(text).not.toContain('No connections yet');
 	});
 
 	it('keeps the other transport drawn', () => {
@@ -150,13 +150,12 @@ describe('Realtime tenant roster', () => {
 				platform: null,
 				platformGate: {
 					state: 'error',
-					message: 'The per-tenant roster could not be read. The counters above are unaffected.',
+					message: 'Could not load connections by tenant.',
 				},
 			}),
 		});
-		expect(said(container)).toContain('roster could not be read');
-		expect(said(container)).toContain('unaffected');
-		expect(said(container)).not.toContain('No tenant has a connection open');
+		expect(said(container)).toContain('Could not load connections by tenant.');
+		expect(said(container)).not.toContain('No open connections');
 	});
 });
 
@@ -185,6 +184,6 @@ describe('whose counters these are', () => {
 		const { container } = render(RealtimePage, {
 			props: props({ stream: stream({ total_connections: 0, active_connections: 0, events_dispatched: 900 }) }),
 		});
-		expect(said(container)).toContain('Nothing has connected over this transport');
+		expect(said(container)).toContain('No connections over this transport yet.');
 	});
 });

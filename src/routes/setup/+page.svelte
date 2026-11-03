@@ -57,7 +57,7 @@
 	const tokenHint = $derived(
 		data.tokenSource === 'env'
 			? "The value of LYEVE_SETUP_TOKEN in the engine's environment."
-			: 'The engine printed it to its log when it started, on the line beginning "setup: no account exists yet". Copy the setup_token value, for example with: docker logs <engine container> 2>&1 | grep setup_token',
+			: 'Find it in the output the engine wrote when it started, on the line that holds setup_token, for example with: docker logs <engine container> 2>&1 | grep setup_token. Copy the value that follows setup_token.',
 	);
 
 	const formError = $derived(form && 'error' in form ? (form.error as string) : null);
@@ -80,15 +80,15 @@
 		const confirm = String(fd.get('confirm') ?? '');
 
 		const found: Record<string, string> = {};
-		if (!setupToken) found.setup_token = 'Setup token is required';
-		if (!email) found.email = 'Email is required';
+		if (!setupToken) found.setup_token = 'Enter the setup token.';
+		if (!email) found.email = 'Enter your email.';
 		// The rules are the engine's password policy, which an install can
 		// change. The engine names the rule a refused password broke, so the
 		// page states no rule of its own that could disagree with it.
-		if (!password) found.password = 'Password is required';
+		if (!password) found.password = 'Enter a password.';
 		else if (passwordTooLong(password)) found.password = passwordTooLong(password) ?? '';
-		if (!confirm) found.confirm = 'Confirm password is required';
-		else if (password && confirm !== password) found.confirm = 'Passwords do not match';
+		if (!confirm) found.confirm = 'Enter the password again.';
+		else if (password && confirm !== password) found.confirm = 'The passwords do not match.';
 
 		errors = found;
 		if (Object.keys(found).length === 0) return true;
@@ -130,8 +130,8 @@
 				<div class="space-y-4" data-state="unreachable">
 					<SectionHeading level={2}>Waiting for the engine</SectionHeading>
 					<p class="text-muted">
-						The admin cannot reach the engine. It may still be starting or restarting. If this lasts, check that
-						the engine is running and that the admin's CORE_INTERNAL_URL points at it.
+						Could not reach the engine. If it is starting or restarting, this page continues once it is up. If
+						this lasts, check that the engine is running and that the admin's CORE_INTERNAL_URL points at it.
 					</p>
 					<p class="flex items-center gap-2 text-sm text-muted" role="status">
 						<Spinner size={ICON.sm} />
@@ -144,12 +144,12 @@
 				<form method="POST" action="?/status" use:enhance={read.enhance} class="space-y-5" data-state="setup-mode">
 					<SectionHeading level={2}>The engine is missing settings</SectionHeading>
 					<p class="text-muted">
-						It started in setup mode, so it serves nothing but this screen until its configuration is complete.
+						The engine started in setup mode and shows only this screen until its configuration is complete.
 						Enter the setup token to see what to set.
 					</p>
 					{#if data.tokenSource === null}
 						<Alert tone="warn">
-							This engine holds no setup token, so it refuses setup. Set LYEVE_SETUP_TOKEN in its environment and
+							This engine has no setup token, so setup cannot continue. Set LYEVE_SETUP_TOKEN in its environment and
 							restart it, or restart it to print a new one-time token to its log.
 						</Alert>
 					{/if}
@@ -174,15 +174,15 @@
 						{#each generatedSecrets as secret (secret.env)}
 							<li data-missing="secret">
 								<span class="font-medium">{secret.env}.</span>
-								<span class="text-muted">A new random value was generated for it below.</span>
+								<span class="text-muted">A new random value for it is shown below.</span>
 							</li>
 						{/each}
 					</ul>
 
 					{#if modeStatus.secrets_included}
 						<Alert tone="warn">
-							These secrets are shown once. Copy them now and store them where the engine reads its settings. The
-							engine keeps them in memory only, never writes them anywhere, and forgets them when it restarts.
+							These secrets are shown only once. Copy them now and store them where the engine reads its settings.
+							The engine does not save them, so they are gone after it restarts.
 						</Alert>
 					{:else if generatedSecrets.length > 0}
 						<Alert tone="warn">
@@ -237,7 +237,7 @@
 					<SectionHeading level={2}>Create the first super admin</SectionHeading>
 					{#if data.tokenSource === null}
 						<Alert tone="warn">
-							This engine holds no setup token, so it refuses setup. Set LYEVE_SETUP_TOKEN in its environment and
+							This engine has no setup token, so setup cannot continue. Set LYEVE_SETUP_TOKEN in its environment and
 							restart it, or restart it to print a new one-time token to its log.
 						</Alert>
 					{:else if data.tokenSource === 'log'}
@@ -273,7 +273,7 @@
 						label="Password"
 						autocomplete="new-password"
 						required
-						hint="The engine's password policy sets the rules. If it refuses this password, the refusal names the rule it broke."
+						hint="The engine's password policy sets the rules. If this password breaks one, the error names it."
 						error={errors.password ?? serverFields.password}
 					/>
 

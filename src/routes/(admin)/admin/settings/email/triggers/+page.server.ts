@@ -22,11 +22,11 @@ export const load: PageServerLoad = async (event) => {
 	// not a tenant without templates, and a schema list that did not answer is
 	// not an instance without schemas.
 	const [triggers, templates, schemas, writeRefusal] = await Promise.all([
-		section(listEmailTriggers(client), 'The triggers could not be read. This is not a report that there are none.'),
-		section(listEmailTemplates(client), 'The templates could not be read, so a trigger cannot be given one right now.'),
+		section(listEmailTriggers(client), 'Could not load email triggers.'),
+		section(listEmailTemplates(client), 'Could not load email templates.'),
 		section(
 			getSchemas(client).then((rows: { name: string }[]) => rows.map((s) => s.name).sort()),
-			'The schemas could not be read, so a trigger can only watch every schema right now.',
+			'Could not load schemas, so a trigger can only watch every schema for now.',
 		),
 		triggerWriteRefusal(client),
 	]);
@@ -61,7 +61,7 @@ export const actions: Actions = {
 			else await createEmailTrigger(client, read.input);
 			return { saved: true };
 		} catch (err) {
-			return writeFailure('save', err, 'The trigger could not be saved.');
+			return writeFailure('save', err, 'Could not save the trigger. Try again.');
 		}
 	},
 
@@ -69,12 +69,12 @@ export const actions: Actions = {
 		await requireRole(event, ['admin', 'super_admin']);
 		const client = authedClient(event);
 		const id = String((await event.request.formData()).get('id') ?? '').trim();
-		if (!id) return fail(400, { action: 'delete', error: 'Choose a trigger.' });
+		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its trigger. Reload the page and try again.' });
 		try {
 			await deleteEmailTrigger(client, id);
 			return { deleted: id };
 		} catch (err) {
-			return writeFailure('delete', err, 'The trigger could not be deleted.');
+			return writeFailure('delete', err, 'Could not delete the trigger. Try again.');
 		}
 	},
 };

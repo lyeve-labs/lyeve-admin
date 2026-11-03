@@ -101,7 +101,7 @@
 		if (read.env.history === 'on') parts.push('Content history is on for every type of every tenant (CONTENT_HISTORY=on).');
 		if (read.env.activity === 'off') parts.push('Activity is off for every tenant (CONTENT_ACTIVITY=off).');
 		if (read.env.activity === 'on') parts.push('Activity is on for every tenant (CONTENT_ACTIVITY=on).');
-		parts.push("The server's environment sets these, so their controls cannot be changed here.");
+		parts.push('Environment variables set these, so you cannot change them here.');
 		return parts.join(' ');
 	});
 
@@ -149,7 +149,7 @@
 
 	const save = tracked(() => async ({ result, update }) => {
 		await update({ reset: false });
-		if (result.type === 'success') toast.success('Saved content history settings');
+		if (result.type === 'success') toast.success('Content history settings saved.');
 	});
 	const prune = tracked(() => async ({ update }) => {
 		await update({ reset: false });
@@ -167,7 +167,7 @@
 
 <PageShell
 	title="Content history"
-	description="Which content types keep their versions, how long they are kept, and the record of who changed what."
+	description="Choose which content types keep versions and for how long, and whether to record who changed each entry."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -176,7 +176,7 @@
 			level={2}
 			gate={data.settings.ok ? { state: 'absent' } : data.settings.gate}
 			title="Content history"
-			absent="This engine does not keep content history settings. They arrive with an engine upgrade."
+			absent="Content history needs a newer version of the engine."
 		/>
 	{:else}
 		{#if lockText}
@@ -205,10 +205,10 @@
 								<GateNotice
 									gate={data.schemas.gate}
 									title="Content types"
-									absent="This engine does not list content types, so none can be chosen."
+									absent="The content type list is not included in this build, so you cannot choose types below."
 								/>
 							{:else if typeOptions.length === 0}
-								<p class="text-sm text-muted">This tenant has no content types yet.</p>
+								<p class="text-sm text-muted">No content types yet.</p>
 							{:else}
 								<CheckboxGroup
 									label="Content types that keep history"
@@ -267,11 +267,11 @@
 						</div>
 						<p class="text-xs text-muted">
 							Retention runs once a day. It never removes an entry's newest version, a version a release or a
-							scheduled change still needs, or anything under a legal hold. Turning history off keeps what is stored.
+							scheduled change still needs, or anything under a legal hold. Turning history off does not delete stored versions.
 						</p>
 						{#if olderNote}
 							<Alert tone="brand">
-								Versions older than {READ_WINDOW_DAYS} days are kept, and reading them needs a license with the
+								Versions older than {READ_WINDOW_DAYS} days are kept. Reading them needs a license with the
 								{HISTORY_READ_FEATURE} feature.
 							</Alert>
 						{/if}
@@ -286,7 +286,7 @@
 						<SegmentedControl
 							id="activity-enabled"
 							label="Record who changed which entry"
-							hint="Kept apart from history. Activity can stay on while history is off."
+							hint="Activity is separate from history and can stay on while history is off."
 							options={ACTIVITY_OPTIONS}
 							disabled={isLocked('activity_enabled')}
 							error={fields.activity_enabled}
@@ -337,7 +337,7 @@
 				<GateNotice
 					gate={data.usage.ok ? { state: 'absent' } : data.usage.gate}
 					title="Content history storage"
-					absent="This engine does not report what content history stores."
+					absent="Storage figures need a newer version of the engine."
 				/>
 			{:else}
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="history-usage">
@@ -346,7 +346,7 @@
 						value={formatBytes(usage.stored_bytes)}
 						sub={saved === null ? undefined : `${formatPercent(saved)} less than full copies`}
 					/>
-					<Stat label="As full copies" value={formatBytes(usage.logical_bytes)} sub="What the same versions take whole" />
+					<Stat label="As full copies" value={formatBytes(usage.logical_bytes)} sub="Size if every version were stored in full" />
 					<Stat
 						label="Versions"
 						value={formatCount(usage.commits)}
@@ -355,7 +355,7 @@
 					<Stat
 						label="Earlier revisions"
 						value={formatCount(usage.legacy_rows)}
-						sub={`${formatBytes(usage.legacy_bytes)}, from before this storage. Retention removes them too.`}
+						sub={`${formatBytes(usage.legacy_bytes)}, stored in the older format. Retention removes them too.`}
 					/>
 				</div>
 			{/if}

@@ -127,15 +127,15 @@
 					// written for the operator. A 5xx can come from a proxy after the
 					// engine stored the file, so it names the file and claims nothing.
 					if (res.status >= 500) {
-						uploadError = `The engine did not confirm ${file.name}. Check the library, then try again in a moment.`;
+						uploadError = `Could not confirm that ${file.name} uploaded. Check the library before you try again.`;
 					} else {
-						uploadError = j.code && j.error ? j.error : `${file.name} was refused, so it was not stored.`;
+						uploadError = j.code && j.error ? j.error : `${file.name} was refused and was not uploaded.`;
 					}
 					break;
 				}
 				uploaded += 1;
 			} catch {
-				uploadError = 'Network error during upload';
+				uploadError = 'Could not upload the file. Check your connection and try again.';
 				break;
 			}
 		}
@@ -230,12 +230,12 @@
 			level={2}
 			gate={data.items.gate}
 			title="Media library"
-			absent="The media plugin does not run on this instance, so there is no library to show."
+			absent="The media library is not included in this build."
 		/>
 	{:else if items.length === 0 && data.q}
 		<EmptyState level={2} title="No files match" description="Clear the search to see the whole library." />
 	{:else if items.length === 0}
-		<EmptyState level={2} title="No files uploaded yet." description="Images, PDFs, video and audio.">
+		<EmptyState level={2} title="No files yet" description="Upload images, PDFs, video or audio.">
 			{#snippet iconSnippet()}
 				<Image size={ICON.lg} />
 			{/snippet}
@@ -267,7 +267,7 @@
 	{/if}
 </PageShell>
 
-<Drawer bind:open={importOpen} title="Import from URL" description="Copies a file from an http or https address into the library. Private and internal addresses are refused.">
+<Drawer bind:open={importOpen} title="Import from URL" description="Copy a file from an http or https address into the library. Private and internal addresses are refused.">
 	<form
 		method="POST"
 		action="?/importUrl"
@@ -282,7 +282,7 @@
 					importOpen = false;
 					importUrl = '';
 					importPublic = false;
-					toast.success('Imported into the library');
+					toast.success('File imported.');
 				}
 			};
 		}}

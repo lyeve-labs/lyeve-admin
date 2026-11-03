@@ -85,7 +85,7 @@ describe('what the page counts', () => {
 	it('says it counts both APIs', () => {
 		const { container } = render(AnalyticsPage, { props: props() });
 		const text = said(container);
-		expect(text).toContain('across the Content API and the Admin API');
+		expect(text).toContain('for the Content API and the Admin API');
 		expect(text).not.toContain('public API');
 	});
 });
@@ -128,19 +128,19 @@ describe('a read that failed', () => {
 	// called, and a failed anomaly read looked like a healthy one.
 	it('says the summary could not be read instead of drawing zeros', () => {
 		const { container } = render(AnalyticsPage, {
-			props: props({ summary: failed('The request summary could not be read.') }),
+			props: props({ summary: failed('Could not load the request summary.') }),
 		});
 		const text = said(container);
-		expect(text).toContain('The request summary could not be read.');
+		expect(text).toContain('Could not load the request summary.');
 		expect(text).not.toContain('Total requests');
 	});
 
 	it('does not report no anomalies when the anomaly read failed', () => {
 		const { container } = render(AnalyticsPage, {
-			props: props({ anomalies: failed('The anomalies could not be read.') }),
+			props: props({ anomalies: failed('Could not load anomalies.') }),
 		});
 		const text = said(container);
-		expect(text).toContain('The anomalies could not be read.');
+		expect(text).toContain('Could not load anomalies.');
 		expect(text).not.toContain('No anomalies detected');
 	});
 
@@ -149,7 +149,7 @@ describe('a read that failed', () => {
 			props: props({ endpoints: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		const text = said(container);
-		expect(text).toContain('did not answer');
+		expect(text).toContain('is unavailable');
 		expect(text).not.toContain('No endpoint data yet');
 	});
 
@@ -159,6 +159,6 @@ describe('a read that failed', () => {
 			props: props({ summary: absent, endpoints: absent, methods: absent, agents: absent, anomalies: absent }),
 		});
 		const text = said(container);
-		expect(text.split('not part of this build').length - 1).toBe(1);
+		expect(text.split('not included in this build').length - 1).toBe(1);
 	});
 });

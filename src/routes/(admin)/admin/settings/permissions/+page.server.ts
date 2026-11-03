@@ -14,12 +14,12 @@ import { gateOf, section, type Gate } from '$lib/api/gate';
 // Static text. The engine's own message can carry driver or upstream detail
 // that has no place in a page, and the operator's next step is the same
 // whatever the cause.
-const LOAD_FAILED = 'Permission rules could not be read from the engine. This is not a report that the instance has no rules.';
+const LOAD_FAILED = 'Could not load permission rules.';
 
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
-		error(403, 'Requires super_admin role');
+		error(403, 'Only a super admin can manage row-level permissions.');
 	}
 	const client = authedClient(event);
 	// The plugin states the role ceiling and how many roles already hold a
@@ -37,7 +37,7 @@ export const load: PageServerLoad = async (event) => {
 		const [permissions, schemas, flowRead] = await Promise.all([
 			listPermissions(client),
 			getSchemas(client),
-			section(listAllFlows(client), 'The flows could not be read.'),
+			section(listAllFlows(client), 'Could not load flows.'),
 		]);
 		const flows: FlowOption[] = flowRead.ok ? flowRead.value : [];
 		const flowsFailed = !flowRead.ok && flowRead.gate.state !== 'absent';
@@ -85,12 +85,12 @@ export const actions: Actions = {
 		// names the one that posted, so it shows in that drawer only.
 		const action = form.get('drawer') === 'role' ? 'role' : 'rule';
 		if (!role || !schemaName) {
-			return fail(422, { action, error: 'Role and resource are required' });
+			return fail(422, { action, error: action === 'role' ? 'Enter a role name.' : 'Choose a resource first.' });
 		}
 		// The engine's validator refuses activate on anything but a flow
 		// resource. Refusing it here keeps the message about the form.
 		if (actions.includes('activate') && !isFlowResource(schemaName)) {
-			return fail(422, { action, error: 'Activate applies to flows only' });
+			return fail(422, { action, error: 'Activate applies only to flows.' });
 		}
 
 		try {
@@ -110,7 +110,7 @@ export const actions: Actions = {
 			}
 			// Any other 402 is a license refusal, which the drawer renders with
 			// its numbers and its link rather than as the engine's sentence.
-			const failure = actionFailure(e, 'The rule could not be saved.');
+			const failure = actionFailure(e, 'Could not save the rule. Try again.');
 			return fail(failure.status, { ...failure.data, action });
 		}
 		return { success: true };
@@ -125,7 +125,7 @@ export const actions: Actions = {
 		try {
 			await deletePermission(id, client);
 		} catch (e: unknown) {
-			return fail(400, { action: 'delete', error: actionError(e, 'The rule could not be removed.') });
+			return fail(400, { action: 'delete', error: actionError(e, 'Could not remove the rule. Try again.') });
 		}
 		return { success: true };
 	},

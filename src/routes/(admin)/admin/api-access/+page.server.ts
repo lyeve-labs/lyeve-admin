@@ -20,12 +20,12 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const email = String(form.get('email') ?? '').trim();
 		const password = String(form.get('password') ?? '');
-		if (!email || !password) return fail(400, { tokenError: 'Enter the email and the password of the account.' });
+		if (!email || !password) return fail(400, { tokenError: 'Enter the account email and password.' });
 		try {
 			const r = await authedClient(event).post<{ token: string }>('/api/v1/auth/token', { email, password });
 			return { token: r.token };
 		} catch (err) {
-			return fail(400, { tokenError: actionError(err, 'The token could not be issued.') });
+			return fail(400, { tokenError: actionError(err, 'Could not create the token. Try again.') });
 		}
 	},
 };

@@ -42,7 +42,7 @@ describe('CommentsPanel', () => {
 
 	it('says a failed read failed, and offers no way to post into it', () => {
 		const { container } = render(CommentsPanel, { props: { threads: [], people, mentionable: people, unavailable: true } });
-		expect(container.textContent).toContain('Comments could not be read');
+		expect(container.textContent).toContain('Could not load comments');
 		expect(container.querySelector('form[action="?/comment"]')).toBeNull();
 	});
 

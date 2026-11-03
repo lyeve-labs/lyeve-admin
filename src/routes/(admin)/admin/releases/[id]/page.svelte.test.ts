@@ -128,19 +128,19 @@ describe('confirmed release actions', () => {
 	it('offers the two item actions as a segmented control', async () => {
 		const { getByRole } = setup({ choices: [] });
 		await fireEvent.click(getByRole('button', { name: /Include entry/ }));
-		const group = getByRole('radiogroup', { name: 'When the release goes out' });
+		const group = getByRole('radiogroup', { name: 'When the release publishes' });
 		expect(group.querySelectorAll('[role="radio"], input[type="radio"]').length).toBe(2);
 	});
 });
 
 describe('release drawers', () => {
 	it('keeps a failed delete out of the edit drawer', async () => {
-		const { getByRole, getByText, getAllByText } = setup({}, { action: 'delete', error: 'The release could not be deleted.' });
-		expect(getByText('The release could not be deleted.')).toBeTruthy();
+		const { getByRole, getByText, getAllByText } = setup({}, { action: 'delete', error: 'Could not delete the release. Try again.' });
+		expect(getByText('Could not delete the release. Try again.')).toBeTruthy();
 		await fireEvent.click(getByRole('button', { name: /Edit/ }));
-		expect(getAllByText('The release could not be deleted.')).toHaveLength(1);
+		expect(getAllByText('Could not delete the release. Try again.')).toHaveLength(1);
 		const drawerForm = document.querySelector('form#release-edit') as HTMLFormElement;
-		expect(drawerForm.textContent).not.toContain('The release could not be deleted.');
+		expect(drawerForm.textContent).not.toContain('Could not delete the release. Try again.');
 	});
 
 	it('shows a failed edit in the edit drawer and not in the include drawer', async () => {

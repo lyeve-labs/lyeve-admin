@@ -23,7 +23,7 @@ describe('AI prompt page', () => {
 		const { container, getByText } = setup();
 		expect((container.querySelector('textarea[name="body"]') as HTMLTextAreaElement).value).toBe('Summarize in three bullets.');
 		expect(getByText('Save as version 3')).toBeTruthy();
-		expect(getByText('Version 2 in force')).toBeTruthy();
+		expect(getByText('Using version 2')).toBeTruthy();
 	});
 
 	it('lists the versions with the shipped default as v0 and a restore on every one but the current', () => {
@@ -42,7 +42,7 @@ describe('AI prompt page', () => {
 
 	it('marks the shipped default current when nothing was saved', () => {
 		const { getByText, queryByLabelText, container } = setup({ prompt: fixtureDefaultPrompt });
-		expect(getByText('Shipped default in force')).toBeTruthy();
+		expect(getByText('Using the default prompt')).toBeTruthy();
 		expect(getByText('Save as version 1')).toBeTruthy();
 		expect(queryByLabelText('Make the shipped default current')).toBeNull();
 		expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
@@ -54,7 +54,7 @@ describe('AI prompt page', () => {
 		await waitFor(() => expect(region(saved.container)?.textContent).toContain('Saved as version 3.'));
 		cleanup();
 		const restored = setup({}, { scope: 'restore', version: 3, from: 1 });
-		await waitFor(() => expect(region(restored.container)?.textContent).toContain('Version 1 is current again, saved as version 3.'));
+		await waitFor(() => expect(region(restored.container)?.textContent).toContain('Version 1 restored as version 3.'));
 	});
 
 	// A reload that hands back the same text in force is not a new version.

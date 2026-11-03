@@ -8,14 +8,14 @@ import { sessionToken } from '$lib/server/session-cookie';
 import { actionError } from '$lib/server/action-error';
 import { forbiddenText } from '$lib/api/gate';
 
-const RENEW_FAILED = 'The license could not be applied. The current license is unchanged.';
+const RENEW_FAILED = 'Could not apply the license. The current license is unchanged.';
 
 /**
  * A failure nobody worded, or an answer that never came, does not say
  * whether the engine stored the key: it may still verify and store it after
  * the admin stops waiting.
  */
-const RENEW_UNCONFIRMED = 'The engine did not confirm the license. Reload to see which license is in force.';
+const RENEW_UNCONFIRMED = 'Could not confirm the license. Reload the page to see which license is active.';
 
 /**
  * How long a renewal may take. The engine may spend up to 15 seconds asking
@@ -31,11 +31,11 @@ const RENEW_TIMEOUT_MS = 45_000;
  */
 const EXCHANGE_FAILURES: Readonly<Record<string, string>> = {
 	'the license server could not be reached':
-		'The license server could not be reached, so the key was not checked. The current license is unchanged. Try again in a moment.',
+		'Could not reach the license server, so the key was not checked. The current license is unchanged. Try again in a moment.',
 	'the license server returned a token that does not verify':
-		'The license server answered with a token this instance cannot verify. The current license is unchanged. Applying the same key again gives the same answer.',
+		'The license server returned a token that could not be verified. The current license is unchanged. Trying the same key again fails the same way.',
 	'license key exchange is not configured on this instance':
-		'This instance does not exchange keys with the license server, so paste the license token instead. The current license is unchanged.',
+		'This instance cannot exchange a key with the license server. Paste the license token instead. The current license is unchanged.',
 };
 
 /** Roles the engine gives the entitlements to. Nobody else has a license to read. */
@@ -53,7 +53,7 @@ export const load: PageServerLoad = async (event) => {
 
 	// A build that links no license module has no license to show, so the page
 	// is not there. An engine that does not say keeps the page.
-	if (entitlements?.license_module === false) error(404, 'No page has that address.');
+	if (entitlements?.license_module === false) error(404, 'This page does not exist.');
 
 	return { entitlements };
 };
@@ -78,7 +78,7 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const licenseKey = data.get('license_key')?.toString()?.trim();
-		if (!licenseKey) return fail(400, { error: 'License key is required' });
+		if (!licenseKey) return fail(400, { error: 'Enter a license token or key.' });
 
 		const client = authedClient(event);
 		try {

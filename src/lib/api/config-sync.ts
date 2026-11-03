@@ -149,17 +149,17 @@ export function parseBundle(text: string): { bundle: ConfigBundle } | { error: s
 	try {
 		raw = JSON.parse(text);
 	} catch {
-		return { error: 'The file is not JSON. Choose the bundle an export downloaded.' };
+		return { error: 'The file is not JSON. Choose a bundle you downloaded from an export.' };
 	}
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
 		return { error: 'The file is not a configuration bundle.' };
 	}
 	const b = raw as Partial<ConfigBundle>;
 	if (b.format !== BUNDLE_FORMAT) {
-		return { error: 'The file is not a configuration bundle. A content type export goes through the Schema builder instead.' };
+		return { error: 'The file is not a configuration bundle. To import a content type export, use the Schema builder.' };
 	}
 	if (!b.sections || typeof b.sections !== 'object') {
-		return { error: 'The bundle names no sections.' };
+		return { error: 'The bundle has no sections.' };
 	}
 	return { bundle: raw as ConfigBundle };
 }

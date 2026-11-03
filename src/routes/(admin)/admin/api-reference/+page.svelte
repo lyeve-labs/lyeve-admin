@@ -187,10 +187,10 @@
 <PageShell
 	title="API reference"
 	description={data.source === 'engine'
-		? `${data.half === 'admin' ? 'The /api/admin routes, for super admins' : 'The content API, auth and every route outside /api/admin'}, read from the engine's OpenAPI document${data.collections ? `, with ${data.collections} collections behind the content API` : ''}.`
+		? `Browse ${data.half === 'admin' ? 'the /api/admin routes, for super admins' : 'the content API, auth and every route outside /api/admin'}, from the engine's OpenAPI document${data.collections ? `, including ${data.collections} collections in the content API` : ''}.`
 		: data.half === 'admin'
-			? 'The /api/admin routes, for super admins.'
-			: 'The content API, auth and every route outside /api/admin.'}
+			? 'Browse the /api/admin routes, for super admins.'
+			: 'Browse the content API, auth and every route outside /api/admin.'}
 	fill
 >
 	{#snippet actions()}
@@ -283,9 +283,9 @@
 
 				{#if data.source === 'catalog'}
 					<Alert tone="warn" title="Showing the built-in catalog">
-						The engine's OpenAPI document could not be read, so this is the reference as
-						written into the admin, not the routes the engine is serving right now. Reload
-						once the engine answers.
+						Could not load the engine's OpenAPI document, so this is the reference built into
+						the admin, not the routes the engine serves right now. Reload the page to try
+						again.
 					</Alert>
 				{/if}
 
@@ -484,7 +484,7 @@
 											<div>
 												<p class="mb-1.5 text-xs font-medium text-faint">
 													Request
-													<span class="font-normal text-faint"> - paste and fill the placeholders</span>
+													<span class="font-normal text-faint"> (paste it, then fill in the placeholders)</span>
 												</p>
 												<div class="group/code relative">
 													<pre class="overflow-x-auto rounded-lg border border-line bg-ink p-3 font-mono text-xs leading-relaxed text-fg">{preview}</pre>
@@ -554,20 +554,20 @@
 				value={ep.path}
 				hint={missing.length > 0
 					? `Replace ${missing.map((m) => `{${m}}`).join(', ')} with real values before sending.`
-					: 'Sent to this instance, as the account you are signed in as.'}
+					: 'The request goes to this instance, signed in as you.'}
 			/>
 
 			{#if write}
 				{#if data.canSeeAdmin}
 					<Checkbox
 						name="acknowledge"
-						label={`I mean to send this ${method} against this instance, and it will change data here.`}
+						label={`I understand this ${method} changes data on this instance.`}
 					/>
 					<Textarea id="try-body-{key}" name="body" label="Body" rows={3} />
 				{:else}
 					<p class="text-xs text-faint">
-						Sending a {method} from this page is a super admin's. The curl line below is the
-						whole request.
+						Only a super admin can send a {method} from this page. The curl line below is the
+						complete request.
 					</p>
 				{/if}
 			{/if}

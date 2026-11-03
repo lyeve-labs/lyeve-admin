@@ -250,9 +250,9 @@ describe('rate-limits rule edits, deletes and protection resets', () => {
 		api.updateRule.mockRejectedValue(outage);
 		api.deleteRule.mockRejectedValue(outage);
 		api.resetProtection.mockRejectedValue(outage);
-		expect(await actions.update(formEvent(RULE))).toMatchObject({ data: { error: 'The rule could not be saved.' } });
-		expect(await actions.delete(formEvent({ id: 'r1' }))).toMatchObject({ data: { error: 'The rule could not be removed.' } });
-		expect(await actions.resetProtection(formEvent({ name: 'x' }))).toMatchObject({ data: { error: 'The protection could not be reset.' } });
+		expect(await actions.update(formEvent(RULE))).toMatchObject({ data: { error: 'Could not save the rule. Try again.' } });
+		expect(await actions.delete(formEvent({ id: 'r1' }))).toMatchObject({ data: { error: 'Could not delete the rule. Try again.' } });
+		expect(await actions.resetProtection(formEvent({ name: 'x' }))).toMatchObject({ data: { error: 'Could not reset the protection. Try again.' } });
 	});
 
 	it('holds a rule edit and delete to an admin and a protection reset to a super admin', async () => {

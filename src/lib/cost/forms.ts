@@ -42,26 +42,26 @@ export function lastDay(periodEnd: string): string {
  */
 export function parseBudget(form: FormData): { budget: BudgetInput } | { error: string } {
 	const name = String(form.get('name') ?? '').trim();
-	if (!name) return { error: 'The budget needs a name.' };
+	if (!name) return { error: 'Enter a name.' };
 	const amount = String(form.get('amount') ?? '').trim();
-	if (!DECIMAL.test(amount)) return { error: 'The amount is a decimal number, such as 250 or 99.50.' };
+	if (!DECIMAL.test(amount)) return { error: 'Enter the amount as a number, such as 250 or 99.50.' };
 	const period = form.get('period');
-	if (!isBudgetPeriod(period)) return { error: 'Pick a period: monthly, quarterly or annual.' };
+	if (!isBudgetPeriod(period)) return { error: 'Choose monthly, quarterly or annual.' };
 	const resourceRaw = String(form.get('resource_type') ?? '').trim();
 	const resource_type: ResourceType | null = resourceRaw ? (isResourceType(resourceRaw) ? resourceRaw : null) : null;
-	if (resourceRaw && !resource_type) return { error: 'Pick a resource type, or leave it for every resource.' };
+	if (resourceRaw && !resource_type) return { error: 'Choose a resource type, or leave it empty for every resource.' };
 	const currency = String(form.get('currency') ?? '').trim().toUpperCase() || 'USD';
 	const thresholdsRaw = String(form.get('alert_thresholds') ?? '').trim();
 	const alert_thresholds = thresholdsRaw
 		? thresholdsRaw.split(',').map((t) => Number(t.trim()))
 		: [50, 80, 100];
 	if (alert_thresholds.some((t) => !Number.isInteger(t) || t <= 0 || t > 1000)) {
-		return { error: 'Alert thresholds are whole percentages, comma separated, such as 50, 80, 100.' };
+		return { error: 'Enter whole percentages separated by commas, such as 50, 80, 100.' };
 	}
 	const period_start = dayStart(String(form.get('period_start') ?? ''));
 	const period_end = dayAfter(String(form.get('period_end') ?? ''));
-	if (!period_start || !period_end) return { error: 'Pick the first and last day of the budget window.' };
-	if (period_end <= period_start) return { error: 'The window ends before it starts.' };
+	if (!period_start || !period_end) return { error: 'Choose the first and last day of the budget window.' };
+	if (period_end <= period_start) return { error: 'Choose an end date after the start date.' };
 	return {
 		budget: { name, resource_type, period, amount, currency, alert_thresholds, period_start, period_end },
 	};
@@ -72,11 +72,11 @@ export function parsePrice(
 	form: FormData,
 ): { resourceType: ResourceType; price: PriceInput } | { error: string } {
 	const resourceType = form.get('resource_type');
-	if (!isResourceType(resourceType)) return { error: 'Pick a resource type.' };
+	if (!isResourceType(resourceType)) return { error: 'Choose a resource type.' };
 	const unit_price = String(form.get('unit_price') ?? '').trim();
-	if (!DECIMAL.test(unit_price)) return { error: 'The unit price is a decimal number, such as 0.09.' };
+	if (!DECIMAL.test(unit_price)) return { error: 'Enter the unit price as a number, such as 0.09.' };
 	const per_units = Number(String(form.get('per_units') ?? '').trim());
-	if (!Number.isInteger(per_units) || per_units < 1) return { error: 'The block is a whole number of units, at least 1.' };
+	if (!Number.isInteger(per_units) || per_units < 1) return { error: 'Enter the block size as a whole number of units, at least 1.' };
 	const currency = String(form.get('currency') ?? '').trim().toUpperCase() || 'USD';
 	return { resourceType, price: { unit_price, per_units, currency } };
 }

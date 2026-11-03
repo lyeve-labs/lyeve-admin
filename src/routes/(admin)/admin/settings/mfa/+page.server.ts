@@ -24,8 +24,8 @@ function proofRefusal(err: unknown, byPasskey: boolean): { status: number; error
 	}
 	if (err.status === 422 && code === 'mfa.totp.current_code_invalid') {
 		return byPasskey
-			? { status: 400, error: 'The passkey did not confirm a second factor on this account. Try again, or enter a code instead.' }
-			: { status: 400, error: 'That code matches no second factor on this account.' };
+			? { status: 400, error: 'Could not confirm the passkey. Try again, or enter a code instead.' }
+			: { status: 400, error: 'That code does not match this account.' };
 	}
 	return undefined;
 }
@@ -45,7 +45,7 @@ export const load: PageServerLoad = async (event) => {
 		authedClient(event)
 			.get<{ enabled: boolean; has_passkeys?: boolean }>('/api/admin/mfa/status')
 			.then((s) => ({ enabled: s.enabled === true, hasPasskeys: s.has_passkeys === true })),
-		'The two-factor state of this account could not be read. This is not a report that it is off.'
+		'Could not load the two-factor status of your account.'
 	);
 	return { mfa };
 };
@@ -65,7 +65,7 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 404) {
 				return fail(404, { step: 'idle' as const, error: 'No passkey is registered on this account. Enter a code instead.' });
 			}
-			const failed = actionFailure(err, 'The passkey check could not be started.');
+			const failed = actionFailure(err, 'Could not start the passkey check. Try again.');
 			return fail(failed.status, { step: 'idle' as const, ...failed.data });
 		}
 	},
@@ -84,7 +84,7 @@ export const actions: Actions = {
 			try {
 				body = { proof_session_id: proofSessionId, assertion: JSON.parse(assertion) };
 			} catch {
-				return fail(400, { step: 'idle' as const, error: 'The passkey answer could not be read. Try again, or enter a code instead.' });
+				return fail(400, { step: 'idle' as const, error: 'Could not read the passkey response. Try again, or enter a code instead.' });
 			}
 		}
 		try {
@@ -93,7 +93,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const refused = proofRefusal(err, 'proof_session_id' in body);
 			if (refused) return fail(refused.status, { step: 'idle' as const, error: refused.error });
-			const failed = actionFailure(err, 'The authenticator key could not be generated.');
+			const failed = actionFailure(err, 'Could not create the authenticator key. Try again.');
 			return fail(failed.status, { step: 'idle' as const, ...failed.data });
 		}
 	},
@@ -117,7 +117,7 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 409 && (err.body as { code?: unknown } | undefined)?.code === 'mfa.totp.setup_unproven') {
 				return fail(409, { step: 'idle' as const, error: 'This setup started before the account had a second factor. Start the setup again.' });
 			}
-			const failed = actionFailure(err, 'The code could not be checked.');
+			const failed = actionFailure(err, 'Could not check the code. Try again.');
 			return fail(failed.status, { step: 'confirming' as const, uri, secret, ...failed.data });
 		}
 	},
@@ -133,9 +133,9 @@ export const actions: Actions = {
 			// The plugin answers 400 when no authenticator app is set up, which
 			// on an account with a passkey the status could not say.
 			if (err instanceof ApiError && err.status === 400 && /not enabled/i.test(err.message)) {
-				return fail(400, { step: 'idle' as const, error: 'No authenticator app is set up on this account, so there is nothing to turn off.' });
+				return fail(400, { step: 'idle' as const, error: 'No authenticator app is set up on this account.' });
 			}
-			const failed = actionFailure(err, 'Two-factor authentication could not be turned off.');
+			const failed = actionFailure(err, 'Could not turn off two-factor authentication. Try again.');
 			return fail(failed.status, { step: 'idle' as const, ...failed.data });
 		}
 	},

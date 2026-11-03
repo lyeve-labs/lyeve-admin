@@ -93,7 +93,7 @@ describe('audit-log prune posts to a prefix the engine mounts', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 			request: { formData: async () => form },
 		} as never)) as { data: { error: string } };
-		expect(out.data.error).toBe('The audit log could not be pruned.');
+		expect(out.data.error).toBe('Could not prune the audit log. Try again.');
 	});
 
 	it('exposes no export as an action', () => {

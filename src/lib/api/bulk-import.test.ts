@@ -49,7 +49,7 @@ describe('what actually happened', () => {
 		const nothing = job({ errored_rows: 100, inserted_rows: 0, updated_rows: 0 });
 		expect(outcome(nothing)).toBe('nothing');
 		expect(outcomeTone('nothing')).toBe('danger');
-		expect(OUTCOME_LABELS.nothing).toContain('imported nothing');
+		expect(OUTCOME_LABELS.nothing).toContain('nothing imported');
 	});
 
 	it('does not judge a job that has not finished', () => {
@@ -109,7 +109,7 @@ describe('the gate', () => {
 
 	it('never reports a failed read as no imports having run', () => {
 		const gate = importGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that none have run');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load imports.');
 	});
 });
 
@@ -203,7 +203,7 @@ describe('a refused import call', () => {
 	it('says it in its own words when a refusal carries no code', async () => {
 		const err = await refusal(413, { error: 'client intended to send too large body' });
 		expect(err.message).toBe('The file is larger than the 50 MB an import takes. Split it and import the parts.');
-		expect((await refusal(400, { error: 'bad request from upstream' })).message).toBe('The engine refused the request.');
+		expect((await refusal(400, { error: 'bad request from upstream' })).message).toBe('The request was refused.');
 	});
 
 	// The engine's 413 names the route's request limit, the base64 encoding
@@ -219,14 +219,14 @@ describe('a refused import call', () => {
 	it('keeps the body of an outage off the page and says the engine did not answer', async () => {
 		const err = await refusal(503, { error: 'dial tcp 10.0.0.4:5432: connection refused' });
 		expect(err.message).not.toContain('10.0.0.4');
-		expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+		expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
 	});
 
 	// The engine answers a start once it has stored the job and imports the
 	// rows after that, so its own 5xx means no job was made. A proxy's 502 or
 	// 504 can arrive after the job was made, so it claims only what is known.
 	describe('on a start', () => {
-		const UNCONFIRMED = 'The engine did not confirm the import. Check the entries before trying again.';
+		const UNCONFIRMED = 'Could not confirm whether the import started. Check the entries before you try again.';
 		async function started(res: Response): Promise<ApiError> {
 			try {
 				await startImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv', content_type: 'posts', field_mappings: [], mode: 'insert' } as never);
@@ -245,18 +245,18 @@ describe('a refused import call', () => {
 
 		it('says nothing was imported when the engine itself answered the 5xx', async () => {
 			const err = await started(new Response(JSON.stringify({ error: 'failed to create import job', code: 'service_unavailable' }), { status: 503 }));
-			expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+			expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
 		});
 	});
 
 	it('says nothing was imported by a preview, which imports nothing, whoever answered', async () => {
 		const res = new Response('<html>504 Gateway Time-out</html>', { status: 504 });
 		const err = (await previewImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv' }).catch((e: unknown) => e)) as ApiError;
-		expect(err.message).toBe('The engine or its database did not answer. Nothing was imported. Try again in a moment.');
+		expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
 	});
 
 	it('keeps the body of any other engine failure off the page', async () => {
 		const err = await refusal(500, { error: 'pq: relation "import_jobs" does not exist' });
-		expect(err.message).toBe('The engine could not finish the request. Nothing was imported.');
+		expect(err.message).toBe('Could not complete the request. Nothing was imported. Try again.');
 	});
 });

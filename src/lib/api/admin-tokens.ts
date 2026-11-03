@@ -349,7 +349,7 @@ export function describeRefusal(status: number, message: string, step: 'password
 		return step === 'mfa_code' || /mfa/i.test(msg)
 			? { error: 'Too many wrong codes. Wait a few minutes, then try again.', fields: {} }
 			: {
-					error: 'Too many wrong passwords. This account is locked for a few minutes, sign-in included. Try again later.',
+					error: 'Too many wrong passwords. Your account is locked for a few minutes, and you cannot sign in until it unlocks.',
 					fields: {},
 				};
 	}
@@ -386,10 +386,10 @@ export function describeRefusal(status: number, message: string, step: 'password
 		if (/^name/.test(msg)) return { error: CHECK_FIELDS, fields: { name: 'Name the token, in at most 255 characters.' } };
 		if (/^grants/.test(msg)) return { error: CHECK_FIELDS, fields: { grants: 'Choose at least one grant from the list.' } };
 		if (/^tenant_id/.test(msg)) return { error: CHECK_FIELDS, fields: { tenant_id: 'Choose a tenant from the list.' } };
-		return { error: msg || 'The token could not be issued.', fields: {} };
+		return { error: msg || 'Could not issue the token.', fields: {} };
 	}
 	if (status === 409) return { error: msg || 'This token can no longer be rotated.', fields: {} };
 	if (status === 404) return { error: 'This token no longer exists. Reload the list.', fields: {} };
-	if (status === 503) return { error: 'The database is unavailable. Try again in a moment.', fields: {} };
-	return { error: 'The token could not be issued. Try again.', fields: {} };
+	if (status === 503) return { error: 'The engine is unavailable. Nothing was changed. Try again in a moment.', fields: {} };
+	return { error: 'Could not issue the token. Try again.', fields: {} };
 }

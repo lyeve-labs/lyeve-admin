@@ -82,7 +82,7 @@
 	const mfaEnabled = $derived(data.mfa.ok && data.mfa.value.enabled);
 	const hasPasskeys = $derived(data.mfa.ok && data.mfa.value.hasPasskeys);
 	const description = $derived(
-		!data.mfa.ok ? 'The state of this account could not be read.' : mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'
+		!data.mfa.ok ? 'Could not load the two-factor status.' : mfaEnabled ? 'Enabled on this account.' : 'Not enabled on this account.'
 	);
 </script>
 
@@ -119,7 +119,7 @@
 				<input type="hidden" name="proof_session_id" value={proofSessionId} />
 				<input type="hidden" name="assertion" value={assertion} />
 				<p class="text-fg text-sm">
-					Confirm it is you with one of this account's passkeys. The authenticator app setup starts once the passkey answers.
+					Confirm it is you with one of this account's passkeys. The authenticator app setup starts after that.
 				</p>
 				{#if passkeyError}
 					<Alert tone="danger">{passkeyError}</Alert>
@@ -181,11 +181,10 @@
 			</form>
 		</Card>
 	{:else if !data.mfa.ok}
-		<GateNotice level={2} gate={data.mfa.gate} title="Two-factor authentication" absent="This engine does not serve two-factor authentication." />
+		<GateNotice level={2} gate={data.mfa.gate} title="Two-factor authentication" absent="Two-factor authentication is not included in this build." />
 	{:else if hasPasskeys}
 		<Alert tone="success" title="Two-factor authentication is on">
-			This account has a passkey, so signing in takes a second factor. While a passkey is registered the engine does
-			not report whether an authenticator app is also set up.
+			This account has a passkey, so signing in takes a second factor. While a passkey is registered, this page cannot show whether an authenticator app is also set up.
 		</Alert>
 		<Card>
 			<div class="flex flex-col gap-4">
@@ -202,7 +201,7 @@
 					<Input
 						id="replace-code"
 						name="code"
-						label="Or a code"
+						label="Or enter a code"
 						hint="A current code from an authenticator app already set up, or a backup code."
 						bind:value={replaceCode}
 						autocomplete="one-time-code"

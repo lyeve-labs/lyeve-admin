@@ -7,14 +7,14 @@ afterEach(cleanup);
 
 describe('Magic link request page', () => {
 	it('asks for the address to send the link to', () => {
-		const { container, getByRole } = render(MagicLinkPage, { props: { form: null, data: { carried: '' } } as never });
+		const { container, getByRole } = render(MagicLinkPage, { props: { form: null, data: { organization: true, carried: '' } } as never });
 
 		expect((container.querySelector('#email') as HTMLInputElement).type).toBe('email');
 		expect(getByRole('button', { name: /email me a link/i })).toBeTruthy();
 	});
 
 	it('confirms without saying whether the address has an account, and reads it out', async () => {
-		const { container, findByText } = render(MagicLinkPage, { props: { form: { sent: true, email: 'a@b.co' }, data: { carried: '' } } as never });
+		const { container, findByText } = render(MagicLinkPage, { props: { form: { sent: true, email: 'a@b.co' }, data: { organization: true, carried: '' } } as never });
 
 		const region = (await findByText(/If an account exists for a@b.co/)).closest('[aria-live="polite"]');
 		expect(region?.getAttribute('aria-atomic')).toBe('true');
@@ -23,7 +23,7 @@ describe('Magic link request page', () => {
 	});
 
 	it('offers an optional organization field that says when to fill it in', () => {
-		const { container } = render(MagicLinkPage, { props: { form: null, data: { carried: '' } } as never });
+		const { container } = render(MagicLinkPage, { props: { form: null, data: { organization: true, carried: '' } } as never });
 
 		const field = container.querySelector('#tenant') as HTMLInputElement;
 		expect(field.name).toBe('tenant');
@@ -32,16 +32,24 @@ describe('Magic link request page', () => {
 		expect(container.textContent).toContain("Leave this empty unless your organization's identity provider created your account.");
 	});
 
+	it('asks for no organization when the console is not set to', () => {
+		const { container } = render(MagicLinkPage, { props: { form: null, data: { organization: false, carried: '' } } as never });
+
+		expect(container.querySelector('[name="tenant"]')).toBeNull();
+		expect(container.textContent).not.toContain('Organization (optional)');
+		expect(container.querySelector('a[href="/login"]')).not.toBeNull();
+	});
+
 	it('keeps a refused organization in the field', () => {
 		const { container } = render(MagicLinkPage, {
-			props: { form: { error: 'x', email: 'a@b.co', tenant: 'acme corp' }, data: { carried: '' } } as never,
+			props: { form: { error: 'x', email: 'a@b.co', tenant: 'acme corp' }, data: { organization: true, carried: '' } } as never,
 		});
 
 		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('acme corp');
 	});
 
 	it('shows the organization its link named, in a field the reader sees', () => {
-		const { container } = render(MagicLinkPage, { props: { form: null, data: { carried: 'acme' } } as never });
+		const { container } = render(MagicLinkPage, { props: { form: null, data: { organization: true, carried: 'acme' } } as never });
 
 		const field = container.querySelector('#tenant') as HTMLInputElement;
 		expect(field.type).toBe('text');
@@ -53,7 +61,7 @@ describe('Magic link request page', () => {
 	});
 
 	it('submits what the field shows after the reader changes or clears it', async () => {
-		const { container } = render(MagicLinkPage, { props: { form: null, data: { carried: 'acme' } } as never });
+		const { container } = render(MagicLinkPage, { props: { form: null, data: { organization: true, carried: 'acme' } } as never });
 		const field = container.querySelector('#tenant') as HTMLInputElement;
 		const posted = () => new FormData(field.form as HTMLFormElement).get('tenant');
 
@@ -65,7 +73,7 @@ describe('Magic link request page', () => {
 	});
 
 	it('keeps an organization the reader cleared when the form comes back refused', () => {
-		const { container } = render(MagicLinkPage, { props: { form: { error: 'x', tenant: '' }, data: { carried: 'acme' } } as never });
+		const { container } = render(MagicLinkPage, { props: { form: { error: 'x', tenant: '' }, data: { organization: true, carried: 'acme' } } as never });
 
 		expect((container.querySelector('#tenant') as HTMLInputElement).value).toBe('');
 	});

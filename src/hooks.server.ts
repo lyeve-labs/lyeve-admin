@@ -10,7 +10,7 @@ import {
 	signEngineRequest
 } from '$lib/server/engine';
 import { relayEngineCookies } from '$lib/server/engine-cookies';
-import { sessionToken } from '$lib/server/session-cookie';
+import { ensureCsrfCookie, sessionToken } from '$lib/server/session-cookie';
 import { refreshSession } from '$lib/server/session-refresh';
 
 // A production server that cannot reach the Content API refuses to start.
@@ -44,6 +44,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		redirect(303, target);
 	}
 	await refreshSession(event);
+	// After the renewal, so a CSRF cookie the engine answered with it is kept.
+	ensureCsrfCookie(event);
 
 	const response = withMutableHeaders(await resolve(event));
 	response.headers.set('X-Frame-Options', 'DENY');

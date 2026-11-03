@@ -77,7 +77,7 @@ describe('the delivery history drawer', () => {
 
 	it('says so when the webhook has made no attempt', () => {
 		render(DeliveriesDrawer, { props: { form: { deliveries: { id: 'w1', items: [] } }, history: named() } });
-		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('No deliveries recorded yet');
+		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('No deliveries yet');
 	});
 });
 
@@ -138,9 +138,9 @@ describe('the history and its own failures', () => {
 	// attempts are not listed rather than passing for the whole history.
 	it('says when the newest attempts fill the list', () => {
 		render(DeliveriesDrawer, { props: { form: listed(3, 3), history: named() } });
-		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('The newest 3 attempts.');
+		expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('Showing the newest 3 attempts.');
 		cleanup();
 		render(DeliveriesDrawer, { props: { form: listed(2, 3), history: named() } });
-		expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain('The newest');
+		expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain('Showing the newest');
 	});
 });

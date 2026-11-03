@@ -50,9 +50,9 @@ describe('providers', () => {
 		const { container } = render(CachePage, {
 			props: props({ inactive: [{ name: 'redis-1', kind: 'redis', priority: 1, reason: 'provider_limit' }] }),
 		});
-		expect(screen.getByTestId('provider-tier').textContent).toContain('runs one provider');
+		expect(screen.getByTestId('provider-tier').textContent).toContain('Only one provider runs on this install');
 		expect(said(container)).toContain('redis-1');
-		expect(said(container)).toContain('Left out: this install runs one provider');
+		expect(said(container)).toContain('Not running. Only one provider runs unless your license includes failover');
 	});
 
 	it('says every provider runs with failover when the install is licensed for it', () => {
@@ -64,7 +64,7 @@ describe('providers', () => {
 		const { container } = render(CachePage, {
 			props: props({ inactive: [{ name: 'redis-0', kind: 'redis', priority: 0, reason: 'networked_unavailable' }] }),
 		});
-		expect(said(container)).toContain('does not run networked cache providers');
+		expect(said(container)).toContain('Networked cache providers are not available on this instance');
 	});
 });
 
@@ -83,7 +83,7 @@ describe('response cache rules', () => {
 			}),
 		});
 		expect(said(container)).toContain('10 of 10 rules');
-		expect(said(container)).toContain('Every rule this install allows is in use');
+		expect(said(container)).toContain('All available rules are in use');
 	});
 
 	it('shows the count alone when the install holds no ceiling', () => {
@@ -100,7 +100,7 @@ describe('response cache rules', () => {
 		const { container } = render(CachePage, {
 			props: props({ rules: { gate: { state: 'ok' }, rows: [], licensed: false, limit: { limit: 10, current: 0 } } }),
 		});
-		expect(said(container)).toContain('No response is cached by rule');
+		expect(said(container)).toContain('No response cache rules yet');
 		expect(said(container)).toContain('0 of 10 rules');
 	});
 
@@ -109,14 +109,14 @@ describe('response cache rules', () => {
 			props: props({ rules: { gate: { state: 'error', message: 'The rules could not be read.' }, rows: [], licensed: null } }),
 		});
 		expect(said(container)).toContain('The rules could not be read.');
-		expect(said(container)).not.toContain('No response is cached by rule');
+		expect(said(container)).not.toContain('No response cache rules yet');
 	});
 
 	it('renders a ceiling refusal from the action through the refusal notice', () => {
 		render(CachePage, {
 			props: props({}, { error: 'x', refused: { kind: 'cap', cap: 'example.rules', limit: 10, current: 10, upgradeUrl: '' } }),
 		});
-		expect(screen.getAllByTestId('refusal-notice')[0].textContent).toContain('10 of 10 rules are in use');
+		expect(screen.getAllByTestId('refusal-notice')[0].textContent).toContain("You're using 10 of 10 rules");
 	});
 
 	it('offers purge by rule, by tag and for everything', () => {
@@ -135,7 +135,7 @@ describe('response cache rules', () => {
 		const button = screen.getByRole('button', { name: /New rule/ }) as HTMLButtonElement;
 		expect(button.disabled).toBe(true);
 		expect(button.getAttribute('aria-describedby')).toBe('rules-full');
-		expect(document.getElementById('rules-full')?.textContent).toContain('Every rule this install allows is in use');
+		expect(document.getElementById('rules-full')?.textContent).toContain('All available rules are in use');
 	});
 
 	it('leaves New rule live below the ceiling', () => {
@@ -151,7 +151,7 @@ describe('flush', () => {
 		const { container } = render(CachePage, { props: props() });
 		expect(screen.getByRole('button', { name: "Flush this tenant's responses" })).toBeTruthy();
 		expect(said(container)).not.toContain('Flush the cache');
-		expect(said(container)).toContain('listed for super admins only');
+		expect(said(container)).toContain('Only super admins can see stored keys');
 	});
 
 	it('names the whole cache only where the session names no tenant', () => {
@@ -162,7 +162,7 @@ describe('flush', () => {
 	it("says the stored list is this tenant's while the counters are every tenant's", () => {
 		const entry = { key: 'resp:acme:1', size: 10, expires_at: '2026-09-23T12:00:00Z', created_at: '2026-09-23T11:00:00Z', ttl_mode: 'fixed', tags: null };
 		const { container } = render(CachePage, { props: props({ superAdmin: true, entries: [entry], total: 1 }) });
-		expect(said(container)).toContain("Only this tenant's keys are listed. The counters above count every tenant.");
+		expect(said(container)).toContain("Only this tenant's keys are listed. The counters above include every tenant.");
 	});
 });
 
@@ -179,10 +179,10 @@ describe('stored entries', () => {
 			props: props({
 				superAdmin: true,
 				stats: { hits: 1, misses: 1, sets: 0, deletes: 0, flushes: 0, evictions: 0, entries: 4200, max_size: 0 },
-				entriesGate: { state: 'error', message: 'The stored entries could not be read. This is not a report that nothing is cached.' },
+				entriesGate: { state: 'error', message: 'Could not load stored entries.' },
 			}),
 		});
-		expect(said(container)).toContain('The stored entries could not be read.');
+		expect(said(container)).toContain('Could not load stored entries.');
 		expect(said(container)).not.toContain('Nothing is cached');
 	});
 
@@ -196,7 +196,7 @@ describe('stored entries', () => {
 				unlisted: true,
 			}),
 		});
-		expect(said(container)).toContain('This cache provider does not list its entries');
+		expect(said(container)).toContain('This cache provider cannot list its entries');
 		expect(said(container)).not.toContain('Nothing is cached');
 	});
 
@@ -205,7 +205,7 @@ describe('stored entries', () => {
 			props: props({ providers: [], providersRead: false, providersGate: { state: 'forbidden' } }),
 		});
 		expect(said(container)).toContain('Your role cannot open the providers');
-		expect(said(container)).not.toContain('No provider is configured');
+		expect(said(container)).not.toContain('No providers configured');
 	});
 });
 
@@ -222,10 +222,10 @@ describe('a failed rule save', () => {
 	// A failed delete, purge, flush or circuit reset belongs to the page. Read
 	// by the drawer, it greeted the next New rule as that rule's failure.
 	it('keeps a failure from a row out of the drawer', async () => {
-		const { container } = render(CachePage, { props: props({}, { error: 'The rule could not be deleted.' }) });
-		expect(said(container)).toContain('The rule could not be deleted.');
+		const { container } = render(CachePage, { props: props({}, { error: 'Could not delete the rule. Try again.' }) });
+		expect(said(container)).toContain('Could not delete the rule. Try again.');
 		await fireEvent.click(screen.getAllByRole('button', { name: /New rule/ })[0]);
 		const form = document.querySelector('#cache-rule-form') as HTMLFormElement;
-		expect(form.textContent).not.toContain('The rule could not be deleted.');
+		expect(form.textContent).not.toContain('Could not delete the rule. Try again.');
 	});
 });

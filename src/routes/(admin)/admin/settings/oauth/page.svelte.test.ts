@@ -46,8 +46,17 @@ describe('OAuth providers page', () => {
 	it('says the providers could not be read instead of inviting a first one', () => {
 		const { container, queryByRole } = setup({ ok: false, gate: { state: 'error', message: 'The OAuth providers could not be read.' } });
 		expect(container.textContent).toContain('The OAuth providers could not be read.');
-		expect(container.textContent).not.toContain('No OAuth providers configured');
+		expect(container.textContent).not.toContain('No OAuth providers yet');
 		expect(queryByRole('button', { name: 'New provider' })).toBeNull();
+	});
+
+	it('opens a new provider with Enabled off, and an edit with the provider\'s own value', async () => {
+		const { getByRole } = setup([provider('google')]);
+		const enabledField = () => document.body.querySelector<HTMLInputElement>('form#provider-form input[name="enabled"]')?.value;
+		await fireEvent.click(getByRole('button', { name: 'New provider' }));
+		expect(enabledField()).toBe('false');
+		await fireEvent.click(getByRole('button', { name: 'Edit google' }));
+		expect(enabledField()).toBe('true');
 	});
 
 	const drawerText = () => document.body.querySelector('form#provider-form')?.textContent ?? '';
@@ -55,15 +64,15 @@ describe('OAuth providers page', () => {
 	it('shows a refused save inside the open drawer', async () => {
 		const { getByRole, rerender } = setup([provider('google')]);
 		await fireEvent.click(getByRole('button', { name: 'New provider' }));
-		await rerender({ data: { providers: { ok: true, value: [provider('google')] } }, form: { action: 'create', error: 'The provider could not be created.' } } as never);
-		expect(drawerText()).toContain('The provider could not be created.');
+		await rerender({ data: { providers: { ok: true, value: [provider('google')] } }, form: { action: 'create', error: 'Could not create the provider. Try again.' } } as never);
+		expect(drawerText()).toContain('Could not create the provider. Try again.');
 	});
 
 	it('leaves a newly opened drawer clean after a failed delete', async () => {
-		const { container, getByRole } = setup([provider('google')], { action: 'delete', error: 'The provider could not be deleted.' });
-		expect(container.textContent).toContain('The provider could not be deleted.');
+		const { container, getByRole } = setup([provider('google')], { action: 'delete', error: 'Could not delete the provider. Try again.' });
+		expect(container.textContent).toContain('Could not delete the provider. Try again.');
 		await fireEvent.click(getByRole('button', { name: 'New provider' }));
-		expect(drawerText()).not.toContain('could not be deleted');
+		expect(drawerText()).not.toContain('Could not delete');
 	});
 
 	it('shows a license refusal of a save in the drawer, not above the list', async () => {

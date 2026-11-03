@@ -23,14 +23,14 @@
 
 <PageShell
 	title="AI transcripts"
-	description="Every call from a route, a flow node, the editor assistant or another plugin, with what was asked and answered."
+	description="Review every AI request from routes, flow nodes, the editor assistant and other plugins, with the prompt and the reply."
 	width="wide"
 >
 	<AiSection level={2} tab="transcripts" gate={data.gate} layoutGate={data.aiLayoutGate} noun="transcripts">
 		{#if !data.aiSettings?.transcripts_enabled}
 			<p class="text-xs text-warn" role="status">
-				Transcript storage is off for this tenant, so nothing new is written here.
-				<a href="/admin/ai/settings" class="underline">Switch it on in settings.</a>
+				Transcript storage is off for this tenant. New requests are not recorded.
+				<a href="/admin/ai/settings" class="underline">Turn it on in settings.</a>
 			</p>
 		{/if}
 
@@ -41,7 +41,7 @@
 				{#snippet search()}
 					<div class="flex items-center gap-2">
 						<label for="f-subject-id" class="sr-only">Subject id</label>
-						<Input id="f-subject-id" name="subject_id" value={data.subjectId} placeholder="Subject id: the flow or entry id" class="min-w-0 flex-1" />
+						<Input id="f-subject-id" name="subject_id" value={data.subjectId} placeholder="Flow or entry id" class="min-w-0 flex-1" />
 						<Button variant="secondary" type="submit">
 							<Search size={ICON.sm} aria-hidden="true" /> Filter
 						</Button>
@@ -64,8 +64,8 @@
 				level={2}
 				title={filtered ? 'No transcripts match' : 'No transcripts yet'}
 				description={filtered
-					? 'Nothing recorded matches these filters.'
-					: 'A transcript is written for every call once a provider is configured and transcript storage is on.'}
+					? 'No transcripts match these filters.'
+					: 'Each AI request is recorded here once a provider is set up and transcript storage is on.'}
 			>
 				{#snippet iconSnippet()}
 					<MessagesSquare size={ICON.lg} />

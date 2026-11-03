@@ -172,6 +172,29 @@ describe('content editor load, the entry read', () => {
 		expect(unhandled).toEqual([]);
 	});
 
+	// The form shows and saves the schema's fields, which live in the body.
+	// Meta is kept beside them, so a meta key named like a field must not
+	// stand in for that field's value, or a save would copy it into the body.
+	it('fills the form from the body and never from meta', async () => {
+		const stored = {
+			...entry,
+			body: { contact: 'ada@example.com', summary: 'Hello' },
+			meta: { contact: 'from meta', seo_title: 'Home' },
+		};
+		const fetchFn = vi.fn(async (path: string) => {
+			if (path.includes('/revisions')) return json({ data: [] });
+			if (path.includes('/api/admin/content?')) return json({ data: [] });
+			return json(stored);
+		}) as unknown as typeof globalThis.fetch;
+		const out = (await load({
+			fetch: fetchFn,
+			cookies: mockCookies(),
+			params: { schema: 'article', id: 'e1' },
+			parent: async () => ({ plugins: none }),
+		} as never)) as { item: { data: Record<string, unknown> } };
+		expect(out.item.data).toEqual({ contact: 'ada@example.com', summary: 'Hello', title: 'One', _status: 'draft' });
+	});
+
 	it('answers 404 when the engine says the entry does not exist', async () => {
 		const thrown = await entryAnswering(404);
 		expect(isHttpError(thrown) && thrown.status).toBe(404);
@@ -379,7 +402,7 @@ describe('content editor save, many_to_many fields', () => {
 
 		const failure = await runSave(saveEvent(fn, { tags: ['t1'] }));
 
-		expect(failure?.data?.error).toBe('The entry was saved, but not every link was. In tags, 1 link could not be added.');
+		expect(failure?.data?.error).toBe('The entry was saved, but some links were not. In tags, 1 link could not be added.');
 	});
 
 	it('leaves a set that has not changed alone', async () => {

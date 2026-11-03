@@ -63,7 +63,7 @@ export const RETENTION_OK: RetentionGate = GATE_OK;
 
 /** What a refused retention read means, read the way every plugin's is. */
 export function retentionGate(err: unknown): RetentionGate {
-	return gateOf(err, 'The retention rules could not be read. This is not a report that nothing is being deleted.');
+	return gateOf(err, 'Could not load the retention rules.');
 }
 
 /** The largest page the plugin serves. */

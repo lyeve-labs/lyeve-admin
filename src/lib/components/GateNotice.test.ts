@@ -34,7 +34,7 @@ describe('GateNotice', () => {
 	it('states a ceiling with the numbers the refusal carried', () => {
 		const { container } = mount({ state: 'full', limit: 7, current: 7, upgradeUrl: '' });
 		expect(container.textContent).toContain('Cache is at its limit');
-		expect(container.textContent).toContain('7 of 7 are in use');
+		expect(container.textContent).toContain("You're using 7 of 7");
 	});
 
 	it('reports a failed read as a failure', () => {
@@ -56,7 +56,7 @@ describe('GateNotice for a role the engine refused', () => {
 
 	it('is not drawn as a failure', () => {
 		const { container } = mount({ state: 'forbidden' });
-		expect(container.textContent).not.toContain('could not be read');
+		expect(container.textContent).not.toContain('did not load');
 		expect(container.querySelector('.text-danger')).toBeNull();
 	});
 
@@ -93,7 +93,7 @@ describe('GateNotice with a heading-only title', () => {
 
 	it('names the subject in lower case inside the outage sentence', () => {
 		const { container } = named({ state: 'unavailable' });
-		expect(container.textContent).toContain('did not answer, so the schema list could not be read.');
+		expect(container.textContent).toContain('The engine is unavailable, so the schema list did not load.');
 	});
 
 	it('keeps the title as the heading', () => {
@@ -103,11 +103,11 @@ describe('GateNotice with a heading-only title', () => {
 });
 
 describe('GateNotice for a read nothing answered', () => {
-	it('says it is temporary, names what could not be read and that nothing changed', () => {
+	it('says it is temporary and names what did not load', () => {
 		const { container } = mount({ state: 'unavailable' });
 		expect(container.textContent).toContain('Temporarily unavailable');
 		expect(container.textContent).toContain(
-			'The engine or its database did not answer, so cache could not be read. Nothing was changed. Try again in a moment.',
+			'The engine is unavailable, so cache did not load. Try again in a moment.',
 		);
 	});
 
@@ -126,7 +126,7 @@ describe('GateNotice for a read the engine refused for the rate', () => {
 
 	it('is not drawn as an outage or a failure', () => {
 		const { container } = mount({ state: 'busy' });
-		expect(container.textContent).not.toContain('did not answer');
+		expect(container.textContent).not.toContain('did not load');
 		expect(container.querySelector('.text-danger')).toBeNull();
 	});
 });

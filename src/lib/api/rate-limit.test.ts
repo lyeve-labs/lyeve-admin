@@ -135,7 +135,7 @@ describe('the gate', () => {
 
 	it('never reports a failed read as nothing being limited', () => {
 		const gate = rateLimitGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that nothing is limited');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load the rate limit rules.');
 	});
 });
 

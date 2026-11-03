@@ -6,7 +6,7 @@
 	import { relativeTime } from '$lib/format';
 	import StepUpField from '$lib/components/admin-tokens/StepUpField.svelte';
 	import { expiresIn, rolesLabel, sessionLength, tenantLabel, type DeviceOutcome } from '$lib/device-login';
-	import { BUSY } from '$lib/outage';
+	import { BUSY, OUTAGE } from '$lib/outage';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -53,11 +53,11 @@
 	const outcomes: Record<string, { title: string; description: string }> = {
 		approved: {
 			title: 'Device signed in',
-			description: 'The device now holds a session as you. Return to it. You can close this page.',
+			description: 'The device is now signed in as you. Go back to it. You can close this page.',
 		},
 		denied: {
 			title: 'Sign-in denied',
-			description: 'The device was refused and holds no session. Nothing else changed.',
+			description: 'The device was not signed in.',
 		},
 		expired: {
 			title: 'This code has expired',
@@ -65,7 +65,7 @@
 		},
 		decided: {
 			title: 'Already decided',
-			description: 'This sign-in was approved or denied before. Start a new one on the device if you need to.',
+			description: 'Someone already approved or denied this sign-in. Start a new one on the device if you need to.',
 		},
 		unknown: {
 			title: 'No sign-in is waiting for this code',
@@ -73,7 +73,7 @@
 		},
 		forbidden: {
 			title: 'Only an admin can approve a device',
-			description: 'Your account does not hold the admin or super admin role, so it cannot approve a device sign-in.',
+			description: 'Approving a device sign-in needs the admin or super admin role.',
 		},
 	};
 
@@ -154,10 +154,7 @@
 		{:else if view === 'refused'}
 			<Alert tone="warn" title="Device sign-in is not available">{refusal}</Alert>
 		{:else if view === 'error'}
-			<Alert tone="danger" title="The engine did not answer">
-				The sign-in request could not be read, most likely because the database is unavailable. Try again in a
-				moment.
-			</Alert>
+			<Alert tone="danger" title={OUTAGE.title}>{OUTAGE.body}</Alert>
 			<Button href="/admin/device?code={encodeURIComponent(data.code)}" variant="secondary">Try again</Button>
 		{:else if view !== 'enter'}
 			{@const outcome = outcomes[view]}

@@ -81,7 +81,7 @@ export function parseLimits(data: FormData): { limits: KeyLimits } | { fields: R
 	const limits = { hourly_limit: 0, daily_limit: 0, monthly_limit: 0 };
 	for (const { field } of LIMIT_FIELDS) {
 		const n = parseLimit(String(data.get(field) ?? ''));
-		if (n === null) fields[field] = 'A whole number of requests, or 0 for no ceiling';
+		if (n === null) fields[field] = 'Enter a whole number of requests, or 0 for no limit';
 		else limits[field] = n;
 	}
 	if (Object.keys(fields).length) return { fields };
@@ -93,13 +93,13 @@ export function parseLimits(data: FormData): { limits: KeyLimits } | { fields: R
 /** A window whose ceiling sits above a longer window's, or null. */
 export function limitOrderProblem(l: KeyLimits): { field: keyof KeyLimits; message: string } | null {
 	if (l.hourly_limit > 0 && l.daily_limit > 0 && l.hourly_limit > l.daily_limit) {
-		return { field: 'hourly_limit', message: 'Above the daily limit, so it can never be reached' };
+		return { field: 'hourly_limit', message: 'Keep this at or below the daily limit, or it never takes effect' };
 	}
 	if (l.daily_limit > 0 && l.monthly_limit > 0 && l.daily_limit > l.monthly_limit) {
-		return { field: 'daily_limit', message: 'Above the monthly limit, so it can never be reached' };
+		return { field: 'daily_limit', message: 'Keep this at or below the monthly limit, or it never takes effect' };
 	}
 	if (l.hourly_limit > 0 && l.monthly_limit > 0 && l.hourly_limit > l.monthly_limit) {
-		return { field: 'hourly_limit', message: 'Above the monthly limit, so it can never be reached' };
+		return { field: 'hourly_limit', message: 'Keep this at or below the monthly limit, or it never takes effect' };
 	}
 	return null;
 }
@@ -206,7 +206,7 @@ export function keyExpiryProblem(roles: readonly string[], day: string, today: D
  */
 export function keyScopeProblem(roles: readonly string[], scopes: readonly string[]): string {
 	if (isPrivilegedKey(roles) || scopes.length > 0) return '';
-	return 'Choose at least one scope. A key without one is refused every route.';
+	return 'Choose at least one scope. A key without one cannot call any route.';
 }
 
 /** Roles the engine lets write content, beside the scope that names the write. */

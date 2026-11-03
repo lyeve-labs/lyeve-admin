@@ -76,7 +76,7 @@ export const load: PageServerLoad = async (event) => {
 	 * that may answer on a second try says so, so its readers can tell the
 	 * stock dashboard standing in from the one the tenant chose.
 	 */
-	const layoutRead = customization?.entitled ? await section(getDashboardLayout(client), 'The dashboard layout could not be read.') : null;
+	const layoutRead = customization?.entitled ? await section(getDashboardLayout(client), 'Could not load the dashboard layout.') : null;
 	const layout = layoutRead?.ok ? layoutRead.value : null;
 	const layoutUnread = layoutRead !== null && !layoutRead.ok && RETRYABLE.has(layoutRead.gate.state);
 	const stock = !layout?.custom;
@@ -136,7 +136,7 @@ export const load: PageServerLoad = async (event) => {
 	] = await Promise.all([
 		// Any signed-in reader may list the schemas.
 		offers.schema
-			? section(getSchemas(client), 'The schemas could not be read. This is not a report that there are none.')
+			? section(getSchemas(client), 'Could not load the schemas.')
 			: Promise.resolve(null),
 		ifAdmin(offers.content, () =>
 			client.get<ListEnvelope<RecentEntry>>(`/api/admin/content?limit=${RECENT}&offset=0`),
@@ -191,7 +191,7 @@ export const load: PageServerLoad = async (event) => {
 	// it that failed is kept, so the dashboard says the page is missing and why.
 	const homeSlug = customization?.entitled ? customization.settings.home_page : '';
 	const homeRead = homeSlug
-		? await section(getCustomPage(client, homeSlug), 'The home page chosen in customization could not be read.')
+		? await section(getCustomPage(client, homeSlug), 'Could not load the home page.')
 		: null;
 	const homePage = homeRead?.ok ? homeRead.value : null;
 	const homeBlocks = homePage ? await resolveBlocks(client, homePage.blocks) : [];
@@ -297,13 +297,13 @@ export const actions: Actions = {
 			// was read. Only the queue the reader confirmed is applied.
 			const queued = (await pendingMigrations(client)).items.map((item) => item.description);
 			if (JSON.stringify(queued) !== String(form.get('expected') ?? '')) {
-				return fail(409, { error: 'The queue changed since it was listed. Review it again.' });
+				return fail(409, { error: 'Someone changed the migration queue after you opened it. Review it again.' });
 			}
 			await applyMigrations(client);
 		} catch (err) {
 			// A migration that fails names the statement that failed, and that
 			// sentence is the whole value of the message.
-			return fail(400, { error: actionError(err, 'Migration failed') });
+			return fail(400, { error: actionError(err, 'Could not apply the migrations. Try again.') });
 		}
 
 		// Back where the reader was, with the shell's count read again on arrival.

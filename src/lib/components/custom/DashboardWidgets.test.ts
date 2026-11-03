@@ -25,11 +25,11 @@ describe('DashboardWidgets', () => {
 			{ id: 'd', type: 'media_usage', heading: 'Media', media: null },
 			{ id: 'e', type: 'api_usage', heading: 'API', api: null },
 		]);
-		expect(widget('Latest')).toContain('These entries could not be read.');
-		expect(widget('Statuses')).toContain('The counts could not be read.');
-		expect(widget('Activity')).toContain('The audit log could not be read.');
-		expect(widget('Media')).toContain('The media library could not be read.');
-		expect(widget('API')).toContain('API usage could not be read.');
+		expect(widget('Latest')).toContain('Could not load these entries.');
+		expect(widget('Statuses')).toContain('Could not load the counts.');
+		expect(widget('Activity')).toContain('Could not load the audit log.');
+		expect(widget('Media')).toContain('Could not load the media library.');
+		expect(widget('API')).toContain('Could not load API usage.');
 	});
 
 	it('tells an empty read apart from a failed one', () => {
@@ -39,14 +39,14 @@ describe('DashboardWidgets', () => {
 			{ id: 'l', type: 'links', heading: 'Links', links: [] },
 		]);
 		expect(widget('Latest')).toContain('No entries yet.');
-		expect(widget('Activity')).toContain('Nothing recorded yet.');
+		expect(widget('Activity')).toContain('No activity yet.');
 		expect(widget('Links')).toContain('No links for your role.');
 	});
 
 	it('says a widget this instance cannot serve is not served', () => {
 		draw([{ id: 'a', type: 'api_usage', heading: 'API', unavailable: true, api: null }]);
-		expect(widget('API')).toContain('This instance does not serve what this widget reads.');
-		expect(widget('API')).not.toContain('could not be read');
+		expect(widget('API')).toContain('This widget needs a plugin that is not running on this instance.');
+		expect(widget('API')).not.toContain('Could not load');
 	});
 
 	it('links each count to its schema and says how much changed', () => {

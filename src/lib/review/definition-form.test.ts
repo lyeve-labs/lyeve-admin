@@ -21,9 +21,9 @@ describe('parseStages', () => {
 		expect(parseStages('[]')).toEqual({ error: 'A definition needs at least one stage.' });
 		expect(parseStages(JSON.stringify([{ name: 'a' }, { name: '' }]))).toEqual({ error: 'Stage 2 needs a name.' });
 		expect(parseStages(JSON.stringify([{ name: 'a', sla_duration_seconds: 900000 }]))).toEqual({
-			error: 'Stage 1: the SLA is 0 to 240 hours.',
+			error: 'Stage 1: enter an SLA from 0 to 240 hours.',
 		});
-		expect(parseStages('not json')).toEqual({ error: 'The stages could not be read.' });
+		expect(parseStages('not json')).toEqual({ error: 'Could not read the stages. Reload the page and try again.' });
 	});
 });
 
@@ -38,7 +38,7 @@ describe('parseStages, the paid stage settings', () => {
 
 	it('sends a quorum above one', () => {
 		expect(parseStages(stage({ quorum: 3 }))).toMatchObject({ stages: [{ quorum: 3 }] });
-		expect(parseStages(stage({ quorum: 101 }))).toEqual({ error: 'Stage 1: the quorum is 0 to 100 approvals.' });
+		expect(parseStages(stage({ quorum: 101 }))).toEqual({ error: 'Stage 1: enter from 0 to 100 approvals.' });
 	});
 
 	it('sends an escalation to a role or a user id, and only with an SLA', () => {
@@ -50,7 +50,7 @@ describe('parseStages, the paid stage settings', () => {
 			stages: [{ escalate_to_user_id: id }],
 		});
 		expect(parseStages(stage({ escalate_kind: 'user', escalate_to: 'ana' }))).toEqual({
-			error: 'Stage 1: escalate to a user by their user id.',
+			error: 'Stage 1: enter the id of the user to hand it to.',
 		});
 		expect(parseStages(stage({ sla_duration_seconds: 0, escalate_kind: 'role', escalate_to: 'lead' }))).toEqual({
 			error: 'Stage 1: escalation follows an SLA breach, so set an SLA.',

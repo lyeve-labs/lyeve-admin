@@ -38,9 +38,9 @@ function fieldWhere(f: SchemaField, row: number): string {
 }
 
 function identifierProblem(name: string, what: string): string | null {
-	if (!name) return `Name the ${what}.`;
+	if (!name) return `Enter a ${what} name.`;
 	if (name.length > MAX_IDENTIFIER) return `The ${what} name is longer than ${MAX_IDENTIFIER} characters.`;
-	if (!IDENTIFIER.test(name)) return `The ${what} name takes letters, digits and underscores, and cannot start with a digit.`;
+	if (!IDENTIFIER.test(name)) return `Use only letters, digits and underscores in the ${what} name, and do not start it with a digit.`;
 	return null;
 }
 
@@ -69,7 +69,7 @@ export function localizableProblem(field: {
 		return `A ${field.field_type.replace(/_/g, ' ')} field is the same value in every language.`;
 	}
 	if (field.unique) {
-		return 'A unique field is a key, and one constraint cannot hold in several languages at once.';
+		return 'A unique field is a key, and one key cannot cover several languages.';
 	}
 	return null;
 }
@@ -130,7 +130,7 @@ export function problemsOf(schema: Schema, others: Schema[], isNew: boolean): Pr
 		const p = identifierProblem(f.name, 'field');
 		if (p) out.push({ fieldId: id, target, where, message: p });
 		else if ((RESERVED_FIELD_NAMES as readonly string[]).includes(f.name.toLowerCase())) {
-			out.push({ fieldId: id, target, where, message: `${f.name} is a column the engine adds itself. Pick another name.` });
+			out.push({ fieldId: id, target, where, message: `${f.name} is a system column. Choose another name.` });
 		} else if ((seen.get(f.name.toLowerCase()) ?? 0) > 1) {
 			out.push({ fieldId: id, target, where, message: `${f.name} is used by more than one field.` });
 		}
@@ -218,8 +218,8 @@ export function canonical(s: Schema | null): string {
 export function appliedMessage(applied: number, canceled: number): string {
 	const ran = applied === 1 ? 'Applied one queued change' : `Applied ${applied} queued changes`;
 	if (canceled === 0) return ran;
-	const kept = canceled === 1 ? 'one was canceled because a schema still uses its column' : `${canceled} were canceled because a schema still uses their columns`;
-	return `${ran}; ${kept}`;
+	const kept = canceled === 1 ? 'One was canceled because a schema still uses its column.' : `${canceled} were canceled because a schema still uses their columns.`;
+	return `${ran}. ${kept}`;
 }
 
 /** How long after an edit the next one still joins the same undo step. */

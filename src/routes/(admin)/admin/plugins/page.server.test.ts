@@ -54,7 +54,7 @@ describe('admin/plugins/+page.server.ts load', () => {
 
 		const result = await runLoad();
 		expect(result.plugins).toEqual([]);
-		expect(result.gate).toEqual({ state: 'error', message: expect.stringContaining('could not be read') });
+		expect(result.gate).toEqual({ state: 'error', message: expect.stringContaining('Could not load') });
 		expect(JSON.stringify(result)).not.toContain('pq:');
 	});
 

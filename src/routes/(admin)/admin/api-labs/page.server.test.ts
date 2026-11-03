@@ -134,7 +134,7 @@ describe('the gRPC action takes its allowlist from the engine', () => {
 		const result = (await actions.grpc(event)) as { status: number; data: { error: string } };
 
 		expect(result.status).toBe(400);
-		expect(result.data.error).toContain('not a route this listener transcodes');
+		expect(result.data.error).toContain('Choose a route from the list.');
 		expect(sent.some((s) => s.url.includes('grpc/invoke'))).toBe(false);
 	});
 
@@ -206,6 +206,6 @@ describe('a lab request that never reached the engine', () => {
 			throw new TypeError('fetch failed: connect ECONNREFUSED 10.0.0.5:8080');
 		});
 		const out = (await actions.graphql(event)) as { status: number; data: { error: string } };
-		expect(out.data.error).toBe('The request could not be sent to the engine. Try again in a moment.');
+		expect(out.data.error).toBe('Could not send the request. Try again in a moment.');
 	});
 });

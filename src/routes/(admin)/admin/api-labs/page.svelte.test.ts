@@ -57,19 +57,19 @@ describe('the warning a tester needs first', () => {
 		const { container } = render(LabsPage, { props: props() });
 		const text = said(container);
 		expect(text).toContain('instance you are signed in to, as you');
-		expect(text).toContain('a write writes, and a delete deletes');
+		expect(text).toContain('a write changes data and a delete removes it');
 	});
 
 	// The list is the allowlist. Rendering the fallback silently would offer
 	// endpoints this build may not serve while implying the engine said so.
 	it('says when the endpoint list is the fallback rather than the engine', () => {
 		const { container } = render(LabsPage, { props: props({ source: 'catalog' }) });
-		expect(said(container)).toContain('rather than what this build actually serves');
+		expect(said(container)).toContain('not what this build serves');
 	});
 
 	it('says nothing of the sort when the engine answered', () => {
 		const { container } = render(LabsPage, { props: props() });
-		expect(said(container)).not.toContain('rather than what this build actually serves');
+		expect(said(container)).not.toContain('not what this build serves');
 	});
 });
 
@@ -87,7 +87,7 @@ describe('the answer', () => {
 		const { container } = render(LabsPage, {
 			props: props({}, { rest: result({ status: 402, statusText: 'Payment Required' }) }),
 		});
-		expect(said(container)).toContain('Nothing about the request is wrong');
+		expect(said(container)).toContain('Changing the request does not help');
 	});
 
 	it('says a body is empty rather than rendering nothing', () => {
@@ -105,14 +105,14 @@ describe('GraphQL', () => {
 		const { container } = render(LabsPage, {
 			props: props({}, { graphql: result({ path: '/api/v1/graphql', body: '{"errors":[{"message":"boom"}]}' }) }),
 		});
-		expect(said(container)).toContain('read the body rather than the status');
+		expect(said(container)).toContain('check the body, not the status');
 	});
 
 	it('says nothing of the sort on a clean response', () => {
 		const { container } = render(LabsPage, {
 			props: props({}, { graphql: result({ path: '/api/v1/graphql', body: '{"data":{}}' }) }),
 		});
-		expect(said(container)).not.toContain('read the body rather than the status');
+		expect(said(container)).not.toContain('check the body, not the status');
 	});
 });
 
@@ -123,7 +123,7 @@ describe('gRPC', () => {
 		const { container } = render(LabsPage, { props: props() });
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
 		const text = said(container);
-		expect(text).toContain('runs the call inside the plugin');
+		expect(text).toContain('checks your token exactly as it would');
 		expect(container.querySelector('form[action="?/grpc"]')).not.toBeNull();
 	});
 
@@ -154,7 +154,7 @@ describe('gRPC', () => {
 			props: props({ grpc: { listening: false, routes: [], gate: { state: 'absent' } } }),
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('no listener to call');
+		expect(said(container)).toContain('turned off on this instance');
 	});
 
 	// The status route is a super admin's, and an admin is not told the
@@ -165,7 +165,7 @@ describe('gRPC', () => {
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
 		expect(said(container)).toContain('Your role cannot open the gRPC listener.');
-		expect(said(container)).not.toContain('not part of this build');
+		expect(said(container)).not.toContain('turned off on this instance');
 	});
 
 	it('offers a retry when the status could not be read', async () => {
@@ -173,8 +173,8 @@ describe('gRPC', () => {
 			props: props({ grpc: { listening: false, routes: [], gate: { state: 'unavailable' } } }),
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('the gRPC listener could not be read');
-		expect(said(container)).not.toContain('not part of this build');
+		expect(said(container)).toContain('the gRPC listener did not load');
+		expect(said(container)).not.toContain('turned off on this instance');
 		expect(said(container)).toContain('Try again');
 	});
 
@@ -183,7 +183,7 @@ describe('gRPC', () => {
 			props: props({ grpc: { listening: false, routes: [], gate: { state: 'ok' } } }),
 		});
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('present and nothing is listening');
+		expect(said(container)).toContain('installed, but its listener is not running');
 	});
 });
 

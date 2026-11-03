@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { load, actions } from './+page.server';
 import { resetRateLimitStore } from '$lib/server/rate-limit';
@@ -250,7 +250,7 @@ describe('signing in', () => {
 			fetch: vi.fn() as never,
 			cookies: mockCookies(),
 		}) as never);
-		expect(result).toEqual({ error: 'Email and password are required.', tenant: '' });
+		expect(result).toEqual({ error: 'Enter your email and password.', tenant: '' });
 	});
 
 	// An adapter behind a proxy it was not told about cannot name the
@@ -380,7 +380,7 @@ describe('signing in', () => {
 		}) as never) as { status: number; data: { error: string } };
 
 		expect(result.status).toBe(503);
-		expect(result.data.error).toBe('Sign-in is unavailable right now. Please try again shortly.');
+		expect(result.data.error).toBe('Sign-in is unavailable right now. Try again in a moment.');
 	});
 
 	// The engine rate-limits login at 5 attempts. Reporting that as a bad
@@ -424,7 +424,7 @@ describe('signing in', () => {
 
 	it('still reports a rejected credential as a rejected credential', async () => {
 		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
-			json({ error: 'Invalid email or password.' }, 401)
+			json({ error: 'Incorrect email or password.' }, 401)
 		) as unknown as typeof globalThis.fetch;
 		const formData = new FormData();
 		formData.set('email', 'a@b.co');
@@ -436,7 +436,7 @@ describe('signing in', () => {
 			cookies: mockCookies(),
 		}) as never);
 
-		expect(result).toEqual({ error: 'Invalid email or password.', tenant: '' });
+		expect(result).toEqual({ error: 'Incorrect email or password.', tenant: '' });
 	});
 
 	// MFA lockout and challenge exhaustion both return 429. Calling either an
@@ -470,7 +470,7 @@ describe('signing in', () => {
 			cookies,
 		}) as never);
 
-		expect(result).toEqual({ error: 'Verification code is required.', mfa_required: true, challenge_token: 'ch-tok' });
+		expect(result).toEqual({ error: 'Enter the verification code.', mfa_required: true, challenge_token: 'ch-tok' });
 	});
 
 	it('MFA step: sets cookie and redirects on successful MFA verification', async () => {
@@ -519,7 +519,7 @@ describe('signing in', () => {
 	it('MFA step: reports a 422 as an invalid code and keeps the challenge', async () => {
 		const result = await verify(() => json({ error: 'invalid code' }, 422));
 		expect(result.status).toBe(400);
-		expect(result.data).toEqual({ error: 'Invalid code.', mfa_required: true, challenge_token: 'ch-tok' });
+		expect(result.data).toEqual({ error: 'That code did not match. Try again.', mfa_required: true, challenge_token: 'ch-tok' });
 	});
 
 	// A 401 is a challenge the engine no longer honors. No code passes it, so
@@ -543,7 +543,7 @@ describe('signing in', () => {
 		);
 		expect(result.status).toBe(401);
 		expect(result.data).toEqual({
-			error: 'This account has no authenticator app to check the code against. Ask an administrator to restore your access.',
+			error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',
 		});
 	});
 
@@ -573,7 +573,7 @@ describe('signing in', () => {
 		const result = await verify(answer);
 		expect(result.status).toBe(503);
 		expect(result.data).toEqual({
-			error: 'The engine did not answer, so the code was not checked. Try again in a moment.',
+			error: 'Could not check the code. Try again in a moment.',
 			mfa_required: true,
 			challenge_token: 'ch-tok',
 		});
@@ -673,12 +673,16 @@ describe('a sign-in the engine challenges', () => {
 
 		const result = await submit({ email: 'a@b.co', password: 'wrong' }, fetch);
 
-		expect(result).toEqual({ error: 'Invalid email or password.', tenant: '' });
+		expect(result).toEqual({ error: 'Incorrect email or password.', tenant: '' });
 	});
 });
 
 describe('naming the organization at sign-in', () => {
-	beforeEach(() => resetRateLimitStore());
+	beforeEach(() => {
+		resetRateLimitStore();
+		vi.stubEnv('SIGN_IN_ORGANIZATION', 'true');
+	});
+	afterEach(() => vi.unstubAllEnvs());
 
 	function submit(fields: Record<string, string>, fetch: typeof globalThis.fetch) {
 		const formData = new FormData();
@@ -699,12 +703,24 @@ describe('naming the organization at sign-in', () => {
 		expect(JSON.parse(String(init.body))).toEqual({ email: 'a@b.co', password: 'right', tenant: 'acme' });
 	});
 
+	it('sends no organization while the console does not ask for one', async () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', '');
+		const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
+			json({ user: { id: 'u1' }, token: 'session' })
+		) as unknown as typeof globalThis.fetch;
+
+		await catchRedirect(() => submit({ email: 'a@b.co', password: 'right', tenant: 'acme corp' }, fetch));
+
+		const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body))).toEqual({ email: 'a@b.co', password: 'right' });
+	});
+
 	it('reads a refusal with an organization named as a wrong password, and keeps the name', async () => {
 		const fetch = vi.fn(async () => json({ error: 'invalid credentials' }, 401)) as unknown as typeof globalThis.fetch;
 
 		const result = await submit({ email: 'a@b.co', password: 'wrong', tenant: 'acme' }, fetch);
 
-		expect(result).toEqual({ error: 'Invalid email or password.', tenant: 'acme' });
+		expect(result).toEqual({ error: 'Incorrect email or password.', tenant: 'acme' });
 	});
 
 	it('refuses a name the engine would not read, without calling it', async () => {
@@ -722,8 +738,16 @@ describe('naming the organization at sign-in', () => {
 	});
 
 	it('follows a link that names the organization', async () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', 'true');
 		const fetch = vi.fn(async () => json([])) as unknown as typeof globalThis.fetch;
 		const result = await load({ fetch, cookies: mockCookies(), url: new URL('http://admin.test/login?tenant=acme') } as never);
-		expect(result).toMatchObject({ carried: 'acme' });
+		expect(result).toMatchObject({ organization: true, carried: 'acme' });
+	});
+
+	it('asks for no organization and carries none on unless the console is set to', async () => {
+		vi.stubEnv('SIGN_IN_ORGANIZATION', '');
+		const fetch = vi.fn(async () => json([])) as unknown as typeof globalThis.fetch;
+		const result = await load({ fetch, cookies: mockCookies(), url: new URL('http://admin.test/login?tenant=acme') } as never);
+		expect(result).toMatchObject({ organization: false, carried: '' });
 	});
 });

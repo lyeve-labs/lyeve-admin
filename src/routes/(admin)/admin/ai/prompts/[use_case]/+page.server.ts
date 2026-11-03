@@ -31,7 +31,7 @@ export const actions: Actions = {
 			const saved = await savePromptVersion(authedClient(event), event.params.use_case, body);
 			return { scope: 'save', version: saved.version };
 		} catch (err) {
-			return fail(400, { scope: 'save', error: aiActionError(err, 'Failed to save the prompt') });
+			return fail(400, { scope: 'save', error: aiActionError(err, 'Could not save the prompt. Try again.') });
 		}
 	},
 
@@ -47,15 +47,15 @@ export const actions: Actions = {
 		try {
 			view = await getPrompt(client, event.params.use_case);
 		} catch (err) {
-			return fail(400, { scope: 'restore', error: aiActionError(err, 'The prompt could not be read') });
+			return fail(400, { scope: 'restore', error: aiActionError(err, 'Could not restore the version. Try again.') });
 		}
 		const body = version === 0 ? view.default : view.versions.find((v) => v.version === version)?.body;
-		if (body === undefined) return fail(404, { scope: 'restore', error: `Version ${version} does not exist.` });
+		if (body === undefined) return fail(404, { scope: 'restore', error: `Version ${version} does not exist. Reload the page.` });
 		try {
 			const saved = await savePromptVersion(client, event.params.use_case, body);
 			return { scope: 'restore', version: saved.version, from: version };
 		} catch (err) {
-			return fail(400, { scope: 'restore', error: aiActionError(err, 'Failed to restore the version') });
+			return fail(400, { scope: 'restore', error: aiActionError(err, 'Could not restore the version. Try again.') });
 		}
 	},
 };

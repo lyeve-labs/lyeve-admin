@@ -160,7 +160,7 @@
 
 <PageShell
 	title="Content"
-	description="Every collection in this tenant, and what each one holds."
+	description="Open a collection to see and edit its entries."
 	width="wide"
 >
 	{#snippet actions()}
@@ -184,13 +184,13 @@
 			level={2}
 			gate={data.schemas.gate}
 			title="Content"
-			absent="This build does not serve the collections."
+			absent="Content is not included in this build."
 		/>
 	{:else if rows.length === 0 && data.filter === 'all' && !data.query}
 		<EmptyState
 			level={2}
 			title="No schemas yet"
-			description="Build a schema first, then come back here to manage content."
+			description="Create a schema to start adding content."
 		>
 			{#snippet iconSnippet()}
 				<Database size={ICON.lg} />
@@ -244,11 +244,11 @@
 			{#if filtered.length === 0}
 				<EmptyState
 					title={data.filter === 'all'
-						? 'No collection matches that name'
-						: `No ${filterLabel} collection${data.query ? ' matches that name' : ''}`}
+						? 'No collections match this search'
+						: `No ${filterLabel} collections${data.query ? ' match this search' : ''}`}
 					description={data.filter === 'all'
 						? 'Clear the search to see every collection.'
-						: 'Pick another chip, or All to see every collection.'}
+						: 'Choose another filter, or All to see every collection.'}
 				>
 					{#snippet iconSnippet()}
 						<Inbox size={ICON.lg} />
@@ -260,7 +260,7 @@
 			{:else}
 				{#if empties > 0 && !filterCountsRows(data.filter)}
 					<p class="text-xs text-faint">
-						{empties} of {filtered.length} on this page {empties === 1 ? 'holds' : 'hold'} no rows.
+						{empties} of {filtered.length} on this page {empties === 1 ? 'has' : 'have'} no entries.
 						<a href={filterHref('with-rows')} class="underline hover:text-fg">Hide them</a>.
 					</p>
 				{/if}

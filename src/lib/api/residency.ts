@@ -73,7 +73,7 @@ export const RESIDENCY_OK: ResidencyGate = GATE_OK;
 
 /** What a refused residency read means, read the way every plugin's is. */
 export function residencyGate(err: unknown): ResidencyGate {
-	return gateOf(err, 'The residency report could not be read. This is not a report that every tenant is placed.');
+	return gateOf(err, 'Could not load the residency report.');
 }
 
 export async function listRegions(

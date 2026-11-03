@@ -137,10 +137,10 @@ describe('data export writes', () => {
 		const unnamed = write({ ...EXPORT, name: ' ' });
 		expect(((await actions.start(unnamed.event)) as Failure).data).toEqual({
 			action: 'start',
-			error: 'Name the export so it can be told apart in the list.',
+			error: 'Enter a name for the export.',
 		});
 		const unknown = write({ ...EXPORT, format: 'xlsx' });
-		expect(((await actions.start(unknown.event)) as Failure).data).toEqual({ action: 'start', error: 'Choose a format the plugin can write.' });
+		expect(((await actions.start(unknown.event)) as Failure).data).toEqual({ action: 'start', error: 'Choose a format.' });
 		expect([...unnamed.calls, ...unknown.calls]).toEqual([]);
 	});
 
@@ -174,7 +174,7 @@ describe('data export writes', () => {
 
 	it('asks when a schedule runs before it creates one', async () => {
 		const { event, calls } = write({ ...EXPORT, cron_expression: '' });
-		expect(((await actions.createSchedule(event)) as Failure).data).toEqual({ action: 'createSchedule', error: 'Say when the schedule runs.' });
+		expect(((await actions.createSchedule(event)) as Failure).data).toEqual({ action: 'createSchedule', error: 'Choose when the schedule runs.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -188,9 +188,9 @@ describe('data export writes', () => {
 	});
 
 	it.each([
-		['cancel', 'No export was named.'],
-		['toggleSchedule', 'No schedule was named.'],
-		['deleteSchedule', 'No schedule was named.'],
+		['cancel', 'This form is missing its export. Reload the page and try again.'],
+		['toggleSchedule', 'This form is missing its schedule. Reload the page and try again.'],
+		['deleteSchedule', 'This form is missing its schedule. Reload the page and try again.'],
 	] as const)('names nothing to %s without a request', async (name, sentence) => {
 		const { event, calls } = write({});
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });
@@ -213,15 +213,15 @@ describe('data export writes', () => {
 
 	it('reads any other 503 on start as an outage', async () => {
 		const { event } = write(EXPORT, json({ error: 'service unavailable' }, 503));
-		expect(((await actions.start(event)) as Failure).data).toEqual({ action: 'start', error: 'The export could not be started.' });
+		expect(((await actions.start(event)) as Failure).data).toEqual({ action: 'start', error: 'Could not start the export. Try again.' });
 	});
 
 	it.each([
-		['start', 'The export could not be started.'],
-		['cancel', 'The export could not be canceled.'],
-		['createSchedule', 'The schedule could not be created.'],
-		['toggleSchedule', 'The schedule could not be changed.'],
-		['deleteSchedule', 'The schedule could not be deleted.'],
+		['start', 'Could not start the export. Try again.'],
+		['cancel', 'Could not cancel the export. Try again.'],
+		['createSchedule', 'Could not create the schedule. Try again.'],
+		['toggleSchedule', 'Could not save the schedule. Try again.'],
+		['deleteSchedule', 'Could not delete the schedule. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = write({ id: 'j1', ...EXPORT, cron_expression: '0 3 * * *' }, OUTAGE);
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });

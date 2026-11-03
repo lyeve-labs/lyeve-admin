@@ -71,7 +71,7 @@
 	});
 	const paidReason = $derived(
 		paidRefusal
-			? `${refusalText(paidRefusal)} Raising a limit, turning enforcement on and approving a request need it. Lowering a limit to 0, turning enforcement off and denying stay open.`
+			? `${refusalText(paidRefusal)} You need it to raise a limit, turn on enforcement or approve a request. You can still lower a limit to 0, turn off enforcement or deny a request.`
 			: '',
 	);
 
@@ -127,7 +127,7 @@
 	let clearForm = $state<HTMLFormElement>();
 	async function askClear() {
 		if (!editing) return;
-		const ok = await confirmDialog(`Delete the quota for ${editing.tenant_id}`, 'The tenant may use as much as it likes, and a block on it is lifted.', {
+		const ok = await confirmDialog(`Delete the quota for ${editing.tenant_id}?`, 'The tenant can then use as much as it likes, and any block on it is lifted.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
@@ -172,7 +172,7 @@
 
 <PageShell
 	title="Quotas and usage"
-	description="What each tenant is allowed, what they have used, and who is asking for more."
+	description="Set what each tenant is allowed, see what they have used and review requests for more."
 	width="wide"
 	{back}
 >
@@ -186,19 +186,19 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			Quotas are read by admins and set by super admins. Your role reads neither.
+			Admins can view quotas and super admins can set them. Your role can do neither.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
 			level={2}
 			gate={data.gate}
 			title="Quotas and usage"
-			absent="The usage plugin is not part of this build, so nothing is metered or capped."
+			absent="Usage quotas are not included in this build. Nothing is metered or capped."
 		/>
 	{:else}
 		<FormErrors message={(pageForm as Failure)?.error || undefined} refused={formRefusal(pageForm)} />
 		{#if !isSuperAdmin}
-			<Alert tone="brand">Your role reads this tenant's quota and its requests. Setting a quota or reviewing a request takes a super admin.</Alert>
+			<Alert tone="brand">Your role can view this tenant's quota and requests. Only a super admin can set a quota or review a request.</Alert>
 		{/if}
 		{#if form && 'quotaSaved' in form}
 			<Alert tone="success" autoDismiss>Quota saved for {form.quotaSaved}.</Alert>
@@ -231,9 +231,8 @@
 			     exist. -->
 			<Alert tone="warn">
 				{reportingOnly.length}
-				{reportingOnly.length === 1 ? 'quota is' : 'quotas are'} reported and never enforced. A
-				tenant passes those limits and nothing stops them, which is a real choice and also
-				what leaving the boxes unticked gives you.
+				{reportingOnly.length === 1 ? 'quota is' : 'quotas are'} reported but not enforced. Tenants
+				can go past those limits. This is what you get when Hard limit is left off.
 			</Alert>
 		{/if}
 
@@ -245,7 +244,7 @@
 			</p>
 			{#if data.quotas.length === 0}
 				<EmptyState
-					title="No quota is set"
+					title="No quotas yet"
 					description={isSuperAdmin ? 'Every tenant may use as much as it likes.' : 'This tenant may use as much as it likes.'}
 				>
 					{#snippet iconSnippet()}
@@ -262,17 +261,17 @@
 			{:else}
 				<ListToolbar label="Filter quotas">
 					{#snippet search()}
-						<label for="quota-search" class="sr-only">Narrow this page</label>
+						<label for="quota-search" class="sr-only">Search this page</label>
 						<SearchInput id="quota-search" bind:value={query} placeholder="Tenant on this page" />
 					{/snippet}
 				</ListToolbar>
 				{#if !data.usage.ok}
-					<GateNotice gate={data.usage.gate} title="what each tenant used" absent="This instance does not report usage per tenant, so the quotas below show their limits alone." />
+					<GateNotice gate={data.usage.gate} title="what each tenant used" absent="Usage per tenant is not included in this build. The quotas below show their limits only." />
 				{/if}
 				{#if visibleQuotas.length === 0}
 					<EmptyState
-						title="No quota on this page matches"
-						description="Clear the search, or turn the page: the box narrows what is on screen."
+						title="No quotas match this search"
+						description="The search covers this page only. Clear it or go to another page."
 					/>
 				{:else}
 				<Table label="Quotas">
@@ -363,10 +362,10 @@
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Requests for more</SectionHeading>
 			{#if !data.requests.ok}
-				<GateNotice gate={data.requests.gate} title="the requests for more" absent="This instance does not take requests for more quota." />
+				<GateNotice gate={data.requests.gate} title="the requests for more" absent="Requests for more quota are not included in this build." />
 			{:else if waiting.length === 0}
 				<EmptyState
-					title="Nobody is waiting"
+					title="No requests waiting"
 					description="No tenant has asked for a higher limit."
 				>
 					{#snippet iconSnippet()}
@@ -466,7 +465,7 @@
 		{:else}
 			<Input id="quota-tenant" name="tenant_id" label="Tenant" required bind:value={tenantId} error={errors.tenant_id} placeholder="acme" />
 		{/if}
-		<p class="text-xs text-muted">0 leaves a dimension unchecked.</p>
+		<p class="text-xs text-muted">Enter 0 for no limit.</p>
 		{#if paidReason}
 			<p class="text-xs text-muted" data-testid="paid-held">{paidReason}</p>
 		{/if}
@@ -484,7 +483,7 @@
 		<Toggle
 			id="quota-hard"
 			label="Hard limit"
-			hint="Off, the limits are reported and never enforced."
+			hint="When on, the limits are enforced. When off, they are only reported."
 			disabled={paidRefusal !== null && !(editing?.is_hard_limit ?? false)}
 			bind:checked={hardLimit}
 		/>

@@ -38,26 +38,26 @@ export interface RequestLog {
 }
 
 function loadError(err: unknown, what: string): string {
-	const gate = gateOf(err, `The ${what} could not be read. Reload the page to try again.`);
-	if (gate.state === 'unavailable') return `The engine or its database did not answer, so the ${what} could not be read. Try again in a moment.`;
+	const gate = gateOf(err, `Could not load the ${what}. Reload the page to try again.`);
+	if (gate.state === 'unavailable') return `The engine is unavailable, so the ${what} did not load. Try again in a moment.`;
 	if (gate.state === 'busy') return BUSY.body;
 	if (gate.state === 'forbidden') return forbiddenText(`the ${what}`);
-	return `The ${what} could not be read. Reload the page to try again.`;
+	return `Could not load the ${what}. Reload the page to try again.`;
 }
 
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const user = await loadUser(event);
-	if (!user.roles.some((r) => OWNER_ROLES.includes(r))) error(403, 'Requires the admin or super_admin role');
+	if (!user.roles.some((r) => OWNER_ROLES.includes(r))) error(403, 'Only an admin or a super admin can open this page.');
 	const superAdmin = user.roles.includes('super_admin');
 	const client = authedClient(event);
 	const { limit, offset } = pageWindow(url, PAGE, MAX_PAGE);
 
 	const [list, grants, mfa, tenants] = await Promise.all([
-		section(listAdminTokens(client, limit, offset), 'The admin tokens could not be read. This is not a report that there are none.'),
+		section(listAdminTokens(client, limit, offset), 'Could not load the admin tokens.'),
 		// The grants are the create form's only required choice, so a failed
 		// read is said in the form rather than drawn as a catalog with none.
-		section(listAdminGrants(client), 'The grants could not be read, so no token can be created now. Reload the page to try again.'),
+		section(listAdminGrants(client), 'Could not load the grants, so you cannot create a token right now. Reload the page to try again.'),
 		// Which step-up the engine will ask for. An unreadable status leaves it
 		// unknown: the form asks for the password, and an engine that wants a
 		// code says so and the form switches.
@@ -68,7 +68,7 @@ export const load: PageServerLoad = async (event) => {
 		superAdmin
 			? section(
 					listTenants(client, 500, 0).then((r) => r.items),
-					'The tenants could not be read, so this form cannot name the tenant a token acts in.'
+					'Could not load the tenants.'
 				)
 			: Promise.resolve<Section<Tenant[]>>({ ok: true, value: [] }),
 	]);
@@ -119,7 +119,7 @@ export const load: PageServerLoad = async (event) => {
 				total: 0,
 				limit: PAGE,
 				offset: logOffset,
-				error: err instanceof ApiError && err.status === 404 ? 'This token is not one you can see.' : loadError(err, 'request log'),
+				error: err instanceof ApiError && err.status === 404 ? 'This token does not exist, or you cannot view it.' : loadError(err, 'request log'),
 			};
 		}
 	}
@@ -234,8 +234,8 @@ export const actions: Actions = {
 					: status === 403
 						? 'Only the owner of a token or a super admin can revoke it.'
 						: status === 503
-							? 'The database is unavailable. Try again in a moment.'
-							: 'The token could not be revoked. Try again.';
+							? 'Could not revoke the token. Try again in a moment.'
+							: 'Could not revoke the token. Try again.';
 			return fail(400, { action: 'revoke', error: message, fields: {} });
 		}
 	},

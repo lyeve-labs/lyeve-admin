@@ -99,7 +99,7 @@
 		{/if}
 
 		{#if unavailable}
-			<Alert tone="warn">Comments could not be read. This is not a report that there are none.</Alert>
+			<Alert tone="warn">Could not load comments. Reload the page to try again.</Alert>
 		{:else}
 			{#if shown.length === 0}
 				<EmptyState

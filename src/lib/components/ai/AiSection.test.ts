@@ -49,7 +49,7 @@ describe('AiSection', () => {
 		const { getByRole } = render(AiSection, {
 			props: { tab: 'providers', gate: { state: 'absent' }, layoutGate: ok, noun: 'providers', level: 2, children: Body } as never,
 		});
-		expect(getByRole('heading', { name: 'The AI plugin is not installed', level: 2 })).toBeTruthy();
+		expect(getByRole('heading', { name: 'AI is not included in this build', level: 2 })).toBeTruthy();
 	});
 
 	it('names the role and the resource when forbidden', () => {
@@ -88,7 +88,7 @@ describe('AiSection', () => {
 
 	it('points at providers when nothing can answer', () => {
 		const { getByText, getByRole } = setup({ state: 'no_provider' });
-		expect(getByText('AI has nothing to answer through')).toBeTruthy();
+		expect(getByText('No AI provider is available')).toBeTruthy();
 		expect(getByRole('link', { name: 'Open providers' }).getAttribute('href')).toBe('/admin/ai/providers');
 	});
 
@@ -99,7 +99,7 @@ describe('AiSection', () => {
 
 	it('lets the layout say the plugin is absent over a page that read nothing', () => {
 		const { getByText, queryByTestId } = setup({ state: 'off' }, { state: 'absent' });
-		expect(getByText('The AI plugin is not installed')).toBeTruthy();
+		expect(getByText('AI is not included in this build')).toBeTruthy();
 		expect(queryByTestId('body')).toBeNull();
 	});
 });

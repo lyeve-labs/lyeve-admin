@@ -35,6 +35,6 @@
 		{/each}
 	</div>
 	<p class="text-xs text-muted">
-		0 sets no ceiling. Windows are UTC: the hour resets on the hour, the day at midnight and the month on the first. A key past any of them is answered 429 with a Retry-After until that window ends.
+		Enter 0 for no limit. Windows are in UTC: the hour resets on the hour, the day at midnight and the month on the first. A key over any limit gets a 429 with a Retry-After header until that window ends.
 	</p>
 </fieldset>

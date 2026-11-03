@@ -63,7 +63,7 @@
 	function deleteTenant(name: string): SubmitFunction {
 		return confirmed(
 			`Delete ${name}?`,
-			"Every row and user scoped to it goes with it. Its stored files stay in the storage backend until the backend's own lifecycle rules remove them.",
+			"All of its data and users are deleted. Its stored files stay in the storage backend until that backend's own lifecycle rules remove them.",
 			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
 		);
 	}
@@ -135,7 +135,7 @@
 	// A notice that withholds creating speaks of the tenants below only when
 	// the list holds some.
 	const stillEditable = $derived(
-		data.tenants.ok && data.tenants.value.length > 0 ? ' The tenants below can still be edited, disabled and deleted.' : '',
+		data.tenants.ok && data.tenants.value.length > 0 ? ' You can still edit, disable and delete the tenants below.' : '',
 	);
 </script>
 
@@ -162,13 +162,13 @@
 			level={2}
 			gate={data.provisionGate}
 			title="Tenant provisioning"
-			absent="This instance does not serve tenant provisioning, so a tenant cannot be created here.{stillEditable}"
+			absent="Creating tenants is not included in this build.{stillEditable}"
 		/>
 	{:else if data.tenants.ok && !canProvision}
 		<NotEnabled
 			level={2}
 			title="Tenant provisioning"
-			description="The license on this instance does not include creating tenants.{stillEditable}"
+			description="Your license does not include creating tenants.{stillEditable}"
 			url={data.provisioningUrl || null}
 		/>
 	{/if}
@@ -178,13 +178,13 @@
 			level={2}
 			gate={data.tenants.gate}
 			title="Tenants"
-			absent="The multitenant plugin is not part of this build, so this instance serves one tenant."
+			absent="Multitenancy is not included in this build. This instance has one tenant."
 		/>
 	{:else if data.tenants.value.length === 0}
 		<EmptyState
 			level={2}
 			title="No tenants yet"
-			description={canProvision ? 'Create a tenant to start serving content on this instance.' : 'This instance lists no tenant.'}
+			description={canProvision ? 'Create a tenant to start serving content on this instance.' : undefined}
 		>
 			{#snippet iconSnippet()}
 				<Building2 size={ICON.lg} />
@@ -200,7 +200,7 @@
 	{:else}
 		<ListToolbar label="Filter tenants">
 			{#snippet search()}
-				<label for="tenant-search" class="sr-only">Narrow this page</label>
+				<label for="tenant-search" class="sr-only">Search this page</label>
 				<SearchInput id="tenant-search" bind:value={query} placeholder="Slug, name or plan on this page" />
 			{/snippet}
 			{#snippet filters()}
@@ -211,8 +211,8 @@
 		{#if visible.length === 0}
 			<EmptyState
 				level={2}
-				title="No tenant on this page matches"
-				description="Clear the search, or turn the page: the box narrows what is on screen."
+				title="No tenants match this search"
+				description="The search covers this page only. Clear it or go to another page."
 			/>
 		{:else}
 		<Table label="Tenants">
@@ -344,7 +344,7 @@
 			id="plan"
 			label="Plan"
 			name="plan"
-			hint="A label stored with the tenant. Left empty, it is stored as free."
+			hint="A label saved with the tenant. Leave it empty to use free."
 			bind:value={plan}
 			autocomplete="off"
 		/>

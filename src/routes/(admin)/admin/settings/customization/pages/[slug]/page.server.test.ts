@@ -43,7 +43,7 @@ describe('custom page editor load', () => {
 	// database did not answer.
 	it('answers 404 only for the engine 404', async () => {
 		api.getCustomPage.mockRejectedValueOnce(new ApiError(404, 'not found'));
-		await expect(load(event())).rejects.toMatchObject({ status: 404, body: { message: 'No page has that address.' } });
+		await expect(load(event())).rejects.toMatchObject({ status: 404, body: { message: 'This page does not exist.' } });
 		api.getCustomPage.mockRejectedValueOnce(new ApiError(503, 'unavailable'));
 		await expect(load(event())).rejects.toMatchObject({ status: 503 });
 		api.getCustomPage.mockRejectedValueOnce(new ApiError(403, 'forbidden'));
@@ -94,7 +94,7 @@ describe('custom page editor writes', () => {
 
 	it('refuses a page the form did not carry as JSON', async () => {
 		const out = (await actions.save(actionEvent({ page: '{title:' }))) as Failure;
-		expect(out.data.error).toBe('The page could not be read from the form.');
+		expect(out.data.error).toBe('This form is missing its page. Reload the page and try again.');
 		expect(api.saveCustomPage).not.toHaveBeenCalled();
 	});
 
@@ -117,8 +117,8 @@ describe('custom page editor writes', () => {
 	});
 
 	it.each([
-		['save', 'saveCustomPage', 'The page could not be saved.'],
-		['delete', 'deleteCustomPage', 'The page could not be deleted.'],
+		['save', 'saveCustomPage', 'Could not save the page. Try again.'],
+		['delete', 'deleteCustomPage', 'Could not delete the page. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, fn, sentence) => {
 		api[fn].mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
 		const out = (await actions[name](actionEvent({ page: JSON.stringify(page) }))) as Failure;

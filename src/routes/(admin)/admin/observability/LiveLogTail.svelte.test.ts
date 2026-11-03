@@ -106,7 +106,7 @@ describe('LiveLogTail', () => {
 		last().emit('error');
 		await tick();
 		expect(badge(container)).toBe('Refused');
-		expect(container.textContent).toContain('The engine refused the log tail');
+		expect(container.textContent).toContain('Could not connect to the live log tail');
 		expect(container.textContent).not.toContain('Waiting for log entries');
 
 		await fireEvent.click(getByRole('button', { name: /try again/i }));
@@ -127,7 +127,7 @@ describe('LiveLogTail', () => {
 		expect(first.closed).toBe(true);
 		expect(StubEventSource.all).toHaveLength(1);
 		expect(badge(container)).toBe('Not running');
-		expect(container.textContent).toContain('The logging plugin is not running on this instance');
+		expect(container.textContent).toContain('The logging plugin is not running on this instance, so the live log tail is not available.');
 	});
 
 	it('opens nothing while the plugin does not run, and closes its stream on unmount', async () => {

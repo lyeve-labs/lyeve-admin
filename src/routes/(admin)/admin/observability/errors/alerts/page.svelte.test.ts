@@ -58,7 +58,7 @@ describe('the spike alerts page', () => {
 
 	it('says why there is nothing to set while the plugin does not run', () => {
 		const { container } = setup(null, null, { state: 'absent' } as never);
-		expect(container.textContent).toContain('not part of this build');
+		expect(container.textContent).toContain('not included in this build');
 	});
 });
 

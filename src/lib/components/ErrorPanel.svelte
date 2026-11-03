@@ -102,12 +102,12 @@
 	 */
 	const hint = $derived(
 		{
-			'signed-out': 'The session has expired. Sign in again to carry on.',
-			denied: message || 'This account cannot open that page.',
+			'signed-out': 'Your session expired. Sign in again.',
+			denied: message || 'You do not have access to this page.',
 			missing: message || 'That page or record does not exist.',
 			busy: message || BUSY.body,
 			outage: OUTAGE.body,
-			server: 'The request did not complete. Trying again is worth one attempt. The details below are what the server said.',
+			server: 'The server could not complete the request. Try again. If it fails again, the details below show what the server returned.',
 		}[variant],
 	);
 
@@ -132,7 +132,7 @@
 				<Collapsible label="What the server said" class="w-full text-left">
 					<pre
 						class="border-line bg-surface-2 text-muted max-h-32 overflow-auto rounded-lg border p-3 text-xs">{message ||
-							'Nothing beyond the status.'}</pre>
+							'No details.'}</pre>
 				</Collapsible>
 			{/if}
 		</div>

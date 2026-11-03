@@ -11,7 +11,7 @@ describe('RefusalNotice', () => {
 		const { container, getByRole } = render(RefusalNotice, {
 			props: { refusal: { kind: 'cap', cap: 'example.items', limit: 4, current: 4, upgradeUrl: '' } },
 		});
-		expect(container.textContent).toContain('4 of 4 items are in use');
+		expect(container.textContent).toContain("You're using 4 of 4 items");
 		expect(getByRole('link', { name: 'View the license' }).getAttribute('href')).toBe('/admin/settings/license');
 	});
 
@@ -27,7 +27,7 @@ describe('RefusalNotice', () => {
 		const { container, getByRole } = render(RefusalNotice, {
 			props: { refusal: { kind: 'cap', cap: 'example.items', limit: 4, current: 4, upgradeUrl: link } },
 		});
-		expect(container.textContent).toContain('4 of 4 items are in use, which is the most this instance allows. A license that allows more lifts the limit. Removing one also makes room.');
+		expect(container.textContent).toContain("You're using 4 of 4 items, the most this instance allows. A license that allows more lifts the limit. Removing one also makes room.");
 		expect(getByRole('link', { name: 'View the license' }).getAttribute('href')).toBe('/admin/settings/license');
 		// The link names neither a plan nor an add-on, so it keeps words of its own.
 		const more = getByRole('link', { name: 'How to raise the limit' });
@@ -101,7 +101,7 @@ describe('FormErrors with a refusal', () => {
 				refused: { kind: 'cap', cap: 'gadgets.probes', limit: 7, current: 7, upgradeUrl: '' },
 			},
 		});
-		expect(container.textContent).toContain('7 of 7 probes are in use');
+		expect(container.textContent).toContain("You're using 7 of 7 probes");
 		expect(container.textContent).not.toContain('raw');
 	});
 });

@@ -189,8 +189,8 @@
 	 */
 	function removeProvider(p: SamlProvider): SubmitFunction {
 		return confirmed(
-			`Delete SAML provider ${p.name}`,
-			'Anyone who signs in through this provider will lose access, and the private key is deleted with it.',
+			`Delete SAML provider ${p.name}?`,
+			'People who sign in through this provider lose access, and its private key is deleted. This cannot be undone.',
 			{ confirmLabel: 'Delete', success: `Deleted ${p.name}` },
 		);
 	}
@@ -202,7 +202,7 @@
 	function promote(p: SamlProvider): SubmitFunction {
 		return confirmed(
 			`Promote the new certificate for ${p.name}?`,
-			'Every request will be signed with it from now on. Do this once the identity provider has read the metadata document and trusts it.',
+			'Every request is signed with it from now on. Promote it only after the identity provider trusts the new certificate from the metadata document.',
 			{ confirmLabel: 'Promote', success: `${p.name} is using the new certificate` },
 		);
 	}
@@ -212,7 +212,7 @@
 
 <PageShell
 	title="SAML SSO"
-	description="Identity providers people sign in through, and the certificates that keep them working."
+	description="Set up the identity providers people sign in through, and renew their certificates."
 	width="wide"
 >
 	{#snippet actions()}
@@ -228,7 +228,7 @@
 			level={2}
 			gate={data.gate}
 			title="SAML SSO"
-			absent="The SAML plugin is not part of this build, so no identity provider can be configured here."
+			absent="SAML SSO is not included in this build."
 		/>
 	{:else}
 		{#if rowError}
@@ -254,9 +254,7 @@
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Waiting to be promoted</SectionHeading>
 				<p class="text-xs text-muted">
-					A new certificate is staged and published in the metadata document beside the one in
-					use. Point the identity provider at the metadata URL, or hand it the certificate
-					below, then promote. Until you promote, nothing changes.
+					A new certificate is ready and published in the metadata document beside the current one. Point the identity provider at the metadata URL or give it the certificate below, then promote it. Nothing changes until you promote.
 				</p>
 				<div class="flex flex-col gap-3">
 					{#each staged as p (p.id)}
@@ -289,8 +287,8 @@
 
 			{#if data.providers.length === 0}
 				<EmptyState
-					title="No identity provider is configured"
-					description={canWrite ? 'Add one to put a sign-in button on the login page.' : 'A super admin adds one to put a sign-in button on the login page.'}
+					title="No identity providers yet"
+					description={canWrite ? 'Add one to put a sign-in button on the login page.' : 'Ask a super admin to add one, which puts a sign-in button on the login page.'}
 				>
 					{#snippet iconSnippet()}
 						<KeyRound size={ICON.lg} />
@@ -313,8 +311,8 @@
 
 				{#if visible.length === 0}
 					<EmptyState
-						title="No provider matches"
-						description="Nothing here is named or points at what you searched for."
+						title="No providers match this search"
+						description="The search covers each provider's name and entity ID."
 					>
 						{#snippet iconSnippet()}
 							<ShieldCheck size={ICON.lg} />
@@ -444,14 +442,14 @@
 					value={templateKey}
 					options={templateOptions}
 					onvaluechange={applyTemplate}
-					hint={chosenTemplate?.description || 'Fills the settings this provider usually takes. Its entity ID, sign-on URL and certificate still come from your account with it.'}
+					hint={chosenTemplate?.description || 'Fills in the usual settings for this provider. You still copy the entity ID, sign-on URL and certificate from your account with the provider.'}
 				/>
 			{/if}
 			<Input
 				id="saml-name"
 				name="name"
 				label="Name"
-				hint="What the sign-in button says. People read this, so write it the way they know the provider."
+				hint="Shown on the sign-in button. Use the name people know the provider by."
 				bind:value={name}
 				required
 			/>
@@ -492,7 +490,7 @@
 				id="saml-name-id"
 				name="name_id_format"
 				label="NameID format"
-				hint="Which identifier the assertion carries. Email address suits most providers."
+				hint="The identifier the assertion contains. Email address suits most providers."
 				bind:value={nameIdFormat}
 			/>
 			<Textarea

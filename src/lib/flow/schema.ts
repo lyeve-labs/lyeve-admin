@@ -276,8 +276,8 @@ export const HOOK_NAME = /^[a-z][a-z0-9_.:-]{0,79}$/;
 export function hookNameError(value: unknown): string | undefined {
 	if (typeof value !== 'string' || value === '') return undefined;
 	if (HOOK_NAME.test(value)) return undefined;
-	if (value.length > 80) return 'A hook name is at most 80 characters.';
-	return 'A hook name is lowercase and uses letters, digits, _ . : and -, starting with a letter.';
+	if (value.length > 80) return 'Use up to 80 characters for the hook name.';
+	return 'Use lower case letters, digits, _ . : and - for the hook name, starting with a letter.';
 }
 
 /**

@@ -220,7 +220,7 @@
 				onchange={(config) => onchange(updateNode(definition, node.id, { config }))}
 			/>
 		{:else}
-			<p class="text-sm text-danger">The catalog has no entry for {node.type}, so its settings cannot be edited here.</p>
+			<p class="text-sm text-danger">{node.type} is not a known node type, so its settings cannot be edited here.</p>
 		{/if}
 		<!-- The id is what expressions and edges name the node by. It is set
 		     once and read everywhere, so it folds away under the settings the
@@ -274,7 +274,7 @@
 		{#if triggerLocked}
 			<p class="flex items-center gap-2 text-xs text-muted" data-testid="trigger-locked">
 				<Lock size={ICON.xs} aria-hidden="true" class="shrink-0" />
-				<span>This trigger is not enabled on this instance. Saving will say so.</span>
+				<span>This trigger is not enabled on this instance. A flow that uses it cannot be saved.</span>
 			</p>
 		{/if}
 		{#if triggerSpec && isEventTriggerSchema(triggerSpec.config_schema)}
@@ -319,7 +319,7 @@
 		{#if endpoints.length > 0}
 			<div class="flex flex-col gap-3" data-testid="flow-endpoints">
 				<SectionHeading level={2} variant="eyebrow">Endpoints</SectionHeading>
-				<p class="text-xs text-muted">Where the flow answers once published. A new slug takes effect when you save, a trigger change when you publish.</p>
+				<p class="text-xs text-muted">The flow responds at these addresses once it is published. A new slug takes effect when you save, and a trigger change when you publish.</p>
 				{#each endpoints as ep (ep.key)}
 					<div class="flex flex-col gap-1">
 						<CopyField id="endpoint-{ep.key}" label={ep.label} value={ep.value} hint={ep.hint} copyLabel="Copy {ep.label}" />
@@ -339,8 +339,8 @@
 			label="Slug"
 			value={definition.slug ?? ''}
 			hint={slugMoved
-				? `Saving moves the flow to this slug. /api/v1/flows/${savedSlug} and the name ${savedSlug} on GraphQL, gRPC and realtime stop answering, and a permission rule on flow:${savedSlug} no longer applies.`
-				: 'Names the flow in its REST URL and on GraphQL, gRPC and realtime. Unique in this tenant.'}
+				? `Saving moves the flow to this slug. /api/v1/flows/${savedSlug} and the name ${savedSlug} on GraphQL, gRPC and realtime stop working, and a permission rule on flow:${savedSlug} no longer applies.`
+				: 'Identifies the flow in its REST URL and on GraphQL, gRPC and realtime. Must be unique in this tenant.'}
 			error={slugProblem}
 			oninput={(e) => onchange({ ...definition, slug: e.currentTarget.value.trim() })}
 			mono

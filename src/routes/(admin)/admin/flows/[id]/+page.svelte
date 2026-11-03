@@ -217,7 +217,7 @@
 			const result = await introspectDatasource(browserClient(), id);
 			tables = { ...tables, [id]: { status: 'ready', tables: result.tables } };
 		} catch {
-			tables = { ...tables, [id]: { status: 'error', tables: [], message: 'The tables could not be listed. Check the datasource and try again.' } };
+			tables = { ...tables, [id]: { status: 'error', tables: [], message: 'Could not load tables. Check the datasource and try again.' } };
 		}
 	}
 
@@ -447,7 +447,7 @@
 			status = form.saved.status;
 			version = form.saved.version;
 			if (form.saved.slug && form.saved.slug !== savedSlug) {
-				toast.success(`Saved. The flow answers at ${form.saved.slug} now`);
+				toast.success(`Saved. The flow is now at ${form.saved.slug}`);
 				savedSlug = form.saved.slug;
 			} else {
 				toast.success('Draft saved');
@@ -666,7 +666,7 @@
 				     so the editor says they could not be read rather than offering
 				     an empty palette. -->
 				<div class="shrink-0 px-3 pt-2" data-testid="flow-catalog-unread">
-					<GateNotice level={2} gate={data.catalogGate} title="the node types" absent="The flow plugin did not send its node types, so the palette has nothing to offer." />
+					<GateNotice level={2} gate={data.catalogGate} title="the node types" absent="Node types are not included in this build." />
 				</div>
 			{/if}
 			{#if blocked}
@@ -732,8 +732,8 @@
 							<EmptyState
 								title={hasFlowCanvas ? 'An empty canvas' : 'No nodes yet'}
 								description={hasFlowCanvas
-									? 'The trigger on the left starts every run. Drag a node in from the palette, or pick a way in below.'
-									: 'The trigger above starts every run. Add a node from the palette, or pick a way in below.'}
+									? 'The trigger on the left starts every run. Drag a node in from the palette, or choose a starting point below.'
+									: 'The trigger above starts every run. Add a node from the palette, or choose a starting point below.'}
 							>
 								{#snippet iconSnippet()}<Workflow size={ICON.lg} />{/snippet}
 								{#snippet action()}
@@ -812,9 +812,9 @@
 				{:else if tab === 'runs'}
 					<div class="flex h-full flex-col gap-3 overflow-y-auto p-3">
 						{#if !data.runs.ok}
-							<GateNotice level={2} gate={data.runs.gate} title="the runs" absent="This flow is no longer there, so it has no runs." />
+							<GateNotice level={2} gate={data.runs.gate} title="the runs" absent="This flow no longer exists. Reload the page." />
 						{:else if data.runs.value.rows.length === 0}
-							<p class="text-sm text-muted">No runs recorded yet.</p>
+							<p class="text-sm text-muted">No runs yet.</p>
 						{:else}
 							<Table hoverable label="Runs">
 								<thead>
@@ -903,7 +903,7 @@
 		<NotEnabled
 			level={2}
 			title="Flows"
-			description="The engine refused the flow routes."
+			description="Flows are not enabled on this instance."
 		/>
 	</PageShell>
 {/if}

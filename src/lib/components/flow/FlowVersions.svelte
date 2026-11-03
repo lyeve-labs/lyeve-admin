@@ -22,7 +22,7 @@
 {#if !versions.ok}
 	<SectionHeading level={2} variant="eyebrow">Versions</SectionHeading>
 	<p class="text-xs text-muted" data-testid="versions-unread">
-		The versions could not be read, so none can be rolled back to from here. Reload to try again.
+		Could not load versions. Reload the page to try again.
 	</p>
 {:else if versions.value.length > 0}
 	<SectionHeading level={2} variant="eyebrow">Versions</SectionHeading>

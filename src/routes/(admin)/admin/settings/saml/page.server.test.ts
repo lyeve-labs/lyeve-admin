@@ -111,10 +111,10 @@ describe('SAML writes', () => {
 	});
 
 	it.each([
-		['name', 'Name the provider so people know what they are signing in with.'],
-		['entity_id', 'The IdP entity ID is required.'],
-		['sso_url', 'The IdP sign-on URL is required.'],
-		['idp_cert', 'The IdP certificate is required, or no assertion can be verified.'],
+		['name', 'Enter a name for the provider.'],
+		['entity_id', 'Enter the entity ID.'],
+		['sso_url', 'Enter the sign-on URL.'],
+		['idp_cert', "Paste the identity provider's signing certificate."],
 	])('asks for %s before it creates anything', async (field, sentence) => {
 		const { event, calls } = write({ ...PROVIDER, [field]: ' ' });
 		expect(((await actions.create(event)) as Failure).data).toEqual({ action: 'create', error: sentence });
@@ -135,8 +135,8 @@ describe('SAML writes', () => {
 	});
 
 	it.each([
-		['entity_id', 'The IdP entity ID is required.'],
-		['sso_url', 'The IdP sign-on URL is required.'],
+		['entity_id', 'Enter the entity ID.'],
+		['sso_url', 'Enter the sign-on URL.'],
 	])('refuses an edit that empties %s before it saves anything', async (field, sentence) => {
 		const { event, calls } = write({ ...PROVIDER, id: 'p1', [field]: ' ' });
 		expect(((await actions.update(event)) as Failure).data).toEqual({ action: 'update', error: sentence });
@@ -155,7 +155,7 @@ describe('SAML writes', () => {
 
 	it.each(['update', 'delete', 'prepare', 'rollover'] as const)('names nothing to %s without a request', async (name) => {
 		const { event, calls } = write({ ...PROVIDER });
-		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'No provider was named.' });
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'This form is missing its provider. Reload the page and try again.' });
 		expect(calls).toEqual([]);
 	});
 
@@ -166,11 +166,11 @@ describe('SAML writes', () => {
 	});
 
 	it.each([
-		['create', 'The provider could not be created.'],
-		['update', 'The provider could not be saved.'],
-		['delete', 'The provider could not be removed.'],
-		['prepare', 'A new certificate could not be prepared.'],
-		['rollover', 'The certificate could not be promoted.'],
+		['create', 'Could not create the provider. Try again.'],
+		['update', 'Could not save the provider. Try again.'],
+		['delete', 'Could not delete the provider. Try again.'],
+		['prepare', 'Could not prepare a new certificate. Try again.'],
+		['rollover', 'Could not promote the certificate. Try again.'],
 	] as const)('keeps outage detail off the page on %s', async (name, sentence) => {
 		const { event } = write({ ...PROVIDER, id: 'p1' }, OUTAGE);
 		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: sentence });

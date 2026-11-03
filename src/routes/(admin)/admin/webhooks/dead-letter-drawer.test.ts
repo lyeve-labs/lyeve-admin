@@ -102,7 +102,7 @@ describe('the dead letter drawer', () => {
 		expect(await deleteSubmit()({ cancel })).toBeUndefined();
 		expect(cancel).toHaveBeenCalled();
 		const [title, detail] = kit.confirm.mock.calls[0] as unknown as [string, string];
-		expect(title).toBe('Delete the dead letter from Ship it');
+		expect(title).toBe('Delete the dead letter from Ship it?');
 		expect(detail).toContain('2026');
 	});
 });
@@ -131,7 +131,7 @@ describe('the result of a replay or a dismissal', () => {
 		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
 		await rerender({ form: { deadLetterReplay: { id: 'a', status: 'replayed', http_status: 502 } } });
 		const row = dialog()?.querySelector('tbody tr');
-		expect(row?.textContent).toContain('The receiver answered HTTP 502. The entry is still pending.');
+		expect(row?.textContent).toContain('The receiver returned HTTP 502. The entry is still pending.');
 		expect(row?.querySelector('form[action="?/dead-letter-replay"]')).not.toBeNull();
 	});
 });
@@ -147,8 +147,8 @@ describe('the queue and its own failures', () => {
 
 	it('ignores a failure of another action', async () => {
 		const { rerender } = render(DeadLetterDrawer, { props: { form: { deadLetters: [entry('a', 'pending')] } } });
-		await rerender({ form: { action: 'delete', error: 'Failed to delete webhook' } });
-		expect(dialog()?.textContent).not.toContain('Failed to delete webhook');
+		await rerender({ form: { action: 'delete', error: 'Could not delete the webhook. Try again.' } });
+		expect(dialog()?.textContent).not.toContain('Could not delete the webhook. Try again.');
 	});
 
 	it('holds replay and dismiss with the reason once the license refused one, and keeps delete', () => {

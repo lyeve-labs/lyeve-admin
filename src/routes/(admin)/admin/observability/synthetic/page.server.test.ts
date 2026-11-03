@@ -121,8 +121,33 @@ describe('running a probe now', () => {
 			{ id: 'r2', probe_id: 'p1', status: 'fail', response_time_ms: 3000, region: 'eu-west', created_at: '' },
 		]);
 		const out = await actions.run(actionEvent({ id: 'p1' }));
-		expect(engine.post).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1/run', {});
+		expect(engine.post).toHaveBeenCalledWith('/api/admin/synthetic-monitoring/probes/p1/run', {}, {
+			signal: expect.any(AbortSignal),
+		});
 		expect(out).toEqual({ ran: 'p1', status: 'fail', ms: 3000, failed: 1, regions: 2 });
+	});
+
+	// The run goes on after the wait ends, so no answer is not a failure.
+	it('reports a run that outlasted the wait as still going', async () => {
+		engine.post.mockRejectedValue(new DOMException('The operation timed out.', 'TimeoutError'));
+		expect(await actions.run(actionEvent({ id: 'p1' }))).toEqual({ running: 'p1', already: false });
+	});
+
+	it('reports a dropped connection as a run still going', async () => {
+		engine.post.mockRejectedValue(new TypeError('fetch failed'));
+		expect(await actions.run(actionEvent({ id: 'p1' }))).toEqual({ running: 'p1', already: false });
+	});
+
+	it('reports a conflict as a run of the probe already going', async () => {
+		engine.post.mockRejectedValue(new ApiError(409, 'probe run already in progress for this probe', {}));
+		expect(await actions.run(actionEvent({ id: 'p1' }))).toEqual({ running: 'p1', already: true });
+	});
+
+	it('keeps an engine failure a failure in the console\'s own words', async () => {
+		engine.post.mockRejectedValue(new ApiError(503, 'down', {}));
+		const out = (await actions.run(actionEvent({ id: 'p1' }))) as unknown as Failure;
+		expect(out.status).toBe(400);
+		expect(out.data.error).toBe('Could not run the probe. Try again.');
 	});
 });
 
@@ -283,7 +308,7 @@ describe('editing a probe', () => {
 		const out = (await actions.update(requestEvent(fields({ secret: '' })))) as Failure;
 		expect(out.status).toBe(400);
 		expect(out.data).toMatchObject({ drawer: 'probe' });
-		expect(String(out.data.error)).toContain('Enter it again');
+		expect(String(out.data.error)).toContain('Enter the password again');
 		expect(engine.put).not.toHaveBeenCalled();
 	});
 
@@ -323,7 +348,7 @@ describe('editing a probe', () => {
 	it('says an outage failed the save', async () => {
 		engine.put.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.update(requestEvent(fields()))) as Failure;
-		expect(out.data).toMatchObject({ error: 'The probe could not be saved.', drawer: 'probe' });
+		expect(out.data).toMatchObject({ error: 'Could not save the probe. Try again.', drawer: 'probe' });
 	});
 });
 
@@ -349,7 +374,7 @@ describe('deleting a probe', () => {
 	it('says an outage failed the delete', async () => {
 		engine.delete.mockRejectedValue(new ApiError(503, 'down', {}));
 		const out = (await actions.delete(actionEvent({ id: 'p1' }))) as Failure;
-		expect(out.data.error).toBe('The probe could not be removed.');
+		expect(out.data.error).toBe('Could not delete the probe. Try again.');
 	});
 });
 
@@ -374,6 +399,6 @@ describe('acknowledging an alert', () => {
 	it('says an outage failed the acknowledgment', async () => {
 		engine.post.mockRejectedValue(new TypeError('fetch failed'));
 		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
-		expect(out.data.error).toBe('The alert could not be acknowledged.');
+		expect(out.data.error).toBe('Could not acknowledge the alert. Try again.');
 	});
 });

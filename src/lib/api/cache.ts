@@ -72,7 +72,7 @@ export const CACHE_OK: CacheGate = GATE_OK;
 
 /** What a refused cache read means, read the way every plugin's is. */
 export function cacheGate(err: unknown): CacheGate {
-	return gateOf(err, 'The cache could not be read. This is not a report that it is healthy.');
+	return gateOf(err, 'Could not load the cache status.');
 }
 
 export async function readStats(client: HttpClient): Promise<CacheStats> {
@@ -107,13 +107,13 @@ export async function listProviders(client: HttpClient): Promise<ProvidersRead> 
 export function inactiveReason(reason: string): string {
 	switch (reason) {
 		case 'provider_limit':
-			return 'Left out: this install runs one provider. The license decides whether the rest run with failover.';
+			return 'Not running. Only one provider runs unless your license includes failover.';
 		case 'networked_unavailable':
-			return 'Left out: this engine does not run networked cache providers.';
+			return 'Not running. Networked cache providers are not available on this instance.';
 		case 'create_failed':
-			return 'Could not be started. Check its address and settings in the deployment.';
+			return 'Could not start. Check its address and settings in your deployment.';
 		case 'register_failed':
-			return 'Refused at start, usually because another provider already has its name.';
+			return 'Could not start, usually because another provider already uses its name.';
 		default:
 			return 'Not running.';
 	}
@@ -284,7 +284,7 @@ export function circuitState(provider: CacheProvider): CircuitState {
 
 export const CIRCUIT_LABELS: Readonly<Record<CircuitState, string>> = {
 	closed: 'Healthy',
-	open: 'Cut out, not being used',
+	open: 'Taken out of use after failures',
 	'half-open': 'Testing whether it recovered',
 	unknown: 'Not reported',
 };

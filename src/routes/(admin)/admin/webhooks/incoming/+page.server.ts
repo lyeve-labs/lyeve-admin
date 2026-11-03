@@ -22,7 +22,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
 
 /** What the page says for a list read that failed for no reason it can name. */
-const LIST_FAILED = 'The incoming webhooks could not be read. This is not a report that there are none.';
+const LIST_FAILED = 'Could not load incoming webhooks.';
 
 function parseIPList(raw: FormDataEntryValue | null): string[] {
 	const s = String(raw ?? '').trim();
@@ -47,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
 			),
 			LIST_FAILED
 		),
-		section(getSchemas(client), 'The schemas could not be read.')
+		section(getSchemas(client), 'Could not load schemas.')
 	]);
 
 	if (!read.ok) {
@@ -103,7 +103,7 @@ export const actions: Actions = {
 		if (Object.keys(fieldMap).length === 0) {
 			return fail(400, {
 				action: 'create',
-				error: 'Field map must connect at least one external key to a schema field.',
+				error: 'Map at least one external key to a schema field.',
 			});
 		}
 
@@ -120,7 +120,7 @@ export const actions: Actions = {
 				client
 			);
 		} catch (err) {
-			return tagged('create', actionFailure(err, 'Failed to create incoming webhook'));
+			return tagged('create', actionFailure(err, 'Could not create the incoming webhook. Try again.'));
 		}
 	},
 
@@ -145,7 +145,7 @@ export const actions: Actions = {
 		if (Object.keys(fieldMap).length === 0) {
 			return fail(400, {
 				action: 'update',
-				error: 'Field map must connect at least one external key to a schema field.',
+				error: 'Map at least one external key to a schema field.',
 			});
 		}
 
@@ -163,7 +163,7 @@ export const actions: Actions = {
 				client
 			);
 		} catch (err) {
-			return tagged('update', actionFailure(err, 'Failed to update incoming webhook'));
+			return tagged('update', actionFailure(err, 'Could not save the incoming webhook. Try again.'));
 		}
 	},
 
@@ -178,7 +178,7 @@ export const actions: Actions = {
 		try {
 			await deleteIncomingWebhook(id, client);
 		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Failed to delete incoming webhook'));
+			return tagged('delete', actionFailure(err, 'Could not delete the incoming webhook. Try again.'));
 		}
 	}
 };

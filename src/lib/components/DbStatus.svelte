@@ -62,14 +62,14 @@
 			if (result.type === 'failure') {
 				const message = result.data?.error;
 				await overlayClosed();
-				error = typeof message === 'string' && message ? message : 'Migration failed';
+				error = typeof message === 'string' && message ? message : 'Could not apply the migrations. Try again.';
 				// The queue moved since it was listed, so the list is read again.
 				if (result.status === 409) await invalidate(MIGRATIONS_DEPENDENCY);
 				return;
 			}
 			if (result.type === 'error') {
 				await overlayClosed();
-				error = 'Network error';
+				error = 'Could not apply the migrations. Check your connection and try again.';
 				return;
 			}
 			/*
@@ -98,7 +98,7 @@
 	<span
 		class="{chip} border-line text-faint"
 		data-testid="db-status"
-		title="The instance did not answer the migration check"
+		title="Could not check for pending migrations"
 	>
 		<CircleHelp size={ICON.sm} class="shrink-0" aria-hidden="true" />
 		<span class={words}>Database unknown</span>
@@ -118,7 +118,7 @@
 		type="button"
 		data-testid="db-status"
 		loading={syncing}
-		title={error || `${pending} migration${pending === 1 ? '' : 's'} waiting to be applied`}
+		title="{pending} migration{pending === 1 ? '' : 's'} waiting to be applied"
 		onclick={() => (confirming = true)}
 	>
 		<CircleAlert size={ICON.sm} class="shrink-0 text-warn" aria-hidden="true" />
@@ -143,7 +143,7 @@
 					{/if}
 				</li>
 			{:else}
-				<li class="text-faint">The instance listed no statements.</li>
+				<li class="text-faint">No statements to run.</li>
 			{/each}
 		</ul>
 		<form id="db-status-apply" method="POST" action="/admin?/applyMigrations" use:enhance={applying}>

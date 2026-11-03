@@ -34,18 +34,18 @@ export async function uploadLogo(event: RequestEvent, file: File, noun = 'logo')
 	body.append('folder', '/branding');
 	body.append('alt_text', noun[0].toUpperCase() + noun.slice(1));
 	const up = await event.fetch('/api/admin/media', { method: 'POST', headers, body });
-	if (!up.ok) throw new LogoRejected(await engineMessage(up, `The ${noun} could not be uploaded.`));
+	if (!up.ok) throw new LogoRejected(await engineMessage(up, `Could not upload the ${noun}. Try again.`));
 	const items = (await up.json().catch(() => [])) as MediaItem[] | MediaItem;
 	const stored = Array.isArray(items) ? items[0] : items;
-	if (!stored?.id) throw new LogoRejected(`The ${noun} could not be uploaded.`);
+	if (!stored?.id) throw new LogoRejected(`Could not upload the ${noun}. Try again.`);
 
 	const pub = await event.fetch(`/api/admin/media/${encodeURIComponent(stored.id)}`, {
 		method: 'PATCH',
 		headers: { ...headers, 'Content-Type': 'application/json' },
 		body: JSON.stringify({ public: true }),
 	});
-	if (!pub.ok) throw new LogoRejected(`The ${noun} was uploaded to the media library but could not be published there.`);
+	if (!pub.ok) throw new LogoRejected(`Could not publish the ${noun}. It was uploaded to the media library, where you can publish it.`);
 	const published = (await pub.json().catch(() => null)) as MediaItem | null;
-	if (!published?.public_url) throw new LogoRejected(`The ${noun} was uploaded to the media library but could not be published there.`);
+	if (!published?.public_url) throw new LogoRejected(`Could not publish the ${noun}. It was uploaded to the media library, where you can publish it.`);
 	return published.public_url;
 }

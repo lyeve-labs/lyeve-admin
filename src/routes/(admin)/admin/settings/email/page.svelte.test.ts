@@ -110,7 +110,7 @@ async function chooseTransport(container: HTMLElement, label: string) {
 describe('email providers page', () => {
 	it('says the plugin did not answer, and offers nothing to create', () => {
 		const { container, queryByText } = setup([], { providers: down });
-		expect(container.textContent).toContain('so email providers could not be read');
+		expect(container.textContent).toContain('so email providers did not load');
 		expect(queryByText('No providers yet')).toBeNull();
 		expect(queryByText('New provider')).toBeNull();
 	});
@@ -223,7 +223,7 @@ describe('email providers page', () => {
 
 		await chooseTransport(container, 'Provider API');
 		expect((form.querySelector('[name="api_key"]') as HTMLInputElement).required).toBe(true);
-		expect(container.textContent).toContain('transport changed');
+		expect(container.textContent).toContain('Enter a key for the new transport.');
 	});
 
 	const drawerText = (container: HTMLElement) => formEl(container)?.textContent ?? '';
@@ -236,16 +236,17 @@ describe('email providers page', () => {
 	});
 
 	it('shows a failed delete above the list and leaves a newly opened drawer clean', async () => {
-		const { getAllByText, container } = setup([smtp], {}, { action: 'delete', error: 'Failed to delete the provider.' });
-		expect(container.textContent).toContain('Failed to delete the provider.');
+		const failed = 'Could not delete the provider. Try again.';
+		const { getAllByText, container } = setup([smtp], {}, { action: 'delete', error: failed });
+		expect(container.textContent).toContain(failed);
 		await fireEvent.click(getAllByText('New provider')[0]);
-		expect(drawerText(container)).not.toContain('Failed to delete');
+		expect(drawerText(container)).not.toContain(failed);
 	});
 
 	it('keeps a mail setting failure out of the provider drawer', async () => {
-		const { getAllByText, container } = setup([smtp], {}, { key: 'SMTP_HOST', error: 'Not a mail setting' });
+		const { getAllByText, container } = setup([smtp], {}, { key: 'SMTP_HOST', error: 'This setting cannot be changed here.' });
 		await fireEvent.click(getAllByText('New provider')[0]);
-		expect(drawerText(container)).not.toContain('Not a mail setting');
+		expect(drawerText(container)).not.toContain('This setting cannot be changed here.');
 	});
 });
 
@@ -276,13 +277,13 @@ describe('email page fallback transport', () => {
 		const text = (setup([smtp], { mail: { ok: true, value: mail } }).container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('Provider pool');
 		expect(text).toContain('tried first');
-		expect(text).toContain('takes effect at the next restart');
+		expect(text).toContain('takes effect at the next engine restart');
 	});
 
 	it('says the transport could not be read rather than leaving it out', () => {
-		const { container } = setup([smtp], { mail: { ok: false, gate: { state: 'error', message: 'The fallback transport could not be read. This is not a report that it is unset.' } } });
+		const { container } = setup([smtp], { mail: { ok: false, gate: { state: 'error', message: 'Could not load the fallback transport.' } } });
 		expect(container.textContent).toContain('Fallback transport');
-		expect(container.textContent).toContain('This is not a report that it is unset.');
+		expect(container.textContent).toContain('Could not load the fallback transport.');
 		expect(container.querySelector('#set-SMTP_HOST')).toBeNull();
 	});
 
@@ -312,8 +313,8 @@ describe('email provider controls', () => {
 		await fireEvent.click(getAllByText('New provider')[0]);
 		await chooseTransport(container, 'Provider API');
 		const hints: Record<string, string> = {
-			Transport: 'SMTP talks to a mail server.',
-			Method: 'The verb of the send request.',
+			Transport: 'SMTP sends through a mail server.',
+			Method: 'The HTTP method of the send request.',
 		};
 		for (const [group, hint] of Object.entries(hints)) {
 			const radios = container.querySelector(`[role="radiogroup"][aria-label="${group}"]`) as HTMLElement;
@@ -329,7 +330,7 @@ describe('email provider delete', () => {
 	it('names the provider and sends its id', async () => {
 		const { getByLabelText } = setup([smtp]);
 		const out = await pressDelete(getByLabelText('Delete Primary'), 'id');
-		expect(out.title).toBe('Delete provider Primary');
+		expect(out.title).toBe('Delete provider Primary?');
 		expect(out.sent).toBe('p1');
 	});
 });

@@ -25,7 +25,7 @@ export const load: PageServerLoad = async (event) => {
 			total = Math.max(totalOf(res), offset + releases.length);
 			stated = statedTotal(res);
 		} catch (err) {
-			gate = gateOf(err, 'Releases could not be read. This is not a report that there are none.');
+			gate = gateOf(err, 'Could not load releases.');
 		}
 	}
 	const back = gate.state === 'ok' ? pastEndOffset(releases.length, limit, offset, stated) : null;
@@ -40,13 +40,13 @@ export const actions: Actions = {
 		const name = String(form.get('name') ?? '').trim();
 		const description = String(form.get('description') ?? '').trim();
 		if (!name) {
-			return fail(400, { error: 'Check the highlighted fields.', fields: { name: 'Name is required' } });
+			return fail(400, { error: 'Check the highlighted fields.', fields: { name: 'Enter a name.' } });
 		}
 		let created: Release;
 		try {
 			created = await createRelease(authedClient(event), { name, description });
 		} catch (err) {
-			return actionFailure(err, 'The release could not be created.');
+			return actionFailure(err, 'Could not create the release. Try again.');
 		}
 		redirect(303, `/admin/releases/${created.id}`);
 	},

@@ -69,8 +69,8 @@
 		if (setting.source === 'env') return 'Set by an environment variable, which always wins.';
 		if (setting.source === 'file') {
 			return setting.origin
-				? `Pinned by ${setting.origin}. Tag the value !overridable to edit it here.`
-				: 'Pinned by the configuration file. Tag the value !overridable to edit it here.';
+				? `Set in ${setting.origin}. Tag the value !overridable there to edit it here.`
+				: 'Set in the configuration file. Tag the value !overridable there to edit it here.';
 		}
 		return '';
 	}
@@ -207,14 +207,14 @@
 	const keyKept = $derived(editing !== null && editing.transport === 'api');
 	const keptHint = 'Stored and never shown. Leave blank to keep it.';
 	const keyHint = $derived(
-		keyKept ? keptHint : editing ? 'The transport changed, so a key is needed.' : 'Encrypted at rest and never echoed back.',
+		keyKept ? keptHint : editing ? 'Enter a key for the new transport.' : 'Encrypted at rest and never shown again.',
 	);
 
 	let deleteId = $state('');
 	let deleteForm = $state<HTMLFormElement>();
 
 	async function askDelete(p: EmailProvider) {
-		const ok = await confirm(`Delete provider ${p.name}`, 'Sends that rotate onto it will go to the next provider.', {
+		const ok = await confirm(`Delete provider ${p.name}?`, 'Mail that would go through it goes to the next provider instead.', {
 			confirmLabel: 'Delete',
 		});
 		if (!ok) return;
@@ -227,13 +227,13 @@
 		return p.transport === 'api' ? p.api_base_url ?? '' : p.host;
 	}
 
-	const placeholderHint = `A JSON template. ${BODY_PLACEHOLDERS.map((p) => `{{${p}}}`).join(', ')} are substituted at send time; {{to}} is an array of addresses, {{to_first}} its first address and {{to_objects}} the same list as objects with an email key.`;
+	const placeholderHint = `A JSON template. ${BODY_PLACEHOLDERS.map((p) => `{{${p}}}`).join(', ')} are filled in at send time. {{to}} is an array of addresses, {{to_first}} its first address and {{to_objects}} the same list as objects with an email key.`;
 </script>
 
 <PageShell
 	title="Email"
 	documentTitle="Email providers"
-	description="How this instance sends mail. The provider pool is tried first, and the fallback transport below it catches anything the pool cannot send."
+	description="Set up how this instance sends mail. Providers in the pool are tried first, and the fallback transport sends anything the pool cannot."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -258,19 +258,19 @@
 	<section class="flex flex-col gap-4">
 		<SectionHeading level={2}>Provider pool</SectionHeading>
 		<p class="text-sm text-muted">
-			An SMTP server, or a provider's HTTP API with a key. The lowest priority that is healthy
-			sends first, and a provider saved here joins the rotation straight away.
+			Each provider is an SMTP server or a provider's HTTP API with a key. The healthy provider with
+			the lowest priority number sends first, and a provider you save here joins the rotation immediately.
 		</p>
 
 	{#if !data.providers.ok}
-		<GateNotice gate={data.providers.gate} title="Email providers" absent="The email plugin is not part of this build, so no provider sends mail." />
+		<GateNotice gate={data.providers.gate} title="Email providers" absent="Email is not included in this build." />
 	{:else}
 		<FormErrors message={deleteFailure?.error} refused={pageRefusal} />
 
 		{#if providers.length === 0}
 			<EmptyState
 				title="No providers yet"
-				description="Until one exists, mail goes through the fallback transport below, if it is set."
+				description="Until you create one, mail goes through the fallback transport below, if it is set."
 			>
 				{#snippet iconSnippet()}<Mail size={ICON.lg} />{/snippet}
 				{#snippet action()}
@@ -337,17 +337,16 @@
 	{#if data.mail && !data.mail.ok}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Fallback transport</SectionHeading>
-			<GateNotice gate={data.mail.gate} title="Fallback transport" absent="This engine does not report its configuration." />
+			<GateNotice gate={data.mail.gate} title="Fallback transport" absent="The fallback transport needs a newer version of the engine." />
 		</section>
 	{:else if mail.length > 0}
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Fallback transport</SectionHeading>
 			<p class="text-sm text-muted">
-				Engine settings, used when the pool is empty or every provider in it fails. Password
-				resets and sign-in links use this when no provider can send, so an instance with no pool
-				still delivers them. The engine reads these at boot, so a change takes effect at
-				the next restart. A password is write-only: it is never sent back to this page, and
-				saving a new one replaces the stored value.
+				These engine settings are used when the pool is empty or every provider in it fails.
+				Password resets and sign-in links use them when no provider can send, so those still arrive
+				on an instance with no pool. A change takes effect at the next engine restart. A password
+				is never shown again after you save it, and saving a new one replaces it.
 			</p>
 
 			<Card>
@@ -420,7 +419,7 @@
 			name="transport"
 			options={TRANSPORT_OPTIONS}
 			bind:value={transport}
-			hint="SMTP talks to a mail server. A provider API sends over HTTPS with a key."
+			hint="SMTP sends through a mail server. Provider API sends over HTTPS with a key."
 		/>
 		<Input id="ep-from" name="from_addr" label="From address" placeholder="noreply@example.com" value={editing?.from_addr ?? ''} required />
 
@@ -442,13 +441,13 @@
 					name="api_method"
 					options={METHOD_OPTIONS}
 					bind:value={apiMethod}
-					hint="The verb of the send request. POST for nearly every provider."
+					hint="The HTTP method of the send request. Nearly every provider uses POST."
 				/>
-				<Input id="ep-api-path" name="api_path" label="Path" placeholder="/v3/messages" hint="Appended to the base URL. Starts with / and carries no query string." bind:value={apiPath} />
+				<Input id="ep-api-path" name="api_path" label="Path" placeholder="/v3/messages" hint="Added to the base URL. Start it with / and leave out any query string." bind:value={apiPath} />
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-xs font-semibold uppercase tracking-wide text-faint">Headers</legend>
 					<p class="text-xs text-muted">
-						Write <span class="font-mono">{'{{api_key}}'}</span> where the key goes, or <span class="font-mono">{'{{basic:<user>}}'}</span> for a basic-auth header built from that user and the key. Both are spliced in at send time and never stored in the header.
+						Write <span class="font-mono">{'{{api_key}}'}</span> where the key goes, or <span class="font-mono">{'{{basic:<user>}}'}</span> for a basic-auth header built from that user and the key. Both are filled in at send time and never stored in the header.
 					</p>
 					{#each apiHeaders as h, i (i)}
 						<div class="flex items-end gap-2">
@@ -467,27 +466,27 @@
 					</div>
 				</fieldset>
 				<Textarea id="ep-api-body" name="api_body" label="Body template" rows={8}  hint={placeholderHint} bind:value={apiBody} mono />
-				<Input id="ep-api-message-id-path" name="api_message_id_path" label="Message id path (optional)" placeholder="data.id" hint="A dotted path into the response that names the provider's message id." bind:value={apiMessageIdPath} />
+				<Input id="ep-api-message-id-path" name="api_message_id_path" label="Message id path (optional)" placeholder="data.id" hint="A dotted path to the provider's message id in the response." bind:value={apiMessageIdPath} />
 			</div>
 
 			<div class="flex flex-col gap-3 rounded-md border border-line p-3" data-testid="webhook-section">
 				<SectionHeading level={3} variant="eyebrow">Delivery webhook</SectionHeading>
 				<p class="text-xs text-muted">
 					{#if editing && editing.transport === 'api'}
-						Point the provider at <span class="font-mono">{webhookPath(editing.id)}</span> on this instance, with the secret as its token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
+						Set the provider's webhook to <span class="font-mono">{webhookPath(editing.id)}</span> on this instance, and send the secret as the token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
 					{:else}
-						Once the row exists, the list shows the path on this instance to point the provider at. The secret is its token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
+						After you create the provider, the list shows its webhook path on this instance. Send the secret as the token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
 					{/if}
-					These paths read the event out of what it posts.
+					The paths below find each field in what the provider posts.
 				</p>
 				<PasswordInput id="ep-webhook-secret" name="webhook_secret" label="Webhook secret" hint={keyKept ? keptHint : 'Encrypted at rest.'} autocomplete="off" />
 				<Input id="ep-webhook-event-path" name="api_webhook_event_path" label="Event path" placeholder="event" bind:value={webhookEventPath} />
 				<Input id="ep-webhook-recipient-path" name="api_webhook_recipient_path" label="Recipient path" placeholder="recipient" bind:value={webhookRecipientPath} />
 				<Input id="ep-webhook-message-id-path" name="api_webhook_message_id_path" label="Message id path" placeholder="message.id" bind:value={webhookMessageIdPath} />
-				<Input id="ep-webhook-reason-path" name="api_webhook_reason_path" label="Reason path (optional)" placeholder="delivery-status.message" hint="Where the provider's own text for a bounce sits. The classifier reads it to name a category." bind:value={webhookReasonPath} />
+				<Input id="ep-webhook-reason-path" name="api_webhook_reason_path" label="Reason path (optional)" placeholder="delivery-status.message" hint="Where the provider puts its text for a bounce. It is used to sort the bounce into a category." bind:value={webhookReasonPath} />
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-xs font-semibold uppercase tracking-wide text-faint">Event map</legend>
-					<p class="text-xs text-muted">The provider's event value on the left, what it means on the right.</p>
+					<p class="text-xs text-muted">Map each event value the provider sends to what it means.</p>
 					{#each eventMap as m, i (i)}
 						<div class="flex items-end gap-2">
 							<Input id="ep-event-key-{i}" name="event_map_key" label="Provider value" bind:value={m.key} class="min-w-0 flex-1" />
@@ -516,7 +515,7 @@
 				<PasswordInput id="ep-password" name="password" label="Password" hint={passwordKept ? keptHint : 'Encrypted at rest.'} autocomplete="off" />
 				<div>
 					<input type="hidden" name="use_tls" value={useTLS ? 'true' : 'false'} />
-					<Toggle id="ep-use-tls" label="Implicit TLS" hint="For port 465. Off, the connection upgrades with STARTTLS when the server offers it." bind:checked={useTLS} />
+					<Toggle id="ep-use-tls" label="Implicit TLS" hint="Encrypts the connection from the start, for port 465. When off, the connection switches to STARTTLS if the server offers it." bind:checked={useTLS} />
 				</div>
 			</div>
 		{/if}

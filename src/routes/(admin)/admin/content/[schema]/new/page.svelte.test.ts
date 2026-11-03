@@ -34,7 +34,7 @@ describe('new entry locale', () => {
 		const { getByText, queryByLabelText } = render(NewEntryPage, {
 			props: { data: data({ ok: false, gate: { state: 'unavailable' } }), form: null },
 		});
-		expect(getByText(/The locales could not be read/)).toBeTruthy();
+		expect(getByText(/Could not load the locales/)).toBeTruthy();
 		expect(queryByLabelText('Locale')).toBeNull();
 	});
 

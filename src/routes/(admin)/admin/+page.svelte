@@ -68,7 +68,7 @@
 
 <PageShell
 	title="Dashboard"
-	description="What this instance is holding and doing right now."
+	description="Check this instance's content, traffic and health."
 	width="wide"
 >
 	{#snippet actions()}
@@ -102,7 +102,7 @@
 	{#if data.layoutUnread}
 		<p class="flex flex-wrap items-center gap-2 text-sm text-muted">
 			<TriangleAlert size={ICON.md} class="shrink-0 text-warn" aria-hidden="true" />
-			This tenant's own dashboard could not be read, so the standard one is shown.
+			Could not load this tenant's own dashboard. Showing the standard one.
 			<a class="relative hit-area underline hover:text-fg" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>Try again</a>
 		</p>
 	{/if}
@@ -117,7 +117,7 @@
 			level={2}
 			gate={data.home.gate}
 			title="The home page"
-			absent="The home page chosen in customization, {data.home.slug}, was not found. Choose another one there."
+			absent="The home page set in Customization, {data.home.slug}, no longer exists. Choose another one in Customization."
 		/>
 	{:else if data.homePage}
 		<section class="flex flex-col gap-4" aria-label={data.homePage.title}>
@@ -127,13 +127,13 @@
 
 	{#if data.composed}
 		{#if data.composed.length === 0}
-			<p class="text-sm text-muted">This dashboard has nothing for your role yet.</p>
+			<p class="text-sm text-muted">This dashboard has no widgets for your role yet.</p>
 		{:else}
 			<DashboardWidgets widgets={data.composed} now={new Date(data.now)} />
 		{/if}
 	{:else if schemas && schemas.length === 0}
 		{#if data.isAdmin}
-			<EmptyState level={2} title="No schemas yet" description="A content type is the first thing to make.">
+			<EmptyState level={2} title="No schemas yet" description="Create a schema to start adding content.">
 				{#snippet action()}
 					<Button variant="secondary" href="/admin/schema">
 						<Plus size={ICON.sm} /> New schema
@@ -142,7 +142,7 @@
 			</EmptyState>
 		{:else}
 			<!-- The engine admits a new schema only from an admin. -->
-			<EmptyState level={2} title="No schemas yet" description="An admin makes the first content type. Your entries start once one exists." />
+			<EmptyState level={2} title="No schemas yet" description="Ask an admin to create one." />
 		{/if}
 	{:else}
 		{#if data.isAdmin}
@@ -154,7 +154,7 @@
 					{#if data.attention.length === 0 && unread}
 						<p class="flex items-center gap-2 px-card py-card-sm text-sm text-muted">
 							<TriangleAlert size={ICON.md} class="shrink-0 text-warn" aria-hidden="true" />
-							Nothing needs attention in what could be read. A tile below says unknown where its read failed.
+							Nothing needs attention in what loaded. Tiles marked unknown did not load.
 						</p>
 					{:else if data.attention.length === 0}
 						<p class="flex items-center gap-2 px-card py-card-sm text-sm text-muted">
@@ -297,7 +297,7 @@
 							{#if data.traffic}
 								<TrafficBars hours={data.traffic} />
 							{:else}
-								<p class="text-sm text-faint">The trend could not be read.</p>
+								<p class="text-sm text-faint">Could not load the trend. Reload the page to try again.</p>
 							{/if}
 						</div>
 					</Card>
@@ -305,9 +305,9 @@
 					<Card>
 						<SectionHeading level={3}>Busiest endpoints</SectionHeading>
 						{#if !data.endpoints}
-							<p class="mt-3 text-sm text-faint">The breakdown could not be read.</p>
+							<p class="mt-3 text-sm text-faint">Could not load the busiest endpoints. Reload the page to try again.</p>
 						{:else if data.endpoints.length === 0}
-							<p class="mt-3 text-sm text-muted">No request in the window.</p>
+							<p class="mt-3 text-sm text-muted">No requests in this window.</p>
 						{:else}
 							<ul class="mt-3 divide-y divide-line">
 								{#each data.endpoints as e (e.key)}
@@ -340,7 +340,7 @@
 								{/snippet}
 							</SectionHeading>
 							{#if !data.entries}
-								<p class="mt-3 text-sm text-faint">The recent entries could not be read.</p>
+								<p class="mt-3 text-sm text-faint">Could not load recent entries. Reload the page to try again.</p>
 							{:else if data.entries.length === 0}
 								<p class="mt-3 text-sm text-muted">No entries yet.</p>
 							{:else}
@@ -376,9 +376,9 @@
 								{/snippet}
 							</SectionHeading>
 							{#if !data.audit}
-								<p class="mt-3 text-sm text-faint">The audit log could not be read.</p>
+								<p class="mt-3 text-sm text-faint">Could not load the audit log. Reload the page to try again.</p>
 							{:else if data.audit.length === 0}
-								<p class="mt-3 text-sm text-muted">Nothing recorded yet.</p>
+								<p class="mt-3 text-sm text-muted">No audit entries yet.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
 									{#each data.audit as entry (entry.id)}
@@ -406,9 +406,9 @@
 								{/snippet}
 							</SectionHeading>
 							{#if !data.deadLetters}
-								<p class="mt-3 text-sm text-faint">The dead letter queue could not be read.</p>
+								<p class="mt-3 text-sm text-faint">Could not load the dead letter queue. Reload the page to try again.</p>
 							{:else if data.deadLetters.length === 0}
-								<p class="mt-3 text-sm text-muted">No delivery is waiting in the dead letter queue.</p>
+								<p class="mt-3 text-sm text-muted">No deliveries are waiting in the dead letter queue.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
 									{#each data.deadLetters as letter (letter.id)}
@@ -440,9 +440,9 @@
 								{/snippet}
 							</SectionHeading>
 							{#if !data.errors}
-								<p class="mt-3 text-sm text-faint">The log could not be read.</p>
+								<p class="mt-3 text-sm text-faint">Could not load the log. Reload the page to try again.</p>
 							{:else if data.errors.length === 0}
-								<p class="mt-3 text-sm text-muted">No error has been logged in the last {WINDOW_LABEL[data.window]}.</p>
+								<p class="mt-3 text-sm text-muted">No errors logged in the last {WINDOW_LABEL[data.window]}.</p>
 							{:else}
 								<ul class="mt-3 divide-y divide-line">
 									{#each data.errors as entry, i (entry.timestamp + i)}

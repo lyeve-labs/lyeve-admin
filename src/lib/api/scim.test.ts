@@ -67,6 +67,6 @@ describe('the gate sorts a refusal by what it means', () => {
 
 	it('never reports a failed read as an empty list', () => {
 		const gate = scimGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toContain('not a report that none are configured');
+		expect(gate.state === 'error' && gate.message).toBe('Could not load SCIM connections.');
 	});
 });

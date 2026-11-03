@@ -49,7 +49,7 @@
 
 <PageShell
 	title="Message broker"
-	description="Where content events are published, and whether they are arriving."
+	description="See where content events are published and whether they arrive."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -63,15 +63,15 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			The broker status names infrastructure outside this instance and covers every tenant, so
-			it is a super admin's to read.
+			Only a super admin can view the broker status, because it shows infrastructure outside this
+			instance and covers every tenant.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
 			level={2}
 			gate={data.gate}
 			title="Message broker"
-			absent="The message broker plugin is not part of this build, so no event is published."
+			absent="The message broker is not included in this build."
 		/>
 	{:else if data.status}
 		<div class="flex items-center gap-2">
@@ -81,8 +81,8 @@
 
 		{#if data.status.degraded}
 			<Alert tone="warn">
-				This instance does not enable the plugin, so every event is dropped rather than
-				published. Nothing is wrong with the broker.
+				The message broker plugin is not enabled on this instance, so events are dropped instead of
+				published.
 			</Alert>
 		{:else if outbox?.enabled && outbox.available && (outbox.dead > 0 || data.status.failed > 0)}
 			<!-- With an outbox a refused event is retried, so the lost and the
@@ -90,34 +90,34 @@
 			<Alert tone={outbox.dead > 0 ? 'danger' : 'warn'}>
 				{#if outbox.dead > 0}
 					{outbox.dead}
-					{outbox.dead === 1 ? 'event' : 'events'} ran out of attempts and never reached the broker.
+					{outbox.dead === 1 ? 'event' : 'events'} failed every retry and never reached the broker.
 				{/if}
 				{outbox.pending}
 				{outbox.pending === 1 ? 'event is' : 'events are'} waiting in the outbox.
 				{#if data.status.failed > 0}
 					The broker refused {data.status.failed} publish
-					{data.status.failed === 1 ? 'attempt' : 'attempts'} since this process started. The outbox
-					retries a refused event until the broker takes it or its attempts run out.
+					{data.status.failed === 1 ? 'attempt' : 'attempts'} since the engine last started. The outbox
+					retries a refused event until the broker accepts it or it reaches its retry limit.
 				{/if}
 			</Alert>
 		{:else if outbox?.enabled && !outbox.available && data.status.failed > 0}
 			<Alert tone="warn">
 				The broker refused {data.status.failed} publish
-				{data.status.failed === 1 ? 'attempt' : 'attempts'} since this process started. The outbox
-				retries them, but its counts could not be read, so whether any event was lost is unknown.
+				{data.status.failed === 1 ? 'attempt' : 'attempts'} since the engine last started. The outbox
+				retries them, but its counts could not be loaded, so it is unknown whether any event was lost.
 			</Alert>
 		{:else if data.status.failed > 0}
 			<Alert tone="danger">
 				The broker refused {data.status.failed}
-				{data.status.failed === 1 ? 'event' : 'events'}. Publishing is deliberately fire and
-				forget, so the content writes behind them all succeeded and nothing else reported
-				this.
+				{data.status.failed === 1 ? 'event' : 'events'}. Refused events are not retried, but the
+				content changes behind them were all saved. No other screen reports these
+				failures.
 			</Alert>
 		{:else if data.status.dropped > 0 && !data.status.connected}
 			<Alert tone="warn">
 				{data.status.dropped}
-				{data.status.dropped === 1 ? 'event' : 'events'} had nowhere to go, because no broker
-				connection was open. That is a configuration problem here, not at the broker.
+				{data.status.dropped === 1 ? 'event' : 'events'} were dropped because no broker connection
+				was open. Check this instance's broker configuration, not the broker.
 			</Alert>
 		{/if}
 
@@ -155,8 +155,8 @@
 			{/if}
 		</div>
 		<p class="text-xs text-muted">
-			Counted since this process started. A restart sets them back to zero, so a low number is
-			not on its own a quiet week.
+			Counted since the engine last started. A restart resets them to zero, so a low number does
+			not mean a quiet week.
 			{#if !broker}
 				With no broker set, Published counts events that were discarded.
 			{:else if rate !== null}
@@ -224,7 +224,7 @@
 						<td class="text-xs text-faint">
 							{broker && data.status.last_publish_at
 								? formatDateTime(data.status.last_publish_at)
-								: 'Nothing has been published'}
+								: 'Nothing published yet'}
 						</td>
 					</tr>
 				</tbody>
@@ -237,7 +237,7 @@
 				<div class="grid gap-4 lg:grid-cols-3">
 					<Card>
 						<div class="flex flex-col gap-2 text-sm text-muted">
-							<SectionHeading level={3}>Hear this instance</SectionHeading>
+							<SectionHeading level={3}>What is published</SectionHeading>
 							<p>
 								Every content create, update and delete is published as JSON: the event type, schema,
 								tenant, the record and an event id to deduplicate on. A broker outage delays events
@@ -271,8 +271,8 @@
 				</div>
 			{:else}
 				<Alert tone="warn">
-					Nothing is connected: <span class="font-mono">EVENT_BUS</span> is unset or noop, so events are
-					discarded and no flow can hear a message. Set it to nats, kafka or rabbitmq.
+					No broker is connected. <span class="font-mono">EVENT_BUS</span> is unset or noop, so events are
+					discarded and no flow receives messages. Set it to nats, kafka or rabbitmq.
 				</Alert>
 			{/if}
 			<!-- One run of text per sentence end: a line break inside the markup
