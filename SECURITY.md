@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The LyEve admin console is pre-1.0. Security fixes land on the latest release.
+LyEve Console is pre-1.0. Security fixes land on the latest release.
 
 | Version | Supported |
 |---------|-----------|
