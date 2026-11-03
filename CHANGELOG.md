@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [Unreleased]
+
+### Changed
+
+- The console reads the key it signs engine requests with from `LYEVE_CONSOLE_KEY`, the same value as `LYEVE_CONSOLE_KEY` on the engine. `ADMIN_CONSOLE_KEY` still works for one more minor release and is read when the new name is unset or empty. Engine releases before the next minor read only `ADMIN_CONSOLE_KEY`, so keep that name on the engine until it moves.
+
 ## [0.25.0] - 2026-11-05
 
 ### Changed
