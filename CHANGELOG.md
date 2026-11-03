@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [0.25.0] - 2026-11-05
+
+### Changed
+
+- The app calls itself LyEve Console in its tab titles and wherever the product name shows. A tenant that set its own name keeps it. The retention note on the AI settings page and the security policy say the console where they said the admin console.
+- The image is published as `ghcr.io/lyeve-labs/lyeve-console`, and the package is renamed `@lyeve/console`. Each 0.25 release is also copied, with the same tags and the same digest, to `ghcr.io/lyeve-labs/lyeve-admin`, so a compose file that names the old image keeps updating. A release candidate gets only its exact tag under both names.
+- The console moves to ui-kit 0.46.0, which adds depth in the same colors. Cards, panels, stat tiles and tables sit on a soft shadow with a lit top edge and rounder corners, menus and dialogs float on deeper shadows, the main action carries a gradient and a resting glow, and every focus ring glows. A faint cyan and violet wash lights the top of each page. Nothing changes size, and forced colors and print drop every shadow, glow and gradient.
+- The settings index, the dashboard's widget picker and the list rows in schema import and history, API key access, admin token grants, review stages, the locale fallback chain and the AI data note draw their boxes with the kit's card and panel, so they carry the same depth. The dashboard's linked tiles and the settings index draw their hover and focus rings on the card's corners, and the problems menu floats on the menu shadow.
+
+### Upgrade notes
+
+- Pull `ghcr.io/lyeve-labs/lyeve-console`. The old name receives every 0.25 release and stops at 0.26.0, and its published tags stay.
+
 ## [0.24.0] - 2026-11-04
 
 ### Changed
