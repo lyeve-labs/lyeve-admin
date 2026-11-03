@@ -10,7 +10,11 @@
 # build and publishes one tag, X.Y.Z-rc.N. It never moves X.Y or latest.
 # .github/scripts/image-tags.sh holds both rules and refuses any other tag.
 #
-# Image name matches the README and the repository: ghcr.io/lyeve-labs/lyeve-admin:<tag>
+# Image name matches the README and the repository: ghcr.io/lyeve-labs/lyeve-console:<tag>
+# Every tag is also published as ghcr.io/lyeve-labs/lyeve-admin, the name the
+# image had before, until the next minor release, so compose files that name
+# it keep updating. Both names get the same tags under the same rules, and
+# both point at one manifest list.
 #
 # Multi-arch strategy: each architecture builds on its OWN native runner
 # (ubuntu-24.04 for amd64, ubuntu-24.04-arm for arm64) and pushes by digest.
@@ -64,7 +68,10 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: lyeve-labs/lyeve-admin
+  IMAGE_NAME: lyeve-labs/lyeve-console
+  # The previous name. It receives a copy of each manifest list IMAGE_NAME
+  # gets, until the next minor release.
+  LEGACY_IMAGE_NAME: lyeve-labs/lyeve-admin
   # The tag being released, whichever trigger asked for it.
   RELEASE_REF: ${{ github.event.inputs.tag || github.ref_name }}
 
@@ -175,7 +182,7 @@ jobs:
           build-args: |
             REQUIRE_EDITORS=1
           labels: |
-            org.opencontainers.image.title=lyeve-admin
+            org.opencontainers.image.title=lyeve-console
             org.opencontainers.image.description=LyEve CMS Admin UI
             org.opencontainers.image.vendor=LyEve Labs
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
@@ -184,7 +191,9 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           # push-by-digest is the canonical buildx multi-arch shape: each
           # platform uploads a manifest under no tag, and `merge` assembles the
-          # list. It leaves no per-platform tags behind in the registry.
+          # list. It leaves no per-platform tags behind in the registry. The
+          # digests go to the primary name only, and `merge` copies the list
+          # to the previous name.
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
@@ -236,26 +245,51 @@ jobs:
 
       # Derive tags from the git tag in shell. No metadata-action, no REST API.
       #   v1.2.3 gives 1.2.3, 1.2 and latest. v1.2.3-rc.1 gives 1.2.3-rc.1 alone.
+      # Both names publish this one list, so a candidate never moves the minor
+      # line or latest under either name.
       - name: Compute image tags
         id: tags
         run: |
           set -euo pipefail
           ver="${RELEASE_REF#v}"
-          img="${REGISTRY}/${IMAGE_NAME}"
-          args=""
-          while read -r t; do args="${args} -t ${img}:${t}"; done \
-            < <(bash .github/scripts/image-tags.sh "${RELEASE_REF}")
-          echo "Publishing:${args}"
+          tags=$(bash .github/scripts/image-tags.sh "${RELEASE_REF}" | tr '\n' ' ')
+          echo "Publishing ${REGISTRY}/${IMAGE_NAME} and ${REGISTRY}/${LEGACY_IMAGE_NAME}: ${tags}"
           echo "version=${ver}" >> "$GITHUB_OUTPUT"
-          echo "args=${args# }" >> "$GITHUB_OUTPUT"
+          echo "tags=${tags% }" >> "$GITHUB_OUTPUT"
 
       - name: Create manifest list & push
         working-directory: ${{ runner.temp }}/digests
+        env:
+          TAGS: ${{ steps.tags.outputs.tags }}
         run: |
-          docker buildx imagetools create ${{ steps.tags.outputs.args }} \
+          set -euo pipefail
+          args=()
+          for t in ${TAGS}; do args+=(-t "${REGISTRY}/${IMAGE_NAME}:${t}"); done
+          docker buildx imagetools create "${args[@]}" \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
-      - name: Inspect
+      # A single source that is already a manifest list is copied as it is, so
+      # the previous name gets the same digest, not a rebuilt list.
+      - name: Copy to the previous name
+        env:
+          TAGS: ${{ steps.tags.outputs.tags }}
+          VERSION: ${{ steps.tags.outputs.version }}
         run: |
-          docker buildx imagetools inspect \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          set -euo pipefail
+          args=()
+          for t in ${TAGS}; do args+=(-t "${REGISTRY}/${LEGACY_IMAGE_NAME}:${t}"); done
+          docker buildx imagetools create "${args[@]}" "${REGISTRY}/${IMAGE_NAME}:${VERSION}"
+
+      - name: Inspect
+        env:
+          VERSION: ${{ steps.tags.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${REGISTRY}/${IMAGE_NAME}:${VERSION}"
+          primary=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "${REGISTRY}/${IMAGE_NAME}:${VERSION}")
+          legacy=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "${REGISTRY}/${LEGACY_IMAGE_NAME}:${VERSION}")
+          if [ "$primary" != "$legacy" ]; then
+            echo "::error::${LEGACY_IMAGE_NAME}:${VERSION} is ${legacy}, ${IMAGE_NAME}:${VERSION} is ${primary}"
+            exit 1
+          fi
+          echo "both names: ${primary}"

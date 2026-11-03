@@ -45,7 +45,7 @@ function flag(name, fallback) {
 const ADMIN_URL = (process.env.ADMIN_URL ?? 'http://localhost:5173').replace(/\/$/, '');
 const EMAIL = process.env.ADMIN_EMAIL ?? '';
 const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
-const OUT = path.resolve(flag('--out', path.join(tmpdir(), 'lyeve-admin-small-screens')));
+const OUT = path.resolve(flag('--out', path.join(tmpdir(), 'lyeve-console-small-screens')));
 const WIDTHS = flag('--widths', '400,768,1280')
 	.split(',')
 	.map((w) => Number(w))
