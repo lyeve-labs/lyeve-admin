@@ -19,8 +19,8 @@ describe('refusalFailure', () => {
 	});
 
 	it('quotes the limit alone when the refusal carries no count', () => {
-		const result = refusalFailure(new FlowRefusal([], 12)) as unknown as Failure;
-		expect(result.data.error).toBe('This tenant is limited to 12 flows. A license that allows more lifts the limit. You can also delete a flow to make room.');
+		const result = refusalFailure(new FlowRefusal([], 20)) as unknown as Failure;
+		expect(result.data.error).toBe('This tenant is limited to 20 flows. A license that allows more lifts the limit. You can also delete a flow to make room.');
 	});
 
 	it('lists the nodes a definition refusal names and keeps their problems', () => {
