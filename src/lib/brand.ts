@@ -22,7 +22,7 @@ export interface PublicBrand {
 }
 
 /** The product's own name, shown wherever the tenant has not named it. */
-export const PRODUCT_NAME = 'LyEve Admin';
+export const PRODUCT_NAME = 'LyEve Console';
 
 export const STOCK_BRAND: PublicBrand = { name: '', logo_url: '', accent: '', favicon_url: '' };
 

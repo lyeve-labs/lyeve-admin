@@ -1,5 +1,5 @@
 /**
- * isExternalHref reports whether href leaves the admin console. The engine
+ * isExternalHref reports whether href leaves the console. The engine
  * sends an in-console path for a plugin's upgrade link by default, and an
  * operator may point it at an absolute URL instead. Only the second opens in
  * a new tab.

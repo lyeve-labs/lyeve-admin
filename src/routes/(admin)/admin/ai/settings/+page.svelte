@@ -108,7 +108,7 @@
 						{:else if data.isSuperAdmin && data.instanceReadable}
 							<p class="text-xs text-faint">
 								<Badge tone="neutral" size="sm">{retention?.source ?? 'default'}</Badge>
-								This setting comes from outside the admin console. Change it there.
+								This setting comes from outside the console. Change it there.
 							</p>
 						{:else if !data.isSuperAdmin}
 							<p class="text-xs text-faint">Only a super admin can see and change the retention window.</p>
