@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Card, DescriptionList, PageShell, SectionHeading, Toggle } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Card, DescriptionList, PageShell, Panel, SectionHeading, Toggle } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import type { ActionData, PageData } from './$types';
 	import AiSection from '$lib/components/ai/AiSection.svelte';
@@ -37,20 +37,22 @@
 								checked={settings.enabled}
 								onchange={() => enabledForm?.requestSubmit()}
 							/>
-							<div class="rounded-md border border-line bg-surface-2 p-4 text-sm leading-relaxed text-muted" data-testid="what-never-leaves">
-								<p class="mb-2 font-medium text-fg">What never leaves this instance</p>
-								<p>
-									Only the request to the endpoint you configured leaves this instance: the system prompt, the
-									conversation and, for image operations, the image. It goes to the vendor behind that endpoint, under
-									your agreement with that vendor, and to nobody else. The plugin has no default provider, no hosted
-									proxy and no prompt telemetry. LyEve Labs never sees your prompts, responses, keys, transcripts or
-									vendor replies, which vendor you use, or whether you use AI at all. A local endpoint on your own
-									network sends nothing to a third party. Transcripts are stored in your database for the retention
-									window below, and are included in tenant deletion and in data subject export and erasure.
-									They are not anonymized, because they never leave your database. Read your vendor's data processing
-									agreement and training-use terms. You sign those terms, and the plugin cannot change them.
-								</p>
-							</div>
+							<Panel pad="sm">
+								<div class="text-sm leading-relaxed text-muted" data-testid="what-never-leaves">
+									<p class="mb-2 font-medium text-fg">What never leaves this instance</p>
+									<p>
+										Only the request to the endpoint you configured leaves this instance: the system prompt, the
+										conversation and, for image operations, the image. It goes to the vendor behind that endpoint, under
+										your agreement with that vendor, and to nobody else. The plugin has no default provider, no hosted
+										proxy and no prompt telemetry. LyEve Labs never sees your prompts, responses, keys, transcripts or
+										vendor replies, which vendor you use, or whether you use AI at all. A local endpoint on your own
+										network sends nothing to a third party. Transcripts are stored in your database for the retention
+										window below, and are included in tenant deletion and in data subject export and erasure.
+										They are not anonymized, because they never leave your database. Read your vendor's data processing
+										agreement and training-use terms. You sign those terms, and the plugin cannot change them.
+									</p>
+								</div>
+							</Panel>
 						</form>
 
 						<form bind:this={transcriptsForm} method="POST" action="?/save" use:enhance class="flex flex-col gap-3" data-testid="ai-transcripts-form">

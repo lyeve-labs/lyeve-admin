@@ -10,6 +10,7 @@
 		MultiSelect,
 		NumberInput,
 		PageShell,
+		Panel,
 		SectionHeading,
 		SegmentedControl,
 		Select,
@@ -303,16 +304,24 @@
 		{:else}
 			<ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				{#each kinds as k (k.type)}
-					<li class="flex flex-col justify-between gap-3 rounded-xl border border-line-strong bg-surface p-4">
-						<div class="flex flex-col gap-1">
-							<span class="text-sm font-medium text-fg">{k.label}</span>
-							<span class="text-xs text-muted">{k.description}</span>
-						</div>
-						<div>
-							<Button variant="secondary" size="sm" type="button" onclick={() => add(k.type)}>
-								<Plus size={ICON.sm} /> Add {inSentence(k.label)}
-							</Button>
-						</div>
+					<li>
+						<!-- A Panel and not a Card: this offers a kind of widget, where a
+						     Card repeated in a list is a row of records with icon-only
+						     actions. Its body grows with the row, so every Add button sits
+						     on the bottom edge however long the description above it is. -->
+						<Panel pad="sm" class="h-full *:h-full">
+							<div class="flex h-full flex-col justify-between gap-3">
+								<div class="flex flex-col gap-1">
+									<span class="text-sm font-medium text-fg">{k.label}</span>
+									<span class="text-xs text-muted">{k.description}</span>
+								</div>
+								<div>
+									<Button variant="secondary" size="sm" type="button" onclick={() => add(k.type)}>
+										<Plus size={ICON.sm} /> Add {inSentence(k.label)}
+									</Button>
+								</div>
+							</div>
+						</Panel>
 					</li>
 				{/each}
 			</ul>
