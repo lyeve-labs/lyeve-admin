@@ -3,6 +3,7 @@ import { building, dev } from '$app/environment';
 import { redirect, type Handle, type HandleFetch, type ServerInit } from '@sveltejs/kit';
 import { cleanupRateLimitStore, WINDOW_MS } from '$lib/server/rate-limit';
 import { setupGateRedirect } from '$lib/server/setup-gate';
+import { limitBody } from '$lib/server/body-limit';
 import {
 	callerOf,
 	contentApiAddressProblem,
@@ -46,8 +47,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	await refreshSession(event);
 	// After the renewal, so a CSRF cookie the engine answered with it is kept.
 	ensureCsrfCookie(event);
+	// Before resolve, because SvelteKit runs a form action ahead of every
+	// load, so no session check in a layout comes first.
+	const refused = await limitBody(event);
 
-	const response = withMutableHeaders(await resolve(event));
+	const response = withMutableHeaders(refused ?? (await resolve(event)));
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
