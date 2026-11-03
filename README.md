@@ -1,8 +1,9 @@
-# lyeve-admin
+# LyEve Console
 
-The admin console of [LyEve](https://lyeve.com), a headless CMS. Teams use
-it to manage content, users, tenants and settings in a browser. Every action
-goes through the engine's API. The engine is
+LyEve Console is the browser app your team works in: write and publish
+content, manage users and roles, and configure the engine. It is part of
+[LyEve](https://lyeve.com), a headless CMS, and every action goes through the
+engine's API. The engine is
 [lyeve-core](https://github.com/lyeve-labs/lyeve-core).
 
 | | |

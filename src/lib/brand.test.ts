@@ -24,10 +24,10 @@ describe('brandOf', () => {
 describe('titles', () => {
 	it('end in the product name until the tenant names the admin', () => {
 		expect(appName(null)).toBe(PRODUCT_NAME);
-		expect(documentTitle(STOCK_BRAND, 'Sign in')).toBe('Sign in - LyEve Admin');
+		expect(documentTitle(STOCK_BRAND, 'Sign in')).toBe('Sign in - LyEve Console');
 		expect(documentTitle({ ...STOCK_BRAND, name: 'Acme Studio' }, 'Sign in')).toBe('Sign in - Acme Studio');
 		expect(documentTitle({ ...STOCK_BRAND, name: 'Acme Studio' })).toBe('Acme Studio');
-		expect(documentTitle(undefined, '', 'Plugins')).toBe('Plugins - LyEve Admin');
+		expect(documentTitle(undefined, '', 'Plugins')).toBe('Plugins - LyEve Console');
 	});
 });
 
