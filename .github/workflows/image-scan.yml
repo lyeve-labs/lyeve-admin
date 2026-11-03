@@ -47,7 +47,9 @@ on:
 permissions: {}
 
 env:
-  IMAGE: ghcr.io/lyeve-labs/lyeve-admin
+  # The primary name only. Release publishes the previous name, lyeve-admin,
+  # as a copy of the same manifest list, so scanning one scans both.
+  IMAGE: ghcr.io/lyeve-labs/lyeve-console
   TRIVY_IMAGE: docker.io/aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 
 jobs:

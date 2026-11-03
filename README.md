@@ -12,7 +12,7 @@ engine's API. The engine is
 | **License** | MIT |
 | **Framework** | SvelteKit 2 with Svelte 5 runes |
 | **Toolchain** | Node 26 and pnpm only, at the versions `mise.toml` pins |
-| **Image** | `ghcr.io/lyeve-labs/lyeve-admin` |
+| **Image** | `ghcr.io/lyeve-labs/lyeve-console` |
 | **UI kit** | `@lyeve-labs/ui-kit` |
 | **API client** | `@lyeve-labs/client`, `@lyeve-labs/client-rest` |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
@@ -25,7 +25,7 @@ LyEve runs as two services, each with its own repository and image.
 | Repository | What it does | Image | Listens on |
 |---|---|---|---|
 | [lyeve-core](https://github.com/lyeve-labs/lyeve-core) | Stores and serves your content, accounts and tenants | `ghcr.io/lyeve-labs/lyeve-core` | `3001` admin API, `3002` content API |
-| **lyeve-admin**, this one | The console your team uses to manage it in a browser | `ghcr.io/lyeve-labs/lyeve-admin` | `3002` |
+| **lyeve-console**, this one | The console your team uses to manage it in a browser | `ghcr.io/lyeve-labs/lyeve-console` | `3002` |
 
 Put both behind one address. A proxy sends `/api/admin/*` to the engine's
 admin port, `/api/v1/*` to its content API, and every other path to the
@@ -54,6 +54,10 @@ sets up the whole stack, TLS included, on one host.
 The console needs a running engine. The
 [Docker Compose guide](https://lyeve.com/docs/deploy/docker-compose/) runs
 both on one host.
+
+The image moved from `ghcr.io/lyeve-labs/lyeve-admin` to
+`ghcr.io/lyeve-labs/lyeve-console`, and the old name receives the same
+releases until the next minor release.
 
 To run the console from source against an engine on this machine (admin API
 on `3001`, content API on `3002`):
@@ -95,12 +99,12 @@ shows them in a full deployment.
 To build and run the image yourself:
 
 ```bash
-docker build -t lyeve-admin:local .
+docker build -t lyeve-console:local .
 docker run --rm -p 3000:3002 \
   -e ORIGIN=http://localhost:3000 \
   -e CORE_INTERNAL_URL=http://engine-proxy:8080 \
   -e CORE_API_INTERNAL_URL=http://engine-proxy:8080 \
-  lyeve-admin:local
+  lyeve-console:local
 ```
 
 Replace `engine-proxy:8080` with the address of the proxy in front of your
@@ -133,7 +137,7 @@ Everything in this repository is MIT licensed. A build from source works with
 any LyEve engine, including one built from
 [lyeve-core](https://github.com/lyeve-labs/lyeve-core) alone.
 
-The official image, `ghcr.io/lyeve-labs/lyeve-admin`, adds visual editors for
+The official image, `ghcr.io/lyeve-labs/lyeve-console`, adds visual editors for
 flows and content types under a commercial license, and its label names both
 licenses. A build from source shows list editors in their place.
 [Source code](https://lyeve.com/docs/trust/source-code/) has the details.
