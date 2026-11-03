@@ -13,6 +13,7 @@
 		Modal,
 		PageShell,
 		Pagination,
+		Panel,
 		SearchInput,
 		Select,
 		Table,
@@ -420,27 +421,29 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					{#each groups as group (group.id)}
 						{@const routes = group.grants.flatMap((g) => g.routes.map((r) => ({ grant: g.name, ...r })))}
-						<div class="flex flex-col gap-2 rounded-lg border border-line p-3">
-							<CheckboxGroup
-								name="grants"
-								label={group.label}
-								options={group.grants.map((g) => ({ value: g.name, label: g.name, description: g.description }))}
-								bind:value={() => picked[group.id] ?? [], (v) => (picked = { ...picked, [group.id]: v })}
-							/>
-							<Collapsible label="Routes" badge={routes.length}>
-								{#if routes.length === 0}
-									<p class="text-xs text-faint">No routes use these grants yet.</p>
-								{:else}
-									<ul class="flex flex-col gap-1">
-										{#each routes as r (r.grant + r.method + r.pattern)}
-											<li class="font-mono text-xs text-muted">
-												<span class="text-fg">{r.method}</span> {r.pattern}
-											</li>
-										{/each}
-									</ul>
-								{/if}
-							</Collapsible>
-						</div>
+						<Panel pad="sm">
+							<div class="flex flex-col gap-2">
+								<CheckboxGroup
+									name="grants"
+									label={group.label}
+									options={group.grants.map((g) => ({ value: g.name, label: g.name, description: g.description }))}
+									bind:value={() => picked[group.id] ?? [], (v) => (picked = { ...picked, [group.id]: v })}
+								/>
+								<Collapsible label="Routes" badge={routes.length}>
+									{#if routes.length === 0}
+										<p class="text-xs text-faint">No routes use these grants yet.</p>
+									{:else}
+										<ul class="flex flex-col gap-1">
+											{#each routes as r (r.grant + r.method + r.pattern)}
+												<li class="font-mono text-xs text-muted">
+													<span class="text-fg">{r.method}</span> {r.pattern}
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</Collapsible>
+							</div>
+						</Panel>
 					{/each}
 				</div>
 			</section>

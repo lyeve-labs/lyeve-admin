@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Collapsible, Skeleton, type StatusTone } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Collapsible, Panel, Skeleton, type StatusTone } from '@lyeve-labs/ui-kit';
 	import { History } from '@lucide/svelte';
 	import { formatDateTime } from '$lib/format';
 	import type { HistoryEntry } from '../+page.server';
@@ -62,24 +62,26 @@
 			{:else}
 				<ol class="flex flex-col gap-2">
 					{#each ddl.view.entries as e, i (e.version + ':' + i)}
-						<li class="rounded-lg border border-line bg-surface p-3">
-							<div class="flex flex-wrap items-center gap-2">
-								<Badge tone={HISTORY_TONE[e.state]} dot>{HISTORY_WORD[e.state]}</Badge>
-								<span class="text-sm text-fg">{e.description}</span>
-								<span class="ms-auto text-xs text-faint">
-									v{e.version} ·
-									{formatDateTime(e.canceled_at ?? e.applied_at ?? e.created_at)}
-									{#if e.tenant}· tenant {e.tenant}{/if}
-									{#if e.applied_by}· {e.applied_by}{/if}
-								</span>
-							</div>
-							<Collapsible label="SQL" class="mt-2">
-								<pre class="mt-1 overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{e.up_sql}</pre>
-								{#if e.down_sql}
-									<p class="mt-2 text-xs text-muted">Undo</p>
-									<pre class="mt-1 overflow-x-auto rounded bg-surface-2/60 p-3 font-mono text-xs whitespace-pre-wrap text-muted">{e.down_sql}</pre>
-								{/if}
-							</Collapsible>
+						<li>
+							<Panel pad="sm">
+								<div class="flex flex-wrap items-center gap-2">
+									<Badge tone={HISTORY_TONE[e.state]} dot>{HISTORY_WORD[e.state]}</Badge>
+									<span class="text-sm text-fg">{e.description}</span>
+									<span class="ms-auto text-xs text-faint">
+										v{e.version} ·
+										{formatDateTime(e.canceled_at ?? e.applied_at ?? e.created_at)}
+										{#if e.tenant}· tenant {e.tenant}{/if}
+										{#if e.applied_by}· {e.applied_by}{/if}
+									</span>
+								</div>
+								<Collapsible label="SQL" class="mt-2">
+									<pre class="mt-1 overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{e.up_sql}</pre>
+									{#if e.down_sql}
+										<p class="mt-2 text-xs text-muted">Undo</p>
+										<pre class="mt-1 overflow-x-auto rounded bg-surface-2/60 p-3 font-mono text-xs whitespace-pre-wrap text-muted">{e.down_sql}</pre>
+									{/if}
+								</Collapsible>
+							</Panel>
 						</li>
 					{/each}
 				</ol>
