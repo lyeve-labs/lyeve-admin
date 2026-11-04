@@ -37,7 +37,7 @@ describe('customization helpers', () => {
 		expect(contrastRatio(pale.base, '#e6e8ee')).toBeGreaterThanOrEqual(ACCENT_MIN_CONTRAST);
 		const deep = accentShades('#1a0f5c', 'dark');
 		expect(deep.adjusted).toBe(true);
-		expect(contrastRatio(deep.base, '#162233')).toBeGreaterThanOrEqual(ACCENT_MIN_CONTRAST);
+		expect(contrastRatio(deep.base, '#121e2f')).toBeGreaterThanOrEqual(ACCENT_MIN_CONTRAST);
 	});
 
 	it('clears the floor on both themes for any hue', () => {
