@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A nested sidebar row is drawn like a top-level row.
 - The dark theme's surfaces, borders and hover fill are darker, and a dark card carries no white wash.
 - The sign-in pages sit on the same ink and faint cyan and violet light as the rest of the console.
+- Moving to another page fades the new page up into place instead of only fading it in.
 
 ## [0.25.0] - 2026-11-05
 
