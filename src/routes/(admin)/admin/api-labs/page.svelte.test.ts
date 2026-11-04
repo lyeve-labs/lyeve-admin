@@ -212,7 +212,7 @@ describe('the endpoint picker', () => {
 	it('keeps the Select cell stuck to the end of the scroll box, painted like its row', () => {
 		const { getAllByRole } = render(LabsPage, { props: props() });
 		const cell = getAllByRole('button', { name: 'Select' })[0].closest('td') as HTMLElement;
-		for (const cls of ['sticky', 'end-0', 'z-1', 'bg-ink', '[tr:hover>&]:bg-[color-mix(in_srgb,var(--color-surface-2)_60%,var(--color-ink))]']) {
+		for (const cls of ['sticky', 'end-0', 'z-1', 'bg-surface', '[tr:hover>&]:bg-surface-2']) {
 			expect(cell.className.split(/\s+/), cls).toContain(cls);
 		}
 		expect((cell.closest('tr') as HTMLElement).className).not.toContain('relative');
