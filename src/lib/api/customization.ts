@@ -214,7 +214,7 @@ export const ACCENT_MIN_CONTRAST = 4.5;
  */
 const THEME_GROUNDS = {
 	light: { canvases: ['#f6f7f9', '#ffffff', '#e6e8ee'], tintOn: '#ffffff', toward: '#000000' },
-	dark: { canvases: ['#0b1422', '#0b172a', '#111f32'], tintOn: '#0b172a', toward: '#ffffff' },
+	dark: { canvases: ['#0b1422', '#0c1728', '#121e30'], tintOn: '#0c1728', toward: '#ffffff' },
 } as const;
 
 export type AccentTheme = keyof typeof THEME_GROUNDS;
