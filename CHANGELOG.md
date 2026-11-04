@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Moving to another page fades the new page up into place instead of only fading it in.
 - The account menu lists its entries as rows drawn like the sidebar's, and Sign out is a plain row under a divider instead of a red button.
 
+### Fixed
+
+- The account menu names your roles as people read them, such as super admin, instead of by their stored ids, such as `super_admin`.
+
 ## [0.25.0] - 2026-11-05
 
 ### Changed

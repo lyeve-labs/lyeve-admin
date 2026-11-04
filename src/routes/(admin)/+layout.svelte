@@ -25,6 +25,7 @@
 	import { hasLicenseModule } from '$lib/entitlements';
 	import { PLUGIN } from '$lib/plugin-names';
 	import { notRunning, runs, whyNotRunning, UNNAMED } from '$lib/plugins';
+	import { rolesLabel } from '$lib/device-login';
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
 
@@ -211,7 +212,7 @@
 			<DbStatus pending={data.migrations.pending} items={data.migrations.items} redirectTo={here} />
 		{/if}
 		<ThemeToggle />
-		<AccountMenu name={data.user.email} secondary={data.user.roles.join(', ')}>
+		<AccountMenu name={data.user.email} secondary={rolesLabel(data.user.roles)}>
 			<AccountMenuItem href="/admin/settings/account" icon={Settings}>
 				Account and appearance
 			</AccountMenuItem>
