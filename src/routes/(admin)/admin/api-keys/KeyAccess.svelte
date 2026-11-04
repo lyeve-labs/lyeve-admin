@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Checkbox, CheckboxGroup, Collapsible, Input, SearchInput, SegmentedControl, Table } from '@lyeve-labs/ui-kit';
+	import { Alert, Checkbox, CheckboxGroup, Collapsible, Input, Panel, SearchInput, SegmentedControl, Table } from '@lyeve-labs/ui-kit';
 	import { Database, BookOpen, Plug } from '@lucide/svelte';
 	import {
 		KEY_ACTIONS,
@@ -116,7 +116,7 @@
 		<input type="hidden" name="schemas" value={schema} />
 	{/each}
 
-	<div class="flex flex-col gap-2 rounded-lg border border-line p-3">
+	<Panel pad="sm">
 		<Collapsible label="Content" icon={Database} badge={contentSummary(access)} open>
 			<div class="flex flex-col gap-3 pt-2">
 				<SegmentedControl
@@ -182,9 +182,9 @@
 				{/if}
 			</div>
 		</Collapsible>
-	</div>
+	</Panel>
 
-	<div class="flex flex-col gap-2 rounded-lg border border-line p-3">
+	<Panel pad="sm">
 		<Collapsible label="Schema catalog" icon={BookOpen} badge={access.discoverSchemas ? 'read' : 'Off'}>
 			<div class="pt-2">
 				<Checkbox
@@ -195,7 +195,7 @@
 				/>
 			</div>
 		</Collapsible>
-	</div>
+	</Panel>
 
 	{#if catalogFailed}
 		<Alert tone="warn">Could not load the route catalog, so you cannot grant other resources right now. Reload the page to try again.</Alert>
@@ -203,7 +203,7 @@
 
 	{#each groups as g (g.resource)}
 		{@const st = resourceState(g.resource)}
-		<div class="flex flex-col gap-2 rounded-lg border border-line p-3">
+		<Panel pad="sm">
 			<Collapsible label={g.label} icon={Plug} badge={resourceBadge(g)}>
 				<div class="flex flex-col gap-3 pt-2">
 					{#if access.contentMode === 'chosen' && READS_EVERY_SCHEMA.has(g.resource)}
@@ -241,7 +241,7 @@
 					</ul>
 				</div>
 			</Collapsible>
-		</div>
+		</Panel>
 	{/each}
 
 	<p class="text-xs text-faint">

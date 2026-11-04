@@ -8,6 +8,7 @@
 		Card,
 		Input,
 		PageShell,
+		Panel,
 		SectionHeading,
 		Select,
 		Tag,
@@ -184,38 +185,42 @@
 					</p>
 					<ol class="flex flex-col gap-2" aria-label="Fallback chain">
 						{#each chain as code, i (code)}
-							<li class="flex items-center gap-2 rounded-md border border-line bg-surface-2/40 px-3 py-2">
-								<span class="w-6 text-xs text-faint">{i + 1}.</span>
-								<span class="flex-1 font-mono text-sm text-fg">{code}</span>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									aria-label="Move {code} up"
-									disabled={i === 0}
-									onclick={() => move(i, -1)}
-								>
-									<ArrowUp size={ICON.sm} />
-								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									aria-label="Move {code} down"
-									disabled={i === chain.length - 1}
-									onclick={() => move(i, 1)}
-								>
-									<ArrowDown size={ICON.sm} />
-								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									aria-label="Remove {code} from the chain"
-									onclick={() => (chain = chain.filter((l) => l !== code))}
-								>
-									<X size={ICON.sm} />
-								</Button>
+							<li>
+								<Panel pad="none">
+									<div class="flex items-center gap-2 px-3 py-2">
+										<span class="w-6 text-xs text-faint">{i + 1}.</span>
+										<span class="flex-1 font-mono text-sm text-fg">{code}</span>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-label="Move {code} up"
+											disabled={i === 0}
+											onclick={() => move(i, -1)}
+										>
+											<ArrowUp size={ICON.sm} />
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-label="Move {code} down"
+											disabled={i === chain.length - 1}
+											onclick={() => move(i, 1)}
+										>
+											<ArrowDown size={ICON.sm} />
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-label="Remove {code} from the chain"
+											onclick={() => (chain = chain.filter((l) => l !== code))}
+										>
+											<X size={ICON.sm} />
+										</Button>
+									</div>
+								</Panel>
 							</li>
 						{:else}
 							<li class="text-sm text-faint">

@@ -1,4 +1,4 @@
-# Contributing to `@lyeve/admin`
+# Contributing to `@lyeve/console`
 
 This guide is short. The git hooks and CI enforce the rest.
 
@@ -36,7 +36,7 @@ happen after merge.
 | 1 | Validate | on every pull request into `dev` or `main`, on a release tag (called by `release.yml`), or dispatched by a maintainer against a branch | `ci.yml`: secret scan, svelte-check, lint:ui, pnpm audit, vitest, build |
 | 2 | Release  | release PR from `dev` into `main` | A person reviews and merges it. Nothing is automated here          |
 | 3 | Tag      | annotated `vX.Y.Z` on `main`      | Cut by a person, with the CHANGELOG entry in the same commit       |
-| 4 | Publish  | on tag push                       | `release.yml`: requires a green `ci` run on the tagged commit, then builds and publishes `ghcr.io/lyeve-labs/lyeve-admin:<tag>` |
+| 4 | Publish  | on tag push                       | `release.yml`: requires a green `ci` run on the tagged commit, then builds and publishes `ghcr.io/lyeve-labs/lyeve-console:<tag>` |
 
 Your commit type determines the version bump and the CHANGELOG section the
 entry lands in:
@@ -134,7 +134,7 @@ A maintainer releases by hand. The flow is:
    published tag is never moved or deleted. A bad release is superseded by
    the next patch.
 4. The `release.yml` workflow requires a green `ci` run on the tagged commit,
-   then publishes `ghcr.io/lyeve-labs/lyeve-admin:vX.Y.Z`.
+   then publishes `ghcr.io/lyeve-labs/lyeve-console:vX.Y.Z`.
 
 ## Local checks before pushing
 

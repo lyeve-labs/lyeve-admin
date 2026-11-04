@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
+	import { Card, PageShell, SectionHeading } from '@lyeve-labs/ui-kit';
 	import { ChevronRight } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
 	import { adminNav } from '$lib/nav';
@@ -42,22 +42,29 @@
 			<ul class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
 				{#each group.entries as entry (entry.id)}
 					<li>
-						<a
-							href={entry.href}
-							class="flex h-full items-start gap-3 rounded-xl border border-line-strong bg-surface p-4 outline-none transition-colors hover:border-brand focus-visible:ring-2 focus-visible:ring-brand"
-						>
-							{#if entry.icon}
-								<entry.icon size={ICON.md} class="mt-0.5 shrink-0 text-muted" />
-							{/if}
-							<span class="flex min-w-0 flex-1 flex-col gap-1">
-								<!-- No beta badge. The page's own header carries its mark,
-								     and a mark here would single out some entries among
-								     others that are equally beta. -->
-								<span class="text-sm font-medium text-fg">{entry.label}</span>
-								<span class="text-xs text-muted">{entry.description}</span>
-							</span>
-							<ChevronRight size={ICON.md} class="mt-0.5 shrink-0 text-faint" aria-hidden="true" />
-						</a>
+						<!-- The link fills the card so the whole tile navigates. Card wraps
+						     its content in a body element of its own, which has to grow
+						     with the row for the link inside to reach the bottom edge. The
+						     ring is inset, on the card's radius, because the card clips what
+						     draws outside it. -->
+						<Card pad="none" hover class="h-full *:h-full">
+							<a
+								href={entry.href}
+								class="flex h-full items-start gap-3 rounded-card p-4 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+							>
+								{#if entry.icon}
+									<entry.icon size={ICON.md} class="mt-0.5 shrink-0 text-muted" />
+								{/if}
+								<span class="flex min-w-0 flex-1 flex-col gap-1">
+									<!-- No beta badge. The page's own header carries its mark,
+									     and a mark here would single out some entries among
+									     others that are equally beta. -->
+									<span class="text-sm font-medium text-fg">{entry.label}</span>
+									<span class="text-xs text-muted">{entry.description}</span>
+								</span>
+								<ChevronRight size={ICON.md} class="mt-0.5 shrink-0 text-faint" aria-hidden="true" />
+							</a>
+						</Card>
 					</li>
 				{/each}
 			</ul>

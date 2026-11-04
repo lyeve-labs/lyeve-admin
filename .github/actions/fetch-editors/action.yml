@@ -45,6 +45,9 @@ runs:
         fi
         dest=src/lib/canvas/editors
         git init -q "$dest"
+        # The root files and the two editors the console mounts, and nothing
+        # else: the console's tests read every file under src/ as its own code.
+        git -C "$dest" sparse-checkout set --cone flow schema
         auth="$(printf 'x-access-token:%s' "$EDITORS_TOKEN" | base64 -w0)"
         echo "::add-mask::$auth"
         GIT_CONFIG_COUNT=1 \

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Collapsible, Drawer, FileInput, SectionHeading, Select, Textarea, toast } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Collapsible, Drawer, FileInput, Panel, SectionHeading, Select, Textarea, toast } from '@lyeve-labs/ui-kit';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
@@ -159,21 +159,23 @@
 				{/if}
 				<ul class="flex flex-col gap-2">
 					{#each importPlan.schemas as p (p.name)}
-						<li class="rounded-lg border border-line bg-surface p-3">
-							<div class="flex flex-wrap items-center gap-2">
-								<span class="font-mono text-sm text-fg">{p.name}</span>
-								<Badge tone={p.action === 'create' ? 'success' : p.action === 'update' ? 'warn' : 'neutral'}>
-									{p.action === 'create' ? 'Creates' : p.action === 'update' ? 'Changes' : 'Unchanged'}
-								</Badge>
-								{#if p.missing?.length}
-									<span class="text-xs text-danger">needs {p.missing.join(', ')}</span>
+						<li>
+							<Panel pad="sm">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="font-mono text-sm text-fg">{p.name}</span>
+									<Badge tone={p.action === 'create' ? 'success' : p.action === 'update' ? 'warn' : 'neutral'}>
+										{p.action === 'create' ? 'Creates' : p.action === 'update' ? 'Changes' : 'Unchanged'}
+									</Badge>
+									{#if p.missing?.length}
+										<span class="text-xs text-danger">needs {p.missing.join(', ')}</span>
+									{/if}
+								</div>
+								{#if p.ddl?.length}
+									<Collapsible label={`${p.ddl.length} ${p.ddl.length === 1 ? 'statement' : 'statements'}`} class="mt-2">
+										<pre class="mt-1 overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{p.ddl.join('\n\n')}</pre>
+									</Collapsible>
 								{/if}
-							</div>
-							{#if p.ddl?.length}
-								<Collapsible label={`${p.ddl.length} ${p.ddl.length === 1 ? 'statement' : 'statements'}`} class="mt-2">
-									<pre class="mt-1 overflow-x-auto rounded bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap text-fg">{p.ddl.join('\n\n')}</pre>
-								</Collapsible>
-							{/if}
+							</Panel>
 						</li>
 					{/each}
 				</ul>

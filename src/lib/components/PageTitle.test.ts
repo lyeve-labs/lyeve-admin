@@ -17,7 +17,7 @@ describe('PageTitle', () => {
 	it('ends in the product name while the tenant has not named the admin', async () => {
 		render(PageTitle, { props: { title: 'Plugins' } });
 		await tick();
-		expect(document.title).toBe('Plugins - LyEve Admin');
+		expect(document.title).toBe('Plugins - LyEve Console');
 	});
 
 	it('ends in the tenant name once it has one', async () => {

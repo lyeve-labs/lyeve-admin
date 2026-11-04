@@ -277,7 +277,7 @@ describe('tab titles', () => {
 		};
 		render(Harness, { props: { title: literal('title') ?? '', documentTitle: literal('documentTitle') } });
 		await tick();
-		expect(document.title).toBe(`${expected} - LyEve Admin`);
+		expect(document.title).toBe(`${expected} - LyEve Console`);
 	});
 
 	it('ends in the tenant name once the tenant has one', async () => {

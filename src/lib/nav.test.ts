@@ -437,7 +437,7 @@ describe('adminSection', () => {
 	});
 
 	it('falls back to the product name for a route with no nav entry', () => {
-		expect(adminSection('/admin/nowhere', tree)).toBe('LyEve Admin');
+		expect(adminSection('/admin/nowhere', tree)).toBe('LyEve Console');
 	});
 
 	it('files a page where the sidebar files it, not where its URL is mounted', () => {
@@ -470,7 +470,7 @@ describe('adminSection', () => {
 		// plain prefix test over every node would name every unmapped page
 		// Dashboard.
 		expect(adminSection('/admin', tree)).toBe('Dashboard');
-		expect(adminSection('/admin/nowhere', tree)).toBe('LyEve Admin');
+		expect(adminSection('/admin/nowhere', tree)).toBe('LyEve Console');
 	});
 });
 

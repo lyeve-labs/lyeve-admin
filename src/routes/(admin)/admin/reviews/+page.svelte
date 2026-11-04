@@ -12,6 +12,7 @@
 		Input,
 		NumberInput,
 		PageShell,
+		Panel,
 		SectionHeading,
 		SegmentedControl,
 		Select,
@@ -540,146 +541,150 @@
 				<SectionHeading level={3}>Stages, in order</SectionHeading>
 				<ol class="flex flex-col gap-3" aria-label="Stages">
 					{#each stages as stage, i (stage.key)}
-						<li class="flex flex-col gap-2 rounded-md border border-line bg-surface-2/40 p-3">
-							<!-- Beside the three stage buttons a phone left the name field
-							     about 105px, which cut its placeholder. The field keeps a
-							     minimum width beside its number, and the buttons wrap below
-							     it as one group when the row is too narrow. -->
-							<div class="flex flex-wrap items-center gap-2">
-								<span class="text-xs text-faint">{i + 1}.</span>
-								<div class="min-w-48 flex-1">
-									<Input
-										id="stage-name-{stage.key}"
-										label="Stage name"
-										required
-										bind:value={stage.name}
-										placeholder="Copy edit"
-									/>
-								</div>
-								<div class="ms-auto flex gap-2">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										aria-label="Move stage {i + 1} up"
-										disabled={i === 0}
-										onclick={() => move(i, -1)}
-									>
-										<ArrowUp size={ICON.sm} />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										aria-label="Move stage {i + 1} down"
-										disabled={i === stages.length - 1}
-										onclick={() => move(i, 1)}
-									>
-										<ArrowDown size={ICON.sm} />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										aria-label="Remove stage {i + 1}"
-										disabled={stages.length === 1}
-										onclick={() => (stages = stages.filter((s) => s.key !== stage.key))}
-									>
-										<X size={ICON.sm} />
-									</Button>
-								</div>
-							</div>
-							<div class="grid gap-2 sm:grid-cols-2">
-								<Input
-									id="stage-role-{stage.key}"
-									label="Required role"
-									hint="Leave empty to allow anyone the permission rules allow. The admin and super_admin roles can always act."
-									bind:value={stage.required_role}
-									placeholder="editor"
-									mono
-								/>
-								<NumberInput
-									id="stage-sla-{stage.key}"
-									label="SLA, hours"
-									hint="0 for none, up to 240."
-									min={0}
-									max={240}
-									step={1}
-									bind:value={stage.sla_hours}
-								/>
-							</div>
-							<div class="flex flex-col gap-3 border-t border-line pt-3" data-testid="stage-paid-settings">
-								{#if stagesLocked}
-									<NotEnabled compact title="Quorum, escalation and conditions" />
-								{/if}
-								<NumberInput
-									id="stage-quorum-{stage.key}"
-									label="Approvals needed"
-									hint="1 needs a single approval. A higher number needs that many assignees to approve."
-									min={1}
-									max={100}
-									step={1}
-									disabled={stagesLocked}
-									bind:value={stage.quorum}
-								/>
-								<SegmentedControl
-									label="Escalate to"
-									options={ESCALATE}
-									disabled={stagesLocked || stage.sla_hours === 0}
-									bind:value={stage.escalate_kind}
-								/>
-								{#if stage.escalate_kind === 'user' && peopleOptions.length > 0}
-									<Select
-										id="stage-escalate-{stage.key}"
-										label="User"
-										hint="The user becomes the assignee when the SLA passes."
-										placeholder="Pick a user"
-										options={escalateOptions(stage.escalate_to)}
-										searchable
-										disabled={stagesLocked}
-										bind:value={stage.escalate_to}
-									/>
-								{:else if stage.escalate_kind !== 'none'}
-									<Input
-										id="stage-escalate-{stage.key}"
-										label={stage.escalate_kind === 'user' ? 'User id' : 'Role'}
-										hint={stage.escalate_kind === 'user'
-											? 'The user becomes the assignee when the SLA passes.'
-											: 'Anyone with this role can act on the stage once the SLA passes.'}
-										disabled={stagesLocked}
-										bind:value={stage.escalate_to}
-										mono
-									/>
-								{/if}
-								<div class="grid gap-2 sm:grid-cols-2">
-									<Input
-										id="stage-condition-field-{stage.key}"
-										label="Condition field"
-										hint="Leave empty to run the stage for every entry."
-										disabled={stagesLocked}
-										bind:value={stage.condition_field}
-										placeholder="category"
-										mono
-									/>
-									{#if stage.condition_field.trim()}
-										<SegmentedControl
-											label="Compares"
-											options={OPS}
-											disabled={stagesLocked}
-											bind:value={stage.condition_op}
+						<li>
+							<Panel pad="sm">
+								<div class="flex flex-col gap-2">
+									<!-- Beside the three stage buttons a phone left the name field
+									     about 105px, which cut its placeholder. The field keeps a
+									     minimum width beside its number, and the buttons wrap below
+									     it as one group when the row is too narrow. -->
+									<div class="flex flex-wrap items-center gap-2">
+										<span class="text-xs text-faint">{i + 1}.</span>
+										<div class="min-w-48 flex-1">
+											<Input
+												id="stage-name-{stage.key}"
+												label="Stage name"
+												required
+												bind:value={stage.name}
+												placeholder="Copy edit"
+											/>
+										</div>
+										<div class="ms-auto flex gap-2">
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												aria-label="Move stage {i + 1} up"
+												disabled={i === 0}
+												onclick={() => move(i, -1)}
+											>
+												<ArrowUp size={ICON.sm} />
+											</Button>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												aria-label="Move stage {i + 1} down"
+												disabled={i === stages.length - 1}
+												onclick={() => move(i, 1)}
+											>
+												<ArrowDown size={ICON.sm} />
+											</Button>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												aria-label="Remove stage {i + 1}"
+												disabled={stages.length === 1}
+												onclick={() => (stages = stages.filter((s) => s.key !== stage.key))}
+											>
+												<X size={ICON.sm} />
+											</Button>
+										</div>
+									</div>
+									<div class="grid gap-2 sm:grid-cols-2">
+										<Input
+											id="stage-role-{stage.key}"
+											label="Required role"
+											hint="Leave empty to allow anyone the permission rules allow. The admin and super_admin roles can always act."
+											bind:value={stage.required_role}
+											placeholder="editor"
+											mono
 										/>
-									{/if}
+										<NumberInput
+											id="stage-sla-{stage.key}"
+											label="SLA, hours"
+											hint="0 for none, up to 240."
+											min={0}
+											max={240}
+											step={1}
+											bind:value={stage.sla_hours}
+										/>
+									</div>
+									<div class="flex flex-col gap-3 border-t border-line pt-3" data-testid="stage-paid-settings">
+										{#if stagesLocked}
+											<NotEnabled compact title="Quorum, escalation and conditions" />
+										{/if}
+										<NumberInput
+											id="stage-quorum-{stage.key}"
+											label="Approvals needed"
+											hint="1 needs a single approval. A higher number needs that many assignees to approve."
+											min={1}
+											max={100}
+											step={1}
+											disabled={stagesLocked}
+											bind:value={stage.quorum}
+										/>
+										<SegmentedControl
+											label="Escalate to"
+											options={ESCALATE}
+											disabled={stagesLocked || stage.sla_hours === 0}
+											bind:value={stage.escalate_kind}
+										/>
+										{#if stage.escalate_kind === 'user' && peopleOptions.length > 0}
+											<Select
+												id="stage-escalate-{stage.key}"
+												label="User"
+												hint="The user becomes the assignee when the SLA passes."
+												placeholder="Pick a user"
+												options={escalateOptions(stage.escalate_to)}
+												searchable
+												disabled={stagesLocked}
+												bind:value={stage.escalate_to}
+											/>
+										{:else if stage.escalate_kind !== 'none'}
+											<Input
+												id="stage-escalate-{stage.key}"
+												label={stage.escalate_kind === 'user' ? 'User id' : 'Role'}
+												hint={stage.escalate_kind === 'user'
+													? 'The user becomes the assignee when the SLA passes.'
+													: 'Anyone with this role can act on the stage once the SLA passes.'}
+												disabled={stagesLocked}
+												bind:value={stage.escalate_to}
+												mono
+											/>
+										{/if}
+										<div class="grid gap-2 sm:grid-cols-2">
+											<Input
+												id="stage-condition-field-{stage.key}"
+												label="Condition field"
+												hint="Leave empty to run the stage for every entry."
+												disabled={stagesLocked}
+												bind:value={stage.condition_field}
+												placeholder="category"
+												mono
+											/>
+											{#if stage.condition_field.trim()}
+												<SegmentedControl
+													label="Compares"
+													options={OPS}
+													disabled={stagesLocked}
+													bind:value={stage.condition_op}
+												/>
+											{/if}
+										</div>
+										{#if stage.condition_field.trim() && stage.condition_op !== 'exists'}
+											<Input
+												id="stage-condition-value-{stage.key}"
+												label={stage.condition_op === 'in' ? 'Values' : 'Value'}
+												hint={stage.condition_op === 'in' ? 'One per comma, up to 100.' : 'A text, a number, or true or false.'}
+												disabled={stagesLocked}
+												bind:value={stage.condition_value}
+											/>
+										{/if}
+									</div>
 								</div>
-								{#if stage.condition_field.trim() && stage.condition_op !== 'exists'}
-									<Input
-										id="stage-condition-value-{stage.key}"
-										label={stage.condition_op === 'in' ? 'Values' : 'Value'}
-										hint={stage.condition_op === 'in' ? 'One per comma, up to 100.' : 'A text, a number, or true or false.'}
-										disabled={stagesLocked}
-										bind:value={stage.condition_value}
-									/>
-								{/if}
-							</div>
+							</Panel>
 						</li>
 					{/each}
 				</ol>
