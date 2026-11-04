@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - The console reads the key it signs engine requests with from `LYEVE_CONSOLE_KEY`, the same value as `LYEVE_CONSOLE_KEY` on the engine. `ADMIN_CONSOLE_KEY` still works for one more minor release and is read when the new name is unset or empty. Engine releases before the next minor read only `ADMIN_CONSOLE_KEY`, so keep that name on the engine until it moves.
-- The console moves to ui-kit 0.51.1, which takes in the changes of 0.47.0 to 0.51.0 as well.
+- The console moves to ui-kit 0.51.2, which takes in the changes of 0.47.0 to 0.51.1 as well.
 - Focus is drawn as the 2px brand outline with no glow.
 - The primary button keeps one small shadow in every state.
 - A hovered table row takes a neutral fill, so it no longer reads as a second head row.
