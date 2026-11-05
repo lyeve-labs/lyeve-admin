@@ -2,8 +2,11 @@ import { globSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { motion } from '@lyeve-labs/ui-kit';
 import type { OnNavigate } from '@sveltejs/kit';
 import { ENTERING, fadeRouteChange } from './page-transition';
+
+vi.mock('@lyeve-labs/ui-kit', () => ({ motion: { swapPage: vi.fn() } }));
 
 function navigation(
 	from: string,
@@ -46,6 +49,7 @@ function page({ frame = true } = {}) {
 
 afterEach(() => {
 	vi.unstubAllGlobals();
+	vi.clearAllMocks();
 });
 
 describe('fadeRouteChange', () => {
@@ -104,6 +108,24 @@ describe('fadeRouteChange', () => {
 		expect(p.body.getAttribute(ENTERING)).toBeNull();
 	});
 
+	// Every kit surface plays its exit when the page holding it goes, and the
+	// page waits for it, so an alert on the page being left kept that page on
+	// screen above the new one.
+	it('swaps the page in one frame on a change of page, not on a change of query', () => {
+		page();
+		fadeRouteChange(
+			navigation(
+				'/admin/content?page=1',
+				'/admin/content?page=2',
+				'/(admin)/admin/content',
+				'/(admin)/admin/content',
+			),
+		);
+		expect(motion.swapPage).not.toHaveBeenCalled();
+		fadeRouteChange(navigation('/admin/content', '/admin/schema'));
+		expect(motion.swapPage).toHaveBeenCalledTimes(1);
+	});
+
 	// In desktop Chrome on Intel graphics a view transition's snapshot came out
 	// white, on a named region and on the root alike, so the dark theme flashed
 	// white between pages.
@@ -116,6 +138,7 @@ describe('fadeRouteChange', () => {
 
 	it('does nothing on the server', () => {
 		expect(() => fadeRouteChange(navigation('/admin/content', '/admin/schema'))).not.toThrow();
+		expect(motion.swapPage).not.toHaveBeenCalled();
 	});
 });
 
