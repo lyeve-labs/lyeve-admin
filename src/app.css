@@ -89,20 +89,15 @@
 }
 
 /*
- * A route change fades the new page up into place. src/lib/page-transition.ts
- * marks the content region, or the body when the change enters or leaves the
- * console's frame, just before SvelteKit swaps the page in. The mark alternates
- * between a and b, so a change during a fade starts it over, and the fade holds
- * nothing once it ends.
+ * A route change fades the new page in where it lands.
+ * src/lib/page-transition.ts marks the content region, or the body when the
+ * change enters or leaves the console's frame, just before SvelteKit swaps the
+ * page in. The mark alternates between a and b, so a change during a fade
+ * starts it over, and the fade holds nothing once it ends.
  *
- * Only the content region rises. While a transform runs, the moving element is
- * the box its fixed descendants are placed in, and it starts a stacking
- * context. Inside the content region that reaches only a dialog, drawer or
- * tooltip opened while the page arrives, and it ends with the rise. The body
- * holds the layers the frame fixes to the window, the navigation drawer and its
- * scrim among them. On a page taller than the window, a layer placed against a
- * moving body lands at the foot of the document, so the body fades without
- * moving.
+ * Nothing moves. A page that rose into place was drawn below where it lands for
+ * as long as it rose, so a page a little shorter than the window overflowed it,
+ * and the window's scrollbar showed until the rise ended.
  *
  * No view transition runs, so the browser takes no snapshot of either page. In
  * desktop Chrome on Intel graphics a view transition's snapshot came out white,
@@ -114,30 +109,12 @@
 [data-page-entering='b'] {
 	animation: page-in-b var(--duration-slow) var(--ease-enter) backwards;
 }
-body[data-page-entering='a'] {
-	animation-name: page-fade-a;
-}
-body[data-page-entering='b'] {
-	animation-name: page-fade-b;
-}
 @keyframes page-in-a {
 	from {
 		opacity: 0;
-		transform: translateY(12px);
 	}
 }
 @keyframes page-in-b {
-	from {
-		opacity: 0;
-		transform: translateY(12px);
-	}
-}
-@keyframes page-fade-a {
-	from {
-		opacity: 0;
-	}
-}
-@keyframes page-fade-b {
 	from {
 		opacity: 0;
 	}
