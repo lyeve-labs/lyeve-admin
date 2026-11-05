@@ -1,13 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 // Mutable reference so individual tests can toggle dev mode.
 // vi.mock is hoisted above imports, so the handle import picks up
 // whatever value env.dev has at the moment it's called.
-const env = vi.hoisted(() => ({ dev: true }));
+const env = vi.hoisted(() => ({ dev: true, building: false }));
 
 vi.mock('$app/environment', () => env);
 
-import { handle } from './hooks.server';
+import { handle, init } from './hooks.server';
 import { resetSetupGateCache } from '$lib/server/setup-gate';
 import { authedHeaders } from '$lib/server/authz';
 import { actions as magicLink } from './routes/auth/magic-link/verify/+page.server';
@@ -132,6 +132,25 @@ describe('every response', () => {
 				'max-age=63072000; includeSubDomains; preload'
 			);
 		});
+	});
+});
+
+describe('starting the server', () => {
+	afterEach(() => {
+		env.dev = true;
+		vi.unstubAllEnvs();
+	});
+
+	// adapter-node serves plain http, so an https ORIGIN has a proxy in front,
+	// and without the header every visitor would share the proxy's address.
+	it('refuses an https ORIGIN that leaves ADDRESS_HEADER unset', () => {
+		env.dev = false;
+		vi.stubEnv('CORE_API_INTERNAL_URL', 'http://engine-proxy:8080');
+		vi.stubEnv('ORIGIN', 'https://console.example.com');
+		vi.stubEnv('ADDRESS_HEADER', '');
+		expect(() => init()).toThrow(/ADDRESS_HEADER/);
+		vi.stubEnv('ADDRESS_HEADER', 'x-forwarded-for');
+		expect(() => init()).not.toThrow();
 	});
 });
 

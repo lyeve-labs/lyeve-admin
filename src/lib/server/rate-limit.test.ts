@@ -129,3 +129,27 @@ describe('rate-limit', () => {
 		});
 	});
 });
+
+describe('addressHeaderProblem', () => {
+	it('names ADDRESS_HEADER when an https ORIGIN leaves it unset', async () => {
+		const { addressHeaderProblem } = await import('./rate-limit');
+		expect(addressHeaderProblem({ ORIGIN: 'https://console.example.com' })).toMatch(/ADDRESS_HEADER/);
+		expect(addressHeaderProblem({ ORIGIN: 'https://console.example.com', ADDRESS_HEADER: ' ' })).toMatch(
+			/ADDRESS_HEADER/
+		);
+	});
+
+	it('accepts an https ORIGIN that names the address header', async () => {
+		const { addressHeaderProblem } = await import('./rate-limit');
+		expect(
+			addressHeaderProblem({ ORIGIN: 'https://console.example.com', ADDRESS_HEADER: 'x-forwarded-for' })
+		).toBeNull();
+	});
+
+	// Without TLS in front, the address the console sees is the browser's own.
+	it('accepts a plain http ORIGIN and an unset one', async () => {
+		const { addressHeaderProblem } = await import('./rate-limit');
+		expect(addressHeaderProblem({ ORIGIN: 'http://localhost:3000' })).toBeNull();
+		expect(addressHeaderProblem({})).toBeNull();
+	});
+});

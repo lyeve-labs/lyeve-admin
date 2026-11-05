@@ -23,6 +23,24 @@ export const WINDOW_MS = envInt('RATE_LIMIT_AUTH_WINDOW_MS', 60_000); // 60 seco
 export const MAX_ATTEMPTS = envInt('RATE_LIMIT_AUTH_MAX_ATTEMPTS', 10); // generous for normal use, restrictive for brute force
 
 /**
+ * Why this limit would count every visitor as one, or null when it would not.
+ *
+ * adapter-node serves plain http, so an https ORIGIN means a proxy terminates
+ * TLS in front of this server. Without ADDRESS_HEADER every request then
+ * carries the proxy's address, and a few failed tries from anyone lock
+ * everyone out of sign-in, password reset, email links and setup.
+ */
+export function addressHeaderProblem(env: Record<string, string | undefined>): string | null {
+	if (!env.ORIGIN?.trim().toLowerCase().startsWith('https:')) return null;
+	if (env.ADDRESS_HEADER?.trim()) return null;
+	return (
+		'ADDRESS_HEADER is unset, but ORIGIN is https, so a proxy stands in front of this console ' +
+		"and every visitor would share the proxy's address for the sign-in limit. Set " +
+		'ADDRESS_HEADER=x-forwarded-for and XFF_DEPTH to the number of proxies in front of the console.'
+	);
+}
+
+/**
  * Empties the fixed-window store outright. Only the tests need it: the
  * periodic sweep is cleanupRateLimitStore, which drops expired buckets and
  * leaves the live ones counting.
