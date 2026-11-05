@@ -16,7 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A nested sidebar row is drawn like a top-level row.
 - The dark theme's surfaces, borders and hover fill are darker and a little bluer, so a card no longer reads violet, and a dark card carries no white wash.
 - The sign-in pages sit on the same ink and faint cyan and violet light as the rest of the console.
-- Moving to another page fades the new page up into place instead of only fading it in.
 - The account menu lists its entries as rows drawn like the sidebar's, and Sign out is a plain row under a divider instead of a red button.
 
 ### Fixed

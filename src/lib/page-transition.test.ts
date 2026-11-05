@@ -130,24 +130,23 @@ describe('the route fade in app.css', () => {
 		expect(css).not.toMatch(/::view-transition|view-transition-name\s*:/);
 	});
 
-	it('fades the content region up into place on either mark, and holds nothing after', () => {
+	it('fades the content region in on either mark, and holds nothing after', () => {
 		for (const mark of ['a', 'b']) {
 			expect(rule(`[data-page-entering='${mark}']`)).toMatch(
 				new RegExp(`animation:\\s*page-in-${mark}\\s+var\\(--duration-slow\\)\\s+var\\(--ease-enter\\)\\s+backwards;`),
 			);
-			expect(css).toMatch(
-				new RegExp(`@keyframes page-in-${mark} \\{\\s*from \\{\\s*opacity: 0;\\s*transform: translateY\\(12px\\);\\s*\\}\\s*\\}`),
-			);
+			expect(css).toMatch(new RegExp(`@keyframes page-in-${mark} \\{\\s*from \\{\\s*opacity: 0;\\s*\\}\\s*\\}`));
 		}
 	});
 
-	// A transform on the body would place the layers the frame fixes to the window
-	// against the moving body instead, for as long as it runs.
-	it('fades the body in without moving it', () => {
-		for (const mark of ['a', 'b']) {
-			expect(rule(`body[data-page-entering='${mark}']`)).toMatch(new RegExp(`animation-name:\\s*page-fade-${mark};`));
-			expect(css).toMatch(new RegExp(`@keyframes page-fade-${mark} \\{\\s*from \\{\\s*opacity: 0;\\s*\\}\\s*\\}`));
-		}
+	// A page drawn below where it lands overflows the window for as long as it
+	// moves, so a page a little shorter than the window showed the scrollbar
+	// until it settled. The body takes the same fade when the frame changes.
+	it('moves nothing while the page fades in', () => {
+		const keyframes = css.match(/@keyframes page-in-[ab] \{[^@]*?\}\s*\}/g) ?? [];
+		expect(keyframes).toHaveLength(2);
+		for (const k of keyframes) expect(k).not.toMatch(/transform|translate/);
+		expect(css).not.toMatch(/data-page-entering[^{]*\{[^}]*(transform|translate)/);
 	});
 });
 
