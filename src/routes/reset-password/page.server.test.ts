@@ -67,12 +67,23 @@ describe('reset-password action', () => {
 			json({ message: 'Password has been reset successfully.' })
 		) as unknown as typeof globalThis.fetch;
 
-		const result = await submit({ token: 't1', password: STRONG, confirm: STRONG }, fetch);
+		const result = await submit({ token: 't1', password: STRONG, confirm: STRONG, remove_passkeys: 'on' }, fetch);
 
-		expect(result).toEqual({ done: true });
+		expect(result).toEqual({ done: true, passkeysRemoved: 0 });
 		const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
 		expect(String(url)).toContain('/api/admin/auth/password-reset/confirm');
-		expect(JSON.parse(String(init.body))).toEqual({ token: 't1', password: STRONG });
+		expect(JSON.parse(String(init.body))).toEqual({ token: 't1', password: STRONG, remove_passkeys: true });
+	});
+
+	it('keeps the passkeys when the box is cleared, and says how many a removal took', async () => {
+		const keep = vi.fn(async () => json({ message: 'ok', passkeys_removed: 0 })) as unknown as typeof globalThis.fetch;
+		await submit({ token: 't1', password: STRONG, confirm: STRONG }, keep);
+		const [, init] = (keep as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body)).remove_passkeys).toBe(false);
+
+		const remove = vi.fn(async () => json({ message: 'ok', passkeys_removed: 2 })) as unknown as typeof globalThis.fetch;
+		const result = await submit({ token: 't1', password: STRONG, confirm: STRONG, remove_passkeys: 'on' }, remove);
+		expect(result).toEqual({ done: true, passkeysRemoved: 2 });
 	});
 
 	it('refuses a short password before spending the token', async () => {

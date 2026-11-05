@@ -20,11 +20,20 @@ export function requestPasswordReset(
 	return client.post<{ message: string }>(`${PASSWORD_RESET_URL}/request`, body);
 }
 
-/** Set a new password with the token a mailed link carries. A token is spent by the first use. */
+/**
+ * Set a new password with the token a mailed link carries. A token is spent by
+ * the first use. The reset removes the account's passkeys unless
+ * `removePasskeys` is false, and the answer counts what was removed.
+ */
 export function confirmPasswordReset(
 	client: HttpClient,
 	token: string,
-	password: string
-): Promise<{ message: string }> {
-	return client.post<{ message: string }>(`${PASSWORD_RESET_URL}/confirm`, { token, password });
+	password: string,
+	removePasskeys: boolean
+): Promise<{ message: string; passkeys_removed?: number }> {
+	return client.post<{ message: string; passkeys_removed?: number }>(`${PASSWORD_RESET_URL}/confirm`, {
+		token,
+		password,
+		remove_passkeys: removePasskeys,
+	});
 }

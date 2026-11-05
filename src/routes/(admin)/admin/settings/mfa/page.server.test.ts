@@ -207,3 +207,39 @@ describe('mfa setup proven by a passkey', () => {
 		});
 	});
 });
+
+/*
+ * A first second factor takes the account's password when the sign-in is not
+ * recent. The engine says which proof it wants by code, and the page asks for
+ * the password, says it did not match, or sends the reader to sign in again.
+ */
+describe('mfa setup of a first factor', () => {
+	const setupPath = '/api/admin/mfa/totp/setup';
+
+	it('sends the password the reader confirmed with', async () => {
+		const { ev, calls } = event({ [setupPath]: { status: 200, body: { provisioning_uri: 'otpauth://x', secret: 'ABC' } } }, { password: 'correct horse battery' });
+		expect(await actions.setup(ev)).toEqual({ step: 'confirming', uri: 'otpauth://x', secret: 'ABC' });
+		expect(calls[0].body).toEqual({ password: 'correct horse battery' });
+	});
+
+	it('asks for the password when the engine requires it', async () => {
+		const { ev } = event({ [setupPath]: { status: 400, body: { error: 'x', code: 'mfa.first_factor.password_required' } } });
+		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(400);
+		expect(r.data).toEqual({ step: 'password' });
+	});
+
+	it('says the password did not match, on the password step', async () => {
+		const { ev } = event({ [setupPath]: { status: 422, body: { error: 'x', code: 'mfa.first_factor.password_invalid' } } }, { password: 'wrong' });
+		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(422);
+		expect(r.data).toEqual({ step: 'password', passwordError: 'That password does not match your account.' });
+	});
+
+	it('sends the reader to sign in again when there is no password to give', async () => {
+		const { ev } = event({ [setupPath]: { status: 403, body: { error: 'x', code: 'mfa.first_factor.sign_in_required' } } });
+		const r = (await actions.setup(ev)) as { status: number; data: Record<string, unknown> };
+		expect(r.status).toBe(403);
+		expect(r.data).toEqual({ step: 'signIn' });
+	});
+});

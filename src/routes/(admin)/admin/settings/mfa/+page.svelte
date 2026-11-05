@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formRefusal } from '$lib/api/refusal';
-	import { Alert, Button, Card, CopyButton, CopyField, Input, PageShell, Skeleton } from '@lyeve-labs/ui-kit';
+	import { Alert, Button, Card, CopyButton, CopyField, Input, PageShell, PasswordInput, Skeleton } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { Shield } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -28,6 +28,7 @@
 	const secret = $derived(form && 'secret' in form ? (form.secret ?? '') : '');
 	const backupCodes = $derived(form && 'backupCodes' in form ? (form.backupCodes ?? []) : []);
 	const actionErrorText = $derived(form && 'error' in form ? form.error : undefined);
+	const passwordError = $derived(form && 'passwordError' in form && typeof form.passwordError === 'string' ? form.passwordError : undefined);
 	const proofSessionId = $derived(form && 'proofSessionId' in form ? (form.proofSessionId ?? '') : '');
 	const proofOptions = $derived(form && 'options' in form ? (form.options as ProofOptions) : undefined);
 
@@ -180,6 +181,38 @@
 				</div>
 			</form>
 		</Card>
+	{:else if step === 'password'}
+		<Card>
+			<form method="POST" action="?/setup" use:enhance={setup.enhance} class="flex flex-col gap-4">
+				<p class="text-fg text-sm">
+					Confirm it is you with your password. You signed in too long ago to turn on two-factor authentication without it.
+				</p>
+				<PasswordInput
+					id="first-factor-password"
+					name="password"
+					label="Password"
+					autocomplete="current-password"
+					required
+					error={passwordError}
+				/>
+				<div class="flex justify-end gap-3">
+					<Button variant="secondary" href="/admin/settings/mfa">Cancel</Button>
+					<Button type="submit" variant="primary" loading={setup.pending}>
+						<Shield size={ICON.sm} aria-hidden="true" />
+						Turn on two-factor authentication
+					</Button>
+				</div>
+			</form>
+		</Card>
+	{:else if step === 'signIn'}
+		<!-- Signing out first, because the sign-in page sends a signed-in
+		     reader straight back here without a new sign-in. -->
+		<Alert tone="warn">
+			<p>Sign in again to add a second factor.</p>
+			<form method="POST" action="/logout" class="mt-3">
+				<Button type="submit" variant="secondary" size="sm">Sign in again</Button>
+			</form>
+		</Alert>
 	{:else if !data.mfa.ok}
 		<GateNotice level={2} gate={data.mfa.gate} title="Two-factor authentication" absent="Two-factor authentication is not included in this build." />
 	{:else if hasPasskeys}
