@@ -38,6 +38,8 @@ export const actions: Actions = {
 		const token = String(form.get('token') ?? '').trim();
 		const password = String(form.get('password') ?? '');
 		const confirm = String(form.get('confirm') ?? '');
+		// A checkbox posts nothing when it is cleared, so absent means keep.
+		const removePasskeys = form.has('remove_passkeys');
 
 		if (!token) return fail(400, { error: EXPIRED, expired: true });
 		if (password.length < RESET_MIN_PASSWORD_LENGTH) {
@@ -49,8 +51,9 @@ export const actions: Actions = {
 		if (tooLong) return fail(400, { error: tooLong });
 		if (password !== confirm) return fail(400, { error: 'The two passwords do not match.' });
 
+		let removed: number;
 		try {
-			await confirmPasswordReset(createClient(event.fetch), token, password);
+			removed = (await confirmPasswordReset(createClient(event.fetch), token, password, removePasskeys)).passkeys_removed ?? 0;
 		} catch (e) {
 			const refused = recoveryRefusal(e, 'Password reset');
 			if (refused) return fail(refused.status, { error: refused.error });
@@ -63,6 +66,6 @@ export const actions: Actions = {
 			}
 			return fail(400, { error: EXPIRED, expired: true });
 		}
-		return { done: true };
+		return { done: true, passkeysRemoved: removed };
 	},
 };

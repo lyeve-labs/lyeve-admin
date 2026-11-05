@@ -20,6 +20,27 @@ describe('Reset password page', () => {
 		expect(container.textContent).toContain('At least 12 characters.');
 	});
 
+	it('offers to remove the passkeys, checked, in the form it posts', () => {
+		const { getByRole, container } = render(ResetPage, { props: props('t1') });
+
+		const box = getByRole('checkbox', { name: 'Remove my passkeys' }) as HTMLInputElement;
+		expect(box.checked).toBe(true);
+		expect(box.name).toBe('remove_passkeys');
+		expect(box.closest('form')).toBe(container.querySelector('form'));
+		expect(container.textContent).toContain(
+			'Recommended. A passkey someone else added stops working. You can add your own again after you sign in.'
+		);
+	});
+
+	it('says how many passkeys the reset removed, and nothing when it removed none', async () => {
+		const removed = render(ResetPage, { props: props('t1', { done: true, passkeysRemoved: 2 }) });
+		expect(await removed.findByText('Your password has been changed. 2 passkeys were removed. Sign in with the new one.')).toBeTruthy();
+		cleanup();
+		const none = render(ResetPage, { props: props('t1', { done: true, passkeysRemoved: 0 }) });
+		expect(await none.findByText('Your password has been changed. Sign in with the new one.')).toBeTruthy();
+		expect(none.queryByText(/passkeys were removed\./)).toBeNull();
+	});
+
 	it('sends the visitor to sign in once the password is changed', () => {
 		const { getByRole, container } = render(ResetPage, { props: props('t1', { done: true }) });
 

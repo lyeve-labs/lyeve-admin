@@ -16,9 +16,27 @@ export type ListedUser = User & { tenant_local?: boolean };
  * The policy is judged by the engine, which answers 422 with the reason in
  * its error field. Nothing here restates the rules: a length or complexity
  * check kept in two places is how the two drift apart.
+ *
+ * The engine removes the account's passkeys unless `removePasskeys` is false,
+ * so a passkey someone added from a stolen session stops signing in. The
+ * choice is always sent, and the answer counts what was removed.
  */
-export function setUserPassword(id: string, password: string, client: HttpClient): Promise<User> {
-	return client.put<User>(`/api/admin/users/${encodeURIComponent(id)}/password`, { password });
+export function setUserPassword(
+	id: string,
+	password: string,
+	client: HttpClient,
+	removePasskeys = true
+): Promise<User & { passkeys_removed?: number }> {
+	return client.put<User & { passkeys_removed?: number }>(`/api/admin/users/${encodeURIComponent(id)}/password`, {
+		password,
+		remove_passkeys: removePasskeys,
+	});
+}
+
+/** The sentence for the passkeys a password change removed, or empty when it removed none. */
+export function passkeysRemovedText(count: number | undefined): string {
+	if (!count) return '';
+	return count === 1 ? '1 passkey was removed.' : `${count} passkeys were removed.`;
 }
 
 /** The longest password the engine's default hasher reads, in UTF-8 bytes. */

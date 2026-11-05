@@ -3,6 +3,7 @@
 		Alert,
 		Badge,
 		Button,
+		Checkbox,
 		CheckboxGroup,
 		Drawer,
 		Select,
@@ -28,6 +29,7 @@
 	import { confirmed, fieldErrors, tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
+	import { passkeysRemovedText } from '$lib/api/users';
 	import { formatDate } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -116,11 +118,14 @@
 	let passwordOpen = $state(false);
 	let passwordFor = $state<User | null>(null);
 	let newPassword = $state('');
+	// Each opening starts from the recommended choice, not the last account's.
+	let removePasskeys = $state(true);
 
 	function openSetPassword(user: User) {
 		passwordOpenedOver = form;
 		passwordFor = user;
 		newPassword = '';
+		removePasskeys = true;
 		passwordOpen = true;
 	}
 
@@ -136,7 +141,8 @@
 				passwordOpen = false;
 				newPassword = '';
 				await invalidateAll();
-				toast.success(`Password set for ${subject}. Their sessions have ended.`);
+				const removed = passkeysRemovedText((result.data as { passkeysRemoved?: number } | undefined)?.passkeysRemoved);
+				toast.success(`Password set for ${subject}. Their sessions have ended.${removed ? ` ${removed}` : ''}`);
 			} else {
 				await update({ reset: false });
 			}
@@ -424,6 +430,13 @@
 			required
 			autocomplete="new-password"
 			error={passwordErrors.new_password}
+		/>
+		<Checkbox
+			id="set-pw-remove-passkeys"
+			name="remove_passkeys"
+			label="Remove this account's passkeys"
+			description="Recommended. The owner can add their passkeys again after signing in."
+			bind:checked={removePasskeys}
 		/>
 	</form>
 	{#snippet footer()}

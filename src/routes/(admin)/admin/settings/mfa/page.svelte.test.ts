@@ -229,3 +229,30 @@ describe('two-factor authentication page', () => {
 		expect(getByText(/If the copy fails, write them down before you leave this page\./)).toBeTruthy();
 	});
 });
+
+describe('a first factor on a sign-in that is not recent', () => {
+	it('asks for the password in the setup form', () => {
+		const { container, getByRole } = setup(false, { step: 'password' });
+		const form = container.querySelector('form[action="?/setup"]') as HTMLFormElement;
+		const field = form.querySelector('input[name="password"]') as HTMLInputElement;
+		expect(field.type).toBe('password');
+		expect(field.getAttribute('autocomplete')).toBe('current-password');
+		expect(field.hasAttribute('aria-invalid')).toBe(false);
+		expect(container.textContent).toContain('Confirm it is you with your password.');
+		expect(getByRole('button', { name: /Turn on two-factor authentication/ }).closest('form')).toBe(form);
+	});
+
+	it('says on the field that the password did not match', () => {
+		const { container } = setup(false, { step: 'password', passwordError: 'That password does not match your account.' });
+		const field = container.querySelector('input[name="password"]') as HTMLInputElement;
+		expect(field.getAttribute('aria-invalid')).toBe('true');
+		expect(container.textContent).toContain('That password does not match your account.');
+	});
+
+	it('offers to sign in again when the account has no password to give', () => {
+		const { container, getByRole } = setup(false, { step: 'signIn' });
+		expect(container.textContent).toContain('Sign in again to add a second factor.');
+		expect(getByRole('button', { name: 'Sign in again' }).closest('form')?.getAttribute('action')).toBe('/logout');
+		expect(container.querySelector('input[name="password"]')).toBeNull();
+	});
+});

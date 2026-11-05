@@ -183,9 +183,11 @@ export const actions: Actions = {
 				fields: { new_password: problem },
 			});
 		}
+		// A checkbox posts nothing when it is cleared, so absent means keep.
+		const removePasskeys = form.has('remove_passkeys');
 		try {
-			await setUserPassword(id, password, client);
-			return { ok: true };
+			const saved = await setUserPassword(id, password, client, removePasskeys);
+			return { ok: true, passkeysRemoved: saved?.passkeys_removed ?? 0 };
 		} catch (err) {
 			/*
 			 * The policy lives in the engine, and its 422 names the rule that

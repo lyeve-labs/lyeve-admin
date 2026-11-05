@@ -1,11 +1,12 @@
 <script lang="ts">
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { enhance } from '$app/forms';
-	import { Alert, Button, PasswordInput } from '@lyeve-labs/ui-kit';
+	import { Alert, Button, Checkbox, PasswordInput } from '@lyeve-labs/ui-kit';
 	import { ArrowLeft } from '@lucide/svelte';
 	import AuthShell from '$lib/components/AuthShell.svelte';
 	import { submitter } from '$lib/forms.svelte';
 	import { ICON } from '$lib/icon';
+	import { passkeysRemovedText } from '$lib/api/users';
 	import { withOrganization } from '$lib/organization';
 	import type { ActionData, PageData } from './$types';
 
@@ -15,6 +16,7 @@
 
 	const done = $derived(form && 'done' in form && form.done === true);
 	const expired = $derived(form && 'expired' in form && form.expired === true);
+	const removed = $derived(form && 'passkeysRemoved' in form ? passkeysRemovedText(form.passkeysRemoved) : '');
 </script>
 
 <PageTitle title="Choose a new password" />
@@ -22,7 +24,7 @@
 <AuthShell title={done ? 'Password changed' : 'Choose a new password'}>
 	{#if done}
 		<div class="space-y-5">
-			<Alert tone="success" announce>Your password has been changed. Sign in with the new one.</Alert>
+			<Alert tone="success" announce>Your password has been changed.{removed ? ` ${removed}` : ''} Sign in with the new one.</Alert>
 			<Button href={withOrganization('/login', data.carried)} variant="primary" full>Sign in</Button>
 		</div>
 	{:else if !data.token || expired}
@@ -57,6 +59,14 @@
 				label="Confirm new password"
 				autocomplete="new-password"
 				required
+			/>
+
+			<Checkbox
+				id="remove-passkeys"
+				name="remove_passkeys"
+				label="Remove my passkeys"
+				description="Recommended. A passkey someone else added stops working. You can add your own again after you sign in."
+				checked
 			/>
 
 			<Button type="submit" variant="primary" full loading={save.pending}>Save</Button>

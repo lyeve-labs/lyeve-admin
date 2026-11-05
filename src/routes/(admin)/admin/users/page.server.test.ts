@@ -405,13 +405,26 @@ describe('setting an account password', () => {
 			json({ id: 'u1', email: 'a@b.co', roles: ['editor'] })
 		) as unknown as typeof globalThis.fetch;
 
-		const result = await submit(fetch, { id: 'u1', new_password: 'correct horse battery' });
+		const result = await submit(fetch, { id: 'u1', new_password: 'correct horse battery', remove_passkeys: 'on' });
 
-		expect(result).toEqual({ ok: true });
+		expect(result).toEqual({ ok: true, passkeysRemoved: 0 });
 		const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
 		expect(url).toBe('/api/admin/users/u1/password');
 		expect(init.method).toBe('PUT');
-		expect(JSON.parse(String(init.body))).toEqual({ password: 'correct horse battery' });
+		expect(JSON.parse(String(init.body))).toEqual({ password: 'correct horse battery', remove_passkeys: true });
+	});
+
+	it('keeps the passkeys when the box is cleared, and answers how many a removal took', async () => {
+		const keep = vi.fn(async () => json({ id: 'u1', passkeys_removed: 0 })) as unknown as typeof globalThis.fetch;
+		await submit(keep, { id: 'u1', new_password: 'correct horse battery' });
+		const [, init] = (keep as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body)).remove_passkeys).toBe(false);
+
+		const remove = vi.fn(async () => json({ id: 'u1', passkeys_removed: 3 })) as unknown as typeof globalThis.fetch;
+		expect(await submit(remove, { id: 'u1', new_password: 'correct horse battery', remove_passkeys: 'on' })).toEqual({
+			ok: true,
+			passkeysRemoved: 3,
+		});
 	});
 
 	// The client above answers with the body whatever the status, so a refusal
