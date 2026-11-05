@@ -229,6 +229,17 @@
 		return ['system', field.required && 'required', field.indexed && 'indexed'].filter(Boolean).join(', ');
 	}
 
+	/**
+	 * The schema a relation points at, when public delivery would leave the
+	 * relation out because that schema is not public itself.
+	 */
+	function unservedTarget(field: SchemaField): string | null {
+		if (!schema.public_delivery || !field.relation_to) return null;
+		const target = schemas.find((s) => s.name === field.relation_to);
+		if (!target || target.public_delivery) return null;
+		return target.display_name || target.name;
+	}
+
 	let topSysFields = $derived(schema.fields.filter((f) => f.system && !isTimestamp(f)));
 	let userFields = $derived(schema.fields.filter((f) => !f.system));
 	let bottomSysFields = $derived(schema.fields.filter((f) => f.system && isTimestamp(f)));
@@ -248,6 +259,7 @@
 		<span class="hidden w-10 shrink-0 @xl:block"></span>
 		<span class="hidden w-10 shrink-0 @xl:block"></span>
 		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-14 shrink-0 @xl:block"></span>
 		<span class="hidden w-8 shrink-0 @xl:block"></span>
 	</div>
 {/snippet}
@@ -265,6 +277,7 @@
 		<span class="hidden w-10 shrink-0 @xl:block"></span>
 		<span class="hidden w-10 shrink-0 @xl:block"></span>
 		<span class="hidden w-10 shrink-0 @xl:block"></span>
+		<span class="hidden w-14 shrink-0 @xl:block"></span>
 		<span class="hidden w-8 shrink-0 @xl:block"></span>
 	</div>
 {/snippet}
@@ -402,6 +415,21 @@
 					{/each}
 				</div>
 			</div>
+			<div class="flex flex-col gap-3 border-t border-line pt-4">
+				<SectionHeading level={3}>Public delivery</SectionHeading>
+				<Checkbox
+					id="schema-public-delivery"
+					label="Serve on public delivery"
+					description="Anyone can read the published entries of this schema without a token, and a CDN can cache them. Fields you mark Private are left out."
+					checked={schema.public_delivery === true}
+					onchange={(checked) => (schema.public_delivery = checked || undefined)}
+				/>
+				{#if schema.public_delivery && !schema.with_draft_publish}
+					<Alert tone="warn">
+						This schema has no draft and publish, so public delivery serves every entry.
+					</Alert>
+				{/if}
+			</div>
 		</div>
 	</Collapsible>
 
@@ -446,6 +474,7 @@
 		<span class="w-10 shrink-0 text-center">Req</span>
 		<span class="w-10 shrink-0 text-center">Idx</span>
 		<span class="w-10 shrink-0 text-center" title="Translated per locale">i18n</span>
+		<span class="w-14 shrink-0 text-center" title="Never served on public delivery">Private</span>
 		<span class="w-8 shrink-0"></span>
 	</div>
 
@@ -536,6 +565,18 @@
 							onchange={(checked) => (field.localized = checked)}
 						/>
 					</div>
+					<!-- Left out of public delivery. Unchecked stores no mark, so
+					     an undo back to the saved definition is not an edit. -->
+					<div class="flex shrink-0 items-center gap-1.5 @xl:w-14 @xl:justify-center" title="Never served on public delivery">
+						<span class="text-xs text-faint @xl:hidden" aria-hidden="true">Private</span>
+						<Checkbox
+							size="sm"
+							label="Private, {fieldLabel(field)}"
+							labelHidden
+							checked={field.private === true}
+							onchange={(checked) => (field.private = checked || undefined)}
+						/>
+					</div>
 					{#if canWrite}
 					<button
 						type="button"
@@ -599,6 +640,11 @@
 							}}
 						/>
 					</div>
+					{#if unservedTarget(field)}
+						<p class="text-xs text-muted">
+							Public delivery does not serve this relation until {unservedTarget(field)} is public too.
+						</p>
+					{/if}
 
 					{#if plan}
 						<p class="text-sm text-fg">{plan.sentence}</p>

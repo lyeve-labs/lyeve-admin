@@ -126,6 +126,54 @@ describe('SchemaEditor', () => {
 		expect(props.schema.transports).toBeUndefined();
 	});
 
+	it('marks the schema for public delivery, and stores no mark once it is cleared', async () => {
+		const { props } = setup();
+		const box = screen.getByRole('checkbox', { name: 'Serve on public delivery' });
+		await fireEvent.click(box);
+		expect(props.schema.public_delivery).toBe(true);
+		await fireEvent.click(box);
+		expect(props.schema.public_delivery).toBeUndefined();
+	});
+
+	it('warns that public delivery serves every entry of a schema without draft and publish', () => {
+		const warning = /public delivery serves every entry/;
+		setup({ schema: { ...posts(), public_delivery: true } });
+		expect(screen.getByText(warning)).toBeTruthy();
+		cleanup();
+		setup({ schema: { ...posts(), public_delivery: true, with_draft_publish: true } });
+		expect(screen.queryByText(warning)).toBeNull();
+		cleanup();
+		setup({ schema: posts() });
+		expect(screen.queryByText(warning)).toBeNull();
+	});
+
+	it('marks a field private, and offers no private box on a system field', async () => {
+		const { props } = setup();
+		expect(screen.queryByRole('checkbox', { name: 'Private, id' })).toBeNull();
+		const box = screen.getByRole('checkbox', { name: 'Private, title' });
+		await fireEvent.click(box);
+		expect(props.schema.fields[1].private).toBe(true);
+		await fireEvent.click(box);
+		expect(props.schema.fields[1].private).toBeUndefined();
+	});
+
+	it('says a relation into a schema that is not public is not served on public delivery', () => {
+		const note = 'Public delivery does not serve this relation until Authors is public too.';
+		const withRelation = (): Schema => {
+			const schema = { ...posts(), public_delivery: true };
+			schema.fields.push({ id: 'f-author', name: 'author', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'authors', required: false, unique: false, indexed: false });
+			return schema;
+		};
+		setup({ schema: withRelation() });
+		expect(screen.getByText(note)).toBeTruthy();
+		cleanup();
+		setup({ schema: withRelation(), schemas: [posts(), { name: 'authors', display_name: 'Authors', fields: [], public_delivery: true }] });
+		expect(screen.queryByText(note)).toBeNull();
+		cleanup();
+		setup({ schema: { ...withRelation(), public_delivery: undefined } });
+		expect(screen.queryByText(note)).toBeNull();
+	});
+
 	it('ties a relation kind problem to its radio group', () => {
 		const schema = posts();
 		schema.fields.push({ id: 'f-rel', name: 'parent', field_type: 'relation', relation_type: 'belongs_to', relation_to: 'posts', required: false, unique: false, indexed: false });
@@ -207,10 +255,10 @@ describe('SchemaEditor column headings', () => {
 		return [...row.children];
 	}
 
-	it('names every column a field row has, the translation box included', () => {
+	it('names every column a field row has, the translation and private boxes included', () => {
 		setup();
 		const names = [...header().children].map((c) => c.textContent?.trim()).filter(Boolean);
-		expect(names).toEqual(['Field', 'Type', 'Req', 'Idx', 'i18n']);
+		expect(names).toEqual(['Field', 'Type', 'Req', 'Idx', 'i18n', 'Private']);
 	});
 
 	it('gives the headings, a system row and a field row the same columns', () => {
