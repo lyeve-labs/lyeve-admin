@@ -250,6 +250,20 @@ describe('SchemaEditor', () => {
 		expect(scale.value).toBe('30');
 	});
 
+	it('steps from the stored value after bringing a typed one inside the bounds', async () => {
+		const schema = posts();
+		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 38, scale: 2, localized: undefined };
+		const { props } = setup({ schema });
+		const precision = screen.getByLabelText('Precision') as HTMLInputElement;
+		precision.value = '50';
+		await fireEvent.input(precision);
+		await tick();
+		const box = precision.closest('[data-field]') as HTMLElement;
+		await fireEvent.click(within(box).getByRole('button', { name: 'Decrease' }));
+		expect(props.schema.fields[1].precision).toBe(37);
+		expect(precision.value).toBe('37');
+	});
+
 	it('says what precision and scale mean in their hints', () => {
 		const schema = posts();
 		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 10, scale: 2, localized: undefined };

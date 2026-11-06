@@ -224,8 +224,9 @@
 
 	/**
 	 * Shows the stored value in a box whose typed text was brought inside the
-	 * bounds. The box redraws only when its value changes, so a second 50
-	 * typed over a stored 38 would otherwise stay on screen while 38 saves.
+	 * bounds. The box's value is bound, so its steppers start from the stored
+	 * value, but its text redraws only when that value changes, so a 50 typed
+	 * over a stored 38 would otherwise stay on screen while 38 saves.
 	 */
 	function showStored(id: string, stored: number) {
 		void tick().then(() => {
@@ -765,8 +766,7 @@
 						hint="The most digits a value can have, from {DECIMAL_PRECISION_MIN} to {DECIMAL_PRECISION_MAX}."
 						min={DECIMAL_PRECISION_MIN}
 						max={DECIMAL_PRECISION_MAX}
-						value={field.precision ?? DECIMAL_PRECISION_DEFAULT}
-						onchange={(next: number) => setPrecision(field, next, `decimal-precision-${rowId}`)}
+						bind:value={() => field.precision ?? DECIMAL_PRECISION_DEFAULT, (next: number) => setPrecision(field, next, `decimal-precision-${rowId}`)}
 					/>
 					<NumberInput
 						id="decimal-scale-{rowId}"
@@ -774,8 +774,7 @@
 						hint="How many of those digits come after the decimal point, from 0 to {maxScale(field)}."
 						min={0}
 						max={maxScale(field)}
-						value={field.scale ?? DECIMAL_SCALE_DEFAULT}
-						onchange={(next: number) => setScale(field, next, `decimal-scale-${rowId}`)}
+						bind:value={() => field.scale ?? DECIMAL_SCALE_DEFAULT, (next: number) => setScale(field, next, `decimal-scale-${rowId}`)}
 						error={problemAt(`decimal-scale-${rowId}`)}
 					/>
 				</div>
