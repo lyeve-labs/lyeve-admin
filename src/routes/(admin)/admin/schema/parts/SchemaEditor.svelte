@@ -221,10 +221,14 @@
 	// them here rather than refused at save.
 	const within = (n: number, lo: number, hi: number) => Math.min(Math.max(Math.trunc(n), lo), hi);
 
-	/** Sets the precision, and lowers the scale when the new precision cannot hold it. */
+	/**
+	 * Sets the precision and leaves the scale alone. The box reports each
+	 * keystroke, so typing 20 passes through 2, and lowering the scale there
+	 * would change it without a word. A scale the precision cannot hold is a
+	 * problem the save waits on instead.
+	 */
 	function setPrecision(field: SchemaField, next: number) {
 		field.precision = within(next, DECIMAL_PRECISION_MIN, DECIMAL_PRECISION_MAX);
-		if ((field.scale ?? DECIMAL_SCALE_DEFAULT) > maxScale(field)) field.scale = maxScale(field);
 	}
 
 	/**
@@ -752,7 +756,8 @@
 						min={0}
 						max={maxScale(field)}
 						value={field.scale ?? DECIMAL_SCALE_DEFAULT}
-						onchange={(next: number) => (field.scale = within(next, 0, maxScale(field)))}
+						error={problemAt(`decimal-scale-${rowId}`)}
+						onchange={(next: number) => (field.scale = within(next, 0, DECIMAL_SCALE_MAX))}
 					/>
 				</div>
 			{/if}

@@ -149,6 +149,13 @@ export function problemsOf(schema: Schema, others: Schema[], isNew: boolean): Pr
 		} else if ((seen.get(f.name.toLowerCase()) ?? 0) > 1) {
 			out.push({ fieldId: id, target, where, message: `${f.name} is used by more than one field.` });
 		}
+		if (f.field_type === 'decimal') {
+			// The engine's defaults when the definition names neither.
+			const most = Math.min(f.precision ?? 18, 30);
+			if ((f.scale ?? 2) > most) {
+				out.push({ fieldId: id, target: `decimal-scale-${id}`, where, message: `Enter a scale of at most ${most}.` });
+			}
+		}
 		if (f.field_type === 'relation') {
 			if (!f.relation_to) {
 				out.push({ fieldId: id, target: `relation-target-${id}`, where, message: 'Pick the schema this relation points at.' });

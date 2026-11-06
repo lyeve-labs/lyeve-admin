@@ -68,6 +68,16 @@ describe('problemsOf', () => {
 		expect(p.message).toMatch(/^Use only letters, digits and underscores in the field name/);
 	});
 
+	it('holds the save while a decimal scale is larger than its precision allows', () => {
+		const decimal = (over: Partial<SchemaField>) => schema('posts', [field('a', 'price', { field_type: 'decimal', ...over })]);
+		expect(problemsOf(decimal({ precision: 2, scale: 4 }), [], false)).toEqual([
+			{ fieldId: 'a', target: 'decimal-scale-a', where: 'Field price', message: 'Enter a scale of at most 2.' },
+		]);
+		expect(problemsOf(decimal({ precision: 38, scale: 31 }), [], false)[0].message).toBe('Enter a scale of at most 30.');
+		expect(problemsOf(decimal({ precision: 20, scale: 4 }), [], false)).toEqual([]);
+		expect(problemsOf(decimal({}), [], false)).toEqual([]);
+	});
+
 	it('leaves the engine-owned rows alone', () => {
 		expect(problemsOf(schema('posts', [field('s', 'id', { system: true })]), [], false)).toEqual([]);
 	});

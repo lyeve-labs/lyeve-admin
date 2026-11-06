@@ -210,6 +210,7 @@ describe('SchemaEditor', () => {
 		expect(props.schema.fields[1].precision).toBe(38);
 		await fireEvent.input(scale, { target: { value: '40' } });
 		expect(props.schema.fields[1].scale).toBe(30);
+		await fireEvent.input(scale, { target: { value: '4' } });
 		await fireEvent.input(precision, { target: { value: '4' } });
 		expect(props.schema.fields[1].precision).toBe(4);
 		expect(props.schema.fields[1].scale).toBe(4);
@@ -219,6 +220,29 @@ describe('SchemaEditor', () => {
 		expect('precision' in props.schema.fields[1]).toBe(false);
 		expect('scale' in props.schema.fields[1]).toBe(false);
 		expect(screen.queryByLabelText('Precision')).toBeNull();
+	});
+
+	it('leaves the scale alone while a precision is typed one digit at a time', async () => {
+		const schema = posts();
+		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 10, scale: 4, localized: undefined };
+		const { props } = setup({ schema });
+		const precision = screen.getByLabelText('Precision') as HTMLInputElement;
+		await fireEvent.input(precision, { target: { value: '2' } });
+		await fireEvent.input(precision, { target: { value: '20' } });
+		expect(props.schema.fields[1].precision).toBe(20);
+		expect(props.schema.fields[1].scale).toBe(4);
+	});
+
+	it('shows the scale problem on the scale box', () => {
+		const schema = posts();
+		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 2, scale: 4, localized: undefined };
+		setup({
+			schema,
+			problems: [{ fieldId: 'f-title', target: 'decimal-scale-f-title', where: 'Field title', message: 'Enter a scale of at most 2.' }],
+		});
+		const scale = screen.getByLabelText('Scale') as HTMLInputElement;
+		expect(scale.getAttribute('aria-invalid')).toBe('true');
+		expect(screen.getByText('Enter a scale of at most 2.')).toBeTruthy();
 	});
 
 	it('finds the integer row, not number, when the type search reads int', async () => {
