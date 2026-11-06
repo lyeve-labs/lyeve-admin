@@ -353,6 +353,23 @@ describe('admin shell support link', () => {
 	});
 });
 
+describe('admin shell account menu', () => {
+	function accountMenu(): HTMLDetailsElement | undefined {
+		return [...document.querySelectorAll('details')].find((d) =>
+			d.querySelector('summary')?.textContent?.includes('a@b.c'),
+		);
+	}
+
+	it('names the roles under the email as people read them, not as the engine stores them', async () => {
+		await mount(SUPER);
+		expect(accountMenu()?.textContent).toContain('super admin');
+		expect(accountMenu()?.textContent).not.toContain('super_admin');
+		cleanup();
+		await mount(['admin', 'editor']);
+		expect(accountMenu()?.textContent).toContain('admin, editor');
+	});
+});
+
 describe('admin shell plugin gate', () => {
 	const kernel = { state: 'named', running: [], withheld: [] };
 

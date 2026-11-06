@@ -4,6 +4,39 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions are listed newest first.
 
+## [0.26.0] - 2026-11-09
+
+### Added
+
+- The schema builder can mark a content type for public delivery, under Table settings, and mark any field but a system field private. A content type without draft and publish shows a warning when it is marked, because every entry of it is published and so served. A relation to a content type that is not public says it is left out of public delivery.
+- The password reset page and the set-password drawer offer to remove the account's passkeys, checked by default, so a passkey added from a stolen session stops signing in. When any were removed, the confirmation says how many.
+- Turning on two-factor authentication on a sign-in that is not recent asks for your password when the engine requires it, says when the password did not match, and offers to sign in again when the engine requires a fresh sign-in.
+
+### Changed
+
+- The console reads the key it signs engine requests with from `LYEVE_CONSOLE_KEY`, the same value as `LYEVE_CONSOLE_KEY` on the engine. `ADMIN_CONSOLE_KEY` still works for one more minor release and is read when the new name is unset or empty. Engine releases before the next minor read only `ADMIN_CONSOLE_KEY`, so keep that name on the engine until it moves.
+- The console moves to ui-kit 0.52.0, which takes in the changes of 0.47.0 to 0.51.2 as well.
+- Focus is drawn as the 2px brand outline with no glow.
+- The primary button keeps one small shadow in every state.
+- A hovered table row takes a neutral fill, so it no longer reads as a second head row.
+- A nested sidebar row is drawn like a top-level row.
+- The dark theme's surfaces, borders and hover fill are darker and a little bluer, so a card no longer reads violet, and a dark card carries no white wash.
+- The sign-in pages sit on the same ink and faint cyan and violet light as the rest of the console.
+- The account menu lists its entries as rows drawn like the sidebar's, and Sign out is a plain row under a divider instead of a red button.
+
+### Fixed
+
+- The account menu names your roles as people read them, such as super admin, instead of by their stored ids, such as `super_admin`.
+- A page change replaces the page in one frame. A page left while it showed an alert or a banner stayed on screen above the new page until its exit ended.
+- The sidebar opens the group of the page you move to, and shuts the group you left, in one frame. It slid them open and shut, so the rows under the pointer moved.
+- The setup page refuses a return path that holds a control character or a space. A path made of a slash, a tab and a second slash read as an address on another site once the browser dropped the tab, so finishing setup could leave the console for that site.
+- The console refuses to start when `ORIGIN` is https and `ADDRESS_HEADER` is unset. Behind such a proxy every visitor shared the proxy's address, so a few failed sign-ins from one visitor blocked sign-in, password reset, email links and setup for everyone.
+- The console answers 413 to a request body over 1 MiB before any form action reads it. Before, anyone could make it parse up to 10 MiB per request without signing in. Configuration sync, the schema and flow imports, preset and template saves, and flow datasources and variables still take the larger bodies they need once the engine has confirmed the session.
+
+### Upgrade notes
+
+- A console served over https behind a proxy needs `ADDRESS_HEADER`, usually `x-forwarded-for`, and `XFF_DEPTH` set to the number of proxies, or it refuses to start.
+
 ## [0.25.0] - 2026-11-05
 
 ### Changed

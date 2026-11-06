@@ -1,5 +1,6 @@
 import { ApiError, createClient } from '@lyeve-labs/client';
 import { getSetupStatus, type SetupTokenSource } from '$lib/api/setup';
+import { localPath } from '$lib/server/local-path';
 
 /**
  * Where the engine is on its way to serving the admin.
@@ -61,9 +62,10 @@ export function isGatedPath(pathname: string): boolean {
  * setup screen cannot be used to bounce a visitor somewhere else.
  */
 export function safeNext(next: string | null): string | null {
-	if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return null;
-	if (next === '/setup' || next.startsWith('/setup?') || next.startsWith('/setup/')) return null;
-	return next;
+	const path = localPath(next, '');
+	if (!path) return null;
+	if (path === '/setup' || path.startsWith('/setup?') || path.startsWith('/setup/')) return null;
+	return path;
 }
 
 // Once the engine reports an account, it keeps one. The gate stops asking for

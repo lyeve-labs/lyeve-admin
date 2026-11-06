@@ -111,8 +111,9 @@ export function engineBaseFor(path: string): string {
  * a browser's behalf is signed with it and names the browser's address, so
  * the engine's login limiter and device risk count each user rather than
  * this server. Unset, nothing is signed and the engine sees this server.
+ * ADMIN_CONSOLE_KEY is the old name, read when the new one is unset or empty.
  */
-const CONSOLE_KEY = process.env.ADMIN_CONSOLE_KEY ?? '';
+const CONSOLE_KEY = process.env.LYEVE_CONSOLE_KEY || process.env.ADMIN_CONSOLE_KEY || '';
 
 export const CONSOLE_CLIENT_HEADER = 'x-lyeve-console-client';
 export const CONSOLE_TIME_HEADER = 'x-lyeve-console-time';

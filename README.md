@@ -87,7 +87,8 @@ engine logged on its first start, and create the first super admin.
 | `ORIGIN` | yes | The console's public URL. Sign-in cookies and form protection depend on it. |
 | `CORE_INTERNAL_URL` | no | Where the console's server reaches the engine. Set it when the console and the engine run on different hosts. It sends both `/api/admin` and `/api/v1` calls here, so point it at the proxy in front of the engine. |
 | `CORE_API_INTERNAL_URL` | yes | Where the API reference page sends the calls you try, the engine's content API or the proxy in front of it. The console refuses to start without it. |
-| `ADMIN_CONSOLE_KEY` | no | The same secret as `ADMIN_CONSOLE_KEY` on the engine, 32 characters or more. With it, sign-in limits count each person rather than the console. Behind a proxy, also set `ADDRESS_HEADER=x-forwarded-for` and `XFF_DEPTH` to the number of proxies. |
+| `LYEVE_CONSOLE_KEY` | no | The same secret as `LYEVE_CONSOLE_KEY` on the engine, 32 characters or more. The old name `ADMIN_CONSOLE_KEY` still works for one more minor release, and engine releases before that minor read only the old name. With it, sign-in limits count each person rather than the console. Behind a proxy, also set `ADDRESS_HEADER=x-forwarded-for` and `XFF_DEPTH` to the number of proxies. |
+| `ADDRESS_HEADER` | behind a proxy | The header that carries the browser's address, usually `x-forwarded-for`, with `XFF_DEPTH` set to the number of proxies. Without it every visitor shares the proxy's address, and a few failed sign-ins lock everyone out. The console refuses to start without it when `ORIGIN` is https. |
 | `SIGN_IN_ORGANIZATION` | no | Set to `true` to show the Organization field on the sign-in, password reset and email link pages. Turn it on when the console serves more than one organization on an address that names none, so an account an identity provider created, or one with a membership in another organization, can name where it signs in. Off by default. |
 | `PORT` | no | Defaults to `3002`. |
 | `BODY_SIZE_LIMIT` | no | The largest request the console accepts. The image sets `10M`, enough for a settings bundle or a schema import. |
@@ -109,6 +110,23 @@ docker run --rm -p 3000:3002 \
 
 Replace `engine-proxy:8080` with the address of the proxy in front of your
 engine.
+
+Behind a proxy that serves the console over https, name the address header
+as well:
+
+```bash
+docker run --rm -p 3000:3002 \
+  -e ORIGIN=https://console.example.com \
+  -e ADDRESS_HEADER=x-forwarded-for \
+  -e XFF_DEPTH=1 \
+  -e CORE_INTERNAL_URL=http://engine-proxy:8080 \
+  -e CORE_API_INTERNAL_URL=http://engine-proxy:8080 \
+  lyeve-console:local
+```
+
+Set `XFF_DEPTH` to the number of proxies in front of the console. On the
+plain http example above, leave both unset. No proxy adds the header there,
+and sign-in fails when a named header is missing.
 
 ## Working on the source
 
@@ -158,7 +176,7 @@ Report a vulnerability privately, as [SECURITY.md](SECURITY.md) describes.
 Please do not open a public issue for it.
 
 The console stores no data and holds no secret of its own beyond its
-optional `ADMIN_CONSOLE_KEY`. Pages ship with a Content Security Policy that
+optional `LYEVE_CONSOLE_KEY`. Pages ship with a Content Security Policy that
 limits where scripts may load from.
 
 ## License

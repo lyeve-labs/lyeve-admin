@@ -1,3 +1,4 @@
+import { motion } from '@lyeve-labs/ui-kit';
 import type { OnNavigate } from '@sveltejs/kit';
 
 /**
@@ -23,6 +24,12 @@ const inFrame = (routeId: string | null | undefined) => routeId?.startsWith('/(a
  * flashed white while it had a snapshot of its own, and the whole page did
  * once only the root had one.
  *
+ * The page itself changes in one frame. Every kit surface plays its exit when
+ * the page holding it goes, and the page waits for it, so an alert on the page
+ * being left kept that page on screen above the new one. The kit's
+ * `motion.swapPage()` runs every exit and entrance in no time until the next
+ * frame.
+ *
  * A change of query alone, such as a filter or a page of results, keeps the
  * reader in place and does not fade. Under reduced motion the kit's
  * stylesheet shortens the fade to 1ms.
@@ -30,6 +37,7 @@ const inFrame = (routeId: string | null | undefined) => routeId?.startsWith('/(a
 export function fadeRouteChange(navigation: OnNavigate): void {
 	if (typeof document === 'undefined') return;
 	if (navigation.from?.url.pathname === navigation.to?.url.pathname) return;
+	motion.swapPage();
 	const frame = inFrame(navigation.from?.route.id) && inFrame(navigation.to?.route.id);
 	const target = (frame && document.getElementById('content')) || document.body;
 	target.setAttribute(ENTERING, target.getAttribute(ENTERING) === 'a' ? 'b' : 'a');

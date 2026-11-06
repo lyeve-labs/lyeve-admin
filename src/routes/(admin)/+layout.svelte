@@ -3,9 +3,9 @@
 	import { afterNavigate } from '$app/navigation';
 	import {
 		AccountMenu,
+		AccountMenuItem,
 		AppShell,
 		Banner,
-		Button,
 		DialogContainer,
 		Logo,
 		PageShell,
@@ -25,9 +25,9 @@
 	import { hasLicenseModule } from '$lib/entitlements';
 	import { PLUGIN } from '$lib/plugin-names';
 	import { notRunning, runs, whyNotRunning, UNNAMED } from '$lib/plugins';
+	import { rolesLabel } from '$lib/device-login';
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
-	import { ICON } from '$lib/icon';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
@@ -212,60 +212,40 @@
 			<DbStatus pending={data.migrations.pending} items={data.migrations.items} redirectTo={here} />
 		{/if}
 		<ThemeToggle />
-		<AccountMenu name={data.user.email} secondary={data.user.roles.join(', ')}>
-			<Button href="/admin/settings/account" variant="secondary" size="sm" full>
-				<Settings size={ICON.sm} />
+		<AccountMenu name={data.user.email} secondary={rolesLabel(data.user.roles)}>
+			<AccountMenuItem href="/admin/settings/account" icon={Settings}>
 				Account and appearance
-			</Button>
+			</AccountMenuItem>
 			<!-- The two surfaces that are the signed-in person's own rather than
 			     the instance's. Neither has a sidebar row, because the sidebar
 			     groups by role and these belong to everybody. Listed here, neither
 			     needs its URL typed to be reached. -->
 			{#if twoFactor}
-				<Button href="/admin/settings/mfa" variant="secondary" size="sm" full>
-					<ShieldCheck size={ICON.sm} />
+				<AccountMenuItem href="/admin/settings/mfa" icon={ShieldCheck}>
 					Two-factor authentication
-				</Button>
+				</AccountMenuItem>
 			{/if}
 			{#if remembersDevices}
-				<Button href="/admin/settings/devices" variant="secondary" size="sm" full>
-					<MonitorSmartphone size={ICON.sm} />
+				<AccountMenuItem href="/admin/settings/devices" icon={MonitorSmartphone}>
 					Trusted devices
-				</Button>
+				</AccountMenuItem>
 			{/if}
 			<!-- Another origin, so it opens in its own tab and cannot reach back
 			     through window.opener into the admin session. -->
-			<Button
-				href={DOCS_URL}
-				variant="secondary"
-				size="sm"
-				full
-				target="_blank"
-				rel="noreferrer noopener"
-			>
-				<BookOpen size={ICON.sm} />
+			<AccountMenuItem href={DOCS_URL} icon={BookOpen} target="_blank" rel="noreferrer noopener">
 				Documentation
-			</Button>
+			</AccountMenuItem>
 			{#if support}
-				<Button
-					href={support.href}
-					variant="secondary"
-					size="sm"
-					full
-					target="_blank"
-					rel="noreferrer noopener"
-				>
-					<LifeBuoy size={ICON.sm} />
+				<AccountMenuItem href={support.href} icon={LifeBuoy} target="_blank" rel="noreferrer noopener">
 					{support.label ?? 'Support'}
-				</Button>
+				</AccountMenuItem>
 			{/if}
-			<!-- A real post, so signing out survives a page that never hydrated. -->
-			<form method="POST" action="/logout">
-				<Button type="submit" variant="danger" size="sm" full>
-					<LogOut size={ICON.sm} />
-					Sign out
-				</Button>
-			</form>
+			{#snippet footer()}
+				<!-- A real post, so signing out survives a page that never hydrated. -->
+				<form method="POST" action="/logout">
+					<AccountMenuItem type="submit" icon={LogOut}>Sign out</AccountMenuItem>
+				</form>
+			{/snippet}
 		</AccountMenu>
 	{/snippet}
 

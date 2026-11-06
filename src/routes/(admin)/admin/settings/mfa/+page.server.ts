@@ -30,6 +30,28 @@ function proofRefusal(err: unknown, byPasskey: boolean): { status: number; error
 	return undefined;
 }
 
+/**
+ * The step a first second factor moves to when the engine wants proof the
+ * session alone does not give: a sign-in that is not recent asks for the
+ * account's password, and an account with no password to give asks for a new
+ * sign-in. Any other failure is not this refusal and gets undefined. 403 is
+ * the engine's status for a missing sign-in so the session stays open.
+ */
+function firstFactorRefusal(err: unknown) {
+	if (!(err instanceof ApiError)) return undefined;
+	const code = (err.body as { code?: unknown } | undefined)?.code;
+	if (err.status === 400 && code === 'mfa.first_factor.password_required') {
+		return fail(400, { step: 'password' as const });
+	}
+	if (err.status === 422 && code === 'mfa.first_factor.password_invalid') {
+		return fail(422, { step: 'password' as const, passwordError: 'That password does not match your account.' });
+	}
+	if (err.status === 403 && code === 'mfa.first_factor.sign_in_required') {
+		return fail(403, { step: 'signIn' as const });
+	}
+	return undefined;
+}
+
 /** The engine's answer to a passkey proof begin: the challenge to sign. */
 type ProofBegin = { session_id: string; options: unknown };
 
@@ -73,13 +95,15 @@ export const actions: Actions = {
 	// Adding an authenticator app to an account that already holds a second
 	// factor takes proof of one: a passkey assertion, a current code from the
 	// app or a backup code. The engine refuses the setup without it. A first
-	// factor takes no proof, so an empty form sends none.
+	// factor takes none, unless the sign-in is not recent: then the engine
+	// asks for the account's password, which the form sends once it has one.
 	setup: async (event) => {
 		const form = await event.request.formData();
 		const code = String(form.get('code') ?? '').trim();
+		const password = String(form.get('password') ?? '');
 		const proofSessionId = String(form.get('proof_session_id') ?? '');
 		const assertion = String(form.get('assertion') ?? '');
-		let body: Record<string, unknown> = code ? { code } : {};
+		let body: Record<string, unknown> = code ? { code } : password ? { password } : {};
 		if (proofSessionId && assertion) {
 			try {
 				body = { proof_session_id: proofSessionId, assertion: JSON.parse(assertion) };
@@ -91,6 +115,8 @@ export const actions: Actions = {
 			const s = await authedClient(event).post<Setup>('/api/admin/mfa/totp/setup', body);
 			return { step: 'confirming' as const, uri: s.provisioning_uri, secret: s.secret };
 		} catch (err) {
+			const firstFactor = firstFactorRefusal(err);
+			if (firstFactor) return firstFactor;
 			const refused = proofRefusal(err, 'proof_session_id' in body);
 			if (refused) return fail(refused.status, { step: 'idle' as const, error: refused.error });
 			const failed = actionFailure(err, 'Could not create the authenticator key. Try again.');

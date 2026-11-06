@@ -181,7 +181,7 @@ the hit box it grows, not only by its visual. Playwright is not a dependency
 here. Install it anywhere and point PLAYWRIGHT_DIR at that directory:
 
 ```bash
-ADMIN_URL=http://localhost:5173 ADMIN_EMAIL=... ADMIN_PASSWORD=... \
+CONSOLE_URL=http://localhost:5173 ADMIN_EMAIL=... ADMIN_PASSWORD=... \
 PLAYWRIGHT_DIR=/path/to/playwright BROWSER_CHANNEL=chrome \
 pnpm run measure:small-screens --out /tmp/small-screens
 ```

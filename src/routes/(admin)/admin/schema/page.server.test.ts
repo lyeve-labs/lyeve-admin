@@ -115,6 +115,13 @@ describe('admin/schema load', () => {
 		expect((out as unknown as { canvasGate: unknown }).canvasGate).toEqual({ state: 'busy' });
 	});
 
+	it('keeps the public delivery mark and private fields as the engine sent them', async () => {
+		const marked = { name: 'posts', display_name: 'Posts', public_delivery: true, fields: [{ name: 'notes', field_type: 'text', private: true }] };
+		const { event } = loadEvent({ ...schemaRoutes, '/api/admin/schemas': () => json([marked]) });
+		const out = (await load(event)) as unknown as Loaded;
+		expect(out.schemas).toEqual([marked]);
+	});
+
 	it('answers no gate for a list it read', async () => {
 		const { event } = loadEvent(schemaRoutes);
 		const out = (await load(event)) as unknown as Loaded;
@@ -368,6 +375,17 @@ describe('admin/schema save action', () => {
 		expect(out.status).toBe(412);
 		expect(out.data.error).toBe('A schema named posts already exists. Open it from the list, or give this one another machine name.');
 		expect(out.data.stale).toBe(false);
+	});
+
+	it('sends the public delivery mark and a private field as the builder set them', async () => {
+		const marked = { ...posts, public_delivery: true, fields: [{ ...posts.fields[0], private: true }] };
+		const { event, calls } = formEvent({ '/api/admin/schemas': () => json(marked) }, { schema: JSON.stringify(marked), original: 'posts', renames: '[]' });
+		const out = await actions.save(event);
+		expect(out).toEqual({ scope: 'save', saved: marked });
+		const post = calls.find((c) => c.init?.method === 'POST');
+		const sent = JSON.parse(String(post?.init?.body));
+		expect(sent.public_delivery).toBe(true);
+		expect(sent.fields[0].private).toBe(true);
 	});
 
 	it('refuses a machine name edited in the definition of a saved schema', async () => {

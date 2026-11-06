@@ -58,8 +58,13 @@ describe('safeNext', () => {
 		['/\\evil.example', null],
 		['https://evil.example', null],
 		['/setup', null],
+		// The browser drops a tab or line break from a URL, so each of these
+		// would become //evil.example/x and leave the origin.
+		['/\t/evil.example/x', null],
+		['/\n/evil.example/x', null],
+		['/\r/evil.example/x', null],
 		[null, null],
-	])('%s -> %s', (next, want) => {
+	])('%j -> %j', (next, want) => {
 		expect(safeNext(next)).toBe(want);
 	});
 });

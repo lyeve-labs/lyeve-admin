@@ -2,8 +2,11 @@ import { globSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { motion } from '@lyeve-labs/ui-kit';
 import type { OnNavigate } from '@sveltejs/kit';
 import { ENTERING, fadeRouteChange } from './page-transition';
+
+vi.mock('@lyeve-labs/ui-kit', () => ({ motion: { swapPage: vi.fn() } }));
 
 function navigation(
 	from: string,
@@ -46,6 +49,7 @@ function page({ frame = true } = {}) {
 
 afterEach(() => {
 	vi.unstubAllGlobals();
+	vi.clearAllMocks();
 });
 
 describe('fadeRouteChange', () => {
@@ -104,6 +108,24 @@ describe('fadeRouteChange', () => {
 		expect(p.body.getAttribute(ENTERING)).toBeNull();
 	});
 
+	// Every kit surface plays its exit when the page holding it goes, and the
+	// page waits for it, so an alert on the page being left kept that page on
+	// screen above the new one.
+	it('swaps the page in one frame on a change of page, not on a change of query', () => {
+		page();
+		fadeRouteChange(
+			navigation(
+				'/admin/content?page=1',
+				'/admin/content?page=2',
+				'/(admin)/admin/content',
+				'/(admin)/admin/content',
+			),
+		);
+		expect(motion.swapPage).not.toHaveBeenCalled();
+		fadeRouteChange(navigation('/admin/content', '/admin/schema'));
+		expect(motion.swapPage).toHaveBeenCalledTimes(1);
+	});
+
 	// In desktop Chrome on Intel graphics a view transition's snapshot came out
 	// white, on a named region and on the root alike, so the dark theme flashed
 	// white between pages.
@@ -116,6 +138,7 @@ describe('fadeRouteChange', () => {
 
 	it('does nothing on the server', () => {
 		expect(() => fadeRouteChange(navigation('/admin/content', '/admin/schema'))).not.toThrow();
+		expect(motion.swapPage).not.toHaveBeenCalled();
 	});
 });
 
@@ -130,17 +153,23 @@ describe('the route fade in app.css', () => {
 		expect(css).not.toMatch(/::view-transition|view-transition-name\s*:/);
 	});
 
-	it('fades the marked element in from transparent on either mark, and holds nothing after', () => {
+	it('fades the content region in on either mark, and holds nothing after', () => {
 		for (const mark of ['a', 'b']) {
 			expect(rule(`[data-page-entering='${mark}']`)).toMatch(
-				new RegExp(
-					`animation:\\s*page-in-${mark}\\s+var\\(--duration-base\\)\\s+var\\(--ease-enter\\)\\s+backwards;`,
-				),
+				new RegExp(`animation:\\s*page-in-${mark}\\s+var\\(--duration-slow\\)\\s+var\\(--ease-enter\\)\\s+backwards;`),
 			);
-			expect(css).toMatch(
-				new RegExp(`@keyframes page-in-${mark} \\{\\s*from \\{\\s*opacity: 0;\\s*\\}\\s*\\}`),
-			);
+			expect(css).toMatch(new RegExp(`@keyframes page-in-${mark} \\{\\s*from \\{\\s*opacity: 0;\\s*\\}\\s*\\}`));
 		}
+	});
+
+	// A page drawn below where it lands overflows the window for as long as it
+	// moves, so a page a little shorter than the window showed the scrollbar
+	// until it settled. The body takes the same fade when the frame changes.
+	it('moves nothing while the page fades in', () => {
+		const keyframes = css.match(/@keyframes page-in-[ab] \{[^@]*?\}\s*\}/g) ?? [];
+		expect(keyframes).toHaveLength(2);
+		for (const k of keyframes) expect(k).not.toMatch(/transform|translate/);
+		expect(css).not.toMatch(/data-page-entering[^{]*\{[^}]*(transform|translate)/);
 	});
 });
 

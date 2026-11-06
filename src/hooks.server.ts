@@ -1,8 +1,9 @@
 import { hostname } from 'node:os';
 import { building, dev } from '$app/environment';
 import { redirect, type Handle, type HandleFetch, type ServerInit } from '@sveltejs/kit';
-import { cleanupRateLimitStore, WINDOW_MS } from '$lib/server/rate-limit';
+import { addressHeaderProblem, cleanupRateLimitStore, WINDOW_MS } from '$lib/server/rate-limit';
 import { setupGateRedirect } from '$lib/server/setup-gate';
+import { limitBody } from '$lib/server/body-limit';
 import {
 	callerOf,
 	contentApiAddressProblem,
@@ -16,10 +17,12 @@ import { refreshSession } from '$lib/server/session-refresh';
 // A production server that cannot reach the Content API refuses to start.
 // The fallback address is this console's own port in the official image, so
 // running on it would answer every /api/v1 call from this application and
-// report the result as the engine's. A failed start names the variable.
+// report the result as the engine's. One behind a proxy that hides the
+// browser's address refuses too, because the sign-in limit would then lock
+// out every visitor at once. A failed start names the variable.
 export const init: ServerInit = () => {
 	if (dev || building) return;
-	const problem = contentApiAddressProblem(process.env, hostname());
+	const problem = contentApiAddressProblem(process.env, hostname()) ?? addressHeaderProblem(process.env);
 	if (problem) throw new Error(problem);
 };
 
@@ -46,8 +49,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	await refreshSession(event);
 	// After the renewal, so a CSRF cookie the engine answered with it is kept.
 	ensureCsrfCookie(event);
+	// Before resolve, because SvelteKit runs a form action ahead of every
+	// load, so no session check in a layout comes first.
+	const refused = await limitBody(event);
 
-	const response = withMutableHeaders(await resolve(event));
+	const response = withMutableHeaders(refused ?? (await resolve(event)));
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');

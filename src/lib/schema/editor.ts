@@ -6,6 +6,21 @@ import type { Schema, SchemaField } from '@lyeve-labs/client';
  * over it and each rule is tested on its own.
  */
 
+/*
+ * The public delivery marks, until the client package types them. Both travel
+ * in the definition the builder saves, and an absent mark reads as false.
+ */
+declare module '@lyeve-labs/client' {
+	interface Schema {
+		/** The published entries are served without a credential, on routes a CDN may cache. */
+		public_delivery?: boolean;
+	}
+	interface SchemaField {
+		/** Never served on the public delivery routes. A system field cannot carry it. */
+		private?: boolean;
+	}
+}
+
 /** The engine's identifier rule, which every table and column name passes. */
 const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const MAX_IDENTIFIER = 63;

@@ -89,21 +89,25 @@
 }
 
 /*
- * A route change fades the new page in. src/lib/page-transition.ts marks the
- * content region, or the body when the change enters or leaves the console's
- * frame, just before SvelteKit swaps the page in. The mark alternates between
- * a and b, so a change during a fade starts it over, and the fade holds
- * nothing once it ends.
+ * A route change fades the new page in where it lands.
+ * src/lib/page-transition.ts marks the content region, or the body when the
+ * change enters or leaves the console's frame, just before SvelteKit swaps the
+ * page in. The mark alternates between a and b, so a change during a fade
+ * starts it over, and the fade holds nothing once it ends.
  *
- * No view transition runs, so the browser takes no snapshot of either page.
- * In desktop Chrome on Intel graphics a view transition's snapshot came out
- * white, which flashed the dark theme white between pages.
+ * Nothing moves. A page that rose into place was drawn below where it lands for
+ * as long as it rose, so a page a little shorter than the window overflowed it,
+ * and the window's scrollbar showed until the rise ended.
+ *
+ * No view transition runs, so the browser takes no snapshot of either page. In
+ * desktop Chrome on Intel graphics a view transition's snapshot came out white,
+ * which flashed the dark theme white between pages.
  */
 [data-page-entering='a'] {
-	animation: page-in-a var(--duration-base) var(--ease-enter) backwards;
+	animation: page-in-a var(--duration-slow) var(--ease-enter) backwards;
 }
 [data-page-entering='b'] {
-	animation: page-in-b var(--duration-base) var(--ease-enter) backwards;
+	animation: page-in-b var(--duration-slow) var(--ease-enter) backwards;
 }
 @keyframes page-in-a {
 	from {

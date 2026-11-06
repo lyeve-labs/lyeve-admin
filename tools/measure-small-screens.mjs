@@ -4,11 +4,11 @@
  * running instance, measure what the layout does with the room it has, and
  * save one screenshot per page per width.
  *
- *   ADMIN_URL=http://localhost:5173 ADMIN_EMAIL=... ADMIN_PASSWORD=... \
+ *   CONSOLE_URL=http://localhost:5173 ADMIN_EMAIL=... ADMIN_PASSWORD=... \
  *     pnpm measure:small-screens [--out <dir>] [--widths 400,768,1280] [--only <substring>]
  *
  * Environment:
- *   ADMIN_URL          the admin dev server (default http://localhost:5173)
+ *   CONSOLE_URL        the console dev server (default http://localhost:5173)
  *   ADMIN_EMAIL        an admin account on the instance behind it
  *   ADMIN_PASSWORD     its password
  *   PLAYWRIGHT_DIR     a directory whose node_modules holds playwright or
@@ -42,7 +42,7 @@ function flag(name, fallback) {
 	return i === -1 ? fallback : args[i + 1];
 }
 
-const ADMIN_URL = (process.env.ADMIN_URL ?? 'http://localhost:5173').replace(/\/$/, '');
+const CONSOLE_URL = (process.env.CONSOLE_URL ?? 'http://localhost:5173').replace(/\/$/, '');
 const EMAIL = process.env.ADMIN_EMAIL ?? '';
 const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
 const OUT = path.resolve(flag('--out', path.join(tmpdir(), 'lyeve-console-small-screens')));
@@ -114,7 +114,7 @@ const candidates = new Map();
 async function listCandidates(page, parent, skip) {
 	const key = parent;
 	if (!candidates.has(key)) {
-		await page.goto(ADMIN_URL + parent, { waitUntil: 'networkidle' });
+		await page.goto(CONSOLE_URL + parent, { waitUntil: 'networkidle' });
 		const values = await page.evaluate(
 			({ parent, skip }) => {
 				const out = [];
@@ -406,7 +406,7 @@ async function checkDrawer(page) {
 }
 
 async function login(page) {
-	await page.goto(ADMIN_URL + '/login', { waitUntil: 'networkidle' });
+	await page.goto(CONSOLE_URL + '/login', { waitUntil: 'networkidle' });
 	if (!page.url().includes('/login')) return;
 	await page.fill('input[name="email"]', EMAIL);
 	await page.fill('input[name="password"]', PASSWORD);
@@ -465,7 +465,7 @@ async function main() {
 				const onError = (e) => errors.push(e.message);
 				page.on('pageerror', onError);
 				try {
-					const resp = await page.goto(ADMIN_URL + p, { waitUntil: 'networkidle', timeout: 30000 });
+					const resp = await page.goto(CONSOLE_URL + p, { waitUntil: 'networkidle', timeout: 30000 });
 					await page.waitForTimeout(250);
 					const m = await page.evaluate(measure, width);
 					m.status = resp ? resp.status() : null;

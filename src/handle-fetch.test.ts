@@ -3,7 +3,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 const KEY = '0123456789abcdef0123456789abcdef';
 
 vi.hoisted(() => {
-	process.env.ADMIN_CONSOLE_KEY = '0123456789abcdef0123456789abcdef';
+	process.env.LYEVE_CONSOLE_KEY = '0123456789abcdef0123456789abcdef';
 	process.env.CORE_INTERNAL_URL = 'http://engine.internal:3001';
 });
 vi.mock('$app/environment', () => ({ dev: false }));
@@ -97,6 +97,52 @@ describe('handleFetch', () => {
 		} as unknown as Parameters<typeof handleFetch>[0]);
 		expect(set).toHaveBeenCalledTimes(1);
 		expect(set).toHaveBeenCalledWith('__Host-csrf', 'pair', expect.objectContaining({ path: '/', secure: true }));
+	});
+});
+
+describe('handleFetch key names', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		vi.resetModules();
+	});
+
+	async function signedWith(env: Record<string, string>): Promise<{ req: Request; sign: typeof consoleSignature }> {
+		for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+		vi.resetModules();
+		const hook = (await import('./hooks.server')).handleFetch;
+		const sign = (await import('$lib/server/engine')).consoleSignature;
+		const sent: Request[] = [];
+		await hook({
+			request: new Request('https://admin.example.com/api/admin/users'),
+			fetch: vi.fn(async (req: Request) => {
+				sent.push(req);
+				return new Response(null, { status: 204 });
+			}),
+			event: {
+				url: new URL('https://admin.example.com/admin/users'),
+				getClientAddress: () => '203.0.113.9',
+				request: new Request('https://admin.example.com/admin/users')
+			}
+		} as unknown as Parameters<typeof handleFetch>[0]);
+		return { req: sent[0], sign };
+	}
+
+	const OTHER = 'fedcba9876543210fedcba9876543210';
+
+	it('signs with LYEVE_CONSOLE_KEY when only it is set', async () => {
+		const { req, sign } = await signedWith({ LYEVE_CONSOLE_KEY: OTHER, ADMIN_CONSOLE_KEY: '' });
+		const stamp = req.headers.get(CONSOLE_TIME_HEADER) ?? '';
+		expect(req.headers.get(CONSOLE_SIGNATURE_HEADER)).toBe(
+			sign(OTHER, stamp, 'GET', '/api/admin/users', '', '203.0.113.9', '')
+		);
+	});
+
+	it('signs with ADMIN_CONSOLE_KEY when only the old name is set', async () => {
+		const { req, sign } = await signedWith({ LYEVE_CONSOLE_KEY: '', ADMIN_CONSOLE_KEY: OTHER });
+		const stamp = req.headers.get(CONSOLE_TIME_HEADER) ?? '';
+		expect(req.headers.get(CONSOLE_SIGNATURE_HEADER)).toBe(
+			sign(OTHER, stamp, 'GET', '/api/admin/users', '', '203.0.113.9', '')
+		);
 	});
 });
 

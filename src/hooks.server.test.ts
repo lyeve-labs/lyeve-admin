@@ -1,14 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 // Mutable reference so individual tests can toggle dev mode.
 // vi.mock is hoisted above imports, so the handle import picks up
 // whatever value env.dev has at the moment it's called.
-const env = vi.hoisted(() => ({ dev: true }));
+const env = vi.hoisted(() => ({ dev: true, building: false }));
 
 vi.mock('$app/environment', () => env);
 
-import { handle } from './hooks.server';
-import { resetSetupGateCache } from '$lib/server/setup-gate';
+import { handle, init } from './hooks.server';
+import { resetSetupGateCache, setupGateRedirect } from '$lib/server/setup-gate';
 import { authedHeaders } from '$lib/server/authz';
 import { actions as magicLink } from './routes/auth/magic-link/verify/+page.server';
 // SvelteKit's own request cookie jar, so a cookie set in handle is read back
@@ -132,6 +132,229 @@ describe('every response', () => {
 				'max-age=63072000; includeSubDomains; preload'
 			);
 		});
+	});
+});
+
+describe('starting the server', () => {
+	afterEach(() => {
+		env.dev = true;
+		vi.unstubAllEnvs();
+	});
+
+	// adapter-node serves plain http, so an https ORIGIN has a proxy in front,
+	// and without the header every visitor would share the proxy's address.
+	it('refuses an https ORIGIN that leaves ADDRESS_HEADER unset', () => {
+		env.dev = false;
+		vi.stubEnv('CORE_API_INTERNAL_URL', 'http://engine-proxy:8080');
+		vi.stubEnv('ORIGIN', 'https://console.example.com');
+		vi.stubEnv('ADDRESS_HEADER', '');
+		expect(() => init()).toThrow(/ADDRESS_HEADER/);
+		vi.stubEnv('ADDRESS_HEADER', 'x-forwarded-for');
+		expect(() => init()).not.toThrow();
+	});
+});
+
+describe('a large request body', () => {
+	const MiB = 1024 * 1024;
+
+	/**
+	 * A POST whose body records whether anything read it. A high-water mark
+	 * of zero keeps the stream from pulling a chunk before a reader asks.
+	 */
+	function post(
+		path: string,
+		routeId: string,
+		size: number,
+		{ session, fetch, declared = true }: { session?: string; fetch?: ReturnType<typeof vi.fn>; declared?: boolean } = {},
+	) {
+		const seen = { read: false };
+		let sent = 0;
+		const body = new ReadableStream<Uint8Array>(
+			{
+				pull(controller) {
+					seen.read = true;
+					if (sent >= size) return controller.close();
+					const chunk = Math.min(MiB, size - sent);
+					sent += chunk;
+					controller.enqueue(new Uint8Array(chunk));
+				},
+			},
+			{ highWaterMark: 0 },
+		);
+		const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded' };
+		if (declared) headers['content-length'] = String(size);
+		const event = {
+			...stubEvent(path, (fetch ?? engineAnswering({ setup_required: false })) as never, session),
+			request: new Request(`http://localhost${path}`, { method: 'POST', headers, body, duplex: 'half' } as RequestInit),
+			route: { id: routeId },
+		};
+		return { event, seen };
+	}
+
+	/** An engine that knows the session as a super admin. */
+	function engineWithSession() {
+		return vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+			const url = input instanceof Request ? input.url : String(input);
+			const body = url.endsWith('/api/admin/auth/me')
+				? { id: 'u1', email: 'admin@example.com', roles: ['super_admin'] }
+				: { setup_required: false };
+			return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+		});
+	}
+
+	/** An engine that ends every session it is asked about. */
+	function engineWithoutSession() {
+		return vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+			const url = input instanceof Request ? input.url : String(input);
+			if (url.endsWith('/api/admin/auth/me')) {
+				return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'content-type': 'application/json' } });
+			}
+			return new Response(JSON.stringify({ setup_required: false }), { status: 200, headers: { 'content-type': 'application/json' } });
+		});
+	}
+
+	// A form action runs before any load, so the admin layout's session check
+	// never comes first, and the body would be parsed for anyone.
+	it('refuses an unauthenticated 10 MiB action with 413 before reading it', async () => {
+		resetSetupGateCache();
+		const { event, seen } = post('/admin/api-labs?/rest', '/(admin)/admin/api-labs', 10 * MiB);
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(413);
+		expect(resolve).not.toHaveBeenCalled();
+		expect(seen.read).toBe(false);
+		expect(response.headers.get('X-Frame-Options')).toBe('DENY');
+	});
+
+	it('refuses a body over 1 MiB with a made-up session cookie too', async () => {
+		resetSetupGateCache();
+		const { event, seen } = post('/admin/api-labs?/rest', '/(admin)/admin/api-labs', MiB + 1, { session: 'x' });
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(413);
+		expect(seen.read).toBe(false);
+	});
+
+	it('passes a body of 1 MiB on to the action', async () => {
+		resetSetupGateCache();
+		const { event } = post('/admin/api-labs?/rest', '/(admin)/admin/api-labs', MiB);
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(200);
+		expect(resolve).toHaveBeenCalled();
+	});
+
+	// A body sent without a length is read here, so the refusal is a 413 from
+	// the hook rather than a failed read inside the action.
+	it('answers 413 to a body sent without a length once it passes 1 MiB', async () => {
+		resetSetupGateCache();
+		const { event } = post('/admin/api-labs?/rest', '/(admin)/admin/api-labs', 3 * MiB, { declared: false });
+		expect(event.request.headers.get('content-length')).toBeNull();
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(413);
+		expect(resolve).not.toHaveBeenCalled();
+	});
+
+	it('hands the action a body sent without a length when it stays within 1 MiB', async () => {
+		resetSetupGateCache();
+		const { event } = post('/admin/api-labs?/rest', '/(admin)/admin/api-labs', MiB, { declared: false });
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(200);
+		const passed = (resolve.mock.calls[0][0] as { request: Request }).request;
+		expect((await passed.arrayBuffer()).byteLength).toBe(MiB);
+	});
+
+	it.each([
+		['/admin/settings/config-sync?/diff', '/(admin)/admin/settings/config-sync'],
+		['/admin/settings/config-sync?/dryRun', '/(admin)/admin/settings/config-sync'],
+		['/admin/settings/config-sync?/apply', '/(admin)/admin/settings/config-sync'],
+		['/admin/schema?/import', '/(admin)/admin/schema'],
+		['/admin/schema?/savePreset', '/(admin)/admin/schema'],
+		['/admin/flows?/import', '/(admin)/admin/flows'],
+		['/admin/flows/f1?/import', '/(admin)/admin/flows/[id]'],
+		['/admin/flows/f1?/saveTemplate', '/(admin)/admin/flows/[id]'],
+		['/admin/flows/datasources?/create', '/(admin)/admin/flows/datasources'],
+		['/admin/flows/variables?/put', '/(admin)/admin/flows/variables'],
+	])('lets a signed-in 2 MiB body through to %s', async (path, routeId) => {
+		resetSetupGateCache();
+		const { event } = post(path, routeId, 2 * MiB, { session: 'tok', fetch: engineWithSession() });
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(200);
+		expect(resolve).toHaveBeenCalled();
+	});
+
+	it.each([
+		['/admin/settings/config-sync?/export', '/(admin)/admin/settings/config-sync'],
+		['/admin/flows?/create', '/(admin)/admin/flows'],
+		['/admin/flows/f1?/save', '/(admin)/admin/flows/[id]'],
+		['/admin/flows/datasources?/update', '/(admin)/admin/flows/datasources'],
+	])('holds %s to 1 MiB, because the engine takes no more there', async (path, routeId) => {
+		resetSetupGateCache();
+		const { event } = post(path, routeId, 2 * MiB, { session: 'tok', fetch: engineWithSession() });
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(413);
+	});
+
+	it('lets a signed-in 8 MiB configuration import through once the engine confirms the session', async () => {
+		resetSetupGateCache();
+		const fetch = engineWithSession();
+		const { event } = post('/admin/settings/config-sync?/apply', '/(admin)/admin/settings/config-sync', 8 * MiB, {
+			session: 'tok',
+			fetch,
+		});
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(200);
+		expect(resolve).toHaveBeenCalled();
+		expect(fetch.mock.calls.some(([input]) => String(input instanceof Request ? input.url : input).endsWith('/api/admin/auth/me'))).toBe(true);
+		const passed = (resolve.mock.calls[0][0] as { request: Request }).request;
+		expect((await passed.arrayBuffer()).byteLength).toBe(8 * MiB);
+	});
+
+	it('lets a signed-in schema import through once the engine confirms the session', async () => {
+		resetSetupGateCache();
+		const { event } = post('/admin/schema?/import', '/(admin)/admin/schema', 4 * MiB, { session: 'tok', fetch: engineWithSession() });
+		const resolve = stubResolve();
+		await handle({ event: event as never, resolve });
+		expect(resolve).toHaveBeenCalled();
+	});
+
+	it('refuses a large configuration import whose session the engine does not know', async () => {
+		resetSetupGateCache();
+		const { event, seen } = post('/admin/settings/config-sync?/apply', '/(admin)/admin/settings/config-sync', 8 * MiB, {
+			session: 'x',
+			fetch: engineWithoutSession(),
+		});
+		const resolve = stubResolve();
+		await expect(handle({ event: event as never, resolve })).rejects.toMatchObject({ status: 401 });
+		expect(resolve).not.toHaveBeenCalled();
+		expect(seen.read).toBe(false);
+	});
+
+	it('refuses a large configuration import without a session cookie and never asks the engine', async () => {
+		// A ready engine, read once, so the setup gate makes no call of its own.
+		resetSetupGateCache();
+		await setupGateRedirect(new URL('http://localhost/admin'), engineAnswering({ setup_required: false }));
+		const fetch = engineWithSession();
+		const { event, seen } = post('/admin/settings/config-sync?/apply', '/(admin)/admin/settings/config-sync', 8 * MiB, { fetch });
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(413);
+		expect(fetch).not.toHaveBeenCalled();
+		expect(resolve).not.toHaveBeenCalled();
+		expect(seen.read).toBe(false);
+	});
+
+	it('holds the other schema actions to 1 MiB', async () => {
+		resetSetupGateCache();
+		const { event } = post('/admin/schema?/save', '/(admin)/admin/schema', 2 * MiB, { session: 'tok', fetch: engineWithSession() });
+		const resolve = stubResolve();
+		const response = await handle({ event: event as never, resolve });
+		expect(response.status).toBe(413);
 	});
 });
 

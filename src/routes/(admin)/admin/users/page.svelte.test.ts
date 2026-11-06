@@ -285,6 +285,17 @@ describe('Users set password', () => {
 		expect(form?.querySelector('input[name="new_password"]')).toBeTruthy();
 	});
 
+	it('offers to remove the account passkeys, checked, in the form it posts', async () => {
+		const { container } = await openSetPassword(null);
+
+		const dialog = container.ownerDocument.querySelector('[role="dialog"]') as HTMLElement;
+		const box = within(dialog).getByRole('checkbox', { name: "Remove this account's passkeys" }) as HTMLInputElement;
+		expect(box.checked).toBe(true);
+		expect(box.name).toBe('remove_passkeys');
+		expect(box.closest('form')?.getAttribute('action')).toBe('?/setPassword');
+		expect(dialog.textContent).toContain('Recommended. The owner can add their passkeys again after signing in.');
+	});
+
 	it('shows the engine refusal on the password control', async () => {
 		const { container } = await openSetPassword(refused);
 
