@@ -23,7 +23,7 @@
 			{
 				twoFactor: runs(data.plugins, PLUGIN.mfa),
 				trustedDevices: runs(data.plugins, PLUGIN.deviceFingerprint),
-				connectedEditors: runs(data.plugins, PLUGIN.siteBuilder),
+				connectedEditors: runs(data.plugins, PLUGIN.builder),
 			},
 		),
 	);

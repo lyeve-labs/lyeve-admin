@@ -9,7 +9,7 @@ import { actions, load } from './+page.server';
 import { SAID } from '$lib/api/connected-editors';
 
 const BASE = '/api/admin/sites';
-const RUNNING = { state: 'named', running: ['site-builder'], withheld: [] };
+const RUNNING = { state: 'named', running: ['builder'], withheld: [] };
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });

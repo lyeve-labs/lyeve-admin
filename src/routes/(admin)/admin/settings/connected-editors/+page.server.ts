@@ -56,7 +56,7 @@ export const load: PageServerLoad = async (event) => {
 	};
 
 	// The shell says why the page is unavailable while its plugin does not run.
-	if (notRunning(plugins, PLUGIN.siteBuilder)) {
+	if (notRunning(plugins, PLUGIN.builder)) {
 		return {
 			...base,
 			connections: [] as Connection[],

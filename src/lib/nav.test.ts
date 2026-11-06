@@ -487,7 +487,7 @@ describe('pagePlugin', () => {
 	it('names the plugin of a page with no sidebar row', () => {
 		expect(pagePlugin('/admin/settings/mfa')).toBe('mfa');
 		expect(pagePlugin('/admin/settings/devices')).toBe('device-fingerprint');
-		expect(pagePlugin('/admin/settings/connected-editors')).toBe('site-builder');
+		expect(pagePlugin('/admin/settings/connected-editors')).toBe('builder');
 		expect(pagePlugin('/admin/pages/launch')).toBe('multitenant');
 		expect(pagePlugin('/admin/content-activity')).toBe('content');
 	});

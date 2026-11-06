@@ -44,7 +44,7 @@ export const PLUGIN = {
 	// page sits with the account rather than the instance settings.
 	deviceFingerprint: 'device-fingerprint',
 	// Browsers a person approved to edit pages through a signed connection.
-	siteBuilder: 'site-builder',
+	builder: 'builder',
 	// Probes this instance runs against itself, and the alerts they raise.
 	syntheticMonitoring: 'synthetic-monitoring',
 	// Content events published to NATS, Kafka or RabbitMQ. The plugin serves
