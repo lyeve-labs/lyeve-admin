@@ -209,12 +209,20 @@ export function changesOf(saved: Schema | null, next: Schema): Change {
 		}
 		if (now.field_type !== old.field_type) {
 			change.retypes.push({ name: now.name || old.name, from: old.field_type, to: now.field_type });
+		} else if (now.field_type === 'decimal' && decimalType(now) !== decimalType(old)) {
+			// A new precision or scale rewrites the column the way a new type does.
+			change.retypes.push({ name: now.name || old.name, from: decimalType(old), to: decimalType(now) });
 		}
 	}
 	for (const [flag, column] of SYSTEM_FLAGS) {
 		if (saved[flag] && !next[flag]) change.systemDrops.push(column);
 	}
 	return change;
+}
+
+/** A decimal field's column type, with the engine's defaults where the definition names none. */
+function decimalType(f: SchemaField): string {
+	return `decimal(${f.precision ?? 18},${f.scale ?? 2})`;
 }
 
 /** Whether a change touches data that already exists. */

@@ -119,6 +119,21 @@ describe('changesOf', () => {
 	});
 });
 
+describe('changesOf, decimal columns', () => {
+	const price = (over: Partial<SchemaField>) => schema('posts', [field('a', 'price', { field_type: 'decimal', ...over })]);
+
+	it('lists a new precision or scale as a column change', () => {
+		const c = changesOf(price({ precision: 10, scale: 2 }), price({ precision: 12, scale: 4 }));
+		expect(c.retypes).toEqual([{ name: 'price', from: 'decimal(10,2)', to: 'decimal(12,4)' }]);
+		expect(isRisky(c)).toBe(true);
+	});
+
+	it('reads an absent precision and scale as the defaults', () => {
+		expect(changesOf(price({}), price({ precision: 18, scale: 2 })).retypes).toEqual([]);
+		expect(changesOf(price({}), price({ scale: 0 })).retypes).toEqual([{ name: 'price', from: 'decimal(18,2)', to: 'decimal(18,0)' }]);
+	});
+});
+
 describe('appliedMessage', () => {
 	it('says what ran', () => {
 		expect(appliedMessage(1, 0)).toBe('Applied one queued change');
