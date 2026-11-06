@@ -195,6 +195,42 @@ describe('SchemaEditor', () => {
 		expect(screen.getByText(/No longer translated per locale\./)).toBeTruthy();
 	});
 
+	it('gives a decimal a precision and a scale inside the engine bounds, and drops both on another type', async () => {
+		const { props } = setup();
+		await fireEvent.click(screen.getByRole('combobox', { name: 'Type, title' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'decimal' }));
+		const precision = screen.getByLabelText('Precision') as HTMLInputElement;
+		const scale = screen.getByLabelText('Scale') as HTMLInputElement;
+		expect(precision.value).toBe('18');
+		expect(scale.value).toBe('2');
+		expect(precision.min).toBe('1');
+		expect(precision.max).toBe('38');
+
+		await fireEvent.input(precision, { target: { value: '50' } });
+		expect(props.schema.fields[1].precision).toBe(38);
+		await fireEvent.input(scale, { target: { value: '40' } });
+		expect(props.schema.fields[1].scale).toBe(30);
+		await fireEvent.input(precision, { target: { value: '4' } });
+		expect(props.schema.fields[1].precision).toBe(4);
+		expect(props.schema.fields[1].scale).toBe(4);
+
+		await fireEvent.click(screen.getByRole('combobox', { name: 'Type, title' }));
+		await fireEvent.click(screen.getByRole('option', { name: 'text' }));
+		expect('precision' in props.schema.fields[1]).toBe(false);
+		expect('scale' in props.schema.fields[1]).toBe(false);
+		expect(screen.queryByLabelText('Precision')).toBeNull();
+	});
+
+	it('finds the integer row, not number, when the type search reads int', async () => {
+		setup();
+		await fireEvent.click(screen.getByRole('combobox', { name: 'Type, title' }));
+		const search = screen.getByPlaceholderText('Search');
+		await fireEvent.input(search, { target: { value: 'int' } });
+		const names = screen.getAllByRole('option').map((o) => o.textContent?.trim());
+		expect(names).toContain('integer');
+		expect(names).not.toContain('number');
+	});
+
 	it('locks every control for a role that cannot write', () => {
 		setup({ canWrite: false });
 		expect(screen.getByRole('group', { name: /Definition of Posts/ }).hasAttribute('disabled')).toBe(true);

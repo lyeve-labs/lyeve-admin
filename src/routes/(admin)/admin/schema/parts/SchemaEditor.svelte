@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Checkbox, Collapsible, CopyButton, Input, SectionHeading, SegmentedControl, Select, type SelectOption } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Button, Checkbox, Collapsible, CopyButton, Input, NumberInput, SectionHeading, SegmentedControl, Select, type SelectOption } from '@lyeve-labs/ui-kit';
 	import type { FieldType, Schema, SchemaField, TransportMode, TransportName } from '@lyeve-labs/client';
 	import { dndzone, type DndEvent } from 'svelte-dnd-action';
 	import type { Action } from 'svelte/action';
@@ -70,7 +70,9 @@
 		{ value: 'email', label: 'email', group: 'Text' },
 		{ value: 'url', label: 'url', group: 'Text', keywords: ['link', 'href'] },
 		{ value: 'uid', label: 'uid', group: 'Text', keywords: ['slug', 'identifier', 'uuid'] },
-		{ value: 'number', label: 'number', group: 'Numbers and dates', keywords: ['int', 'float', 'decimal'] },
+		{ value: 'number', label: 'number', group: 'Numbers and dates', keywords: ['float', 'double'] },
+		{ value: 'integer', label: 'integer', group: 'Numbers and dates', keywords: ['int', 'bigint', 'whole number'] },
+		{ value: 'decimal', label: 'decimal', group: 'Numbers and dates', keywords: ['numeric', 'money', 'price', 'currency'] },
 		{ value: 'boolean', label: 'boolean', group: 'Numbers and dates', keywords: ['true', 'false', 'flag'] },
 		{ value: 'date', label: 'date', group: 'Numbers and dates' },
 		{ value: 'datetime', label: 'datetime', group: 'Numbers and dates', keywords: ['timestamp'] },
@@ -193,7 +195,36 @@
 		// beside this one already reads as belongs_to, so the field agrees with
 		// what the operator can see rather than with an empty box behind it.
 		if (next === 'relation' && !field.relation_type) field.relation_type = 'belongs_to';
+		// Only a decimal has a precision and a scale, and the engine refuses
+		// either on any other type.
+		if (next !== 'decimal') {
+			delete field.precision;
+			delete field.scale;
+		}
 		dropInertFlags(field);
+	}
+
+	// The engine's bounds for a decimal, and the values it uses when the
+	// definition names none.
+	const DECIMAL_PRECISION_MIN = 1;
+	const DECIMAL_PRECISION_MAX = 38;
+	const DECIMAL_SCALE_MAX = 30;
+	const DECIMAL_PRECISION_DEFAULT = 18;
+	const DECIMAL_SCALE_DEFAULT = 2;
+
+	/** The largest scale a decimal's precision allows. */
+	function maxScale(field: SchemaField): number {
+		return Math.min(field.precision ?? DECIMAL_PRECISION_DEFAULT, DECIMAL_SCALE_MAX);
+	}
+
+	// A typed value is not held to the box's bounds, so it is brought inside
+	// them here rather than refused at save.
+	const within = (n: number, lo: number, hi: number) => Math.min(Math.max(Math.trunc(n), lo), hi);
+
+	/** Sets the precision, and lowers the scale when the new precision cannot hold it. */
+	function setPrecision(field: SchemaField, next: number) {
+		field.precision = within(next, DECIMAL_PRECISION_MIN, DECIMAL_PRECISION_MAX);
+		if ((field.scale ?? DECIMAL_SCALE_DEFAULT) > maxScale(field)) field.scale = maxScale(field);
 	}
 
 	/**
@@ -695,6 +726,34 @@
 							what saving creates.
 						</p>
 					{/if}
+				</div>
+			{:else if field.field_type === 'decimal'}
+				<!-- Precision and scale decide the column, so they sit in a band
+				     under the row, as a relation's settings do. An absent value
+				     is the engine's default, which is what each box shows. -->
+				<div
+					class="grid gap-3 border-t border-line/60 bg-surface/60 p-3 sm:grid-cols-2"
+					data-testid="decimal-panel-{rowId}"
+					use:keysStayInRow
+				>
+					<NumberInput
+						id="decimal-precision-{rowId}"
+						label="Precision"
+						hint="Digits in all, from {DECIMAL_PRECISION_MIN} to {DECIMAL_PRECISION_MAX}."
+						min={DECIMAL_PRECISION_MIN}
+						max={DECIMAL_PRECISION_MAX}
+						value={field.precision ?? DECIMAL_PRECISION_DEFAULT}
+						onchange={(next: number) => setPrecision(field, next)}
+					/>
+					<NumberInput
+						id="decimal-scale-{rowId}"
+						label="Scale"
+						hint="Digits after the point, from 0 to {maxScale(field)}."
+						min={0}
+						max={maxScale(field)}
+						value={field.scale ?? DECIMAL_SCALE_DEFAULT}
+						onchange={(next: number) => (field.scale = within(next, 0, maxScale(field)))}
+					/>
 				</div>
 			{/if}
 		</div>
