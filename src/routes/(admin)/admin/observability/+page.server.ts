@@ -18,6 +18,8 @@ import {
 	type PoolView,
 } from '$lib/api/goroutine-engine';
 import { refusalOf } from '$lib/api/refusal';
+import { RUNTIME_FORBIDDEN, parseRuntimeForm, positiveInt, putRuntimeSettings, readRuntime } from '$lib/api/runtime-settings';
+import { conflictText, invalidText } from '$lib/api/runtime-words';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { goroutineCount } from '$lib/server/goroutines';
@@ -99,28 +101,40 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
+	const superAdmin = user.roles.includes('super_admin');
 
 	// The row count is a query parameter, so the ranking a person is looking at
 	// is a link, and refreshing the page keeps the depth they chose.
 	const top = latencyTop(url.searchParams.get('top'));
 
-	const [poolHealth, latency, views] = await Promise.all([
+	// The replica count and the database cores a reader typed refine the
+	// recommendations, and as query parameters they survive a reload.
+	const runtimeInputs = {
+		replicas: positiveInt(url.searchParams.get('replicas')),
+		database_cores: positiveInt(url.searchParams.get('database_cores')),
+	};
+
+	const [poolHealth, latency, views, runtimeRead] = await Promise.all([
 		section(client.get<PoolHealth>('/api/admin/pool/health'), FAILED.pool),
 		section(client.get<LatencyResponse>(`/api/admin/debug/latency?top=${top}`), FAILED.latency),
 		readGoroutineEngine(client),
+		// Both runtime reads are for a super admin alone, so no other role makes them.
+		superAdmin ? readRuntime(client, runtimeInputs) : RUNTIME_FORBIDDEN,
 	]);
 
 	const goroutineEngine: GoroutineEnginePanel = {
 		...views,
 		byOwner: byOwnerRows(views.snapshot),
-		superAdmin: user.roles.includes('super_admin'),
+		superAdmin,
 	};
 
 	// The tail is the logging plugin's stream. Without the plugin the stream is
 	// refused on every attempt, so the page says so rather than opening it.
 	const logTail = !notRunning(plugins, PLUGIN.logging);
 
-	return { poolHealth, latency, top, goroutines: goroutineCount(views.snapshot), goroutineEngine, logTail };
+	const runtime = { ...runtimeRead, inputs: runtimeInputs, superAdmin };
+
+	return { poolHealth, latency, top, goroutines: goroutineCount(views.snapshot), goroutineEngine, runtime, logTail };
 };
 
 /**
@@ -151,7 +165,50 @@ async function saveTunable<T>(
 	}
 }
 
+/**
+ * A refused runtime write. A 402 travels as the license refusal. A 409, a
+ * 422 and a 400 naming an unknown field are worded from their code and
+ * params, never from the route's English. Another 4xx relays the API's own
+ * sentence, and anything else makes no claim about whether the change
+ * landed.
+ */
+function runtimeFailure(err: unknown) {
+	const form = 'runtime' as const;
+	const refused = refusalOf(err);
+	if (refused) return fail(402, { form, refused });
+	if (err instanceof ApiError && err.status === 409) {
+		return fail(409, { form, error: conflictText(err.body) });
+	}
+	if (err instanceof ApiError) {
+		const invalid = invalidText(err.status, err.body);
+		if (invalid !== null) return fail(err.status, { form, error: invalid });
+	}
+	if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+		return fail(err.status, { form, error: actionError(err, 'Could not save the runtime settings. Try again.') });
+	}
+	return fail(400, { form, error: 'Check whether your change was saved, then try again.' });
+}
+
 export const actions: Actions = {
+	runtime: async (event) => {
+		await requireRole(event, ['super_admin']);
+		const parsed = parseRuntimeForm(await event.request.formData());
+		if ('error' in parsed) {
+			// A value the form refuses is shown on its own field.
+			if (parsed.field) return fail(422, { form: 'runtime' as const, fields: { [parsed.field]: parsed.error } });
+			return fail(422, { form: 'runtime' as const, error: parsed.error });
+		}
+		try {
+			const view = await putRuntimeSettings(authedClient(event), parsed.body);
+			// The engine's warning is a caution about the pool's share of the
+			// database's connections. Only whether it came travels, so the
+			// panel words it in the console's own sentence.
+			return { form: 'runtime' as const, saved: true, stored: view.stored !== false, poolWarning: Boolean(view.warning) };
+		} catch (err) {
+			return runtimeFailure(err);
+		}
+	},
+
 	pool: async (event) => {
 		await requireRole(event, ['super_admin']);
 		const parsed = parsePoolForm(await event.request.formData());
