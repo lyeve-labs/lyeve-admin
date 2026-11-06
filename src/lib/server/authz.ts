@@ -58,12 +58,38 @@ export function authedHeaders(event: SessionRead): Record<string, string> {
 export function authedClient(event: RequestEvent, extra: Record<string, string> = {}): HttpClient {
 	const allowed = Object.entries(extra).filter(([name]) => !SESSION_HEADERS.has(name.toLowerCase()));
 	const headers = { ...Object.fromEntries(allowed), ...authedHeaders(event) };
-	return createClient((url, init) =>
-		event.fetch(url, {
-			...init,
-			headers: { ...init?.headers, ...headers },
-		})
+	return createClient(async (url, init) =>
+		withExactIntegers(
+			await event.fetch(url, {
+				...init,
+				headers: { ...init?.headers, ...headers },
+			})
+		)
 	);
+}
+
+/**
+ * Keeps the digits of an integer JSON.parse would round. The reviver's third
+ * argument carries each number's source text, so a plain whole number outside
+ * the safe range comes back as that text. A fraction, an exponent form and a
+ * number too large for a double come back as JSON.parse reads them.
+ */
+function keepIntegerDigits(_key: string, value: unknown, context?: { source?: string }): unknown {
+	if (typeof value !== 'number' || Number.isSafeInteger(value)) return value;
+	const source = context?.source;
+	return source !== undefined && /^-?\d+$/.test(source) ? source : value;
+}
+
+/**
+ * An integer field holds up to 19 digits, and a double holds 15 or 16, so a
+ * read through the default parse rounds an integer past 2^53 before any page
+ * sees it, and a save would write the rounded value back. A successful
+ * response is parsed here with the digits kept instead.
+ */
+function withExactIntegers(res: Response): Response {
+	if (!res.ok) return res;
+	res.json = async () => JSON.parse(await res.text(), keepIntegerDigits);
+	return res;
 }
 
 const NO_SEAT = 'This instance has no admin seat left for this account.';

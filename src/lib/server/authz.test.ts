@@ -460,3 +460,25 @@ describe('stripProtectedFields', () => {
 		expect(stripProtectedFields({ id: '1', tenant_id: 't' })).toEqual({});
 	});
 });
+
+describe('authedClient exact integers', () => {
+	it('keeps the digits of an integer past 2^53 and parses every other number as before', async () => {
+		const raw =
+			'{"over":9007199254740993,"max":9223372036854775807,"min":-9223372036854775808,' +
+			'"fraction":12.5,"small":42,"exponent":1e21,"huge":1e400,"nested":[{"id":9007199254740993}]}';
+		const fetchImpl = vi.fn(
+			async (): Promise<Response> => new Response(raw, { status: 200, headers: { 'content-type': 'application/json' } })
+		) as unknown as typeof fetch;
+
+		const body = await authedClient(stubEvent({ fetchImpl })).get<Record<string, unknown>>('/api/admin/content/e1');
+
+		expect(body.over).toBe('9007199254740993');
+		expect(body.max).toBe('9223372036854775807');
+		expect(body.min).toBe('-9223372036854775808');
+		expect(body.fraction).toBe(12.5);
+		expect(body.small).toBe(42);
+		expect(body.exponent).toBe(1e21);
+		expect(body.huge).toBe(Infinity);
+		expect(body.nested).toEqual([{ id: '9007199254740993' }]);
+	});
+});
