@@ -1,7 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { SchemaField } from '@lyeve-labs/client';
-import type { RequestEvent } from '@sveltejs/kit';
-import { authedClient } from '$lib/server/authz';
 import {
 	fieldKey,
 	buildEmpty,
@@ -485,34 +483,3 @@ describe('datetime round trip - load then save with no edit', () => {
 	});
 });
 
-describe('integer round trip - load, edit the title, save', () => {
-	it('writes an integer past 2^53 back with the digits it was stored with', async () => {
-		const stored = '{"body":{"title":"Old","views":9007199254740993,"price":"19.90"}}';
-		const sent: string[] = [];
-		const fetchImpl = vi.fn(async (_url: string, init?: RequestInit): Promise<Response> => {
-			if (init?.method === 'PUT') {
-				sent.push(String(init.body));
-				return new Response('{}', { status: 200 });
-			}
-			return new Response(stored, { status: 200 });
-		}) as unknown as typeof fetch;
-		const event = {
-			cookies: { get: vi.fn().mockReturnValue('sess-tok') },
-			fetch: fetchImpl,
-		} as unknown as RequestEvent;
-		const fields = [
-			field({ name: 'title', field_type: 'text' }),
-			field({ name: 'views', field_type: 'integer' }),
-			field({ name: 'price', field_type: 'decimal', precision: 10, scale: 2 }),
-		];
-
-		const client = authedClient(event);
-		const entry = await client.get<{ body: Record<string, unknown> }>('/api/admin/content/e1');
-		const form = buildFromData(fields, entry.body);
-		form.title = 'New';
-		// The save action parses the posted form data and puts it as the body.
-		await client.put('/api/admin/content/e1', { body: JSON.parse(serialize(fields, form)) });
-
-		expect(sent).toEqual(['{"body":{"title":"New","views":"9007199254740993","price":"19.90"}}']);
-	});
-});

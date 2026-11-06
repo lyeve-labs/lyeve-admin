@@ -1,13 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
+import type { SchemaField } from '@lyeve-labs/client';
 import {
 	assertRole,
 	authedClient,
 	authedHeaders,
+	exactParse,
 	loadUser,
 	requireUser,
 	requireRole,
 	stripProtectedFields,
+	withExactIntegers,
 } from './authz';
 import { BUSY, OUTAGE } from '$lib/outage';
 
@@ -462,23 +465,46 @@ describe('stripProtectedFields', () => {
 });
 
 describe('authedClient exact integers', () => {
-	it('keeps the digits of an integer past 2^53 and parses every other number as before', async () => {
-		const raw =
-			'{"over":9007199254740993,"max":9223372036854775807,"min":-9223372036854775808,' +
-			'"fraction":12.5,"small":42,"exponent":1e21,"huge":1e400,"nested":[{"id":9007199254740993}]}';
+	const raw =
+		'{"over":9007199254740993,"max":9223372036854775807,"min":-9223372036854775808,' +
+		'"fraction":12.5,"small":42,"exponent":1e21,"huge":1e400,"json":{"big":1790000000000000000}}';
+	const read = async () => {
 		const fetchImpl = vi.fn(
 			async (): Promise<Response> => new Response(raw, { status: 200, headers: { 'content-type': 'application/json' } })
 		) as unknown as typeof fetch;
+		return authedClient(stubEvent({ fetchImpl })).get<Record<string, unknown>>('/api/admin/content/e1');
+	};
 
-		const body = await authedClient(stubEvent({ fetchImpl })).get<Record<string, unknown>>('/api/admin/content/e1');
-
-		expect(body.over).toBe('9007199254740993');
-		expect(body.max).toBe('9223372036854775807');
-		expect(body.min).toBe('-9223372036854775808');
-		expect(body.fraction).toBe(12.5);
+	it('parses a response as JSON.parse does', async () => {
+		const body = await read();
+		expect(body.over).toBe(9007199254740992);
 		expect(body.small).toBe(42);
-		expect(body.exponent).toBe(1e21);
-		expect(body.huge).toBe(Infinity);
-		expect(body.nested).toEqual([{ id: '9007199254740993' }]);
+		expect(body.json).toEqual({ big: 1790000000000000000 });
+	});
+
+	it('parses the same response again with the digits of every integer past 2^53 kept', async () => {
+		const exact = exactParse(await read()) as Record<string, unknown>;
+		expect(exact.over).toBe('9007199254740993');
+		expect(exact.max).toBe('9223372036854775807');
+		expect(exact.min).toBe('-9223372036854775808');
+		expect(exact.fraction).toBe(12.5);
+		expect(exact.small).toBe(42);
+		expect(exact.exponent).toBe(1e21);
+		expect(exact.huge).toBe(Infinity);
+		expect(exactParse({ over: 1 })).toBeUndefined();
+	});
+
+	it('takes only integer fields from the exact parse', async () => {
+		const body = await read();
+		const fields = [
+			{ name: 'over', field_type: 'integer' },
+			{ name: 'small', field_type: 'integer' },
+			{ name: 'json', field_type: 'json' },
+		] as SchemaField[];
+		const out = withExactIntegers(fields, body, exactParse(body));
+		expect(out.over).toBe('9007199254740993');
+		expect(out.small).toBe(42);
+		expect(out.json).toEqual({ big: 1790000000000000000 });
+		expect(out.max).toBe(9223372036854775807);
 	});
 });
