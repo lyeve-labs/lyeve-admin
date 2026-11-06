@@ -158,6 +158,14 @@ describe('mapping', () => {
 		expect(targets.map((t) => t.dataType).slice(3)).toEqual(['number', 'boolean', 'json']);
 	});
 
+	it('coerces an integer field as an integer and a decimal field as a decimal', async () => {
+		const { dataTypeFor } = await import('./bulk-import');
+		expect(['integer', 'int', 'bigint'].map(dataTypeFor)).toEqual(['integer', 'integer', 'integer']);
+		expect(dataTypeFor('decimal')).toBe('decimal');
+		expect(dataTypeFor('number')).toBe('number');
+		expect(dataTypeFor('float')).toBe('float');
+	});
+
 	it('guesses by name, ignoring case and separators, and leaves the rest unmapped', async () => {
 		const { mappingTargets, suggestMapping } = await import('./bulk-import');
 		const targets = mappingTargets([{ name: 'page_views', field_type: 'number' }, { name: 'summary' }]);
