@@ -250,6 +250,14 @@ describe('SchemaEditor', () => {
 		expect(scale.value).toBe('30');
 	});
 
+	it('says what precision and scale mean in their hints', () => {
+		const schema = posts();
+		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 10, scale: 2, localized: undefined };
+		setup({ schema });
+		expect(screen.getByText('The most digits a value can have, from 1 to 38.')).toBeTruthy();
+		expect(screen.getByText('How many of those digits come after the decimal point, from 0 to 10.')).toBeTruthy();
+	});
+
 	it('shows the scale problem on the scale box', () => {
 		const schema = posts();
 		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 2, scale: 4, localized: undefined };

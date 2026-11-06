@@ -762,7 +762,7 @@
 					<NumberInput
 						id="decimal-precision-{rowId}"
 						label="Precision"
-						hint="Digits in all, from {DECIMAL_PRECISION_MIN} to {DECIMAL_PRECISION_MAX}."
+						hint="The most digits a value can have, from {DECIMAL_PRECISION_MIN} to {DECIMAL_PRECISION_MAX}."
 						min={DECIMAL_PRECISION_MIN}
 						max={DECIMAL_PRECISION_MAX}
 						value={field.precision ?? DECIMAL_PRECISION_DEFAULT}
@@ -771,7 +771,7 @@
 					<NumberInput
 						id="decimal-scale-{rowId}"
 						label="Scale"
-						hint="Digits after the point, from 0 to {maxScale(field)}."
+						hint="How many of those digits come after the decimal point, from 0 to {maxScale(field)}."
 						min={0}
 						max={maxScale(field)}
 						value={field.scale ?? DECIMAL_SCALE_DEFAULT}
