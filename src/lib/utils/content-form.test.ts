@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { SchemaField } from '@lyeve-labs/client';
+import type { RequestEvent } from '@sveltejs/kit';
+import { authedClient } from '$lib/server/authz';
 import {
 	fieldKey,
 	buildEmpty,
@@ -163,6 +165,26 @@ describe('serialize', () => {
 	it('coerces number field', () => {
 		const json = serialize([field({ name: 'count', field_type: 'number' })], { count: '42' });
 		expect(JSON.parse(json).count).toBe(42);
+	});
+
+	it('sends a safe integer as a number and a larger one as its digits', () => {
+		const fields = [field({ name: 'n', field_type: 'integer' })];
+		expect(JSON.parse(serialize(fields, { n: ' 42 ' })).n).toBe(42);
+		expect(JSON.parse(serialize(fields, { n: '-9223372036854775808' })).n).toBe('-9223372036854775808');
+		expect(JSON.parse(serialize(fields, { n: 9007199254740991 })).n).toBe(9007199254740991);
+		expect(JSON.parse(serialize(fields, { n: '' })).n).toBeNull();
+	});
+
+	it('sends an integer that is not a plain whole number as typed, for the API to refuse', () => {
+		const fields = [field({ name: 'n', field_type: 'integer' })];
+		expect(JSON.parse(serialize(fields, { n: '12.5' })).n).toBe('12.5');
+		expect(JSON.parse(serialize(fields, { n: '1e3' })).n).toBe('1e3');
+	});
+
+	it('sends a decimal as its trimmed string, never as a number', () => {
+		const fields = [field({ name: 'price', field_type: 'decimal', precision: 10, scale: 2 })];
+		expect(JSON.parse(serialize(fields, { price: ' 19.90 ' })).price).toBe('19.90');
+		expect(JSON.parse(serialize(fields, { price: '' })).price).toBeNull();
 	});
 
 	it('null for empty number field', () => {
@@ -460,5 +482,37 @@ describe('datetime round trip - load then save with no edit', () => {
 
 	it('canonicalizes an offset the API sent to the same instant in UTC', () => {
 		expect(roundTrip('Etc/GMT-9', '2026-01-02T12:04:05+09:00')).toBe('2026-01-02T03:04:05.000Z');
+	});
+});
+
+describe('integer round trip - load, edit the title, save', () => {
+	it('writes an integer past 2^53 back with the digits it was stored with', async () => {
+		const stored = '{"body":{"title":"Old","views":9007199254740993,"price":"19.90"}}';
+		const sent: string[] = [];
+		const fetchImpl = vi.fn(async (_url: string, init?: RequestInit): Promise<Response> => {
+			if (init?.method === 'PUT') {
+				sent.push(String(init.body));
+				return new Response('{}', { status: 200 });
+			}
+			return new Response(stored, { status: 200 });
+		}) as unknown as typeof fetch;
+		const event = {
+			cookies: { get: vi.fn().mockReturnValue('sess-tok') },
+			fetch: fetchImpl,
+		} as unknown as RequestEvent;
+		const fields = [
+			field({ name: 'title', field_type: 'text' }),
+			field({ name: 'views', field_type: 'integer' }),
+			field({ name: 'price', field_type: 'decimal', precision: 10, scale: 2 }),
+		];
+
+		const client = authedClient(event);
+		const entry = await client.get<{ body: Record<string, unknown> }>('/api/admin/content/e1');
+		const form = buildFromData(fields, entry.body);
+		form.title = 'New';
+		// The save action parses the posted form data and puts it as the body.
+		await client.put('/api/admin/content/e1', { body: JSON.parse(serialize(fields, form)) });
+
+		expect(sent).toEqual(['{"body":{"title":"New","views":"9007199254740993","price":"19.90"}}']);
 	});
 });

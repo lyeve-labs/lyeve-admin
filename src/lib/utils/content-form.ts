@@ -226,6 +226,22 @@ export function validate(
 }
 
 /**
+ * An integer field's value as the API takes it. The form holds the digits as
+ * text. A JSON number past 2^53 is rounded by every JSON reader in
+ * JavaScript, so a plain integer outside the safe range goes as its digit
+ * string, which the API reads exactly. Anything else goes as typed, so the
+ * API refuses it with its own message for the field.
+ */
+function integerValue(val: unknown): unknown {
+	if (val === null || val === undefined) return null;
+	const text = String(val).trim();
+	if (text === '') return null;
+	if (!/^-?\d+$/.test(text)) return text;
+	const n = Number(text);
+	return Number.isSafeInteger(n) ? n : text;
+}
+
+/**
  * Serialize form values to a JSON string ready to POST to the API.
  * Handles number coercion, boolean casting, JSON parsing, and the local wall
  * clock of a datetime field back to the UTC instant the API stores.
@@ -245,7 +261,15 @@ export function serialize(
 		if (f.field_type === 'relation' && (f.relation_type === 'has_one' || f.relation_type === 'has_many' || f.relation_type === 'many_to_many')) continue;
 		const key = fieldKey(f);
 		const val = formValues[key];
-		if (f.field_type === 'number') {
+		if (f.field_type === 'integer') {
+			out[key] = integerValue(val);
+		} else if (f.field_type === 'decimal') {
+			// A decimal is exact digits as a string, sent as typed less the
+			// spaces around it. The API refuses a value it cannot hold rather
+			// than rounding it, so nothing is rounded here either.
+			const text = val === null || val === undefined ? '' : String(val).trim();
+			out[key] = text === '' ? null : text;
+		} else if (f.field_type === 'number') {
 			out[key] = val === '' || val === null || val === undefined ? null : Number(val);
 		} else if (f.field_type === 'boolean') {
 			out[key] = Boolean(val);

@@ -97,6 +97,12 @@
 	 */
 	let numberValue = $derived(typeof value === 'number' ? value : Number(value) || 0);
 
+	// A format example at the field's scale, such as 0.00 for a scale of 2.
+	function decimalExample(f: SchemaField): string {
+		const scale = f.scale ?? 2;
+		return scale > 0 ? `0.${'0'.repeat(scale)}` : '0';
+	}
+
 	// A datetime is the local wall clock the form utilities convert to and from
 	// the stored UTC instant. The kit's DateTimePicker reads minutes or seconds
 	// and nothing finer, so a stored fraction is dropped from what it is shown.
@@ -228,6 +234,37 @@
 		value={numberValue}
 		required={field.required}
 		onchange={(next: number) => { value = next; }}
+	/>
+
+{:else if field.field_type === 'integer'}
+	<!-- Text, not a number input: a number input reads what is typed as a
+	     double, which rounds past 2^53, so a long whole number would show
+	     and save different digits from the ones typed. -->
+	<Input
+		{id}
+		{error}
+		type="text"
+		inputmode="numeric"
+		value={String(value ?? '')}
+		oninput={(e: InputEv) => { value = e.currentTarget.value; }}
+		required={field.required}
+		autocomplete="off"
+	/>
+
+{:else if field.field_type === 'decimal'}
+	<!-- Text, not a number input: a decimal is exact digits, and a number
+	     input reads what is typed as a double, so 0.10 would come back 0.1
+	     and a long value would round. -->
+	<Input
+		{id}
+		{error}
+		type="text"
+		inputmode="decimal"
+		value={String(value ?? '')}
+		oninput={(e: InputEv) => { value = e.currentTarget.value; }}
+		placeholder={decimalExample(field)}
+		required={field.required}
+		autocomplete="off"
 	/>
 
 {:else if field.field_type === 'date'}
