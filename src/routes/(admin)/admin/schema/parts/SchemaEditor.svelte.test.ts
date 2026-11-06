@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
-import { flushSync } from 'svelte';
+import { flushSync, tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Schema } from '@lyeve-labs/client';
 import type { Problem } from '$lib/schema/editor';
@@ -231,6 +231,23 @@ describe('SchemaEditor', () => {
 		await fireEvent.input(precision, { target: { value: '20' } });
 		expect(props.schema.fields[1].precision).toBe(20);
 		expect(props.schema.fields[1].scale).toBe(4);
+	});
+
+	it('shows the value it stored after bringing a typed one inside the bounds', async () => {
+		const schema = posts();
+		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 38, scale: 30, localized: undefined };
+		const { props } = setup({ schema });
+		const precision = screen.getByLabelText('Precision') as HTMLInputElement;
+		const scale = screen.getByLabelText('Scale') as HTMLInputElement;
+		precision.value = '50';
+		await fireEvent.input(precision);
+		scale.value = '45';
+		await fireEvent.input(scale);
+		await tick();
+		expect(props.schema.fields[1].precision).toBe(38);
+		expect(precision.value).toBe('38');
+		expect(props.schema.fields[1].scale).toBe(30);
+		expect(scale.value).toBe('30');
 	});
 
 	it('shows the scale problem on the scale box', () => {

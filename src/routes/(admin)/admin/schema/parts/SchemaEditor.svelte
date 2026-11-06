@@ -2,6 +2,7 @@
 	import { Alert, Badge, Button, Checkbox, Collapsible, CopyButton, Input, NumberInput, SectionHeading, SegmentedControl, Select, type SelectOption } from '@lyeve-labs/ui-kit';
 	import type { FieldType, Schema, SchemaField, TransportMode, TransportName } from '@lyeve-labs/client';
 	import { dndzone, type DndEvent } from 'svelte-dnd-action';
+	import { tick } from 'svelte';
 	import type { Action } from 'svelte/action';
 	import { BookOpen, Code, GripVertical, Link2, Pencil, Plus, RefreshCw, Trash2, TriangleAlert } from '@lucide/svelte';
 	import { collectionRoutes } from '$lib/api/collection-api';
@@ -222,13 +223,31 @@
 	const within = (n: number, lo: number, hi: number) => Math.min(Math.max(Math.trunc(n), lo), hi);
 
 	/**
+	 * Shows the stored value in a box whose typed text was brought inside the
+	 * bounds. The box redraws only when its value changes, so a second 50
+	 * typed over a stored 38 would otherwise stay on screen while 38 saves.
+	 */
+	function showStored(id: string, stored: number) {
+		void tick().then(() => {
+			const box = document.getElementById(id);
+			if (box instanceof HTMLInputElement && box.value !== String(stored)) box.value = String(stored);
+		});
+	}
+
+	/**
 	 * Sets the precision and leaves the scale alone. The box reports each
 	 * keystroke, so typing 20 passes through 2, and lowering the scale there
 	 * would change it without a word. A scale the precision cannot hold is a
 	 * problem the save waits on instead.
 	 */
-	function setPrecision(field: SchemaField, next: number) {
+	function setPrecision(field: SchemaField, next: number, id: string) {
 		field.precision = within(next, DECIMAL_PRECISION_MIN, DECIMAL_PRECISION_MAX);
+		if (field.precision !== next) showStored(id, field.precision);
+	}
+
+	function setScale(field: SchemaField, next: number, id: string) {
+		field.scale = within(next, 0, DECIMAL_SCALE_MAX);
+		if (field.scale !== next) showStored(id, field.scale);
 	}
 
 	/**
@@ -747,7 +766,7 @@
 						min={DECIMAL_PRECISION_MIN}
 						max={DECIMAL_PRECISION_MAX}
 						value={field.precision ?? DECIMAL_PRECISION_DEFAULT}
-						onchange={(next: number) => setPrecision(field, next)}
+						onchange={(next: number) => setPrecision(field, next, `decimal-precision-${rowId}`)}
 					/>
 					<NumberInput
 						id="decimal-scale-{rowId}"
@@ -756,8 +775,8 @@
 						min={0}
 						max={maxScale(field)}
 						value={field.scale ?? DECIMAL_SCALE_DEFAULT}
+						onchange={(next: number) => setScale(field, next, `decimal-scale-${rowId}`)}
 						error={problemAt(`decimal-scale-${rowId}`)}
-						onchange={(next: number) => (field.scale = within(next, 0, DECIMAL_SCALE_MAX))}
 					/>
 				</div>
 			{/if}
