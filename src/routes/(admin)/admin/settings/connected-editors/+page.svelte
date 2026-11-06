@@ -121,11 +121,16 @@
 	});
 
 	const request = $derived(held && normalizeUserCode(codeInput) === held.code ? held.request : null);
+	// The last answer, only while the field still shows the code it answered. Cancel
+	// clears the field but not the answer, which would otherwise greet the next open.
+	const answered = $derived(
+		drawer && (drawer.code === codeInput || normalizeUserCode(codeInput) === drawer.code) ? drawer : null,
+	);
 	const lifetimes = $derived(request ? lifetimesUpTo(request.lifetime_days) : []);
 	const lifetime = $derived(
 		lifetimes.includes(Number(lifetimePick)) ? lifetimePick : String(request?.lifetime_days ?? ''),
 	);
-	const mfa = $derived(drawer?.stepUp ? drawer.stepUp.needsMfa : data.mfaEnrolled);
+	const mfa = $derived(answered?.stepUp ? answered.stepUp.needsMfa : data.mfaEnrolled);
 
 	/** The browser's own word on whether it is online. Approve, Decline and Revoke wait while it is not. */
 	let online = $state(true);
@@ -148,7 +153,7 @@
 		tick().then(() => document.getElementById('connected-editors-code')?.focus());
 	});
 
-	const approveReady = $derived(!!request && online && !drawer?.approvalUnavailable);
+	const approveReady = $derived(!!request && online && !answered?.approvalUnavailable);
 
 	/** When a connection approved now with the chosen lifetime would end, never past what the engine said. */
 	function expiryOf(r: ConnectionRequest, days: number): string {
@@ -182,6 +187,9 @@
 		pending = kind;
 		return async ({ result, update }) => {
 			try {
+				// The password goes after every decision, refused or not, so it never
+				// outlives the submit that used it.
+				if (kind !== 'lookup') secret = '';
 				await update({ reset: false });
 				if (kind !== 'lookup' && result.type === 'success') close();
 				// A request someone else decided changed the list behind the drawer.
@@ -573,7 +581,7 @@
 							spellcheck={false}
 							bind:value={codeInput}
 							oninput={typed}
-							error={drawer?.codeError}
+							error={answered?.codeError}
 							hint={request ? undefined : 'Enter the code the builder shows, then choose Find request.'}
 						/>
 						<Button variant="secondary" type="submit" loading={pending === 'lookup'}>Find request</Button>
@@ -582,23 +590,23 @@
 			</Field>
 		</form>
 
-		{#if drawer?.withheld}
+		{#if answered?.withheld}
 			<Alert tone="warn">{SAID.withheld}</Alert>
 		{/if}
-		{#if drawer?.expired}
+		{#if answered?.expired}
 			<Alert tone="warn">{SAID.expired}</Alert>
 		{/if}
-		{#if drawer?.decided}
+		{#if answered?.decided}
 			<Alert tone="warn">{SAID.decided}</Alert>
 		{/if}
-		{#if drawer?.keyChanged}
+		{#if answered?.keyChanged}
 			<Alert tone="warn">{SAID.keyChanged}</Alert>
 		{/if}
-		{#if drawer?.lifetimeChanged}
+		{#if answered?.lifetimeChanged}
 			<Alert tone="warn">{SAID.lifetime}</Alert>
 		{/if}
-		{#if drawer?.error}
-			<Alert tone="danger">{drawer.error}</Alert>
+		{#if answered?.error}
+			<Alert tone="danger">{answered.error}</Alert>
 		{/if}
 
 		{#if request}
@@ -647,26 +655,26 @@
 					onchange={(v) => (lifetimePick = v)}
 				/>
 
-				{#if drawer?.approvalUnavailable}
+				{#if answered?.approvalUnavailable}
 					<Alert tone="warn">{SAID.approvalUnavailable}</Alert>
 				{:else}
-					<StepUpField id="connected-editors-step-up" {mfa} bind:value={secret} error={drawer?.stepUp?.field} />
+					<StepUpField id="connected-editors-step-up" {mfa} bind:value={secret} error={answered?.stepUp?.field} />
 				{/if}
 
-				{#if drawer?.checkUnavailable}
-					<Alert tone="warn">
-						<p>{SAID.checkUnavailable}</p>
-						<div class="mt-3">
-							<Button variant="secondary" size="sm" type="submit" disabled={!approveReady}>
-								<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again
-							</Button>
-						</div>
-					</Alert>
+				{#if answered?.checkUnavailable}
+					<Alert tone="warn">{SAID.checkUnavailable}</Alert>
 				{/if}
 
 				{#if !online}
 					<p id="approve-blocked" class="text-sm text-muted">You're offline.</p>
 				{/if}
+			</form>
+			<!-- Decline posts from a form of its own, so Approve is the approve form's
+			     only submit button: Enter in the password field approves, and the
+			     password never travels with a decline. -->
+			<form id="connected-editors-decline" method="POST" action="?/decline" use:enhance={drawerSubmit} hidden>
+				<input type="hidden" name="code" value={held?.code ?? ''} />
+				<input type="hidden" name="code_expires_at" value={request.code_expires_at} />
 			</form>
 		{/if}
 	</div>
@@ -679,9 +687,7 @@
 			<Button
 				variant="secondary"
 				type="submit"
-				form="connected-editors-approve"
-				formaction="?/decline"
-				formnovalidate
+				form="connected-editors-decline"
 				loading={pending === 'decline'}
 				disabled={!online}
 			>

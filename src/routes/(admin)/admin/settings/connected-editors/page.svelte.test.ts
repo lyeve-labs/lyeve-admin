@@ -361,14 +361,69 @@ describe('the approve drawer', () => {
 		expect(find?.parentElement).toBe(code.parentElement?.parentElement);
 	});
 
-	it('submits Approve and Decline from the footer to the approve form', async () => {
+	it('makes Approve the approve form\'s only submit button, so Enter in the password approves', async () => {
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST, checkUnavailable: true } }) });
+		await tick();
+		const form = document.getElementById('connected-editors-approve') as HTMLFormElement;
+		const submits = [...form.elements].filter((e) => e instanceof HTMLButtonElement && e.type === 'submit');
+		// The form's default button is its first submit button, which is the one
+		// implicit submission from a text field presses.
+		expect(submits).toEqual([approve()]);
+		expect(form.getAttribute('action')).toBe('?/approve');
+		expect(form.contains(document.querySelector('#connected-editors-step-up-password'))).toBe(true);
+	});
+
+	it('declines from a form of its own that never carries the password', async () => {
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
 		await tick();
 		const decline = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Decline');
-		expect(approve().getAttribute('form')).toBe('connected-editors-approve');
-		expect(decline?.getAttribute('form')).toBe('connected-editors-approve');
-		expect(decline?.getAttribute('formaction')).toBe('?/decline');
-		expect(document.getElementById('connected-editors-approve')?.getAttribute('action')).toBe('?/approve');
+		const form = document.getElementById('connected-editors-decline') as HTMLFormElement;
+		expect(decline?.getAttribute('form')).toBe('connected-editors-decline');
+		expect(decline?.hasAttribute('formaction')).toBe(false);
+		expect(form.getAttribute('action')).toBe('?/decline');
+		expect([...new FormData(form).keys()].sort()).toEqual(['code', 'code_expires_at']);
+		expect(new FormData(form).get('code')).toBe('K7F3-A2M9');
+	});
+
+	it.each(['approve', 'decline'])('clears the password after a refused %s', async (kind) => {
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
+		await tick();
+		const password = document.querySelector('#connected-editors-step-up-password') as HTMLInputElement;
+		await fireEvent.input(password, { target: { value: 'hunter2-hunter2' } });
+		expect(password.value).toBe('hunter2-hunter2');
+		const done = (await (forms.submits.get(`?/${kind}`) as Submit)({ cancel: vi.fn(), action: new URL(`http://a/?/${kind}`) })) as (
+			o: unknown,
+		) => Promise<void>;
+		await done({ result: { type: 'failure', status: 503, data: {} }, update: async () => {} });
+		await tick();
+		expect(password.value).toBe('');
+	});
+
+	it('reloads the list when someone else decided the request first', async () => {
+		const { invalidateAll } = await import('$app/navigation');
+		vi.mocked(invalidateAll).mockClear();
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
+		await tick();
+		const done = (await (forms.submits.get('?/approve') as Submit)({ cancel: vi.fn(), action: new URL('http://a/?/approve') })) as (
+			o: unknown,
+		) => Promise<void>;
+		await done({ result: { type: 'failure', status: 409, data: { drawer: { code: 'K7F3-A2M9', decided: true } } }, update: async () => {} });
+		expect(invalidateAll).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not draw an answer over a code it did not answer', async () => {
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', codeError: SAID.unknown, withheld: true } }) });
+		await tick();
+		expect(said()).toContain(SAID.unknown);
+		const cancel = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Cancel') as HTMLButtonElement;
+		await fireEvent.click(cancel);
+		await tick();
+		const open = [...document.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Approve a connection') as HTMLAnchorElement;
+		await fireEvent.click(open);
+		await tick();
+		expect((document.querySelector('#connected-editors-code') as HTMLInputElement).value).toBe('');
+		expect(said()).not.toContain(SAID.unknown);
+		expect(said()).not.toContain(SAID.withheld);
 	});
 
 	it('shows the new key after the key changed', async () => {
@@ -405,7 +460,6 @@ describe('the approve drawer', () => {
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST, checkUnavailable: true } }) });
 		await tick();
 		expect(said()).toContain(SAID.checkUnavailable);
-		expect(said()).toContain('Try again');
 		expect(said()).not.toContain('Approving connections is not available on this engine.');
 		cleanup();
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST, error: SAID.approveOutage } }) });
