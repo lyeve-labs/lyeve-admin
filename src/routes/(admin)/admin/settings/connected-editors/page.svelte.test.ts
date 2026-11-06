@@ -103,7 +103,7 @@ describe('the list', () => {
 	it('shows the first-run words when no connection exists', () => {
 		render(Page, { props: props({ connections: [], total: 0 }) });
 		expect(said()).toContain('No builder connections yet');
-		expect(said()).toContain('Connect from the site builder, then approve the connection here with the code it shows.');
+		expect(said()).toContain('Connect from the builder, then approve the connection here with the code it shows.');
 	});
 
 	it('shows five skeleton rows while the list loads', () => {
@@ -281,7 +281,7 @@ describe('the approve drawer', () => {
 		render(Page, { props: props({ openApprove: true }) });
 		await tick();
 		expect(said()).toContain(
-			'Approve only a code you started in the site builder in the last 10 minutes. If someone sends you a code, they are asking for access to your pages.',
+			'Approve only a code you started in the builder in the last 10 minutes. If someone sends you a code, they are asking for access to your pages.',
 		);
 		expect(approve()).toBeUndefined();
 		await waitFor(() => expect(document.activeElement?.id).toBe('connected-editors-code'));
@@ -528,14 +528,14 @@ describe('the settings card', () => {
 
 	it('draws a refused settings read as a failure', () => {
 		render(Page, { props: props({ settings: { ok: false, gate: { state: 'unavailable' } } }) });
-		expect(said()).toContain('site builder settings did not load');
+		expect(said()).toContain('builder settings did not load');
 	});
 
 	it('states that the builder is off, and keeps saying it', () => {
 		render(Page, { props: props({ settings: { ok: true, value: { ...SETTINGS, allowed: false } } }) });
-		expect(said()).toContain('The site builder is off. Connected browsers cannot save.');
+		expect(said()).toContain('The builder is off. Connected browsers cannot save.');
 		// A standing condition is no outcome, so it never clears itself.
-		const live = [...document.querySelectorAll('[aria-live="polite"]')].some((a) => a.textContent?.includes('The site builder is off'));
+		const live = [...document.querySelectorAll('[aria-live="polite"]')].some((a) => a.textContent?.includes('The builder is off'));
 		expect(live).toBe(false);
 	});
 
@@ -544,7 +544,7 @@ describe('the settings card', () => {
 	it('switches the builder with a Toggle that applies at once', async () => {
 		const submit = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(() => {});
 		render(Page, { props: props({ settings: { ok: true, value: { ...SETTINGS, allowed: false } } }) });
-		expect(allowSwitch().getAttribute('aria-label')).toBe('Allow the site builder');
+		expect(allowSwitch().getAttribute('aria-label')).toBe('Allow the builder');
 		expect(allowSwitch().getAttribute('aria-checked')).toBe('false');
 		await fireEvent.click(allowSwitch());
 		await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
@@ -561,7 +561,7 @@ describe('the settings card', () => {
 		await fireEvent.click(allowSwitch());
 		await waitFor(() =>
 			expect(kit.confirm).toHaveBeenCalledWith(
-				'Turn off the site builder?',
+				'Turn off the builder?',
 				'Connected browsers stop saving immediately.',
 				{ confirmLabel: 'Turn off' },
 			),
