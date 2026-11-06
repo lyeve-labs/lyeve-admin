@@ -185,6 +185,11 @@ describe('serialize', () => {
 		expect(JSON.parse(serialize(fields, { price: '' })).price).toBeNull();
 	});
 
+	it('sends a decimal holding a comma as typed, for the API to refuse rather than to read as a point', () => {
+		const fields = [field({ name: 'price', field_type: 'decimal', precision: 10, scale: 2 })];
+		expect(JSON.parse(serialize(fields, { price: '1,000' })).price).toBe('1,000');
+	});
+
 	it('null for empty number field', () => {
 		const json = serialize([field({ name: 'count', field_type: 'number' })], { count: '' });
 		expect(JSON.parse(json).count).toBeNull();
