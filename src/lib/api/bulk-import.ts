@@ -464,10 +464,12 @@ export function dataTypeFor(fieldType: string | undefined): string {
 		case 'integer':
 		case 'int':
 		case 'bigint':
+			return 'integer';
+		case 'decimal':
+			return 'decimal';
 		case 'number':
 			return 'number';
 		case 'float':
-		case 'decimal':
 		case 'double':
 			return 'float';
 		case 'boolean':

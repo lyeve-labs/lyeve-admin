@@ -2,7 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { type HttpClient, type Schema, type SchemaField } from '@lyeve-labs/client';
 import { getSchemas, getSchema } from '@lyeve-labs/client-rest';
-import { authedClient, requireUser } from '$lib/server/authz';
+import { authedClient, exactParse, requireUser, withExactIntegers } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
 import { section, type Section } from '$lib/api/gate';
@@ -70,12 +70,17 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const rows = listed.value.data ?? [];
-	const entries: ListedEntry[] = rows.map((e) => ({
+	// The table shows an integer field's stored digits, which the plain read
+	// rounds past 2^53.
+	const exactRows = ((exactParse(listed.value) as ListEnvelope<EntryRow> | undefined)?.data ?? []) as EntryRow[];
+	const entries: ListedEntry[] = rows.map((e, i) => ({
 		id: e.id,
 		created_at: e.created_at,
 		updated_at: e.updated_at,
 		data: {
-			...(e.body && typeof e.body === 'object' ? e.body : {}),
+			...(e.body && typeof e.body === 'object'
+				? withExactIntegers(schemaDef.fields ?? [], e.body as Record<string, unknown>, exactRows[i]?.body)
+				: {}),
 			...(e.title !== undefined ? { title: e.title } : {}),
 			_status: e.status ?? 'published',
 		} as Record<string, unknown>,

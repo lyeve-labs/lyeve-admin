@@ -1,8 +1,8 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { ApiError, type Schema, type HttpClient } from '@lyeve-labs/client';
+import { ApiError, type Schema, type SchemaField, type HttpClient } from '@lyeve-labs/client';
 import { getSchema } from '@lyeve-labs/client-rest';
-import { authedClient, requireUser, stripProtectedFields } from '$lib/server/authz';
+import { authedClient, exactParse, requireUser, stripProtectedFields, withExactIntegers } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
 import { refusalOf, refusalText } from '$lib/api/refusal';
@@ -66,15 +66,21 @@ type StoredEntry = {
  * like a field would otherwise replace that field's value, and the next save
  * would write it into the body.
  */
-async function getEntry(client: HttpClient, id: string) {
+async function getEntry(client: HttpClient, id: string, fields: Promise<SchemaField[]>) {
 	const e = await client.get<StoredEntry>(`/api/admin/content/${encodeURIComponent(id)}`);
+	const exact = exactParse(e) as StoredEntry | undefined;
+	const body = withExactIntegers(
+		await fields,
+		e.body && typeof e.body === 'object' ? (e.body as Record<string, unknown>) : {},
+		exact?.body,
+	);
 	return {
 		id: e.id,
 		tenant_id: e.tenant_id ?? '',
 		created_at: e.created_at,
 		updated_at: e.updated_at,
 		data: {
-			...(e.body && typeof e.body === 'object' ? e.body : {}),
+			...body,
 			...(e.title !== undefined ? { title: e.title } : {}),
 			_status: e.status ?? 'published',
 		} as Record<string, unknown>,
@@ -99,8 +105,15 @@ type EditorRevision = {
  * the panel's own summary calls Object.keys on it, which throws during
  * hydration and takes the whole page down.
  */
-function toEditorRevision(rev: Record<string, unknown>): EditorRevision {
-	const body = rev.body;
+function toEditorRevision(
+	rev: Record<string, unknown>,
+	fields: readonly SchemaField[] = [],
+	exact?: Record<string, unknown>,
+): EditorRevision {
+	const body =
+		rev.body && typeof rev.body === 'object'
+			? withExactIntegers(fields, rev.body as Record<string, unknown>, exact?.body)
+			: rev.body;
 	const meta = rev.meta;
 	return {
 		id: String(rev.id ?? ''),
@@ -174,18 +187,21 @@ type RevisionBody =
  */
 const REVISION_LIMIT = 500;
 
-async function listRevisions(client: HttpClient, id: string): Promise<RevisionList> {
+async function listRevisions(client: HttpClient, id: string, fields: Promise<SchemaField[]>): Promise<RevisionList> {
 	try {
 		const body = await client.get<RevisionBody>(
 			`/api/admin/content/${encodeURIComponent(id)}/revisions?limit=${REVISION_LIMIT}&offset=0`,
 		);
 		const rows = (Array.isArray(body) ? body : (body?.data ?? [])) as Record<string, unknown>[];
+		const exact = exactParse(body) as RevisionBody | undefined;
+		const exactRows = (Array.isArray(exact) ? exact : (exact?.data ?? [])) as Record<string, unknown>[];
+		const known = await fields;
 		const hidden = Array.isArray(body) ? 0 : Number(body?.hidden_older ?? 0);
 		const days = Array.isArray(body) ? null : body?.window_days;
 		const counted = Array.isArray(body) ? NaN : Number(body?.total_count);
 		const enabled = Array.isArray(body) ? undefined : body?.history_enabled;
 		return {
-			revisions: rows.map(toEditorRevision),
+			revisions: rows.map((row, i) => toEditorRevision(row, known, exactRows[i])),
 			total: Number.isInteger(counted) && counted > rows.length ? counted : rows.length,
 			hiddenOlder: Number.isInteger(hidden) && hidden > 0 ? hidden : 0,
 			windowDays: typeof days === 'number' && days > 0 ? days : null,
@@ -386,16 +402,21 @@ export const load: PageServerLoad = async (event) => {
 	// One read of the directory serves the mention list and the review picker.
 	const people = listPeople(client);
 
-	const entry = getEntry(client, params.id);
+	const schema = getSchema(params.schema, client);
+	// The entry and its revisions read integer fields exactly, which takes the
+	// schema. A schema that cannot be read is reported below, and the reads
+	// then keep their plain values.
+	const fields = schema.then((s) => s.fields ?? [], () => [] as SchemaField[]);
+	const entry = getEntry(client, params.id, fields);
 	// Caught where it starts: when the entry read fails the load throws before
 	// the comments ever read the tenant, and a rejection nobody holds by then
 	// is an unhandled one. The entry's own failure is reported below.
 	const tenant = entry.then((e) => e.tenant_id).catch(() => '');
 
 	const [schemaDef, item, revisionList, localization, review, comments, releases] = await Promise.all([
-		getSchema(params.schema, client).catch((err: unknown): Schema => readError(err, `Schema "${params.schema}" not found`)),
+		schema.catch((err: unknown): Schema => readError(err, `Schema "${params.schema}" not found`)),
 		entry.catch((err: unknown) => readError(err, 'Entry not found')),
-		listRevisions(client, params.id),
+		listRevisions(client, params.id, fields),
 		loadLocalization(client, params.id, runs(plugins, PLUGIN.localization)),
 		loadReview(client, params.id, runs(plugins, PLUGIN.review), user).then(async (r) =>
 			r ? { ...r, people: await people } : null,
@@ -743,15 +764,18 @@ export const actions: Actions = {
 		if (!Number.isInteger(num) || num <= 0) {
 			return fail(400, { error: 'Choose a revision first.', revision: true });
 		}
+		const client = authedClient(event);
 		let raw: Record<string, unknown>;
 		try {
-			raw = await authedClient(event).get<Record<string, unknown>>(
+			raw = await client.get<Record<string, unknown>>(
 				`/api/admin/content/${encodeURIComponent(params.id)}/revisions/${num}`,
 			);
 		} catch (err) {
 			const failed = actionFailure(err, 'Could not open the revision. Try again.');
 			return fail(failed.status, { ...failed.data, revision: true });
 		}
-		return { openedRevision: toEditorRevision(raw) };
+		// Without the schema the revision still opens, with its plain values.
+		const fields = await getSchema(params.schema, client).then((s) => s.fields ?? [], () => []);
+		return { openedRevision: toEditorRevision(raw, fields, exactParse(raw) as Record<string, unknown> | undefined) };
 	},
 };
