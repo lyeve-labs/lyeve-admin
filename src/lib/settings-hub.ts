@@ -115,7 +115,7 @@ function leaves(tree: NavTree): Map<string, NavNode> {
 export interface PersonalPages {
 	twoFactor: boolean;
 	trustedDevices: boolean;
-	connectedEditors?: boolean;
+	connectedEditors: boolean;
 }
 
 /**
