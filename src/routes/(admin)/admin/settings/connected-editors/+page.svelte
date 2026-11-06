@@ -240,7 +240,7 @@
 	// else in the settings saves together under one Save.
 	async function allowedChanged(on: boolean) {
 		if (!on && settings?.allowed) {
-			const ok = await confirm('Turn off the site builder?', 'Connected browsers stop saving immediately.', {
+			const ok = await confirm('Turn off the builder?', 'Connected browsers stop saving immediately.', {
 				confirmLabel: 'Turn off',
 			});
 			if (!ok) {
@@ -281,7 +281,7 @@
 
 <PageShell
 	title="Builder connections"
-	description="Approve and revoke the browsers that edit pages from the site builder."
+	description="Approve and revoke the browsers that edit pages from the builder."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -355,7 +355,7 @@
 				<EmptyState
 					level={2}
 					title="No builder connections yet"
-					description="Connect from the site builder, then approve the connection here with the code it shows."
+					description="Connect from the builder, then approve the connection here with the code it shows."
 				>
 					{#snippet iconSnippet()}
 						<Link2 size={ICON.lg} />
@@ -436,10 +436,10 @@
 		</section>
 
 		{#if data.owner && data.settings}
-			<section class="flex flex-col gap-4" aria-label="Site builder settings">
-				<SectionHeading level={2}>Site builder</SectionHeading>
+			<section class="flex flex-col gap-4" aria-label="Builder settings">
+				<SectionHeading level={2}>Builder</SectionHeading>
 				{#if !data.settings.ok}
-					<GateNotice gate={data.settings.gate} title="Site builder settings" absent="Site builder settings need a newer version of the site builder plugin." />
+					<GateNotice gate={data.settings.gate} title="Builder settings" absent="Builder settings need a newer version of the builder plugin." />
 				{:else if loading}
 					<Card>
 						<div class="flex flex-col gap-3" data-testid="settings-loading">
@@ -454,13 +454,13 @@
 							<input type="hidden" name="field" value="allowed" />
 							<input type="hidden" name="allowed" value={allowedOn ? 'on' : 'off'} />
 							{#if !settings.allowed}
-								<Alert tone="warn">The site builder is off. Connected browsers cannot save.</Alert>
+								<Alert tone="warn">The builder is off. Connected browsers cannot save.</Alert>
 							{/if}
 							{#if savedField === 'allowed'}
 								<Alert tone="success" autoDismiss>Setting saved.</Alert>
 							{/if}
 							<Toggle
-								label="Allow the site builder"
+								label="Allow the builder"
 								hint="Lets connected browsers save pages. Changes apply immediately."
 								bind:checked={allowedOn}
 								disabled={saveAllowed.pending || !online}
@@ -563,7 +563,7 @@
 <Drawer bind:open title="Approve a connection" onclose={close}>
 	<div class="flex flex-col gap-5">
 		<p class="text-sm text-muted">
-			Approve only a code you started in the site builder in the last 10 minutes. If someone sends you a code, they
+			Approve only a code you started in the builder in the last 10 minutes. If someone sends you a code, they
 			are asking for access to your pages.
 		</p>
 

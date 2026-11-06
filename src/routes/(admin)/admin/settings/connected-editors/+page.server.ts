@@ -79,7 +79,7 @@ export const load: PageServerLoad = async (event) => {
 		.catch(() => false);
 	// The settings route answers owners only, so nobody else asks and no 403
 	// from it reaches the page.
-	const settings = owner ? section(getSettings(client), 'Could not load the site builder settings.') : null;
+	const settings = owner ? section(getSettings(client), 'Could not load the builder settings.') : null;
 	// A failed schema read is said as a failure, never offered as no schemas.
 	const schemas = owner
 		? listSchemaNames(client).then(

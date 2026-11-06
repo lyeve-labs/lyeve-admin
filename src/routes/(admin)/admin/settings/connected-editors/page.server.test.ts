@@ -319,7 +319,7 @@ describe('approve', () => {
 	});
 
 	it("shows the engine's sentence for a builder that is turned off", async () => {
-		const msg = 'The site builder is turned off. Turn it on under Settings, Connected editors first.';
+		const msg = 'The builder is turned off. Turn it on under Settings, Connected editors first.';
 		const { event } = approveWith(refusal(403, 'builder_off', msg));
 		expect(((await actions.approve(event)) as Failure).data.drawer).toEqual({ code: 'K7F3-A2M9', error: msg });
 	});

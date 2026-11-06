@@ -137,7 +137,7 @@ export function settingsHub(tree: NavTree, personal: PersonalPages): HubGroup[] 
 				? [{ id: 'devices', label: 'Trusted devices', href: '/admin/settings/devices', icon: MonitorSmartphone, description: 'See the browsers that skip the second step, and forget any of them.' }]
 				: []),
 			...(personal.connectedEditors
-				? [{ id: 'connected-editors', label: 'Builder connections', href: '/admin/settings/connected-editors', icon: Link2, description: 'Approve and revoke the browsers that edit pages from the site builder.' }]
+				? [{ id: 'connected-editors', label: 'Builder connections', href: '/admin/settings/connected-editors', icon: Link2, description: 'Approve and revoke the browsers that edit pages from the builder.' }]
 				: []),
 		],
 	};
