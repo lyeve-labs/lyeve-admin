@@ -72,6 +72,18 @@ describe('this browser', () => {
 		expect(said(container)).toContain("remembers the browser you're using now");
 	});
 
+	it('puts Trust this browser on the name field row, with the hint under the input', () => {
+		const { container } = render(DevicesPage, { props: props() });
+		const name = container.querySelector('#device-label') as HTMLInputElement;
+		const trust = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Trust this browser');
+		expect(container.querySelector('label[for="device-label"]')?.textContent).toContain('Name this device');
+		expect(name.required).toBe(true);
+		expect(container.querySelector(`#${name.getAttribute('aria-describedby')}`)?.textContent).toBe(
+			'Something you will recognize in the list.',
+		);
+		expect(trust?.parentElement).toBe(name.parentElement?.parentElement);
+	});
+
 	it('says so instead when this browser is already remembered', () => {
 		const { container } = render(DevicesPage, {
 			props: props({ userAgent: CHROME_MAC }),
