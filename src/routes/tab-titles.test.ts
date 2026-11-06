@@ -83,6 +83,7 @@ const TAB_TITLES: [string, Expected][] = [
 	['(admin)/admin/settings/captcha/+page.svelte', 'Captcha'],
 	['(admin)/admin/settings/config-sync/+page.svelte', 'Config sync'],
 	['(admin)/admin/settings/configuration/+page.svelte', 'Configuration'],
+	['(admin)/admin/settings/connected-editors/+page.svelte', 'Builder connections'],
 	['(admin)/admin/settings/customization/+page.svelte', 'Customization'],
 	['(admin)/admin/settings/customization/dashboard/+page.svelte', 'Dashboard - Customization'],
 	['(admin)/admin/settings/customization/pages/[slug]/+page.svelte', { expr: "`${page.title || 'Page'} - Customization`" }],

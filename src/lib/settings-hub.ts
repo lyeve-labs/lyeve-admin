@@ -11,10 +11,10 @@
  * reader's roles and this instance's plugins, so the hub and the sidebar
  * cannot disagree about who may open a page. Only the personal pages, which
  * have no sidebar row, are listed on their own terms: the account page always,
- * and each of the other two while the plugin behind it runs.
+ * and each of the others while the plugin behind it runs.
  */
 import type { NavNode, NavTree } from '@lyeve-labs/ui-kit';
-import { MonitorSmartphone, ShieldCheck, UserRound } from '@lucide/svelte';
+import { Link2, MonitorSmartphone, ShieldCheck, UserRound } from '@lucide/svelte';
 
 export interface HubEntry {
 	id: string;
@@ -115,6 +115,7 @@ function leaves(tree: NavTree): Map<string, NavNode> {
 export interface PersonalPages {
 	twoFactor: boolean;
 	trustedDevices: boolean;
+	connectedEditors: boolean;
 }
 
 /**
@@ -134,6 +135,9 @@ export function settingsHub(tree: NavTree, personal: PersonalPages): HubGroup[] 
 				: []),
 			...(personal.trustedDevices
 				? [{ id: 'devices', label: 'Trusted devices', href: '/admin/settings/devices', icon: MonitorSmartphone, description: 'See the browsers that skip the second step, and forget any of them.' }]
+				: []),
+			...(personal.connectedEditors
+				? [{ id: 'connected-editors', label: 'Builder connections', href: '/admin/settings/connected-editors', icon: Link2, description: 'Approve and revoke the browsers that edit pages from the site builder.' }]
 				: []),
 		],
 	};
