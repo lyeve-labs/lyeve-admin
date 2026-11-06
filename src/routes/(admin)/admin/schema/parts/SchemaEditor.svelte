@@ -8,7 +8,7 @@
 	import { collectionRoutes } from '$lib/api/collection-api';
 	import { curlFor } from '$lib/api/request-preview';
 	import { RELATION_KINDS, planRelation, planSchemaRelations, tableName, type RelationType } from '$lib/relations';
-	import { dropUnlocalizableMark, fieldNameTarget, localizableProblem, type Problem } from '$lib/schema/editor';
+	import { decimalScale, dropUnlocalizableMark, fieldNameTarget, localizableProblem, type Problem } from '$lib/schema/editor';
 	import { ICON } from '$lib/icon';
 	import { methodTone } from '$lib/tones';
 	import SchemaHistory from './SchemaHistory.svelte';
@@ -211,7 +211,6 @@
 	const DECIMAL_PRECISION_MAX = 38;
 	const DECIMAL_SCALE_MAX = 30;
 	const DECIMAL_PRECISION_DEFAULT = 18;
-	const DECIMAL_SCALE_DEFAULT = 2;
 
 	/** The largest scale a decimal's precision allows. */
 	function maxScale(field: SchemaField): number {
@@ -774,7 +773,7 @@
 						hint="How many of those digits come after the decimal point, from 0 to {maxScale(field)}."
 						min={0}
 						max={maxScale(field)}
-						bind:value={() => field.scale ?? DECIMAL_SCALE_DEFAULT, (next: number) => setScale(field, next, `decimal-scale-${rowId}`)}
+						bind:value={() => decimalScale(field), (next: number) => setScale(field, next, `decimal-scale-${rowId}`)}
 						error={problemAt(`decimal-scale-${rowId}`)}
 					/>
 				</div>

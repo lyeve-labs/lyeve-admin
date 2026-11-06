@@ -152,7 +152,7 @@ export function problemsOf(schema: Schema, others: Schema[], isNew: boolean): Pr
 		if (f.field_type === 'decimal') {
 			// The engine's defaults when the definition names neither.
 			const most = Math.min(f.precision ?? 18, 30);
-			if ((f.scale ?? 2) > most) {
+			if (decimalScale(f) > most) {
 				out.push({ fieldId: id, target: `decimal-scale-${id}`, where, message: `Enter a scale of at most ${most}.` });
 			}
 		}
@@ -220,9 +220,17 @@ export function changesOf(saved: Schema | null, next: Schema): Change {
 	return change;
 }
 
+/**
+ * A decimal field's scale. One left out is 2, or the precision when that is
+ * smaller, as the engine reads it.
+ */
+export function decimalScale(f: SchemaField): number {
+	return f.scale ?? Math.min(2, f.precision ?? 18);
+}
+
 /** A decimal field's column type, with the engine's defaults where the definition names none. */
 function decimalType(f: SchemaField): string {
-	return `decimal(${f.precision ?? 18},${f.scale ?? 2})`;
+	return `decimal(${f.precision ?? 18},${decimalScale(f)})`;
 }
 
 /** Whether a change touches data that already exists. */

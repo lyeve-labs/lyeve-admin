@@ -264,6 +264,13 @@ describe('SchemaEditor', () => {
 		expect(precision.value).toBe('37');
 	});
 
+	it('shows an omitted scale as the precision when the precision is below 2', () => {
+		const schema = posts();
+		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 1, localized: undefined };
+		setup({ schema });
+		expect((screen.getByLabelText('Scale') as HTMLInputElement).value).toBe('1');
+	});
+
 	it('says what precision and scale mean in their hints', () => {
 		const schema = posts();
 		schema.fields[1] = { ...schema.fields[1], field_type: 'decimal', precision: 10, scale: 2, localized: undefined };

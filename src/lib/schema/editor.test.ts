@@ -76,6 +76,7 @@ describe('problemsOf', () => {
 		expect(problemsOf(decimal({ precision: 38, scale: 31 }), [], false)[0].message).toBe('Enter a scale of at most 30.');
 		expect(problemsOf(decimal({ precision: 20, scale: 4 }), [], false)).toEqual([]);
 		expect(problemsOf(decimal({}), [], false)).toEqual([]);
+		expect(problemsOf(decimal({ precision: 1 }), [], false)).toEqual([]);
 	});
 
 	it('leaves the engine-owned rows alone', () => {
@@ -131,6 +132,7 @@ describe('changesOf, decimal columns', () => {
 	it('reads an absent precision and scale as the defaults', () => {
 		expect(changesOf(price({}), price({ precision: 18, scale: 2 })).retypes).toEqual([]);
 		expect(changesOf(price({}), price({ scale: 0 })).retypes).toEqual([{ name: 'price', from: 'decimal(18,2)', to: 'decimal(18,0)' }]);
+		expect(changesOf(price({ precision: 1 }), price({ precision: 1, scale: 1 })).retypes).toEqual([]);
 	});
 });
 
