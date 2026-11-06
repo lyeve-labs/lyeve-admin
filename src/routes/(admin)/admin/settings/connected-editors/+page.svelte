@@ -286,7 +286,7 @@
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
 	{#if !online}
-		<Banner tone="warn">You're offline. Approve and Revoke wait until you reconnect.</Banner>
+		<Banner tone="warn">You're offline. Changes on this page wait until you reconnect.</Banner>
 	{/if}
 
 	{#if data.gate.state === 'withheld'}

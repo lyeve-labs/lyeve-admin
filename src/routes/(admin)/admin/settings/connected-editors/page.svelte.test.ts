@@ -263,7 +263,7 @@ describe('offline', () => {
 		render(Page, { props: props() });
 		window.dispatchEvent(new Event('offline'));
 		await tick();
-		expect(said()).toContain("You're offline. Approve and Revoke wait until you reconnect.");
+		expect(said()).toContain("You're offline. Changes on this page wait until you reconnect.");
 		expect((document.querySelector('tbody button[aria-label^="Revoke"]') as HTMLButtonElement).disabled).toBe(true);
 		const all = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Revoke all') as HTMLButtonElement;
 		expect(all.disabled).toBe(true);
