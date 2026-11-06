@@ -13,6 +13,7 @@
 		DescriptionList,
 		Drawer,
 		EmptyState,
+		Field,
 		Indicator,
 		Input,
 		MultiSelect,
@@ -248,11 +249,6 @@
 	}
 
 	const schemaOptions = $derived(data.schemas.map((s) => ({ value: s, label: s })));
-
-	/** Why Approve cannot be pressed, said beside it. Approval being unavailable has its own alert above. */
-	const approveBlocked = $derived(
-		!request ? 'Enter the code the builder shows, then choose Find request.' : !online ? "You're offline." : '',
-	);
 </script>
 
 {#snippet keyDetail()}
@@ -556,33 +552,34 @@
 </PageShell>
 
 <Drawer bind:open title="Approve a connection" onclose={close}>
-	<div class="flex flex-col gap-4">
+	<div class="flex flex-col gap-5">
 		<p class="text-sm text-muted">
 			Approve only a code you started in the site builder in the last 10 minutes. If someone sends you a code, they
 			are asking for access to your pages.
 		</p>
 
-		<form
-			bind:this={lookupForm}
-			method="POST"
-			action="?/lookup"
-			use:enhance={drawerSubmit}
-			class="flex flex-wrap items-end gap-3"
-		>
-			<div class="min-w-48 flex-1">
-				<Input
-					id="connected-editors-code"
-					name="code"
-					label="Code"
-					placeholder="K7F3-A2M9"
-					autocomplete="off"
-					spellcheck={false}
-					bind:value={codeInput}
-					oninput={typed}
-					error={drawer?.codeError}
-				/>
-			</div>
-			<Button variant="secondary" type="submit" loading={pending === 'lookup'}>Find request</Button>
+		<form bind:this={lookupForm} method="POST" action="?/lookup" use:enhance={drawerSubmit}>
+			<!-- The label sits above the row and the message under the input alone,
+			     so Find request stays level with the input box whatever shows under it. -->
+			<Field id="connected-editors-code" label="Code">
+				{#snippet children(field)}
+					<div class="flex items-start gap-3">
+						<Input
+							id={field.id}
+							name="code"
+							class="min-w-0 flex-1"
+							placeholder="K7F3-A2M9"
+							autocomplete="off"
+							spellcheck={false}
+							bind:value={codeInput}
+							oninput={typed}
+							error={drawer?.codeError}
+							hint={request ? undefined : 'Enter the code the builder shows, then choose Find request.'}
+						/>
+						<Button variant="secondary" type="submit" loading={pending === 'lookup'}>Find request</Button>
+					</div>
+				{/snippet}
+			</Field>
 		</form>
 
 		{#if drawer?.withheld}
@@ -605,21 +602,33 @@
 		{/if}
 
 		{#if request}
-			{#if !request.same_network}
-				<Alert tone="warn">
-					This request came from a different network than this browser. Approve it only if you started it yourself.
-				</Alert>
-			{/if}
-
-			<form method="POST" action="?/approve" use:enhance={drawerSubmit} class="flex flex-col gap-4">
+			<form
+				id="connected-editors-approve"
+				method="POST"
+				action="?/approve"
+				use:enhance={drawerSubmit}
+				class="flex flex-col gap-4 border-t border-line pt-5"
+			>
 				<input type="hidden" name="code" value={held?.code ?? ''} />
 				<input type="hidden" name="fingerprint" value={request.fingerprint} />
 				<input type="hidden" name="code_expires_at" value={request.code_expires_at} />
 
+				<SectionHeading level={3}>Check this request</SectionHeading>
+
+				{#if !request.same_network}
+					<Alert tone="warn">
+						This request came from a different network than this browser. Approve it only if you started it yourself.
+					</Alert>
+				{/if}
+
 				<DescriptionList
 					items={[
+						{ term: 'Browser name', value: request.label, detail: nameDetail },
 						{ term: 'Key', value: request.fingerprint, detail: keyDetail },
 						{ term: 'From', value: request.origin, detail: fromDetail },
+						{ term: 'Requested from', value: request.requester_network || 'Unknown address' },
+						{ term: 'Your address', value: request.approver_address || 'Unknown address' },
+						{ term: 'Code expires', value: expiresIn(request.code_expires_at) },
 						{ term: 'Access', value: 'read and write pages, sections and the theme, and listed data only with consent' },
 						{
 							term: 'Approved as',
@@ -627,10 +636,6 @@
 						},
 						...(data.tenant ? [{ term: 'Tenant', value: data.tenant }] : []),
 						{ term: 'Expires', value: formatDate(expiryOf(request, Number(lifetime))) },
-						{ term: 'Requested from', value: request.requester_network || 'Unknown address' },
-						{ term: 'Your address', value: request.approver_address || 'Unknown address' },
-						{ term: 'Code expires', value: expiresIn(request.code_expires_at) },
-						{ term: 'Browser name', value: request.label, detail: nameDetail },
 					]}
 				/>
 
@@ -659,38 +664,39 @@
 					</Alert>
 				{/if}
 
-				<div class="flex flex-wrap items-center justify-end gap-2">
-					{#if approveBlocked}
-						<span id="approve-blocked" class="text-sm text-muted">{approveBlocked}</span>
-					{/if}
-					<Button variant="ghost" onclick={close}>Cancel</Button>
-					<Button
-						variant="secondary"
-						type="submit"
-						formaction="?/decline"
-						formnovalidate
-						loading={pending === 'decline'}
-						disabled={!request || !online}
-					>
-						Decline
-					</Button>
-					<Button
-						variant="primary"
-						type="submit"
-						loading={pending === 'approve'}
-						disabled={!approveReady}
-						aria-describedby={approveBlocked ? 'approve-blocked' : undefined}
-					>
-						Approve
-					</Button>
-				</div>
+				{#if !online}
+					<p id="approve-blocked" class="text-sm text-muted">You're offline.</p>
+				{/if}
 			</form>
-		{:else}
-			<div class="flex flex-wrap items-center justify-end gap-2">
-				<span id="approve-blocked" class="text-sm text-muted">{approveBlocked}</span>
-				<Button variant="ghost" onclick={close}>Cancel</Button>
-				<Button variant="primary" type="button" disabled aria-describedby="approve-blocked">Approve</Button>
-			</div>
 		{/if}
 	</div>
+
+	{#snippet footer()}
+		<Button variant="secondary" onclick={close}>Cancel</Button>
+		<!-- Approve and Decline appear once a lookup found a request, so the
+		     footer never offers a decision about nothing. -->
+		{#if request}
+			<Button
+				variant="secondary"
+				type="submit"
+				form="connected-editors-approve"
+				formaction="?/decline"
+				formnovalidate
+				loading={pending === 'decline'}
+				disabled={!online}
+			>
+				Decline
+			</Button>
+			<Button
+				variant="primary"
+				type="submit"
+				form="connected-editors-approve"
+				loading={pending === 'approve'}
+				disabled={!approveReady}
+				aria-describedby={online ? undefined : 'approve-blocked'}
+			>
+				Approve
+			</Button>
+		{/if}
+	{/snippet}
 </Drawer>

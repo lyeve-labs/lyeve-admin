@@ -261,22 +261,23 @@ describe('the approve drawer', () => {
 	const approve = () =>
 		[...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Approve') as HTMLButtonElement;
 
-	it('opens from the builder link with the warning first and Approve disabled', async () => {
+	it('opens from the builder link with the warning first and no Approve until a request is found', async () => {
 		render(Page, { props: props({ openApprove: true }) });
 		await tick();
 		expect(said()).toContain(
 			'Approve only a code you started in the site builder in the last 10 minutes. If someone sends you a code, they are asking for access to your pages.',
 		);
-		expect(approve().disabled).toBe(true);
+		expect(approve()).toBeUndefined();
 		await waitFor(() => expect(document.activeElement?.id).toBe('connected-editors-code'));
 	});
 
-	it('says beside a disabled Approve what it waits for', async () => {
+	it('says under the code what to do, and beside a disabled Approve what it waits for', async () => {
 		render(Page, { props: props({ openApprove: true }) });
 		await tick();
 		const reason = 'Enter the code the builder shows, then choose Find request.';
-		expect(said()).toContain(reason);
-		expect(document.getElementById(approve().getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason);
+		const code = document.getElementById('connected-editors-code') as HTMLInputElement;
+		expect(document.querySelector('label[for="connected-editors-code"]')?.textContent?.trim()).toBe('Code');
+		expect(document.getElementById(code.getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason);
 		cleanup();
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
 		await tick();
@@ -342,11 +343,32 @@ describe('the approve drawer', () => {
 		[{ expired: true }, SAID.expired],
 		[{ decided: true }, SAID.decided],
 		[{ withheld: true }, SAID.withheld],
-	])('keeps Approve disabled and says why', async (drawer, words) => {
+	])('offers no Approve and says why', async (drawer, words) => {
 		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', ...drawer } }) });
 		await tick();
 		expect(said()).toContain(words);
-		expect(approve().disabled).toBe(true);
+		expect(approve()).toBeUndefined();
+	});
+
+	it('keeps Find request in the code row when the code is refused', async () => {
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', codeError: SAID.unknown } }) });
+		await tick();
+		const code = document.getElementById('connected-editors-code') as HTMLInputElement;
+		const find = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Find request');
+		expect(code.getAttribute('aria-invalid')).toBe('true');
+		expect(document.getElementById(code.getAttribute('aria-describedby') ?? '')?.textContent).toBe(SAID.unknown);
+		// The error sits inside the input's own column, never between the label and the row.
+		expect(find?.parentElement).toBe(code.parentElement?.parentElement);
+	});
+
+	it('submits Approve and Decline from the footer to the approve form', async () => {
+		render(Page, { props: props({}, { drawer: { code: 'K7F3-A2M9', request: REQUEST } }) });
+		await tick();
+		const decline = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Decline');
+		expect(approve().getAttribute('form')).toBe('connected-editors-approve');
+		expect(decline?.getAttribute('form')).toBe('connected-editors-approve');
+		expect(decline?.getAttribute('formaction')).toBe('?/decline');
+		expect(document.getElementById('connected-editors-approve')?.getAttribute('action')).toBe('?/approve');
 	});
 
 	it('shows the new key after the key changed', async () => {
