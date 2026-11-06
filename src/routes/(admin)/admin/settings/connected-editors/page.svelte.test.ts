@@ -174,6 +174,22 @@ describe('the gates', () => {
 		render(Page, { props: props({ gate: { state: 'forbidden' }, connections: [] }) });
 		expect(said()).not.toContain('Try again');
 	});
+
+	it.each(['absent', 'forbidden', 'unavailable', 'withheld'])(
+		'opens no approve dialog from the builder link while the gate is %s',
+		async (state) => {
+			render(Page, { props: props({ gate: { state }, connections: [], openApprove: true }) });
+			await tick();
+			expect(document.querySelector('[role="dialog"]')).toBeNull();
+			expect(document.querySelector('#connected-editors-code')).toBeNull();
+		},
+	);
+
+	it('opens the approve dialog from the builder link while the gate is ok', async () => {
+		render(Page, { props: props({ openApprove: true }) });
+		await tick();
+		expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+	});
 });
 
 describe('revoking', () => {

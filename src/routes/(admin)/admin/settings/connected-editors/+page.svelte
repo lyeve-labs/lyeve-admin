@@ -559,6 +559,7 @@
 	{/if}
 </PageShell>
 
+{#if data.gate.state === 'ok'}
 <Drawer bind:open title="Approve a connection" onclose={close}>
 	<div class="flex flex-col gap-5">
 		<p class="text-sm text-muted">
@@ -706,3 +707,4 @@
 		{/if}
 	{/snippet}
 </Drawer>
+{/if}
