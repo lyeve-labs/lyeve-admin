@@ -3,7 +3,9 @@
 		Alert,
 		Badge,
 		Button,
+		Card,
 		EmptyState,
+		Field,
 		Input,
 		PageShell,
 		SectionHeading,
@@ -90,28 +92,31 @@
 					This browser is already trusted, as {deviceLabel(thisOne)}.
 				</Alert>
 			{:else}
-				<p class="text-xs text-muted">
-					Trusting remembers the browser you're using now. To trust another browser, open this page in that browser.
-				</p>
-				<form
-					method="POST"
-					action="?/trust"
-					use:enhance={trustThis}
-					class="flex max-w-md flex-col items-start gap-3"
-				>
-					<div class="w-full">
-						<Input
-							id="device-label"
-							name="label"
-							label="Name this device"
-							placeholder={suggestedName}
-							hint="Something you will recognize in the list."
-							bind:value={label}
-							required
-						/>
-					</div>
-					<Button variant="primary" type="submit">Trust this browser</Button>
-				</form>
+				<Card pad="md">
+					<form method="POST" action="?/trust" use:enhance={trustThis} class="flex flex-col gap-4">
+						<p class="max-w-prose text-sm text-muted">
+							Trusting remembers the browser you're using now. To trust another browser, open this page in that browser.
+						</p>
+						<!-- The label sits above the row and the hint under the input alone,
+						     so the button stays level with the input box. -->
+						<Field id="device-label" label="Name this device" required>
+							{#snippet children(field)}
+								<div class="flex flex-col items-start gap-3 sm:flex-row">
+									<Input
+										id={field.id}
+										name="label"
+										class="w-full sm:w-80"
+										placeholder={suggestedName}
+										hint="Something you will recognize in the list."
+										bind:value={label}
+										required
+									/>
+									<Button variant="primary" type="submit">Trust this browser</Button>
+								</div>
+							{/snippet}
+						</Field>
+					</form>
+				</Card>
 			{/if}
 		</section>
 
