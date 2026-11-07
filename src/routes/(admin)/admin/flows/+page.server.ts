@@ -156,7 +156,7 @@ export const actions: Actions = {
 			}
 			if (err instanceof ImportError) {
 				if (err.status === 422) return tagged('import', validationFailure(err, 'Could not import the flow. Try again.'));
-				return fail(400, { action: 'import', error: err.status < 500 && err.message ? err.message : 'Could not import the flow. Try again.' });
+				return fail(400, { action: 'import', error: err.status < 500 && err.code && err.message ? err.message : 'Could not import the flow. Try again.' });
 			}
 			return fail(400, { action: 'import', error: 'Could not import the flow. Try again.' });
 		}

@@ -12,8 +12,9 @@ export function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+/** A refusal in the engine's envelope, which carries a code beside the sentence. */
 export function refused(status: number, error: string): Response {
-	return json({ error }, status);
+	return json({ error, code: `http_${status}` }, status);
 }
 
 export function mockCookies(): Cookies {

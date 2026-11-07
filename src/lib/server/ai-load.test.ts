@@ -43,6 +43,10 @@ describe('aiActionError', () => {
 		const refused = new ApiError(403, 'insufficient permissions', { error: 'insufficient permissions', code: 'forbidden' });
 		expect(aiActionError(refused, 'f')).toBe('Only an admin or a super admin can change this.');
 		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Only a super admin can change this.');
+		// A 403 with no code came from something in front of the engine.
+		expect(aiActionError(new ApiError(403, '<html>Forbidden</html>'), 'f')).toBe('Only an admin or a super admin can change this.');
+		const tenant = new ApiError(403, 'AI calls are paused for this tenant', { error: 'AI calls are paused for this tenant', code: 'forbidden' });
+		expect(aiActionError(tenant, 'f')).toBe('AI calls are paused for this tenant');
 	});
 
 	it('says the budget is spent only when the 402 names the budget', () => {
@@ -63,9 +67,13 @@ describe('aiActionError', () => {
 		expect(aiActionError(new ApiError(503, 'failed to list models', { error: 'failed to list models' }), 'f')).toBe('f');
 		expect(aiActionError(new ApiError(503, '<html>Service Unavailable</html>'), 'f')).toBe('f');
 		expect(aiActionError(new ApiError(409, 'x'), 'f')).toContain('supports');
-		expect(aiActionError(new ApiError(400, 'base_url is required for the openai_compatible kind'), 'f')).toBe(
-			'base_url is required for the openai_compatible kind'
-		);
+		const coded = new ApiError(400, 'base_url is required for the openai_compatible kind', {
+			error: 'base_url is required for the openai_compatible kind',
+			code: 'http_400',
+		});
+		expect(aiActionError(coded, 'f')).toBe('base_url is required for the openai_compatible kind');
+		// A proxy's refusal carries no code, so its text stays off the page.
+		expect(aiActionError(new ApiError(413, 'Request Entity Too Large'), 'f')).toBe('f');
 	});
 
 	it('collapses a 5xx to the fallback so driver text never reaches the page', () => {

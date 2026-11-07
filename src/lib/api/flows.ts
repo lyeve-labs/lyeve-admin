@@ -330,26 +330,34 @@ export async function importFlow(
 		const refusal = refusalOf(res.status, text);
 		if (refusal) throw refusal;
 		let message = text;
+		let code = '';
 		try {
-			const json = JSON.parse(text) as { error?: string };
+			const json = JSON.parse(text) as { error?: string; code?: string };
 			message = json.error ?? text;
+			code = typeof json.code === 'string' ? json.code : '';
 		} catch {
 			// Not JSON: the text is the message.
 		}
-		throw new ImportError(res.status, message, text);
+		throw new ImportError(res.status, message, text, code);
 	}
 	return JSON.parse(text) as ImportResult;
 }
 
-/** An import refusal, carrying the raw body so a 422 can surface its error list. */
+/**
+ * An import refusal, carrying the raw body so a 422 can surface its error
+ * list. `code` is the API error code, empty when something in front of the
+ * engine answered.
+ */
 export class ImportError extends Error {
 	readonly status: number;
 	readonly body: string;
-	constructor(status: number, message: string, body: string) {
+	readonly code: string;
+	constructor(status: number, message: string, body: string, code = '') {
 		super(message);
 		this.name = 'ImportError';
 		this.status = status;
 		this.body = body;
+		this.code = code;
 	}
 }
 
