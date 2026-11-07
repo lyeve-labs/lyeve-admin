@@ -31,26 +31,10 @@ import { confirm, toast, type ConfirmOptions } from '@lyeve-labs/ui-kit';
  * longer say what the answer was built from.
  */
 export function submitter(close?: () => void, { reset = true }: { reset?: boolean } = {}) {
-	let pending = $state(false);
-	const enhance: SubmitFunction = () => {
-		pending = true;
-		return async ({ result, update }) => {
-			try {
-				if (result.type !== 'failure' && result.type !== 'error') close?.();
-				await update({ reset });
-			} finally {
-				// Cleared after the patch, as `tracked` does: a primary that goes
-				// live again mid-update invites the second click.
-				pending = false;
-			}
-		};
-	};
-	return {
-		get pending() {
-			return pending;
-		},
-		enhance,
-	};
+	return tracked(() => async ({ result, update }) => {
+		if (result.type !== 'failure' && result.type !== 'error') close?.();
+		await update({ reset });
+	});
 }
 
 /**
