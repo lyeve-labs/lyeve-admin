@@ -381,14 +381,14 @@ describe('deleting an entry', () => {
 	});
 
 	it('relays the reason the plugin refused', async () => {
-		const { event } = deleteEvent(async () => json({ error: 'entry is referenced by another entry' }, 409));
+		const { event } = deleteEvent(async () => json({ error: 'entry is referenced by another entry', code: 'conflict' }, 409));
 		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
 		expect(out.data.error).toBe('entry is referenced by another entry');
 	});
 
 	it('relays the role refusal the engine sends', async () => {
-		const { event } = deleteEvent(async () => json({ error: 'insufficient permissions' }, 403));
+		const { event } = deleteEvent(async () => json({ error: 'insufficient permissions', code: 'forbidden' }, 403));
 		const out = (await actions.delete(event)) as { status: number; data: { error: string } };
 		expect(out.data.error).toBe('insufficient permissions');
 	});

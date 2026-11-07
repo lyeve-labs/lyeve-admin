@@ -346,7 +346,7 @@ describe('admin/tenants/[id] revoke, archive and restore', () => {
 			{
 				'GET /api/admin/auth/me': ME,
 				'GET /api/admin/tenants/t1': TENANT,
-				'DELETE /api/admin/users/u2/memberships/acme': json({ error: 'the home tenant has no membership to revoke' }, 409),
+				'DELETE /api/admin/users/u2/memberships/acme': json({ error: 'the home tenant has no membership to revoke', code: 'conflict' }, 409),
 			},
 			revokeForm(),
 		);
@@ -376,13 +376,13 @@ describe('admin/tenants/[id] revoke, archive and restore', () => {
 	});
 
 	it('relays a refused archive and restore, and hides an outage behind a sentence', async () => {
-		const refused = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': json({ error: 'tenant is already archived' }, 409) });
+		const refused = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': json({ error: 'tenant is already archived', code: 'conflict' }, 409) });
 		expect(await actions.archive(refused.event)).toEqual({ status: 400, data: { stateError: 'tenant is already archived' } });
 		const down = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': json({ error: 'pq: timeout' }, 503) });
 		expect(await actions.restore(down.event)).toEqual({ status: 400, data: { stateError: 'Could not restore the tenant. Try again.' } });
 		const downArchive = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/archive': json({ error: 'pq: timeout' }, 503) });
 		expect(await actions.archive(downArchive.event)).toEqual({ status: 400, data: { stateError: 'Could not archive the tenant. Try again.' } });
-		const refusedRestore = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': json({ error: 'tenant is not archived' }, 409) });
+		const refusedRestore = event({ 'GET /api/admin/auth/me': ME, 'POST /api/admin/tenants/t1/restore': json({ error: 'tenant is not archived', code: 'conflict' }, 409) });
 		expect(await actions.restore(refusedRestore.event)).toEqual({ status: 400, data: { stateError: 'tenant is not archived' } });
 	});
 

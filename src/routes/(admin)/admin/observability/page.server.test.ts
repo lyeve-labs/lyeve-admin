@@ -161,7 +161,7 @@ describe('the tunable actions', () => {
 
 	it('relays the plugin bounds message on a 422', async () => {
 		const { event } = actionEvent(form({ workers: '8', queue_size: '64', timeout: '5s', enabled: 'on' }), {
-			'/debug/goroutines/async-hooks': () => json({ error: 'workers must be between 1 and 1024' }, 422),
+			'/debug/goroutines/async-hooks': () => json({ error: 'workers must be between 1 and 1024', code: 'http_422' }, 422),
 		});
 		const result = await actions.asyncHooks(event);
 		expect(result).toMatchObject({ status: 422, data: { form: 'asyncHooks', error: 'workers must be between 1 and 1024' } });

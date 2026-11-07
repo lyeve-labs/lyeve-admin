@@ -444,7 +444,7 @@ describe('admin/tenants update, toggle and delete', () => {
 	});
 
 	it('names the action that failed, for each write', async () => {
-		const refuse = () => json({ error: 'tenant not found' }, 404);
+		const refuse = () => json({ error: 'tenant not found', code: 'not_found' }, 404);
 		expect(await actions.update(writeEvent({ id: 't1', name: 'ACME' }, refuse))).toEqual({
 			status: 400,
 			data: { action: 'update', error: 'tenant not found' },

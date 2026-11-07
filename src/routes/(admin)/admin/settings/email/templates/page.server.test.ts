@@ -113,7 +113,7 @@ describe('email templates save', () => {
 	it('updates by id and relays the sentence a refused body gets', async () => {
 		const { event } = actionEvent(
 			{ id: 't1', subject: 'Reset', mjml_source: '<mjml/>', status: 'active' },
-			{ '/api/admin/email-templates/t1': () => json({ error: 'This template is required, and its body has to include {{.Vars.reset_link}}, the link the mail delivers.' }, 422) },
+			{ '/api/admin/email-templates/t1': () => json({ error: 'This template is required, and its body has to include {{.Vars.reset_link}}, the link the mail delivers.', code: 'http_422' }, 422) },
 		);
 		expect(await actions.save(event)).toMatchObject({ status: 422, data: { error: expect.stringContaining('{{.Vars.reset_link}}') } });
 	});
@@ -134,7 +134,7 @@ describe('email templates save', () => {
 
 describe('email templates delete and preview', () => {
 	it('relays the refusal to delete a required template', async () => {
-		const { event } = actionEvent({ id: 't1' }, { '/api/admin/email-templates/t1': () => json({ error: 'This template is required: the sign-in mails are sent from it. Edit it instead.' }, 409) });
+		const { event } = actionEvent({ id: 't1' }, { '/api/admin/email-templates/t1': () => json({ error: 'This template is required: the sign-in mails are sent from it. Edit it instead.', code: 'conflict' }, 409) });
 		expect(await actions.delete(event)).toMatchObject({ status: 409, data: { error: expect.stringContaining('required') } });
 	});
 

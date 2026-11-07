@@ -137,7 +137,7 @@ describe('address list actions', () => {
 	});
 
 	it('relays a conflict without a code as it was sent', async () => {
-		api.createAddressEntry.mockRejectedValue(new ApiError(409, 'this entry would refuse the address you are calling from'));
+		api.createAddressEntry.mockRejectedValue(new ApiError(409, 'this entry would refuse the address you are calling from', { error: 'this entry would refuse the address you are calling from', code: 'conflict' }));
 		const out = (await actions.addAddress(formEvent({ cidr: '10.0.0.1', list: 'allow' }))) as {
 			status: number;
 			data: { error: string; lockout?: string };
@@ -170,7 +170,7 @@ describe('removing an address entry', () => {
 	});
 
 	it('relays the plugin refusal under its action', async () => {
-		api.deleteAddressEntry.mockRejectedValue(new ApiError(404, 'entry not found'));
+		api.deleteAddressEntry.mockRejectedValue(new ApiError(404, 'entry not found', { error: 'entry not found', code: 'not_found' }));
 		expect(await actions.deleteAddress(formEvent({ id: 'a1' }))).toMatchObject({
 			status: 400,
 			data: { action: 'deleteAddress', error: 'entry not found' },

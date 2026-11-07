@@ -44,7 +44,7 @@ describe('privacy request failures', () => {
 	});
 
 	it('relays a refusal written for the operator', async () => {
-		rest.eraseSubject.mockRejectedValue(new ApiError(400, 'identifier must be an email address or a user id'));
+		rest.eraseSubject.mockRejectedValue(new ApiError(400, 'identifier must be an email address or a user id', { error: 'identifier must be an email address or a user id', code: 'bad_request' }));
 		const out = (await actions.erase(formEvent({ subject: 'x', confirm: 'x' }))) as Failure;
 		expect(out.data.error).toBe('identifier must be an email address or a user id');
 	});

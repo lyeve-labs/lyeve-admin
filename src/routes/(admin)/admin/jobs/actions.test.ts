@@ -60,7 +60,7 @@ describe('clearing a payload', () => {
 
 describe('which form a failure belongs to', () => {
 	it('tags a failed update for the drawer', async () => {
-		engine.put.mockRejectedValue(new ApiError(422, 'schedule fires more than once a minute', {}));
+		engine.put.mockRejectedValue(new ApiError(422, 'schedule fires more than once a minute', { error: 'schedule fires more than once a minute', code: 'http_422' }));
 		const out = (await actions.update(event({ ...job, id: 'j1' }))) as Failure;
 		expect(out.data).toMatchObject({ action: 'update', error: 'schedule fires more than once a minute' });
 	});
@@ -79,7 +79,7 @@ describe('deleting a job', () => {
 	});
 
 	it("relays the plugin's refusal, tagged for the page", async () => {
-		engine.delete.mockRejectedValue(new ApiError(404, 'job not found', {}));
+		engine.delete.mockRejectedValue(new ApiError(404, 'job not found', { error: 'job not found', code: 'not_found' }));
 		const out = (await actions.delete(event({ id: 'j1' }))) as Failure;
 		expect(out.data).toEqual({ error: 'job not found', action: 'delete' });
 	});

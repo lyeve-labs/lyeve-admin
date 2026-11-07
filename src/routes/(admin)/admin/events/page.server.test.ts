@@ -105,7 +105,7 @@ describe('replaying events', () => {
 	});
 
 	it('relays the engine refusal', async () => {
-		engine.post.mockRejectedValue(new ApiError(409, 'a replay is already in progress'));
+		engine.post.mockRejectedValue(new ApiError(409, 'a replay is already in progress', { error: 'a replay is already in progress', code: 'conflict' }));
 		const out = (await actions.replay(replayEvent({ since: '2026-10-01T09:30', since_offset: '0' }))) as Failure;
 		expect(out.data.error).toBe('a replay is already in progress');
 	});

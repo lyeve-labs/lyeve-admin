@@ -165,7 +165,7 @@ describe('admin dashboard applyMigrations action', () => {
 	it('relays the engine refusal', async () => {
 		const { event } = applyEvent(
 			{ redirectTo: '/admin' },
-			{ apply: json({ error: 'migration 059 failed' }, 400) }
+			{ apply: json({ error: 'migration 059 failed', code: 'bad_request' }, 400) }
 		);
 
 		const result = (await actions.applyMigrations(event)) as {

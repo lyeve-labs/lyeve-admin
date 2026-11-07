@@ -273,7 +273,7 @@ describe('deleting a rule', () => {
 	});
 
 	it("relays the plugin's refusal", async () => {
-		api.deleteCaptureRule.mockRejectedValue(new ApiError(404, 'rule not found', {}));
+		api.deleteCaptureRule.mockRejectedValue(new ApiError(404, 'rule not found', { error: 'rule not found', code: 'not_found' }));
 		const out = (await actions.deleteRule(formEvent({ id: 'r1' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
 		expect(out.data.error).toBe('rule not found');
@@ -307,7 +307,7 @@ describe('deleting a replay set', () => {
 	});
 
 	it("relays the plugin's refusal", async () => {
-		api.deleteReplaySet.mockRejectedValue(new ApiError(404, 'replay set not found', {}));
+		api.deleteReplaySet.mockRejectedValue(new ApiError(404, 'replay set not found', { error: 'replay set not found', code: 'not_found' }));
 		const out = (await actions.deleteSet(formEvent({ id: 's1' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
 		expect(out.data.error).toBe('replay set not found');

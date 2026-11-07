@@ -7,9 +7,11 @@ vi.mock('@lyeve-labs/client', () => {
 		createClient: vi.fn(),
 		ApiError: class ApiError extends Error {
 			status: number;
-			constructor(status: number, message: string) {
+			body?: unknown;
+			constructor(status: number, message: string, body?: unknown) {
 				super(message);
 				this.status = status;
+				this.body = body;
 			}
 		},
 	};
@@ -291,7 +293,7 @@ describe('license +page.server.ts actions.renew', () => {
 		const { actions } = await import('./+page.server');
 		const mockClient = {
 			post: vi.fn(async () => {
-				throw new ApiError(422, 'Invalid license key');
+				throw new ApiError(422, 'Invalid license key', { error: 'Invalid license key', code: 'http_422' });
 			}),
 		};
 		mockedCreateClient.mockReturnValue(mockClient as never);
@@ -469,7 +471,7 @@ describe('license +page.server.ts actions.renew with a license key', () => {
 		const { actions } = await import('./+page.server');
 		mockedCreateClient.mockReturnValue({
 			post: vi.fn(async () => {
-				throw new ApiError(400, 'the key was refused');
+				throw new ApiError(400, 'the key was refused', { error: 'the key was refused', code: 'bad_request' });
 			}),
 		} as never);
 

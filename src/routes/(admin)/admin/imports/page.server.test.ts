@@ -194,7 +194,7 @@ describe('canceling an import', () => {
 	});
 
 	it('names the cancel on a refusal and relays its reason', async () => {
-		api.cancelJob.mockRejectedValue(new ApiError(409, 'job is not running'));
+		api.cancelJob.mockRejectedValue(new ApiError(409, 'job is not running', { error: 'job is not running', code: 'conflict' }));
 		expect(((await actions.cancel(formEvent({ id: 'j1' }))) as Failure).data).toEqual({ action: 'cancel', error: 'job is not running' });
 	});
 

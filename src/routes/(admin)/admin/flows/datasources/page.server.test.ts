@@ -391,7 +391,7 @@ describe('admin/flows/datasources actions', () => {
 		form.set('name', 'x');
 		form.set('kind', 'http');
 		form.set('base_url', 'https://x');
-		const { event } = actionEvent(form, { '/datasources': () => json({ error: 'name already exists' }, 409) });
+		const { event } = actionEvent(form, { '/datasources': () => json({ error: 'name already exists', code: 'conflict' }, 409) });
 		const result = (await actions.create(event)) as { status: number; data: { error: string } };
 		expect(result.data.error).toBe('name already exists');
 	});

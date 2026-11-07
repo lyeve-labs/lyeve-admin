@@ -99,7 +99,7 @@ describe('custom page editor writes', () => {
 	});
 
 	it('shows the first block problem the engine names', async () => {
-		api.saveCustomPage.mockRejectedValue(new ApiError(422, 'block 2: chart needs a schema'));
+		api.saveCustomPage.mockRejectedValue(new ApiError(422, 'block 2: chart needs a schema', { error: 'block 2: chart needs a schema', code: 'http_422' }));
 		const out = (await actions.save(actionEvent({ page: JSON.stringify(page) }))) as Failure;
 		expect(out.data.error).toBe('block 2: chart needs a schema');
 	});
@@ -111,7 +111,7 @@ describe('custom page editor writes', () => {
 	});
 
 	it('stays on the page when the engine refuses the delete', async () => {
-		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found'));
+		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found', { error: 'page not found', code: 'not_found' }));
 		const out = (await actions.delete(actionEvent())) as Failure;
 		expect(out.data.error).toBe('page not found');
 	});

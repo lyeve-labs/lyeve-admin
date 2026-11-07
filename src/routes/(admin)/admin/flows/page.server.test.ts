@@ -290,7 +290,7 @@ describe('admin/flows delete action', () => {
 	it('relays the engine message on refusal', async () => {
 		const form = new FormData();
 		form.set('id', 'f9');
-		const { event } = actionEvent({ '/api/admin/flows/f9': () => json({ error: 'super_admin required' }, 403) }, form);
+		const { event } = actionEvent({ '/api/admin/flows/f9': () => json({ error: 'super_admin required', code: 'forbidden' }, 403) }, form);
 		const result = (await actions.delete(event)) as { status: number; data: { error: string; forbidden: boolean; action: string } };
 		expect(result.status).toBe(403);
 		expect(result.data.forbidden).toBe(true);

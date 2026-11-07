@@ -258,7 +258,7 @@ describe('cache flush', () => {
 
 	it("relays the plugin's refusal", async () => {
 		authz.roles = ['super_admin'];
-		api.flushTag.mockRejectedValue(new ApiError(403, "cannot flush another tenant's cache entries", {}));
+		api.flushTag.mockRejectedValue(new ApiError(403, "cannot flush another tenant's cache entries", { error: "cannot flush another tenant's cache entries", code: 'forbidden' }));
 		const out = (await actions.flush(formEvent({ tag: 'tenant:other' }))) as { status: number; data: { error: string } };
 		expect(out.status).toBe(400);
 		expect(out.data.error).toBe("cannot flush another tenant's cache entries");
@@ -298,7 +298,7 @@ describe('cache rule update', () => {
 	});
 
 	it("relays the plugin's refusal into the rule drawer", async () => {
-		api.updateRule.mockRejectedValue(new ApiError(422, 'pattern overlaps another rule', {}));
+		api.updateRule.mockRejectedValue(new ApiError(422, 'pattern overlaps another rule', { error: 'pattern overlaps another rule', code: 'http_422' }));
 		const out = (await actions.updateRule(formEvent(fields))) as { status: number; data: Record<string, unknown> };
 		expect(out.status).toBe(400);
 		expect(out.data.error).toBe('pattern overlaps another rule');

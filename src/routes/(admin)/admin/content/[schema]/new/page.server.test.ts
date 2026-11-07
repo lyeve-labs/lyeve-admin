@@ -167,7 +167,9 @@ describe('creating a content entry', () => {
 	});
 
 	it('relays the reason a create was refused', async () => {
-		client.post.mockRejectedValueOnce(new FakeApiError('slug already in use', 409));
+		client.post.mockRejectedValueOnce(
+			Object.assign(new FakeApiError('slug already in use', 409), { body: { error: 'slug already in use', code: 'conflict' } }),
+		);
 		const { result } = await create({ title: 'Contact' });
 		expect(JSON.stringify(result)).toContain('slug already in use');
 	});

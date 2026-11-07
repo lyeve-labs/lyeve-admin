@@ -184,7 +184,7 @@ describe('deleting a destination', () => {
 	});
 
 	it('relays the reason the plugin refused with', async () => {
-		engine.delete.mockRejectedValue(new ApiError(404, 'provider not found'));
+		engine.delete.mockRejectedValue(new ApiError(404, 'provider not found', { error: 'provider not found', code: 'not_found' }));
 		expect(await actions.delete(actionEvent({ id: 'p1' }))).toMatchObject({ status: 400, data: { error: 'provider not found' } });
 	});
 

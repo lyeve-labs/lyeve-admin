@@ -340,7 +340,7 @@ describe('editing a probe', () => {
 	});
 
 	it("relays the plugin's refusal into the drawer", async () => {
-		engine.put.mockRejectedValue(new ApiError(400, 'probe target is not allowed', {}));
+		engine.put.mockRejectedValue(new ApiError(400, 'probe target is not allowed', { error: 'probe target is not allowed', code: 'bad_request' }));
 		const out = (await actions.update(requestEvent(fields()))) as Failure;
 		expect(out.data).toMatchObject({ error: 'probe target is not allowed', drawer: 'probe' });
 	});
@@ -366,7 +366,7 @@ describe('deleting a probe', () => {
 	});
 
 	it("relays the plugin's refusal", async () => {
-		engine.delete.mockRejectedValue(new ApiError(404, 'probe not found', {}));
+		engine.delete.mockRejectedValue(new ApiError(404, 'probe not found', { error: 'probe not found', code: 'not_found' }));
 		const out = (await actions.delete(actionEvent({ id: 'p1' }))) as Failure;
 		expect(out.data.error).toBe('probe not found');
 	});
@@ -391,7 +391,7 @@ describe('acknowledging an alert', () => {
 	});
 
 	it("relays the plugin's refusal", async () => {
-		engine.post.mockRejectedValue(new ApiError(404, 'alert not found', {}));
+		engine.post.mockRejectedValue(new ApiError(404, 'alert not found', { error: 'alert not found', code: 'not_found' }));
 		const out = (await actions.acknowledge(actionEvent({ id: 'a1' }))) as Failure;
 		expect(out.data.error).toBe('alert not found');
 	});

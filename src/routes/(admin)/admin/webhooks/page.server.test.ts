@@ -283,7 +283,7 @@ describe('rotating a webhook signing secret', () => {
 	});
 
 	it('names its action on a refusal and keeps driver text out of an outage', async () => {
-		const refused = postEvent({ id: 'w1' }, () => json({ error: 'failed to rotate webhook secret' }, 404), ['super_admin']);
+		const refused = postEvent({ id: 'w1' }, () => json({ error: 'failed to rotate webhook secret', code: 'not_found' }, 404), ['super_admin']);
 		expect(await actions['rotate-secret'](refused.event)).toEqual({
 			status: 400,
 			data: { action: 'rotate-secret', error: 'failed to rotate webhook secret' },
@@ -327,7 +327,7 @@ describe('the delivery and dead-letter actions each report their own outcome', (
 	});
 
 	it.each(names)('%s names its action on a refusal', async (name) => {
-		const { event } = postEvent(cases[name].fields, () => json({ error: 'dead letter entry is not pending' }, 409));
+		const { event } = postEvent(cases[name].fields, () => json({ error: 'dead letter entry is not pending', code: 'conflict' }, 409));
 		expect(await actions[name](event)).toMatchObject({ status: 400, data: { action: name, error: 'dead letter entry is not pending' } });
 	});
 

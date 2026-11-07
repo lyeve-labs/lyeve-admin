@@ -216,7 +216,7 @@ describe('admin/webhooks/incoming writes', () => {
 	});
 
 	it.each(['create', 'update', 'delete'] as const)('relays the engine refusal on %s under its action', async (name) => {
-		const { event } = superAdminWrite({ ...ENDPOINT, id: 'i1' }, json({ error: 'schema orders does not exist' }, 422));
+		const { event } = superAdminWrite({ ...ENDPOINT, id: 'i1' }, json({ error: 'schema orders does not exist', code: 'http_422' }, 422));
 		const out = (await actions[name](event)) as Failure;
 		expect(out.data).toEqual({ action: name, error: 'schema orders does not exist' });
 	});

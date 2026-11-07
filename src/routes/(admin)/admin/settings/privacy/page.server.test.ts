@@ -206,7 +206,7 @@ describe('privacy settings: export sections save', () => {
 	});
 
 	it("relays the engine's refusal of a section it does not know", async () => {
-		engine.put.mockRejectedValue(new ApiError(400, 'an excluded section is not known'));
+		engine.put.mockRejectedValue(new ApiError(400, 'an excluded section is not known', { error: 'an excluded section is not known', code: 'bad_request' }));
 		const result = (await actions.sections(formWith([['available', 'engine']]))) as { data: { action: string; error: string } };
 		expect(result.data).toMatchObject({ action: 'sections', error: 'an excluded section is not known' });
 	});

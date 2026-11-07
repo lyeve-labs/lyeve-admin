@@ -188,7 +188,7 @@ describe('saving the default weights', () => {
 	});
 
 	it('relays the reason the plugin refused', async () => {
-		const { event } = actionEvent(weights, { 'PUT /api/admin/search/ranking': () => json({ error: 'schema_name is required' }, 400) });
+		const { event } = actionEvent(weights, { 'PUT /api/admin/search/ranking': () => json({ error: 'schema_name is required', code: 'bad_request' }, 400) });
 
 		expect(((await actions.ranking(event)) as Failure).data.rankingError).toBe('schema_name is required');
 	});
@@ -213,7 +213,7 @@ describe('the public schemas', () => {
 
 	it('relays the reason the plugin refused', async () => {
 		const { event } = actionEvent({ schemas: 'nope' }, {
-			'PUT /api/admin/search/public-schemas': () => json({ error: 'unknown schema nope' }, 400),
+			'PUT /api/admin/search/public-schemas': () => json({ error: 'unknown schema nope', code: 'bad_request' }, 400),
 		});
 
 		expect(((await actions.publicSchemas(event)) as Failure).data.publicError).toBe('unknown schema nope');
@@ -238,7 +238,7 @@ describe('the synonym groups', () => {
 
 	it('relays the reason the plugin refused a group', async () => {
 		const { event } = actionEvent({ base_term: 'tv', synonyms: 'telly' }, {
-			'POST /api/admin/search/synonyms': () => json({ error: 'synonym group already exists' }, 409),
+			'POST /api/admin/search/synonyms': () => json({ error: 'synonym group already exists', code: 'conflict' }, 409),
 		});
 
 		expect(((await actions.createSynonym(event)) as Failure).data.synonymError).toBe('synonym group already exists');
@@ -262,7 +262,7 @@ describe('the synonym groups', () => {
 	// The New synonym drawer shows create failures. A delete failure under the
 	// same key opened the next drawer with it, as if the create had failed.
 	it('returns a failed delete under its own key', async () => {
-		const { event } = actionEvent({ id: 's1' }, { 'DELETE /api/admin/search/synonyms': () => json({ error: 'not found' }, 404) });
+		const { event } = actionEvent({ id: 's1' }, { 'DELETE /api/admin/search/synonyms': () => json({ error: 'not found', code: 'not_found' }, 404) });
 
 		const out = (await actions.deleteSynonym(event)) as Failure;
 		expect(out.data).toEqual({ synonymDeleteError: 'not found' });
@@ -285,7 +285,7 @@ describe('rebuilding the index', () => {
 
 	it('relays the reason the plugin refused', async () => {
 		authz.roles = ['super_admin'];
-		const { event } = actionEvent({}, { 'POST /api/admin/search/reindex': () => json({ error: 'a reindex is already running' }, 409) });
+		const { event } = actionEvent({}, { 'POST /api/admin/search/reindex': () => json({ error: 'a reindex is already running', code: 'conflict' }, 409) });
 
 		expect(((await actions.reindex(event)) as Failure).data.reindexError).toBe('a reindex is already running');
 	});
