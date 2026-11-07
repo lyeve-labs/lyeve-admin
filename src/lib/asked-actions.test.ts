@@ -68,7 +68,7 @@ type Asking = { kit: RegExp | null };
 const NO_KIT: Asking = { kit: null };
 
 function askingOf(src: string): Asking {
-	for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@lyeve-labs\/ui-kit'/g)) {
+	for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]@lyeve-labs\/ui-kit['"]/g)) {
 		const named = /(?:^|,)\s*confirm(?:\s+as\s+(\w+))?\s*(?:,|$)/.exec(m[1]);
 		if (named) return { kit: new RegExp(`(?<![\\w.$])${named[1] ?? 'confirm'}\\(`) };
 	}
@@ -80,20 +80,22 @@ function calls(text: string, how: Asking, kitCounts: boolean): boolean {
 	return text.includes('confirmed(') || (kitCounts && how.kit !== null && how.kit.test(text));
 }
 
-/** The names at the top of a component's script whose function body or const value asks. */
-function askingNames(src: string, how: Asking): Set<string> {
-	const names = new Set<string>();
-	for (const m of src.matchAll(/^\tfunction\s+(\w+)\s*\(/gm)) {
+/** The names in a component's script whose function body or const value asks, each with that text. */
+function askingNames(src: string, how: Asking): Map<string, string> {
+	const names = new Map<string, string>();
+	for (const m of src.matchAll(/^\t(?:async\s+)?function\s+(\w+)\s*\(/gm)) {
 		const params = closeOf(src, m.index + m[0].length - 1);
 		const body = src.indexOf('{', params);
 		const submits = /^\s*:\s*SubmitFunction\b/.test(src.slice(params, body));
-		if (calls(src.slice(body, closeOf(src, body)), how, submits)) names.add(m[1]);
+		const text = src.slice(body, closeOf(src, body));
+		if (calls(text, how, submits)) names.set(m[1], text);
 	}
-	for (const m of src.matchAll(/^\tconst\s+(\w+)\s*(?::\s*([\w<>[\]]+)\s*)?=/gm)) {
-		// A const's value runs to the semicolon that ends its statement.
+	for (const m of src.matchAll(/^\t(?:const|let)\s+(\w+)\s*(?::\s*([\w<>[\]]+)\s*)?=/gm)) {
+		// A value runs to the semicolon that ends its statement.
 		let i = m.index + m[0].length;
 		while (i < src.length && src[i] !== ';') i = '([{`\'"'.includes(src[i]) ? closeOf(src, i) : i + 1;
-		if (calls(src.slice(m.index, i), how, m[2] === 'SubmitFunction')) names.add(m[1]);
+		const text = src.slice(m.index, i);
+		if (calls(text, how, m[2] === 'SubmitFunction')) names.set(m[1], text);
 	}
 	return names;
 }
@@ -130,7 +132,7 @@ function formsOf(file: string, src: string): Form[] {
 }
 
 /** Whether a form's handler asks. */
-function asks(form: Form, names: Set<string>, how: Asking): boolean {
+function asks(form: Form, names: Map<string, string>, how: Asking): boolean {
 	if (calls(form.enhance, how, true)) return true;
 	const head = /^\s*(\w+)/.exec(form.enhance);
 	return head !== null && names.has(head[1]);
@@ -178,11 +180,18 @@ function wrapped(server: string, name: string): boolean {
 	return at.test(readFileSync(server, 'utf8'));
 }
 
-type Finding = { asking: Form[]; direct: Form[]; unwrapped: string[]; unmapped: string[]; unused: string[] };
+type Finding = {
+	asking: Form[];
+	direct: Form[];
+	unset: string[];
+	unwrapped: string[];
+	unmapped: string[];
+	unused: string[];
+};
 
 function survey(): Finding {
 	const by = importers();
-	const out: Finding = { asking: [], direct: [], unwrapped: [], unmapped: [], unused: [] };
+	const out: Finding = { asking: [], direct: [], unset: [], unwrapped: [], unmapped: [], unused: [] };
 	for (const file of components) {
 		const src = readFileSync(file, 'utf8');
 		const how = askingOf(src);
@@ -191,12 +200,19 @@ function survey(): Finding {
 		const plain = askingNames(src, NO_KIT);
 		const forms = formsOf(file, src).filter((f) => asks(f, names, how));
 		// Every asking name reaches a form, or the reading above missed one.
-		for (const name of names) {
+		for (const name of names.keys()) {
 			if (!forms.some((f) => new RegExp(`^\\s*${name}\\b`).test(f.enhance))) out.unused.push(`${file}: ${name}`);
 		}
 		for (const form of forms) {
 			out.asking.push(form);
-			if (!asks(form, plain, NO_KIT)) out.direct.push(form);
+			if (!asks(form, plain, NO_KIT)) {
+				out.direct.push(form);
+				// confirmed() sets the field itself. A handler that asks through the
+				// kit has to set it by hand, or a yes posts what the action refuses.
+				const head = /^\s*(\w+)/.exec(form.enhance);
+				const handler = (head && names.get(head[1])) ?? form.enhance;
+				if (!handler.includes('CONFIRM_FIELD')) out.unset.push(`${file}: ${form.action ?? 'a computed action'}`);
+			}
 			const pages = pagesOf(file, by);
 			if (form.action === null || pages.length === 0) {
 				out.unmapped.push(`${file}: ${form.action ?? 'a computed action'}`);
@@ -221,6 +237,10 @@ describe('writes that ask first', () => {
 
 	it('finds the forms that ask through the kit directly', () => {
 		expect(found.direct.length).toBeGreaterThanOrEqual(14);
+	});
+
+	it('sets the confirmation in every handler that asks through the kit directly', () => {
+		expect(found.unset).toEqual([]);
 	});
 
 	it('maps every asking form to a static action', () => {
