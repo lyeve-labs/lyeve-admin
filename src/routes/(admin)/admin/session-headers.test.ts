@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { UNNAMED } from '$lib/plugins';
 
@@ -15,6 +15,7 @@ const PAGES = [
 	'analytics',
 	'api-keys',
 	'api-labs',
+	'api-labs/grpc',
 	'api-reference',
 	'audit-log',
 	'content',
@@ -25,20 +26,41 @@ const PAGES = [
 	'flows/[id]',
 	'flows/datasources',
 	'flows/variables',
+	'imports/templates',
 	'jobs',
 	'logs',
 	'media',
 	'observability',
+	'observability/cache/rules',
+	'observability/cache/stored',
+	'observability/captures/rules',
+	'observability/captures/sets',
+	'observability/goroutines',
 	'observability/profiler',
+	'observability/profiler/capture',
+	'observability/profiler/memory',
 	'observability/telemetry',
+	'observability/telemetry/export',
 	'plugins',
 	'plugins/[name]',
+	'reviews/definitions',
 	'schema',
 	'search',
+	'search/settings',
+	'search/synonyms',
 	'settings/connected-editors',
+	'settings/connected-editors/builder',
+	'settings/customization/menu',
+	'settings/customization/pages',
+	'settings/graphql/persisted',
 	'settings/oauth',
 	'settings/permissions',
+	'settings/pii/reads',
+	'settings/rate-limits/live',
+	'settings/rate-limits/tenant/refusals',
 	'tenants',
+	'tenants/costs/budgets',
+	'tenants/costs/prices',
 	'users',
 	'webhooks',
 	'webhooks/incoming',
@@ -76,6 +98,10 @@ async function engineCalls(page: string) {
 }
 
 describe('page loads read as the session', () => {
+	// The menu tab's load builds its choices from the nav, whose icon imports
+	// take longer than one case's budget to load on a cold worker.
+	beforeAll(() => import('$lib/nav'), 60_000);
+
 	it.each(PAGES)('%s sends the session headers on every read', async (page) => {
 		const calls = await engineCalls(page);
 		expect(calls.length).toBeGreaterThan(0);
