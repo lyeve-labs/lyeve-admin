@@ -17,7 +17,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import { formatBytes, formatCount } from '$lib/format';
 import { shortId } from '$lib/utils/entry-identity';
@@ -79,15 +78,6 @@ export interface TenantUsage {
 	bandwidth_bytes: number;
 	content_count: number;
 	media_count: number;
-}
-
-export type UsageGate = Gate;
-
-export const USAGE_OK: UsageGate = GATE_OK;
-
-/** What a refused usage read means, read the way every plugin's is. */
-export function usageGate(err: unknown): UsageGate {
-	return gateOf(err, 'Could not load usage.');
 }
 
 export async function listQuotas(

@@ -5,17 +5,14 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	IDEMPOTENCY_OK,
-	idempotencyGate,
 	listKeys,
 	readStats,
 	releaseKey,
-	type IdempotencyGate,
 	type IdempotencyKey,
 	type IdempotencyStats,
 } from '$lib/api/idempotency';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { gateOf, type Gate } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -29,7 +26,7 @@ export const load: PageServerLoad = async (event) => {
 	let total: number | null = null;
 	let hasMore = false;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: IdempotencyGate = notRunning(plugins, PLUGIN.idempotency) ? { state: 'absent' } : IDEMPOTENCY_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.idempotency) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			const page = pageOf(await listKeys(client, limit + 1, offset), limit, offset);
@@ -40,7 +37,7 @@ export const load: PageServerLoad = async (event) => {
 			if (back !== null) redirect(307, withOffset(event.url, back));
 		} catch (err) {
 			if (isRedirect(err)) throw err;
-			gate = idempotencyGate(err);
+			gate = gateOf(err, 'Could not load idempotency keys.');
 		}
 	}
 

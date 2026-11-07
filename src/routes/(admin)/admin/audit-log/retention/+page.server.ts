@@ -5,7 +5,6 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	RETENTION_OK,
 	archiveFailures,
 	createHold,
 	createPolicy,
@@ -15,13 +14,11 @@ import {
 	listHolds,
 	listPolicies,
 	releaseHold,
-	retentionGate,
 	type LegalHold,
-	type RetentionGate,
 	type RetentionPolicy,
 } from '$lib/api/retention';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { rowsOf } from '$lib/api/list';
-import { section, type Section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -29,12 +26,12 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	let policies: RetentionPolicy[] = [];
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: RetentionGate = notRunning(plugins, PLUGIN.audit) ? { state: 'absent' } : RETENTION_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.audit) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			policies = rowsOf(await listPolicies(client));
 		} catch (err) {
-			gate = retentionGate(err);
+			gate = gateOf(err, 'Could not load the retention rules.');
 		}
 	}
 

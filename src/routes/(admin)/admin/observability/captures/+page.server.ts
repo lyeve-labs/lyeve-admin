@@ -7,13 +7,11 @@ import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	CAPTURE_OK,
 	CONFIRM_WRITES,
 	MAX_RETENTION_SECONDS,
 	MAX_SET_CAPTURES,
 	MIN_RETENTION_SECONDS,
 	RULE_METHODS,
-	captureGate,
 	capturePatternIsSound,
 	createCaptureRule,
 	createReplaySet,
@@ -25,13 +23,12 @@ import {
 	replaySet,
 	updateCaptureRule,
 	type Capture,
-	type CaptureGate,
 	type CaptureRule,
 	type ReplaySet,
 	type RuleMethod,
 } from '$lib/api/request-capture';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { gateOf, type Gate } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -63,11 +60,11 @@ export const load: PageServerLoad = async (event) => {
 
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.requestCapture)) {
-		return { ...empty, gate: { state: 'absent' } as CaptureGate };
+		return { ...empty, gate: { state: 'absent' } as Gate };
 	}
 
 	const client = authedClient(event);
-	let gate: CaptureGate = CAPTURE_OK;
+	let gate: Gate = GATE_OK;
 	let licensed: boolean | null = null;
 	let page = { rows: [] as Capture[], total: null as number | null, hasMore: false };
 	try {
@@ -76,7 +73,7 @@ export const load: PageServerLoad = async (event) => {
 		page = { rows: p.rows, total: p.total, hasMore: p.hasMore };
 		if (typeof read?.licensed === 'boolean') licensed = read.licensed;
 	} catch (err) {
-		gate = captureGate(err);
+		gate = gateOf(err, 'Could not load captures.');
 	}
 	if (gate.state !== 'ok') return { ...empty, gate };
 	const back = pastEndOffset(page.rows.length, limit, offset, page.total);

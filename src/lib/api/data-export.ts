@@ -11,7 +11,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import { formatCount } from '$lib/format';
 
 export const JOBS_URL = '/api/admin/data-export/jobs';
@@ -128,15 +127,6 @@ interface SchedulePage {
 export interface Page<T> {
 	data: T[];
 	total_count: number;
-}
-
-export type ExportGate = Gate;
-
-export const EXPORT_OK: ExportGate = GATE_OK;
-
-/** What a refused export read means, read the way every plugin's is. */
-export function exportGate(err: unknown): ExportGate {
-	return gateOf(err, 'Could not load exports.');
 }
 
 export async function listJobs(

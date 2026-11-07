@@ -7,22 +7,19 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	EXPORT_OK,
 	cancelJob,
 	createSchedule,
 	deleteSchedule,
-	exportGate,
 	listJobs,
 	listSchedules,
 	setScheduleEnabled,
 	startExport,
-	type ExportGate,
 	type ExportJob,
 	type ExportSchedule,
 } from '$lib/api/data-export';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { exportConfigFrom } from '$lib/data-export-form';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { section, type Section } from '$lib/api/gate';
 
 /** The plugin's own 503 when every export slot is taken. */
 const EXPORTS_BUSY = 'too many concurrent exports running, try again later';
@@ -52,7 +49,7 @@ export const load: PageServerLoad = async (event) => {
 
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.dataExport)) {
-		const gate: ExportGate = { state: 'absent' };
+		const gate: Gate = { state: 'absent' };
 		const schedules: Section<ExportSchedule[]> = { ok: false, gate };
 		const schemas: Section<string[]> = { ok: false, gate };
 		return { jobs: [] as ExportJob[], schedules, schemas, total: 0, limit, offset, gate };
@@ -61,7 +58,7 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	let jobs: ExportJob[] = [];
 	let total = 0;
-	let gate: ExportGate = EXPORT_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		const page = await listJobs(client, limit, offset);
 		jobs = page.data;
@@ -70,7 +67,7 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
 		if (isRedirect(err)) throw err;
-		gate = exportGate(err);
+		gate = gateOf(err, 'Could not load exports.');
 	}
 
 	// Schedules and the schema list are panels beside the jobs. Losing them

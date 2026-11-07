@@ -5,20 +5,17 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	RESIDENCY_OK,
 	createRegion,
 	deleteRegion,
 	listRegions,
 	readReport,
-	residencyGate,
 	slugIsSound,
 	updateRegion,
 	type Region,
-	type ResidencyGate,
 	type ResidencyReport,
 } from '$lib/api/residency';
+import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
 import { rowsOf } from '$lib/api/list';
-import { GATE_OK, section, type Gate } from '$lib/api/gate';
 
 /** The most regions the page lists. An instance runs in a handful. */
 const REGION_CAP = 100;
@@ -37,14 +34,14 @@ export const load: PageServerLoad = async (event) => {
 			more: false,
 			report: null as ResidencyReport | null,
 			reportGate: GATE_OK as Gate,
-			gate: (absent ? { state: 'absent' } : RESIDENCY_OK) as ResidencyGate,
+			gate: (absent ? { state: 'absent' } : GATE_OK) as Gate,
 			permitted,
 		};
 	}
 
 	const client = authedClient(event);
 	let regions: Region[] = [];
-	let gate: ResidencyGate = RESIDENCY_OK;
+	let gate: Gate = GATE_OK;
 	// One row past the cap says whether the list was cut.
 	let more = false;
 	try {
@@ -52,7 +49,7 @@ export const load: PageServerLoad = async (event) => {
 		more = rows.length > REGION_CAP;
 		regions = rows.slice(0, REGION_CAP);
 	} catch (err) {
-		gate = residencyGate(err);
+		gate = gateOf(err, 'Could not load the residency report.');
 	}
 
 	// The report is the evidence half of this page. An unread report is never

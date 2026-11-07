@@ -5,16 +5,13 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	EVENTS_OK,
-	eventsGate,
 	listEvents,
 	listReplays,
 	startReplay,
 	type EventRow,
-	type EventsGate,
 	type ReplayRun,
 } from '$lib/api/events';
-import { section, type Section } from '$lib/api/gate';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { instantFromWallClock } from '$lib/utils/wall-clock';
 
@@ -44,14 +41,14 @@ export const load: PageServerLoad = async (event) => {
 			total: 0,
 			limit,
 			offset,
-			gate: { state: 'absent' } as EventsGate,
+			gate: { state: 'absent' } as Gate,
 		};
 	}
 
 	const client = authedClient(event);
 	let events: EventRow[] = [];
 	let total = 0;
-	let gate: EventsGate = EVENTS_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		const page = await listEvents(client, limit, offset);
 		events = page.data ?? [];
@@ -60,7 +57,7 @@ export const load: PageServerLoad = async (event) => {
 		total = Math.max(page.total_count ?? 0, offset + events.length);
 	} catch (err) {
 		if (isRedirect(err)) throw err;
-		gate = eventsGate(err);
+		gate = gateOf(err, 'Could not load the event log.');
 	}
 
 	// The run list is a panel beside the log. Losing it should not lose the

@@ -6,18 +6,16 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
 	MIN_TOKEN_LENGTH,
-	SCIM_OK,
 	createProvider,
 	deleteProvider,
 	deprovisionAction,
 	listProviders,
 	rotateToken,
-	scimGate,
-	type ScimGate,
 	type ScimProvider,
 } from '$lib/api/scim';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { listProviders as listSamlProviders, samlGate } from '$lib/api/saml';
+import { listProviders as listSamlProviders } from '$lib/api/saml';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -40,7 +38,7 @@ async function samlLink(event: Parameters<PageServerLoad>[0], plugins: Parameter
 		const page = await listSamlProviders(authedClient(event), MAX_LIMIT, 0);
 		return { state: 'ok', providers: (page.data ?? []).map((p) => ({ id: p.id, name: p.name })) };
 	} catch (err) {
-		return SAML_OFF_STATES.has(samlGate(err).state) ? { state: 'off' } : { state: 'failed' };
+		return SAML_OFF_STATES.has(gateOf(err, 'Could not load identity providers.').state) ? { state: 'off' } : { state: 'failed' };
 	}
 }
 
@@ -56,7 +54,7 @@ export const load: PageServerLoad = async (event) => {
 			limit,
 			offset,
 			hasMore: false,
-			gate: { state: 'absent' } as ScimGate,
+			gate: { state: 'absent' } as Gate,
 			saml: { state: 'off' } as SamlLink,
 		};
 	}
@@ -65,14 +63,14 @@ export const load: PageServerLoad = async (event) => {
 	let providers: ScimProvider[] = [];
 	let total: number | null = null;
 	let hasMore = false;
-	let gate: ScimGate = SCIM_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		const page = pageOf(await listProviders(client, limit + 1, offset), limit, offset);
 		providers = page.rows;
 		total = page.total;
 		hasMore = page.hasMore;
 	} catch (err) {
-		gate = scimGate(err);
+		gate = gateOf(err, 'Could not load SCIM connections.');
 	}
 	if (gate.state === 'ok') {
 		const back = pastEndOffset(providers.length, limit, offset, total);

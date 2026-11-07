@@ -11,7 +11,6 @@
  * tenant's, which the plugin decides, not this page.
  */
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 
 export const RULES_URL = '/api/admin/pii/rules';
 export const ACCESS_LOG_URL = '/api/admin/pii/access-log';
@@ -77,15 +76,6 @@ export interface AccessEntry {
 interface Page<T> {
 	data?: T[] | null;
 	total_count?: number;
-}
-
-export type PiiGate = Gate;
-
-export const PII_OK: PiiGate = GATE_OK;
-
-/** What a refused masking read means, read the way every plugin's is. */
-export function piiGate(err: unknown): PiiGate {
-	return gateOf(err, 'Could not load the masking settings.');
 }
 
 export async function getRules(client: HttpClient): Promise<RuleCatalog> {

@@ -7,12 +7,10 @@ import { refusalOf, refusalText } from '$lib/api/refusal';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	IMPORT_OK,
 	cancelJob,
 	createTemplate,
 	deleteTemplate,
 	getJob,
-	importGate,
 	listJobs,
 	listRows,
 	listTemplates,
@@ -21,13 +19,12 @@ import {
 	type FieldMapping,
 	type MappingTemplate,
 	type SaveMappingTemplate,
-	type ImportGate,
 	type ImportJob,
 	type ImportRow,
 	type ImportSchema,
 } from '$lib/api/bulk-import';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { section, type Gate, type Section } from '$lib/api/gate';
 
 /** The job the history's Rows button opened, with the rows it rejected and skipped. */
 export interface ImportDetail {
@@ -54,7 +51,7 @@ export const load: PageServerLoad = async (event) => {
 	let total: number | null = null;
 	let hasMore = false;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: ImportGate = notRunning(plugins, PLUGIN.bulkImport) ? { state: 'absent' } : IMPORT_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.bulkImport) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			const page = pageOf(await listJobs(client, limit + 1, offset), limit, offset);
@@ -65,7 +62,7 @@ export const load: PageServerLoad = async (event) => {
 			hasMore = page.hasMore;
 		} catch (err) {
 			if (isRedirect(err)) throw err;
-			gate = importGate(err);
+			gate = gateOf(err, 'Could not load imports.');
 		}
 	}
 

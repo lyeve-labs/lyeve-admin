@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '@lyeve-labs/client';
 import {
-	abGate,
 	hasWinner,
 	isFinished,
 	movesFrom,
@@ -198,19 +196,5 @@ describe('the numbers as printed', () => {
 		expect(pValue(0.0000001)).toBe('p < 0.001');
 		expect(pValue(0.042)).toBe('p = 0.042');
 		expect(pValue(null)).toBe('Not calculated');
-	});
-});
-
-describe('the gate sorts a refusal by what it means', () => {
-	it('tells a 402, a 404 and any other failure apart', () => {
-		expect(abGate(new ApiError(402, 'payment required')).state).toBe('locked');
-		expect(abGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(abGate(new ApiError(500, 'internal error')).state).toBe('error');
-		expect(abGate(new ApiError(503, 'database error')).state).toBe('unavailable');
-	});
-
-	it('never reports a failed read as an empty list', () => {
-		const gate = abGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toBe('Could not load experiments.');
 	});
 });

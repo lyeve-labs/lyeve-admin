@@ -13,7 +13,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 
 export const EVENTS_URL = '/api/admin/events';
 export const REPLAY_URL = '/api/admin/events/replay';
@@ -53,15 +52,6 @@ export interface ReplayRun {
 interface Page<T> {
 	data?: T[] | null;
 	total_count?: number;
-}
-
-export type EventsGate = Gate;
-
-export const EVENTS_OK: EventsGate = GATE_OK;
-
-/** What a refused event log read means, read the way every plugin's is. */
-export function eventsGate(err: unknown): EventsGate {
-	return gateOf(err, 'Could not load the event log.');
 }
 
 export async function listEvents(

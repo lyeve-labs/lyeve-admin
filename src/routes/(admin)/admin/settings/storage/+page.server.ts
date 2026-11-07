@@ -5,19 +5,17 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	STORAGE_OK,
 	createProvider,
 	deleteProvider,
 	providerBodyFrom,
 	updateProvider,
 	listProviders,
-	storageGate,
 	testMessage,
 	testPassed,
 	testProvider,
-	type StorageGate,
 	type StorageProvider,
 } from '$lib/api/storage';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { rowsOf } from '$lib/api/list';
 
 export const load: PageServerLoad = async (event) => {
@@ -29,12 +27,12 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	let providers: StorageProvider[] = [];
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: StorageGate = notRunning(plugins, PLUGIN.storage) ? { state: 'absent' } : STORAGE_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.storage) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			providers = rowsOf(await listProviders(client));
 		} catch (err) {
-			gate = storageGate(err);
+			gate = gateOf(err, 'Could not load storage providers.');
 		}
 	}
 

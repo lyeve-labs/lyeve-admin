@@ -5,17 +5,15 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	AB_OK,
-	abGate,
 	createExperiment,
 	deleteExperiment,
 	listExperiments,
 	transition,
 	updateExperiment,
-	type AbGate,
 	type Experiment,
 	type Transition,
 } from '$lib/api/ab-testing';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
@@ -51,7 +49,7 @@ export const load: PageServerLoad = async (event) => {
 			limit,
 			offset,
 			hasMore: false,
-			gate: { state: 'absent' } as AbGate,
+			gate: { state: 'absent' } as Gate,
 		};
 	}
 
@@ -59,7 +57,7 @@ export const load: PageServerLoad = async (event) => {
 	let experiments: Experiment[] = [];
 	let total: number | null = null;
 	let hasMore = false;
-	let gate: AbGate = AB_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		const page = pageOf(await listExperiments(client, limit + 1, offset), limit, offset);
 		const back = pastEndOffset(page.rows.length, limit, offset, page.total);
@@ -69,7 +67,7 @@ export const load: PageServerLoad = async (event) => {
 		hasMore = page.hasMore;
 	} catch (err) {
 		if (isRedirect(err)) throw err;
-		gate = abGate(err);
+		gate = gateOf(err, 'Could not load experiments.');
 	}
 
 	return { experiments, total, limit, offset, hasMore, gate };

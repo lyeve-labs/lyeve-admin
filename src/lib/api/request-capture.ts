@@ -14,7 +14,6 @@
  * that exists is not gated by it.
  */
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const CAPTURES_URL = '/api/admin/request-captures';
@@ -113,13 +112,6 @@ export const RETENTION_CHOICES: readonly { seconds: number; label: string }[] = 
 	{ seconds: 14 * 86400, label: '14 days' },
 	{ seconds: 30 * 86400, label: '30 days' },
 ];
-
-export type CaptureGate = Gate;
-export const CAPTURE_OK: CaptureGate = GATE_OK;
-
-export function captureGate(err: unknown): CaptureGate {
-	return gateOf(err, 'Could not load captures.');
-}
 
 export async function listCaptures(client: HttpClient, limit: number, offset: number): Promise<CapturesRead> {
 	return client.get<CapturesRead>(`${CAPTURES_URL}?limit=${limit}&offset=${offset}`);

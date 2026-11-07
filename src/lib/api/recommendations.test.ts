@@ -4,7 +4,6 @@ import {
 	hasUsers,
 	isAlreadyRunning,
 	percent,
-	recommendationsGate,
 	score,
 	sourceLabel,
 	sourceTone,
@@ -100,19 +99,5 @@ describe('the numbers as printed', () => {
 		expect(score(0.123456789)).toBe('0.123');
 		expect(score(12)).toBe('12.000');
 		expect(score(undefined)).toBe('-');
-	});
-});
-
-describe('the gate sorts a refusal by what it means', () => {
-	it('tells a 402, a 404 and any other failure apart', () => {
-		expect(recommendationsGate(new ApiError(402, 'payment required')).state).toBe('locked');
-		expect(recommendationsGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(recommendationsGate(new ApiError(500, 'internal error')).state).toBe('error');
-		expect(recommendationsGate(new ApiError(503, 'database error')).state).toBe('unavailable');
-	});
-
-	it('never reports a failed read as nobody being recommended to', () => {
-		const gate = recommendationsGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toBe('Could not load the recommendation split.');
 	});
 });

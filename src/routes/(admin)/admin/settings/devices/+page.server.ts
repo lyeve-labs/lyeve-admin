@@ -5,14 +5,12 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	DEVICES_OK,
-	deviceGate,
 	listDevices,
 	trustThisDevice,
 	untrustDevice,
 	type Device,
-	type DeviceGate,
 } from '$lib/api/devices';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
@@ -36,7 +34,7 @@ export const load: PageServerLoad = async (event) => {
 			offset,
 			hasMore: false,
 			userAgent,
-			gate: { state: 'absent' } as DeviceGate,
+			gate: { state: 'absent' } as Gate,
 		};
 	}
 
@@ -44,14 +42,14 @@ export const load: PageServerLoad = async (event) => {
 	let devices: Device[] = [];
 	let total: number | null = null;
 	let hasMore = false;
-	let gate: DeviceGate = DEVICES_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		const page = pageOf(await listDevices(client, limit + 1, offset), limit, offset);
 		devices = page.rows;
 		total = page.total;
 		hasMore = page.hasMore;
 	} catch (err) {
-		gate = deviceGate(err);
+		gate = gateOf(err, 'Could not load your devices.');
 	}
 	if (gate.state === 'ok') {
 		const back = pastEndOffset(devices.length, limit, offset, total);

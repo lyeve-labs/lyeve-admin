@@ -14,7 +14,6 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { toChannels, type AlertChannels } from './alert-channels';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import { rowsOf, type ListEnvelope } from './list';
 
 export const PROBES_URL = '/api/admin/synthetic-monitoring/probes';
@@ -137,15 +136,6 @@ export interface ProbeAlert {
 	acknowledged: boolean;
 	acknowledged_at?: string | null;
 	created_at: string;
-}
-
-export type SyntheticGate = Gate;
-
-export const SYNTHETIC_OK: SyntheticGate = GATE_OK;
-
-/** What a refused probe read means, read the way every plugin's is. */
-export function syntheticGate(err: unknown): SyntheticGate {
-	return gateOf(err, 'Could not load probes.');
 }
 
 export async function listProbes(

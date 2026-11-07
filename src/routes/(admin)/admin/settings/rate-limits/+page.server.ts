@@ -6,12 +6,10 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	RATE_LIMIT_OK,
 	createRule,
 	deleteRule,
 	endpointIsSound,
 	listRules,
-	rateLimitGate,
 	readOverview,
 	readStatus,
 	resetProtection,
@@ -20,12 +18,11 @@ import {
 	updateGlobal,
 	updateRule,
 	type LimiterState,
-	type RateLimitGate,
 	type RateLimitOverview,
 	type RateRule,
 } from '$lib/api/rate-limit';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { section, type Section } from '$lib/api/gate';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -48,7 +45,7 @@ export const load: PageServerLoad = async (event) => {
 	let total: number | null = null;
 	let hasMore = false;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: RateLimitGate = notRunning(plugins, PLUGIN.rateLimit) ? { state: 'absent' } : RATE_LIMIT_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.rateLimit) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			// The global limit and the protections have sections of their own, so
@@ -58,7 +55,7 @@ export const load: PageServerLoad = async (event) => {
 			total = page.total;
 			hasMore = page.hasMore;
 		} catch (err) {
-			gate = rateLimitGate(err);
+			gate = gateOf(err, 'Could not load the rate limit rules.');
 		}
 	}
 	// An offset past the last rule draws the empty state, which would say no

@@ -6,7 +6,6 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
 	SECRET_MASK,
-	SYNTHETIC_OK,
 	acknowledgeAlert,
 	createProbe,
 	deleteProbe,
@@ -22,17 +21,15 @@ import {
 	runOutcome,
 	runOutlastedTheWait,
 	runProbeNow,
-	syntheticGate,
 	updateProbe,
 	type Probe,
 	type ProbeAlert,
 	type ProbeChannels,
 	type ProbeConfig,
 	type ProbeLimits,
-	type SyntheticGate,
 } from '$lib/api/synthetic';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { channelsFrom, hasChannels } from '$lib/api/alert-channels';
-import { gateOf, section, type Gate, type Section } from '$lib/api/gate';
 
 /** What the notice channels drawer posts its fields under. */
 const CHANNEL_PREFIX = 'channel_';
@@ -138,7 +135,7 @@ export const load: PageServerLoad = async (event) => {
 			limit,
 			offset,
 			hasMore: false,
-			gate: { state: 'absent' } as SyntheticGate,
+			gate: { state: 'absent' } as Gate,
 			channelsFor: null as ChannelsFor,
 			limits: null as ProbeLimits | null,
 			counts: null as ProbeCounts | null,
@@ -151,7 +148,7 @@ export const load: PageServerLoad = async (event) => {
 	let counts: ProbeCounts | null = null;
 	let total: number | null = null;
 	let hasMore = false;
-	let gate: SyntheticGate = SYNTHETIC_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		const read = await listProbes(client, limit + 1, offset);
 		if (Array.isArray(read)) {
@@ -177,7 +174,7 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
 		if (isRedirect(err)) throw err;
-		gate = syntheticGate(err);
+		gate = gateOf(err, 'Could not load probes.');
 	}
 
 	// Alerts are a band above the list. Losing them must not lose the probes,

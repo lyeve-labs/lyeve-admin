@@ -14,7 +14,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import { rowsOf, type ListEnvelope } from './list';
 
 export const EXPERIMENTS_URL = '/api/admin/ab/experiments';
@@ -88,15 +87,6 @@ export interface ExperimentResults {
 	winner?: string | null;
 	significant: boolean;
 	sample_sizes: Record<string, number>;
-}
-
-export type AbGate = Gate;
-
-export const AB_OK: AbGate = GATE_OK;
-
-/** What a refused experiments read means, read the way every plugin's is. */
-export function abGate(err: unknown): AbGate {
-	return gateOf(err, 'Could not load experiments.');
 }
 
 export async function listExperiments(

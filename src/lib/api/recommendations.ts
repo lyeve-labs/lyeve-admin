@@ -13,7 +13,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 
 export const AB_STATS_URL = '/api/admin/recommendations/ab-stats';
 export const REFRESH_URL = '/api/admin/recommendations/refresh';
@@ -45,15 +44,6 @@ export interface FeedEntry {
 	score: number;
 	source: string;
 	created_at: string;
-}
-
-export type RecommendationsGate = Gate;
-
-export const RECOMMENDATIONS_OK: RecommendationsGate = GATE_OK;
-
-/** What a refused recommendations read means, read the way every plugin's is. */
-export function recommendationsGate(err: unknown): RecommendationsGate {
-	return gateOf(err, 'Could not load the recommendation split.');
 }
 
 export async function readAbStats(client: HttpClient): Promise<AbStats> {

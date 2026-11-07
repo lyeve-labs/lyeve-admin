@@ -5,7 +5,6 @@ import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	USAGE_OK,
 	getTenantUsage,
 	listQuotas,
 	listRequests,
@@ -14,13 +13,11 @@ import {
 	quotaFrom,
 	reviewRequest,
 	upsertQuota,
-	usageGate,
 	type Quota,
 	type QuotaRequest,
 	type TenantUsage,
-	type UsageGate,
 } from '$lib/api/usage';
-import { section, type Section } from '$lib/api/gate';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { rowsOf, pageWindow, pastEndOffset, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
 
@@ -51,7 +48,7 @@ export const load: PageServerLoad = async (event) => {
 			requestTotal: null as number | null,
 			usage: UNREAD as Section<TenantUsage[]>,
 			people: {} as Record<string, string>,
-			gate: USAGE_OK as UsageGate,
+			gate: GATE_OK as Gate,
 			permitted,
 		};
 	}
@@ -64,7 +61,7 @@ export const load: PageServerLoad = async (event) => {
 	let quotaTotal = 0;
 	let back: number | null = null;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: UsageGate = notRunning(plugins, PLUGIN.usage) ? { state: 'absent' } : USAGE_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.usage) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			const res = await listQuotas(client, limit, offset);
@@ -73,7 +70,7 @@ export const load: PageServerLoad = async (event) => {
 			// A page past the end is not an instance with no quota set.
 			back = pastEndOffset(quotas.length, limit, offset, statedTotal(res));
 		} catch (err) {
-			gate = usageGate(err);
+			gate = gateOf(err, 'Could not load usage.');
 		}
 	}
 	if (back !== null) redirect(307, withOffset(event.url, back));

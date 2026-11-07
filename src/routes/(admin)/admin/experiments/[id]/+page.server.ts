@@ -3,15 +3,12 @@ import { error, fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
-import { section } from '$lib/api/gate';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { ApiError } from '@lyeve-labs/client';
 import {
-	AB_OK,
 	EXPERIMENTS_URL,
 	METRIC_TYPES,
-	abGate,
 	createMetric,
 	createVariant,
 	deleteMetric,
@@ -19,13 +16,13 @@ import {
 	listMetrics,
 	listVariants,
 	readResults,
-	type AbGate,
 	type Experiment,
 	type ExperimentResults,
 	type Metric,
 	type MetricType,
 	type Variant,
 } from '$lib/api/ab-testing';
+import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
 
 function metricType(value: string): MetricType | null {
 	return METRIC_TYPES.includes(value as MetricType) ? (value as MetricType) : null;
@@ -58,7 +55,7 @@ export const load: PageServerLoad = async (event) => {
 		section<ExperimentResults>(readResults(client, id), 'Could not load the results.'),
 	]);
 
-	const gate: AbGate = AB_OK;
+	const gate: Gate = GATE_OK;
 	return { experiment, variants, metrics, results, gate };
 };
 

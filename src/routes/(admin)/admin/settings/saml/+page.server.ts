@@ -5,7 +5,6 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	SAML_OK,
 	createProvider,
 	deleteProvider,
 	getTemplate,
@@ -13,12 +12,11 @@ import {
 	listTemplates,
 	prepareCert,
 	rolloverCert,
-	samlGate,
 	updateProvider,
-	type SamlGate,
 	type SamlProvider,
 	type SamlTemplate,
 } from '$lib/api/saml';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
@@ -55,7 +53,7 @@ export const load: PageServerLoad = async (event) => {
 			limit,
 			offset,
 			hasMore: false,
-			gate: { state: 'absent' } as SamlGate,
+			gate: { state: 'absent' } as Gate,
 		};
 	}
 
@@ -63,14 +61,14 @@ export const load: PageServerLoad = async (event) => {
 	let providers: SamlProvider[] = [];
 	let total: number | null = null;
 	let hasMore = false;
-	let gate: SamlGate = SAML_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		const page = pageOf(await listProviders(client, limit + 1, offset), limit, offset);
 		providers = page.rows;
 		total = page.total;
 		hasMore = page.hasMore;
 	} catch (err) {
-		gate = samlGate(err);
+		gate = gateOf(err, 'Could not load identity providers.');
 	}
 	if (gate.state === 'ok') {
 		const back = pastEndOffset(providers.length, limit, offset, total);

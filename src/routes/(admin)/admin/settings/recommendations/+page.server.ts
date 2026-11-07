@@ -4,20 +4,17 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
-import { section, type Section } from '$lib/api/gate';
 import {
-	RECOMMENDATIONS_OK,
 	generateFeed,
 	isAlreadyRunning,
 	isUserId,
 	readAbStats,
-	recommendationsGate,
 	refreshAll,
 	type AbStats,
-	type RecommendationsGate,
 	readTrending,
 	type TrendingItem,
 } from '$lib/api/recommendations';
+import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 
 /** An account the preview can run for. */
 interface Reader {
@@ -35,7 +32,7 @@ export const load: PageServerLoad = async (event) => {
 	if (notRunning(plugins, PLUGIN.recommendations)) {
 		return {
 			stats: null as AbStats | null,
-			gate: { state: 'absent' } as RecommendationsGate,
+			gate: { state: 'absent' } as Gate,
 			canRecompute,
 			trending: { ok: false, gate: { state: 'absent' } } as Section<TrendingItem[]>,
 			readers: { ok: true, value: [] } as Section<Reader[]>,
@@ -72,7 +69,7 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		return {
 			stats: await readAbStats(client),
-			gate: RECOMMENDATIONS_OK,
+			gate: GATE_OK,
 			canRecompute,
 			trending,
 			readers,
@@ -80,7 +77,7 @@ export const load: PageServerLoad = async (event) => {
 	} catch (err) {
 		return {
 			stats: null,
-			gate: recommendationsGate(err),
+			gate: gateOf(err, 'Could not load the recommendation split.'),
 			canRecompute,
 			trending,
 			readers,

@@ -14,7 +14,6 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { toChannels, type AlertChannels } from './alert-channels';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import { rowsOf, statedTotal, type ListEnvelope } from './list';
 
 export const BASE_URL = '/api/admin/error-tracking';
@@ -141,15 +140,6 @@ export interface AlertSettingsInput {
 export interface AlertPage {
 	alerts: ErrorAlert[];
 	total: number | null;
-}
-
-export type ErrorGate = Gate;
-
-export const ERROR_OK: ErrorGate = GATE_OK;
-
-/** What a refused error tracking read means, read the way every plugin's is. */
-export function errorGate(err: unknown): ErrorGate {
-	return gateOf(err, 'Could not load errors.');
 }
 
 export async function listAlerts(

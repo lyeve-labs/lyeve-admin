@@ -6,8 +6,6 @@ import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	CACHE_OK,
-	cacheGate,
 	createRule,
 	deleteRule,
 	flushAll,
@@ -24,14 +22,13 @@ import {
 	tagIsSound,
 	updateRule,
 	type CacheEntry,
-	type CacheGate,
 	type CacheProvider,
 	type CacheRule,
 	type CacheStats,
 	type InactiveProvider,
 	type Limit,
 } from '$lib/api/cache';
-import { gateOf, type Gate } from '$lib/api/gate';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 /** What the response cache rules read answered, beside the rest of the page. */
@@ -65,12 +62,12 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	let stats: CacheStats | null = null;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: CacheGate = notRunning(plugins, PLUGIN.cache) ? { state: 'absent' } : CACHE_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.cache) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok' && superAdmin) {
 		try {
 			stats = await readStats(client);
 		} catch (err) {
-			gate = cacheGate(err);
+			gate = gateOf(err, 'Could not load the cache status.');
 		}
 	}
 

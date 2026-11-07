@@ -6,10 +6,8 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
 	ALERT_STATUSES,
-	ERROR_OK,
 	acknowledge,
 	assign,
-	errorGate,
 	isTriageAction,
 	listAlerts,
 	listCodes,
@@ -18,9 +16,9 @@ import {
 	type AlertStatus,
 	type ErrorAlert,
 	type ErrorCode,
-	type ErrorGate,
 	type EventPage,
 } from '$lib/api/error-tracking';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
@@ -43,12 +41,12 @@ export const load: PageServerLoad = async (event) => {
 	let alerts: ErrorAlert[] = [];
 	let total: number | null = null;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: ErrorGate = notRunning(plugins, PLUGIN.errorTracking) ? { state: 'absent' } : ERROR_OK;
+	let gate: Gate = notRunning(plugins, PLUGIN.errorTracking) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
 		try {
 			({ alerts, total } = await listAlerts(client, limit, offset, status));
 		} catch (err) {
-			gate = errorGate(err);
+			gate = gateOf(err, 'Could not load errors.');
 		}
 		if (gate.state === 'ok') {
 			const back = pastEndOffset(alerts.length, limit, offset, total);

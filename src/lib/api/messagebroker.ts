@@ -17,7 +17,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 
 export const STATUS_URL = '/api/admin/messagebroker/status';
 
@@ -59,15 +58,6 @@ export interface OutboxStatus {
 	dead: number;
 	oldest_pending_at?: string | null;
 	oldest_pending_age_seconds?: number;
-}
-
-export type BrokerGate = Gate;
-
-export const BROKER_OK: BrokerGate = GATE_OK;
-
-/** What a refused broker read means, read the way every plugin's is. */
-export function brokerGate(err: unknown): BrokerGate {
-	return gateOf(err, 'Could not load the broker status.');
 }
 
 export async function readStatus(client: HttpClient): Promise<BrokerStatus> {

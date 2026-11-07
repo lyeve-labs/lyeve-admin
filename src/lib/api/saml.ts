@@ -20,7 +20,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const PROVIDERS_URL = '/api/admin/saml-providers';
@@ -82,15 +81,6 @@ export interface SamlTemplate {
 	vendor?: string;
 	docs_url?: string;
 	config?: SamlTemplateConfig;
-}
-
-export type SamlGate = Gate;
-
-export const SAML_OK: SamlGate = GATE_OK;
-
-/** What a refused SAML read means, read the way every plugin's is. */
-export function samlGate(err: unknown): SamlGate {
-	return gateOf(err, 'Could not load identity providers.');
 }
 
 export async function listProviders(

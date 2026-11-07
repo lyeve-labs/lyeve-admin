@@ -13,7 +13,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import { csrfHeaders } from './csrf';
 import { outageFor } from '../outage';
@@ -42,15 +41,6 @@ export interface ImportJob {
 	mode?: ImportMode;
 	/** upload or url. */
 	source_kind?: 'upload' | 'url';
-}
-
-export type ImportGate = Gate;
-
-export const IMPORT_OK: ImportGate = GATE_OK;
-
-/** What a refused imports read means, read the way every plugin's is. */
-export function importGate(err: unknown): ImportGate {
-	return gateOf(err, 'Could not load imports.');
 }
 
 /** The plugin names its rows `jobs`, not `data`. */

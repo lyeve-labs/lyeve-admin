@@ -21,7 +21,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import { limitOf, type Limit } from './limits';
 
@@ -92,15 +91,6 @@ export interface LimiterState {
 	burst: number;
 	remaining: number;
 	reset_at: string;
-}
-
-export type RateLimitGate = Gate;
-
-export const RATE_LIMIT_OK: RateLimitGate = GATE_OK;
-
-/** What a refused rate limit read means, read the way every plugin's is. */
-export function rateLimitGate(err: unknown): RateLimitGate {
-	return gateOf(err, 'Could not load the rate limit rules.');
 }
 
 export async function listRules(

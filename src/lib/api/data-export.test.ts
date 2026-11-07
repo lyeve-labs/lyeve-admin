@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '@lyeve-labs/client';
 import {
 	downloadable,
-	exportGate,
 	jobProgress,
 	jobTone,
 	scheduleState,
@@ -39,18 +37,6 @@ function schedule(over: Partial<ExportSchedule> = {}): ExportSchedule {
 		...over,
 	};
 }
-
-describe('exportGate', () => {
-	it('reads a 402 as not enabled and a 404 as the plugin absent', () => {
-		expect(exportGate(new ApiError(402, 'x')).state).toBe('locked');
-		expect(exportGate(new ApiError(404, 'x')).state).toBe('absent');
-	});
-
-	it('says a failed read is not a report that none have run', () => {
-		const gate = exportGate(new Error('down'));
-		expect(gate.state === 'error' && gate.message).toBe('Could not load exports.');
-	});
-});
 
 describe('jobTone', () => {
 	it('uses the kit vocabulary rather than a synonym', () => {

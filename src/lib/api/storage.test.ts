@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '@lyeve-labs/client';
 import {
 	activeProvider,
 	brokenCredentials,
@@ -7,7 +6,6 @@ import {
 	providerState,
 	providerTone,
 	publiclyReadable,
-	storageGate,
 	targetLabel,
 	testMessage,
 	testPassed,
@@ -129,20 +127,6 @@ describe('presentation', () => {
 		expect(targetLabel(provider({ region: '' }))).toBe('media');
 		expect(targetLabel(provider({ bucket: '', endpoint: 'http://minio:9000' }))).toBe('http://minio:9000');
 		expect(targetLabel(provider({ bucket: '', endpoint: '' }))).toBe('Local directory');
-	});
-});
-
-describe('the gate', () => {
-	it('tells a 402, a 404 and any other failure apart', () => {
-		expect(storageGate(new ApiError(402, 'payment required')).state).toBe('locked');
-		expect(storageGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(storageGate(new ApiError(500, 'internal error')).state).toBe('error');
-		expect(storageGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
-	});
-
-	it('never reports a failed read as uploads working', () => {
-		const gate = storageGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toBe('Could not load storage providers.');
 	});
 });
 

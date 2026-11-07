@@ -14,7 +14,7 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, inSentence, type Gate } from './gate';
+import { inSentence } from './gate';
 import type { ListEnvelope } from './list';
 
 export const PROVIDERS_URL = '/api/admin/storage/providers';
@@ -61,15 +61,6 @@ export interface TestResult {
 	latency_ms?: number;
 	/** Empty when the provider answered. */
 	error?: string;
-}
-
-export type StorageGate = Gate;
-
-export const STORAGE_OK: StorageGate = GATE_OK;
-
-/** What a refused storage read means, read the way every plugin's is. */
-export function storageGate(err: unknown): StorageGate {
-	return gateOf(err, 'Could not load storage providers.');
 }
 
 export async function listProviders(client: HttpClient): Promise<ListEnvelope<StorageProvider>> {

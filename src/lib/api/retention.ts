@@ -17,7 +17,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const POLICIES_URL = '/api/admin/retention-policies';
@@ -55,15 +54,6 @@ export interface LegalHold {
 	created_by: string;
 	/** Soft delete. A released hold stops protecting anything. */
 	deleted_at?: string | null;
-}
-
-export type RetentionGate = Gate;
-
-export const RETENTION_OK: RetentionGate = GATE_OK;
-
-/** What a refused retention read means, read the way every plugin's is. */
-export function retentionGate(err: unknown): RetentionGate {
-	return gateOf(err, 'Could not load the retention rules.');
 }
 
 /** The largest page the plugin serves. */

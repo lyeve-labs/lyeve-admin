@@ -14,7 +14,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 import type { Limit } from './limits';
 
@@ -64,15 +63,6 @@ export interface CacheEntry {
 	created_at: string;
 	ttl_mode: string;
 	tags: string[] | null;
-}
-
-export type CacheGate = Gate;
-
-export const CACHE_OK: CacheGate = GATE_OK;
-
-/** What a refused cache read means, read the way every plugin's is. */
-export function cacheGate(err: unknown): CacheGate {
-	return gateOf(err, 'Could not load the cache status.');
 }
 
 export async function readStats(client: HttpClient): Promise<CacheStats> {

@@ -5,18 +5,16 @@ import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	PII_OK,
 	createRule,
 	deleteRule,
 	getRules,
 	listAccessLog,
-	piiGate,
 	testRule,
 	updateRule,
 	type AccessEntry,
-	type PiiGate,
 	type RuleCatalog,
 } from '$lib/api/pii-mask';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
@@ -34,17 +32,17 @@ export const load: PageServerLoad = async (event) => {
 			total: 0,
 			limit,
 			offset,
-			gate: { state: 'absent' } as PiiGate,
+			gate: { state: 'absent' } as Gate,
 		};
 	}
 
 	const client = authedClient(event);
 	let rules: RuleCatalog | null = null;
-	let gate: PiiGate = PII_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		rules = await getRules(client);
 	} catch (err) {
-		gate = piiGate(err);
+		gate = gateOf(err, 'Could not load the masking settings.');
 	}
 
 	// The access log is the second read. Losing it must not hide the rules,

@@ -13,7 +13,6 @@
  * lying about what the endpoint does.
  */
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const DEVICES_URL = '/api/admin/devices';
@@ -36,15 +35,6 @@ export interface Device {
 	user_agent?: string;
 	last_seen_at: string;
 	created_at: string;
-}
-
-export type DeviceGate = Gate;
-
-export const DEVICES_OK: DeviceGate = GATE_OK;
-
-/** What a refused devices read means, read the way every plugin's is. */
-export function deviceGate(err: unknown): DeviceGate {
-	return gateOf(err, 'Could not load your devices.');
 }
 
 export async function listDevices(

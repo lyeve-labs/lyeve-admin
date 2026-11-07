@@ -3,7 +3,6 @@
  * by introspection, and the persisted query allowlist it keeps per tenant.
  */
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, type Gate } from './gate';
 
 export const GRAPHQL_HTTP = '/api/v1/graphql';
 export const GRAPHQL_WS = '/api/v1/graphql/ws';
@@ -30,10 +29,6 @@ export interface SchemaRoots {
 	mutation: RootField[];
 	subscription: RootField[];
 }
-
-export type GraphqlGate = Gate;
-
-export const GRAPHQL_OK: GraphqlGate = GATE_OK;
 
 /** Asks for the root fields only, which is what the page lists. */
 export const ROOTS_QUERY = `query Roots {

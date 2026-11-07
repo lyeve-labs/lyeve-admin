@@ -8,7 +8,6 @@
  * one is stored, and a save that leaves the secret empty keeps the stored one.
  */
 import type { HttpClient } from '@lyeve-labs/client';
-import { gateOf, type Gate } from './gate';
 
 export const CAPTCHA_SETTINGS_URL = '/api/admin/captcha/settings';
 
@@ -56,10 +55,6 @@ export interface SaveCaptchaSettings {
 	 * save sends back the threshold it read rather than clearing it.
 	 */
 	failure_threshold: number | null;
-}
-
-export function captchaSettingsGate(err: unknown): Gate {
-	return gateOf(err, 'Could not load the captcha settings.');
 }
 
 export async function readCaptchaSettings(client: HttpClient): Promise<CaptchaSettings> {

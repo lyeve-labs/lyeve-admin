@@ -12,7 +12,6 @@
  * middleware gates it, rather than a role branch inside one handler.
  */
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
 
 export const SSE_METRICS_URL = '/api/admin/realtime/metrics';
 export const SSE_PLATFORM_URL = '/api/admin/realtime/metrics/platform';
@@ -45,15 +44,6 @@ export interface SocketMetrics extends StreamMetrics {
 	broadcasts_sent?: number;
 	pings_sent?: number;
 	pongs_received?: number;
-}
-
-export type RealtimeGate = Gate;
-
-export const REALTIME_OK: RealtimeGate = GATE_OK;
-
-/** What a refused realtime read means, read the way every plugin's is. */
-export function realtimeGate(err: unknown): RealtimeGate {
-	return gateOf(err, 'Could not load realtime metrics.');
 }
 
 export async function getStreamMetrics(client: HttpClient): Promise<StreamMetrics> {
