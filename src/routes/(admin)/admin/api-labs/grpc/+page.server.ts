@@ -61,6 +61,25 @@ async function readGrpcRoutes(client: HttpClient): Promise<{ listening: boolean;
 	}
 }
 
+/**
+ * Words for a call the plugin would not run. A coded 4xx names what to
+ * change, and is relayed. A 5xx, and anything a proxy sent, gets the lab's
+ * own sentence.
+ */
+function notRun(status: number, body: string): string {
+	if (status === 402) return 'gRPC is not enabled on this instance.';
+	if (status === 403) return 'Only a super admin can run a gRPC call.';
+	if (status >= 400 && status < 500) {
+		try {
+			const said = JSON.parse(body) as { error?: unknown; code?: unknown };
+			if (typeof said.code === 'string' && said.code && typeof said.error === 'string' && said.error) return said.error;
+		} catch {
+			// Not the engine's JSON, so something in front of it answered.
+		}
+	}
+	return 'Could not run the call. Try again.';
+}
+
 export const actions: Actions = {
 	grpc: async (event) => {
 		// The allowlist is what the plugin says it transcodes, read from the
@@ -101,11 +120,9 @@ export const actions: Actions = {
 		if ('error' in out) return fail(504, { error: out.error });
 
 		// The engine answers 200 when the call ran, whatever the transcoded
-		// handler said. Anything else is the engine refusing, and its message
-		// is the useful one: 402 when the plugin is not enabled, 503 for no
-		// listener.
+		// handler said. Anything else is the plugin refusing to run it.
 		if (out.result.status !== 200) {
-			return fail(400, { error: `The call was not run: ${out.result.status}. ${out.result.body}` });
+			return fail(400, { error: notRun(out.result.status, out.result.body) });
 		}
 		let invoked: GrpcInvokeResult;
 		try {

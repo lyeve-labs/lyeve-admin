@@ -52,6 +52,39 @@ describe('the gRPC action takes its allowlist from the engine', () => {
 	});
 });
 
+describe('a call the plugin would not run', () => {
+	function invokeAnswers(res: () => Response) {
+		const { event } = sendEvent({ route: 'GET /api/content/{schema}', g_schema: 'post' });
+		const held = event as unknown as { fetch: typeof globalThis.fetch };
+		const base = held.fetch;
+		held.fetch = (async (url: string, init?: RequestInit) =>
+			String(url).includes('grpc/invoke') ? res() : base(url, init)) as typeof globalThis.fetch;
+		return event;
+	}
+	const said = async (res: () => Response) =>
+		((await actions.grpc(invokeAnswers(res))) as { data: { error: string } }).data.error;
+
+	it("relays the plugin's sentence for a coded refusal", async () => {
+		expect(await said(() => json({ error: 'every path parameter needs a value', code: 'bad_request' }, 400))).toBe(
+			'every path parameter needs a value',
+		);
+	});
+
+	it('says the feature is not enabled on a 402 and names the role on a 403', async () => {
+		expect(await said(() => json({ error: 'the license does not carry this plugin, so no listener was started', code: 'http_402' }, 402))).toBe(
+			'gRPC is not enabled on this instance.',
+		);
+		expect(await said(() => json({ error: 'super_admin role required', code: 'forbidden' }, 403))).toBe('Only a super admin can run a gRPC call.');
+	});
+
+	it("keeps a 5xx and a proxy's page off the screen", async () => {
+		expect(await said(() => json({ error: 'the transcoding listener is not running', code: 'service_unavailable' }, 503))).toBe(
+			'Could not run the call. Try again.',
+		);
+		expect(await said(() => new Response('<html>413 Request Entity Too Large</html>', { status: 413 }))).toBe('Could not run the call. Try again.');
+	});
+});
+
 /*
  * The gRPC lab's status read. The route is a super admin's, so the lab opens
  * for one alone, and only a 404 says the plugin is not here.
