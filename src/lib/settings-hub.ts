@@ -44,7 +44,7 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	scim: 'Let identity providers create and remove accounts without anyone signing in.',
 	'rate-limits': 'See each rate limit and who is close to reaching one.',
 	'tenant-rate-limits': "Set this tenant's rate limit and the addresses it always allows or blocks, and see what was refused.",
-	captcha: "Choose the captcha this tenant's pages and flows use. The admin sign-in keeps the instance's captcha.",
+	captcha: "Choose the captcha this tenant's pages and flows use. The console sign-in keeps this instance's captcha.",
 	'sign-in': 'Set how long accounts from your identity provider can sign in without it.',
 	'api-access': 'See how external apps authenticate and what each role can do, and get a token to try it.',
 	'api-keys': 'Create machine-to-machine credentials for the content API and see their usage.',
@@ -68,7 +68,7 @@ const GROUPS: readonly { id: string; label: string; description: string; ids: re
 	{
 		id: 'workspace',
 		label: 'Workspace',
-		description: 'Set how this admin looks and what it offers your team.',
+		description: 'Set how the console looks and what it offers your team.',
 		ids: ['customization', 'localization', 'email', 'recommendations'],
 	},
 	{

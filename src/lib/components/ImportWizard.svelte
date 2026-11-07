@@ -358,7 +358,7 @@
 <Drawer
 	bind:open
 	title="New import"
-	description="Nothing is imported until the last step. The dry run shows which rows would be rejected and why."
+	description="Import rows from a file as entries of one content type. Nothing is written until the last step."
 >
 	<div class="flex flex-col gap-5">
 		<StepIndicator steps={STEPS} current={step + 1} />

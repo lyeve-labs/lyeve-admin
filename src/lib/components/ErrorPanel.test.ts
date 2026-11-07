@@ -99,13 +99,13 @@ describe('ErrorPanel', () => {
 		});
 
 		it('keeps the detail block for other server failures only', () => {
-			expect(mount(503, 'The experiment could not be read').queryByText('What the server said')).toBeNull();
+			expect(mount(503, 'The experiment could not be read').queryByText('What the engine returned')).toBeNull();
 			cleanup();
-			expect(mount(500, 'boom').getByText('What the server said')).toBeTruthy();
+			expect(mount(500, 'boom').getByText('What the engine returned')).toBeTruthy();
 		});
 
 		it('folds the detail block shut behind a disclosure button', () => {
-			const toggle = mount(500, 'boom').getByRole('button', { name: 'What the server said' });
+			const toggle = mount(500, 'boom').getByRole('button', { name: 'What the engine returned' });
 			expect(toggle.getAttribute('aria-expanded')).toBe('false');
 		});
 

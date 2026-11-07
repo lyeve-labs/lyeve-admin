@@ -204,12 +204,12 @@
 				<p class="text-xs text-faint">
 					{item.public
 						? 'Anyone can load this file at the path below on your site. Content fields can point at it.'
-						: 'Only signed-in operators can open this file. Publish it to give it an address a site or a content field can use.'}
+						: 'Only someone signed in to the console can open this file. Publish it to give it an address a site or a content field can use.'}
 				</p>
 			</form>
 
 			<div class="flex flex-col gap-3" data-testid="media-copy">
-				<CopyField id="media-url" label={item.public ? 'Public path' : 'Admin URL'} value={snippets.url} copyLabel="Copy URL" />
+				<CopyField id="media-url" label={item.public ? 'Public path' : 'Console URL'} value={snippets.url} copyLabel="Copy URL" />
 				{#if kind === 'image'}
 					<CopyField id="media-markdown" label="Markdown" value={snippets.markdown} copyLabel="Copy as Markdown" />
 					<CopyField id="media-html" label="HTML" value={snippets.html} copyLabel="Copy as HTML" />

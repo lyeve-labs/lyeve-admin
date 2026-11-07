@@ -92,7 +92,7 @@
 	<NotEnabled
 		title="AI"
 		{level}
-		description="Providers, prompts, transcripts and the editor assistant are part of the AI plugin."
+		description="Set up providers and prompts, read transcripts and use the editor assistant with the AI plugin."
 	/>
 {:else if effective.state === 'forbidden'}
 	<Alert tone="danger" title="Not allowed">Only an admin or a super admin can open AI {noun}.</Alert>

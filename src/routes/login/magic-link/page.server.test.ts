@@ -110,7 +110,7 @@ describe('organization on the request', () => {
 			data: { error: string; email: string; tenant: string };
 		};
 		expect(result.status).toBe(400);
-		expect(result.data.error).toMatch(/short name your admin gave you/);
+		expect(result.data.error).toMatch(/short name your administrator gave you/);
 		expect(result.data.tenant).toBe('acme corp');
 		expect(fetch).not.toHaveBeenCalled();
 	});

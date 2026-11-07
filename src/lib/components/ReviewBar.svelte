@@ -153,8 +153,7 @@
 	<div class="flex flex-col gap-4" data-testid="review-bar">
 		{#if unavailable}
 			<Alert tone="warn" title="Could not load the review">
-				The review plugin is included in this build but is not responding. You cannot see or move
-				this review until it responds.
+				The review plugin is not running on this instance, so this review is not available.
 			</Alert>
 		{:else if forbidden}
 			<Alert tone="warn" title="You cannot see this entry's review">

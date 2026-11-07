@@ -101,7 +101,7 @@ describe('MediaPreviewDrawer', () => {
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 		setup(IMAGE);
 		const url = `${window.location.origin}/api/admin/media/m-image/download`;
-		expect((screen.getByLabelText('Admin URL') as HTMLInputElement).value).toBe(url);
+		expect((screen.getByLabelText('Console URL') as HTMLInputElement).value).toBe(url);
 		expect((screen.getByLabelText('Markdown') as HTMLInputElement).readOnly).toBe(true);
 		await fireEvent.click(screen.getByRole('button', { name: 'Copy URL' }));
 		await waitFor(() => expect(writeText).toHaveBeenCalledWith(url));
