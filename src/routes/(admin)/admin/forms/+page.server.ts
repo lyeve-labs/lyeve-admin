@@ -1,29 +1,26 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
-import { notRunning, runs } from '$lib/plugins';
+import { notRunning } from '$lib/plugins';
 import { isOutage, section, type Gate, type Section } from '$lib/api/gate';
 import { pageWindow } from '$lib/api/list';
 import { listSchemaNames } from '$lib/api/search-settings';
-import { applySchemaPreset, readSchemaPresets } from '$lib/api/schema-preset-catalog';
-import { getSettings, refusalCode, refusedField, saveSettings, showable, type Settings, type SettingsPatch } from '$lib/api/connected-editors';
+import { applySchemaPreset } from '$lib/api/schema-preset-catalog';
+import { getSettings, refusalCode, refusedField, saveSettings, type SettingsPatch } from '$lib/api/connected-editors';
 import {
 	CONTACT_PRESET,
 	CONTACT_SCHEMA,
 	deleteSubmission,
+	hasSubmissions,
 	isFormState,
 	listForms,
 	listSubmissions,
-	readFlowTargets,
 	setSubmissionState,
-	type FlowTarget,
 	type FormRef,
 	type FormState,
 	type PublishedForm,
-	type SchemaOption,
 	type SubmissionPage,
 } from '$lib/api/builder-forms';
 
@@ -38,7 +35,7 @@ interface Selected {
 	limit: number;
 	offset: number;
 	form: PublishedForm | null;
-	/** Null for a form that does not save into a content type. */
+	/** Null for a form that never saved into a content type. */
 	submissions: Section<SubmissionPage> | null;
 }
 
@@ -49,30 +46,10 @@ function selectedRef(url: URL): FormRef | null {
 	return site && path && block ? { site, path, block } : null;
 }
 
-async function readSchemas(client: ReturnType<typeof authedClient>): Promise<SchemaOption[]> {
-	const rows = await getSchemas(client);
-	const names = showable(rows.map((s) => s.name));
-	return rows
-		.filter((s) => names.includes(s.name))
-		.map((s) => ({
-			name: s.name,
-			label: s.display_name || s.name,
-			delivered: (s as { public_delivery?: unknown }).public_delivery === true,
-		}))
-		.sort((a, b) => a.label.localeCompare(b.label));
-}
-
-/** Whether the schema plugin offers the contact preset. A failed read offers nothing, and the page links the schema builder instead. */
-async function contactPresetOffered(client: ReturnType<typeof authedClient>): Promise<boolean> {
-	try {
-		const { presets } = await readSchemaPresets(client);
-		return presets.some((p) => p.id === CONTACT_PRESET);
-	} catch {
-		return false;
-	}
-}
-
 export const load: PageServerLoad = async (event) => {
+	// The triage forms invalidate only this, so the flows and settings in the
+	// layout are not read again on every submit.
+	event.depends('forms:submissions');
 	const { plugins } = await event.parent();
 	const ref = selectedRef(event.url);
 	const stateParam = event.url.searchParams.get('state') ?? 'new';
@@ -80,30 +57,17 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	if (notRunning(plugins, PLUGIN.builder)) {
-		return {
-			gate: { state: 'absent' } as Gate,
-			forms: [] as PublishedForm[],
-			settings: null as Section<Settings> | null,
-			schemas: null as Section<SchemaOption[]> | null,
-			flows: null as Section<FlowTarget[]> | null,
-			presetOffered: false,
-			selected: null as Selected | null,
-		};
+		return { gate: { state: 'absent' } as Gate, forms: [] as PublishedForm[], selected: null as Selected | null };
 	}
 
 	const client = authedClient(event);
-	const settings = section(getSettings(client), 'Could not load where forms can send.');
-	const schemas = section(readSchemas(client), 'Could not load content types.');
-	// Without the flow plugin no flow can start, so forms send only to content types.
-	const flows = runs(plugins, PLUGIN.flow) ? section(readFlowTargets(client), 'Could not load flows.') : Promise.resolve(null);
-	const presetOffered = runs(plugins, PLUGIN.schema) ? contactPresetOffered(client) : Promise.resolve(false);
 	const forms = await section(listForms(client), 'Could not load forms.');
 
 	let selected: Selected | null = null;
 	if (forms.ok && ref) {
 		const form = forms.value.find((f) => f.site === ref.site && f.path === ref.path && f.block === ref.block) ?? null;
 		const submissions =
-			form && !form.destination?.flow
+			form && hasSubmissions(form)
 				? await section(
 						listSubmissions(client, ref, { state: state === 'all' ? undefined : state, limit, offset }),
 						'Could not load submissions.',
@@ -112,15 +76,7 @@ export const load: PageServerLoad = async (event) => {
 		selected = { ref, state, limit, offset, form, submissions };
 	}
 
-	return {
-		gate: forms.ok ? ({ state: 'ok' } as Gate) : forms.gate,
-		forms: forms.ok ? forms.value : [],
-		settings: await settings,
-		schemas: await schemas,
-		flows: await flows,
-		presetOffered: await presetOffered,
-		selected,
-	};
+	return { gate: forms.ok ? ({ state: 'ok' } as Gate) : forms.gate, forms: forms.ok ? forms.value : [], selected };
 };
 
 /** The engine's own sentence for a 4xx that carries its code, else the page's. */

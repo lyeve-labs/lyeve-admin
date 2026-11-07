@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidate } from '$app/navigation';
 	import { navigating } from '$app/state';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import {
@@ -26,8 +27,11 @@
 	import {
 		CONTACT_SCHEMA,
 		FLOW_NOTE,
+		FLOW_UNCHECKED,
+		destinationProblem,
 		flowProblem,
 		formWarning,
+		hasSubmissions,
 		type FormRef,
 		type FormState,
 		type PublishedForm,
@@ -63,12 +67,11 @@
 		return flows?.find((f) => f.slug === slug)?.name ?? slug;
 	}
 
-	/** The warning a form shows when its posts start nothing. Empty while the flows did not load. */
+	/** The warning a form shows when its posts fail or start nothing. What did not load is not checked. */
 	function warningOf(f: PublishedForm): string {
-		const slug = f.destination?.flow;
-		if (!slug || !flows) return '';
-		const problem = flowProblem(slug, flows);
-		return problem ? formWarning(problem, flowName(slug)) : '';
+		const problem = destinationProblem(f.destination, settings, flows);
+		if (!problem) return '';
+		return formWarning(problem, f.destination?.schema ? schemaLabel(f.destination.schema) : flowName(f.destination?.flow ?? ''));
 	}
 
 	function formParams(ref: FormRef, state = 'new'): Record<string, string> {
@@ -79,8 +82,10 @@
 		return `${PATH}?${new URLSearchParams(formParams(ref, state))}`;
 	}
 
-	function exportHref(ref: FormRef): string {
-		return `${PATH}/export?${new URLSearchParams({ site: ref.site, path: ref.path, block: ref.block })}`;
+	function exportHref(ref: FormRef, state: string): string {
+		const qs = new URLSearchParams({ site: ref.site, path: ref.path, block: ref.block });
+		if (state !== 'all') qs.set('state', state);
+		return `${PATH}/export?${qs}`;
 	}
 
 	// Where forms can send.
@@ -97,13 +102,18 @@
 	// start stays in the list with the reason beside it, so it can be cleared.
 	const flowOptions = $derived.by(() => {
 		if (!flows) return [];
+		const allowed = settings?.form_flows ?? [];
+		// A flow whose trigger could not be read is listed only when it is already allowed, so a save keeps it.
 		const rows: { value: string; label: string; description?: string }[] = flows
-			.filter((f) => f.formTrigger)
-			.map((f) => ({
-				value: f.slug,
-				label: f.name,
-				description: f.status === 'active' ? undefined : FLOW_NOTE.inactive,
-			}));
+			.filter((f) => f.formTrigger === true || (f.formTrigger === null && allowed.includes(f.slug)))
+			.map((f) => {
+				const problem = flowProblem(f.slug, flows);
+				return {
+					value: f.slug,
+					label: f.name,
+					description: f.formTrigger === null ? FLOW_UNCHECKED : problem ? FLOW_NOTE[problem] : undefined,
+				};
+			});
 		for (const slug of settings?.form_flows ?? []) {
 			const problem = flowProblem(slug, flows);
 			if (problem === 'missing' || problem === 'trigger') {
@@ -139,21 +149,34 @@
 	const MOVES: Record<FormState, [FormState, string][]> = {
 		new: [
 			['read', 'Mark read'],
-			['spam', 'Spam'],
+			['spam', 'Mark spam'],
 		],
 		read: [
 			['new', 'Mark new'],
-			['spam', 'Spam'],
+			['spam', 'Mark spam'],
 		],
 		spam: [['new', 'Not spam']],
 	};
 
+	/**
+	 * A triage write changes one form's submissions and counts. It refreshes
+	 * only the page data, so the flows are not read again on every click.
+	 */
+	const triage: SubmitFunction = () => async ({ result, update }) => {
+		await update({ invalidateAll: false });
+		if (result.type === 'success') await invalidate('forms:submissions');
+	};
+
 	function deleteOne(schema: string): SubmitFunction {
-		return confirmed(
+		const ask = confirmed(
 			'Delete this submission?',
 			`It is deleted from the ${schemaLabel(schema)} content type too. This cannot be undone.`,
 			{ confirmLabel: 'Delete' },
 		);
+		return async (input) => {
+			const after = await ask(input);
+			return after ? triage(input) : after;
+		};
 	}
 
 	function shown(v: unknown): string {
@@ -230,7 +253,7 @@
 								<td data-cell="nowrap">{f.counts.read}</td>
 								<td data-cell="nowrap">{f.counts.spam}</td>
 								<td data-cell="nowrap">
-									{#if f.destination?.schema}
+									{#if hasSubmissions(f)}
 										<div class="flex justify-end">
 											<Button variant="ghost" size="sm" href={formHref(f)}>View submissions</Button>
 										</div>
@@ -272,7 +295,7 @@
 								{ value: 'all', label: 'All', href: formHref(selected.ref, 'all') },
 							]}
 						/>
-						<Button variant="secondary" size="sm" href={exportHref(selected.ref)} download data-sveltekit-reload>
+						<Button variant="secondary" size="sm" href={exportHref(selected.ref, selected.state)} download data-sveltekit-reload>
 							<Download size={ICON.sm} aria-hidden="true" /> Export CSV
 						</Button>
 					</div>
@@ -328,7 +351,7 @@
 										<td data-cell="nowrap">
 											<div class="flex justify-end gap-1">
 												{#each MOVES[s.state] as [to, label] (to)}
-													<form method="POST" action="?/state" use:enhance>
+													<form method="POST" action="?/state" use:enhance={triage}>
 														<input type="hidden" name="id" value={s.id} />
 														<input type="hidden" name="state" value={to} />
 														<Button variant="ghost" size="sm" type="submit">{label}</Button>
@@ -337,7 +360,7 @@
 												<form method="POST" action="?/delete" use:enhance={deleteOne(s.schema)}>
 													<input type="hidden" name="id" value={s.id} />
 													<Button variant="ghost" size="sm" type="submit" aria-label="Delete the submission from {relativeTime(s.created_at)}">
-														<Trash2 size={ICON.sm} class="text-danger" />
+														<Trash2 size={ICON.sm} class="text-danger" aria-hidden="true" />
 													</Button>
 												</form>
 											</div>
@@ -405,12 +428,18 @@
 							<Alert tone="success" autoDismiss>Settings saved.</Alert>
 						{/if}
 
+						<!-- Only a list that loaded is saved, so a list that failed to load clears nothing. -->
+						{#if data.schemas?.ok}
+							<input type="hidden" name="schemas_offered" value="1" />
+						{/if}
+						{#if data.flows?.ok}
+							<input type="hidden" name="flows_offered" value="1" />
+						{/if}
 						{#if !data.schemas || !data.schemas.ok}
 							<GateNotice gate={data.schemas ? data.schemas.gate : { state: 'absent' }} title="Content types" absent="Content types are not included in this build." />
 						{:else if offered.length === 0}
 							<p class="text-sm text-muted">No content types forms can send to yet.</p>
 						{:else}
-							<input type="hidden" name="schemas_offered" value="1" />
 							{#if offered.length <= 12}
 								<CheckboxGroup
 									label="Content types"
@@ -457,7 +486,6 @@
 								trigger is the builder form event.
 							</p>
 						{:else}
-							<input type="hidden" name="flows_offered" value="1" />
 							{#if flowOptions.length <= 12}
 								<CheckboxGroup
 									label="Flows"

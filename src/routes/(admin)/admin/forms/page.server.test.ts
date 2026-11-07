@@ -6,6 +6,7 @@ vi.mock('$lib/server/authz', async () => {
 });
 
 import { actions, load } from './+page.server';
+import { load as layoutLoad } from './+layout.server';
 
 const RUNNING = { state: 'named', running: ['builder', 'flow', 'schema'], withheld: [] };
 
@@ -62,7 +63,8 @@ const ROUTES: Routes = {
 function loadEvent(routes: Routes, { search = '', plugins = RUNNING as unknown } = {}) {
 	const e = engine(routes);
 	const url = new URL(`http://admin/admin/forms${search}`);
-	return { ...e, event: { fetch: e.fetch, url, request: new Request(url), parent: async () => ({ plugins }) } as never };
+	const depends = vi.fn();
+	return { ...e, depends, event: { fetch: e.fetch, url, request: new Request(url), depends, parent: async () => ({ plugins }) } as never };
 }
 
 function actionEvent(routes: Routes, fields: [string, string][] = []) {
@@ -77,17 +79,27 @@ type Loaded = Record<string, unknown> & { gate: { state: string }; selected: Rec
 
 describe('forms load', () => {
 	it('makes no engine call while the builder plugin does not run', async () => {
-		const { event, calls } = loadEvent(ROUTES, { plugins: { state: 'named', running: [], withheld: [] } });
-		const out = (await load(event)) as Loaded;
-		expect(out.gate).toEqual({ state: 'absent' });
-		expect(calls).toEqual([]);
+		const off = { plugins: { state: 'named', running: [], withheld: [] } };
+		const page = loadEvent(ROUTES, off);
+		expect(((await load(page.event)) as Loaded).gate).toEqual({ state: 'absent' });
+		const layout = loadEvent(ROUTES, off);
+		expect(await layoutLoad(layout.event)).toMatchObject({ settings: null, flows: null });
+		expect([...page.calls, ...layout.calls]).toEqual([]);
 	});
 
-	it('reads the forms, the settings, the content types, the flows and the preset', async () => {
-		const { event } = loadEvent(ROUTES);
+	it('reads the forms in the page load and nothing the layout reads', async () => {
+		const { event, calls, depends } = loadEvent(ROUTES);
 		const out = (await load(event)) as Loaded;
 		expect(out.gate).toEqual({ state: 'ok' });
 		expect(out.forms).toEqual([FORM]);
+		expect(out.selected).toBeNull();
+		expect(calls.map((c) => c.path)).toEqual(['/api/admin/builder/forms']);
+		expect(depends).toHaveBeenCalledWith('forms:submissions');
+	});
+
+	it('reads the settings, the content types, the flows and the preset in the layout load', async () => {
+		const { event, depends } = loadEvent(ROUTES);
+		const out = (await layoutLoad(event)) as Record<string, unknown>;
 		expect(out.settings).toEqual({ ok: true, value: SETTINGS });
 		// The builder's own types never reach the list, and a delivered type is marked.
 		expect(out.schemas).toEqual({
@@ -99,7 +111,7 @@ describe('forms load', () => {
 		});
 		expect(out.flows).toEqual({ ok: true, value: [] });
 		expect(out.presetOffered).toBe(true);
-		expect(out.selected).toBeNull();
+		expect(depends).toHaveBeenCalledWith('forms:flows');
 	});
 
 	it('reports a failed forms read as a gate, never as no forms', async () => {
@@ -113,7 +125,7 @@ describe('forms load', () => {
 			{ ...ROUTES, 'GET /api/admin/schemas/presets': json({ presets: [] }) },
 			{ plugins: { state: 'named', running: ['builder', 'schema'], withheld: [] } },
 		);
-		const out = (await load(event)) as Loaded;
+		const out = (await layoutLoad(event)) as Record<string, unknown>;
 		expect(out.flows).toBeNull();
 		expect(out.presetOffered).toBe(false);
 		expect(calls.some((c) => c.path.startsWith('/api/admin/flows'))).toBe(false);
@@ -133,6 +145,27 @@ describe('forms load', () => {
 		await load(event);
 		const read = calls.find((c) => c.path.startsWith('/api/admin/builder/forms/submissions'));
 		expect(read?.path).not.toContain('state=');
+	});
+
+	it('still opens the submissions of a form that now starts a flow', async () => {
+		const moved = { ...FORM, destination: { flow: 'notify' }, counts: { new: 0, read: 2, spam: 0 } };
+		const { event } = loadEvent(
+			{ ...ROUTES, 'GET /api/admin/builder/forms': json({ data: [moved] }) },
+			{ search: '?site=s1&path=%2Fcontact&block=b1&state=all' },
+		);
+		const out = (await load(event)) as Loaded;
+		expect(out.selected).toMatchObject({ submissions: { ok: true } });
+	});
+
+	it('opens nothing for a flow form that never saved a submission', async () => {
+		const flowForm = { ...FORM, destination: { flow: 'notify' }, counts: { new: 0, read: 0, spam: 0 } };
+		const { event, calls } = loadEvent(
+			{ ...ROUTES, 'GET /api/admin/builder/forms': json({ data: [flowForm] }) },
+			{ search: '?site=s1&path=%2Fcontact&block=b1' },
+		);
+		const out = (await load(event)) as Loaded;
+		expect(out.selected).toMatchObject({ submissions: null });
+		expect(calls.some((c) => c.path.startsWith('/api/admin/builder/forms/submissions'))).toBe(false);
 	});
 });
 

@@ -7,7 +7,7 @@
  * sent lives in the flow's runs.
  */
 import type { HttpClient } from '@lyeve-labs/client';
-import { getFlow, listFlows } from '$lib/api/flows';
+import { getFlow, listFlows, type Flow } from '$lib/api/flows';
 import type { FlowDefinition, FlowStatus } from '$lib/flow/types';
 
 export const FORMS_URL = '/api/admin/builder/forms';
@@ -100,9 +100,17 @@ export function deleteSubmission(client: HttpClient, id: string): Promise<void> 
 	return client.delete<void>(`${FORMS_URL}/submissions/${encodeURIComponent(id)}`);
 }
 
-/** The engine's CSV of one form. */
-export function exportPath(ref: FormRef): string {
-	return `${FORMS_URL}/submissions/export?${formQuery(ref)}`;
+/** The engine's CSV of one form, of one state when one is named. */
+export function exportPath(ref: FormRef, state?: FormState): string {
+	return `${FORMS_URL}/submissions/export?${formQuery(ref, { state })}`;
+}
+
+/**
+ * Whether a form has submissions to open: it saves into a content type, or
+ * saved into one before it was pointed at a flow.
+ */
+export function hasSubmissions(f: PublishedForm): boolean {
+	return !!f.destination?.schema || f.counts.new + f.counts.read + f.counts.spam > 0;
 }
 
 /** A content type a form may be allowed to send to. */
@@ -119,12 +127,15 @@ export interface FlowTarget {
 	slug: string;
 	name: string;
 	status: FlowStatus;
-	/** The flow's trigger is the builder form event. */
-	formTrigger: boolean;
+	/** The flow's trigger is the builder form event. Null when its trigger could not be read. */
+	formTrigger: boolean | null;
 }
 
 /** The engine caps a page of flows at this many rows. */
 const FLOW_PAGE = 200;
+
+/** The most trigger reads in flight at once, so a tenant with many event flows does not meet the rate limit. */
+const TRIGGER_READS = 8;
 
 /** Whether a trigger is the system event a form publishes. */
 function startsFromForm(def: FlowDefinition | undefined): boolean {
@@ -139,45 +150,85 @@ function startsFromForm(def: FlowDefinition | undefined): boolean {
  * else its draft.
  */
 export async function readFlowTargets(client: HttpClient, cap = 1000): Promise<FlowTarget[]> {
-	const rows = [];
+	const rows: Flow[] = [];
 	for (let offset = 0; offset < cap; offset += FLOW_PAGE) {
 		const page = await listFlows(client, { limit: FLOW_PAGE, offset });
 		rows.push(...page.rows);
 		if (page.rows.length < FLOW_PAGE) break;
 	}
-	return Promise.all(
-		rows.slice(0, cap).map(async (f) => {
-			let formTrigger = false;
-			if (f.trigger_type === 'trigger.event') {
+	const out: FlowTarget[] = rows.slice(0, cap).map((f) => ({
+		id: f.id,
+		slug: f.slug,
+		name: f.name || f.slug,
+		status: f.status,
+		formTrigger: f.trigger_type === 'trigger.event' ? null : false,
+	}));
+	const pending = out.map((t, i) => ({ t, f: rows[i] })).filter(({ t }) => t.formTrigger === null);
+	const worker = async () => {
+		for (let next = pending.shift(); next; next = pending.shift()) {
+			const { t, f } = next;
+			try {
 				const def =
 					f.version > 0
 						? (await client.get<{ definition?: FlowDefinition }>(`/api/admin/flows/${encodeURIComponent(f.id)}/versions/${f.version}`)).definition
 						: (await getFlow(client, f.id)).draft;
-				formTrigger = startsFromForm(def);
+				t.formTrigger = startsFromForm(def);
+			} catch {
+				// One unreadable flow leaves its trigger unknown rather than failing every other.
+				t.formTrigger = null;
 			}
-			return { id: f.id, slug: f.slug, name: f.name || f.slug, status: f.status, formTrigger };
-		}),
-	);
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(TRIGGER_READS, pending.length) }, worker));
+	return out;
 }
 
-/** Why a form sending to `slug` starts nothing, or null when it starts the flow. */
-export type FlowProblem = 'missing' | 'trigger' | 'inactive';
+/** Why a form sending to `slug` starts nothing, or null when it starts the flow or its trigger is unknown. */
+export type FlowProblem = 'missing' | 'trigger' | 'blocked' | 'inactive';
 
 export function flowProblem(slug: string, flows: readonly FlowTarget[]): FlowProblem | null {
 	const f = flows.find((x) => x.slug === slug);
 	if (!f) return 'missing';
-	if (!f.formTrigger) return 'trigger';
+	if (f.formTrigger === false) return 'trigger';
+	if (f.status === 'blocked') return 'blocked';
 	if (f.status !== 'active') return 'inactive';
 	return null;
 }
 
-/** What the list of forms says beside a form whose flow starts nothing. */
-export function formWarning(problem: FlowProblem, name: string): string {
+/** Why posts to a form fail or start nothing. */
+export type FormProblem = FlowProblem | 'schema-not-allowed' | 'flow-not-allowed';
+
+/**
+ * The problem with a form's destination, read against what forms may send
+ * to and the flows. A destination off those lists refuses every post. A
+ * list that did not load is not checked.
+ */
+export function destinationProblem(
+	d: FormDestination | null,
+	allowed: { form_schemas: string[]; form_flows: string[] } | null,
+	flows: readonly FlowTarget[] | null,
+): FormProblem | null {
+	if (d?.schema) return allowed && !allowed.form_schemas.includes(d.schema) ? 'schema-not-allowed' : null;
+	if (d?.flow) {
+		if (allowed && !allowed.form_flows.includes(d.flow)) return 'flow-not-allowed';
+		return flows ? flowProblem(d.flow, flows) : null;
+	}
+	return null;
+}
+
+/** What the list of forms says beside a form whose posts fail or start nothing. */
+export function formWarning(problem: FormProblem, name: string): string {
 	switch (problem) {
+		case 'schema-not-allowed':
+			return `Forms cannot send to ${name} any more, so posts to this form fail. Choose it again under Where forms can send.`;
+		case 'flow-not-allowed':
+			return `Forms cannot start the flow ${name} any more, so posts to this form fail. Choose it again under Where forms can send.`;
 		case 'missing':
 			return `The flow ${name} no longer exists, so posts to this form start nothing.`;
 		case 'trigger':
 			return `The flow ${name} does not start from a builder form, so posts to this form start nothing.`;
+		case 'blocked':
+			return `The flow ${name} uses a step that is no longer available, so posts to this form start nothing.`;
 		case 'inactive':
 			return `The flow ${name} is not active, so posts to this form start nothing. Publish the flow to turn it on.`;
 	}
@@ -187,5 +238,9 @@ export function formWarning(problem: FlowProblem, name: string): string {
 export const FLOW_NOTE: Record<FlowProblem, string> = {
 	missing: 'No flow uses this slug any more. Clear it, then save.',
 	trigger: 'This flow does not start from a builder form, so forms cannot start it.',
+	blocked: 'This flow uses a step that is no longer available, so forms that send to it start nothing.',
 	inactive: 'This flow is not active, so forms that send to it start nothing.',
 };
+
+/** What the settings say beside a flow whose trigger could not be read. */
+export const FLOW_UNCHECKED = 'Could not check whether this flow starts from a builder form.';

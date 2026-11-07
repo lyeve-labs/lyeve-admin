@@ -99,7 +99,29 @@ describe('the forms list', () => {
 		expect(said()).toContain('Deleted site 7c9e6679-7425-40de-944b-e07fc1f90ae7');
 	});
 
+	it('warns on a form whose content type is no longer allowed', () => {
+		render(Page, { props: props({ settings: { ok: true, value: { ...SETTINGS, form_schemas: [] } } }) });
+		expect(document.querySelector('[data-testid="form-warning"]')?.textContent).toContain(
+			'Forms cannot send to Contact messages any more, so posts to this form fail. Choose it again under Where forms can send.',
+		);
+	});
+
+	it('warns on a form whose flow is no longer allowed', () => {
+		render(Page, {
+			props: props({ forms: [published({ destination: { flow: 'notify' } })], settings: { ok: true, value: { ...SETTINGS, form_flows: [] } } }),
+		});
+		expect(document.querySelector('[data-testid="form-warning"]')?.textContent).toContain(
+			'Forms cannot start the flow Notify sales any more, so posts to this form fail.',
+		);
+	});
+
+	it('offers the submissions of a form that now starts a flow while it has any', () => {
+		render(Page, { props: props({ forms: [published({ destination: { flow: 'notify' }, counts: { new: 0, read: 2, spam: 0 } })] }) });
+		expect(document.querySelector('a[href*="block=b1"]')?.textContent).toContain('View submissions');
+	});
+
 	it.each([
+		{ why: 'is blocked', flows: [flow({ status: 'blocked' })], text: 'The flow Notify sales uses a step that is no longer available, so posts to this form start nothing.' },
 		{ why: 'is not active', flows: [flow({ status: 'disabled' })], text: 'The flow Notify sales is not active, so posts to this form start nothing.' },
 		{ why: 'has another trigger', flows: [flow({ formTrigger: false })], text: 'The flow Notify sales does not start from a builder form, so posts to this form start nothing.' },
 		{ why: 'is gone', flows: [], text: 'The flow notify no longer exists, so posts to this form start nothing.' },
@@ -120,6 +142,18 @@ describe('where forms can send', () => {
 		expect(said()).toContain('Notify sales');
 		expect(said()).not.toContain('Nightly report');
 		expect(said()).toContain('No flow uses this slug any more. Clear it, then save.');
+	});
+
+	it('keeps a flow whose trigger could not be checked, and says so', () => {
+		render(Page, { props: props({ flows: { ok: true, value: [flow({ formTrigger: null })] } }) });
+		expect(said()).toContain('Notify sales');
+		expect(said()).toContain('Could not check whether this flow starts from a builder form.');
+	});
+
+	it('sends the content type list whenever it loaded, so a save can clear one that is gone', () => {
+		render(Page, { props: props({ schemas: { ok: true, value: [] } }) });
+		expect(said()).toContain('Forms cannot send to contact_messages any more. Save to clear it.');
+		expect(document.querySelector('form[action="?/targets"] input[name="schemas_offered"]')).not.toBeNull();
 	});
 
 	it('says the flow plugin is not running instead of offering no flows', () => {
@@ -177,9 +211,14 @@ describe('one form', () => {
 			}),
 		});
 		expect(said()).toContain('ana@example.com');
-		expect(document.querySelector('a[href^="/admin/forms/export?"]')?.getAttribute('href')).toBe('/admin/forms/export?site=s1&path=%2Fcontact&block=b1');
+		// The file holds the state the list is filtered to.
+		expect(document.querySelector('a[href^="/admin/forms/export?"]')?.getAttribute('href')).toBe(
+			'/admin/forms/export?site=s1&path=%2Fcontact&block=b1&state=new',
+		);
 		const states = [...document.querySelectorAll('form[action="?/state"] input[name="state"]')].map((i) => (i as HTMLInputElement).value);
 		expect(states).toEqual(['read', 'spam']);
+		expect(said()).toContain('Mark read');
+		expect(said()).toContain('Mark spam');
 		expect(document.querySelector('form[action="?/delete"]')).not.toBeNull();
 	});
 
