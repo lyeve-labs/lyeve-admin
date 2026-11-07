@@ -134,6 +134,7 @@ function write(roles: string[], reply: () => Response | Promise<Response>) {
 		return reply();
 	}) as unknown as typeof globalThis.fetch;
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	form.set('id', 'k1');
 	const url = new URL('http://localhost/admin/api-keys');
 	return { calls, event: { fetch, cookies, url, request: new Request(url, { method: 'POST', body: form }) } as never };

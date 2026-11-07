@@ -16,6 +16,7 @@ import { ApiError } from '@lyeve-labs/client';
 import { sessionToken } from '$lib/server/session-cookie';
 import { SESSION_ENDED } from '$lib/session';
 import { section, type Section } from '$lib/api/gate';
+import { asked } from '$lib/server/asked';
 
 /**
  * The engine config keys that make up the fallback transport.
@@ -133,15 +134,22 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireUser(event);
-		const data = await event.request.formData();
-		try {
-			await deleteEmailProvider(authedClient(event), text(data, 'id'));
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the provider. Try again.'));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this provider?',
+			detail: 'Mail that would go through it goes to the next provider instead.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const data = await event.request.formData();
+			try {
+				await deleteEmailProvider(authedClient(event), text(data, 'id'));
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the provider. Try again.'));
+			}
+		},
+	),
 
 	// One setting per submission. Sending the whole form would clear every
 	// credential the operator did not retype, because a blank secret is how the

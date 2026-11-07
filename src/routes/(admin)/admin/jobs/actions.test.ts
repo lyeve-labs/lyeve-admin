@@ -16,8 +16,9 @@ import { actions } from './+page.server';
 
 function event(fields: Record<string, string>) {
 	const data = new FormData();
+	data.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) data.set(k, v);
-	return { request: { formData: async () => data } } as never;
+	return { request: { formData: async () => data, clone: () => ({ formData: async () => data }) } } as never;
 }
 
 type Failure = { status: number; data: Record<string, unknown> };

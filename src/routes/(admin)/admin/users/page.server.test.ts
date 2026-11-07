@@ -65,6 +65,7 @@ function mockEvent(overrides: Record<string, unknown> = {}) {
 
 function form(data: Record<string, string>): FormData {
 	const fd = new FormData();
+	fd.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(data)) fd.set(k, v);
 	return fd;
 }
@@ -644,8 +645,9 @@ describe('deleting an account', () => {
 			calls.push({ method: init?.method ?? 'GET', url: String(url) });
 			return reply();
 		}) as unknown as typeof globalThis.fetch;
+		const posted = form({ id: 'u1' });
 		const event = mockEvent({
-			request: { formData: () => Promise.resolve(form({ id: 'u1' })) } as never,
+			request: { formData: async () => posted, clone: () => ({ formData: async () => posted }) } as never,
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		});

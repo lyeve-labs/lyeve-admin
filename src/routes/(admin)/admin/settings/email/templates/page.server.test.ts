@@ -37,9 +37,10 @@ function loadEvent(routes: Record<string, Route>, plugins = withEmail) {
 
 function actionEvent(entries: Record<string, string>, routes: Record<string, Route>) {
 	const fd = new FormData();
+	fd.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(entries)) fd.append(k, v);
 	const { fetch, calls } = fetchFor(routes);
-	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => fd }, url: URL_, params: {} } as never };
+	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => fd, clone: () => ({ formData: async () => fd }) }, url: URL_, params: {} } as never };
 }
 
 const reset = { id: 't1', key: 'password-reset', subject: 'Reset', mjml_source: '<mjml/>', status: 'active', required: true };

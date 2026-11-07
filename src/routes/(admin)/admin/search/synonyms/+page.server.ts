@@ -6,6 +6,7 @@ import { createSynonym, deleteSynonym, listSynonymGroups, parseTerms, type Synon
 import { section } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
 import { attempt } from '../attempt.server';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
@@ -32,14 +33,21 @@ export const actions: Actions = {
 		}
 	},
 
-	deleteSynonym: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const form = await event.request.formData();
-		try {
-			await deleteSynonym(authedClient(event), String(form.get('id') ?? ''));
-			return { synonymDeleted: true };
-		} catch (err) {
-			return fail(400, { synonymDeleteError: actionError(err, 'Could not delete the synonym. Try again.') });
-		}
-	},
+	deleteSynonym: asked(
+		{
+			question: 'Delete the synonyms of this term?',
+			detail: 'Searches for it match only the term itself.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const form = await event.request.formData();
+			try {
+				await deleteSynonym(authedClient(event), String(form.get('id') ?? ''));
+				return { synonymDeleted: true };
+			} catch (err) {
+				return fail(400, { synonymDeleteError: actionError(err, 'Could not delete the synonym. Try again.') });
+			}
+		},
+	),
 };

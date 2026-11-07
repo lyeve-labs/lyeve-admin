@@ -96,6 +96,7 @@ function write(fields: Record<string, string | string[]>, reply: Response = json
 		return reply.clone();
 	});
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) form.append(k, one);
 	const url = new URL('http://admin.test/admin/data-export');
 	return { calls, event: { fetch, url, request: new Request(url, { method: 'POST', body: form }) } as never };

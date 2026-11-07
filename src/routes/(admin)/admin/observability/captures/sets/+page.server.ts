@@ -8,6 +8,7 @@ import { notRunning } from '$lib/plugins';
 import { CONFIRM_WRITES, deleteReplaySet, listReplaySets, replaySet, type ReplaySet } from '$lib/api/request-capture';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -38,18 +39,25 @@ function idOf(form: FormData): string {
 }
 
 export const actions: Actions = {
-	deleteSet: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const form = await event.request.formData();
-		const id = idOf(form);
-		if (!id) return fail(400, { error: 'This form is missing its replay set. Reload the page and try again.' });
-		try {
-			await deleteReplaySet(authedClient(event), id);
-		} catch (err) {
-			return actionFailure(err, 'Could not delete the replay set. Try again.');
-		}
-		return { removedSet: id };
-	},
+	deleteSet: asked(
+		{
+			question: 'Delete this replay set?',
+			detail: 'Its captures are kept. Only the set is deleted.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const form = await event.request.formData();
+			const id = idOf(form);
+			if (!id) return fail(400, { error: 'This form is missing its replay set. Reload the page and try again.' });
+			try {
+				await deleteReplaySet(authedClient(event), id);
+			} catch (err) {
+				return actionFailure(err, 'Could not delete the replay set. Try again.');
+			}
+			return { removedSet: id };
+		},
+	),
 
 	replaySet: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);

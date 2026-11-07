@@ -8,6 +8,7 @@ import { actionFailure, tagged } from '$lib/server/action-error';
 import { createWebhookRecord, updateWebhookRecord, webhookBodyFrom } from '$lib/api/webhook-options';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
+import { asked } from '$lib/server/asked';
 
 /** The page size when a request names none. */
 const DEFAULT_LIMIT = 50;
@@ -152,20 +153,27 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		// The plugin serves this write to a super admin only.
-		await requireRole(event, ['super_admin']);
-		const { request } = event;
-		const client = authedClient(event);
-		const data = await request.formData();
-		const id = String(data.get('id') ?? '');
+	delete: asked(
+		{
+			question: 'Delete this webhook?',
+			detail: 'This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			// The plugin serves this write to a super admin only.
+			await requireRole(event, ['super_admin']);
+			const { request } = event;
+			const client = authedClient(event);
+			const data = await request.formData();
+			const id = String(data.get('id') ?? '');
 
-		try {
-			await deleteWebhook(id, client);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the webhook. Try again.'));
-		}
-	},
+			try {
+				await deleteWebhook(id, client);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the webhook. Try again.'));
+			}
+		},
+	),
 
 	test: async (event) => {
 		await requireUser(event);

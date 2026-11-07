@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProvidersPage from './+page.svelte';
 import type { EmailProvider } from '$lib/api/email';
 
-type Submit = (input: { cancel: () => void }) => Promise<unknown>;
+type Submit = (input: { cancel: () => void; formData: FormData }) => Promise<unknown>;
 const forms = vi.hoisted(() => ({ submits: new Map<HTMLFormElement, unknown>() }));
 vi.mock('$app/forms', () => ({
 	enhance: (form: HTMLFormElement, submit: unknown) => {
@@ -27,7 +27,7 @@ async function pressDelete(button: HTMLElement, field: string, answer = true) {
 	const cancel = vi.fn();
 	kit.confirm.mockClear();
 	kit.confirm.mockResolvedValueOnce(answer);
-	await (forms.submits.get(form) as Submit)({ cancel });
+	await (forms.submits.get(form) as Submit)({ cancel, formData: new FormData(form) });
 	return {
 		action: form.getAttribute('action'),
 		title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''),

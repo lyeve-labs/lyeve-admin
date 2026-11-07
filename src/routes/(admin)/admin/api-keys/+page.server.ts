@@ -20,6 +20,7 @@ import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } f
 import { section, type Section } from '$lib/api/gate';
 import { rolesInWords } from '$lib/roles';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 /**
  * A failed write tagged with the action that made it. Every action answers
@@ -209,29 +210,43 @@ export const actions: Actions = {
 		return { limited: id };
 	},
 
-	revoke: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const { request } = event;
-		const client = authedClient(event);
-		const data = await request.formData();
-		const id = String(data.get('id') ?? '');
-		try {
-			await revokeAPIKey(id, client);
-		} catch (err) {
-			return tagged('revoke', actionFailure(err, 'Could not revoke the API key. Try again.'));
-		}
-	},
+	revoke: asked(
+		{
+			question: 'Revoke this key?',
+			detail: 'Anything that uses this key stops working immediately. The key stays in the list and cannot be used again.',
+			label: 'Revoke',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const { request } = event;
+			const client = authedClient(event);
+			const data = await request.formData();
+			const id = String(data.get('id') ?? '');
+			try {
+				await revokeAPIKey(id, client);
+			} catch (err) {
+				return tagged('revoke', actionFailure(err, 'Could not revoke the API key. Try again.'));
+			}
+		},
+	),
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const { request } = event;
-		const client = authedClient(event);
-		const data = await request.formData();
-		const id = String(data.get('id') ?? '');
-		try {
-			await deleteAPIKey(id, client);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the API key. Try again.'));
-		}
-	}
+	delete: asked(
+		{
+			question: 'Delete this API key?',
+			detail: 'Anything that uses this key stops working, and the key is removed from the list. This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const { request } = event;
+			const client = authedClient(event);
+			const data = await request.formData();
+			const id = String(data.get('id') ?? '');
+			try {
+				await deleteAPIKey(id, client);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the API key. Try again.'));
+			}
+		},
+	),
 };

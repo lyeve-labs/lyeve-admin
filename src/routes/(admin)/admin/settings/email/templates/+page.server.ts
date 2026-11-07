@@ -21,6 +21,7 @@ import {
 	type TemplateStarter,
 	type TemplateStatus,
 } from '$lib/api/email-templates';
+import { asked } from '$lib/server/asked';
 
 const STATUSES: TemplateStatus[] = ['draft', 'active', 'archived'];
 
@@ -83,17 +84,24 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireUser(event);
-		const id = text(await event.request.formData(), 'id');
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its template. Reload the page and try again.' });
-		try {
-			await deleteTemplate(authedClient(event), id);
-			return { deleted: id };
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the template. Try again.', err instanceof ApiError && err.status === 409 ? 409 : 400));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this template?',
+			detail: 'A trigger or a flow that sends it stops sending.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const id = text(await event.request.formData(), 'id');
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its template. Reload the page and try again.' });
+			try {
+				await deleteTemplate(authedClient(event), id);
+				return { deleted: id };
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the template. Try again.', err instanceof ApiError && err.status === 409 ? 409 : 400));
+			}
+		},
+	),
 
 	preview: async (event) => {
 		await requireUser(event);

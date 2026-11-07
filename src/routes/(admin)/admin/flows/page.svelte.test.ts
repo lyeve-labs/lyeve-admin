@@ -139,8 +139,11 @@ describe('flows list page', () => {
 
 		kit.confirm.mockResolvedValue(true);
 		cancel.mockClear();
-		await forms.submits.get(form)?.({ cancel });
+		const formData = new FormData(form);
+		await forms.submits.get(form)?.({ cancel, formData });
 		expect(cancel).not.toHaveBeenCalled();
+		// The agreed post carries the answer the delete action requires.
+		expect(formData.get('confirmed')).toBe('yes');
 	});
 
 	it('renders the not-enabled state when the engine answered 402, and nothing to create', () => {

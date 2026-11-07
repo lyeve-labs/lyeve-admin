@@ -79,6 +79,7 @@ function loadEvent(routes: Record<string, Route>, roles: string[]) {
 function actionEvent(fields: Record<string, string>, routes: Record<string, Route>, roles: string[]) {
 	const { fetch, calls } = fetchFor(routes, roles);
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) body.set(k, v);
 	return {
 		event: { fetch, cookies: mockCookies(), request: new Request('http://localhost/admin/observability/telemetry/export', { method: 'POST', body }) } as never,

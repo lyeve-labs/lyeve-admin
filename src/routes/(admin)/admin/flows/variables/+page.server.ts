@@ -8,6 +8,7 @@ import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';
 import { pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
+import { asked } from '$lib/server/asked';
 
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -78,15 +79,22 @@ export const actions: Actions = {
 		return { saved: key };
 	},
 
-	delete: async (event) => {
-		await requireUser(event);
-		const client = authedClient(event);
-		const data = await event.request.formData();
-		const key = String(data.get('key') ?? '').trim();
-		try {
-			await deleteVariable(client, key);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the variable. Try again.'));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this variable?',
+			detail: 'Expressions that use it will fail.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const client = authedClient(event);
+			const data = await event.request.formData();
+			const key = String(data.get('key') ?? '').trim();
+			try {
+				await deleteVariable(client, key);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the variable. Try again.'));
+			}
+		},
+	),
 };

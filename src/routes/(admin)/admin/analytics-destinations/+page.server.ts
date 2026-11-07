@@ -26,6 +26,7 @@ import {
 	type ProviderInput,
 	type ProviderType,
 } from '$lib/api/analytics-destinations';
+import { asked } from '$lib/server/asked';
 
 function statusOf(url: URL): DeliveryStatus | '' {
 	const s = url.searchParams.get('status') ?? '';
@@ -134,18 +135,25 @@ export const actions: Actions = {
 		return { saved: saved.name || name, signingSecret: saved.signing_secret ?? '' };
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const id = String((await event.request.formData()).get('id') ?? '');
-		if (!id) return fail(400, { error: 'This form is missing its destination. Reload the page and try again.' });
-		try {
-			await deleteProvider(authedClient(event), id);
-		} catch (err) {
-			const failed = actionFailure(err, 'Could not delete the destination. Try again.');
-			return fail(failed.status, failed.data);
-		}
-		return { deleted: id };
-	},
+	delete: asked(
+		{
+			question: 'Delete this destination?',
+			detail: 'Events stop going to this destination, and its queued deliveries are deleted. This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const id = String((await event.request.formData()).get('id') ?? '');
+			if (!id) return fail(400, { error: 'This form is missing its destination. Reload the page and try again.' });
+			try {
+				await deleteProvider(authedClient(event), id);
+			} catch (err) {
+				const failed = actionFailure(err, 'Could not delete the destination. Try again.');
+				return fail(failed.status, failed.data);
+			}
+			return { deleted: id };
+		},
+	),
 
 	replay: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);

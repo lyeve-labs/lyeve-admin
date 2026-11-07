@@ -14,6 +14,7 @@ import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
 import { rolesInWords } from '$lib/roles';
+import { asked } from '$lib/server/asked';
 
 /** The engine's own page size when a request names none. */
 const DEFAULT_LIMIT = 25;
@@ -155,19 +156,26 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const { request } = event;
-		const client = authedClient(event);
-		const form = await request.formData();
-		const id = String(form.get('id') ?? '');
-		try {
-			await deleteUser(id, client);
-			return { ok: true };
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the user. Try again.'));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this user?',
+			detail: 'Their sessions end immediately and their audit trail is kept. This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const { request } = event;
+			const client = authedClient(event);
+			const form = await request.formData();
+			const id = String(form.get('id') ?? '');
+			try {
+				await deleteUser(id, client);
+				return { ok: true };
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the user. Try again.'));
+			}
+		},
+	),
 
 	setPassword: async (event) => {
 		await requireRole(event, ['super_admin']);

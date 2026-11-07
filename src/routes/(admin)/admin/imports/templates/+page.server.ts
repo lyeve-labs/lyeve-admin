@@ -14,6 +14,7 @@ import {
 } from '$lib/api/bulk-import';
 import { type Gate, GATE_OK, type Section } from '$lib/api/gate';
 import { readSchemas, readTemplates } from '../reads.server';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -96,16 +97,23 @@ export const actions: Actions = {
 	},
 
 	// Deleting a template is always allowed.
-	deleteTemplate: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'deleteTemplate', error: 'This form is missing its template. Reload the page and try again.' });
-		try {
-			await deleteTemplate(authedClient(event), id);
-		} catch (err) {
-			return tagged('deleteTemplate', actionFailure(err, 'Could not delete the template. Try again.'));
-		}
-		return { removedTemplate: id };
-	},
+	deleteTemplate: asked(
+		{
+			question: 'Delete this template?',
+			detail: 'Imports that already used it keep their history.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'deleteTemplate', error: 'This form is missing its template. Reload the page and try again.' });
+			try {
+				await deleteTemplate(authedClient(event), id);
+			} catch (err) {
+				return tagged('deleteTemplate', actionFailure(err, 'Could not delete the template. Try again.'));
+			}
+			return { removedTemplate: id };
+		},
+	),
 };

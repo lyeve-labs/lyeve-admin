@@ -19,6 +19,7 @@ import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
 import { readSchemas, readTemplates } from './reads.server';
+import { asked } from '$lib/server/asked';
 
 /** The job the history's Rows button opened, with the rows it rejected and skipped. */
 export interface ImportDetail {
@@ -102,35 +103,49 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
-	cancel: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'cancel', error: 'This form is missing its import. Reload the page and try again.' });
-		try {
-			await cancelJob(client, id);
-		} catch (err) {
-			return tagged('cancel', actionFailure(err, 'Could not cancel the import. Try again.'));
-		}
-		return { canceled: id };
-	},
+	cancel: asked(
+		{
+			question: 'Cancel this import?',
+			detail: 'The import stops where it is. Rows it already wrote stay, and canceling does not undo them.',
+			label: 'Cancel import',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'cancel', error: 'This form is missing its import. Reload the page and try again.' });
+			try {
+				await cancelJob(client, id);
+			} catch (err) {
+				return tagged('cancel', actionFailure(err, 'Could not cancel the import. Try again.'));
+			}
+			return { canceled: id };
+		},
+	),
 
 	// Removes the entries the job created. Offered only where there is one to
 	// remove, since a dry run wrote nothing and a rollback of one would be a
 	// no-op dressed as a repair. The engine takes it from any admin, so the
 	// admin who ran a bad import can undo it.
-	rollback: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'rollback', error: 'This form is missing its import. Reload the page and try again.' });
-		try {
-			await rollbackJob(client, id);
-		} catch (err) {
-			return tagged('rollback', actionFailure(err, 'Could not roll back the import. Try again.'));
-		}
-		return { rolledBack: id };
-	},
+	rollback: asked(
+		{
+			question: 'Roll back this import?',
+			detail: 'The entries it created are deleted, with any edits made to them since. Entries it updated keep the imported values. The history of the import stays.',
+			label: 'Roll back',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'rollback', error: 'This form is missing its import. Reload the page and try again.' });
+			try {
+				await rollbackJob(client, id);
+			} catch (err) {
+				return tagged('rollback', actionFailure(err, 'Could not roll back the import. Try again.'));
+			}
+			return { rolledBack: id };
+		},
+	),
 };

@@ -17,6 +17,7 @@ import {
 } from '$lib/api/storage';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { rowsOf } from '$lib/api/list';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins, user } = await event.parent();
@@ -87,18 +88,25 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'This form is missing its provider. Reload the page and try again.' });
-		try {
-			await deleteProvider(client, id);
-		} catch (err) {
-			const failed = actionFailure(err, 'Could not delete the provider. Try again.');
-			return fail(failed.status, failed.data);
-		}
-		return { removed: id };
-	},
+	delete: asked(
+		{
+			question: 'Delete this provider?',
+			detail: 'Files already stored there stay where they are, but this instance can no longer read them.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { error: 'This form is missing its provider. Reload the page and try again.' });
+			try {
+				await deleteProvider(client, id);
+			} catch (err) {
+				const failed = actionFailure(err, 'Could not delete the provider. Try again.');
+				return fail(failed.status, failed.data);
+			}
+			return { removed: id };
+		},
+	),
 };

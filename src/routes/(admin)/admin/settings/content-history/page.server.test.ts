@@ -52,6 +52,7 @@ function loadEvent(features: string[] = []) {
 
 function formEvent(fields: Record<string, string | readonly string[]>) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) {
 		for (const one of typeof v === 'string' ? [v] : v) body.append(k, one);
 	}

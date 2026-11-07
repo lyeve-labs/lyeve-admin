@@ -28,8 +28,9 @@ function loadEvent(query = '') {
 
 function actionEvent(fields: Record<string, string>) {
 	const data = new FormData();
+	data.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) data.set(k, v);
-	return { request: { formData: async () => data } } as never;
+	return { request: { formData: async () => data, clone: () => ({ formData: async () => data }) } } as never;
 }
 
 /** An event whose request can be read twice, as the update action reads it. */

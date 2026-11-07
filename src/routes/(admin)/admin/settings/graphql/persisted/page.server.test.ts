@@ -62,6 +62,7 @@ describe('register', () => {
 describe('switching and deleting a persisted query', () => {
 	const post = (hash: string) => {
 		const form = new FormData();
+		form.set('confirmed', 'yes');
 		form.set('hash', hash);
 		return { request: new Request('http://x', { method: 'POST', body: form }) } as never;
 	};

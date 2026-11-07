@@ -55,6 +55,7 @@ function loadEvent(roles: string[], tenant = '', plugins?: unknown) {
 
 function formEvent(fields: Record<string, string>) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) body.set(k, v);
 	return {
 		request: new Request('http://admin/admin/observability/cache/rules', { method: 'POST', body }),
@@ -161,6 +162,17 @@ describe('cache rule actions', () => {
 		expect(api.purgeResponses).toHaveBeenLastCalledWith(expect.anything(), '');
 	});
 
+	it('purges nothing on a post that skipped the question, and keeps what it named for the second post', async () => {
+		const body = new FormData();
+		body.set('tag', 'posts');
+		const url = new URL('http://admin/admin/observability/cache/rules?/purge');
+		const out = await actions.purge({ url, request: new Request(url, { method: 'POST', body }), cookies: {}, fetch: vi.fn() } as never);
+		expect(api.purgeResponses).not.toHaveBeenCalled();
+		expect(api.purgeRule).not.toHaveBeenCalled();
+		expect(out).toMatchObject({
+			unconfirmed: { question: 'Purge these cached responses?', label: 'Purge', action: '/admin/observability/cache/rules?/purge', fields: [['tag', 'posts']] },
+		});
+	});
 });
 
 describe('cache rule update', () => {

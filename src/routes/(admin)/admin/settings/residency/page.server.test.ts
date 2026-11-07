@@ -32,6 +32,7 @@ function engine(
 		return opts.reply?.clone() ?? json({});
 	});
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) form.set(k, v);
 	const url = new URL('http://localhost/admin/settings/residency');
 	return {

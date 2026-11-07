@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EmailTrigger } from '$lib/api/email-triggers';
 
-type Submit = (input: { cancel: () => void }) => Promise<unknown>;
+type Submit = (input: { cancel: () => void; formData: FormData }) => Promise<unknown>;
 const forms = vi.hoisted(() => ({ submits: new Map<HTMLFormElement, unknown>() }));
 vi.mock('$app/forms', () => ({
 	enhance: (form: HTMLFormElement, submit: unknown) => {
@@ -25,7 +25,7 @@ async function pressDelete(button: HTMLElement, field: string) {
 	const form = button.closest('form') as HTMLFormElement;
 	const cancel = vi.fn();
 	kit.confirm.mockClear();
-	await (forms.submits.get(form) as Submit)({ cancel });
+	await (forms.submits.get(form) as Submit)({ cancel, formData: new FormData(form) });
 	return {
 		action: form.getAttribute('action'),
 		title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''),

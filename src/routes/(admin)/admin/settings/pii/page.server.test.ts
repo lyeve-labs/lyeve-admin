@@ -25,6 +25,7 @@ import { actions, load } from './+page.server';
 
 function formEvent(fields: Record<string, string>) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) body.set(k, v);
 	return { request: new Request('http://admin/x', { method: 'POST', body }), cookies: {}, fetch: vi.fn() } as never;
 }

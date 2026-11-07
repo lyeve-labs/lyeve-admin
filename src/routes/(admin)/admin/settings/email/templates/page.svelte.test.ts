@@ -25,10 +25,10 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
  */
 async function pressDelete(button: HTMLElement, field: string) {
 	const form = button.closest('form') as HTMLFormElement;
-	const submit = forms.submits.find((s) => s.node === form)?.submit as (input: { cancel: () => void }) => Promise<unknown>;
+	const submit = forms.submits.find((s) => s.node === form)?.submit as (input: { cancel: () => void; formData: FormData }) => Promise<unknown>;
 	const cancel = vi.fn();
 	kit.confirm.mockClear();
-	await submit({ cancel });
+	await submit({ cancel, formData: new FormData(form) });
 	return {
 		action: form.getAttribute('action'),
 		title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''),

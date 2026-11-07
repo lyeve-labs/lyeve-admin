@@ -16,6 +16,7 @@ import {
 import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { listProviders as listSamlProviders } from '$lib/api/saml';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -136,17 +137,24 @@ export const actions: Actions = {
 		return { rotated: id };
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its connection. Reload the page and try again.' });
-		try {
-			await deleteProvider(client, id);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the connection. Try again.'));
-		}
-		return { removed: id };
-	},
+	delete: asked(
+		{
+			question: 'Delete this SCIM connection?',
+			detail: 'The identity provider stops being able to create or remove accounts here. Accounts it already created are left as they are.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its connection. Reload the page and try again.' });
+			try {
+				await deleteProvider(client, id);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the connection. Try again.'));
+			}
+			return { removed: id };
+		},
+	),
 };

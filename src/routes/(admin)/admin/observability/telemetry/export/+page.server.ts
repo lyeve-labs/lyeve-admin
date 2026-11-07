@@ -22,6 +22,7 @@ import { actionError, actionFailure } from '$lib/server/action-error';
 import { forbiddenText, section, type Section } from '$lib/api/gate';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 const READERS = ['admin', 'super_admin'];
 
@@ -141,15 +142,22 @@ export const actions: Actions = {
 	},
 
 	// Removing a destination is always allowed.
-	removeDestination: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		try {
-			await removeDestination(authedClient(event));
-		} catch (err) {
-			return destinationFailure('remove', err, 'Could not delete the destination. Try again.');
-		}
-		return { removedDestination: true };
-	},
+	removeDestination: asked(
+		{
+			question: 'Delete this destination?',
+			detail: "This tenant's series stop being pushed there, and its stored headers are deleted.",
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			try {
+				await removeDestination(authedClient(event));
+			} catch (err) {
+				return destinationFailure('remove', err, 'Could not delete the destination. Try again.');
+			}
+			return { removedDestination: true };
+		},
+	),
 
 	export: async (event) => {
 		await requireRole(event, ['super_admin']);

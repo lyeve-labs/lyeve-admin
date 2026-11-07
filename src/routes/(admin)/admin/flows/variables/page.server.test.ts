@@ -34,7 +34,7 @@ function loadEvent(routes: Record<string, Route>, search = '') {
 
 function actionEvent(form: FormData, routes: Record<string, Route>) {
 	const { fetch, calls } = fetchFor(routes);
-	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => form }, url: new URL('http://localhost/admin/flows/variables'), params: {} } as never };
+	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => form, clone: () => ({ formData: async () => form }) }, url: new URL('http://localhost/admin/flows/variables'), params: {} } as never };
 }
 
 describe('admin/flows/variables load', () => {
@@ -142,6 +142,7 @@ describe('admin/flows/variables actions', () => {
 
 	it('delete removes by key', async () => {
 		const form = new FormData();
+		form.set('confirmed', 'yes');
 		form.set('key', 'region');
 		const { event, calls } = actionEvent(form, { '/variables/region': () => new Response(null, { status: 204 }) });
 		await actions.delete(event);

@@ -13,6 +13,7 @@ import {
 	type PersistedQuery,
 } from '$lib/api/graphql';
 import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
+import { asked } from '$lib/server/asked';
 
 /** The persisted queries a page shows, and the most the plugin answers at once. */
 const PERSISTED_PAGE = 50;
@@ -82,15 +83,22 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireUser(event);
-		const hash = await hashOf(event);
-		if (!hash) return fail(400, { action: 'delete', error: 'This form is missing its query. Reload the page and try again.' });
-		try {
-			await deletePersisted(authedClient(event), hash);
-			return { deleted: hash };
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the query. Try again.'));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this persisted query?',
+			detail: 'Clients that send only its hash will be refused.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const hash = await hashOf(event);
+			if (!hash) return fail(400, { action: 'delete', error: 'This form is missing its query. Reload the page and try again.' });
+			try {
+				await deletePersisted(authedClient(event), hash);
+				return { deleted: hash };
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the query. Try again.'));
+			}
+		},
+	),
 };

@@ -8,6 +8,7 @@ import { notRunning } from '$lib/plugins';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
 import { createSink, deleteSink, isSinkKind, listSinks, testSink, updateSink, type AuditSink } from '$lib/api/audit-sinks';
+import { asked } from '$lib/server/asked';
 
 const ADMINS = ['admin', 'super_admin'];
 
@@ -107,18 +108,25 @@ export const actions: Actions = {
 		return { saved: body.name };
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ADMINS);
-		const form = await event.request.formData();
-		const id = text(form, 'id');
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its destination. Reload the page and try again.' });
-		try {
-			await deleteSink(authedClient(event), id);
-		} catch (err) {
-			return failure('delete', err, 'Could not delete the destination. Try again.');
-		}
-		return { deleted: true };
-	},
+	delete: asked(
+		{
+			question: 'Delete this destination?',
+			detail: 'The destination stops receiving the audit log. Entries already sent stay where they are.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ADMINS);
+			const form = await event.request.formData();
+			const id = text(form, 'id');
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its destination. Reload the page and try again.' });
+			try {
+				await deleteSink(authedClient(event), id);
+			} catch (err) {
+				return failure('delete', err, 'Could not delete the destination. Try again.');
+			}
+			return { deleted: true };
+		},
+	),
 
 	test: async (event) => {
 		await requireRole(event, ADMINS);

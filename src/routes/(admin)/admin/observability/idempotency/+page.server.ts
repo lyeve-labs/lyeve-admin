@@ -14,6 +14,7 @@ import {
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -75,17 +76,24 @@ export const actions: Actions = {
 	// which is the repair for a key whose process died mid-write and the wrong
 	// thing to do to one that is genuinely in flight. The plugin admits any
 	// admin to the release, the same readers who can list the keys.
-	release: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const key = String(form.get('key') ?? '');
-		if (!key) return fail(400, { error: 'This form is missing its key. Reload the page and try again.' });
-		try {
-			await releaseKey(client, key);
-		} catch (err) {
-			return actionFailure(err, 'Could not release the key. Try again.');
-		}
-		return { released: key };
-	},
+	release: asked(
+		{
+			question: 'Release this key?',
+			detail: 'The next request with this key runs again. If the original request is still running, the write happens twice.',
+			label: 'Release',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const key = String(form.get('key') ?? '');
+			if (!key) return fail(400, { error: 'This form is missing its key. Reload the page and try again.' });
+			try {
+				await releaseKey(client, key);
+			} catch (err) {
+				return actionFailure(err, 'Could not release the key. Try again.');
+			}
+			return { released: key };
+		},
+	),
 };

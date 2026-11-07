@@ -22,6 +22,7 @@ import {
 	type Flow,
 	type ImportResult,
 } from '$lib/api/flows';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
@@ -123,18 +124,25 @@ export const actions: Actions = {
 		redirect(303, `/admin/flows/${encodeURIComponent(created.id)}`);
 	},
 
-	delete: async (event) => {
-		await requireUser(event);
-		const client = authedClient(event);
-		const data = await event.request.formData();
-		const id = String(data.get('id') ?? '');
-		try {
-			await deleteFlow(client, id);
-		} catch (err) {
-			if (err instanceof ApiError && err.status === 403) return tagged('delete', forbiddenFailure(err));
-			return tagged('delete', actionFailure(err, 'Could not delete the flow. Try again.'));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this flow?',
+			detail: 'Its versions and run history go with it.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const client = authedClient(event);
+			const data = await event.request.formData();
+			const id = String(data.get('id') ?? '');
+			try {
+				await deleteFlow(client, id);
+			} catch (err) {
+				if (err instanceof ApiError && err.status === 403) return tagged('delete', forbiddenFailure(err));
+				return tagged('delete', actionFailure(err, 'Could not delete the flow. Try again.'));
+			}
+		},
+	),
 
 	import: async (event) => {
 		await requireUser(event);

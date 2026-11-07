@@ -43,6 +43,7 @@ function loadEvent(plugins?: unknown) {
 
 function formEvent(fields: Record<string, string | string[]>) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) {
 		for (const one of Array.isArray(v) ? v : [v]) body.append(k, one);
 	}

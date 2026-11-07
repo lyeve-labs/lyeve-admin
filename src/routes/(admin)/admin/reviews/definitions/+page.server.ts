@@ -10,6 +10,7 @@ import { forbiddenText, section, type Section } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
 import { createDefinition, deleteDefinition, type ReviewLimits } from '$lib/api/review';
 import { DEFINITIONS_FAILED, OPERATORS, loadDefinitions, loadPeople, type DefinitionRow } from '../reads.server';
+import { asked } from '$lib/server/asked';
 
 /** What the page renders. */
 export type DefinitionsPage = {
@@ -88,16 +89,23 @@ export const actions: Actions = {
 		return { created: true };
 	},
 
-	delete: async (event) => {
-		await requireRole(event, OPERATORS);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '').trim();
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its definition. Reload the page and try again.' });
-		try {
-			await deleteDefinition(authedClient(event), id);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the definition. Try again.'));
-		}
-		return { deleted: true };
-	},
+	delete: asked(
+		{
+			question: 'Delete this definition?',
+			detail: 'Its assignments, their history and their comments go with it.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, OPERATORS);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '').trim();
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its definition. Reload the page and try again.' });
+			try {
+				await deleteDefinition(authedClient(event), id);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the definition. Try again.'));
+			}
+			return { deleted: true };
+		},
+	),
 };

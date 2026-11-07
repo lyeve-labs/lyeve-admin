@@ -121,6 +121,7 @@ describe('admin/webhooks/incoming writes by role', () => {
 			return json({});
 		}) as unknown as typeof globalThis.fetch;
 		const form = new FormData();
+		form.set('confirmed', 'yes');
 		form.set('id', 'i1');
 		form.set('field_map', '{"id":"external_id"}');
 		return {
@@ -128,7 +129,7 @@ describe('admin/webhooks/incoming writes by role', () => {
 			event: {
 				fetch,
 				cookies: mockCookies(),
-				request: { formData: async () => form },
+				request: { formData: async () => form, clone: () => ({ formData: async () => form }) },
 				url: new URL('http://localhost/admin/webhooks/incoming'),
 			} as never,
 		};
@@ -160,6 +161,7 @@ function superAdminWrite(fields: Record<string, string>, reply: Response = json(
 		return reply.clone();
 	}) as unknown as typeof globalThis.fetch;
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) form.set(k, v);
 	const url = new URL('http://localhost/admin/webhooks/incoming');
 	return { calls, event: { fetch, cookies: mockCookies(), url, request: new Request(url, { method: 'POST', body: form }) } as never };

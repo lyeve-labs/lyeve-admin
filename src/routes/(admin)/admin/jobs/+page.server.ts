@@ -8,6 +8,7 @@ import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
 import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 export interface Job {
 	id: string;
@@ -190,19 +191,26 @@ export const actions: Actions = {
 		redirect(303, '/admin/jobs');
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const { request } = event;
-		const client = authedClient(event);
-		const form = await request.formData();
-		const id = form.get('id') as string;
-		if (!id) return fail(400, { error: 'This form is missing its job. Reload the page and try again.', action: 'delete' as const });
-		try {
-			await client.delete(`/api/admin/jobs/${encodeURIComponent(id)}`);
-		} catch (err) {
-			const failed = actionFailure(err, 'Could not delete the job. Try again.');
-			return fail(failed.status, { ...failed.data, action: 'delete' as const });
-		}
-		redirect(303, '/admin/jobs');
-	},
+	delete: asked(
+		{
+			question: 'Delete this job?',
+			detail: 'Its schedule stops and its run history is deleted. This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const { request } = event;
+			const client = authedClient(event);
+			const form = await request.formData();
+			const id = form.get('id') as string;
+			if (!id) return fail(400, { error: 'This form is missing its job. Reload the page and try again.', action: 'delete' as const });
+			try {
+				await client.delete(`/api/admin/jobs/${encodeURIComponent(id)}`);
+			} catch (err) {
+				const failed = actionFailure(err, 'Could not delete the job. Try again.');
+				return fail(failed.status, { ...failed.data, action: 'delete' as const });
+			}
+			redirect(303, '/admin/jobs');
+		},
+	),
 };

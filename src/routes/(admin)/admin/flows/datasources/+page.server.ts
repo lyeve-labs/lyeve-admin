@@ -20,6 +20,7 @@ import {
 	type DatasourceKind,
 } from '$lib/api/flows';
 import { SSL_MODES, authFromForm } from '$lib/flow/datasources';
+import { asked } from '$lib/server/asked';
 
 const KINDS: DatasourceKind[] = ['postgres', 'mysql', 'mssql', 'http', 'google_sheets'];
 
@@ -178,16 +179,23 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireUser(event);
-		const client = authedClient(event);
-		const data = await event.request.formData();
-		try {
-			await deleteDatasource(client, text(data, 'id'));
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the datasource. Try again.'));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this datasource?',
+			detail: 'Flows that use it fail at that node until you create it again.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const client = authedClient(event);
+			const data = await event.request.formData();
+			try {
+				await deleteDatasource(client, text(data, 'id'));
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the datasource. Try again.'));
+			}
+		},
+	),
 
 	test: async (event) => {
 		await requireUser(event);

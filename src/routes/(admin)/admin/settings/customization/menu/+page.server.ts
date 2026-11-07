@@ -5,6 +5,7 @@ import { actionError } from '$lib/server/action-error';
 import { adminNav, navLeaves } from '$lib/nav';
 import { EMPTY_SETTINGS, saveCustomization, type CustomLink } from '$lib/api/customization';
 import { current, openTab, roleList } from '../customization.server';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
@@ -57,16 +58,23 @@ export const actions: Actions = {
 		}
 	},
 
-	removeLink: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const index = Number((await event.request.formData()).get('index'));
-		try {
-			const settings = await current(event);
-			settings.menu.links = settings.menu.links.filter((_, i) => i !== index);
-			await saveCustomization(authedClient(event), settings);
-			return { linkRemoved: true };
-		} catch (err) {
-			return fail(400, { menuError: actionError(err, 'Could not remove the link. Try again.') });
-		}
-	},
+	removeLink: asked(
+		{
+			question: 'Delete this link?',
+			detail: 'It is removed from the menu for everyone in this tenant.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const index = Number((await event.request.formData()).get('index'));
+			try {
+				const settings = await current(event);
+				settings.menu.links = settings.menu.links.filter((_, i) => i !== index);
+				await saveCustomization(authedClient(event), settings);
+				return { linkRemoved: true };
+			} catch (err) {
+				return fail(400, { menuError: actionError(err, 'Could not remove the link. Try again.') });
+			}
+		},
+	),
 };

@@ -8,6 +8,7 @@ import { createBudget, deleteBudget, listBudgets, type Budget } from '$lib/api/c
 import { parseBudget } from '$lib/cost/forms';
 import { couldNotLoad } from '$lib/outage';
 import { OPERATOR_ROLES, UNREAD, ledgerReader, refusal, refuseBelowAdmin } from '../costs.server';
+import { asked } from '$lib/server/asked';
 
 type BudgetsPage = {
 	enabled: boolean;
@@ -47,16 +48,23 @@ export const actions: Actions = {
 		return { action: 'createBudget', saved: true };
 	},
 
-	deleteBudget: async (event) => {
-		await requireRole(event, OPERATOR_ROLES);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '').trim();
-		if (!id) return fail(400, { action: 'deleteBudget', error: 'This form is missing its budget. Reload the page and try again.', locked: false });
-		try {
-			await deleteBudget(authedClient(event), id);
-		} catch (err) {
-			return refusal({ action: 'deleteBudget' }, err, 'Could not delete the budget. Try again.');
-		}
-		return { action: 'deleteBudget', saved: true };
-	},
+	deleteBudget: asked(
+		{
+			question: 'Delete this budget?',
+			detail: 'Its threshold history is deleted too.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, OPERATOR_ROLES);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '').trim();
+			if (!id) return fail(400, { action: 'deleteBudget', error: 'This form is missing its budget. Reload the page and try again.', locked: false });
+			try {
+				await deleteBudget(authedClient(event), id);
+			} catch (err) {
+				return refusal({ action: 'deleteBudget' }, err, 'Could not delete the budget. Try again.');
+			}
+			return { action: 'deleteBudget', saved: true };
+		},
+	),
 };
