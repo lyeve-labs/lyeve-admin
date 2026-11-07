@@ -2,6 +2,7 @@
 	import { Badge } from '@lyeve-labs/ui-kit';
 	import type { SchemaField } from '@lyeve-labs/client';
 	import { formatDate, formatDateTime, plural } from '$lib/format';
+	import { shortId } from '$lib/utils/entry-identity';
 
 	let { field, value }: { field: SchemaField; value: unknown } = $props();
 
@@ -69,7 +70,6 @@
 			case 'json':
 				return typeof value === 'object' ? '{...}' : String(value).slice(0, 40);
 			case 'relation': {
-				// Populated object: show the first useful display field (title/name/label/slug/email)
 				if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
 					const obj = value as Record<string, unknown>;
 					const label =
@@ -77,13 +77,11 @@
 						obj['email'] ?? obj['display_name'];
 					return label != null ? String(label).slice(0, 60) : '{...}';
 				}
-				// Array (has_many / many_to_many): show count
 				if (Array.isArray(value)) {
 					return `${(value as unknown[]).length} ${plural((value as unknown[]).length, 'item')}`;
 				}
-				// Raw UUID string: show truncated
 				const s = String(value);
-				return s.length > 12 ? s.slice(0, 8) + '...' : s;
+				return s.length > 12 ? `${shortId(s)}...` : s;
 			}
 			default:
 				return String(value).slice(0, 100);

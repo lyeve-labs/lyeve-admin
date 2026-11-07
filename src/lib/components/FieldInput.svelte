@@ -33,7 +33,6 @@
 	}: {
 		field: SchemaField;
 		value?: unknown;
-		/** Items from the related schema, for relation-type fields */
 		relationItems?: Content[];
 		/** How many entries the related schema holds. Above the items' count, the picker is cut. */
 		relationTotal?: number;

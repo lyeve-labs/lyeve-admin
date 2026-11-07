@@ -26,14 +26,13 @@ export const init: ServerInit = () => {
 	if (problem) throw new Error(problem);
 };
 
-// Periodically prune expired rate-limit buckets so the in-memory Map
-// does not grow without bound under diverse/spoofed client IPs.
-// .unref() prevents the timer from keeping the Node.js process alive.
+// Expired rate-limit buckets are pruned on a timer, or the in-memory map
+// grows with every client address, spoofed ones included.
 setInterval(cleanupRateLimitStore, WINDOW_MS).unref();
 
-// Static security headers applied to every response. The Content-Security-Policy
-// is configured in svelte.config.js (kit.csp) so SvelteKit can attach nonces to
-// its own inline hydration scripts. Setting script-src here would break it.
+// The Content-Security-Policy is configured in svelte.config.js (kit.csp), not
+// with the headers below, so SvelteKit can attach nonces to its own inline
+// hydration scripts. Setting script-src here would break it.
 export const handle: Handle = async ({ event, resolve }) => {
 	// Every page goes to the setup screen until the engine has an account:
 	// while it is unreachable, in setup mode, or waiting for its first admin.
