@@ -82,7 +82,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	// The wizard offers the saved mappings, and whether this install may name
-	// a paid transform. An unread list offers none.
+	// a paid transform. An unread list offers none, and the wizard says so
+	// unless the plugin serves no templates or the reader may not read them.
 	const templates = gate.state === 'ok' ? await readTemplates(client) : null;
 
 	return {
@@ -95,6 +96,7 @@ export const load: PageServerLoad = async (event) => {
 		schemas,
 		detail,
 		templates: templates?.rows ?? ([] as MappingTemplate[]),
+		templatesFailed: ['busy', 'unavailable', 'error'].includes(templates?.gate?.state ?? ''),
 		licensed: templates?.licensed ?? null,
 	};
 };

@@ -348,6 +348,7 @@
 	bind:open={wizardOpen}
 	schemas={schemaList}
 	templates={data.templates}
+	templatesFailed={data.templatesFailed}
 	licensed={data.licensed}
 	onstarted={started}
 />

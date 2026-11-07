@@ -74,6 +74,7 @@ describe('imports load', () => {
 	it('hands the wizard the templates and whether this install may name a paid transform', async () => {
 		const result = (await load(loadEvent())) as Loaded;
 		expect(result.templates).toEqual([template]);
+		expect(result.templatesFailed).toBe(false);
 		expect(result.licensed).toBe(false);
 	});
 
@@ -81,7 +82,15 @@ describe('imports load', () => {
 		api.listTemplates.mockRejectedValue(new Error('down'));
 		const result = (await load(loadEvent())) as Loaded;
 		expect(result.templates).toEqual([]);
+		expect(result.templatesFailed).toBe(true);
 		expect(result.licensed).toBeNull();
+	});
+
+	it('reports no failure when the plugin serves no templates', async () => {
+		api.listTemplates.mockRejectedValue(new ApiError(404, 'not found'));
+		const result = (await load(loadEvent())) as Loaded;
+		expect(result.templates).toEqual([]);
+		expect(result.templatesFailed).toBe(false);
 	});
 });
 

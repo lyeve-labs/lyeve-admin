@@ -64,6 +64,7 @@
 		open = $bindable(false),
 		schemas,
 		templates = [],
+		templatesFailed = false,
 		licensed = null,
 		onstarted,
 	}: {
@@ -72,6 +73,8 @@
 		schemas: ImportSchema[] | null;
 		/** The tenant's saved mappings, offered on the first step. */
 		templates?: MappingTemplate[];
+		/** Whether the saved mappings could not be read, which the first step says. */
+		templatesFailed?: boolean;
 		/** Whether the plugin said this instance may name the paid transforms. Null when it did not say. */
 		licensed?: boolean | null;
 		onstarted: (job: ImportJob) => void;
@@ -439,6 +442,8 @@
 					onvaluechange={chooseTemplate}
 					options={templateOptions}
 				/>
+			{:else if templatesFailed}
+				<p class="text-xs text-muted">Could not load the mapping templates. Reload the page to try again.</p>
 			{/if}
 		{:else if step === 1 && preview}
 			<p class="text-sm text-muted">
