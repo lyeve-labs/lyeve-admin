@@ -10,7 +10,7 @@
 	import { pageNumber } from '$lib/api/list';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
-	import { eventTone } from './event-tone';
+	import { eventTone } from '$lib/tones';
 
 	interface Props {
 		/** The page's one action result, which carries the queue and each replay or dismissal. */

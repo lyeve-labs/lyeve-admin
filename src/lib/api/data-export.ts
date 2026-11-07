@@ -9,7 +9,6 @@
  * only good while the file is still there. The list says when a job finished
  * rather than promising the file is still downloadable.
  */
-import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { formatCount } from '$lib/format';
 
@@ -235,14 +234,6 @@ export async function startExport(client: HttpClient, body: StartExport): Promis
 
 export async function cancelJob(client: HttpClient, id: string): Promise<void> {
 	await client.post(`${JOBS_URL}/${encodeURIComponent(id)}/cancel`, {});
-}
-
-/** The tone a status wears, in the kit's own vocabulary. */
-export function jobTone(status: JobStatus): StatusTone {
-	if (status === 'completed') return 'success';
-	if (status === 'failed') return 'danger';
-	if (status === 'running') return 'warn';
-	return 'neutral';
 }
 
 /**

@@ -24,7 +24,8 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { didFire, failedOnly, progressOf, runTone } from '$lib/api/events';
+	import { didFire, failedOnly, progressOf } from '$lib/api/events';
+	import { jobTone } from '$lib/tones';
 	import { NO_VALUE, formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
@@ -193,7 +194,7 @@
 									{/if}
 								</td>
 								<td data-cell="nowrap">
-									<Badge tone={runTone(run.status)}>{run.status}</Badge>
+									<Badge tone={jobTone(run.status)}>{run.status}</Badge>
 									{#if run.dry_run}
 										<Badge tone="neutral">rehearsal</Badge>
 									{/if}

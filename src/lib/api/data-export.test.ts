@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
 	downloadable,
 	jobProgress,
-	jobTone,
 	scheduleState,
 	type ExportJob,
 	type ExportSchedule,
@@ -37,15 +36,6 @@ function schedule(over: Partial<ExportSchedule> = {}): ExportSchedule {
 		...over,
 	};
 }
-
-describe('jobTone', () => {
-	it('uses the kit vocabulary rather than a synonym', () => {
-		expect(jobTone('running')).toBe('warn');
-		expect(jobTone('completed')).toBe('success');
-		expect(jobTone('failed')).toBe('danger');
-		expect(jobTone('canceled')).toBe('neutral');
-	});
-});
 
 describe('jobProgress', () => {
 	// rows_total is zero until the counting query has run, so a bar drawn

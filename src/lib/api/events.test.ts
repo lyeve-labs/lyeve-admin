@@ -3,7 +3,6 @@ import {
 	didFire,
 	failedOnly,
 	progressOf,
-	runTone,
 	type EventRow,
 	type ReplayRun,
 } from './events';
@@ -37,15 +36,6 @@ function row(over: Partial<EventRow> = {}): EventRow {
 		...over,
 	};
 }
-
-describe('runTone', () => {
-	it('uses the kit vocabulary rather than a synonym', () => {
-		expect(runTone('running')).toBe('warn');
-		expect(runTone('completed')).toBe('success');
-		expect(runTone('failed')).toBe('danger');
-		expect(runTone('pending')).toBe('neutral');
-	});
-});
 
 describe('progressOf', () => {
 	// A run knows its total before it starts, so progress drawn from replayed

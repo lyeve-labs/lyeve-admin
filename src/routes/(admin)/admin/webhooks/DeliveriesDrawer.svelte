@@ -8,7 +8,7 @@
 	import { formRefusal, refusalText, type Refusal } from '$lib/api/refusal';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
-	import { eventTone } from './event-tone';
+	import { eventTone } from '$lib/tones';
 	import type { DeliveryHistory } from './delivery-history.svelte';
 
 	interface Props {

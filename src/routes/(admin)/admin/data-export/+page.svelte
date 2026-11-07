@@ -35,11 +35,11 @@
 		cronLabel,
 		downloadable,
 		jobProgress,
-		jobTone,
 		scheduleState,
 		stageText,
 		type ExportSchedule,
 	} from '$lib/api/data-export';
+	import { jobTone } from '$lib/tones';
 	import { NO_VALUE, formatBytes, formatCount, formatDateTime } from '$lib/format';
 	import { confirmed, submitter } from '$lib/forms.svelte';
 	import type { ActionData, PageData } from './$types';

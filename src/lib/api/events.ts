@@ -11,7 +11,6 @@
  * Every replay is asked for with a dry run first because the plugin offers
  * one, and because a replay that fans out cannot be taken back.
  */
-import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
 const EVENTS_URL = '/api/admin/events';
@@ -83,14 +82,6 @@ export async function startReplay(
 	body: ReplayRequest,
 ): Promise<ReplayRun> {
 	return client.post<ReplayRun>(REPLAY_URL, body);
-}
-
-/** The tone a run's status wears, in the kit's own vocabulary. */
-export function runTone(status: ReplayStatus): StatusTone {
-	if (status === 'completed') return 'success';
-	if (status === 'failed') return 'danger';
-	if (status === 'running') return 'warn';
-	return 'neutral';
 }
 
 /**

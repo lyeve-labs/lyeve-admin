@@ -48,7 +48,7 @@
 	import { narrows } from '$lib/narrow';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
-	import { eventTone } from './event-tone';
+	import { eventTone } from '$lib/tones';
 	import { DeliveryHistory } from './delivery-history.svelte';
 	import DeliveriesDrawer from './DeliveriesDrawer.svelte';
 	import DeadLetterDrawer from './DeadLetterDrawer.svelte';
