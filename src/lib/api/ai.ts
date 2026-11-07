@@ -10,6 +10,7 @@
 
 import type { HttpClient } from '@lyeve-labs/client';
 import { query, rowsOf, statedTotal, type ListEnvelope } from '$lib/api/list';
+import type { Gate } from '$lib/api/gate';
 
 export const PROVIDER_KINDS = ['openai', 'anthropic', 'openai_compatible', 'anthropic_compatible'] as const;
 export type ProviderKind = (typeof PROVIDER_KINDS)[number];
@@ -207,20 +208,13 @@ export interface AiDashboard {
 }
 
 /**
- * What a read of the plugin answered, sorted for the page. Lives here rather
- * than beside the sorter because a page passes it to a component.
+ * What a read of the plugin answered, sorted for the page: a shared gate, the
+ * tenant's switch turned off, or no provider to answer through. Lives here
+ * rather than beside the sorter because a page passes it to a component. An
+ * absent gate is the plugin not mounted, which only the settings read, the
+ * one the tenant switch leaves open, can tell.
  */
-export type AiGate =
-	| { state: 'ok' }
-	| { state: 'locked' }
-	| { state: 'forbidden' }
-	/** The plugin is not mounted: only the settings read, which the tenant gate leaves open, can tell. */
-	| { state: 'absent' }
-	| { state: 'off' }
-	| { state: 'no_provider' }
-	| { state: 'error'; message: string };
-
-export const AI_OK: AiGate = { state: 'ok' };
+export type AiGate = Gate | { state: 'off' } | { state: 'no_provider' };
 
 /**
  * The gate a page renders under: the layout's word when the settings read

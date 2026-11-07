@@ -88,7 +88,7 @@
 
 {#if !blocked}
 	{@render children()}
-{:else if effective.state === 'locked'}
+{:else if effective.state === 'locked' || effective.state === 'full'}
 	<NotEnabled
 		title="AI"
 		{level}

@@ -2,7 +2,8 @@ import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireRole, requireUser } from '$lib/server/authz';
-import { AI_OK, aiActionError, aiGate, type AiGate } from '$lib/server/ai-load';
+import { aiActionError, aiGate } from '$lib/server/ai-load';
+import { GATE_OK, section } from '$lib/api/gate';
 import { readProviderForm } from '$lib/server/ai-provider-form';
 import { couldNotLoad } from '$lib/outage';
 import { deleteProvider, getCapabilities, getProvider, listModels, updateProvider, type AiProvider } from '$lib/api/ai';
@@ -10,19 +11,15 @@ import { deleteProvider, getCapabilities, getProvider, listModels, updateProvide
 export const load: PageServerLoad = async (event) => {
 	const { aiSettings } = await event.parent();
 	const client = authedClient(event);
-	let gate: AiGate = AI_OK;
-	let provider: AiProvider | null = null;
-	try {
-		provider = await getProvider(client, event.params.id);
-	} catch (err) {
+	const read = await section(getProvider(client, event.params.id), (err) => {
 		// The tenant gate and a missing row both answer 404. The settings read
 		// from the layout, which the gate leaves open, says which it was.
 		if (err instanceof ApiError && err.status === 404 && aiSettings?.enabled !== false) {
 			error(404, 'This provider no longer exists.');
 		}
-		gate = aiGate(err, event, 'providers');
-	}
-	return { gate, provider };
+		return aiGate(err, event, 'providers');
+	});
+	return { gate: read.ok ? GATE_OK : read.gate, provider: read.ok ? read.value : null };
 };
 
 async function existing(event: RequestEvent): Promise<AiProvider | null> {

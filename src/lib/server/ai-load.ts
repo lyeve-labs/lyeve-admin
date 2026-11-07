@@ -15,10 +15,11 @@
 import { redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { clearSessionCookie, type SessionEvent } from './session-cookie';
-import { AI_OK, type AiGate } from '$lib/api/ai';
+import type { AiGate } from '$lib/api/ai';
+import { gateOf } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
 
-export { AI_OK, type AiGate };
+export type { AiGate };
 
 export function aiGate(err: unknown, session: SessionEvent, plural: string): AiGate {
 	return sortGate(err, session, plural, 'off');
@@ -38,12 +39,14 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 			clearSessionCookie(session);
 			redirect(302, '/login');
 		}
-		if (err.status === 402) return { state: 'locked' };
-		if (err.status === 403) return { state: 'forbidden' };
 		if (err.status === 404) return { state: notFound };
 		if (noProvider(err)) return { state: 'no_provider' };
 	}
-	return { state: 'error', message: couldNotLoad(plural) };
+	const gate = gateOf(err, couldNotLoad(plural));
+	// The AI pages word a refused rate and an outage as the failed read they
+	// are for the reader, so both keep the page's own sentence.
+	if (gate.state === 'busy' || gate.state === 'unavailable') return { state: 'error', message: couldNotLoad(plural) };
+	return gate;
 }
 
 /**

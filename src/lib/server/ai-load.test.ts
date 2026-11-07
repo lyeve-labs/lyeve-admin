@@ -17,7 +17,7 @@ describe('aiGate', () => {
 	});
 
 	it('sorts the four refusals into distinct states', () => {
-		expect(aiGate(new ApiError(402, 'payment required'), { cookies: cookies() }, 'providers')).toEqual({ state: 'locked' });
+		expect(aiGate(new ApiError(402, 'payment required'), { cookies: cookies() }, 'providers')).toEqual({ state: 'locked', upgradeUrl: '' });
 		expect(aiGate(new ApiError(403, 'forbidden'), { cookies: cookies() }, 'providers')).toEqual({ state: 'forbidden' });
 		expect(aiGate(new ApiError(404, 'AI is switched off for this tenant'), { cookies: cookies() }, 'providers')).toEqual({ state: 'off' });
 		expect(aiGate(new ApiError(503, 'no enabled AI provider configured', { error: 'no enabled AI provider configured', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toEqual({ state: 'no_provider' });
@@ -78,6 +78,6 @@ describe('aiSettingsGate', () => {
 	it('reads a 404 on the settings route as a plugin that is not mounted', async () => {
 		const { aiSettingsGate } = await import('./ai-load');
 		expect(aiSettingsGate(new ApiError(404, 'not found'), { cookies: cookies() })).toEqual({ state: 'absent' });
-		expect(aiSettingsGate(new ApiError(402, 'x'), { cookies: cookies() })).toEqual({ state: 'locked' });
+		expect(aiSettingsGate(new ApiError(402, 'x'), { cookies: cookies() })).toEqual({ state: 'locked', upgradeUrl: '' });
 	});
 });

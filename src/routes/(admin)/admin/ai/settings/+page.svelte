@@ -4,7 +4,7 @@
 	import type { ActionData, PageData } from './$types';
 	import AiSection from '$lib/components/ai/AiSection.svelte';
 	import SettingRow from '$lib/components/SettingRow.svelte';
-	import { AI_OK } from '$lib/api/ai';
+	import { GATE_OK } from '$lib/api/gate';
 	import { formatDateTime } from '$lib/format';
 	import { couldNotLoad } from '$lib/outage';
 
@@ -23,7 +23,7 @@
 </script>
 
 <PageShell title="AI settings" description="Turn AI on or off for this tenant, and choose whether and how long transcripts are kept." width="wide">
-	<AiSection level={2} tab="settings" gate={AI_OK} layoutGate={data.aiLayoutGate} noun="settings">
+	<AiSection level={2} tab="settings" gate={GATE_OK} layoutGate={data.aiLayoutGate} noun="settings">
 		{#if settings}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>This tenant</SectionHeading>

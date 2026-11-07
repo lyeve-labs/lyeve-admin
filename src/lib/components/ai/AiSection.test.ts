@@ -39,7 +39,7 @@ describe('AiSection', () => {
 	});
 
 	it('shows the not-enabled state when locked', () => {
-		const { queryByTestId, getByText } = setup({ state: 'locked' });
+		const { queryByTestId, getByText } = setup({ state: 'locked', upgradeUrl: '' });
 		expect(queryByTestId('body')).toBeNull();
 		expect(queryByTestId('not-enabled')).toBeTruthy();
 		expect(getByText('Not enabled on this instance.')).toBeTruthy();
