@@ -42,7 +42,7 @@ export function ledgerReader() {
 /** A refused write: a 402 means the ledger is not enabled, and is said as such. */
 export function refusal<T extends object>(tag: T, err: unknown, fallback: string) {
 	if (err instanceof ApiError && err.status === 402) {
-		return fail(402, { ...tag, error: 'The cost ledger is not enabled on this instance.', locked: true });
+		return fail(402, { ...tag, error: 'The cost ledger is not enabled on this engine.', locked: true });
 	}
 	return fail(400, { ...tag, error: actionError(err, fallback), locked: false });
 }

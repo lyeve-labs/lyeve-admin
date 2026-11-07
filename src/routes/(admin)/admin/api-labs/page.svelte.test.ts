@@ -57,7 +57,7 @@ describe('the warning a tester needs first', () => {
 	it('says every request hits the live instance as the caller', () => {
 		const { container } = render(LabsPage, { props: props() });
 		const text = said(container);
-		expect(text).toContain('instance you are signed in to, as you');
+		expect(text).toContain('engine you are signed in to, as you');
 		expect(text).toContain('a write changes data and a delete removes it');
 	});
 
@@ -111,7 +111,7 @@ describe('the endpoint picker', () => {
 	// line.
 	it('keeps the path its width and drops the summary below the small breakpoint', () => {
 		const { container } = render(LabsPage, { props: props() });
-		const cells = container.querySelectorAll('table[aria-label="Pick an endpoint"] td, [aria-label="Pick an endpoint"] td');
+		const cells = container.querySelectorAll('table[aria-label="Choose an endpoint"] td, [aria-label="Choose an endpoint"] td');
 		const path = [...cells].find((c) => c.classList.contains('font-mono')) as HTMLElement;
 		expect(path.className).toContain('min-w-56');
 		const summary = path.nextElementSibling as HTMLElement;
@@ -133,7 +133,7 @@ describe('the endpoint picker', () => {
 	it('gives each row one Select button, and a click picks that row', async () => {
 		const posts = endpoint({ id: 'POST /api/v1/content/{schema}', method: 'POST', summary: 'Create an entry' });
 		const { container, getByRole, queryByRole } = render(LabsPage, { props: props({ endpoints: [endpoint(), posts] }) });
-		const rows = [...container.querySelectorAll('[aria-label="Pick an endpoint"] tbody tr')] as HTMLElement[];
+		const rows = [...container.querySelectorAll('[aria-label="Choose an endpoint"] tbody tr')] as HTMLElement[];
 		expect(rows).toHaveLength(2);
 		for (const row of rows) {
 			const buttons = [...row.querySelectorAll('button')];

@@ -82,7 +82,7 @@
 <PageShell
 	{title}
 	documentTitle={`${title} - Plugins`}
-	description={plugin?.description || 'See what this plugin does and the routes it serves on this instance.'}
+	description={plugin?.description || 'See what this plugin does and the routes it serves on this engine.'}
 	width="wide"
 	{back}
 >

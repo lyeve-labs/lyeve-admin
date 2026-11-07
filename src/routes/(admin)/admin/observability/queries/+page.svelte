@@ -157,7 +157,7 @@
 				{#if data.analyzeFailed}
 					<Alert tone="warn">
 						Could not explain these statements as {data.dialect}. Choose the dialect this
-						instance's database uses.
+						engine's database uses.
 					</Alert>
 				{:else if data.dialect && data.analysis && suggestions.length === 0}
 					<p class="text-sm text-muted">{noSuggestionText(data.dialect, data.analysis)}</p>

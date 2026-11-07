@@ -105,7 +105,7 @@ describe('NotRunning', () => {
 			{
 			  "failed": "Stopped at startup The search plugin stopped with an error at startup. Plugin details",
 			  "not-built": "Not part of this build The search plugin is not included in this build.",
-			  "not-enabled": "Search Not enabled on this instance.",
+			  "not-enabled": "Search Not enabled on this engine.",
 			  "not-started": "Not started The search plugin is included in this build but did not start. Plugin details",
 			  "unexplained": "Not running The plugin behind this page is not running. Plugin details",
 			  "withheld": "Turned off for this tenant Search is turned off for this tenant. Ask a super admin to turn it back on.",

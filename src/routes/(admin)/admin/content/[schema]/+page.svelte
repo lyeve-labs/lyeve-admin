@@ -172,8 +172,8 @@
 			<Autocomplete
 				id="collection-picker"
 				name="q"
-				label="Collection"
-				placeholder="Search collections"
+				label="Content type"
+				placeholder="Search content types"
 				value={data.activeSchema}
 				options={schemaOptions}
 				allowClear={false}
@@ -181,7 +181,7 @@
 			/>
 		</form>
 	{:else if !data.schemas.ok}
-		<p class="text-sm text-muted">{couldNotLoad('the other collections', { reload: true })}</p>
+		<p class="text-sm text-muted">{couldNotLoad('the other content types', { reload: true })}</p>
 	{/if}
 
 	{#if form?.error}
@@ -219,7 +219,7 @@
 		{:else if entries.length === 0 && data.status}
 			<EmptyState
 				title="No {STATUS_LABELS[data.status].toLowerCase()} entries"
-				description="Pick another status, or All to see every entry."
+				description="Choose another status, or All to see every entry."
 			>
 				{#snippet iconSnippet()}
 					<Inbox size={ICON.lg} />
@@ -229,7 +229,7 @@
 				{/snippet}
 			</EmptyState>
 		{:else if entries.length === 0}
-			<EmptyState title="No entries yet" description="Add the first entry to this collection.">
+			<EmptyState title="No entries yet" description="Add the first entry to this content type.">
 				{#snippet iconSnippet()}
 					<Inbox size={ICON.lg} />
 				{/snippet}

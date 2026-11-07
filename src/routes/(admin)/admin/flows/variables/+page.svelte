@@ -231,6 +231,6 @@
 	</Drawer>
 {:else}
 	<PageShell title="Flows" documentTitle="Variables - Flows" width="wide">
-		<NotEnabled level={2} title="Flows" description="Flows are not enabled on this instance." />
+		<NotEnabled level={2} title="Flows" description="Flows are not enabled on this engine." />
 	</PageShell>
 {/if}

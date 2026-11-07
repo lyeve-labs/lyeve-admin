@@ -45,9 +45,9 @@
 			{#if !data.publicSchemas.ok}
 				<GateNotice gate={data.publicSchemas.gate} title="Public search" absent="Public search is not included in this build." />
 			{:else if !data.schemas.ok}
-				<GateNotice gate={data.schemas.gate} title="The schemas" absent="The schema list is not included in this build." />
+				<GateNotice gate={data.schemas.gate} title="The content types" absent="The content type list is not included in this build." />
 			{:else if data.schemas.value.length === 0}
-				<EmptyState title="No schemas yet" description="Build a schema, then choose here whether anyone may search it.">
+				<EmptyState title="No content types yet" description="Build a content type, then choose here whether anyone may search it.">
 					{#snippet iconSnippet()}<Database size={ICON.lg} />{/snippet}
 					{#snippet action()}
 						<Button variant="secondary" href="/admin/schema">Go to the schema builder</Button>
@@ -65,8 +65,8 @@
 					<MultiSelect
 						id="public-schemas"
 						label="Searchable by anyone"
-						hint="Anyone can search the published entries of a chosen schema on your site's own host, without credentials, and see the title, slug, tags and a snippet. A query matches every field, and the snippet can quote any of them, so choose only schemas whose fields can all be public."
-						placeholder="Pick schemas"
+						hint="Anyone can search the published entries of a chosen content type on your site's own host, without credentials, and see the title, slug, tags and a snippet. A query matches every field, and the snippet can quote any of them, so choose only content types whose fields can all be public."
+						placeholder="Choose content types"
 						searchable
 						options={data.schemas.value.map((n) => ({ value: n, label: n }))}
 						bind:value={publicChoice}
@@ -98,7 +98,7 @@
 					{:else if form && 'rankingSaved' in form}
 						<Alert tone="success" autoDismiss>Saved.</Alert>
 					{/if}
-					<p class="text-xs text-muted">Set how much a match in each field counts. These weights apply to every schema without its own.</p>
+					<p class="text-xs text-muted">Set how much a match in each field counts. These weights apply to every content type without its own.</p>
 					<NumberInput id="w-title" name="title_weight" label="Title" min={0} max={10} step={0.1} value={ranking.title_weight} />
 					<NumberInput id="w-body" name="body_weight" label="Body" min={0} max={10} step={0.1} value={ranking.body_weight} />
 					<NumberInput id="w-tag" name="tag_weight" label="Tags" min={0} max={10} step={0.1} value={ranking.tag_weight} />

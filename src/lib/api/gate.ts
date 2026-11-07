@@ -121,10 +121,10 @@ export async function section<T, G>(read: Promise<T>, failed: string | ((err: un
 /** The sentence a page shows for a gate at a ceiling. */
 export function fullText(gate: Extract<Gate, { state: 'full' }>): string {
 	if (gate.limit !== null && gate.current !== null) {
-		return `You're using ${gate.current} of ${gate.limit}, the most this instance allows.`;
+		return `You're using ${gate.current} of ${gate.limit}, the most this engine allows.`;
 	}
-	if (gate.limit !== null) return `This instance allows at most ${gate.limit}.`;
-	return 'This instance is at its limit.';
+	if (gate.limit !== null) return `This engine allows at most ${gate.limit}.`;
+	return 'This engine is at its limit.';
 }
 
 /**

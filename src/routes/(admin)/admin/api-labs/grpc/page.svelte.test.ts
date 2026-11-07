@@ -71,7 +71,7 @@ describe('gRPC', () => {
 		const { container } = render(GrpcLab, {
 			props: props({ grpc: { listening: false, routes: [], gate: { state: 'absent' } } }),
 		});
-		expect(said(container)).toContain('turned off on this instance');
+		expect(said(container)).toContain('turned off on this engine');
 	});
 
 	// The engine can still refuse the status read to a super admin, and the
@@ -81,7 +81,7 @@ describe('gRPC', () => {
 			props: props({ grpc: { listening: false, routes: [], gate: { state: 'forbidden' } } }),
 		});
 		expect(said(container)).toContain('Your role cannot open the gRPC listener.');
-		expect(said(container)).not.toContain('turned off on this instance');
+		expect(said(container)).not.toContain('turned off on this engine');
 	});
 
 	it('offers a retry when the status could not be read', () => {
@@ -89,7 +89,7 @@ describe('gRPC', () => {
 			props: props({ grpc: { listening: false, routes: [], gate: { state: 'unavailable' } } }),
 		});
 		expect(said(container)).toContain('the gRPC listener did not load');
-		expect(said(container)).not.toContain('turned off on this instance');
+		expect(said(container)).not.toContain('turned off on this engine');
 		expect(said(container)).toContain('Try again');
 	});
 

@@ -80,7 +80,7 @@ describe('AI providers page', () => {
 	});
 
 	it.each([
-		['locked', 'Not enabled on this instance.'],
+		['locked', 'Not enabled on this engine.'],
 		['forbidden', 'Only an admin or a super admin can open AI providers.'],
 		['off', 'AI is switched off for this tenant'],
 		['no_provider', 'No AI provider is available'],

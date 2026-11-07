@@ -109,7 +109,7 @@
 					{#if data.providersLicensed}
 						Every configured provider runs, in priority order, with failover and a circuit breaker on each.
 					{:else}
-						Only one provider runs on this instance: the highest-priority one that starts. Other configured
+						Only one provider runs on this engine: the highest-priority one that starts. Other configured
 						providers are listed below as left out.
 					{/if}
 				</p>

@@ -135,7 +135,7 @@
 	{/if}
 
 	{#if nothingShown}
-		<Alert tone="brand">None of these settings apply to this instance.</Alert>
+		<Alert tone="brand">None of these settings apply to this engine.</Alert>
 	{/if}
 
 	{#if data.formErasure}
@@ -206,7 +206,7 @@
 								<input type="hidden" name="kept" value={section} />
 							{/each}
 							{#if sectionOptions.length === 0}
-								<p class="text-sm text-muted">Nothing on this instance can be exported.</p>
+								<p class="text-sm text-muted">Nothing on this engine can be exported.</p>
 							{:else}
 								<CheckboxGroup
 									name="offered"

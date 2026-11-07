@@ -35,7 +35,7 @@ export const FORMAT_LABELS: Readonly<Record<ExportFormat, { label: string; hint:
 	yaml: { label: 'YAML', hint: 'The JSON document written as YAML. Imports back.' },
 	csv: {
 		label: 'CSV',
-		hint: 'A column per field, one file per schema. Several schemas download as a zip. Imports back.',
+		hint: 'A column per field, one file per content type. Several content types download as a zip. Imports back.',
 	},
 	markdown: { label: 'Markdown', hint: 'Each entry as a heading and its body, for reading.' },
 	hugo: { label: 'Hugo', hint: 'Markdown with TOML front matter, for a static site.' },

@@ -43,7 +43,7 @@ function statusFrom(url: URL): EntryStatus | null {
 }
 
 const ENTRIES_FAILED = couldNotLoad('entries');
-const SCHEMAS_FAILED = couldNotLoad('the other collections');
+const SCHEMAS_FAILED = couldNotLoad('the other content types');
 
 /**
  * Entries are listed through the admin API, which holds every entry with its
@@ -62,7 +62,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const [schemas, schemaDef, listed] = await Promise.all([
 		section<Schema[]>(getSchemas(client), SCHEMAS_FAILED),
-		getSchema(params.schema, client).catch((err: unknown) => readError(err, `Schema "${params.schema}" not found`)),
+		getSchema(params.schema, client).catch((err: unknown) => readError(err, `Content type "${params.schema}" not found`)),
 		section(client.get<ListEnvelope<EntryRow>>(`/api/admin/content?${query}`), ENTRIES_FAILED),
 	]);
 

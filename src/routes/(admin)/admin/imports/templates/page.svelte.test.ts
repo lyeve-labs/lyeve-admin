@@ -67,9 +67,9 @@ describe('mapping templates', () => {
 		expect(said(container)).toContain('Your role cannot open templates');
 	});
 
-	it('says what an instance without templates keeps', () => {
+	it('says what an engine without templates keeps', () => {
 		const { container } = render(TemplatesPage, { props: props({ licensed: false }) });
-		expect(said(container)).toContain('Saving templates and the date, split and lookup transforms are not enabled on this instance.');
+		expect(said(container)).toContain('Saving templates and the date, split and lookup transforms are not enabled on this engine.');
 	});
 
 	it('opens a stored template in the drawer with its transform', async () => {

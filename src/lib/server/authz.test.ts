@@ -386,7 +386,7 @@ describe('requireUser', () => {
 		it('throws 402 with the seat sentence when the body names nothing', async () => {
 			const err = await refusedWith(402, {});
 			expect(err.status).toBe(402);
-			expect(err.body?.message).toBe('This instance has no admin seat left for this account.');
+			expect(err.body?.message).toBe('This engine has no admin seat left for this account.');
 		});
 
 		it('throws 403 for an address rule or a firewall in front of the engine', async () => {

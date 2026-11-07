@@ -78,7 +78,7 @@
 			const verb = selectedRisk === 'destructive' ? 'delete from' : 'write to';
 			const ok = await confirmDialog(
 				`Send ${selected.method} ${selected.path}?`,
-				`This will ${verb} the instance you are signed in to, as you. This is not a test run.`,
+				`This will ${verb} the engine you are signed in to, as you. This is not a test run.`,
 				{ confirmLabel: 'Send it' },
 			);
 			if (!ok) {
@@ -97,7 +97,7 @@
 
 <PageShell
 	title="API labs"
-	description="Send a real request to this instance and see the response."
+	description="Send a real request to this engine and see the response."
 	width="wide"
 >
 	<NoSandbox />
@@ -116,7 +116,7 @@
 	<ApiLabsTabs active="rest" {superAdmin} />
 
 	<section class="flex flex-col gap-4">
-		<SectionHeading level={2}>Pick an endpoint</SectionHeading>
+		<SectionHeading level={2}>Choose an endpoint</SectionHeading>
 		<label for="endpoint-narrow" class="sr-only">Search endpoints</label>
 		<SearchInput id="endpoint-narrow" bind:value={narrow} placeholder="Search {data.endpoints.length} endpoints" />
 
@@ -128,7 +128,7 @@
 			</EmptyState>
 		{:else}
 			<div class="max-h-72 overflow-auto rounded border border-line">
-				<Table label="Pick an endpoint">
+				<Table label="Choose an endpoint">
 					<tbody>
 						{#each visible.slice(0, 200) as e (e.id)}
 							<tr>

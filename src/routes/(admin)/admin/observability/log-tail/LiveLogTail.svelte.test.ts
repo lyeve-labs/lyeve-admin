@@ -127,7 +127,7 @@ describe('LiveLogTail', () => {
 		expect(first.closed).toBe(true);
 		expect(StubEventSource.all).toHaveLength(1);
 		expect(badge(container)).toBe('Not running');
-		expect(container.textContent).toContain('The logging plugin is not running on this instance, so the live log tail is not available.');
+		expect(container.textContent).toContain('The logging plugin is not running on this engine, so the live log tail is not available.');
 	});
 
 	it('opens nothing while the plugin does not run, and closes its stream on unmount', async () => {

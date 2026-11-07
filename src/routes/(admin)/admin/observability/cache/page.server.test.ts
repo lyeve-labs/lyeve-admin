@@ -82,7 +82,7 @@ beforeEach(() => {
 describe('cache overview load', () => {
 	// The counters describe every tenant, so a tenant admin's page never asks
 	// for them, and their absence is not an error.
-	it('reads the providers for a tenant admin and never the instance counters', async () => {
+	it('reads the providers for a tenant admin and never the engine counters', async () => {
 		const result = (await load(loadEvent(['admin']))) as Loaded;
 		expect(api.readStats).not.toHaveBeenCalled();
 		expect(result.gate).toEqual({ state: 'ok' });

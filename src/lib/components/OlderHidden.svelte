@@ -37,7 +37,7 @@
 	<Alert tone="warn" title={label}>
 		<p>
 			You can read {span} of them. The older ones are still stored, and reading them is not enabled on
-			this instance.
+			this engine.
 		</p>
 		{#if children}
 			<div class="mt-2">{@render children()}</div>

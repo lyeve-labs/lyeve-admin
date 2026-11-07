@@ -182,19 +182,19 @@ describe('the settings card', () => {
 		render(Page, {
 			props: props({
 				schemas: [],
-				schemasGate: { state: 'error', message: 'Could not load schemas. Pages keep showing the schemas saved before.' },
+				schemasGate: { state: 'error', message: 'Could not load content types. Pages keep showing the content types saved before.' },
 			}),
 		});
-		expect(said()).toContain('Could not load schemas. Pages keep showing the schemas saved before.');
+		expect(said()).toContain('Could not load content types. Pages keep showing the content types saved before.');
 		expect(said()).toContain('Try again');
-		expect(said()).not.toContain('Create a schema');
+		expect(said()).not.toContain('Create a content type');
 		// Nothing offered, so a Save clears no stored schema.
 		expect(document.querySelector('input[name="schemas_offered"]')).toBeNull();
 	});
 
 	it('says how to offer a schema when there is none', () => {
 		render(Page, { props: props({ schemas: [] }) });
-		expect(said()).toContain('Create a schema to show its entries on pages.');
+		expect(said()).toContain('Create a content type to show its entries on pages.');
 		expect(document.querySelector('input[name="schemas_offered"]')).toBeNull();
 	});
 
@@ -270,7 +270,7 @@ describe('where forms can send', () => {
 		render(Page, {
 			props: props({
 				settings: { ok: true, value: FORM_SETTINGS },
-				schemasGate: { state: 'error', message: 'Could not load schemas. Pages keep showing the schemas saved before.' },
+				schemasGate: { state: 'error', message: 'Could not load content types. Pages keep showing the content types saved before.' },
 			}),
 		});
 		expect(formsCard().textContent).toContain('Could not load content types. Forms keep sending to the content types saved before.');
@@ -300,7 +300,7 @@ describe('where forms can send', () => {
 
 	it('says the flow plugin is not running instead of offering no flows', () => {
 		render(Page, { props: props({ settings: { ok: true, value: FORM_SETTINGS }, formSchemas: FORM_SCHEMAS }) });
-		expect(said()).toContain('The flow plugin is not running on this instance, so forms cannot start flows.');
+		expect(said()).toContain('The flow plugin is not running on this engine, so forms cannot start flows.');
 	});
 
 	it('names a type forms can no longer send to by its label', () => {

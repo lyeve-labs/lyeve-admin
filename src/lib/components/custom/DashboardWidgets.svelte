@@ -48,7 +48,7 @@
 					<div class="flex flex-col gap-3">
 						<SectionHeading level={3}>{w.heading}</SectionHeading>
 						{#if w.unavailable}
-							<p class="text-sm text-muted">This widget needs a plugin that is not running on this instance.</p>
+							<p class="text-sm text-muted">This widget needs a plugin that is not running on this engine.</p>
 						{:else if w.type === 'entry_counts'}
 							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 								{#each w.counts ?? [] as c (c.schema)}

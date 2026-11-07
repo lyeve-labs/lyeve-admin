@@ -70,7 +70,7 @@ describe('audit sinks page', () => {
 			{ sinks: [sink] },
 			{ action: 'delete', error: 'x', refused: { kind: 'feature', feature: 'example-capability', plugin: 'example', upgradeUrl: '' } },
 		);
-		expect(getAllByTestId('refusal-notice')[0].textContent).toContain('Not enabled on this instance');
+		expect(getAllByTestId('refusal-notice')[0].textContent).toContain('Not enabled on this engine');
 	});
 
 	it('says why the page is empty when the plugin is not there', () => {

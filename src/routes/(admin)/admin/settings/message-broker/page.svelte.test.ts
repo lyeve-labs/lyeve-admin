@@ -44,7 +44,7 @@ describe('the gate', () => {
 		const { container } = render(BrokerPage, {
 			props: props({ gate: { state: 'locked', upgradeUrl: '' }, status: null }),
 		});
-		expect(said(container)).toContain('Not enabled on this instance');
+		expect(said(container)).toContain('Not enabled on this engine');
 	});
 
 	it('explains the refusal to an admin who may not read it', () => {
@@ -83,7 +83,7 @@ describe('what the numbers mean', () => {
 		});
 		const text = said(container);
 		expect(text).toContain('were dropped because no broker connection');
-		expect(text).toContain("Check this instance's broker configuration.");
+		expect(text).toContain("Check this engine's broker configuration.");
 	});
 
 	it('names a disabled plugin as the cause rather than the broker', () => {
@@ -91,7 +91,7 @@ describe('what the numbers mean', () => {
 			props: props({ status: status({ degraded: true, dropped: 40, published: 0 }) }),
 		});
 		const text = said(container);
-		expect(text).toContain('The message broker plugin is not enabled on this instance, so events are dropped instead of published.');
+		expect(text).toContain('The message broker plugin is not enabled on this engine, so events are dropped instead of published.');
 	});
 
 	// A counter reset by a restart is not a quiet week, and a reader comparing
@@ -107,7 +107,7 @@ describe('what the numbers mean', () => {
  * that discards it, counts it as published and reports itself connected.
  * None of that reached a broker, so the page must not say it did.
  */
-describe('an instance with no broker', () => {
+describe('an engine with no broker', () => {
 	const none = (backend: string) =>
 		props({ status: status({ backend, target: '', stream: '', tls: false, published: 25 }) });
 

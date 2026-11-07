@@ -212,7 +212,7 @@ export const load: PageServerLoad = async (event) => {
 	const tenant = entry.then((e) => e.tenant_id).catch(() => '');
 
 	const [schemaDef, item, revisionList, localization, review, comments, releases] = await Promise.all([
-		schema.catch((err: unknown): Schema => readError(err, `Schema "${params.schema}" not found`)),
+		schema.catch((err: unknown): Schema => readError(err, `Content type "${params.schema}" not found`)),
 		entry.catch((err: unknown) => readError(err, 'Entry not found')),
 		listRevisions(client, params.id, fields),
 		loadLocalization(client, params.id, runs(plugins, PLUGIN.localization)),

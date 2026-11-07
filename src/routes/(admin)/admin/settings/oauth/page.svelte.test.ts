@@ -80,8 +80,8 @@ describe('OAuth providers page', () => {
 		const { container, getByRole, rerender } = setup([provider('google')]);
 		await fireEvent.click(getByRole('button', { name: 'New provider' }));
 		await rerender({ data: { providers: { ok: true, value: [provider('google')] } }, form: { action: 'create', error: 'Not enabled.', refused } } as never);
-		expect(drawerText()).toContain('Not enabled on this instance');
-		expect(container.textContent?.split('This is not enabled on this instance.').length).toBe(2);
+		expect(drawerText()).toContain('Not enabled on this engine');
+		expect(container.textContent?.split('This is not enabled on this engine.').length).toBe(2);
 	});
 
 });

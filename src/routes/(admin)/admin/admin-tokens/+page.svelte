@@ -539,7 +539,7 @@
 				id="issued-example"
 				label="Try it"
 				value={curlExample(data.adminOrigin)}
-				hint="Set LYEVE_ADMIN_TOKEN to the token first. This lists the schemas if the token has schemas:read."
+				hint="Set LYEVE_ADMIN_TOKEN to the token first. This lists the content types if the token has schemas:read."
 				copyLabel="Copy the example"
 			/>
 		</div>

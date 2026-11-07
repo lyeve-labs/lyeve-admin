@@ -166,7 +166,7 @@
 	<div class="flex flex-col gap-4" data-testid="translations-panel">
 		{#if unavailable}
 			<Alert tone="warn" title="Could not load translations">
-				The localization plugin is not running on this instance, so translations are not available.
+				The localization plugin is not running on this engine, so translations are not available.
 			</Alert>
 		{:else if targets.length === 0}
 			<p class="text-sm text-muted">
@@ -177,14 +177,14 @@
 				to add it here as a tab.
 			</p>
 		{:else if textFields.length === 0}
-			<p class="text-sm text-muted">This schema has no text field to translate.</p>
+			<p class="text-sm text-muted">This content type has no text field to translate.</p>
 		{:else}
 			{#if !marked}
 				<!-- The schema carries no per-field mark, so these are every
 				     text field rather than the ones somebody chose. Saying so
 				     stops the list reading as a decision nobody made. -->
 				<p class="text-xs text-faint">
-					No field on this schema is marked as translated, so every text field is shown. Mark
+					No field on this content type is marked as translated, so every text field is shown. Mark
 					the ones you translate in the
 					<a href="/admin/schema" class="text-brand underline-offset-2 hover:underline">
 						schema builder

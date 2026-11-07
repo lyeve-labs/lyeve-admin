@@ -50,7 +50,7 @@ describe('settings hub', () => {
 		expect(hrefs(false)).not.toContain('/admin/settings/connected-editors');
 	});
 
-	it('offers a reader only the instance pages their sidebar offers', () => {
+	it('offers a reader only the engine pages their sidebar offers', () => {
 		const editor = settingsHub(adminNav(['editor']), { twoFactor: true, trustedDevices: false, connectedEditors: false });
 		expect(editor.map((g) => g.id)).toEqual(['account', 'apis']);
 		expect(editor[1].entries.map((e) => e.id)).toEqual(['api-access']);
@@ -78,7 +78,7 @@ describe('settings hub', () => {
 		}
 	});
 
-	it('lists trusted devices only where the instance remembers them', () => {
+	it('lists trusted devices only where the engine remembers them', () => {
 		expect(settingsHub(adminNav(SUPER), { twoFactor: true, trustedDevices: true, connectedEditors: false })[0].entries.map((e) => e.id)).toContain('devices');
 		expect(settingsHub(adminNav(SUPER), { twoFactor: true, trustedDevices: false, connectedEditors: false })[0].entries.map((e) => e.id)).not.toContain('devices');
 	});

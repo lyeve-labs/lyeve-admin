@@ -234,7 +234,7 @@
 							<Select
 								id="chain-pick"
 								label="Append a locale"
-								placeholder="Pick a locale"
+								placeholder="Choose a locale"
 								options={addable}
 								searchable
 								bind:value={chainPick}

@@ -238,7 +238,7 @@
 
 <PageShell
 	title="Synthetic monitoring"
-	description="Run scheduled checks against this instance and see their results."
+	description="Run scheduled checks against this engine and see their results."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -320,7 +320,7 @@
 			{#if data.probes.length === 0}
 				<EmptyState
 					title="No probes yet"
-					description="Create a probe to check this instance on a schedule."
+					description="Create a probe to check this engine on a schedule."
 				>
 					{#snippet iconSnippet()}
 						<Radar size={ICON.lg} />
@@ -622,7 +622,7 @@
 				<NotEnabled
 					title="Notice channels"
 					description={target.gate.state === 'locked'
-						? 'Notice channels are not enabled on this instance.'
+						? 'Notice channels are not enabled on this engine.'
 						: 'Notice channels are not included in this build.'}
 					url={target.gate.state === 'locked' ? target.gate.upgradeUrl : null}
 				/>

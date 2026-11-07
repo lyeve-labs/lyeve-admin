@@ -49,7 +49,7 @@
 	{#if !data.permitted}
 		<Alert tone="brand">
 			Only a super admin can see the broker status, because it shows infrastructure outside this
-			instance and covers every tenant.
+			engine and covers every tenant.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
@@ -66,7 +66,7 @@
 
 		{#if data.status.degraded}
 			<Alert tone="warn">
-				The message broker plugin is not enabled on this instance, so events are dropped instead of
+				The message broker plugin is not enabled on this engine, so events are dropped instead of
 				published.
 			</Alert>
 		{:else if outbox?.enabled && outbox.available && (outbox.dead > 0 || data.status.failed > 0)}
@@ -101,7 +101,7 @@
 			<Alert tone="warn">
 				{data.status.dropped}
 				{plural(data.status.dropped, 'event')} were dropped because no broker connection was open.
-				Check this instance's broker configuration.
+				Check this engine's broker configuration.
 			</Alert>
 		{/if}
 
@@ -222,7 +222,7 @@
 						<div class="flex flex-col gap-2 text-sm text-muted">
 							<SectionHeading level={3}>What is published</SectionHeading>
 							<p>
-								Every content create, update and delete is published as JSON: the event type, schema,
+								Every content create, update and delete is published as JSON: the event type, content type,
 								tenant, the record and an event id to deduplicate on. A broker outage delays events
 								rather than losing them.
 							</p>
@@ -231,7 +231,7 @@
 					</Card>
 					<Card>
 						<div class="flex flex-col gap-2 text-sm text-muted">
-							<SectionHeading level={3}>Send to this instance</SectionHeading>
+							<SectionHeading level={3}>Send to this engine</SectionHeading>
 							<p>
 								A flow whose trigger is <span class="font-medium text-fg">Message received</span> runs once
 								per message under its tenant's namespace. Give it a group and every instance sharing the

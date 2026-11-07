@@ -24,7 +24,7 @@ export const GET: RequestHandler = async ({ cookies, params, url, fetch }) => {
 	}
 	if (!res.ok) {
 		if (res.status === 404) error(404, 'This transcript no longer exists.');
-		if (res.status === 402) error(402, 'AI is not enabled on this instance');
+		if (res.status === 402) error(402, 'AI is not enabled on this engine');
 		if (res.status === 403) error(403, 'Only an admin or a super admin can export transcripts.');
 		error(502, 'Could not export the transcript. Try again.');
 	}

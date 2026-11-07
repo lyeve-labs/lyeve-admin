@@ -117,7 +117,7 @@
 
 <PageShell
 	title="Data residency"
-	description="Manage the regions this instance runs in, and see where each tenant's data is."
+	description="Manage the regions this engine runs in, and see where each tenant's data is."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -131,7 +131,7 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			Only a super admin can see regions and the residency report, because they cover the whole instance and every tenant.
+			Only a super admin can see regions and the residency report, because they cover the whole engine and every tenant.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice

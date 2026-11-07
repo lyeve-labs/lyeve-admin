@@ -234,7 +234,7 @@
 					</div>
 					{#if !limitLicensed}
 						<p id="limit-license" class="mt-3 text-xs text-faint">
-							Setting a tenant limit is not enabled on this instance. You can always clear it.
+							Setting a tenant limit is not enabled on this engine. You can always clear it.
 						</p>
 					{/if}
 				</Card>
@@ -268,7 +268,7 @@
 				{#if !addressesLicensed}
 					<div id="address-license">
 						<Alert tone="brand">
-							Adding an address is not enabled on this instance. Saved entries still apply, and you can always remove one.
+							Adding an address is not enabled on this engine. Saved entries still apply, and you can always remove one.
 						</Alert>
 					</div>
 				{/if}

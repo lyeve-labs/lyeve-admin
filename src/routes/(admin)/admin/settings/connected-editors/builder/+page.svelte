@@ -205,9 +205,9 @@
 				/>
 
 				{#if data.schemasGate}
-					<GateNotice gate={data.schemasGate} title="Schemas" absent="Schemas are not included in this build." />
+					<GateNotice gate={data.schemasGate} title="Content types" absent="Content types are not included in this build." />
 				{:else if data.schemas.length === 0}
-					<p class="text-sm text-muted">Create a schema to show its entries on pages.</p>
+					<p class="text-sm text-muted">Create a content type to show its entries on pages.</p>
 				{:else}
 					<!-- Only a form that offered the schemas saves them, so a schema list that failed to load clears nothing. -->
 					<input type="hidden" name="schemas_offered" value="1" />
@@ -218,7 +218,7 @@
 							bind:value={shown}
 							options={schemaOptions}
 							orientation="horizontal"
-							hint="Pages can show entries from the schemas you choose."
+							hint="Pages can show entries from the content types you choose."
 							error={errorOn('show_schemas')}
 						/>
 					{:else}
@@ -228,7 +228,7 @@
 							bind:value={shown}
 							options={schemaOptions}
 							searchable
-							hint="Pages can show entries from the schemas you choose."
+							hint="Pages can show entries from the content types you choose."
 							error={errorOn('show_schemas')}
 						/>
 						{#each shown as name (name)}
@@ -340,7 +340,7 @@
 					{/if}
 
 					{#if data.flows === null}
-						<p class="text-sm text-muted">The flow plugin is not running on this instance, so forms cannot start flows.</p>
+						<p class="text-sm text-muted">The flow plugin is not running on this engine, so forms cannot start flows.</p>
 					{:else if !data.flows.ok}
 						<GateNotice gate={data.flows.gate} title="Flows" absent="Flows are not included in this build." />
 					{:else if !data.flows.value.eventKnown}

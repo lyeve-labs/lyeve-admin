@@ -134,7 +134,7 @@
 				<thead>
 					<tr>
 						<th scope="col">Name</th>
-						<th scope="col">Schema</th>
+						<th scope="col">Content type</th>
 						<th scope="col">Stages</th>
 						<th scope="col">On approval</th>
 						<th scope="col" class="text-right">Actions</th>

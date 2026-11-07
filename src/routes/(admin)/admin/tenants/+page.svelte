@@ -132,8 +132,8 @@
 <PageShell
 	title="Tenants"
 	description={data.tenants.ok
-		? `See and manage the ${data.total} ${plural(data.total, 'tenant')} on this instance.`
-		: 'See and manage every tenant on this instance.'}
+		? `See and manage the ${data.total} ${plural(data.total, 'tenant')} on this engine.`
+		: 'See and manage every tenant on this engine.'}
 	width="wide"
 >
 	{#snippet actions()}
@@ -160,7 +160,7 @@
 		<NotEnabled
 			level={2}
 			title="Tenant provisioning"
-			description="Creating tenants is not enabled on this instance.{stillEditable}"
+			description="Creating tenants is not enabled on this engine.{stillEditable}"
 			url={data.provisioningUrl || null}
 		/>
 	{/if}
@@ -170,13 +170,13 @@
 			level={2}
 			gate={data.tenants.gate}
 			title="Tenants"
-			absent="Multitenancy is not included in this build. This instance has one tenant."
+			absent="Multitenancy is not included in this build. This engine has one tenant."
 		/>
 	{:else if data.tenants.value.length === 0}
 		<EmptyState
 			level={2}
 			title="No tenants yet"
-			description={canProvision ? 'Create a tenant to start serving content on this instance.' : undefined}
+			description={canProvision ? 'Create a tenant to start serving content on this engine.' : undefined}
 		>
 			{#snippet iconSnippet()}
 				<Building2 size={ICON.lg} />

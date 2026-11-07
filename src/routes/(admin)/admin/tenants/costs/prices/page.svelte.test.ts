@@ -38,16 +38,16 @@ describe('tenant cost prices page', () => {
 		render(PricesPage, {
 			props: { data: data({ enabled: false, prices: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }), form: null },
 		});
-		expect(screen.getByTestId('not-enabled').textContent).toContain('Not enabled on this instance.');
+		expect(screen.getByTestId('not-enabled').textContent).toContain('Not enabled on this engine.');
 		expect(fieldsets()).toHaveLength(0);
 		expect(screen.queryByText('Beta')).toBeNull();
 	});
 
 	it('reports a refused price once', () => {
 		render(PricesPage, {
-			props: { data: data(), form: { form: 'price', error: 'The cost ledger is not enabled on this instance.', locked: true } as never },
+			props: { data: data(), form: { form: 'price', error: 'The cost ledger is not enabled on this engine.', locked: true } as never },
 		});
-		expect(screen.getAllByText('The cost ledger is not enabled on this instance.')).toHaveLength(1);
+		expect(screen.getAllByText('The cost ledger is not enabled on this engine.')).toHaveLength(1);
 	});
 });
 

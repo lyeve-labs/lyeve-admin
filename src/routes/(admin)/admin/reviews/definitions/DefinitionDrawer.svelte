@@ -185,8 +185,8 @@
 			<Select
 				id="definition-schema"
 				name="content_schema"
-				label="Content schema"
-				hint="The schema whose entries this definition reviews. Approval publishes the row there."
+				label="Content type"
+				hint="The content type whose entries this definition reviews. Approval publishes the row there."
 				options={schemaOptions}
 				searchable
 				bind:value={contentSchema}
@@ -195,10 +195,10 @@
 			<Input
 				id="definition-schema"
 				name="content_schema"
-				label="Content schema"
+				label="Content type"
 				hint={schemas.ok
-					? 'The schema whose entries this definition reviews.'
-					: `${couldNotLoad('schemas')} Type the name of the schema whose entries this definition reviews.`}
+					? 'The content type whose entries this definition reviews.'
+					: `${couldNotLoad('content types')} Type the name of the content type whose entries this definition reviews.`}
 				value={contentSchema ?? ''}
 				oninput={(e) => (contentSchema = (e.currentTarget as HTMLInputElement).value)}
 				class="font-mono"
@@ -311,7 +311,7 @@
 												id="stage-escalate-{stage.key}"
 												label="User"
 												hint="The user becomes the assignee when the SLA passes."
-												placeholder="Pick a user"
+												placeholder="Choose a user"
 												options={escalateOptions(stage.escalate_to)}
 												searchable
 												disabled={stagesLocked}

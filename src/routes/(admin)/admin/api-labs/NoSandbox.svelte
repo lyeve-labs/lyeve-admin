@@ -5,6 +5,6 @@
 
 <!-- The one thing a tester has to understand before the first send. -->
 <Alert tone="warn">
-	Every request goes to the instance you are signed in to, as you. There is no sandbox, so a
+	Every request goes to the engine you are signed in to, as you. There is no sandbox, so a
 	write changes data and a delete removes it.
 </Alert>

@@ -57,7 +57,7 @@ export const HEALTH_LABELS: Readonly<Record<GrpcHealth, string>> = {
 	serving: 'Serving',
 	partial: 'Listening, but a service is not serving',
 	down: 'Not listening',
-	disabled: 'Not started on this instance',
+	disabled: 'Not started on this engine',
 };
 
 export function healthTone(h: GrpcHealth): StatusTone {

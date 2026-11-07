@@ -26,7 +26,7 @@
 		if (graphqlMutates(document)) {
 			const ok = await confirmDialog(
 				'Send this mutation?',
-				'It changes data on the instance you are signed in to, as you.',
+				'It changes data on the engine you are signed in to, as you.',
 				{ confirmLabel: 'Send it' },
 			);
 			if (!ok) {
@@ -46,7 +46,7 @@
 <PageShell
 	title="API labs"
 	documentTitle="GraphQL - API labs"
-	description="Send a real request to this instance and see the response."
+	description="Send a real request to this engine and see the response."
 	width="wide"
 >
 	<NoSandbox />

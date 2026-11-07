@@ -192,7 +192,7 @@
 
 <PageShell
 	title="Users"
-	description="Manage the accounts that sign in to this instance."
+	description="Manage the accounts that sign in to this engine."
 	width="wide"
 >
 	{#snippet actions()}
@@ -214,7 +214,7 @@
 	{:else if rows.length === 0}
 		<EmptyState
 			title="No users yet"
-			description="Create an account to give someone access to this instance."
+			description="Create an account to give someone access to this engine."
 		>
 			{#snippet iconSnippet()}
 				<Users size={ICON.lg} />
@@ -370,7 +370,7 @@
 				     here keeps a refusal for a missing tenant from reading as a
 				     fault in the fields the operator filled in. -->
 				<Alert tone="warn" title="Could not load the tenants">
-					You cannot choose a tenant for this account. On an instance with several tenants, each account needs one. Reload the page to try again.
+					You cannot choose a tenant for this account. On an engine with several tenants, each account needs one. Reload the page to try again.
 				</Alert>
 			{:else if tenants.length > 1}
 				<input type="hidden" name="tenant_required" value="1" />

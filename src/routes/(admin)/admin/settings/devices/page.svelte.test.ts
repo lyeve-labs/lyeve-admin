@@ -50,7 +50,7 @@ describe('the gate', () => {
 		const { container } = render(DevicesPage, {
 			props: props({ gate: { state: 'locked', upgradeUrl: '' }, devices: [] }),
 		});
-		expect(said(container)).toContain('Not enabled on this instance');
+		expect(said(container)).toContain('Not enabled on this engine');
 		expect(said(container)).not.toContain('No trusted devices yet');
 	});
 

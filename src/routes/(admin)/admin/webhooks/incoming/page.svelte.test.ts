@@ -113,7 +113,7 @@ describe('the incoming webhook drawer and the failures of other actions', () => 
  * them live let the reader fill in the whole form before the refusal arrived.
  */
 describe('the incoming webhook controls and the license', () => {
-	const HELD = 'Creating and changing incoming webhooks is not enabled on this instance.';
+	const HELD = 'Creating and changing incoming webhooks is not enabled on this engine.';
 
 	it('holds New and Edit with the reason when the plugin says the license is missing', () => {
 		const { container, getByRole } = setup({ licensed: false });

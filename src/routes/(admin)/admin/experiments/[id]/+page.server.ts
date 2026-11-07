@@ -44,7 +44,7 @@ export const load: PageServerLoad = async (event) => {
 	} catch (err) {
 		// The page has nothing to draw without the experiment, and a plugin this
 		// instance is not enabled for is not an experiment that is missing.
-		if (err instanceof ApiError && err.status === 402) error(402, 'A/B testing is not enabled on this instance.');
+		if (err instanceof ApiError && err.status === 402) error(402, 'A/B testing is not enabled on this engine.');
 		readError(err, 'No such experiment');
 	}
 

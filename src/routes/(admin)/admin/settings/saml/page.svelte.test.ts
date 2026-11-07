@@ -81,7 +81,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 describe('the gate', () => {
 	it('shows the not-enabled state when the engine refuses the routes', () => {
 		const { container } = render(SamlPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' }, providers: [] }) });
-		expect(said(container)).toContain('Not enabled on this instance');
+		expect(said(container)).toContain('Not enabled on this engine');
 		expect(said(container)).not.toContain('New provider');
 	});
 

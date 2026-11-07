@@ -91,7 +91,7 @@
 	}
 
 	function scopeText(schemas: string[] | null | undefined): string {
-		if (!schemas || schemas.length === 0) return 'Every schema';
+		if (!schemas || schemas.length === 0) return 'Every content type';
 		if (schemas.length <= 3) return schemas.join(', ');
 		return `${schemas.slice(0, 2).join(', ')} and ${schemas.length - 2} more`;
 	}

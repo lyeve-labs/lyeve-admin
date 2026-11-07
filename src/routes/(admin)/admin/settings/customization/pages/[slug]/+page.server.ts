@@ -30,7 +30,7 @@ export const load: PageServerLoad = async (event) => {
 		// outage are not one failure.
 		section(
 			Promise.resolve().then(() => listSchemaNames(client)),
-			'Could not load schemas. Blocks keep the schemas they already use.',
+			'Could not load content types. Blocks keep the content types they already use.',
 		),
 	]);
 	return { customPage: page, schemas: schemas.ok ? schemas.value : [], schemasGate: schemas.ok ? GATE_OK : schemas.gate };

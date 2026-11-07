@@ -79,7 +79,7 @@ export const actions: Actions = {
 	clear: asked(
 		{
 			question: 'Clear the tenant captcha settings?',
-			detail: "This tenant's pages and flows go back to this instance's captcha, and the stored secret is deleted.",
+			detail: "This tenant's pages and flows go back to this engine's captcha, and the stored secret is deleted.",
 			label: 'Clear',
 		},
 		async (event) => {

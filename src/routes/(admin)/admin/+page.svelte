@@ -41,7 +41,7 @@
 
 	/** What the collections carry, from the list already in hand. */
 	const collectionsSub = $derived.by(() => {
-		if (!schemas) return 'schemas unavailable';
+		if (!schemas) return 'content types unavailable';
 		const staged = schemas.filter((s) => s.with_draft_publish).length;
 		return staged > 0
 			? `${formatCount(staged)} with draft and publish`
@@ -134,16 +134,16 @@
 		{/if}
 	{:else if schemas && schemas.length === 0}
 		{#if data.isAdmin}
-			<EmptyState level={2} title="No schemas yet" description="Create a schema to start adding content.">
+			<EmptyState level={2} title="No content types yet" description="Create a content type to start adding content.">
 				{#snippet action()}
 					<Button variant="secondary" href="/admin/schema">
-						<Plus size={ICON.sm} /> New schema
+						<Plus size={ICON.sm} /> New content type
 					</Button>
 				{/snippet}
 			</EmptyState>
 		{:else}
 			<!-- The engine admits a new schema only from an admin. -->
-			<EmptyState level={2} title="No schemas yet" description="Ask an administrator to create one." />
+			<EmptyState level={2} title="No content types yet" description="Ask an administrator to create one." />
 		{/if}
 	{:else}
 		{#if data.isAdmin}
@@ -197,7 +197,7 @@
 					<a href="/admin/content" class="block h-full rounded-card outline-none transition-shadow hover:ring-1 hover:ring-brand/40 focus-visible:ring-2 focus-visible:ring-brand">
 						<Stat
 							class="h-full"
-							label="Collections"
+							label="Content types"
 							accent="neutral"
 							value={schemas ? formatCount(schemas.length) : 'unknown'}
 							sub={collectionsSub}
@@ -212,7 +212,7 @@
 							label="Entries"
 							accent="neutral"
 							value={data.entryTotal === null ? 'unknown' : formatCount(data.entryTotal)}
-							sub={data.entryTotal === null ? 'entries unavailable' : (entriesSub ?? 'across every collection')}
+							sub={data.entryTotal === null ? 'entries unavailable' : (entriesSub ?? 'across every content type')}
 						/>
 					</a>
 				{/if}
@@ -337,7 +337,7 @@
 							<SectionHeading level={3}>
 								Recent entries
 								{#snippet actions()}
-									<a href="/admin/content" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">All collections</a>
+									<a href="/admin/content" class="relative -my-1 py-1 hit-area text-xs text-muted hover:text-brand">All content types</a>
 								{/snippet}
 							</SectionHeading>
 							{#if !data.entries}

@@ -38,7 +38,7 @@ export const load: PageServerLoad = async (event) => {
 		// outage are not one failure.
 		section(
 			Promise.resolve().then(() => listSchemaNames(client)),
-			'Could not load schemas. Widgets keep the schemas they already use.',
+			'Could not load content types. Widgets keep the content types they already use.',
 		),
 	]);
 	return {

@@ -118,7 +118,7 @@ describe('Users create', () => {
 	});
 
 	// The roles offered here and on the API key page are the same list.
-	it('offers every role the instance issues', async () => {
+	it('offers every role the engine issues', async () => {
 		const { container, getAllByRole } = render(UsersPage, { props: props() });
 
 		await fireEvent.click(getAllByRole('button', { name: /new user/i })[0]);

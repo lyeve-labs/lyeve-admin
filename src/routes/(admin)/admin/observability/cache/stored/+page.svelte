@@ -39,7 +39,7 @@
 		}
 		return confirmed(
 			'Flush the cache?',
-			`Your session is not scoped to a tenant. On an instance with many tenants, this removes every key of every tenant. On an instance with one tenant, it removes that tenant's cached responses. ${RECOMPUTED}`,
+			`Your session is not scoped to a tenant. On an engine with many tenants, this removes every key of every tenant. On an engine with one tenant, it removes that tenant's cached responses. ${RECOMPUTED}`,
 			{ confirmLabel: 'Flush', success: 'Cache flushed.' },
 		);
 	}

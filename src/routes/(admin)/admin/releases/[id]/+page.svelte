@@ -281,7 +281,7 @@
 						<thead>
 							<tr>
 								<th scope="col">Entry</th>
-								<th scope="col">Collection</th>
+								<th scope="col">Content type</th>
 								<th scope="col">Does</th>
 								<th scope="col">Outcome</th>
 								<th scope="col"><span class="sr-only">Actions</span></th>
@@ -344,13 +344,13 @@
 				id="release-entry"
 				name="entry_id"
 				label="Entry"
-				placeholder="Pick an entry"
+				placeholder="Choose an entry"
 				options={entryOptions}
 				searchable
 				required
 				bind:value={picked}
 				error={own.fields.entry_id}
-				hint="Shows the most recently changed entries, by collection. Add an older one from its own page."
+				hint="Shows the most recently changed entries, by content type. Add an older one from its own page."
 			/>
 		{:else}
 			<!-- The entry list could not be read, so the drawer takes an id and

@@ -161,7 +161,7 @@
 				{/each}
 				<Textarea id="comment-body" name="body" label="New thread" rows={3} bind:value={body} />
 				{#if options.length > 0}
-					<MultiSelect id="comment-mentions" label="Mention" bind:value={mentions} {options} searchable placeholder="Pick people to notify" />
+					<MultiSelect id="comment-mentions" label="Mention" bind:value={mentions} {options} searchable placeholder="Choose people to notify" />
 				{/if}
 				<div class="flex justify-end">
 					<Button variant="primary" size="sm" type="submit" disabled={!body.trim()} loading={start.pending}>Comment</Button>

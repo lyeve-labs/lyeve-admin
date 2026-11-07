@@ -27,7 +27,7 @@ export const ADMIN_SEATS_CAP = 'admin.seats';
 export const LICENSE_PAGE = '/admin/settings/license';
 
 /** The neutral locked state, which names no plan, license or capability. */
-export const NOT_ENABLED = 'Not enabled on this instance';
+export const NOT_ENABLED = 'Not enabled on this engine';
 
 /** The way forward from any limit, said first. */
 export const LIFTS = 'A license that allows more lifts the limit.';
@@ -98,7 +98,7 @@ export function capNoun(cap: string): string {
 export function refusalTitle(r: Refusal): string {
 	if (r.kind === 'cap') {
 		const noun = capNoun(r.cap);
-		return `No more ${noun} on this instance`;
+		return `No more ${noun} on this engine`;
 	}
 	return NOT_ENABLED;
 }
@@ -115,11 +115,11 @@ export function refusalText(r: Refusal): string {
 		const noun = capNoun(r.cap);
 		let line: string;
 		if (r.limit !== null && r.current !== null) {
-			line = `You're using ${r.current} of ${r.limit} ${noun}, the most this instance allows.`;
+			line = `You're using ${r.current} of ${r.limit} ${noun}, the most this engine allows.`;
 		} else if (r.limit !== null) {
-			line = `This instance allows at most ${r.limit} ${noun}.`;
+			line = `This engine allows at most ${r.limit} ${noun}.`;
 		} else {
-			line = `This instance is at its limit for ${noun}.`;
+			line = `This engine is at its limit for ${noun}.`;
 		}
 		if (r.cap === ADMIN_SEATS_CAP) {
 			// The heading already names the seats, so the count stands alone.
@@ -128,7 +128,7 @@ export function refusalText(r: Refusal): string {
 		}
 		return `${line} ${LIFTS} Removing one also makes room.`;
 	}
-	return 'This is not enabled on this instance. Nothing was changed.';
+	return 'This is not enabled on this engine. Nothing was changed.';
 }
 
 /**

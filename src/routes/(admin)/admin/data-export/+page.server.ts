@@ -85,7 +85,7 @@ export const load: PageServerLoad = async (event) => {
 					),
 					section(
 						getSchemas(client).then((rows) => rows.map((s) => s.name).sort((a, b) => a.localeCompare(b))),
-						couldNotLoad('the schemas')
+						couldNotLoad('the content types')
 					),
 				])
 			: [unread(), unread()];

@@ -82,7 +82,7 @@
 		</p>
 		{#if data.licensed === false}
 			<Alert tone="brand">
-				Saving templates and the date, split and lookup transforms are not enabled on this instance. Saved
+				Saving templates and the date, split and lookup transforms are not enabled on this engine. Saved
 				templates still apply with their transforms, and you can always delete one.
 			</Alert>
 		{/if}

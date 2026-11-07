@@ -81,6 +81,6 @@ describe('admin/ai/providers create', () => {
 			{ '/api/admin/ai/providers': () => refused(402, 'payment_required') },
 			formOf({ name: 'x', kind: 'openai', api_key: 'k', modalities: 'text' })
 		);
-		expect(await actions.create(event)).toMatchObject({ status: 400, data: { error: 'AI is not enabled on this instance.' } });
+		expect(await actions.create(event)).toMatchObject({ status: 400, data: { error: 'AI is not enabled on this engine.' } });
 	});
 });

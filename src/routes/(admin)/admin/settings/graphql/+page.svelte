@@ -89,7 +89,7 @@
 				<Alert tone="danger">{couldNotLoad('the GraphQL schema', { reload: true })}</Alert>
 			{:else}
 				<p class="text-xs text-muted">
-					Built from your content types. A schema you add in the schema builder appears here as its own
+					Built from your content types. A content type you add in the schema builder appears here as its own
 					fields.
 				</p>
 				<div class="grid gap-4 xl:grid-cols-3">

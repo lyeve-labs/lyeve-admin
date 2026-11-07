@@ -49,7 +49,7 @@ export const load: PageServerLoad = async (event) => {
 			),
 			LIST_FAILED
 		),
-		section(getSchemas(client), 'Could not load schemas.')
+		section(getSchemas(client), 'Could not load content types.')
 	]);
 
 	if (!read.ok) {
@@ -96,7 +96,7 @@ export const actions: Actions = {
 		if (Object.keys(fieldMap).length === 0) {
 			return fail(400, {
 				action: 'create',
-				error: 'Map at least one external key to a schema field.',
+				error: 'Map at least one external key to a content type field.',
 			});
 		}
 
@@ -138,7 +138,7 @@ export const actions: Actions = {
 		if (Object.keys(fieldMap).length === 0) {
 			return fail(400, {
 				action: 'update',
-				error: 'Map at least one external key to a schema field.',
+				error: 'Map at least one external key to a content type field.',
 			});
 		}
 

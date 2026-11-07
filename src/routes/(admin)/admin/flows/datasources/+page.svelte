@@ -49,7 +49,7 @@
 	const available = $derived(data.available !== false);
 	// The plugin refuses an edit and a connection test as it refuses a create
 	// while datasources are not enabled. A delete it still takes.
-	const UNAVAILABLE = 'Datasources are not enabled on this instance';
+	const UNAVAILABLE = 'Datasources are not enabled on this engine';
 	// Only a super admin may grant writes or private addresses, or change
 	// either grant. An admin sees both and the reason they are fixed.
 	const superAdmin = $derived(data.user.roles.includes('super_admin'));
@@ -257,7 +257,7 @@
 				<NotEnabled compact title="Datasources" />
 			{/if}
 			{#if data.gate.state === 'ok'}
-				<Button variant="primary" size="sm" onclick={openCreate} disabled={!available} title={available ? undefined : 'Not enabled on this instance'}>
+				<Button variant="primary" size="sm" onclick={openCreate} disabled={!available} title={available ? undefined : 'Not enabled on this engine'}>
 					<Plus size={ICON.sm} />
 					New datasource
 				</Button>
@@ -299,7 +299,7 @@
 		{/if}
 
 		{#if pageFailure?.refused}
-			<Alert tone="warn" title="Not enabled on this instance">
+			<Alert tone="warn" title="Not enabled on this engine">
 				{#snippet children()}
 					{pageFailure.error}
 					{#if enableLink}
@@ -589,6 +589,6 @@
 	</Drawer>
 {:else}
 	<PageShell title="Flows" documentTitle="Datasources - Flows" width="wide">
-		<NotEnabled level={2} title="Flows" description="Datasources are not enabled on this instance." />
+		<NotEnabled level={2} title="Flows" description="Datasources are not enabled on this engine." />
 	</PageShell>
 {/if}

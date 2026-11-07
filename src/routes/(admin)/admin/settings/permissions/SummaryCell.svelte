@@ -15,7 +15,7 @@
 {#if role === EXEMPT_ROLE}
 	<ShieldCheck size={ICON.sm} class="inline-block align-middle text-violet" aria-hidden="true" data-mark="exempt" />
 	<span class="sr-only">
-		{role} is always allowed {action} on every schema. The role is exempt from these rules.
+		{role} is always allowed {action} on every content type. The role is exempt from these rules.
 	</span>
 {:else}
 	{@const state = rules.summaryState(role, action)}

@@ -122,7 +122,7 @@ describe('rate-limits page', () => {
 	it('without the capability, shows custom rules as not enabled and says stored ones are not enforced', () => {
 		const { getByText, queryByRole } = setup({ customEnabled: false });
 		expect(getByText('Custom rate limits')).toBeTruthy();
-		expect(getByText(/saved rule is not enforced, because custom rules are not enabled on this instance\./)).toBeTruthy();
+		expect(getByText(/saved rule is not enforced, because custom rules are not enabled on this engine\./)).toBeTruthy();
 		expect(getByText('Not enforced')).toBeTruthy();
 		expect(queryByRole('button', { name: /New rule/ })).toBeNull();
 		expect(queryByRole('button', { name: /Edit POST \/api\/admin\/auth\/login/ })).toBeNull();

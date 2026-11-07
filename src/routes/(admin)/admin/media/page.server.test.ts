@@ -335,7 +335,7 @@ describe('describing an image', () => {
 			json({ error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' }, 402),
 		);
 		expect(((await actions.describe(license.event)) as Failure).data.detailsError).toBe(
-			'This is not enabled on this instance. Nothing was changed.',
+			'This is not enabled on this engine. Nothing was changed.',
 		);
 	});
 

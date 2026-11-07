@@ -90,7 +90,7 @@ const ROLE_TEXT: Record<AiWriteRole, string> = {
 export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRole = 'admin'): string {
 	if (err instanceof ApiError) {
 		if (aiBudgetSpent(err)) return AI_BUDGET_TEXT;
-		if (err.status === 402) return 'AI is not enabled on this instance.';
+		if (err.status === 402) return 'AI is not enabled on this engine.';
 		if (err.status === 403) {
 			// The engine's role gate answers a bare "insufficient permissions".
 			// The plugin's own 403 is a sentence about the tenant, worth relaying.

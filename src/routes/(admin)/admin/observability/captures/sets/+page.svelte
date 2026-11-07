@@ -48,7 +48,7 @@
 				writes ? `Replay ${s.name}, writes included?` : `Replay ${s.name}?`,
 				writes
 					? 'Every request in the set runs again with your credentials, and each write is repeated.'
-					: 'Every request in the set runs again against this instance with your credentials in place of the ones that were redacted.',
+					: 'Every request in the set runs again against this engine with your credentials in place of the ones that were redacted.',
 				{ confirmLabel: 'Replay' },
 			);
 			if (!ok) {
@@ -85,7 +85,7 @@
 		{:else if needsWrites}
 			{@const s = data.sets.find((x) => x.id === needsWrites)}
 			<Alert tone="warn" title="This set includes a write">
-				<p>Replaying it repeats each write against this instance. Nothing in the set has run yet.</p>
+				<p>Replaying it repeats each write against this engine. Nothing in the set has run yet.</p>
 				{#if s}
 					<form method="POST" action="?/replaySet" class="mt-3" use:enhance={runSet(s, true)}>
 						<input type="hidden" name="id" value={s.id} />

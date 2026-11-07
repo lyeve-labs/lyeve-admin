@@ -25,7 +25,7 @@ const MAX_LIMIT = 199;
 const LIST_FAILED = 'Could not load webhooks.';
 
 /** What the drawer says when the schema names could not be read. */
-const SCHEMAS_FAILED = 'Could not load schemas.';
+const SCHEMAS_FAILED = 'Could not load content types.';
 
 /** One page of the dead letter queue. */
 const DEAD_LETTER_PAGE = 50;

@@ -154,7 +154,7 @@
 	<div class="flex flex-col gap-4" data-testid="review-bar">
 		{#if unavailable}
 			<Alert tone="warn" title="Could not load the review">
-				The review plugin is not running on this instance, so this review is not available.
+				The review plugin is not running on this engine, so this review is not available.
 			</Alert>
 		{:else if forbidden}
 			<Alert tone="warn" title="You cannot see this entry's review">
@@ -183,7 +183,7 @@
 							id="review-definition"
 							name="definition_id"
 							label="Definition"
-							placeholder="Pick a definition"
+							placeholder="Choose a definition"
 							options={definitionOptions}
 							searchable
 							bind:value={definitionId}
@@ -195,7 +195,7 @@
 								name="assignee_id"
 								label="Assignee"
 								hint="The first reviewer."
-								placeholder="Pick a user"
+								placeholder="Choose a user"
 								options={personOptions}
 								searchable
 								bind:value={assigneeId}
@@ -222,7 +222,7 @@
 							id="review-other-assignees"
 							label="More assignees"
 							hint="A stage that needs several approvals gets them from these assignees, so pick at least as many people as it needs."
-							placeholder="Pick users"
+							placeholder="Choose users"
 							options={otherOptions}
 							searchable
 							bind:value={otherIds}

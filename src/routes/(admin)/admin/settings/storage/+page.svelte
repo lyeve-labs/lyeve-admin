@@ -154,7 +154,7 @@
 	function remove(p: StorageProvider): SubmitFunction {
 		return confirmed(
 			`Delete provider ${p.name}?`,
-			'Files already stored there stay where they are, but this instance can no longer read them.',
+			'Files already stored there stay where they are, but this engine can no longer read them.',
 			{ confirmLabel: 'Delete', success: `${p.name} deleted.` },
 		);
 	}
@@ -241,14 +241,14 @@
 					Each tenant uploads to its own providers. A tenant with none uses the default tenant's providers, and if there are none, the engine's directory. Among the providers that can take an upload, one with a cost weight set through the API is preferred, lowest weight first. Otherwise the lowest priority number receives it. Every store keeps each tenant's files under a separate prefix.
 				</p>
 				<p>
-					Providers are saved in this instance's database. While this page is available,
+					Providers are saved in this engine's database. While this page is available,
 					<span class="font-mono text-xs">STORAGE_DRIVER</span> and
 					<span class="font-mono text-xs">STORAGE_S3_*</span>
 					have no effect, because the providers below replace them.
 					<span class="font-mono text-xs">STORAGE_LOCAL_PATH</span> still sets the directory the fallback writes to.
 				</p>
 				<p>
-					On the first start with no providers, an instance that already had
+					On the first start with no providers, an engine that already had
 					<span class="font-mono text-xs">STORAGE_S3_BUCKET</span>
 					set gets one provider built from those variables, so it keeps writing to its bucket. This happens only once. After that, you manage providers on this page.
 				</p>

@@ -72,18 +72,18 @@
 						label="Accepted in {window_(data.stream)}"
 						value={formatCount(data.stream?.total_connections)}
 					/>
-					<Stat size="sm" mono label="Events pushed, whole instance" value={formatCount(data.stream?.events_dispatched)} />
+					<Stat size="sm" mono label="Events pushed, whole engine" value={formatCount(data.stream?.events_dispatched)} />
 					<Stat
 						size="sm"
 						mono
-						label="Rejected, whole instance"
+						label="Rejected, whole engine"
 						value={formatCount(data.stream?.connections_rejected)}
 						tone={(data.stream?.connections_rejected ?? 0) > 0 ? 'warn' : undefined}
 					/>
 				</div>
 				<p class="text-xs text-faint">
 					Open now and Accepted count this tenant's connections. The other counters cover every tenant on
-					the instance.
+					the engine.
 				</p>
 			{/if}
 		</section>
@@ -100,12 +100,12 @@
 			{#if !data.socketGate}
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					<Stat size="sm" mono label="Open now" value={formatCount(data.socket?.active_connections)} />
-					<Stat size="sm" mono label="Broadcasts, whole instance" value={formatCount(data.socket?.broadcasts_sent)} />
-					<Stat size="sm" mono label="Reconnections, whole instance" value={formatCount(data.socket?.reconnections)} />
+					<Stat size="sm" mono label="Broadcasts, whole engine" value={formatCount(data.socket?.broadcasts_sent)} />
+					<Stat size="sm" mono label="Reconnections, whole engine" value={formatCount(data.socket?.reconnections)} />
 				</div>
 				<p class="text-xs text-faint">
 					Open now counts this tenant's sockets. Broadcasts and reconnections cover every tenant on the
-					instance.
+					engine.
 				</p>
 			{/if}
 

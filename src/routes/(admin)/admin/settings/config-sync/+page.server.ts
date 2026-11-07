@@ -96,7 +96,7 @@ export const actions: Actions = {
 			const plan = await diffConfig(authedClient(event), read.req);
 			return { scope: 'sync' as const, mode: 'diff' as const, plan };
 		} catch (err) {
-			return syncFailure(err, 'diff', 'Could not compare the bundle with this instance. Try again.');
+			return syncFailure(err, 'diff', 'Could not compare the bundle with this engine. Try again.');
 		}
 	},
 

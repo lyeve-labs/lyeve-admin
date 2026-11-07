@@ -71,11 +71,11 @@ describe('GoroutineEnginePanel', () => {
 		expect(container.querySelector('[data-testid="goroutine-license-note"]')).toBeTruthy();
 	});
 
-	it('disables only the form whose part the instance runs without', () => {
+	it('disables only the form whose part the engine runs without', () => {
 		const { container } = setup({ parallel: undefined });
 		expect(fieldset(container, 'pool').disabled).toBe(false);
 		expect(fieldset(container, 'parallel').disabled).toBe(true);
-		expect(container.textContent).toContain('This instance runs without a parallel engine.');
+		expect(container.textContent).toContain('This engine runs without a parallel engine.');
 	});
 
 	it('shows an answer only on the form that asked', async () => {

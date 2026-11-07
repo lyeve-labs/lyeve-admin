@@ -36,7 +36,7 @@ function refusalView(e: ApiError): { view: View; refusal: string } {
 		const r = refusalOf(e);
 		return {
 			view: 'refused',
-			refusal: r ? refusalText(r) : 'Device sign-in is not enabled on this instance.',
+			refusal: r ? refusalText(r) : 'Device sign-in is not enabled on this engine.',
 		};
 	}
 	return { view: outcomeForRefusal(e.status, e.message), refusal: '' };

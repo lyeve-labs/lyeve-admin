@@ -141,7 +141,7 @@ describe('Goroutine engine', () => {
 		expect(fieldsets(container)).toHaveLength(3);
 		for (const fs of fieldsets(container)) expect(fs.disabled).toBe(true);
 		const note = section(container).querySelector('[data-testid="goroutine-license-note"]') as HTMLElement;
-		expect(note.textContent).toContain('Tuning the goroutine engine is not enabled on this instance.');
+		expect(note.textContent).toContain('Tuning the goroutine engine is not enabled on this engine.');
 		expect(note.querySelector('a')).toBeNull();
 		expect(section(container).querySelector('[data-testid="goroutine-role-note"]')).toBeNull();
 		// Every reading stays: only the writes are licensed.
@@ -165,7 +165,7 @@ describe('Goroutine engine', () => {
 		});
 		const forms = [...section(container).querySelectorAll('form')];
 		const notice = forms[0].querySelector('[data-testid="refusal-notice"]') as HTMLElement;
-		expect(notice.textContent).toContain('Not enabled on this instance');
+		expect(notice.textContent).toContain('Not enabled on this engine');
 		expect(notice.textContent).toContain('Nothing was changed.');
 		expect(forms[0].querySelector('[role="alert"]')?.textContent ?? '').not.toContain('Failed to');
 		expect(forms[1].querySelector('[data-testid="refusal-notice"]')).toBeNull();

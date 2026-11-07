@@ -29,7 +29,7 @@ function conditionOf(r: Record<string, unknown>, n: number): { condition?: Stage
 	const field = text(r.condition_field);
 	if (!field) return {};
 	const op = text(r.condition_op) as ConditionOp;
-	if (!(CONDITION_OPS as readonly string[]).includes(op)) return { error: `Stage ${n}: pick how the condition compares.` };
+	if (!(CONDITION_OPS as readonly string[]).includes(op)) return { error: `Stage ${n}: choose how the condition compares.` };
 	if (op === 'exists') return { condition: { field, op } };
 	const raw = text(r.condition_value);
 	if (op === 'in') {

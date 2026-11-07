@@ -170,7 +170,7 @@
 			<SectionHeading level={2}>Where the directory sends its requests</SectionHeading>
 			<CopyField label="Base path" labelHidden value={SCIM_BASE_PATH} copyLabel="Copy base path" />
 			<p class="text-xs text-muted">
-				Give the directory this path, added to this instance's URL, and the bearer token from a connection below. The token is the only authentication these endpoints use.
+				Give the directory this path, added to this engine's URL, and the bearer token from a connection below. The token is the only authentication these endpoints use.
 			</p>
 		</section>
 

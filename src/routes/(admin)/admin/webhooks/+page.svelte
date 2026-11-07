@@ -316,7 +316,7 @@
 		<ListToolbar label="Filter webhooks">
 			{#snippet search()}
 				<label for="webhook-search" class="sr-only">Search this page</label>
-				<SearchInput id="webhook-search" bind:value={query} placeholder="Name, URL, event or schema on this page" />
+				<SearchInput id="webhook-search" bind:value={query} placeholder="Name, URL, event or content type on this page" />
 			{/snippet}
 			{#snippet filters()}
 				<SegmentedControl label="Status" labelHidden bind:value={status} options={STATUSES} />
@@ -332,7 +332,7 @@
 					<th scope="col">Name</th>
 					<th scope="col">URL</th>
 					<th scope="col">Events</th>
-					<th scope="col">Schemas</th>
+					<th scope="col">Content types</th>
 					<th scope="col">Status</th>
 					<th scope="col">Actions</th>
 				</tr>
@@ -498,13 +498,13 @@
 		     boxes do. -->
 		<MultiSelect
 			id="webhook-schemas"
-			label="Schemas"
-			placeholder="Every schema"
+			label="Content types"
+			placeholder="Every content type"
 			hint={data.schemas.ok
-				? 'Leave empty to fire on every schema.'
+				? 'Leave empty to fire on every content type.'
 				: editing
-					? 'Could not load schemas. Only the ones this webhook already uses are listed.'
-					: 'Could not load schemas. If you save it like this, the webhook fires for every schema.'}
+					? 'Could not load content types. Only the ones this webhook already uses are listed.'
+					: 'Could not load content types. If you save it like this, the webhook fires for every content type.'}
 			searchable
 			options={schemaOptions}
 			bind:value={schemas}
@@ -521,7 +521,7 @@
 
 		<fieldset class="flex flex-col gap-4 border-t border-line pt-4">
 			<legend class="text-sm font-medium text-fg">Delivery options</legend>
-			<p class="text-xs text-muted">Leave a field empty to use the default. An option that is not enabled on this instance cannot be saved.</p>
+			<p class="text-xs text-muted">Leave a field empty to use the default. An option that is not enabled on this engine cannot be saved.</p>
 			<Textarea
 				id="webhook-template"
 				name="payload_template"

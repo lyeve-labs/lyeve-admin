@@ -188,7 +188,7 @@ describe('plugin detail page', () => {
 		expect(container.querySelector('h1')?.textContent).toContain('search');
 		expect(container.querySelector('dl')).toBeNull();
 		expect(
-			screen.getByText('See what this plugin does and the routes it serves on this instance.'),
+			screen.getByText('See what this plugin does and the routes it serves on this engine.'),
 		).toBeTruthy();
 	});
 });

@@ -42,7 +42,7 @@ describe('AiSection', () => {
 		const { queryByTestId, getByText } = setup({ state: 'locked', upgradeUrl: '' });
 		expect(queryByTestId('body')).toBeNull();
 		expect(queryByTestId('not-enabled')).toBeTruthy();
-		expect(getByText('Not enabled on this instance.')).toBeTruthy();
+		expect(getByText('Not enabled on this engine.')).toBeTruthy();
 	});
 
 	it('heads its blocked state at the level the page asks for', () => {

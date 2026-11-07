@@ -64,7 +64,7 @@ describe('tenant costs page', () => {
 		render(CostsPage, {
 			props: { data: data({ enabled: false, summary: null, dashboard: null }), form: null },
 		});
-		expect(screen.getByTestId('not-enabled').textContent).toContain('Not enabled on this instance.');
+		expect(screen.getByTestId('not-enabled').textContent).toContain('Not enabled on this engine.');
 		expect(screen.queryByRole('region', { name: 'This month' })).toBeNull();
 		expect(screen.queryByRole('button', { name: /Update costs/ })).toBeNull();
 		expect(screen.queryByText('Beta')).toBeNull();
@@ -102,8 +102,8 @@ describe('tenant costs page', () => {
 		expect(screen.getByText(/3 cost lines written, 1 budget events published/)).toBeTruthy();
 		cleanup();
 		render(CostsPage, {
-			props: { data: data(), form: { form: 'aggregate', error: 'The cost ledger is not enabled on this instance.', locked: true } as never },
+			props: { data: data(), form: { form: 'aggregate', error: 'The cost ledger is not enabled on this engine.', locked: true } as never },
 		});
-		expect(screen.getAllByText('The cost ledger is not enabled on this instance.')).toHaveLength(1);
+		expect(screen.getAllByText('The cost ledger is not enabled on this engine.')).toHaveLength(1);
 	});
 });

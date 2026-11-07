@@ -64,7 +64,7 @@ describe('refusal history', () => {
 		const { container } = render(RefusalsPage, {
 			props: props({ history: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }),
 		});
-		expect(said(container)).toContain('Not enabled on this instance');
+		expect(said(container)).toContain('Not enabled on this engine');
 		expect(said(container)).not.toContain('requests refused');
 	});
 

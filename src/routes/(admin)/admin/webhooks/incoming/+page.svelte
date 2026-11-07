@@ -130,7 +130,7 @@
 
 	{#if data.incomingWebhooks.ok && isSuperAdmin && held}
 		<Alert tone="warn">
-			Creating and changing incoming webhooks is not enabled on this instance. You can still delete them.
+			Creating and changing incoming webhooks is not enabled on this engine. You can still delete them.
 		</Alert>
 	{/if}
 
@@ -161,7 +161,7 @@
 		<ListToolbar label="Filter incoming webhooks">
 			{#snippet search()}
 				<label for="incoming-search" class="sr-only">Narrow the list</label>
-				<SearchInput id="incoming-search" bind:value={query} placeholder="Name, schema or id" />
+				<SearchInput id="incoming-search" bind:value={query} placeholder="Name, content type or id" />
 			{/snippet}
 			{#snippet filters()}
 				<SegmentedControl label="Status" labelHidden bind:value={status} options={STATUSES} />
@@ -183,7 +183,7 @@
 								</Badge>
 							</div>
 							<div class="mt-1 flex flex-wrap items-center gap-4 text-xs text-muted">
-								<span>Schema: <span class="font-mono text-fg">{wh.schema_name}</span></span>
+								<span>Content type: <span class="font-mono text-fg">{wh.schema_name}</span></span>
 								<span>
 									POST /api/v1/webhooks/in/<span class="font-mono text-fg">{wh.id}</span>
 								</span>
@@ -259,12 +259,12 @@
 		{#if editing}<input type="hidden" name="id" value={editing.id} />{/if}
 		<Input id="incoming-name" name="name" label="Name" required bind:value={name} placeholder="Stripe events" />
 		{#if !data.schemas.ok}
-			<p class="text-xs text-muted">Could not load schemas. Only the one this endpoint already uses is listed.</p>
+			<p class="text-xs text-muted">Could not load content types. Only the one this endpoint already uses is listed.</p>
 		{/if}
 		<Select
 			id="incoming-schema"
 			name="schema_name"
-			label="Target schema"
+			label="Target content type"
 			required
 			searchable
 			options={schemaOptions}
@@ -283,7 +283,7 @@
 			name="field_map"
 			label="Field map"
 			required
-			hint="A JSON map of external keys to schema fields. Add at least one mapping."
+			hint="A JSON map of external keys to content type fields. Add at least one mapping."
 			rows={4}
 			bind:value={fieldMap}
 			mono

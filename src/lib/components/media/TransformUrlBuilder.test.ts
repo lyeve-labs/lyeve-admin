@@ -62,7 +62,7 @@ describe('TransformUrlBuilder', () => {
 		const { getByTestId } = render(TransformUrlBuilder, {
 			props: { id: 'm1', published: true, focal: null, refused: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },
 		});
-		expect(getByTestId('refusal-notice').textContent).toContain('Not enabled on this instance');
+		expect(getByTestId('refusal-notice').textContent).toContain('Not enabled on this engine');
 	});
 
 	it('renders a cap refusal with its numbers', () => {
