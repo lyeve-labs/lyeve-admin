@@ -130,7 +130,7 @@ describe('Users delete confirmation', () => {
 		const after = (await submit({ cancel: vi.fn() } as never)) as (arg: unknown) => Promise<void>;
 		await after({ result: { type: 'success' }, update: async () => {} });
 
-		expect(kit.success).toHaveBeenCalledWith('Deleted user1@b.co');
+		expect(kit.success).toHaveBeenCalledWith('user1@b.co deleted.');
 	});
 
 	it('stays silent when the action failed', async () => {

@@ -124,7 +124,7 @@
 		const name = item?.filename ?? 'file';
 		const after = await confirmed(`Delete ${name}?`, 'The file is removed from the library, and any page that links to it can no longer load it. This cannot be undone.', {
 			confirmLabel: 'Delete',
-			success: `Deleted ${name}`,
+			success: `${name} deleted.`,
 		})(input);
 		if (!after) return;
 		deleting = true;

@@ -158,7 +158,7 @@ describe('media library preview', () => {
 		const update = vi.fn(async () => {});
 		await (after as (a: unknown) => Promise<void>)({ result: { type: 'success' }, update });
 		expect(update).toHaveBeenCalled();
-		expect(kit.success).toHaveBeenCalledWith('Deleted clip.webm');
+		expect(kit.success).toHaveBeenCalledWith('clip.webm deleted.');
 		// The tile that opened the drawer is gone, so focus goes to a control
 		// that is still there rather than falling to the page body.
 		expect(document.activeElement?.hasAttribute('data-media-upload')).toBe(true);

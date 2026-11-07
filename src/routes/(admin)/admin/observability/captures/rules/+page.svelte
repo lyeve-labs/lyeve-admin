@@ -89,11 +89,11 @@
 		};
 	});
 
-	function remove(what: string, detail: string): SubmitFunction {
+	function remove(what: string, detail: string, done: string): SubmitFunction {
 		return confirmed(
 			`Delete ${what}?`,
 			detail,
-			{ confirmLabel: 'Delete', success: `Deleted ${what}` },
+			{ confirmLabel: 'Delete', success: done },
 		);
 	}
 </script>
@@ -231,6 +231,7 @@
 											use:enhance={remove(
 												`the rule for ${r.route_pattern}`,
 												'The captures it kept stay until their retention ends.',
+												`Rule for ${r.route_pattern} deleted.`,
 											)}
 										>
 											<input type="hidden" name="id" value={r.id} />

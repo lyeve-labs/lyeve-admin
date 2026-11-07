@@ -108,7 +108,7 @@
 		return confirmed(
 			`Delete user ${email}?`,
 			'Their sessions end immediately and their audit trail is kept. This cannot be undone.',
-			{ confirmLabel: 'Delete', success: `Deleted ${email}` },
+			{ confirmLabel: 'Delete', success: `${email} deleted.` },
 		);
 	}
 

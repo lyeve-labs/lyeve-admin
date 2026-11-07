@@ -166,7 +166,7 @@
 		return confirmed(
 			`Delete API key ${name}?`,
 			'Anything that uses this key stops working, and the key is removed from the list. This cannot be undone.',
-			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+			{ confirmLabel: 'Delete', success: `${name} deleted.` },
 		);
 	}
 
@@ -181,7 +181,7 @@
 		return confirmed(
 			`Revoke key ${name}?`,
 			'Anything that uses this key stops working immediately. The key stays in the list and cannot be used again.',
-			{ confirmLabel: 'Revoke', success: `Revoked ${name}` },
+			{ confirmLabel: 'Revoke', success: `${name} revoked.` },
 		);
 	}
 

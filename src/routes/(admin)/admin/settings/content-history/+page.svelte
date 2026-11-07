@@ -396,7 +396,10 @@
 							'The entries stay as they are. Their stored versions cannot be recovered.',
 							{
 								confirmLabel: 'Delete',
-								success: (d) => `Deleted ${formatCount(Number(d?.commits ?? 0))} versions of ${deleteLabel}`,
+								success: (d) => {
+									const n = Number(d?.commits ?? 0);
+									return `${formatCount(n)} ${plural(n, 'version')} of ${deleteLabel} deleted.`;
+								},
 							},
 						)(input)}
 				>

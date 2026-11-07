@@ -54,7 +54,7 @@
 		return confirmed(
 			`Delete ${name}?`,
 			"All of its data and users are deleted. Its stored files stay in the storage backend until that backend's own lifecycle rules remove them.",
-			{ confirmLabel: 'Delete', success: `Deleted ${name}` },
+			{ confirmLabel: 'Delete', success: `${name} deleted.` },
 		);
 	}
 

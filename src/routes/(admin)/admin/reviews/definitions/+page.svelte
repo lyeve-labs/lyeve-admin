@@ -66,7 +66,7 @@
 	function deleteDefinition(name: string) {
 		return confirmed(`Delete ${name}?`, 'Its assignments, their history and their comments go with it.', {
 			confirmLabel: 'Delete',
-			success: `Deleted ${name}`,
+			success: `${name} deleted.`,
 		});
 	}
 </script>

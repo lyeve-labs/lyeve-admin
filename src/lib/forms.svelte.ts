@@ -166,7 +166,7 @@ type Success = string | ((data: Record<string, unknown> | undefined) => string);
  *
  *     <form use:enhance={confirmed(`Delete ${name}?`, 'Its history goes with it.', {
  *         confirmLabel: 'Delete',
- *         success: `Deleted ${name}`,
+ *         success: `${name} deleted.`,
  *     })}>
  *
  * Every other option goes to the kit's confirm unchanged.

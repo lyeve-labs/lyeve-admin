@@ -33,7 +33,7 @@
 		return confirmed(
 			`Delete ${what}?`,
 			detail,
-			{ confirmLabel: 'Delete', success: `Deleted ${what}` },
+			{ confirmLabel: 'Delete', success: `${what} deleted.` },
 		);
 	}
 

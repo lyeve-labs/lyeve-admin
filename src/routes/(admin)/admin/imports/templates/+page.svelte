@@ -43,7 +43,7 @@
 		return confirmed(
 			`Delete template ${t.name}`,
 			'Imports that already used it keep their history.',
-			{ confirmLabel: 'Delete', success: `Deleted ${t.name}` },
+			{ confirmLabel: 'Delete', success: `${t.name} deleted.` },
 		);
 	}
 </script>

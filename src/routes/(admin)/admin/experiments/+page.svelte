@@ -162,7 +162,7 @@
 		return confirmed(
 			`Delete experiment ${e.name}?`,
 			'Its variants, metrics and recorded exposures are deleted too.',
-			{ confirmLabel: 'Delete', success: `Deleted ${e.name}` },
+			{ confirmLabel: 'Delete', success: `${e.name} deleted.` },
 		);
 	}
 
