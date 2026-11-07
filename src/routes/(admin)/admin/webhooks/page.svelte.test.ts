@@ -119,7 +119,7 @@ describe('the webhook list when it could not be read', () => {
 		expect(container.textContent).not.toContain('No webhooks yet');
 		expect(queryByRole('button', { name: /new webhook/i })).toBeNull();
 		// The queue is the same plugin's read, so it is not offered either.
-		expect(queryByRole('button', { name: /dead letters/i })).toBeNull();
+		expect(queryByRole('link', { name: /dead letters/i })).toBeNull();
 		expect(container.querySelector('table')).toBeNull();
 	});
 
@@ -145,7 +145,7 @@ describe('the webhook controls by role', () => {
 		expect(queryByRole('button', { name: 'Delete Ship it' })).toBeNull();
 		expect(queryByRole('button', { name: /rotate the signing secret/i })).toBeNull();
 		expect(getByRole('button', { name: 'Test Ship it' })).toBeTruthy();
-		expect(getByRole('button', { name: 'Delivery history for Ship it' })).toBeTruthy();
+		expect(getByRole('link', { name: 'Delivery history for Ship it' })).toBeTruthy();
 		expect(container.textContent).toContain(superAdminOnly);
 	});
 
@@ -292,8 +292,10 @@ describe('the failures of the history and the queue', () => {
 		},
 	);
 
-	it('still reports a queue that could not be opened above the list', () => {
-		const { container } = render(WebhooksPage, { props: props({ action: 'dead-letters', error: 'Could not load dead letters. Try again.' }) });
-		expect(container.textContent).toContain('Could not load dead letters. Try again.');
+	// Each drawer opens from the address, so a link or a reload opens it too.
+	it('links the queue and each row\'s history by the address that opens them', () => {
+		const { getByRole } = render(WebhooksPage, { props: props(null) });
+		expect(getByRole('link', { name: 'Delivery history for Ship it' }).getAttribute('href')).toContain('deliveries=w1');
+		expect(getByRole('link', { name: /dead letters/i }).getAttribute('href')).toContain('dead=1');
 	});
 });

@@ -49,7 +49,7 @@
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import { eventTone } from '$lib/tones';
-	import { DeliveryHistory } from './delivery-history.svelte';
+	import { page } from '$app/state';
 	import DeliveriesDrawer from './DeliveriesDrawer.svelte';
 	import DeadLetterDrawer from './DeadLetterDrawer.svelte';
 
@@ -59,7 +59,7 @@
 	const failure = drawerFailure(() => form as Failure, ['create', 'update']);
 	// The history and the queue draw their own writes' failures inside them,
 	// where the reader clicked, rather than behind the open panel.
-	const OTHER_DRAWERS = ['retry-delivery', 'dead-letters-page', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
+	const OTHER_DRAWERS = ['retry-delivery', 'dead-letter-replay', 'dead-letter-dismiss', 'dead-letter-delete'];
 	const drawerForm = $derived(failure.drawer);
 	// A rotation that succeeds settles the result shown before it. The secret
 	// never reaches the form, so the earlier result is set aside instead.
@@ -224,8 +224,14 @@
 		}
 	});
 
-	// The history drawer reads what the row's submit names, so the two share it.
-	const history = new DeliveryHistory();
+	// A row's history and the queue open from the address, so a link or a
+	// reload opens them too, and the list keeps its page under them.
+	function drawerHref(param: string, value: string): string {
+		const next = new URL(page.url);
+		next.searchParams.set(param, value);
+		return `${next.pathname}${next.search}`;
+	}
+	const historyName = $derived(rows.find((wh) => wh.id === data.deliveries?.id)?.name ?? data.deliveries?.id ?? '');
 
 	/*
 	 * The plugin shows a rotated secret once and never again, and the old one
@@ -263,12 +269,10 @@
 		<!-- The queue is the same plugin's read: a list that could not be
 		     read offers no queue either. -->
 		{#if data.webhooks.ok}
-			<form method="POST" action="?/dead-letters" use:enhance>
-				<Button variant="secondary" size="sm" type="submit" title="View dead letter queue">
-					<Skull size={ICON.sm} />
-					Dead letters
-				</Button>
-			</form>
+			<Button variant="secondary" size="sm" href={drawerHref('dead', '1')} title="View dead letter queue">
+				<Skull size={ICON.sm} />
+				Dead letters
+			</Button>
 		{/if}
 		<!-- A list that could not be read offers no write against it. -->
 		{#if data.webhooks.ok && isSuperAdmin}
@@ -379,18 +383,15 @@
 										<FlaskConical size={ICON.sm} />
 									</Button>
 								</form>
-								<form method="POST" action="?/deliveries" use:enhance={history.load(wh)}>
-									<input type="hidden" name="id" value={wh.id} />
-									<Button
-										variant="ghost"
-										size="sm"
-										type="submit"
-										title="Delivery history"
-										aria-label="Delivery history for {wh.name}"
-									>
-										<History size={ICON.sm} />
-									</Button>
-								</form>
+								<Button
+									variant="ghost"
+									size="sm"
+									href={drawerHref('deliveries', wh.id)}
+									title="Delivery history"
+									aria-label="Delivery history for {wh.name}"
+								>
+									<History size={ICON.sm} />
+								</Button>
 								{#if isSuperAdmin}
 									<form method="POST" action="?/rotate-secret" use:enhance={takeSecret}>
 										<input type="hidden" name="id" value={wh.id} />
@@ -556,9 +557,9 @@
 
 <!-- A row's history is a read on that row, so it opens over the list the way
      its edit does, and the queue does the same. -->
-<DeliveriesDrawer {form} {history} {held} />
+<DeliveriesDrawer {form} deliveries={data.deliveries} name={historyName} {held} />
 
-<DeadLetterDrawer {form} {held} />
+<DeadLetterDrawer {form} deadLetters={data.deadLetters} {held} />
 
 {#if reveal}
 	<Modal open title="New signing secret for {reveal.name}" onclose={() => (reveal = null)}>
