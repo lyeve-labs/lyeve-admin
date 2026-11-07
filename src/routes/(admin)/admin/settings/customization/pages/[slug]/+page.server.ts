@@ -17,7 +17,7 @@ export const load: PageServerLoad = async (event) => {
 	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Only an admin or a super admin can change customization.');
 	// The plugin says whether this tenant may shape its admin, and the shell
 	// has read its answer. The customization page says why when it may not.
-	if (!customization.entitled) redirect(303, '/admin/settings/customization');
+	if (!customization.entitled) redirect(303, '/admin/settings/customization/pages');
 	const client = authedClient(event);
 	const [page, schemas] = await Promise.all([
 		// Only the engine's 404 says the page does not exist. A refusal or an
@@ -65,6 +65,6 @@ export const actions: Actions = {
 			const failed = actionFailure(err, 'Could not delete the page. Try again.');
 			return fail(failed.status, failed.data);
 		}
-		redirect(303, '/admin/settings/customization');
+		redirect(303, '/admin/settings/customization/pages');
 	},
 };

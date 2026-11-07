@@ -104,9 +104,9 @@ describe('custom page editor writes', () => {
 		expect(out.data.error).toBe('block 2: chart needs a schema');
 	});
 
-	it('deletes the page and returns to the customization settings', async () => {
+	it('deletes the page and returns to the pages tab', async () => {
 		api.deleteCustomPage.mockResolvedValue(undefined);
-		await expect(actions.delete(actionEvent())).rejects.toMatchObject({ status: 303, location: '/admin/settings/customization' });
+		await expect(actions.delete(actionEvent())).rejects.toMatchObject({ status: 303, location: '/admin/settings/customization/pages' });
 		expect(api.deleteCustomPage).toHaveBeenCalledWith(expect.anything(), 'launch');
 	});
 

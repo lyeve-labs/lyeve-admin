@@ -1,9 +1,9 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error, fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionFailure } from '$lib/server/action-error';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { listSchemaNames } from '$lib/api/search-settings';
-import { ROLE_CHOICES } from '$lib/api/customization';
+import { ROLE_CHOICES, saveCustomization, type PageSummary } from '$lib/api/customization';
 import { readPluginSet } from '$lib/plugins';
 import {
 	MAX_WIDGETS,
@@ -11,18 +11,21 @@ import {
 	resetDashboardLayout,
 	saveDashboardLayout,
 	wireWidget,
+	type DashboardLayout,
 	type Widget,
 } from '$lib/api/custom-dashboard';
 import { resolveWidgets } from '$lib/server/dashboard-widgets';
 import { readError } from '$lib/server/read-error';
 import { GATE_OK, section } from '$lib/api/gate';
+import { current, openTab } from '../customization.server';
 
 export const load: PageServerLoad = async (event) => {
-	const { user, customization } = await event.parent();
-	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Only an admin or a super admin can change customization.');
-	// The plugin says whether this tenant may shape its admin, and the shell
-	// has read its answer. The customization page says why when it may not.
-	if (!customization.entitled) redirect(303, '/admin/settings/customization');
+	const { user, plugins } = await event.parent();
+	const { gate, custom } = await openTab(event, user, plugins);
+	if (!custom) {
+		const layout: DashboardLayout = { entitled: false, custom: false, widgets: [], updated_at: null };
+		return { gate, entitled: false, layout, schemas: [] as string[], schemasGate: GATE_OK, pages: [] as PageSummary[], homePage: '' };
+	}
 	const client = authedClient(event);
 	const [layout, schemas] = await Promise.all([
 		// The editor has nothing to draw without the layout, so a failed read
@@ -37,7 +40,15 @@ export const load: PageServerLoad = async (event) => {
 			'Could not load schemas. Widgets keep the schemas they already use.',
 		),
 	]);
-	return { layout, schemas: schemas.ok ? schemas.value : [], schemasGate: schemas.ok ? GATE_OK : schemas.gate };
+	return {
+		gate,
+		entitled: true,
+		layout,
+		schemas: schemas.ok ? schemas.value : [],
+		schemasGate: schemas.ok ? GATE_OK : schemas.gate,
+		pages: custom.pages,
+		homePage: custom.settings.home_page,
+	};
 };
 
 /** The widgets a form posted, or null when the field is not a widget list. */
@@ -95,6 +106,20 @@ export const actions: Actions = {
 		} catch (err) {
 			const failed = actionFailure(err, 'Could not reset the dashboard. Try again.');
 			return fail(failed.status, failed.data);
+		}
+	},
+
+	/** The page shown above the dashboard, or none. */
+	home: async (event) => {
+		await requireRole(event, ['admin', 'super_admin']);
+		const home = String((await event.request.formData()).get('home_page') ?? '');
+		try {
+			const settings = await current(event);
+			settings.home_page = home;
+			await saveCustomization(authedClient(event), settings);
+			return { homeSaved: true };
+		} catch (err) {
+			return fail(400, { pagesError: actionError(err, 'Could not save the dashboard page. Try again.') });
 		}
 	},
 };
