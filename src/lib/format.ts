@@ -245,18 +245,19 @@ export function relativeTime(value: string | null | undefined, now: Date = new D
  * A measured time in milliseconds at the precision it was measured: `400 µs`,
  * `1.5 ms`, `342 ms`, `1.50 s` and `2m 05s`. Below ten milliseconds and in
  * seconds a decimal carries a difference a reader compares against a
- * threshold, and past that it is noise.
+ * threshold, and past that it is noise. Each unit is chosen by the value as it
+ * prints, so a time that rounds up to the next unit shows in that unit rather
+ * than as `1000 ms` or `60.00 s`.
  */
 export function formatMillis(ms: number | null | undefined, fallback: string = NO_VALUE): string {
 	if (typeof ms !== 'number' || !Number.isFinite(ms)) return fallback;
-	if (ms > 0 && ms < 0.001) return `${Math.round(ms * 1e6)} ns`;
-	if (ms > 0 && ms < 1) return `${Math.round(ms * 1000)} µs`;
-	if (ms > 0 && ms < 10) return `${ms.toFixed(1)} ms`;
-	if (ms < 1000) return `${Math.round(ms)} ms`;
-	if (ms < 60_000) return `${(ms / 1000).toFixed(2)} s`;
-	const minutes = Math.floor(ms / 60_000);
-	const seconds = Math.floor((ms % 60_000) / 1000);
-	return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+	if (ms > 0 && Math.round(ms * 1e6) < 1000) return `${Math.round(ms * 1e6)} ns`;
+	if (ms > 0 && Math.round(ms * 1000) < 1000) return `${Math.round(ms * 1000)} µs`;
+	if (ms > 0 && Number(ms.toFixed(1)) < 10) return `${ms.toFixed(1)} ms`;
+	if (Math.round(ms) < 1000) return `${Math.round(ms)} ms`;
+	if (Number((ms / 1000).toFixed(2)) < 60) return `${(ms / 1000).toFixed(2)} s`;
+	const total = Math.round(ms / 1000);
+	return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
 }
 
 const GO_UNIT_MS: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1000, ms: 1, us: 1e-3, 'µs': 1e-3, ns: 1e-6 };
