@@ -2,15 +2,13 @@
 	import {
 		Alert,
 		Badge,
-		Button,
 		Card,
 		PageShell,
 		SectionHeading,
 		Stat,
 		Table,
 	} from '@lyeve-labs/ui-kit';
-	import { invalidateAll } from '$app/navigation';
-	import { RefreshCw } from '@lucide/svelte';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		BACKEND_SETTINGS,
@@ -25,19 +23,8 @@
 	} from '$lib/api/messagebroker';
 	import { NO_VALUE, formatDateTime, plural } from '$lib/format';
 	import type { PageData } from './$types';
-	import { ICON } from '$lib/icon';
 
 	let { data }: { data: PageData } = $props();
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	const health = $derived(brokerHealth(data.status));
 	const broker = $derived(hasBroker(data.status));
@@ -55,9 +42,7 @@
 >
 	{#snippet actions()}
 		{#if data.permitted && data.gate.state === 'ok'}
-			<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-				<RefreshCw size={ICON.sm} /> Refresh
-			</Button>
+			<RefreshButton />
 		{/if}
 	{/snippet}
 

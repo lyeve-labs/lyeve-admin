@@ -15,9 +15,9 @@
 		Textarea,
 		Toggle,
 	} from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
-	import { Copy, Eye, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2 } from '@lucide/svelte';
+	import { Copy, Eye, Pencil, Plus, Search, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import { duplicateRow } from '$lib/duplicate';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -36,16 +36,6 @@
 	import { pageHref, pageNumber } from '$lib/api/list';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	let narrow = $state('');
 
@@ -163,9 +153,7 @@
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 		<!-- Optional, because a page can be rendered before its load has run and
 		     a header that dereferences the gate takes the whole page down. -->
 		{#if data.gate?.state === 'ok'}

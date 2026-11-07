@@ -17,10 +17,11 @@
 		Table,
 		Toggle,
 	} from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { CalendarClock, Download, Pause, Play, Plus, RefreshCw, Search, Trash2, X } from '@lucide/svelte';
+	import { CalendarClock, Download, Pause, Play, Plus, Search, Trash2, X } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
@@ -49,16 +50,6 @@
 
 	/** How often the list re-reads while an export is still going. */
 	const POLL_MS = 2000;
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidate('app:data-export');
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	const running = $derived(data.jobs.filter(active));
 	const failed = $derived(data.jobs.filter((j) => j.status === 'failed').length);
@@ -184,9 +175,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton dependency="app:data-export" />
 		{#if data.gate.state === 'ok'}
 			<Button variant="primary" size="sm" onclick={openStart}>
 				<Plus size={ICON.sm} /> New export

@@ -14,6 +14,7 @@
 		Table,
 		toast,
 	} from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -26,7 +27,6 @@
 		ListChecks,
 		Pencil,
 		Plus,
-		RefreshCw,
 		Rows3,
 		Trash2,
 		Undo2,
@@ -85,16 +85,6 @@
 		const id = setInterval(() => void invalidate('app:imports'), POLL_MS);
 		return () => clearInterval(id);
 	});
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidate('app:imports');
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	let wizardOpen = $state(false);
 	async function started(job: ImportJob) {
@@ -157,9 +147,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton dependency="app:imports" />
 		{#if data.gate.state === 'ok'}
 			<Button variant="primary" size="sm" onclick={() => (wizardOpen = true)}>
 				<Plus size={ICON.sm} /> New import

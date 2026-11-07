@@ -13,8 +13,8 @@
 		Table,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
 	import {
 		AlertTriangle,
 		CheckCircle,
@@ -23,7 +23,6 @@
 		Gauge,
 		MemoryStick,
 		Puzzle,
-		RefreshCw,
 		RotateCcw,
 	} from '@lucide/svelte';
 	import {
@@ -40,16 +39,6 @@
 	import { httpStatusTone } from '$lib/tones';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	let resetting = $state(false);
 	let capturing = $state(false);
@@ -135,9 +124,7 @@
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 		<form
 			method="POST"
 			action="?/reset"

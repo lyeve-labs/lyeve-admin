@@ -2,15 +2,14 @@
 	import {
 		Alert,
 		Badge,
-		Button,
 		CopyButton,
 		EmptyState,
 		PageShell,
 		SectionHeading,
 		Table,
 	} from '@lyeve-labs/ui-kit';
-	import { invalidateAll } from '$app/navigation';
-	import { Network, RefreshCw } from '@lucide/svelte';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
+	import { Network } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		HEALTH_LABELS,
@@ -28,16 +27,6 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
-
 	const health = $derived(grpcHealth(data.status));
 	const gaps = $derived(undeclared(data.status));
 	const note = $derived(reflectionNote(data.status));
@@ -50,9 +39,7 @@
 >
 	{#snippet actions()}
 		{#if data.permitted && data.gate.state === 'ok'}
-			<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-				<RefreshCw size={ICON.sm} /> Refresh
-			</Button>
+			<RefreshButton />
 		{/if}
 	{/snippet}
 

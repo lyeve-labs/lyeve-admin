@@ -12,7 +12,8 @@
 		Table,
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
-	import { goto, invalidateAll } from '$app/navigation';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
+	import { goto } from '$app/navigation';
 	import { Lightbulb, RefreshCw, Search, Timer } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { page } from '$app/state';
@@ -35,16 +36,6 @@
 	let { data }: { data: PageData } = $props();
 
 	const here = $derived(`${page.url.pathname}${page.url.search}`);
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	// Narrowing happens on what is on screen. The plugin samples after the
 	// fact and offers no server-side filter, so a filter that pretended to
@@ -108,9 +99,7 @@
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 	{/snippet}
 
 	{#if data.gate.state === 'capture_store'}

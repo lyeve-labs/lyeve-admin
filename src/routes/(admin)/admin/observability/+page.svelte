@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Card, EmptyState, PageShell, SectionHeading, SegmentedControl, Stat, Table, type StatusTone } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Card, EmptyState, PageShell, SectionHeading, SegmentedControl, Stat, Table, type StatusTone } from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import { invalidateAll } from '$app/navigation';
-	import { Database, Gauge, AlertTriangle, CheckCircle, RefreshCw } from '@lucide/svelte';
+	import { Database, Gauge, AlertTriangle, CheckCircle } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { LATENCY_TOP_CHOICES } from '$lib/api/observability';
 	import { formatMillis, NO_VALUE } from '$lib/format';
@@ -12,21 +12,6 @@
 	import LiveLogTail from './LiveLogTail.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-
-	// Both panels read through the page load, so a refresh is one invalidation
-	// and the row count survives a reload as a query parameter. Fetching from
-	// the component would leave the server render and the client holding two
-	// different answers with nothing reconciling them.
-	let refreshing = $state(false);
-
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	// Each depth is a link, so the ranking a person is looking at is an
 	// address and the choice works before the page hydrates.
@@ -59,9 +44,7 @@
 	{#snippet actions()}
 		<!-- One refresh for the page: both panels read through the load, so one
 		     invalidation refreshes them together. -->
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 	{/snippet}
 
 	<!-- The pool's state is a badge on its card, not a banner over the page:
