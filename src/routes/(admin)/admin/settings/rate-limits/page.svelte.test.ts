@@ -123,7 +123,7 @@ describe('rate-limits page', () => {
 	it('without the capability, shows custom rules as not enabled and says stored ones are not enforced', () => {
 		const { getByText, queryByRole } = setup({ customEnabled: false });
 		expect(getByText('Custom rate limits')).toBeTruthy();
-		expect(getByText(/saved rule is not enforced/)).toBeTruthy();
+		expect(getByText(/saved rule is not enforced, because custom rules are not enabled on this instance\./)).toBeTruthy();
 		expect(getByText('Not enforced')).toBeTruthy();
 		expect(queryByRole('button', { name: /New rule/ })).toBeNull();
 		expect(queryByRole('button', { name: /Edit POST \/api\/admin\/auth\/login/ })).toBeNull();
@@ -267,11 +267,11 @@ describe('the live counters', () => {
 		expect(rows[0].textContent).not.toBe(rows[1].textContent);
 	});
 
-	it('says a global limit bucket counts the whole instance', () => {
+	it('says a global limit bucket counts every tenant', () => {
 		const global = { ...bucket, kind: 'global', endpoint: '*' };
 		const { getByRole } = setup({ status: [global, { ...bucket, tenant_id: 'default' }] });
 		const rows = [...getByRole('region', { name: 'Right now' }).querySelectorAll('tbody tr')];
-		expect(rows[0].textContent).toContain('Whole instance');
+		expect(rows[0].textContent).toContain('Every tenant');
 		expect(rows[1].textContent).toContain('Tenant default');
 	});
 

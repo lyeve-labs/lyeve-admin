@@ -21,8 +21,9 @@ import {
 	type RateLimitOverview,
 	type RateRule,
 } from '$lib/api/rate-limit';
-import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
-import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
+import { pageOf, pageWindow, pastEndOffset, withOffset, type PagedList } from '$lib/api/list';
+import { couldNotLoad } from '$lib/outage';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -41,27 +42,20 @@ export const load: PageServerLoad = async (event) => {
 	const superAdmin = user?.roles?.includes('super_admin') ?? false;
 
 	const client = authedClient(event);
-	let rules: RateRule[] = [];
-	let total: number | null = null;
-	let hasMore = false;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: Gate = notRunning(plugins, PLUGIN.rateLimit) ? { state: 'absent' } : GATE_OK;
-	if (gate.state === 'ok') {
-		try {
-			// The global limit and the protections have sections of their own, so
-			// the list, and its total, is the custom rules alone.
-			const page = pageOf(await listRules(client, limit + 1, offset, 'custom'), limit, offset);
-			rules = page.rows;
-			total = page.total;
-			hasMore = page.hasMore;
-		} catch (err) {
-			gate = gateOf(err, 'Could not load the rate limit rules.');
-		}
-	}
+	// The global limit and the protections have sections of their own, so the
+	// list, and its total, is the custom rules alone.
+	const read: Section<PagedList<RateRule>> = notRunning(plugins, PLUGIN.rateLimit)
+		? { ok: false, gate: { state: 'absent' } }
+		: await section(
+				listRules(client, limit + 1, offset, 'custom').then((res) => pageOf(res, limit, offset)),
+				couldNotLoad('the rate limit rules'),
+			);
+	const gate: Gate = read.ok ? GATE_OK : read.gate;
+	const page = read.ok ? read.value : null;
 	// An offset past the last rule draws the empty state, which would say no
-	// rule is configured. Outside the try, so the redirect is not taken for a
-	// failed read.
-	const back = gate.state === 'ok' ? pastEndOffset(rules.length, limit, offset, total) : null;
+	// rule is configured. A failed read is never redirected.
+	const back = page ? pastEndOffset(page.rows.length, limit, offset, page.total) : null;
 	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// The overview says whether custom rules are enabled, which only the engine
@@ -89,11 +83,11 @@ export const load: PageServerLoad = async (event) => {
 
 	return {
 		routes,
-		rules,
-		total,
+		rules: page?.rows ?? [],
+		total: page?.total ?? null,
 		limit,
 		offset,
-		hasMore,
+		hasMore: page?.hasMore ?? false,
 		overview,
 		superAdmin,
 		status,
