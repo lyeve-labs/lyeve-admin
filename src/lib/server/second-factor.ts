@@ -28,7 +28,7 @@ const MFA_NOT_CONFIGURED = 'AUTH_MFA_NOT_CONFIGURED';
  * A 401 with AUTH_MFA_NOT_CONFIGURED means the engine found no authenticator
  * app for the account: one that signs in with a passkey alone, or a store
  * that could not be read. Signing in again reaches the same challenge, so the
- * reader is told to ask an administrator. The sign-in page offers no passkey
+ * reader is told to ask a super admin. The sign-in page offers no passkey
  * sign-in to point to instead. Every other 401 is a challenge the engine no
  * longer honors (AUTH_CHALLENGE_EXPIRED: expired, malformed or already used)
  * or an account it no longer signs in (UNAUTHORIZED, AUTH_INVALID_CREDENTIALS:
@@ -51,7 +51,7 @@ export function secondFactorFailure(e: unknown, again = 'sign in again'): Second
 		if (e.status === 401 && errorCodeOf(e) === MFA_NOT_CONFIGURED) {
 			return {
 				status: 401,
-				error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',
+				error: 'This account has no authenticator app set up. Ask a super admin to restore your access.',
 				restart: true,
 			};
 		}

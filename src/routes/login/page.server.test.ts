@@ -543,7 +543,7 @@ describe('signing in', () => {
 		);
 		expect(result.status).toBe(401);
 		expect(result.data).toEqual({
-			error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',
+			error: 'This account has no authenticator app set up. Ask a super admin to restore your access.',
 		});
 	});
 

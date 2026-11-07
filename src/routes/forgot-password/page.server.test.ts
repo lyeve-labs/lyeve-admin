@@ -53,7 +53,7 @@ describe('forgot-password action', () => {
 	it('says the feature is off when the engine has no such route', async () => {
 		const fetch = vi.fn(async () => json({ error: 'not found' }, 404)) as unknown as typeof globalThis.fetch;
 		const result = (await submit({ email: 'a@b.co' }, fetch)) as { status: number; data: { error: string } };
-		expect(result.data.error).toBe('Password reset is not included in this build. Ask an administrator to sign you in.');
+		expect(result.data.error).toBe('Password reset is not included in this build. Ask a super admin to sign you in.');
 	});
 });
 
