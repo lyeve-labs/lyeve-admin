@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { authedClient } from '$lib/server/authz';
 import { getSearchAnalytics, searchPage, type SearchAnalytics, type SearchPage } from '$lib/api/search-settings';
-import { section, type Section } from '$lib/api/gate';
+import { section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
 import { attempt } from './attempt.server';

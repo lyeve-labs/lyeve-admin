@@ -213,7 +213,8 @@ export interface ReadPage<T> {
 /**
  * Every row of a paged list, a page at a time. The walk ends at a short page,
  * at the stated total, once `enough` holds, or before a page that would start
- * at `cap` rows, so an endpoint that never sends a short page still ends.
+ * at `cap` rows. An endpoint that never sends a short page or a total needs a
+ * finite `cap`, or the walk does not end.
  */
 export async function readAll<T>(
 	read: (limit: number, offset: number) => Promise<ReadPage<T>>,
