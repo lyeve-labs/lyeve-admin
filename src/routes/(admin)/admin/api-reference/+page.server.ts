@@ -123,7 +123,7 @@ export const actions: Actions = {
 			// have the reader debugging an endpoint that was never reached. The
 			// runtime's own words can name an internal address, so none of them
 			// are shown.
-			return fail(502, { tryError: 'Could not send the request. Try again in a moment.' });
+			return fail(502, { tryError: 'Could not send the request. Try again.' });
 		}
 	},
 };

@@ -64,12 +64,12 @@ describe('the warning a tester needs first', () => {
 	// endpoints this build may not serve while implying the engine said so.
 	it('says when the endpoint list is the fallback rather than the engine', () => {
 		const { container } = render(LabsPage, { props: props({ source: 'catalog' }) });
-		expect(said(container)).toContain('not what this build serves');
+		expect(said(container)).toContain("Could not load the engine's API document, so this is the catalog built into the console");
 	});
 
 	it('says nothing of the sort when the engine answered', () => {
 		const { container } = render(LabsPage, { props: props() });
-		expect(said(container)).not.toContain('not what this build serves');
+		expect(said(container)).not.toContain("Could not load the engine's API document, so this is the catalog built into the console");
 	});
 });
 
@@ -123,7 +123,7 @@ describe('gRPC', () => {
 		const { container } = render(LabsPage, { props: props() });
 		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
 		const text = said(container);
-		expect(text).toContain('checks your token exactly as it would');
+		expect(text).toContain('checks your token as it does for any caller');
 		expect(container.querySelector('form[action="?/grpc"]')).not.toBeNull();
 	});
 

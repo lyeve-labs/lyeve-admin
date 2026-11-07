@@ -4,6 +4,7 @@ import { staticGroups, type EndpointGroup } from '$lib/api/reference';
 import { buildReference, type OpenAPIDocument } from '$lib/api/openapi';
 import type { HttpClient } from '@lyeve-labs/client';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 import { authedClient, authedHeaders, loadUser } from '$lib/server/authz';
 import {
 	GRAPHQL_URL,
@@ -62,7 +63,7 @@ async function readGroups(client: HttpClient): Promise<{ groups: EndpointGroup[]
 }
 
 /** What the gRPC tab says when the listener's status could not be read. */
-const GRPC_FAILED = 'Could not load the gRPC listener status.';
+const GRPC_FAILED = couldNotLoad('the gRPC listener status');
 
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
@@ -144,7 +145,7 @@ async function send(
 		// address, so none of them are shown.
 		const msg = err instanceof Error && err.name === 'TimeoutError'
 			? `The request timed out after ${TIMEOUT_MS / 1000} seconds.`
-			: 'Could not send the request. Try again in a moment.';
+			: 'Could not send the request. Try again.';
 		return { error: msg };
 	}
 
@@ -280,7 +281,7 @@ export const actions: Actions = {
 		try {
 			invoked = JSON.parse(out.result.body) as GrpcInvokeResult;
 		} catch {
-			return fail(502, { error: 'The call returned a response this page cannot read.' });
+			return fail(502, { error: 'Could not read the response.' });
 		}
 		return { grpc: labResultFromInvoke(invoked), grpcRoute: route };
 	},

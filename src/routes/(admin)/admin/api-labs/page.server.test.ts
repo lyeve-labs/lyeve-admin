@@ -206,6 +206,6 @@ describe('a lab request that never reached the engine', () => {
 			throw new TypeError('fetch failed: connect ECONNREFUSED 10.0.0.5:8080');
 		});
 		const out = (await actions.graphql(event)) as { status: number; data: { error: string } };
-		expect(out.data.error).toBe('Could not send the request. Try again in a moment.');
+		expect(out.data.error).toBe('Could not send the request. Try again.');
 	});
 });
