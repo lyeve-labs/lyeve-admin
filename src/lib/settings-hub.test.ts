@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { NavTree } from '@lyeve-labs/ui-kit';
 import { adminNav } from './nav';
-import { HUB_IDS, settingsHub } from './settings-hub';
+import { settingsHub } from './settings-hub';
 
 const SUPER = ['super_admin'];
 
@@ -22,9 +22,12 @@ describe('settings hub', () => {
 	// A settings page with no place on the hub is reachable only from the
 	// sidebar, and the two lists drift apart.
 	it('places every settings page the sidebar offers a super admin', () => {
-		const leaves = settingsLeaves(adminNav(SUPER));
+		const tree = adminNav(SUPER);
+		const leaves = settingsLeaves(tree);
 		expect(leaves.length).toBeGreaterThan(15);
-		for (const id of leaves) expect(HUB_IDS, `${id} has no group on the hub`).toContain(id);
+		const everyPage = { twoFactor: true, trustedDevices: true, connectedEditors: true };
+		const placed = settingsHub(tree, everyPage).flatMap((g) => g.entries.map((e) => e.id));
+		for (const id of leaves) expect(placed, `${id} has no group on the hub`).toContain(id);
 	});
 
 	it('shows each page once, with what it holds', () => {

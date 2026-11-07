@@ -164,6 +164,3 @@ export function settingsHub(tree: NavTree, personal: PersonalPages): HubGroup[] 
 	})).filter((g) => g.entries.length > 0);
 	return [account, ...groups];
 }
-
-/** Every instance entry id the hub knows how to place, for the test that keeps it complete. */
-export const HUB_IDS: readonly string[] = GROUPS.flatMap((g) => g.ids);

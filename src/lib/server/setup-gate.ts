@@ -75,11 +75,6 @@ export function safeNext(next: string | null): string | null {
 const READY_TTL_MS = 15_000;
 let readyUntil = 0;
 
-/** Clears the cached ready state. Tests call it between cases. */
-export function resetSetupGateCache(): void {
-	readyUntil = 0;
-}
-
 /**
  * The one setup check: returns where to send the request, or null to let it
  * through. Every route reads this one answer, so no two disagree when the
