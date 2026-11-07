@@ -3,7 +3,14 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+// Each form's submit handler, by its action, so a test can play an outcome through it.
+const forms = vi.hoisted(() => ({ submits: new Map<string, (input: unknown) => Promise<unknown>>() }));
+vi.mock('$app/forms', () => ({
+	enhance: (el: HTMLFormElement, submit: (input: unknown) => Promise<unknown>) => {
+		forms.submits.set(el.getAttribute('action') ?? '', submit);
+		return { destroy() {} };
+	},
+}));
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(async () => {}) }));
 const app = vi.hoisted(() => ({
 	page: { url: new URL('http://admin/admin/settings/connected-editors/builder') },
@@ -18,6 +25,7 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
 });
 
 import Page from './+page.svelte';
+import { invalidateAll } from '$app/navigation';
 import { SAID } from '$lib/api/connected-editors';
 import { FORMS_TYPE_TAKEN, SUBMISSIONS_PUBLIC } from '$lib/api/form-destinations';
 
@@ -258,6 +266,17 @@ describe('where forms can send', () => {
 		expect(document.querySelector('[data-testid="flow-notes"] .font-mono')?.className).toContain('break-all');
 	});
 
+	it('says the content types failed in the forms card in its own words', () => {
+		render(Page, {
+			props: props({
+				settings: { ok: true, value: FORM_SETTINGS },
+				schemasGate: { state: 'error', message: 'Could not load schemas. Pages keep showing the schemas saved before.' },
+			}),
+		});
+		expect(formsCard().textContent).toContain('Could not load content types. Forms keep sending to the content types saved before.');
+		expect(formsCard().textContent).not.toContain('Pages keep showing');
+	});
+
 	it('draws a failed flow list as a failure with a way to try again, and saves no flow list', () => {
 		render(Page, {
 			props: props({
@@ -312,12 +331,14 @@ describe('where forms can send', () => {
 		render(Page, { props: props({ settings: { ok: true, value: NONE_ALLOWED }, submissions: 'public', formsPreset: PRESET }) });
 		expect(said()).toContain(SUBMISSIONS_PUBLIC);
 		expect(document.querySelector('form[action="?/formsPreset"]')).toBeNull();
+		expect([...document.querySelectorAll('a[href="/admin/schema"]')].map((a) => a.textContent)).toEqual(['schema builder']);
 	});
 
 	it('says why instead of offering the preset when a forms type of the tenant is in the way', () => {
 		render(Page, { props: props({ settings: { ok: true, value: NONE_ALLOWED }, formsTypeTaken: true, formsPreset: PRESET }) });
 		expect(said()).toContain(FORMS_TYPE_TAKEN);
 		expect(document.querySelector('form[action="?/formsPreset"]')).toBeNull();
+		expect(document.querySelector('[data-testid="forms-type-taken"] a')?.getAttribute('href')).toBe('/admin/schema');
 	});
 
 	it('draws a failed preset catalog as a failure', () => {
@@ -341,6 +362,20 @@ describe('where forms can send', () => {
 		render(Page, { props: props({ settings: { ok: true, value: FORM_SETTINGS }, formSchemas: FORM_SCHEMAS }, { presetApplied: { created: true, settings: FORM_SETTINGS } }) });
 		await frames();
 		expect(said()).toContain('The Forms and Form submissions content types were created. Forms can send to Form submissions now.');
+	});
+
+	it.each([
+		[{ presetCreated: true, presetError: 'created' }, 1],
+		[{ presetError: 'refused' }, 0],
+	])('reloads the page data only when setup created the types and the save after them failed', async (data, reloads) => {
+		vi.mocked(invalidateAll).mockClear();
+		render(Page, { props: props({ settings: { ok: true, value: NONE_ALLOWED }, formsPreset: PRESET }) });
+		const submit = forms.submits.get('?/formsPreset');
+		const after = (await submit?.({ cancel: vi.fn(), formData: new FormData() })) as (opts: unknown) => Promise<void>;
+		const update = vi.fn(async () => {});
+		await after({ result: { type: 'failure', status: 422, data }, update });
+		expect(update).toHaveBeenCalledTimes(1);
+		expect(invalidateAll).toHaveBeenCalledTimes(reloads);
 	});
 
 	it('offers no preset once its submissions type is allowed', () => {

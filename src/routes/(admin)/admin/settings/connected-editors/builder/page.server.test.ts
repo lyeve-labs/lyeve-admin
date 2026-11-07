@@ -272,7 +272,7 @@ describe('where forms can send', () => {
 		expect(out.data).toEqual({
 			presetCreated: true,
 			presetError:
-				'The Forms and Form submissions content types were created, but forms cannot send to them yet. Forms cannot send to form_submissions.',
+				'The Forms and Form submissions content types were created, but forms cannot send to Form submissions yet. Forms cannot send to form_submissions.',
 		});
 	});
 

@@ -111,6 +111,12 @@
 	// Offered while forms cannot send to the preset's submissions type yet.
 	const presetWanted = $derived(!!settings && !data.schemasGate && !(settings.form_schemas ?? []).includes(FORM_SUBMISSIONS));
 	const presetOffered = $derived(!!data.formsPreset?.ok && data.formsPreset.value && !answer.presetMissing);
+	// The forms card says the content types failed in its own words, not the pages card's.
+	const formsSchemasGate = $derived(
+		data.schemasGate?.state === 'error'
+			? { state: 'error' as const, message: 'Could not load content types. Forms keep sending to the content types saved before.' }
+			: data.schemasGate,
+	);
 	const saveForms = tracked(() => {});
 	// When the preset created its types but the save after it failed, the page reloads its data so it offers to allow them.
 	const applyPreset = tracked(() => async ({ result, update }) => {
@@ -118,6 +124,11 @@
 		if (result.type === 'failure' && result.data?.presetCreated) await invalidateAll();
 	});
 </script>
+
+{#snippet schemaBuilderLinked(text: string)}
+	{@const [before, after] = text.split('schema builder')}
+	{before}<a class="text-brand underline" href="/admin/schema">schema builder</a>{after}
+{/snippet}
 
 <PageShell
 	title="Builder connections"
@@ -259,7 +270,7 @@
 				{/if}
 				{#if presetWanted}
 					{#if data.submissions === 'public'}
-						<Alert tone="warn">{SUBMISSIONS_PUBLIC}</Alert>
+						<Alert tone="warn">{@render schemaBuilderLinked(SUBMISSIONS_PUBLIC)}</Alert>
 					{:else if data.submissions === 'private' || (presetOffered && !data.formsTypeTaken)}
 						<div class="flex flex-col items-start gap-3" data-testid="forms-preset">
 							<p class="text-sm text-muted">
@@ -274,7 +285,7 @@
 							</form>
 						</div>
 					{:else if data.formsTypeTaken}
-						<p class="text-sm text-muted" data-testid="forms-type-taken">{FORMS_TYPE_TAKEN}</p>
+						<p class="text-sm text-muted" data-testid="forms-type-taken">{@render schemaBuilderLinked(FORMS_TYPE_TAKEN)}</p>
 					{:else if data.formsPreset && !data.formsPreset.ok}
 						<GateNotice gate={data.formsPreset.gate} title="Content type presets" absent="Content type presets need a newer version of the schema plugin." />
 					{:else}
@@ -291,8 +302,8 @@
 						<Alert tone="success" autoDismiss>Settings saved.</Alert>
 					{/if}
 
-					{#if data.schemasGate}
-						<GateNotice gate={data.schemasGate} title="Content types" absent="Content types are not included in this build." />
+					{#if formsSchemasGate}
+						<GateNotice gate={formsSchemasGate} title="Content types" absent="Content types are not included in this build." />
 					{:else}
 						<input type="hidden" name="form_schemas_offered" value="1" />
 						{#if formSchemaOptions.length === 0}

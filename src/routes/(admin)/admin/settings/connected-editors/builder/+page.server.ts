@@ -202,7 +202,7 @@ export const actions: Actions = {
 			if (created) {
 				const presetError = isOutage(e)
 					? 'The Forms and Form submissions content types were created. Check whether Form submissions is ticked below, then try again.'
-					: `The Forms and Form submissions content types were created, but forms cannot send to them yet. ${refusalSentence(e, 'Try again.')}`;
+					: `The Forms and Form submissions content types were created, but forms cannot send to Form submissions yet. ${refusalSentence(e, 'Try again.')}`;
 				return fail(isOutage(e) ? 503 : status, { presetCreated: true, presetError });
 			}
 			if (isOutage(e)) return fail(503, { presetError: SAID.settingOutage });

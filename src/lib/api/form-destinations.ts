@@ -153,10 +153,10 @@ export function submissionsState(rows: readonly FormSchemaRow[]): SubmissionsSta
 	return !row ? 'absent' : row.publicDelivery ? 'public' : 'private';
 }
 
-/** What the card says when the submissions type is served by the delivery API. */
+/** What the card says when the submissions type is served by the delivery API. The card links "schema builder". */
 export const SUBMISSIONS_PUBLIC =
 	'Forms cannot send to Form submissions while anyone can read it through the delivery API. Turn off public delivery on it in the schema builder, then come back.';
 
-/** What the card says when a forms type of the tenant's own keeps the preset from adding its types. */
+/** What the card says when a forms type of the tenant's own keeps setup from adding its types. The card links "schema builder". */
 export const FORMS_TYPE_TAKEN =
-	'You already have a content type named forms, so the forms preset cannot add its types. Create a content type for form posts in the schema builder, then choose it here.';
+	'You already have a content type named forms, so Set up form submissions cannot add its content types. Create a content type for form posts in the schema builder, then choose it here.';
