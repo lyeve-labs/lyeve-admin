@@ -1,7 +1,7 @@
 /**
- * API reference data. Structured definitions for every endpoint exposed by the CMS.
- * This is a first-party data model, not an OpenAPI/Swagger artifact.
- * The UI renders it via the custom /admin/api-reference page.
+ * The endpoint catalog the API reference page draws. The console carries it
+ * rather than asking the engine, because the page explains each route in the
+ * console's own words, which no machine description the engine serves holds.
  */
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -9,7 +9,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type AuthRequirement =
 	| 'none'           // Public: no token needed
 	| 'bearer'         // Bearer JWT (Content API)
-	| 'cookie'         // HTTP-only __Host-sys_session cookie (Admin UI)
+	| 'cookie'         // HTTP-only __Host-sys_session cookie (the console)
 	| 'bearer-or-cookie'; // Either works (Admin API endpoints)
 
 export interface EndpointParam {
@@ -52,7 +52,7 @@ export interface EndpointGroup {
 const adminAuthGroup: EndpointGroup = {
 	id: 'admin-auth',
 	label: 'Admin · Auth',
-	description: 'Authentication and setup for the admin panel. Uses HTTP-only cookie sessions.',
+	description: 'Authentication and setup for LyEve Console. Uses HTTP-only cookie sessions.',
 	server: 'admin',
 	baseUrl: '/api/admin',
 	endpoints: [
@@ -60,7 +60,7 @@ const adminAuthGroup: EndpointGroup = {
 			method: 'GET',
 			path: '/api/admin/setup',
 			summary: 'Setup status',
-			description: 'Returns whether the CMS has been initialized (i.e. at least one admin user exists).',
+			description: 'Returns whether the engine has been set up, which means at least one admin account exists.',
 			auth: 'none',
 			response: {
 				description: 'Setup state',
@@ -72,7 +72,7 @@ const adminAuthGroup: EndpointGroup = {
 			path: '/api/admin/setup',
 			summary: 'Initial setup',
 			description:
-				'Creates the first super_admin user. Only works when no users exist yet, and only with the setup token: LYEVE_SETUP_TOKEN, or the one-time token the engine logs at boot. 401 without it.',
+				'Creates the first super admin account. It works only while no account exists, and only with the setup token: LYEVE_SETUP_TOKEN, or the one-time token the engine logs at boot. Without it the answer is 401.',
 			auth: 'none',
 			requestBody: {
 				description: 'First user credentials and the setup token',
@@ -123,7 +123,7 @@ const adminAuthGroup: EndpointGroup = {
 const adminSchemasGroup: EndpointGroup = {
 	id: 'admin-schemas',
 	label: 'Admin · Schemas',
-	description: 'Manage content type definitions. Schema writes require admin or super_admin role.',
+	description: 'Manage content type definitions. Only an admin or a super admin can write a schema.',
 	server: 'admin',
 	baseUrl: '/api/admin',
 	endpoints: [
@@ -196,7 +196,7 @@ const adminSchemasGroup: EndpointGroup = {
 			roles: ['super_admin'],
 			params: [
 				{ name: 'from', in: 'query', type: 'string', required: false, description: 'Source format', values: ['lyeve', 'json-schema', 'openapi', 'strapi', 'contentful', 'wordpress'] },
-				{ name: 'apply', in: 'query', type: 'boolean', required: false, description: 'Write the changes; without it nothing is written' },
+				{ name: 'apply', in: 'query', type: 'boolean', required: false, description: 'Write the changes. Without it, nothing is written.' },
 			],
 			response: {
 				description: 'The plan, and whether it was applied.',
@@ -209,7 +209,7 @@ const adminSchemasGroup: EndpointGroup = {
 const adminUsersGroup: EndpointGroup = {
 	id: 'admin-users',
 	label: 'Admin · Users',
-	description: 'Manage CMS admin users. All endpoints require super_admin role.',
+	description: "Manage the console's accounts. Only a super admin can call these endpoints.",
 	server: 'admin',
 	baseUrl: '/api/admin',
 	endpoints: [
@@ -303,7 +303,7 @@ const adminMigrateGroup: EndpointGroup = {
 const adminWebhooksGroup: EndpointGroup = {
 	id: 'admin-webhooks',
 	label: 'Admin · Webhooks',
-	description: 'Manage outgoing HTTP webhooks. The CMS fires a POST to each matching URL after content lifecycle events.',
+	description: 'Manage outgoing HTTP webhooks. The engine sends a POST to each matching URL after a content event.',
 	server: 'admin',
 	baseUrl: '/api/admin',
 	endpoints: [
@@ -378,7 +378,7 @@ const adminWebhooksGroup: EndpointGroup = {
 			method: 'POST',
 			path: '/api/admin/webhooks/{id}/rotate-secret',
 			summary: 'Rotate webhook secret',
-			description: 'Replaces the webhook signing secret. Optionally pass new_secret in body; omitting it auto-generates one. Requires super_admin.',
+			description: 'Replaces the webhook signing secret. Pass new_secret in the body to choose it, or omit it to generate one. Only a super admin can call this.',
 			auth: 'cookie',
 			roles: ['super_admin'],
 			params: [{ name: 'id', in: 'path', type: 'uuid', required: true, description: 'Webhook UUID' }],
@@ -524,7 +524,7 @@ const adminDeadLettersGroup: EndpointGroup = {
 			method: 'DELETE',
 			path: '/api/admin/webhook-dead-letters/{id}',
 			summary: 'Delete dead letter',
-			description: 'Permanently removes the dead letter entry. Irreversible.',
+			description: 'Removes the dead letter entry. This cannot be undone.',
 			auth: 'cookie',
 			roles: ['admin', 'super_admin'],
 			params: [{ name: 'id', in: 'path', type: 'uuid', required: true, description: 'Dead letter UUID' }],
@@ -573,7 +573,7 @@ const adminSystemGroup: EndpointGroup = {
 			path: '/api/admin/plugins/{name}/schema',
 			summary: 'Plugin configuration schema',
 			description:
-				'Returns the JSON Schema for a plugin\'s configuration struct, used by the admin UI to auto-generate a configuration form.',
+				"Returns the JSON Schema for a plugin's configuration, which the console uses to draw its settings form.",
 			auth: 'cookie',
 			roles: ['admin', 'super_admin'],
 			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Plugin name' }],
@@ -590,7 +590,7 @@ const adminSystemGroup: EndpointGroup = {
 const apiAuthGroup: EndpointGroup = {
 	id: 'api-auth',
 	label: 'API · Auth',
-	description: 'Obtain Bearer tokens for the Content API. Tokens are JWTs signed with EdDSA (Ed25519), verifiable via /.well-known/jwks.json; HS256 is a legacy fallback.',
+	description: 'Obtain bearer tokens for the content API. Tokens are JWTs signed with EdDSA (Ed25519) and verifiable at /.well-known/jwks.json. HS256 is a legacy fallback.',
 	server: 'api',
 	baseUrl: '/api/v1',
 	endpoints: [
@@ -667,7 +667,7 @@ export function makeContentGroup(): EndpointGroup {
 		id: 'api-content',
 		label: 'API · Content',
 		description:
-			'CRUD operations over any collection. Write endpoints require editor, admin, or super_admin role.',
+			'Create, read, update and delete records in any collection. Only an editor, an admin or a super admin can write.',
 		server: 'api',
 		baseUrl: '/api/v1',
 		endpoints: [
@@ -745,7 +745,7 @@ export function makeContentGroup(): EndpointGroup {
 const apiJwksGroup: EndpointGroup = {
 	id: 'api-jwks',
 	label: 'API · JWKS',
-	description: 'JSON Web Key Set for verifying EdDSA (Ed25519) tokens issued by the CMS.',
+	description: 'JSON Web Key Set for verifying the EdDSA (Ed25519) tokens the engine issues.',
 	server: 'api',
 	baseUrl: '/.well-known',
 	endpoints: [

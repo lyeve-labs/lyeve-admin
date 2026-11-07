@@ -404,7 +404,7 @@ describe('content editor save, many_to_many fields', () => {
 
 		const failure = await runSave(saveEvent(fn, { tags: ['t1'] }));
 
-		expect(failure?.data?.error).toBe('The entry was saved, but some links were not. In tags, 1 link could not be added.');
+		expect(failure?.data?.error).toBe('The entry was saved, but some links were not. Could not add 1 link in tags.');
 	});
 
 	it('leaves a set that has not changed alone', async () => {
@@ -459,7 +459,7 @@ describe('content editor save, a schema refusal', () => {
 
 		expect(failure.status).toBe(422);
 		expect(failure.data.fieldErrors).toEqual({ email: 'must be a valid email' });
-		expect(failure.data.error).toBe('The entry was not saved. Check the highlighted fields.');
+		expect(failure.data.error).toBe('Check the highlighted fields.');
 	});
 });
 

@@ -14,7 +14,7 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import { GATE_OK, gateOf, type Gate } from './gate';
+import { GATE_OK, gateOf, inSentence, type Gate } from './gate';
 import type { ListEnvelope } from './list';
 
 export const PROVIDERS_URL = '/api/admin/storage/providers';
@@ -100,7 +100,7 @@ export function testPassed(result: TestResult | null | undefined): boolean {
 
 /** Why a provider failed its test. The plugin sends an empty error on a pass. */
 export function testMessage(result: TestResult | null | undefined): string {
-	return result?.error?.trim() || 'No reason was given.';
+	return result?.error?.trim() || 'The connection test failed, and the provider gave no reason.';
 }
 
 /**
@@ -161,7 +161,7 @@ export function providerTone(
 }
 
 export function providerState(p: StorageProvider): string {
-	if (p.credentials_unavailable) return 'Credentials will not decrypt';
+	if (p.credentials_unavailable) return 'Credentials cannot be decrypted';
 	if (!p.enabled) return 'Disabled';
 	if (p.local_public_unsigned) return 'Serving unsigned URLs';
 	return 'Ready';
@@ -278,7 +278,7 @@ export function providerBodyFrom(form: FormData, creating: boolean): { body: Pro
 	for (const f of PROVIDER_FIELDS[type]) {
 		const v = String(form.get(f.key) ?? '').trim();
 		if (!v) {
-			if (f.required && (creating || !isCredential(f))) return { error: `${f.label} is required.` };
+			if (f.required && (creating || !isCredential(f))) return { error: `Enter ${inSentence(f.label)}.` };
 			continue;
 		}
 		body[f.key] = v;

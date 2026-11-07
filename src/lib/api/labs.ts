@@ -275,7 +275,7 @@ export const STATUS_HINTS: Readonly<Record<number, string>> = {
 	409: 'The change is not allowed from the current state.',
 	422: 'The body failed validation. The response says which field.',
 	429: 'A rate limit was reached. The Retry-After header says when to try again.',
-	503: 'The database or a replica is unavailable. The request itself is not wrong.',
+	503: 'The database or a replica is unavailable. Send the request again later.',
 };
 
 export function statusHint(status: number): string {

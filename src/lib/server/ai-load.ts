@@ -102,7 +102,7 @@ export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRol
 			return msg;
 		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';
-		if (noProvider(err)) return 'No AI provider is enabled. Add or enable one first.';
+		if (noProvider(err)) return 'No AI provider is enabled. A super admin can add or enable one under AI providers.';
 		if (err.status === 409) return 'No configured provider supports this operation.';
 		if (err.status >= 400 && err.status < 500) {
 			const msg = err.message?.trim();

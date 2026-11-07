@@ -115,7 +115,7 @@ describe('creating a provider', () => {
 	it('asks for a missing credential before it sends anything', async () => {
 		const { event, calls } = engine({ ...S3, secret_key: '' });
 		const out = (await actions.create(event)) as Failure;
-		expect(out.data.providerError).toBe('Secret access key is required.');
+		expect(out.data.providerError).toBe('Enter secret access key.');
 		expect(calls).toEqual([]);
 	});
 

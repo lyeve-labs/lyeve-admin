@@ -351,7 +351,7 @@ describe('admin/flows/datasources actions', () => {
 
 	it('refuses a scheme missing what it cannot work without, before the engine sees it', async () => {
 		for (const [auth, message] of [
-			[{ auth_type: 'basic', auth_password: 'pw' }, 'needs a user'],
+			[{ auth_type: 'basic', auth_password: 'pw' }, 'Enter a user'],
 			[{ auth_type: 'oauth2_client_credentials', auth_client_id: 'cid' }, 'token URL'],
 			[{ auth_type: 'digest' }, 'authentication type'],
 		] as const) {

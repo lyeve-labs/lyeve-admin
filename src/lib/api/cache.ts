@@ -113,7 +113,7 @@ export function inactiveReason(reason: string): string {
 		case 'create_failed':
 			return 'Could not start. Check its address and settings in your deployment.';
 		case 'register_failed':
-			return 'Could not start, usually because another provider already uses its name.';
+			return 'Could not start because another provider already uses its name.';
 		default:
 			return 'Not running.';
 	}

@@ -215,10 +215,10 @@ export function validate(
 		const v = formValues[fieldKey(f)];
 		if (f.field_type === 'boolean') continue;
 		if (v === null || v === undefined || v === '') {
-			errors[f.name] = 'This field is required';
+			errors[f.name] = `Enter ${f.name}.`;
 		} else if (f.field_type === 'rich_text') {
 			if (!String(v).replace(/<[^>]*>/g, '').trim()) {
-				errors[f.name] = 'This field is required';
+				errors[f.name] = `Enter ${f.name}.`;
 			}
 		}
 	}

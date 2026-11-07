@@ -223,7 +223,7 @@ export function planRelation(
 		kind,
 		sentence: many
 			? `Each ${here} row has many ${there} rows.`
-			: `Each ${here} row has one ${there} row. Only one is expected, but nothing enforces it. If several ${there} rows point here, the first one is used.`,
+			: `Each ${here} row has one ${there} row. The limit is not enforced, so if several ${there} rows point here, the first one is used.`,
 		creates: [],
 		reads: `${thatTable}.${column}`,
 		flags: `Neither applies. The key is ${thatTable}.${column}, and Req and Idx on it belong to ${there}.`,

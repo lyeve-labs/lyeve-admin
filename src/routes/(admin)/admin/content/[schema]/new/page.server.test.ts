@@ -162,7 +162,7 @@ describe('creating a content entry', () => {
 		const failure = result as { status: number; data: { error: string; fieldErrors: Record<string, string> } };
 		expect(failure.status).toBe(422);
 		expect(failure.data.fieldErrors).toEqual({ title: 'must be an email' });
-		expect(failure.data.error).toBe('The entry was not saved. Check the highlighted fields.');
+		expect(failure.data.error).toBe('Check the highlighted fields.');
 		expect(failure.data.error).not.toContain('{');
 	});
 

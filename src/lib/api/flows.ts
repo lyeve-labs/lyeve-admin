@@ -305,7 +305,7 @@ export async function exportFlow(
 	headers: Record<string, string> = {}
 ): Promise<string> {
 	const res = await fetchFn(`${BASE}/${enc(id)}/export?format=${format}`, { headers });
-	if (!res.ok) throw new Error(`export failed with ${res.status}`);
+	if (!res.ok) throw new Error('Could not export the flow. Try again.');
 	return res.text();
 }
 

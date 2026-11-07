@@ -153,7 +153,7 @@ describe('the connection', () => {
 		const { container } = render(BrokerPage, {
 			props: props({ status: status({ published: 0, last_publish_at: null }) }),
 		});
-		expect(said(container)).toContain('Nothing published yet');
+		expect(said(container)).toContain('No events published yet');
 	});
 });
 

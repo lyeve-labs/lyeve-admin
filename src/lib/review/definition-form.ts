@@ -58,7 +58,7 @@ export function parseStages(raw: string): { stages: StageInput[] } | { error: st
 	try {
 		parsed = JSON.parse(raw || '[]');
 	} catch {
-		return { error: 'Could not read the stages. Reload the page and try again.' };
+		return { error: 'Could not load the stages. Reload the page to try again.' };
 	}
 	if (!Array.isArray(parsed) || parsed.length === 0) {
 		return { error: 'A definition needs at least one stage.' };

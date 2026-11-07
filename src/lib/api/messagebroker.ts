@@ -145,7 +145,7 @@ export const HEALTH_LABELS: Readonly<Record<BrokerHealth, string>> = {
 	undelivered: 'Some events were dropped',
 	disabled: 'Dropping events, not enabled on this instance',
 	discarding: 'No broker, events are discarded',
-	idle: 'Nothing published yet',
+	idle: 'No events published yet',
 };
 
 export function healthTone(h: BrokerHealth): StatusTone {

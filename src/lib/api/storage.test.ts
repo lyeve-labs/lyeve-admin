@@ -78,7 +78,7 @@ describe('providers that look fine and are not', () => {
 		const providers = [provider(), provider({ id: 'x', credentials_unavailable: true })];
 		expect(brokenCredentials(providers).map((p) => p.id)).toEqual(['x']);
 		expect(providerTone(provider({ credentials_unavailable: true }))).toBe('danger');
-		expect(providerState(provider({ credentials_unavailable: true }))).toContain('will not decrypt');
+		expect(providerState(provider({ credentials_unavailable: true }))).toContain('cannot be decrypted');
 	});
 
 	// Deliberate with a CDN in front of the directory, a data leak otherwise.
@@ -112,8 +112,8 @@ describe('the credentials test', () => {
 
 	it('relays the reason the plugin gives, and says when it gave none', () => {
 		expect(testMessage({ healthy: false, error: 'access denied' })).toBe('access denied');
-		expect(testMessage({ healthy: false, error: '' })).toBe('No reason was given.');
-		expect(testMessage({})).toBe('No reason was given.');
+		expect(testMessage({ healthy: false, error: '' })).toBe('The connection test failed, and the provider gave no reason.');
+		expect(testMessage({})).toBe('The connection test failed, and the provider gave no reason.');
 	});
 });
 

@@ -1,4 +1,5 @@
 import type { HttpClient } from '@lyeve-labs/client';
+import { inSentence } from './gate';
 
 /**
  * The engine's scaling primitives as it reports them under
@@ -126,17 +127,17 @@ const text = (data: FormData, key: string): string => String(data.get(key) ?? ''
 function integer(data: FormData, key: string, label: string, bounds: { min: number; max: number }): { n: number } | { error: string } {
 	const raw = text(data, key);
 	const n = Number(raw);
-	if (!raw || !Number.isInteger(n)) return { error: `${label} must be a whole number.` };
-	if (n < bounds.min || n > bounds.max) return { error: `${label} must be between ${bounds.min} and ${bounds.max}.` };
+	if (!raw || !Number.isInteger(n)) return { error: `Enter a whole number for ${inSentence(label)}.` };
+	if (n < bounds.min || n > bounds.max) return { error: `Enter a value from ${bounds.min} to ${bounds.max} for ${inSentence(label)}.` };
 	return { n };
 }
 
 function duration(data: FormData, key: string, label: string, max: string): { d: string } | { error: string } {
 	const raw = text(data, key);
 	const ms = durationMs(raw);
-	if (ms === null) return { error: `${label} must be a duration such as 30s or 1m.` };
-	if (ms <= 0) return { error: `${label} must be longer than zero.` };
-	if (ms > (durationMs(max) as number)) return { error: `${label} can be at most ${max}.` };
+	if (ms === null) return { error: `Enter a duration such as 30s or 1m for ${inSentence(label)}.` };
+	if (ms <= 0) return { error: `Enter a duration longer than zero for ${inSentence(label)}.` };
+	if (ms > (durationMs(max) as number)) return { error: `Enter at most ${max} for ${inSentence(label)}.` };
 	return { d: raw };
 }
 
