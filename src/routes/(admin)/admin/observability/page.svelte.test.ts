@@ -149,8 +149,14 @@ describe('reads that failed', () => {
 			props: props({ poolHealth: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		expect(container.textContent).toContain('is unavailable');
-		expect(container.textContent).not.toContain('No pool statistics for this instance');
+		expect(container.textContent).not.toContain('No pool statistics');
 		expect(container.textContent).not.toContain('No check time reported');
+	});
+
+	it('says the pool reported no statistics when the read answered without them', () => {
+		const { container } = render(ObservabilityPage, { props: props({ poolHealth: ok({}) }) });
+		expect(container.textContent).toContain('No pool statistics');
+		expect(container.textContent).not.toContain('is unavailable');
 	});
 });
 

@@ -100,7 +100,7 @@
 				</div>
 			{/if}
 		{:else}
-			<EmptyState title="Pool health unavailable" description="No pool statistics for this instance.">
+			<EmptyState title="No pool statistics">
 				{#snippet iconSnippet()}
 					<Database size={ICON.lg} />
 				{/snippet}

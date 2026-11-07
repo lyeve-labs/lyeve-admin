@@ -273,7 +273,7 @@
 						label="Password"
 						autocomplete="new-password"
 						required
-						hint="The engine's password policy applies. If this password breaks a rule, the message says which."
+						hint="It must meet the engine's password policy. If it breaks a rule, you'll see which one."
 						error={errors.password ?? serverFields.password}
 					/>
 

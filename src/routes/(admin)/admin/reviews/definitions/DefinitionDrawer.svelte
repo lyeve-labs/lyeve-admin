@@ -271,7 +271,7 @@
 										<Input
 											id="stage-role-{stage.key}"
 											label="Required role"
-											hint="Leave empty to allow anyone the permission rules allow. An admin or a super admin can always act."
+											hint="Leave empty to allow anyone the permission rules allow. An administrator can always act."
 											bind:value={stage.required_role}
 											placeholder="editor"
 											mono

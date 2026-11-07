@@ -370,7 +370,7 @@
 				     here keeps a refusal for a missing tenant from reading as a
 				     fault in the fields the operator filled in. -->
 				<Alert tone="warn" title="Could not load the tenants">
-					You cannot choose a tenant for this account, and an instance with several tenants refuses an account without one. Reload the page to try again.
+					You cannot choose a tenant for this account. On an instance with several tenants, each account needs one. Reload the page to try again.
 				</Alert>
 			{:else if tenants.length > 1}
 				<input type="hidden" name="tenant_required" value="1" />
