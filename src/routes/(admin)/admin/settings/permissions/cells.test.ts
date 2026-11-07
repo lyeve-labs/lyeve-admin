@@ -2,7 +2,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Permission, Schema } from '@lyeve-labs/client';
-import ExemptMark from './ExemptMark.svelte';
 import FieldMaskCell from './FieldMaskCell.svelte';
 import MarkCell from './MarkCell.svelte';
 import RuleControls from './RuleControls.svelte';
@@ -32,15 +31,6 @@ function said(c: HTMLElement): string {
 	return (c.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
-describe('ExemptMark', () => {
-	it('draws a shield in currentColor that screen readers skip', () => {
-		const { container } = render(ExemptMark);
-		const svg = container.querySelector('svg[data-mark="exempt"]');
-		expect(svg?.classList.contains('lucide-shield-check')).toBe(true);
-		expect(svg?.getAttribute('aria-hidden')).toBe('true');
-	});
-});
-
 describe('MarkCell', () => {
 	const mark = (role: string, schema: string, action: string) =>
 		render(MarkCell, { props: { rules, role, schema, action } as never }).container;
@@ -63,9 +53,11 @@ describe('MarkCell', () => {
 		expect(said(c)).toContain('editor is denied read on article.');
 	});
 
-	it('draws the exempt role as a shield', () => {
+	it('draws the exempt role as a shield that screen readers skip', () => {
 		const c = mark('super_admin', 'article', 'delete');
-		expect(c.querySelector('[data-mark="exempt"]')).toBeTruthy();
+		const svg = c.querySelector('svg[data-mark="exempt"]');
+		expect(svg?.classList.contains('lucide-shield-check')).toBe(true);
+		expect(svg?.getAttribute('aria-hidden')).toBe('true');
 		expect(said(c)).toContain('The role is exempt from these rules.');
 	});
 
