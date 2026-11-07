@@ -22,7 +22,8 @@
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import { SAID, type Settings } from '$lib/api/connected-editors';
-	import { FORM_SUBMISSIONS, flowOptions } from '$lib/api/form-destinations';
+	import { invalidateAll } from '$app/navigation';
+	import { FORMS_TYPE_TAKEN, FORM_SUBMISSIONS, SUBMISSIONS_PUBLIC, flowNotes, flowOptions } from '$lib/api/form-destinations';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -36,6 +37,7 @@
 		presetApplied?: { created: boolean; settings: Settings };
 		presetMissing?: boolean;
 		presetError?: string;
+		presetCreated?: boolean;
 	}
 
 	const answer = $derived((form ?? {}) as Answer);
@@ -97,18 +99,24 @@
 	// A type allowed earlier and deleted or opened to delivery since is not offered, so the next save drops it.
 	let formSchemas = $derived((settings?.form_schemas ?? []).filter((n) => data.formSchemas.some((s) => s.name === n)));
 	const goneFormSchemas = $derived(
-		data.schemasGate ? [] : (settings?.form_schemas ?? []).filter((n) => !data.formSchemas.some((s) => s.name === n)),
+		data.schemasGate
+			? []
+			: (settings?.form_schemas ?? []).filter((n) => !data.formSchemas.some((s) => s.name === n)).map((n) => data.schemaLabels[n] ?? n),
 	);
-	const flows = $derived(data.flows?.ok ? data.flows.value : null);
-	const formFlowOptions = $derived(flows ? flowOptions(flows, settings?.form_flows ?? []) : []);
+	const flowTargets = $derived(data.flows?.ok ? data.flows.value : null);
+	const formFlowOptions = $derived(flowTargets ? flowOptions(flowTargets, settings?.form_flows ?? []) : []);
 	let formFlows = $derived([...(settings?.form_flows ?? [])]);
-	const flowNotes = $derived(formFlowOptions.filter((o) => o.description && formFlows.includes(o.value)));
-	const submissionsExist = $derived(data.formSchemas.some((s) => s.name === FORM_SUBMISSIONS));
+	// Warnings sit only beside the flows the reader has ticked, the same way at every list length.
+	const notes = $derived(flowTargets ? flowNotes(flowTargets, formFlows) : []);
 	// Offered while forms cannot send to the preset's submissions type yet.
 	const presetWanted = $derived(!!settings && !data.schemasGate && !(settings.form_schemas ?? []).includes(FORM_SUBMISSIONS));
-	const presetAvailable = $derived(data.formsPreset && !answer.presetMissing);
+	const presetOffered = $derived(!!data.formsPreset?.ok && data.formsPreset.value && !answer.presetMissing);
 	const saveForms = tracked(() => {});
-	const applyPreset = tracked(() => {});
+	// When the preset created its types but the save after it failed, the page reloads its data so it offers to allow them.
+	const applyPreset = tracked(() => async ({ result, update }) => {
+		await update();
+		if (result.type === 'failure' && result.data?.presetCreated) await invalidateAll();
+	});
 </script>
 
 <PageShell
@@ -241,33 +249,43 @@
 				<SectionHeading level={3}>Where forms can send</SectionHeading>
 				{#if answer.presetApplied}
 					<Alert tone="success" autoDismiss>
-						{answer.presetApplied.created ? 'Form submissions set up. Forms can send to it now.' : 'Forms can send to Form submissions now.'}
+						{answer.presetApplied.created
+							? 'The Forms and Form submissions content types were created. Forms can send to Form submissions now.'
+							: 'Forms can send to Form submissions now.'}
 					</Alert>
 				{/if}
 				{#if answer.presetError}
 					<Alert tone="danger">{answer.presetError}</Alert>
 				{/if}
-				{#if presetWanted && presetAvailable}
-					<div class="flex flex-col items-start gap-3" data-testid="forms-preset">
-						<p class="text-sm text-muted">
-							{#if submissionsExist}
-								Let forms save posts into the Form submissions content type you already have.
-							{:else}
-								Add the Forms and Form submissions content types, and let forms save posts into Form submissions. You manage what arrives on the Content screens.
-							{/if}
+				{#if presetWanted}
+					{#if data.submissions === 'public'}
+						<Alert tone="warn">{SUBMISSIONS_PUBLIC}</Alert>
+					{:else if data.submissions === 'private' || (presetOffered && !data.formsTypeTaken)}
+						<div class="flex flex-col items-start gap-3" data-testid="forms-preset">
+							<p class="text-sm text-muted">
+								{#if data.submissions === 'private'}
+									Let forms save posts into the Form submissions content type you already have.
+								{:else}
+									Add the Forms and Form submissions content types, and let forms save posts into Form submissions. You manage what arrives on the Content screens.
+								{/if}
+							</p>
+							<form method="POST" action="?/formsPreset" use:enhance={applyPreset.enhance}>
+								<Button variant="secondary" type="submit" loading={applyPreset.pending} disabled={!online}>Set up form submissions</Button>
+							</form>
+						</div>
+					{:else if data.formsTypeTaken}
+						<p class="text-sm text-muted" data-testid="forms-type-taken">{FORMS_TYPE_TAKEN}</p>
+					{:else if data.formsPreset && !data.formsPreset.ok}
+						<GateNotice gate={data.formsPreset.gate} title="Content type presets" absent="Content type presets need a newer version of the schema plugin." />
+					{:else}
+						<p class="text-sm text-muted" data-testid="forms-preset-link">
+							Create a content type for form posts in the <a class="text-brand underline" href="/admin/schema">schema builder</a>, then choose
+							it here.
 						</p>
-						<form method="POST" action="?/formsPreset" use:enhance={applyPreset.enhance}>
-							<Button variant="secondary" type="submit" loading={applyPreset.pending} disabled={!online}>Set up form submissions</Button>
-						</form>
-					</div>
-				{:else if presetWanted && !submissionsExist}
-					<p class="text-sm text-muted" data-testid="forms-preset-link">
-						Create a content type for form posts in the <a class="text-brand underline" href="/admin/schema">schema builder</a>, then choose it
-						here.
-					</p>
+					{/if}
 				{/if}
 
-				<form method="POST" action="?/setting" use:enhance={saveForms.enhance} class="flex flex-col items-start gap-6">
+				<form method="POST" action="?/setting" use:enhance={saveForms.enhance} class="flex w-full flex-col items-start gap-6">
 					<input type="hidden" name="field" value="forms" />
 					{#if savedField === 'forms'}
 						<Alert tone="success" autoDismiss>Settings saved.</Alert>
@@ -314,6 +332,9 @@
 						<p class="text-sm text-muted">The flow plugin is not running on this instance, so forms cannot start flows.</p>
 					{:else if !data.flows.ok}
 						<GateNotice gate={data.flows.gate} title="Flows" absent="Flows are not included in this build." />
+					{:else if !data.flows.value.eventKnown}
+						<!-- No flow list is offered, so the save leaves the allowed flows as they are. -->
+						<p class="text-sm text-muted">Choosing flows needs a newer version of the flow plugin.</p>
 					{:else}
 						<input type="hidden" name="form_flows_offered" value="1" />
 						{#if formFlowOptions.length === 0}
@@ -335,7 +356,7 @@
 								id="form-flows"
 								label="Flows"
 								bind:value={formFlows}
-								options={formFlowOptions.map((o) => ({ value: o.value, label: o.label }))}
+								options={formFlowOptions}
 								searchable
 								hint="Forms can start the flows you choose. Only flows that start from a builder form are listed."
 								error={errorOn('form_flows')}
@@ -343,13 +364,15 @@
 							{#each formFlows as slug (slug)}
 								<input type="hidden" name="form_flows" value={slug} />
 							{/each}
-							{#if flowNotes.length > 0}
-								<ul class="flex flex-col gap-1 text-sm text-warn">
-									{#each flowNotes as note (note.value)}
-										<li><span class="font-mono">{note.value}</span>: {note.description}</li>
-									{/each}
-								</ul>
-							{/if}
+						{/if}
+						{#if notes.length > 0}
+							<ul class="flex w-full min-w-0 flex-col gap-1 text-sm text-warn" data-testid="flow-notes">
+								{#each notes as n (n.slug)}
+									<li class="min-w-0">
+										{#if n.label === n.slug}<span class="font-mono break-all">{n.slug}</span>{:else}<span class="break-words">{n.label}</span>{/if}: {n.note}
+									</li>
+								{/each}
+							</ul>
 						{/if}
 					{/if}
 

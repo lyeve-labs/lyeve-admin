@@ -6,16 +6,22 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning, runs } from '$lib/plugins';
 import { forbiddenText, gateOf, GATE_OK, isOutage, section, type Gate, type Section } from '$lib/api/gate';
 import { bodyString, errorCodeOf } from '$lib/api/limits';
+import type { HttpClient } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
-import { listSchemaNames } from '$lib/api/search-settings';
 import { applySchemaPreset, readSchemaPresets } from '$lib/api/schema-preset-catalog';
 import {
 	FORMS_PRESET,
+	FORMS_TYPE,
+	FORMS_TYPE_TAKEN,
 	FORM_SUBMISSIONS,
+	SUBMISSIONS_PUBLIC,
 	formSchemaOptions,
 	readFlowTargets,
-	type FlowTarget,
+	submissionsState,
+	type FlowTargets,
 	type FormSchemaOption,
+	type FormSchemaRow,
+	type SubmissionsState,
 } from '$lib/api/form-destinations';
 import {
 	LIFETIMES,
@@ -29,6 +35,27 @@ import {
 	type SettingsPatch,
 } from '$lib/api/connected-editors';
 import { OWNER_ROLES, isOwner, refusalSentence } from '../shared.server';
+
+/** Every content type with what the form settings need of it. */
+async function formSchemaRows(client: HttpClient): Promise<FormSchemaRow[]> {
+	const rows = await getSchemas(client);
+	return rows
+		.filter((s) => !!s.name)
+		.map((s) => ({
+			name: s.name,
+			label: s.display_name || s.name,
+			publicDelivery: (s as { public_delivery?: unknown }).public_delivery === true,
+		}));
+}
+
+/**
+ * Whether forms may send to a type: it is not the builder's own, and the
+ * delivery API does not serve it, because anyone could read a visitor's post
+ * there. The builder plugin refuses a save that names any other type.
+ */
+function formsMaySendTo(row: FormSchemaRow): boolean {
+	return !row.publicDelivery && showable([row.name]).length > 0;
+}
 
 /** What a refused settings read means. A tenant the plugin is withheld from gets the area's own notice. */
 function settingsGate(err: unknown): ConnectionsGate {
@@ -49,32 +76,25 @@ export const load: PageServerLoad = async (event) => {
 			schemas: [] as string[],
 			schemasGate: null as Gate | null,
 			formSchemas: [] as FormSchemaOption[],
-			flows: null as Section<FlowTarget[]> | null,
-			formsPreset: false,
+			schemaLabels: {} as Record<string, string>,
+			submissions: 'absent' as SubmissionsState,
+			formsTypeTaken: false,
+			flows: null as Section<FlowTargets> | null,
+			formsPreset: null as Section<boolean> | null,
 		};
 	}
 
 	const client = authedClient(event);
-	// Forms are offered only the types the delivery API does not serve, which
-	// the plugin refuses because anyone could read a visitor's post there.
-	const schemas = section(
-		getSchemas(client).then((rows) => ({
-			names: rows.map((s) => s.name).filter(Boolean).sort(),
-			forms: rows
-				.filter((s) => (s as { public_delivery?: unknown }).public_delivery !== true)
-				.map((s) => ({ name: s.name, label: s.display_name || s.name })),
-		})),
-		'Could not load schemas. Pages keep showing the schemas saved before.',
-	);
+	const schemas = section(formSchemaRows(client), 'Could not load schemas. Pages keep showing the schemas saved before.');
 	// Without the flow plugin no flow can start, so forms send only to content types.
 	const flows = runs(plugins, PLUGIN.flow) ? section(readFlowTargets(client), 'Could not load flows.') : null;
-	// A catalog that cannot be read offers no preset, and the card links the schema builder instead.
+	// Without the schema plugin there is no preset to apply. A catalog that fails to load is said as a failure.
 	const formsPreset = runs(plugins, PLUGIN.schema)
-		? readSchemaPresets(client).then(
-				(c) => c.presets.some((p) => p.id === FORMS_PRESET),
-				() => false,
+		? section(
+				readSchemaPresets(client).then((c) => c.presets.some((p) => p.id === FORMS_PRESET)),
+				'Could not load the content type presets.',
 			)
-		: Promise.resolve(false);
+		: null;
 	const read = await section(getSettings(client), settingsGate);
 	const schemaList = await schemas;
 	// A tenant the plugin is withheld from is the page's gate, and every other
@@ -86,18 +106,25 @@ export const load: PageServerLoad = async (event) => {
 			schemas: [] as string[],
 			schemasGate: null,
 			formSchemas: [] as FormSchemaOption[],
+			schemaLabels: {} as Record<string, string>,
+			submissions: 'absent' as SubmissionsState,
+			formsTypeTaken: false,
 			flows: null,
-			formsPreset: false,
+			formsPreset: null,
 		};
 	}
+	const rows = schemaList.ok ? schemaList.value : [];
 	return {
 		gate: GATE_OK as ConnectionsGate,
 		settings: read as Section<Settings>,
-		schemas: schemaList.ok ? showable(schemaList.value.names) : [],
+		schemas: showable(rows.map((r) => r.name).sort()),
 		schemasGate: schemaList.ok ? null : schemaList.gate,
-		formSchemas: schemaList.ok ? formSchemaOptions(schemaList.value.forms.filter((s) => showable([s.name]).length > 0)) : [],
+		formSchemas: formSchemaOptions(rows.filter(formsMaySendTo).map(({ name, label }) => ({ name, label }))),
+		schemaLabels: Object.fromEntries(rows.map((r) => [r.name, r.label])),
+		submissions: submissionsState(rows),
+		formsTypeTaken: rows.some((r) => r.name === FORMS_TYPE),
 		flows: flows ? await flows : null,
-		formsPreset: await formsPreset,
+		formsPreset: formsPreset ? await formsPreset : null,
 	};
 };
 
@@ -143,31 +170,44 @@ function setting(form: FormData): { field: string; patch?: SettingsPatch; error?
 // No requireRole here. The engine answers the settings route for owners only.
 export const actions: Actions = {
 	// Applies the schema plugin's forms preset, unless its submissions type
-	// exists already, and lets forms send to that type.
+	// exists already, and lets forms send to that type. The save keeps only
+	// the allowed types forms may still send to, because the builder plugin
+	// refuses the whole save over one that was deleted or opened to delivery.
 	formsPreset: async (event) => {
 		const client = authedClient(event);
+		let created = false;
 		try {
-			const [names, current] = await Promise.all([listSchemaNames(client), getSettings(client)]);
-			let created = false;
-			if (!names.includes(FORM_SUBMISSIONS)) {
+			const [rows, current] = await Promise.all([formSchemaRows(client), getSettings(client)]);
+			const state = submissionsState(rows);
+			if (state === 'public') return fail(409, { presetError: SUBMISSIONS_PUBLIC });
+			if (state === 'absent') {
+				if (rows.some((r) => r.name === FORMS_TYPE)) return fail(409, { presetError: FORMS_TYPE_TAKEN });
 				try {
 					await applySchemaPreset(client, FORMS_PRESET);
 					created = true;
 				} catch (e) {
 					if (e instanceof ApiError && e.status === 404) return fail(404, { presetMissing: true });
+					if (e instanceof ApiError && e.status === 409) return fail(409, { presetError: FORMS_TYPE_TAKEN });
 					throw e;
 				}
 			}
 			const allowed = current.form_schemas ?? [];
-			const settings = allowed.includes(FORM_SUBMISSIONS)
-				? current
-				: await saveSettings(client, { form_schemas: [...allowed, FORM_SUBMISSIONS] });
+			if (allowed.includes(FORM_SUBMISSIONS)) return { presetApplied: { created, settings: current } };
+			const still = allowed.filter((n) => rows.some((r) => r.name === n && formsMaySendTo(r)));
+			const settings = await saveSettings(client, { form_schemas: [...still, FORM_SUBMISSIONS] });
 			return { presetApplied: { created, settings } };
 		} catch (e) {
+			const status = e instanceof ApiError ? e.status : 503;
+			// The types exist now, so the page reloads its data and offers to allow them.
+			if (created) {
+				const presetError = isOutage(e)
+					? 'The Forms and Form submissions content types were created. Check whether Form submissions is ticked below, then try again.'
+					: `The Forms and Form submissions content types were created, but forms cannot send to them yet. ${refusalSentence(e, 'Try again.')}`;
+				return fail(isOutage(e) ? 503 : status, { presetCreated: true, presetError });
+			}
 			if (isOutage(e)) return fail(503, { presetError: SAID.settingOutage });
-			return fail(e instanceof ApiError ? e.status : 400, {
-				presetError: refusalSentence(e, 'Could not set up form submissions. Try again.'),
-			});
+			const why = refusalSentence(e, 'Could not set up form submissions. Try again.');
+			return fail(status, { presetError: why });
 		}
 	},
 
