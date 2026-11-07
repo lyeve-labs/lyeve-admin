@@ -86,7 +86,7 @@ const text = (data: FormData, key: string): string => String(data.get(key) ?? ''
 function bodyFrom(data: FormData): DatasourceBody | string {
 	const name = text(data, 'name');
 	const kind = text(data, 'kind') as DatasourceKind;
-	if (!name) return 'A datasource needs a name.';
+	if (!name) return 'Enter a name.';
 	if (!KINDS.includes(kind)) return 'Choose a kind.';
 
 	const config: Record<string, unknown> = {};
@@ -99,7 +99,7 @@ function bodyFrom(data: FormData): DatasourceBody | string {
 		config.user = text(data, 'user');
 		const modes = SSL_MODES[kind].map((m) => m.value);
 		const ssl = text(data, 'ssl') || modes[0];
-		if (!modes.includes(ssl)) return `TLS must be one of ${modes.join(', ')} for ${kind}.`;
+		if (!modes.includes(ssl)) return `Choose one of ${modes.join(', ')} for TLS on ${kind}.`;
 		config.ssl = ssl;
 		const password = text(data, 'password');
 		if (password) secret.password = password;

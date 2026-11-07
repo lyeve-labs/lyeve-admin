@@ -7,7 +7,22 @@ import type { Datasource } from '$lib/api/flows';
 import { AUTH_TYPES } from '$lib/flow/datasources';
 
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/admin/flows/datasources') } }));
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+// enhance keeps each form's submit handler, so a case can run the one a
+// delete would run and read the question it asks.
+const forms = vi.hoisted(() => ({
+	submits: new Map<HTMLFormElement, (input: unknown) => unknown>(),
+	confirm: vi.fn(async () => false),
+}));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit: (input: unknown) => unknown) => {
+		forms.submits.set(node, submit);
+		return { destroy: () => forms.submits.delete(node) };
+	},
+}));
+vi.mock('@lyeve-labs/ui-kit', async (original) => ({
+	...(await original<typeof import('@lyeve-labs/ui-kit')>()),
+	confirm: forms.confirm,
+}));
 const upgrade = vi.hoisted(() => ({ link: null as { href: string; label?: string } | null }));
 vi.mock('$lib/instance.svelte', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/instance.svelte')>();
@@ -216,11 +231,15 @@ describe('datasources page', () => {
 		expect(container.textContent).toContain('connection refused');
 	});
 
-	it('never posts a delete straight from the row', () => {
-		const { container, getByLabelText } = setup();
-		expect(getByLabelText('Delete warehouse')).toBeTruthy();
-		const form = container.querySelector('form[action="?/delete"]') as HTMLFormElement;
-		expect((form.querySelector('[name="id"]') as HTMLInputElement).value).toBe('');
+	it('asks before a row posts its delete', async () => {
+		const { getByLabelText } = setup();
+		const form = getByLabelText('Delete warehouse').closest('form') as HTMLFormElement;
+		expect(form.getAttribute('action')).toBe('?/delete');
+		expect(new FormData(form).get('id')).toBe('d1');
+		const cancel = vi.fn();
+		await forms.submits.get(form)?.({ cancel });
+		expect(forms.confirm).toHaveBeenCalledWith('Delete datasource warehouse?', expect.any(String), { confirmLabel: 'Delete' });
+		expect(cancel).toHaveBeenCalled();
 	});
 
 	it('shows a failed load as an alert and not as an empty list', () => {
@@ -341,12 +360,12 @@ describe('where a datasource failure shows', () => {
 		await fireEvent.click(getAllByText('New datasource')[0]);
 		await rerender({
 			data: { datasources: [warehouse], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed },
-			form: { action: 'save', error: 'A datasource needs a name.' },
+			form: { action: 'save', error: 'Enter a name.' },
 		} as never);
 		const drawer = container.ownerDocument.querySelector('#datasource-form') as HTMLElement;
-		expect(drawer.textContent).toContain('A datasource needs a name.');
+		expect(drawer.textContent).toContain('Enter a name.');
 		// Once, in the drawer, and not again on the page behind it.
-		expect(document.body.textContent?.split('A datasource needs a name.').length).toBe(2);
+		expect(document.body.textContent?.split('Enter a name.').length).toBe(2);
 	});
 });
 
