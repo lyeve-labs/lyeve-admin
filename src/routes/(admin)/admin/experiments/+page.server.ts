@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -108,7 +108,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateExperiment(client, id, body);
 		else await createExperiment(client, body);
 	} catch (err) {
-		return fail(400, { action, error: actionError(err, 'Could not save the experiment. Try again.') });
+		return tagged(action, actionFailure(err, 'Could not save the experiment. Try again.'));
 	}
 	return { saved: name };
 }
@@ -132,7 +132,7 @@ export const actions: Actions = {
 		try {
 			await deleteExperiment(client, id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the experiment. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the experiment. Try again.'));
 		}
 		return { removed: id };
 	},
@@ -151,7 +151,7 @@ export const actions: Actions = {
 		try {
 			await transition(client, id, move);
 		} catch (err) {
-			return fail(400, { action: 'move', error: actionError(err, 'Could not change the experiment. Try again.') });
+			return tagged('move', actionFailure(err, 'Could not change the experiment. Try again.'));
 		}
 		return { moved: move };
 	},

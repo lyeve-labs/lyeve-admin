@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
@@ -22,7 +22,7 @@ import {
 	type MetricType,
 	type Variant,
 } from '$lib/api/ab-testing';
-import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
+import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
 
 function metricType(value: string): MetricType | null {
@@ -83,7 +83,7 @@ export const actions: Actions = {
 				is_control: form.get('is_control') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { action: 'addVariant', error: actionError(err, 'Could not add the variant. Try again.') });
+			return tagged('addVariant', actionFailure(err, 'Could not add the variant. Try again.'));
 		}
 		return { saved: name };
 	},
@@ -97,7 +97,7 @@ export const actions: Actions = {
 		try {
 			await deleteVariant(client, event.params.id, vid);
 		} catch (err) {
-			return fail(400, { action: 'removeVariant', error: actionError(err, 'Could not remove the variant. Try again.') });
+			return tagged('removeVariant', actionFailure(err, 'Could not remove the variant. Try again.'));
 		}
 		return { removed: vid };
 	},
@@ -127,7 +127,7 @@ export const actions: Actions = {
 				metric_type: kind,
 			});
 		} catch (err) {
-			return fail(400, { action: 'addMetric', error: actionError(err, 'Could not add the metric. Try again.') });
+			return tagged('addMetric', actionFailure(err, 'Could not add the metric. Try again.'));
 		}
 		return { saved: name };
 	},
@@ -141,7 +141,7 @@ export const actions: Actions = {
 		try {
 			await deleteMetric(client, event.params.id, mid);
 		} catch (err) {
-			return fail(400, { action: 'removeMetric', error: actionError(err, 'Could not remove the metric. Try again.') });
+			return tagged('removeMetric', actionFailure(err, 'Could not remove the metric. Try again.'));
 		}
 		return { removed: mid };
 	},

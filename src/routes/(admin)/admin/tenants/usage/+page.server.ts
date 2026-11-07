@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -118,15 +118,6 @@ export const load: PageServerLoad = async (event) => {
 		permitted,
 	};
 };
-
-/**
- * A failure that names the action it came from. The page holds one result for
- * every form, so the quota drawer shows only its own failures and the page
- * shows the rest.
- */
-function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
-	return fail(failure.status, { ...failure.data, action });
-}
 
 export const actions: Actions = {
 	review: async (event) => {

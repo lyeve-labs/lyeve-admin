@@ -1,8 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionError, tagged } from '$lib/server/action-error';
 import { readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
@@ -95,15 +95,6 @@ function validationFailure(err: unknown, fallback: string) {
 	if (isLocked(err)) return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
 	if (err instanceof ApiError && err.status === 403) return forbiddenFailure(err);
 	return fail(400, { error: actionError(err, fallback) });
-}
-
-/**
- * A failure tagged with the form that caused it. The create drawer, the
- * import drawer and the row's delete share one `form` result, and each shows
- * only its own failure.
- */
-function tagged<F extends ActionFailure<Record<string, unknown>>>(action: string, failure: F) {
-	return fail(failure.status, { ...(failure.data as F['data']), action });
 }
 
 export const actions: Actions = {

@@ -2,8 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
-import { refusalOf, refusalText } from '$lib/api/refusal';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -170,17 +169,6 @@ function templateBody(form: FormData): SaveMappingTemplate | string {
 	};
 }
 
-/**
- * A failed write, tagged with the action that made it. Every form on the page
- * reports through one result, and the tag is how the template drawer tells
- * its own failure from a row action's.
- */
-function failure(action: string, err: unknown, fallback: string) {
-	const refused = refusalOf(err);
-	if (refused) return fail(402, { action, error: refusalText(refused), refused });
-	return fail(400, { action, error: actionError(err, fallback) });
-}
-
 async function saveTemplate(event: Parameters<Actions[string]>[0], id: string | null) {
 	await requireRole(event, ['admin', 'super_admin']);
 	const form = await event.request.formData();
@@ -190,7 +178,7 @@ async function saveTemplate(event: Parameters<Actions[string]>[0], id: string | 
 		if (id) await updateTemplate(authedClient(event), id, body);
 		else await createTemplate(authedClient(event), body);
 	} catch (err) {
-		return failure('saveTemplate', err, 'Could not save the template. Try again.');
+		return tagged('saveTemplate', actionFailure(err, 'Could not save the template. Try again.'));
 	}
 	return { savedTemplate: body.name };
 }
@@ -214,7 +202,7 @@ export const actions: Actions = {
 		try {
 			await deleteTemplate(authedClient(event), id);
 		} catch (err) {
-			return failure('deleteTemplate', err, 'Could not delete the template. Try again.');
+			return tagged('deleteTemplate', actionFailure(err, 'Could not delete the template. Try again.'));
 		}
 		return { removedTemplate: id };
 	},
@@ -228,7 +216,7 @@ export const actions: Actions = {
 		try {
 			await cancelJob(client, id);
 		} catch (err) {
-			return failure('cancel', err, 'Could not cancel the import. Try again.');
+			return tagged('cancel', actionFailure(err, 'Could not cancel the import. Try again.'));
 		}
 		return { canceled: id };
 	},
@@ -246,7 +234,7 @@ export const actions: Actions = {
 		try {
 			await rollbackJob(client, id);
 		} catch (err) {
-			return failure('rollback', err, 'Could not roll back the import. Try again.');
+			return tagged('rollback', actionFailure(err, 'Could not roll back the import. Try again.'));
 		}
 		return { rolledBack: id };
 	},

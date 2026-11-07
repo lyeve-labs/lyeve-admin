@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, type ActionFailure } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { GATE_OK, section, type Gate, type Section } from '$lib/api/gate';
@@ -61,14 +61,6 @@ export const load: PageServerLoad = async (event) => {
 
 	return { gate: GATE_OK as Gate, limit, addresses, history, hours };
 };
-
-/**
- * The failure marked with the action that caused it. Each drawer shows only
- * its own action's failure, and the page shows the row actions'.
- */
-function tagged<T extends Record<string, unknown>>(action: string, failure: ActionFailure<T>) {
-	return fail(failure.status, { ...failure.data, action });
-}
 
 function num(raw: FormDataEntryValue | null): number {
 	const n = Number(raw);

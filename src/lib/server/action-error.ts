@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, type ActionFailure } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { errorCodeOf } from '$lib/api/limits';
@@ -36,4 +36,13 @@ export function actionFailure(err: unknown, fallback: string, status = 400) {
 	const refused = refusalOf(err);
 	if (refused) return fail(402, { error: refusalText(refused), refused });
 	return fail(status, { error: actionError(err, fallback) });
+}
+
+/**
+ * A failure tagged with the action that returned it. A page with several
+ * forms reports every one through one result, and the tag tells each form its
+ * own failure. `id` names the row a row action failed on.
+ */
+export function tagged<F extends ActionFailure<Record<string, unknown>>>(action: string, failure: F, id?: string) {
+	return fail(failure.status, { ...(failure.data as F['data']), action, ...(id ? { id } : {}) });
 }

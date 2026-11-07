@@ -3,7 +3,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { parseStages } from '$lib/review/definition-form';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { section, type Section } from '$lib/api/gate';
@@ -197,8 +197,7 @@ export const actions: Actions = {
 		} catch (err) {
 			// A 402 is the workflow ceiling or a paid stage setting, and the
 			// drawer renders the plugin's own numbers or capability.
-			const failed = actionFailure(err, 'Could not create the definition. Try again.');
-			return fail(failed.status, { ...failed.data, action: 'create' });
+			return tagged('create', actionFailure(err, 'Could not create the definition. Try again.'));
 		}
 		return { created: true };
 	},
@@ -211,7 +210,7 @@ export const actions: Actions = {
 		try {
 			await deleteDefinition(authedClient(event), id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the definition. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the definition. Try again.'));
 		}
 		return { deleted: true };
 	},

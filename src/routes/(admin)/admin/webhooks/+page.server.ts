@@ -1,10 +1,10 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole, requireUser } from '$lib/server/authz';
 import type { DeadLetter, Webhook } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { deleteWebhook, testWebhook, listDeliveries, rotateSecret, retryDelivery, replayDeadLetter, dismissDeadLetter, deleteDeadLetter } from '@lyeve-labs/client-rest';
-import { actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { createWebhookRecord, updateWebhookRecord, webhookBodyFrom } from '$lib/api/webhook-options';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
@@ -71,15 +71,6 @@ export const load: PageServerLoad = async (event) => {
 		hasMore: page.hasMore
 	};
 };
-
-/**
- * A failure that names the action it came from. The page holds one result for
- * every form, so the drawer shows only its own writes' failures and the page
- * shows the rest.
- */
-function tagged(action: string, failure: ActionFailure<Record<string, unknown>>, id?: string) {
-	return fail(failure.status, { ...failure.data, action, ...(id ? { id } : {}) });
-}
 
 export const actions: Actions = {
 	create: async (event) => {
