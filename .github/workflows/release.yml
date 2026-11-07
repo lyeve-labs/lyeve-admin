@@ -16,13 +16,12 @@
 # it keep updating. Both names get the same tags under the same rules, and
 # both point at one manifest list.
 #
-# Multi-arch strategy: each architecture builds on its OWN native runner
-# (ubuntu-24.04 for amd64, ubuntu-24.04-arm for arm64) and pushes by digest.
-# A final `merge` job stitches the per-arch digests into one manifest list.
-# This deliberately avoids QEMU emulation, under which the arm64 SvelteKit and
-# pnpm build hangs or runs out of memory on a hosted x64 runner.
+# Each architecture builds on a native runner of its own (ubuntu-24.04 for
+# amd64, ubuntu-24.04-arm for arm64) and pushes by digest, and a final `merge`
+# job joins the digests into one manifest list. Under QEMU on a hosted x64
+# runner the arm64 SvelteKit and pnpm build hangs or runs out of memory.
 #
-# This workflow deliberately does NOT use docker/metadata-action: that action
+# The workflow does not use docker/metadata-action, because that action
 # calls the GitHub REST API, so a GitHub API degradation makes the release
 # fail. Labels are static. Tags are derived from the git ref in shell. The
 # only GitHub services this workflow needs are Git, Actions runners, and the
@@ -183,7 +182,7 @@ jobs:
             REQUIRE_EDITORS=1
           labels: |
             org.opencontainers.image.title=lyeve-console
-            org.opencontainers.image.description=LyEve CMS Admin UI
+            org.opencontainers.image.description=LyEve Console, the browser app for a LyEve engine
             org.opencontainers.image.vendor=LyEve Labs
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses=MIT AND LicenseRef-LyEve-Commercial

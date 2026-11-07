@@ -1,4 +1,4 @@
-# SCAN: look for known vulnerabilities in the published admin image.
+# SCAN: look for known vulnerabilities in the published console image.
 #
 # This is a workflow of its own and never a step of release.yml, so a finding
 # can neither stop a release nor turn its run red. It runs:
