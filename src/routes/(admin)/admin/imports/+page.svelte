@@ -35,7 +35,7 @@
 	import ImportWizard from '$lib/components/ImportWizard.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { formRefusal } from '$lib/api/refusal';
-	import { confirmed } from '$lib/forms.svelte';
+	import { confirmed, drawerFailure } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import {
 		OUTCOME_LABELS,
@@ -50,7 +50,8 @@
 		type ImportJob,
 		type MappingTemplate,
 	} from '$lib/api/bulk-import';
-	import { NO_VALUE, formatCount, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatCount, formatDateTime, plural } from '$lib/format';
+	import { couldNotLoad } from '$lib/outage';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -65,13 +66,12 @@
 	// Every form on this page reports through one result, so each failure is
 	// tagged with its action. The template drawer shows only its own, the page
 	// shows the rest, and a drawer opened after a failure starts clean.
-	let setAside = $state<unknown>(null);
-	const failure = $derived(form && form !== setAside && 'error' in form ? form : null);
-	const inDrawer = $derived(failure?.action === 'saveTemplate');
-	const formError = $derived(failure && !inDrawer ? String(failure.error ?? '') : '');
-	const refusal = $derived(failure && !inDrawer ? formRefusal(failure) : null);
-	const templateError = $derived(inDrawer ? String(failure?.error ?? '') : '');
-	const templateRefusal = $derived(inDrawer ? formRefusal(failure) : null);
+	type Failure = { action?: string; error?: string } | null;
+	const failure = drawerFailure(() => (form && 'error' in form ? (form as Failure) : null), ['saveTemplate']);
+	const formError = $derived(String(failure.page?.error ?? ''));
+	const refusal = $derived(formRefusal(failure.page));
+	const templateError = $derived(String(failure.drawer?.error ?? ''));
+	const templateRefusal = $derived(formRefusal(failure.drawer));
 	// Null while the content types are unread, so each place that offers one
 	// says why it offers none.
 	const schemaList = $derived(data.schemas.ok ? data.schemas.value : null);
@@ -128,17 +128,17 @@
 	function rollback(j: ImportJob): SubmitFunction {
 		return confirmed(
 			`Roll back the import of ${j.source_name}?`,
-			`The ${formatCount(j.inserted_rows)} ${j.inserted_rows === 1 ? 'entry it created is deleted, with any edits made to it' : 'entries it created are deleted, with any edits made to them'} since. Entries it updated keep the imported values. The history of the import stays.`,
+			`The ${formatCount(j.inserted_rows)} ${plural(j.inserted_rows, 'entry it created is deleted, with any edits made to it', 'entries it created are deleted, with any edits made to them')} since. Entries it updated keep the imported values. The history of the import stays.`,
 			{ confirmLabel: 'Roll back', success: 'Import rolled back' },
 		);
 	}
 
-	// The drawer owns its fields. The page sets the old failure aside first,
-	// so a drawer opened after a failure starts clean.
+	// The drawer owns its fields. The page marks the old failure first, so a
+	// drawer opened after a failure starts clean.
 	let templateDrawer = $state<TemplateDrawer>();
 
 	function openTemplate(t: MappingTemplate | null) {
-		setAside = form;
+		failure.opened();
 		templateDrawer?.edit(t);
 	}
 
@@ -332,7 +332,7 @@
 									{#if rejectionRate(j) !== null && j.errored_rows > 0}
 										<div class="text-xs text-faint">
 											{rejectionRate(j)}% of the {formatCount(j.processed_rows)}
-											{j.processed_rows === 1 ? 'row' : 'rows'} read
+											{plural(j.processed_rows, 'row')} read
 										</div>
 									{/if}
 								</td>
@@ -404,13 +404,13 @@
 			</p>
 			{#if data.licensed === false}
 				<Alert tone="brand">
-					Saving templates and the date, split and lookup transforms need a license this instance does not have.
-					Saved templates still apply with their transforms, and you can always delete one.
+					Saving templates and the date, split and lookup transforms are not enabled on this instance. Saved
+					templates still apply with their transforms, and you can always delete one.
 				</Alert>
 			{/if}
 			{#if !data.templatesRead}
 				<GateNotice
-					gate={data.templatesGate ?? { state: 'error', message: 'Could not load templates.' }}
+					gate={data.templatesGate ?? { state: 'error', message: couldNotLoad('templates') }}
 					title="Templates"
 					absent="Mapping templates are not included in this build."
 				/>

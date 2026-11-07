@@ -33,7 +33,7 @@
 		type Metric,
 		type Variant,
 	} from '$lib/api/ab-testing';
-	import { NO_VALUE, formatPercent } from '$lib/format';
+	import { NO_VALUE, formatPercent, plural } from '$lib/format';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
@@ -168,7 +168,7 @@
 		{#if thin}
 			<Alert tone="warn">
 				So far the experiment has {exposures}
-				{exposures === 1 ? 'exposure' : 'exposures'} across all variants, fewer than the
+				{plural(exposures, 'exposure')} across all variants, fewer than the
 				{exp.min_sample_size} it needs. Until then no result counts as significant, whatever the
 				p-value says.
 			</Alert>
@@ -403,7 +403,7 @@
 				id="metric-event"
 				name="event_name"
 				label="Event name"
-				hint="Must match the event name your application sends exactly. A mismatch counts nothing and shows no error."
+				hint="Enter the exact event name your application sends. A mismatch counts nothing and shows no error."
 				bind:value={metricEvent}
 				required
 			/>

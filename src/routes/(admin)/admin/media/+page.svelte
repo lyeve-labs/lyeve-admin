@@ -35,6 +35,8 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
+	import { plural } from '$lib/format';
+	import { tracked } from '$lib/forms.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -59,9 +61,17 @@
 	// Import from URL: a file on another site copied into the library through
 	// the engine, which refuses private addresses and checks it as an upload.
 	let importOpen = $state(false);
-	let importing = $state(false);
 	let importUrl = $state('');
 	let importPublic = $state(false);
+	const importSubmit = tracked(() => async ({ result, update }) => {
+		await update({ reset: false });
+		if (result.type === 'success') {
+			importOpen = false;
+			importUrl = '';
+			importPublic = false;
+			toast.success('File imported.');
+		}
+	});
 	const importError = $derived(form && 'importError' in form ? String(form.importError ?? '') : '');
 	let uploadError = $state('');
 	let picker = $state<HTMLInputElement | undefined>(undefined);
@@ -149,14 +159,14 @@
 		// what makes it visible from page three or from inside a search.
 		if (uploaded > 0) {
 			await goto('/admin/media', { invalidateAll: true });
-			toast.success(`Uploaded ${uploaded} ${uploaded === 1 ? 'file' : 'files'}`);
+			toast.success(`Uploaded ${uploaded} ${plural(uploaded, 'file')}`);
 		}
 	}
 </script>
 
 <PageShell
 	title="Media library"
-	description={data.items.ok ? `${total} ${total === 1 ? 'file' : 'files'}` : undefined}
+	description={data.items.ok ? `${total} ${plural(total, 'file')}` : undefined}
 	width="wide"
 >
 	{#snippet actions()}
@@ -273,19 +283,7 @@
 		action="?/importUrl"
 		id="import-form"
 		class="flex flex-col gap-4"
-		use:enhance={() => {
-			importing = true;
-			return async ({ result, update }) => {
-				importing = false;
-				await update({ reset: false });
-				if (result.type === 'success') {
-					importOpen = false;
-					importUrl = '';
-					importPublic = false;
-					toast.success('File imported.');
-				}
-			};
-		}}
+		use:enhance={importSubmit.enhance}
 	>
 		<FormErrors message={importError || undefined} />
 		<Input id="import-url" name="url" label="Address" type="url" mono required placeholder="https://example.com/logo.png" bind:value={importUrl} />
@@ -294,7 +292,7 @@
 	</form>
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (importOpen = false)}>Cancel</Button>
-		<Button variant="primary" type="submit" form="import-form" disabled={!importUrl.trim()} loading={importing}>Import</Button>
+		<Button variant="primary" type="submit" form="import-form" disabled={!importUrl.trim()} loading={importSubmit.pending}>Import</Button>
 	{/snippet}
 </Drawer>
 

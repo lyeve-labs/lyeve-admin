@@ -9,6 +9,7 @@ import { describeMedia, importMedia, importRefusal, parseTags, setMediaPublic, u
 import { ApiError } from '@lyeve-labs/client';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
+import { couldNotLoad } from '$lib/outage';
 
 export type { MediaItem } from '$lib/api/media';
 
@@ -47,7 +48,7 @@ const MAX_LIMIT = 199;
  */
 const NO_FILE = 'This form is missing its file. Reload the page and try again.';
 
-const LIST_FAILED = 'Could not load the media library.';
+const LIST_FAILED = couldNotLoad('the media library');
 
 /**
  * The grid renders one window of the library. A library of ten thousand files

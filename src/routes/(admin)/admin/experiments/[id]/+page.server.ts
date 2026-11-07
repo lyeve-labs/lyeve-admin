@@ -23,6 +23,7 @@ import {
 	type Variant,
 } from '$lib/api/ab-testing';
 import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
 function metricType(value: string): MetricType | null {
 	return METRIC_TYPES.includes(value as MetricType) ? (value as MetricType) : null;
@@ -50,9 +51,9 @@ export const load: PageServerLoad = async (event) => {
 	// and keeps its failure, so a panel that could not be read never offers
 	// to add the first row of a list that may already have rows.
 	const [variants, metrics, results] = await Promise.all([
-		section<Variant[]>(listVariants(client, id), 'Could not load the variants.'),
-		section<Metric[]>(listMetrics(client, id), 'Could not load the metrics.'),
-		section<ExperimentResults>(readResults(client, id), 'Could not load the results.'),
+		section<Variant[]>(listVariants(client, id), couldNotLoad('the variants')),
+		section<Metric[]>(listMetrics(client, id), couldNotLoad('the metrics')),
+		section<ExperimentResults>(readResults(client, id), couldNotLoad('the results')),
 	]);
 
 	const gate: Gate = GATE_OK;

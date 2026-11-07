@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, isRedirect, redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
@@ -13,7 +13,8 @@ import {
 	type Experiment,
 	type Transition,
 } from '$lib/api/ab-testing';
-import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { type Gate, GATE_OK, section } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
@@ -54,23 +55,18 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
-	let experiments: Experiment[] = [];
-	let total: number | null = null;
-	let hasMore = false;
-	let gate: Gate = GATE_OK;
-	try {
-		const page = pageOf(await listExperiments(client, limit + 1, offset), limit, offset);
-		const back = pastEndOffset(page.rows.length, limit, offset, page.total);
-		if (back !== null) redirect(307, withOffset(event.url, back));
-		experiments = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
-	} catch (err) {
-		if (isRedirect(err)) throw err;
-		gate = gateOf(err, 'Could not load experiments.');
+	const read = await section(
+		listExperiments(client, limit + 1, offset).then((res) => pageOf(res, limit, offset)),
+		couldNotLoad('experiments'),
+	);
+	if (!read.ok) {
+		return { experiments: [] as Experiment[], total: null as number | null, limit, offset, hasMore: false, gate: read.gate };
 	}
+	const page = read.value;
+	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+	if (back !== null) redirect(307, withOffset(event.url, back));
 
-	return { experiments, total, limit, offset, hasMore, gate };
+	return { experiments: page.rows, total: page.total, limit, offset, hasMore: page.hasMore, gate: GATE_OK };
 };
 
 async function save(event: Parameters<Actions[string]>[0], id: string | null) {

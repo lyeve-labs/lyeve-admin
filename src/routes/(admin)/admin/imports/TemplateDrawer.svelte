@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { couldNotLoad } from '$lib/outage';
 	import { Button, Drawer, Input, RadioGroup, Select, toast } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { Plus, Trash2 } from '@lucide/svelte';
@@ -123,7 +124,7 @@
 				name="content_type"
 				label="Content type"
 				searchable
-				hint={schemas === null ? 'Could not load content types. Reload the page to try again.' : undefined}
+				hint={schemas === null ? couldNotLoad('content types', { reload: true }) : undefined}
 				bind:value={templateType}
 				options={(schemas ?? []).map((x) => ({ value: x.name, label: x.name }))}
 			/>
