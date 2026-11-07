@@ -212,6 +212,27 @@ describe('what the page says recommendations do', () => {
 	});
 });
 
+// The page opened on its explainer, so a returning reader scrolled past it
+// to the lists they came for. The explainer and the integration now come last.
+describe('section order', () => {
+	it('puts the lists first and the explainer last', () => {
+		const { container } = render(RecommendationsPage, { props: props() });
+		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent?.trim());
+		expect(headings).toEqual([
+			'Trending now',
+			'What one reader would see',
+			'The split',
+			'Wire it into your application',
+			'What recommendations do',
+		]);
+	});
+
+	it('points at the split above it', () => {
+		const { container } = render(RecommendationsPage, { props: props() });
+		expect(said(container)).toContain('so the split above shows whether');
+	});
+});
+
 describe('the preview failure', () => {
 	it('shows a refused preview inside the preview form, not at the top of the page', () => {
 		const { container } = render(RecommendationsPage, {
