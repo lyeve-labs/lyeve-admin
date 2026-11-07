@@ -1,4 +1,4 @@
-import type { RequestEvent } from '@sveltejs/kit';
+import { error, type RequestEvent } from '@sveltejs/kit';
 import { CONFIRM_FIELD, CONFIRMED, type Unconfirmed } from '$lib/confirmation';
 
 /** The question the page asks when a post arrives without the reader's answer. */
@@ -38,7 +38,9 @@ export function asked<E extends RequestEvent, R>(
 		if (form.get(CONFIRM_FIELD) === CONFIRMED || !when(form)) return action(event);
 		const fields: [string, string][] = [];
 		for (const [name, value] of form) {
-			if (typeof value === 'string' && name !== CONFIRM_FIELD) fields.push([name, value]);
+			// The banner posts the fields again as hidden inputs, which cannot hold a file.
+			if (typeof value !== 'string') error(400, 'Could not send this form without scripts. Reload the page and try again.');
+			if (name !== CONFIRM_FIELD) fields.push([name, value]);
 		}
 		return { unconfirmed: { ...question, action: `${event.url.pathname}${event.url.search}`, fields } };
 	};

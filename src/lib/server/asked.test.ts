@@ -43,6 +43,18 @@ describe('asked', () => {
 		expect(answer).toMatchObject({ unconfirmed: { fields: [['id', 'wh-1']] } });
 	});
 
+	it('refuses an unconfirmed post holding a file, which the banner cannot post again', async () => {
+		const body = new FormData();
+		body.set('id', 'wh-1');
+		body.set('upload', new File(['x'], 'x.txt'));
+		const url = new URL('http://admin.test/admin/webhooks?/delete');
+		const event = { request: new Request(url, { method: 'POST', body }), url } as unknown as RequestEvent;
+		const action = vi.fn(async () => undefined);
+
+		await expect(asked(QUESTION, action)(event)).rejects.toMatchObject({ status: 400 });
+		expect(action).not.toHaveBeenCalled();
+	});
+
 	it('asks only for the posts its condition picks', async () => {
 		const action = vi.fn(async () => 'moved');
 		const stop = asked(QUESTION, action, (form) => form.get('move') === 'stop');
