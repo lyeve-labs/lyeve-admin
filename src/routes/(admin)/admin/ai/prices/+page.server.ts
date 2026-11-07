@@ -31,7 +31,7 @@ export const actions: Actions = {
 		const model = String(data.get('model') ?? '').trim();
 		const key = `${kind}/${model}`;
 		if (!(PROVIDER_KINDS as readonly string[]).includes(kind)) return fail(400, { action: 'save', key, error: 'Choose a provider kind.' });
-		if (!model) return fail(400, { action: 'save', key, error: 'Model is required.' });
+		if (!model) return fail(400, { action: 'save', key, error: 'Enter a model.' });
 		const input = money(data, 'input_per_1k');
 		const output = money(data, 'output_per_1k');
 		const image = money(data, 'image_per_call');

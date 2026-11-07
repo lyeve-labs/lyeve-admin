@@ -38,7 +38,7 @@ describe('transcript export route', () => {
 
 	it('answers the refusals with their own words', async () => {
 		for (const [status, message] of [
-			[404, 'Transcript not found'],
+			[404, 'This transcript no longer exists.'],
 			[402, 'AI is not enabled on this instance'],
 			[403, 'Only an admin or a super admin can export transcripts.'],
 		] as const) {

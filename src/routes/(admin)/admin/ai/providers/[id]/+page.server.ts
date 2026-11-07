@@ -4,6 +4,7 @@ import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireRole, requireUser } from '$lib/server/authz';
 import { AI_OK, aiActionError, aiGate, type AiGate } from '$lib/server/ai-load';
 import { readProviderForm } from '$lib/server/ai-provider-form';
+import { couldNotLoad } from '$lib/outage';
 import { deleteProvider, getCapabilities, getProvider, listModels, updateProvider, type AiProvider } from '$lib/api/ai';
 
 export const load: PageServerLoad = async (event) => {
@@ -17,7 +18,7 @@ export const load: PageServerLoad = async (event) => {
 		// The tenant gate and a missing row both answer 404. The settings read
 		// from the layout, which the gate leaves open, says which it was.
 		if (err instanceof ApiError && err.status === 404 && aiSettings?.enabled !== false) {
-			error(404, 'Provider not found');
+			error(404, 'This provider no longer exists.');
 		}
 		gate = aiGate(err, event, 'providers');
 	}
@@ -61,7 +62,7 @@ export const actions: Actions = {
 			const models = await listModels(authedClient(event), event.params.id);
 			return { scope: 'models', models };
 		} catch (err) {
-			return fail(400, { scope: 'models', error: aiActionError(err, 'Could not load the models from this provider. Try again.') });
+			return fail(400, { scope: 'models', error: aiActionError(err, couldNotLoad('the models from this provider')) });
 		}
 	},
 
@@ -73,7 +74,7 @@ export const actions: Actions = {
 			const capabilities = await getCapabilities(authedClient(event), event.params.id, model);
 			return { scope: 'capabilities', capabilities };
 		} catch (err) {
-			return fail(400, { scope: 'capabilities', error: aiActionError(err, 'Could not load the capabilities. Try again.') });
+			return fail(400, { scope: 'capabilities', error: aiActionError(err, couldNotLoad('the capabilities')) });
 		}
 	},
 };

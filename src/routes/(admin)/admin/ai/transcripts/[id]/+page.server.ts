@@ -14,7 +14,7 @@ export const load: PageServerLoad = async (event) => {
 		transcript = await getTranscript(client, event.params.id);
 	} catch (err) {
 		if (err instanceof ApiError && err.status === 404 && aiSettings?.enabled !== false) {
-			error(404, 'Transcript not found');
+			error(404, 'This transcript no longer exists.');
 		}
 		gate = aiGate(err, event, 'transcripts');
 	}
