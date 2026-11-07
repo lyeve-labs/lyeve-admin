@@ -22,6 +22,7 @@
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Check, Gauge, Pencil, Plus, X } from '@lucide/svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
@@ -145,7 +146,7 @@
 	const usageByTenant = $derived(new Map((data.usage.ok ? data.usage.value : []).map((u) => [u.tenant_id, u])));
 
 	function review(r: QuotaRequest, decision: 'approve' | 'deny'): SubmitFunction {
-		return async ({ cancel }) => {
+		return async ({ cancel, formData }) => {
 			if (decision === 'approve') {
 				const confirmed = await confirmDialog(
 					`Approve more quota for ${r.tenant_id}?`,
@@ -156,6 +157,7 @@
 					cancel();
 					return;
 				}
+				formData.set(CONFIRM_FIELD, CONFIRMED);
 			}
 			return async ({ result, update }) => {
 				await update();

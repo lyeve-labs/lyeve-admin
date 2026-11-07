@@ -20,6 +20,7 @@ describe('a lab write echoes the CSRF token', () => {
 			endpoint: 'POST /api/v1/content/{schema}',
 			p_schema: 'post',
 			body: '{"title":"x"}',
+			confirmed: 'yes',
 		});
 
 		await actions.rest(event);

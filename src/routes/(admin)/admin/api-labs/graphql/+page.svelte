@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Alert, Badge, Button, PageShell, SectionHeading, Textarea, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Play } from '@lucide/svelte';
 	import { GRAPHQL_URL, graphqlMutates, type LabResult } from '$lib/api/labs';
@@ -21,7 +22,7 @@
 	let document = $state('query {\n  \n}');
 	let variables = $state('');
 
-	const sendGraphql: SubmitFunction = async ({ cancel }) => {
+	const sendGraphql: SubmitFunction = async ({ cancel, formData }) => {
 		if (graphqlMutates(document)) {
 			const ok = await confirmDialog(
 				'Send this mutation?',
@@ -32,6 +33,7 @@
 				cancel();
 				return;
 			}
+			formData.set(CONFIRM_FIELD, CONFIRMED);
 		}
 		sending = true;
 		return async ({ update }) => {

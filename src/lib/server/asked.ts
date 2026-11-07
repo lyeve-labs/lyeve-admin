@@ -22,12 +22,20 @@ export type Question = {
  *
  *     delete: asked({ question: 'Delete this webhook?', detail: 'This cannot be undone.', label: 'Delete' },
  *         async (event) => { ... }),
+ *
+ * A form whose handler asks only for some posts, such as a stop among an
+ * experiment's moves, passes `when`, which picks those posts from the body.
+ * Every other post runs without the confirmation.
  */
-export function asked<E extends RequestEvent, R>(question: Question, action: (event: E) => R | Promise<R>) {
+export function asked<E extends RequestEvent, R>(
+	question: Question,
+	action: (event: E) => R | Promise<R>,
+	when: (form: FormData) => boolean = () => true,
+) {
 	return async (event: E): Promise<R | Unconfirmed> => {
 		// The action reads the body itself, so the check reads a copy.
 		const form = await event.request.clone().formData();
-		if (form.get(CONFIRM_FIELD) === CONFIRMED) return action(event);
+		if (form.get(CONFIRM_FIELD) === CONFIRMED || !when(form)) return action(event);
 		const fields: [string, string][] = [];
 		for (const [name, value] of form) {
 			if (typeof value === 'string' && name !== CONFIRM_FIELD) fields.push([name, value]);

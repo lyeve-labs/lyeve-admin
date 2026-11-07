@@ -148,19 +148,27 @@ export const actions: Actions = {
 	// One action for all four moves. The engine decides whether a move is legal
 	// and answers 409 naming both statuses when it is not, so the message it
 	// sends is relayed rather than replaced: it says more than this side knows.
-	move: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		const move = String(form.get('move') ?? '') as Transition;
-		if (!id) return fail(400, { action: 'move', error: 'This form is missing its experiment. Reload the page and try again.' });
-		if (!MOVES.includes(move)) return fail(400, { action: 'move', error: 'That change is not available for this experiment. Reload the page and try again.' });
-		try {
-			await transition(client, id, move);
-		} catch (err) {
-			return tagged('move', actionFailure(err, 'Could not change the experiment. Try again.'));
-		}
-		return { moved: move };
-	},
+	move: asked(
+		{
+			question: 'Stop this experiment?',
+			detail: 'A stopped experiment cannot be started again. Pause it instead if you mean to come back to it.',
+			label: 'Stop',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			const move = String(form.get('move') ?? '') as Transition;
+			if (!id) return fail(400, { action: 'move', error: 'This form is missing its experiment. Reload the page and try again.' });
+			if (!MOVES.includes(move)) return fail(400, { action: 'move', error: 'That change is not available for this experiment. Reload the page and try again.' });
+			try {
+				await transition(client, id, move);
+			} catch (err) {
+				return tagged('move', actionFailure(err, 'Could not change the experiment. Try again.'));
+			}
+			return { moved: move };
+		},
+		(form) => form.get('move') === 'stop',
+	),
 };

@@ -4,7 +4,8 @@ import { readMemoryTrend } from '$lib/api/profiler';
 import { section } from '$lib/api/gate';
 import { authedClient, loadUser } from '$lib/server/authz';
 import { couldNotLoad } from '$lib/outage';
-import { reset } from '../reset.server';
+import { RESET_QUESTION, reset } from '../reset.server';
+import { asked } from '$lib/server/asked';
 
 // The snapshots describe the whole process, so the tab is a super admin's,
 // like the rest of the profiler.
@@ -17,4 +18,6 @@ export const load: PageServerLoad = async (event) => {
 	return { memory };
 };
 
-export const actions: Actions = { reset };
+export const actions: Actions = {
+	reset: asked(RESET_QUESTION, reset),
+};

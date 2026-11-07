@@ -3,17 +3,21 @@ import { dirname, join, normalize } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /*
- * A form that asks first through `confirmed()` asks only once the page has
+ * A form that asks first in its enhance handler asks only once the page has
  * hydrated. A click before that, or with scripts off, posts natively with no
  * question, so the action it reaches has to refuse a post that carries no
  * answer, which `asked()` does. This reads every component, finds each form
- * whose enhance handler asks through `confirmed()`, follows its `action` to
- * the server action it reaches, and fails when that action is not wrapped.
+ * whose enhance handler asks, through `confirmed()` or through the kit's
+ * `confirm` directly, follows its `action` to the server action it reaches,
+ * and fails when that action is not wrapped.
  *
- * A form's handler asks when its `use:enhance` expression calls `confirmed(`
+ * A form's handler asks when its `use:enhance` expression makes the call
  * itself or names a function or const of the same component whose own text
- * calls it. A relative action resolves against every page that draws the
- * component, followed through the components that import it.
+ * makes it. A name counts for the kit's `confirm` only when it is typed
+ * `SubmitFunction`, because a click handler that asks and then submits a
+ * form of its own posts nothing before the page hydrates. A relative action
+ * resolves against every page that draws the component, followed through the
+ * components that import it.
  */
 
 /** The index just past the bracket closing the one at `open`, stepping over strings and comments. */
@@ -58,18 +62,38 @@ function closeOf(src: string, open: number): number {
 	throw new Error(`unbalanced bracket at ${open}`);
 }
 
-/** The names at the top of a component's script whose function body or const value calls `confirmed(`. */
-function askingNames(src: string): Set<string> {
+/** A call of the kit's `confirm` under the name a component imports it as, or null when it does not. */
+type Asking = { kit: RegExp | null };
+
+const NO_KIT: Asking = { kit: null };
+
+function askingOf(src: string): Asking {
+	for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@lyeve-labs\/ui-kit'/g)) {
+		const named = /(?:^|,)\s*confirm(?:\s+as\s+(\w+))?\s*(?:,|$)/.exec(m[1]);
+		if (named) return { kit: new RegExp(`(?<![\\w.$])${named[1] ?? 'confirm'}\\(`) };
+	}
+	return NO_KIT;
+}
+
+/** Whether a piece of a component asks, through `confirmed(` anywhere or the kit's confirm where it may count. */
+function calls(text: string, how: Asking, kitCounts: boolean): boolean {
+	return text.includes('confirmed(') || (kitCounts && how.kit !== null && how.kit.test(text));
+}
+
+/** The names at the top of a component's script whose function body or const value asks. */
+function askingNames(src: string, how: Asking): Set<string> {
 	const names = new Set<string>();
 	for (const m of src.matchAll(/^\tfunction\s+(\w+)\s*\(/gm)) {
-		const body = src.indexOf('{', closeOf(src, m.index + m[0].length - 1));
-		if (src.slice(body, closeOf(src, body)).includes('confirmed(')) names.add(m[1]);
+		const params = closeOf(src, m.index + m[0].length - 1);
+		const body = src.indexOf('{', params);
+		const submits = /^\s*:\s*SubmitFunction\b/.test(src.slice(params, body));
+		if (calls(src.slice(body, closeOf(src, body)), how, submits)) names.add(m[1]);
 	}
-	for (const m of src.matchAll(/^\tconst\s+(\w+)\s*(?::\s*[\w<>[\]]+\s*)?=/gm)) {
+	for (const m of src.matchAll(/^\tconst\s+(\w+)\s*(?::\s*([\w<>[\]]+)\s*)?=/gm)) {
 		// A const's value runs to the semicolon that ends its statement.
 		let i = m.index + m[0].length;
 		while (i < src.length && src[i] !== ';') i = '([{`\'"'.includes(src[i]) ? closeOf(src, i) : i + 1;
-		if (src.slice(m.index, i).includes('confirmed(')) names.add(m[1]);
+		if (calls(src.slice(m.index, i), how, m[2] === 'SubmitFunction')) names.add(m[1]);
 	}
 	return names;
 }
@@ -105,9 +129,9 @@ function formsOf(file: string, src: string): Form[] {
 	return forms;
 }
 
-/** Whether a form's handler asks through `confirmed()`. */
-function asks(form: Form, names: Set<string>): boolean {
-	if (form.enhance.includes('confirmed(')) return true;
+/** Whether a form's handler asks. */
+function asks(form: Form, names: Set<string>, how: Asking): boolean {
+	if (calls(form.enhance, how, true)) return true;
 	const head = /^\s*(\w+)/.exec(form.enhance);
 	return head !== null && names.has(head[1]);
 }
@@ -154,22 +178,25 @@ function wrapped(server: string, name: string): boolean {
 	return at.test(readFileSync(server, 'utf8'));
 }
 
-type Finding = { asking: Form[]; unwrapped: string[]; unmapped: string[]; unused: string[] };
+type Finding = { asking: Form[]; direct: Form[]; unwrapped: string[]; unmapped: string[]; unused: string[] };
 
 function survey(): Finding {
 	const by = importers();
-	const out: Finding = { asking: [], unwrapped: [], unmapped: [], unused: [] };
+	const out: Finding = { asking: [], direct: [], unwrapped: [], unmapped: [], unused: [] };
 	for (const file of components) {
 		const src = readFileSync(file, 'utf8');
-		if (!src.includes('confirmed(')) continue;
-		const names = askingNames(src);
-		const forms = formsOf(file, src).filter((f) => asks(f, names));
+		const how = askingOf(src);
+		if (!calls(src, how, true)) continue;
+		const names = askingNames(src, how);
+		const plain = askingNames(src, NO_KIT);
+		const forms = formsOf(file, src).filter((f) => asks(f, names, how));
 		// Every asking name reaches a form, or the reading above missed one.
 		for (const name of names) {
 			if (!forms.some((f) => new RegExp(`^\\s*${name}\\b`).test(f.enhance))) out.unused.push(`${file}: ${name}`);
 		}
 		for (const form of forms) {
 			out.asking.push(form);
+			if (!asks(form, plain, NO_KIT)) out.direct.push(form);
 			const pages = pagesOf(file, by);
 			if (form.action === null || pages.length === 0) {
 				out.unmapped.push(`${file}: ${form.action ?? 'a computed action'}`);
@@ -190,6 +217,10 @@ describe('writes that ask first', () => {
 
 	it('finds the forms that ask through confirmed()', () => {
 		expect(found.asking.length).toBeGreaterThan(50);
+	});
+
+	it('finds the forms that ask through the kit directly', () => {
+		expect(found.direct.length).toBeGreaterThanOrEqual(14);
 	});
 
 	it('maps every asking form to a static action', () => {

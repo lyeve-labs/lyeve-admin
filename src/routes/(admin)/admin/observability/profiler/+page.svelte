@@ -12,6 +12,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import { Gauge, Puzzle, RotateCcw } from '@lucide/svelte';
 	import { formatNs, latencyTone, type EndpointStats } from '$lib/api/profiler';
 	import { NO_VALUE, formatBytes, formatTime } from '$lib/format';
@@ -87,7 +88,7 @@
 		<form
 			method="POST"
 			action="?/reset"
-			use:enhance={async ({ cancel }) => {
+			use:enhance={async ({ cancel, formData }) => {
 				const confirmed = await confirmDialog(
 					'Reset the profiler?',
 					'Sampled requests and memory snapshots are deleted, and a new snapshot is taken. This cannot be undone.',
@@ -97,6 +98,7 @@
 					cancel();
 					return;
 				}
+				formData.set(CONFIRM_FIELD, CONFIRMED);
 				resetting = true;
 				return async ({ update }) => {
 					resetting = false;

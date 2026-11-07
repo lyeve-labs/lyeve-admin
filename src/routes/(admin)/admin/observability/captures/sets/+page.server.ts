@@ -59,25 +59,32 @@ export const actions: Actions = {
 		},
 	),
 
-	replaySet: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const form = await event.request.formData();
-		const id = idOf(form);
-		if (!id) return fail(400, { error: 'This form is missing its replay set. Reload the page and try again.' });
-		const writes = form.get('confirm_mutating') === 'true';
-		try {
-			const out = await replaySet(authedClient(event), id, writes);
-			return { replay: out };
-		} catch (err) {
-			// The plugin refuses a set holding a write before any of it runs,
-			// so asking again with the writes confirmed is safe.
-			if (!writes && errorCodeOf(err) === CONFIRM_WRITES) {
-				return fail(428, {
-					error: 'This set includes a request that writes data. Replaying it repeats the write.',
-					needsWrites: id,
-				});
+	replaySet: asked(
+		{
+			question: 'Replay this set?',
+			detail: 'Every request in the set runs again with your credentials in place of the ones that were redacted.',
+			label: 'Replay',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const form = await event.request.formData();
+			const id = idOf(form);
+			if (!id) return fail(400, { error: 'This form is missing its replay set. Reload the page and try again.' });
+			const writes = form.get('confirm_mutating') === 'true';
+			try {
+				const out = await replaySet(authedClient(event), id, writes);
+				return { replay: out };
+			} catch (err) {
+				// The plugin refuses a set holding a write before any of it runs,
+				// so asking again with the writes confirmed is safe.
+				if (!writes && errorCodeOf(err) === CONFIRM_WRITES) {
+					return fail(428, {
+						error: 'This set includes a request that writes data. Replaying it repeats the write.',
+						needsWrites: id,
+					});
+				}
+				return actionFailure(err, 'Could not replay the set. Try again.');
 			}
-			return actionFailure(err, 'Could not replay the set. Try again.');
-		}
-	},
+		},
+	),
 };

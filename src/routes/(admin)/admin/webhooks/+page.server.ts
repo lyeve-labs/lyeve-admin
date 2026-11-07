@@ -258,7 +258,13 @@ export const actions: Actions = {
 			}
 		},
 
-		'dead-letter-delete': async (event) => {
+	'dead-letter-delete': asked(
+		{
+			question: 'Delete this dead letter?',
+			detail: 'The delivery is deleted permanently. It cannot be replayed.',
+			label: 'Delete',
+		},
+		async (event) => {
 			await requireUser(event);
 			const { request, fetch, cookies } = event;
 			const client = authedClient(event);
@@ -270,5 +276,6 @@ export const actions: Actions = {
 			} catch (err) {
 				return tagged('dead-letter-delete', actionFailure(err, 'Could not delete the dead letter. Try again.'), id);
 			}
-		}
+		},
+	),
 };

@@ -42,4 +42,13 @@ describe('asked', () => {
 		expect(action).not.toHaveBeenCalled();
 		expect(answer).toMatchObject({ unconfirmed: { fields: [['id', 'wh-1']] } });
 	});
+
+	it('asks only for the posts its condition picks', async () => {
+		const action = vi.fn(async () => 'moved');
+		const stop = asked(QUESTION, action, (form) => form.get('move') === 'stop');
+
+		expect(await stop(post({ id: 'ex-1', move: 'pause' }))).toBe('moved');
+		expect(await stop(post({ id: 'ex-1', move: 'stop' }))).toMatchObject({ unconfirmed: { fields: [['id', 'ex-1'], ['move', 'stop']] } });
+		expect(action).toHaveBeenCalledOnce();
+	});
 });

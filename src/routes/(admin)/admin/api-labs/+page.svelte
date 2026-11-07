@@ -13,6 +13,7 @@
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Play, Terminal } from '@lucide/svelte';
 	import { RISK_LABELS, pathParams, riskOf, riskTone, type LabEndpoint, type LabResult } from '$lib/api/labs';
@@ -68,7 +69,7 @@
 	 * A tester pointed at a real instance is one click from deleting a row
 	 * they meant to read.
 	 */
-	const sendRest: SubmitFunction = async ({ cancel }) => {
+	const sendRest: SubmitFunction = async ({ cancel, formData }) => {
 		if (!selected) {
 			cancel();
 			return;
@@ -84,6 +85,7 @@
 				cancel();
 				return;
 			}
+			formData.set(CONFIRM_FIELD, CONFIRMED);
 		}
 		sending = true;
 		return async ({ update }) => {

@@ -13,7 +13,8 @@ import {
 import { section, type Section } from '$lib/api/gate';
 import { authedClient, loadUser } from '$lib/server/authz';
 import { couldNotLoad } from '$lib/outage';
-import { reset } from './reset.server';
+import { RESET_QUESTION, reset } from './reset.server';
+import { asked } from '$lib/server/asked';
 
 /**
  * What the timings tab renders. Every view is the profiler plugin's, under
@@ -79,4 +80,6 @@ export const load: PageServerLoad = async (event) => {
 	return page;
 };
 
-export const actions: Actions = { reset };
+export const actions: Actions = {
+	reset: asked(RESET_QUESTION, reset),
+};

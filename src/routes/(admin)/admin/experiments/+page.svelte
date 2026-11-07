@@ -15,6 +15,7 @@
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import { confirmed, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, FlaskConical, Pencil, Plus, Trash2 } from '@lucide/svelte';
@@ -139,7 +140,7 @@
 	 * where starting and pausing are not.
 	 */
 	function moveExperiment(e: Experiment, move: string): SubmitFunction {
-		return async ({ cancel }) => {
+		return async ({ cancel, formData }) => {
 			if (move === 'stop') {
 				const ok = await confirmDialog(
 					`Stop ${e.name}?`,
@@ -150,6 +151,7 @@
 					cancel();
 					return;
 				}
+				formData.set(CONFIRM_FIELD, CONFIRMED);
 			}
 			return async ({ result, update }) => {
 				await update();

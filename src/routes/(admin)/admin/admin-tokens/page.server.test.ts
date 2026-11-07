@@ -19,6 +19,7 @@ function event(replies: Record<string, Reply>, form: Record<string, string | str
 		return new Response(r.status === 204 ? null : JSON.stringify(r.body ?? {}), { status: r.status, headers: { 'content-type': 'application/json' } });
 	});
 	const data = new FormData();
+	data.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(form)) for (const one of [v].flat()) data.append(k, one);
 	const cookies = { get: (n: string) => (n === '__Host-sys_session' ? 'tok' : n === '__Host-csrf' ? 'c' : undefined) };
 	return {

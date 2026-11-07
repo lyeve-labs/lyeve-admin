@@ -18,6 +18,7 @@
 	} from '@lyeve-labs/ui-kit';
 	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { browserOffset } from '$lib/utils/wall-clock';
 	import { History, Rss, Search } from '@lucide/svelte';
@@ -50,7 +51,7 @@
 	 * The form keeps its values after the answer: the run name decides what a
 	 * later run skips, so the real run after a rehearsal has to carry it.
 	 */
-	const replay: SubmitFunction = async ({ cancel }) => {
+	const replay: SubmitFunction = async ({ cancel, formData }) => {
 		if (!dryRun) {
 			const name = handler.trim() ? `the run name ${handler.trim()}` : 'the shared name';
 			const ok = await confirm(
@@ -62,6 +63,7 @@
 				cancel();
 				return;
 			}
+			formData.set(CONFIRM_FIELD, CONFIRMED);
 		}
 		starting = true;
 		return async ({ update }) => {

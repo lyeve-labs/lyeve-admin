@@ -12,6 +12,7 @@
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Network, Play } from '@lucide/svelte';
 	import { grpcRouteParams, grpcRouteTakesBody, type LabResult } from '$lib/api/labs';
@@ -41,7 +42,7 @@
 		for (const n of grpcParams) if (grpcValues[n] === undefined) grpcValues[n] = '';
 	});
 
-	const sendGrpc: SubmitFunction = async ({ cancel }) => {
+	const sendGrpc: SubmitFunction = async ({ cancel, formData }) => {
 		if (grpcWrites || grpcRoute.startsWith('DELETE ')) {
 			const ok = await confirmDialog(
 				'Run this call?',
@@ -52,6 +53,7 @@
 				cancel();
 				return;
 			}
+			formData.set(CONFIRM_FIELD, CONFIRMED);
 		}
 		sending = true;
 		return async ({ update }) => {

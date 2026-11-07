@@ -289,14 +289,16 @@ function postEvent(fields: Record<string, string>, answer: (url: string) => Resp
 		return answer(asked);
 	}) as unknown as typeof globalThis.fetch;
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [key, value] of Object.entries(fields)) form.set(key, value);
+	const url = new URL('http://localhost/admin/webhooks');
 	return {
 		seen,
 		event: {
 			fetch,
 			cookies: mockCookies(),
-			request: { formData: async () => form },
-			url: new URL('http://localhost/admin/webhooks'),
+			request: new Request(url, { method: 'POST', body: form }),
+			url,
 		} as never,
 	};
 }

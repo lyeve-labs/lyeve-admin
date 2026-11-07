@@ -18,6 +18,7 @@
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { ArrowDown, ArrowUp, Eye, LayoutDashboard, Plus, RotateCcw, Trash2 } from '@lucide/svelte';
 	import { ICON } from '$lib/icon';
@@ -156,7 +157,7 @@
 			await update({ reset: false, invalidateAll: false });
 		};
 	};
-	const confirmReset: SubmitFunction = async ({ cancel }) => {
+	const confirmReset: SubmitFunction = async ({ cancel, formData }) => {
 		const ok = await confirmDialog(
 			'Reset the dashboard?',
 			'Everyone in this tenant sees the stock dashboard again, and this layout is deleted.',
@@ -166,6 +167,7 @@
 			cancel();
 			return;
 		}
+		formData.set(CONFIRM_FIELD, CONFIRMED);
 		return async ({ update }) => update({ reset: false, invalidateAll: true });
 	};
 </script>

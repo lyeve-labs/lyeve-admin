@@ -2,6 +2,7 @@
 	import { Alert, Badge, Button, Card, EmptyState, PageShell, SectionHeading, Stat, confirm as confirmDialog } from '@lyeve-labs/ui-kit';
 	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import { AlertTriangle, CheckCircle, MemoryStick, RotateCcw } from '@lucide/svelte';
 	import { NO_VALUE, formatBytes, formatDateTime, formatSignedBytes } from '$lib/format';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -34,7 +35,7 @@
 		<form
 			method="POST"
 			action="?/reset"
-			use:enhance={async ({ cancel }) => {
+			use:enhance={async ({ cancel, formData }) => {
 				const confirmed = await confirmDialog(
 					'Reset the profiler?',
 					'Sampled requests and memory snapshots are deleted, and a new snapshot is taken. This cannot be undone.',
@@ -44,6 +45,7 @@
 					cancel();
 					return;
 				}
+				formData.set(CONFIRM_FIELD, CONFIRMED);
 				resetting = true;
 				return async ({ update }) => {
 					resetting = false;
