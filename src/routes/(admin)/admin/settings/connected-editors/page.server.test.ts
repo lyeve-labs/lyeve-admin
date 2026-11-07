@@ -8,7 +8,7 @@ vi.mock('$lib/server/authz', async () => {
 import { actions, load } from './+page.server';
 import { SAID } from '$lib/api/connected-editors';
 
-const BASE = '/api/admin/sites';
+const BASE = '/api/admin/builder';
 const RUNNING = { state: 'named', running: ['builder'], withheld: [] };
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -68,7 +68,7 @@ function loadEvent(routes: Routes, { roles = ['admin'], search = '', plugins = R
 const LISTED: Routes = {
 	[`GET ${BASE}/connections`]: json({ data: [CONNECTION], total: 1 }),
 	[`GET ${BASE}/settings`]: json(SETTINGS),
-	'GET /api/admin/schemas': json([{ name: 'posts' }, { name: 'lyeve_site_pages' }, { name: 'products' }]),
+	'GET /api/admin/schemas': json([{ name: 'posts' }, { name: 'lyeve_builder_pages' }, { name: 'products' }]),
 	'GET /api/admin/mfa/status': json({ enabled: false }),
 };
 

@@ -33,10 +33,10 @@ describe('the connected editors routes', () => {
 		await declineRequest(client, 'a?b');
 		await revokeConnection(client, '1/2');
 		expect(calls.map((c) => c.path)).toEqual([
-			'/api/admin/sites/connections/requests/K7F3%2F..%2FA2M9',
-			'/api/admin/sites/connections/requests/K7F3%20A2M9/approve',
-			'/api/admin/sites/connections/requests/a%3Fb/decline',
-			'/api/admin/sites/connections/1%2F2/revoke',
+			'/api/admin/builder/connections/requests/K7F3%2F..%2FA2M9',
+			'/api/admin/builder/connections/requests/K7F3%20A2M9/approve',
+			'/api/admin/builder/connections/requests/a%3Fb/decline',
+			'/api/admin/builder/connections/1%2F2/revoke',
 		]);
 	});
 
@@ -45,7 +45,7 @@ describe('the connected editors routes', () => {
 		await approveRequest(client, 'K7F3-A2M9', { fingerprint: 'AB12:CD34', lifetime_days: 30, mfa_code: '123456' });
 		expect(calls[0]).toEqual({
 			method: 'POST',
-			path: '/api/admin/sites/connections/requests/K7F3-A2M9/approve',
+			path: '/api/admin/builder/connections/requests/K7F3-A2M9/approve',
 			body: { fingerprint: 'AB12:CD34', lifetime_days: 30, mfa_code: '123456' },
 		});
 	});
@@ -56,9 +56,9 @@ describe('the connected editors routes', () => {
 		await revokeAllConnections(client);
 		await saveSettings(client, { writes_per_minute: 60 });
 		expect(calls).toEqual([
-			{ method: 'GET', path: '/api/admin/sites/connections?limit=50&offset=100', body: undefined },
-			{ method: 'POST', path: '/api/admin/sites/connections/revoke-all', body: {} },
-			{ method: 'PUT', path: '/api/admin/sites/settings', body: { writes_per_minute: 60 } },
+			{ method: 'GET', path: '/api/admin/builder/connections?limit=50&offset=100', body: undefined },
+			{ method: 'POST', path: '/api/admin/builder/connections/revoke-all', body: {} },
+			{ method: 'PUT', path: '/api/admin/builder/settings', body: { writes_per_minute: 60 } },
 		]);
 	});
 });
@@ -85,7 +85,7 @@ describe('connectionsGate', () => {
 
 describe('what the page shows', () => {
 	it('never offers the builder or engine schemas', () => {
-		expect(showable(['posts', 'lyeve_site_pages', 'sys_users', 'products'])).toEqual(['posts', 'products']);
+		expect(showable(['posts', 'lyeve_builder_pages', 'sys_users', 'products'])).toEqual(['posts', 'products']);
 	});
 
 	it('offers only the lifetimes the tenant allows', () => {
