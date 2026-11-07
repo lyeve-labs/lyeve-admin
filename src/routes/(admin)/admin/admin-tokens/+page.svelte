@@ -76,11 +76,11 @@
 		return { action: String(v.action), error: String(v.error), fields: v.fields ?? {}, needsMfa: v.needsMfa };
 	}
 
-	// The last refusal, per action, kept here rather than read from `form`: a
+	// The last refusal, per action. It follows `form`, which a post from the
+	// layout's confirmation banner sets, and the handlers below overwrite it: a
 	// success never goes through `form` (see issue below), so `form` would
 	// keep showing a refusal the operator has already fixed.
-	// svelte-ignore state_referenced_locally
-	let failure = $state<Failure | null>(asFailure(form));
+	let failure = $derived<Failure | null>(asFailure(form));
 	const createFailure = $derived(failure?.action === 'create' ? failure : null);
 	const rotateFailure = $derived(failure?.action === 'rotate' ? failure : null);
 	const pageFailure = $derived(failure?.action === 'revoke' ? failure : null);
