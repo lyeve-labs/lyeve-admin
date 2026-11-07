@@ -14,6 +14,7 @@
 	import { page } from '$app/state';
 	import { ICON } from '$lib/icon';
 	import { BUSY, OUTAGE } from '$lib/outage';
+	import { SESSION_ENDED } from '$lib/session';
 
 	/**
 	 * What the reader is told when a page cannot be served.
@@ -102,7 +103,7 @@
 	 */
 	const hint = $derived(
 		{
-			'signed-out': 'Your session expired. Sign in again.',
+			'signed-out': SESSION_ENDED,
 			denied: message || 'You do not have access to this page.',
 			missing: message || 'That page or record does not exist.',
 			busy: message || BUSY.body,
