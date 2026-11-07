@@ -3,7 +3,15 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PageData } from './$types';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+// enhance keeps each form's submit handler, so a case can run the one a
+// delete would run and read the question it asks.
+const forms = vi.hoisted(() => ({ submits: new Map<HTMLFormElement, (input: unknown) => unknown>() }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit: (input: unknown) => unknown) => {
+		forms.submits.set(node, submit);
+		return { destroy: () => forms.submits.delete(node) };
+	},
+}));
 
 const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => false) }));
 vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
@@ -81,7 +89,7 @@ describe('tenant costs page', () => {
 		expect(screen.getByText('Beta')).toBeTruthy();
 		expect(screen.getByText('12.50 USD')).toBeTruthy();
 		expect(screen.getByTestId('cost-summary').textContent).toContain('USD');
-		expect(screen.getByText('From 4 cost lines since the first of the month.')).toBeTruthy();
+		expect(screen.getByText('From 4 cost lines since the first of the month. Costs are updated every hour from the usage and AI meters.')).toBeTruthy();
 		expect(screen.getByTestId('cost-dashboard')).toBeTruthy();
 		expect(screen.getByRole('list', { name: 'Budgets at risk' }).textContent).toContain('Storage cap');
 		expect(screen.getByTestId('budget-row').textContent).toContain('50%, 80%, 100%');
@@ -212,15 +220,15 @@ describe('the budget controls', () => {
 		expect(new FormData(form).get('period')).toBe('monthly');
 	});
 
-	it('names the budget in the delete confirmation and posts its id once agreed', async () => {
-		kit.confirm.mockResolvedValue(true);
+	it('names the budget in the delete confirmation and posts its id', async () => {
 		render(CostsPage, { props: { data: data(), form: null } });
-		const form = document.body.querySelector('form[action="?/deleteBudget"]') as HTMLFormElement;
-		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
-		await fireEvent.click(screen.getByRole('button', { name: 'Delete Storage cap' }));
-		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
-		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap?', expect.any(String), { confirmLabel: 'Delete' });
+		const form = screen.getByRole('button', { name: 'Delete Storage cap' }).closest('form') as HTMLFormElement;
+		expect(form.getAttribute('action')).toBe('?/deleteBudget');
 		expect(new FormData(form).get('id')).toBe('b1');
+		const cancel = vi.fn();
+		await forms.submits.get(form)?.({ cancel });
+		expect(kit.confirm).toHaveBeenCalledWith('Delete budget Storage cap?', expect.any(String), { confirmLabel: 'Delete' });
+		expect(cancel).toHaveBeenCalled();
 	});
 });
 

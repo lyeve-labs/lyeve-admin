@@ -24,6 +24,8 @@ import {
 	monthStart,
 } from '$lib/api/cost';
 import { parseBudget, parsePrice } from '$lib/cost/forms';
+import { couldNotLoad } from '$lib/outage';
+import { rolesInWords } from '$lib/roles';
 
 const OPERATOR_ROLES = ['admin', 'super_admin'];
 
@@ -49,7 +51,7 @@ const UNREAD: Section<never> = { ok: false, gate: { state: 'absent' } };
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
 	if (!user.roles.some((role) => OPERATOR_ROLES.includes(role))) {
-		error(403, 'Only an admin or a super admin can open this page.');
+		error(403, `Only ${rolesInWords(OPERATOR_ROLES)} can open this page.`);
 	}
 	const page: CostsPage = {
 		enabled: true,
@@ -76,10 +78,10 @@ export const load: PageServerLoad = async (event) => {
 		);
 	const client = authedClient(event);
 	const [summary, dashboard, budgets, prices] = await Promise.all([
-		read(getSummary(client, monthStart(new Date())), 'Could not load the split by resource.'),
-		read(getDashboard(client), "Could not load this month's costs."),
-		read(listBudgets(client), 'Could not load the budgets.'),
-		read(listPrices(client), 'Could not load the prices.'),
+		read(getSummary(client, monthStart(new Date())), couldNotLoad('the split by resource')),
+		read(getDashboard(client), couldNotLoad("this month's costs")),
+		read(listBudgets(client), couldNotLoad('the budgets')),
+		read(listPrices(client), couldNotLoad('the prices')),
 	]);
 	if (refused.upgradeUrl !== null) return { ...page, enabled: false, upgradeUrl: refused.upgradeUrl };
 	return { ...page, summary, dashboard, budgets, prices };

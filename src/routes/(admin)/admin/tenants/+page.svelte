@@ -21,7 +21,7 @@
 	import type { PageData, ActionData } from './$types';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { Tenant } from '@lyeve-labs/client-rest';
-	import { formatDate, NO_VALUE } from '$lib/format';
+	import { formatDate, NO_VALUE, plural } from '$lib/format';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ICON } from '$lib/icon';
@@ -131,7 +131,9 @@
 
 <PageShell
 	title="Tenants"
-	description={data.tenants.ok ? `${data.total} ${data.total === 1 ? 'tenant' : 'tenants'} on this instance` : 'Every tenant on this instance'}
+	description={data.tenants.ok
+		? `See and manage the ${data.total} ${plural(data.total, 'tenant')} on this instance.`
+		: 'See and manage every tenant on this instance.'}
 	width="wide"
 >
 	{#snippet actions()}
@@ -158,7 +160,7 @@
 		<NotEnabled
 			level={2}
 			title="Tenant provisioning"
-			description="Your license does not include creating tenants.{stillEditable}"
+			description="Creating tenants is not enabled on this instance.{stillEditable}"
 			url={data.provisioningUrl || null}
 		/>
 	{/if}

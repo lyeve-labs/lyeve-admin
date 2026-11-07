@@ -17,15 +17,16 @@ import {
 	type QuotaRequest,
 	type TenantUsage,
 } from '$lib/api/usage';
-import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
+import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 import { rowsOf, pageWindow, pastEndOffset, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
+import { couldNotLoad } from '$lib/outage';
 
 /** What the page says in place of a requests read that failed. */
-const REQUESTS_FAILED = 'Could not load the requests for more quota.';
+const REQUESTS_FAILED = couldNotLoad('the requests for more quota');
 
 /** What the page says in place of a usage read that failed. */
-const USAGE_FAILED = 'Could not load usage per tenant.';
+const USAGE_FAILED = couldNotLoad('usage per tenant');
 
 /** A read the page did not make, said the same way a refusal would be. */
 const UNREAD: Section<never> = { ok: false, gate: { state: 'absent' } };
@@ -59,21 +60,20 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, 50, 500);
 	let quotas: Quota[] = [];
 	let quotaTotal = 0;
-	let back: number | null = null;
 	// The shell says why the page is unavailable while its plugin does not run.
 	let gate: Gate = notRunning(plugins, PLUGIN.usage) ? { state: 'absent' } : GATE_OK;
 	if (gate.state === 'ok') {
-		try {
-			const res = await listQuotas(client, limit, offset);
-			quotas = rowsOf(res);
-			quotaTotal = Math.max(totalOf(res), offset + quotas.length);
+		const read = await section(listQuotas(client, limit, offset), couldNotLoad('usage'));
+		if (read.ok) {
+			quotas = rowsOf(read.value);
+			quotaTotal = Math.max(totalOf(read.value), offset + quotas.length);
 			// A page past the end is not an instance with no quota set.
-			back = pastEndOffset(quotas.length, limit, offset, statedTotal(res));
-		} catch (err) {
-			gate = gateOf(err, 'Could not load usage.');
+			const back = pastEndOffset(quotas.length, limit, offset, statedTotal(read.value));
+			if (back !== null) redirect(307, withOffset(event.url, back));
+		} else {
+			gate = read.gate;
 		}
 	}
-	if (back !== null) redirect(307, withOffset(event.url, back));
 
 	// Pending requests are the queue somebody has to act on, so an unread list
 	// is never drawn as an empty one. Only the pending ones are asked for, so
@@ -152,7 +152,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const tenant = String(form.get('tenant_id') ?? '').trim();
 		if (!tenant) {
-			return fail(400, { action: 'quota', error: 'Check the highlighted fields.', fields: { tenant_id: 'Tenant is required' } });
+			return fail(400, { action: 'quota', error: 'Check the highlighted fields.', fields: { tenant_id: 'Choose a tenant.' } });
 		}
 		try {
 			await upsertQuota(authedClient(event), tenant, quotaFrom(form));

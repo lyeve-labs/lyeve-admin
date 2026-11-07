@@ -297,7 +297,7 @@ describe('Tenants refusals', () => {
 			props: props({ canProvision: false, provisioningUrl: ADD_ON }),
 		});
 
-		expect(getByTestId('not-enabled').textContent).toContain('Your license does not include creating tenants.');
+		expect(getByTestId('not-enabled').textContent).toContain('Creating tenants is not enabled on this instance.');
 		const link = getByRole('link', { name: 'View the add-on' });
 		expect(link.getAttribute('href')).toBe(ADD_ON);
 		expect(link.getAttribute('rel')).toBe('noopener noreferrer');
@@ -370,7 +370,7 @@ describe('Tenants with none listed and no create offered', () => {
 
 	it('names no tenants below when the license does not include creating them', () => {
 		const { container } = render(TenantsPage, { props: props({ tenants: [], total: 0, canProvision: false }) });
-		expect(container.textContent).toContain('does not include creating tenants');
+		expect(container.textContent).toContain('Creating tenants is not enabled on this instance.');
 		expect(container.textContent).not.toContain('the tenants below');
 		expect(container.textContent).not.toContain('Create a tenant');
 	});

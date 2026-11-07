@@ -199,7 +199,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 			data: {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { slug: 'Slug is required' },
+				fields: { slug: 'Enter a slug.' },
 			},
 		});
 	});
@@ -212,7 +212,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 			data: {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { slug: 'Slug is required', name: 'Display name is required' },
+				fields: { slug: 'Enter a slug.', name: 'Enter a display name.' },
 			},
 		});
 	});
@@ -220,7 +220,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 	it('treats whitespace as absent', async () => {
 		const result = await actions.create(createEvent({ slug: '   ', name: 'ACME Corp' }));
 
-		expect(result).toMatchObject({ data: { fields: { slug: 'Slug is required' } } });
+		expect(result).toMatchObject({ data: { fields: { slug: 'Enter a slug.' } } });
 	});
 
 	/** The body the action posted to create the tenant. */
@@ -400,7 +400,11 @@ describe('admin/tenants create refusals', () => {
 		);
 		expect(result).toEqual({
 			status: 400,
-			data: { action: 'create', error: 'Check the highlighted fields.', fields: { slug: message } },
+			data: {
+				action: 'create',
+				error: 'Check the highlighted fields.',
+				fields: { slug: 'Use lowercase letters, digits and underscores, starting with a letter, in at most 63 characters.' },
+			},
 		});
 	});
 

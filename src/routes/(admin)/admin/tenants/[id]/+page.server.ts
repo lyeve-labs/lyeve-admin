@@ -28,6 +28,7 @@ import {
 	type FeatureChoice,
 	type TenantMember,
 } from '$lib/api/tenant-access';
+import { couldNotLoad } from '$lib/outage';
 
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
@@ -50,11 +51,11 @@ export const load: PageServerLoad = async (event) => {
 	// with nothing in it, and an empty list here would offer only what is
 	// already withheld.
 	const [features, license, members] = await Promise.all([
-		section(getTenantFeatures(client, tenant.slug), "Could not load this tenant's features."),
-		section(getEntitlements(client), 'Could not load the license.'),
+		section(getTenantFeatures(client, tenant.slug), couldNotLoad("this tenant's features")),
+		section(getEntitlements(client), couldNotLoad('the license')),
 		section(
 			listTenantMembers(client, tenant.slug, limit, offset),
-			"Could not load this tenant's members.",
+			couldNotLoad("this tenant's members"),
 		),
 	]);
 
@@ -118,8 +119,8 @@ export const actions: Actions = {
 		const email = String(form.get('email') ?? '').trim();
 		const userId = String(form.get('user_id') ?? '').trim();
 		const roles = form.getAll('roles').map(String).filter(Boolean);
-		if (!userId && !email) return fail(400, { action: 'grant', memberError: 'Enter the account email.', fields: { email: 'Required' } });
-		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Required' } });
+		if (!userId && !email) return fail(400, { action: 'grant', memberError: 'Enter the account email.', fields: { email: 'Enter the account email.' } });
+		if (roles.length === 0) return fail(400, { action: 'grant', memberError: 'Choose at least one role.', fields: { roles: 'Choose at least one role.' } });
 		const client = authedClient(event);
 		try {
 			const slug = await tenantSlug(event);
