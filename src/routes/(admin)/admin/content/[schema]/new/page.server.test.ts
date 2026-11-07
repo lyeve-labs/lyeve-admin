@@ -145,7 +145,7 @@ describe('creating a content entry', () => {
 		const { result, threw } = await create({ title: 'Contact' }, { tags: ['t1'] });
 		expect(threw).toBeUndefined();
 		const data = (result as { data: { error: string; created: string } }).data;
-		expect(data.error).toContain('The entry was created');
+		expect(data.error).toContain('Entry created.');
 		expect(data.error).toContain('In tags, 1 link could not be added.');
 		expect(data.created).toBe('e1');
 	});

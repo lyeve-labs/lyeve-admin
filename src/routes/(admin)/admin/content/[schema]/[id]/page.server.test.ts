@@ -404,7 +404,7 @@ describe('content editor save, many_to_many fields', () => {
 
 		const failure = await runSave(saveEvent(fn, { tags: ['t1'] }));
 
-		expect(failure?.data?.error).toBe('The entry was saved, but some links were not. Could not add 1 link in tags.');
+		expect(failure?.data?.error).toBe('Entry saved. Could not add 1 link in tags.');
 	});
 
 	it('leaves a set that has not changed alone', async () => {

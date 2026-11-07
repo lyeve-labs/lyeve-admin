@@ -1,4 +1,4 @@
-import type { PageServerLoad, Actions } from './$types';
+import type { PageServerLoad, Actions, RequestEvent } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { ApiError, type Schema, type SchemaField, type HttpClient } from '@lyeve-labs/client';
 import { getSchema } from '@lyeve-labs/client-rest';
@@ -38,7 +38,7 @@ import {
 } from '$lib/api/review';
 import { listPeople, type Person } from '$lib/server/people';
 
-/**
+/*
  * Entries live in the admin store (sys_content_entries) and are served by the
  * admin API. The v1 content routes read the schema engine's per-schema tables,
  * a store the admin never writes, so every load and action below targets the
@@ -159,15 +159,6 @@ const REVISIONS_FAILED: RevisionList = {
 	historyEnabled: null,
 };
 
-/**
- * Fetch the entry's revisions.
- *
- * The endpoint answers with the paginated envelope every admin list uses, so
- * the rows are under `data`. Handed straight through, the page would receive
- * the envelope where it expects the array: `revisions.length` would be
- * undefined, and the History control is rendered only when that is above
- * zero. Beside the page it says how many older revisions it left out.
- */
 /** The revisions as the endpoint answers them: the envelope, or a bare array from an older engine. */
 type RevisionBody =
 	| Record<string, unknown>[]
@@ -187,6 +178,15 @@ type RevisionBody =
  */
 const REVISION_LIMIT = 500;
 
+/**
+ * Fetch the entry's revisions.
+ *
+ * The endpoint answers with the paginated envelope every admin list uses, so
+ * the rows are under `data`. Handed straight through, the page would receive
+ * the envelope where it expects the array: `revisions.length` would be
+ * undefined, and the History control is rendered only when that is above
+ * zero. Beside the page it says how many older revisions it left out.
+ */
 async function listRevisions(client: HttpClient, id: string, fields: Promise<SchemaField[]>): Promise<RevisionList> {
 	try {
 		const body = await client.get<RevisionBody>(
@@ -221,7 +221,7 @@ async function listRevisions(client: HttpClient, id: string, fields: Promise<Sch
  * plugin that runs but is not answering is `unavailable`, which the panel
  * says in one line rather than hiding.
  */
-export type EntryLocalization = {
+type EntryLocalization = {
 	locales: LocalePreferences;
 	translations: Translation[];
 	unavailable: boolean;
@@ -329,7 +329,7 @@ async function loadReview(
  * The entry's editorial threads, or null when the build serves none. A read
  * that failed is said so, never drawn as an entry nobody has commented on.
  */
-export type EntryComments = {
+type EntryComments = {
 	threads: EntryComment[];
 	/** Every account the directory names, so an author reads by email. */
 	people: { id: string; email: string }[];
@@ -364,7 +364,7 @@ async function loadComments(
  * The releases this entry can join, and the ones it is already in. Null
  * when the build serves no releases.
  */
-export type EntryReleases = {
+type EntryReleases = {
 	open: Pick<Release, 'id' | 'name' | 'status'>[];
 	holding: string[];
 	/** The releases could not be read, so the card offers none. */
@@ -431,7 +431,7 @@ export const load: PageServerLoad = async (event) => {
 	// the schema has one. A read that fails is null, so the picker says the
 	// library could not be read instead of claiming nothing is published.
 	const mediaChoices: MediaChoice[] | null = schemaDef.fields.some((f) => f.field_type === 'media')
-		? await Promise.resolve().then(() => listMediaChoices(client)).catch(() => null)
+		? await listMediaChoices(client).catch(() => null)
 		: [];
 
 	const { revisions, hiddenOlder, windowDays, total: revisionTotal, failed: revisionsFailed, historyEnabled } =
@@ -454,6 +454,19 @@ export const load: PageServerLoad = async (event) => {
 		releases,
 	};
 };
+
+/** Moves the entry to `status`, and returns `failed` when the engine refuses. */
+async function setStatus(event: RequestEvent, status: 'published' | 'draft', failed: string) {
+	await requireUser(event);
+	const { params } = event;
+	const client = authedClient(event);
+	try {
+		await client.put(`/api/admin/content/${encodeURIComponent(params.id)}`, { status });
+	} catch (err) {
+		return actionFailure(err, failed);
+	}
+	redirect(303, `/admin/content/${params.schema}/${params.id}`);
+}
 
 export const actions: Actions = {
 	// Named, not default: SvelteKit rejects a default action on a page that also
@@ -489,41 +502,21 @@ export const actions: Actions = {
 				const refused = fieldRefusalOf(err, shown);
 				if (refused) return fail(422, refused);
 			}
-			return fail(400, { error: actionError(err, 'Could not save the entry. Check the fields and try again.') });
+			return actionFailure(err, 'Could not save the entry. Try again.');
 		}
 
 		// The entry is saved by now, so a refused link is reported as such
 		// rather than as a failed save or a finished one.
 		if (links) {
 			const failed = await setEntryRelations(event, params.id, links);
-			if (failed) return fail(400, { error: `The entry was saved, but some links were not. ${failed}` });
+			if (failed) return fail(400, { error: `Entry saved. ${failed}` });
 		}
 		redirect(303, `/admin/content/${params.schema}`);
 	},
 
-	publish: async (event) => {
-		await requireUser(event);
-		const { params } = event;
-		const client = authedClient(event);
-		try {
-			await client.put(`/api/admin/content/${encodeURIComponent(params.id)}`, { status: 'published' });
-		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not publish the entry. Try again.') });
-		}
-		redirect(303, `/admin/content/${params.schema}/${params.id}`);
-	},
+	publish: (event) => setStatus(event, 'published', 'Could not publish the entry. Try again.'),
 
-	unpublish: async (event) => {
-		await requireUser(event);
-		const { params } = event;
-		const client = authedClient(event);
-		try {
-			await client.put(`/api/admin/content/${encodeURIComponent(params.id)}`, { status: 'draft' });
-		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not unpublish the entry. Try again.') });
-		}
-		redirect(303, `/admin/content/${params.schema}/${params.id}`);
-	},
+	unpublish: (event) => setStatus(event, 'draft', 'Could not unpublish the entry. Try again.'),
 
 	/**
 	 * Write one locale's translation. The panel says whether the locale
