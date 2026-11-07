@@ -3,10 +3,20 @@ import { error, fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
-import { notRunning } from '$lib/plugins';
+import { notRunning, runs } from '$lib/plugins';
 import { forbiddenText, gateOf, GATE_OK, isOutage, section, type Gate, type Section } from '$lib/api/gate';
 import { bodyString, errorCodeOf } from '$lib/api/limits';
+import { getSchemas } from '@lyeve-labs/client-rest';
 import { listSchemaNames } from '$lib/api/search-settings';
+import { applySchemaPreset, readSchemaPresets } from '$lib/api/schema-preset-catalog';
+import {
+	FORMS_PRESET,
+	FORM_SUBMISSIONS,
+	formSchemaOptions,
+	readFlowTargets,
+	type FlowTarget,
+	type FormSchemaOption,
+} from '$lib/api/form-destinations';
 import {
 	LIFETIMES,
 	SAID,
@@ -38,23 +48,56 @@ export const load: PageServerLoad = async (event) => {
 			settings: null as Section<Settings> | null,
 			schemas: [] as string[],
 			schemasGate: null as Gate | null,
+			formSchemas: [] as FormSchemaOption[],
+			flows: null as Section<FlowTarget[]> | null,
+			formsPreset: false,
 		};
 	}
 
 	const client = authedClient(event);
-	const schemas = section(listSchemaNames(client), 'Could not load schemas. Pages keep showing the schemas saved before.');
+	// Forms are offered only the types the delivery API does not serve, which
+	// the plugin refuses because anyone could read a visitor's post there.
+	const schemas = section(
+		getSchemas(client).then((rows) => ({
+			names: rows.map((s) => s.name).filter(Boolean).sort(),
+			forms: rows
+				.filter((s) => (s as { public_delivery?: unknown }).public_delivery !== true)
+				.map((s) => ({ name: s.name, label: s.display_name || s.name })),
+		})),
+		'Could not load schemas. Pages keep showing the schemas saved before.',
+	);
+	// Without the flow plugin no flow can start, so forms send only to content types.
+	const flows = runs(plugins, PLUGIN.flow) ? section(readFlowTargets(client), 'Could not load flows.') : null;
+	// A catalog that cannot be read offers no preset, and the card links the schema builder instead.
+	const formsPreset = runs(plugins, PLUGIN.schema)
+		? readSchemaPresets(client).then(
+				(c) => c.presets.some((p) => p.id === FORMS_PRESET),
+				() => false,
+			)
+		: Promise.resolve(false);
 	const read = await section(getSettings(client), settingsGate);
 	const schemaList = await schemas;
 	// A tenant the plugin is withheld from is the page's gate, and every other
 	// refusal stays on the settings.
 	if (!read.ok && read.gate.state === 'withheld') {
-		return { gate: read.gate as ConnectionsGate, settings: null, schemas: [] as string[], schemasGate: null };
+		return {
+			gate: read.gate as ConnectionsGate,
+			settings: null,
+			schemas: [] as string[],
+			schemasGate: null,
+			formSchemas: [] as FormSchemaOption[],
+			flows: null,
+			formsPreset: false,
+		};
 	}
 	return {
 		gate: GATE_OK as ConnectionsGate,
 		settings: read as Section<Settings>,
-		schemas: schemaList.ok ? showable(schemaList.value) : [],
+		schemas: schemaList.ok ? showable(schemaList.value.names) : [],
 		schemasGate: schemaList.ok ? null : schemaList.gate,
+		formSchemas: schemaList.ok ? formSchemaOptions(schemaList.value.forms.filter((s) => showable([s.name]).length > 0)) : [],
+		flows: flows ? await flows : null,
+		formsPreset: await formsPreset,
 	};
 };
 
@@ -82,6 +125,16 @@ function setting(form: FormData): { field: string; patch?: SettingsPatch; error?
 			if (form.get('schemas_offered')) patch.show_schemas = form.getAll('show_schemas').map(String).filter(Boolean);
 			return { field, patch };
 		}
+		// Where forms may send. Only a list that loaded is saved, so a list that failed to load clears nothing.
+		case 'forms': {
+			const patch: SettingsPatch = {};
+			if (form.get('form_schemas_offered')) patch.form_schemas = form.getAll('form_schemas').map(String).filter(Boolean);
+			if (form.get('form_flows_offered')) patch.form_flows = form.getAll('form_flows').map(String).filter(Boolean);
+			if (Object.keys(patch).length === 0) {
+				return { field, error: 'This form is missing its setting. Reload the page and try again.' };
+			}
+			return { field, patch };
+		}
 		default:
 			return { field: '', error: 'This form is missing its setting. Reload the page and try again.' };
 	}
@@ -89,6 +142,35 @@ function setting(form: FormData): { field: string; patch?: SettingsPatch; error?
 
 // No requireRole here. The engine answers the settings route for owners only.
 export const actions: Actions = {
+	// Applies the schema plugin's forms preset, unless its submissions type
+	// exists already, and lets forms send to that type.
+	formsPreset: async (event) => {
+		const client = authedClient(event);
+		try {
+			const [names, current] = await Promise.all([listSchemaNames(client), getSettings(client)]);
+			let created = false;
+			if (!names.includes(FORM_SUBMISSIONS)) {
+				try {
+					await applySchemaPreset(client, FORMS_PRESET);
+					created = true;
+				} catch (e) {
+					if (e instanceof ApiError && e.status === 404) return fail(404, { presetMissing: true });
+					throw e;
+				}
+			}
+			const allowed = current.form_schemas ?? [];
+			const settings = allowed.includes(FORM_SUBMISSIONS)
+				? current
+				: await saveSettings(client, { form_schemas: [...allowed, FORM_SUBMISSIONS] });
+			return { presetApplied: { created, settings } };
+		} catch (e) {
+			if (isOutage(e)) return fail(503, { presetError: SAID.settingOutage });
+			return fail(e instanceof ApiError ? e.status : 400, {
+				presetError: refusalSentence(e, 'Could not set up form submissions. Try again.'),
+			});
+		}
+	},
+
 	setting: async (event) => {
 		const form = await event.request.formData();
 		const { field, patch, error } = setting(form);
