@@ -13,8 +13,8 @@ import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { gateOf, type Gate } from './gate';
 
-export const CONNECTIONS_URL = '/api/admin/sites/connections';
-export const SETTINGS_URL = '/api/admin/sites/settings';
+export const CONNECTIONS_URL = '/api/admin/builder/connections';
+export const SETTINGS_URL = '/api/admin/builder/settings';
 
 /** The lifetimes a connection may have, in days. */
 export const LIFETIMES = [30, 90, 180] as const;
@@ -144,7 +144,7 @@ export function connectionsGate(err: unknown): ConnectionsGate {
 
 /** Schemas a page may show: the builder's own and the engine's are never offered. */
 export function showable(names: readonly string[]): string[] {
-	return names.filter((n) => !n.startsWith('lyeve_site_') && !n.startsWith('sys_'));
+	return names.filter((n) => !n.startsWith('lyeve_builder_') && !n.startsWith('sys_'));
 }
 
 /** The lifetimes a person may pick when the tenant allows at most `max` days. */
