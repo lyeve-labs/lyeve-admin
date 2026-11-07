@@ -5,9 +5,9 @@
  * tree without rendering the layout, and the grouping is a decision a test can
  * pin.
  *
- * Seven destinations stay at depth 0 because they carry the daily work and
+ * Eight destinations stay at depth 0 because they carry the daily work and
  * must never sit behind a disclosure: Dashboard, Content, Schema builder,
- * Flows, Reviews, Media Library and Search. Content, the Schema builder and
+ * Flows, Reviews, Forms, Media Library and Search. Content, the Schema builder and
  * Flows lead, in a row and in the order a reader builds them: a schema, the
  * content in it, the flows that act on it. Flows sits here rather than under Delivery because
  * the tree files a page by how often it is opened, not by what it does, and
@@ -81,6 +81,7 @@ import {
 	HardDrive,
 	Home,
 	Images,
+	Inbox,
 	Key,
 	KeyRound,
 	KeySquare,
@@ -148,6 +149,7 @@ function group(node: Omit<NavNode, 'children'>, children: NavNode[]): NavNode[] 
 const PAGE_PLUGIN: Readonly<Record<string, PluginName>> = {
 	content: PLUGIN.content,
 	reviews: PLUGIN.review,
+	forms: PLUGIN.builder,
 	schema: PLUGIN.schema,
 	media: PLUGIN.media,
 	flows: PLUGIN.flow,
@@ -283,6 +285,10 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		// are an admin's, and the page reads them only for an admin.
 		{ id: 'reviews', label: 'Reviews', href: '/admin/reviews', icon: ClipboardCheck, match: 'prefix' },
 		...operatorOnly(
+			// What visitors send through builder forms is triaged like the review
+			// queue, so it sits beside it. The builder plugin serves the forms to
+			// an admin only.
+			{ id: 'forms', label: 'Forms', href: '/admin/forms', icon: Inbox, match: 'prefix' },
 			{ id: 'media', label: 'Media library', href: '/admin/media', icon: Images, match: 'prefix' },
 			{ id: 'search', label: 'Search', href: '/admin/search', icon: Search, match: 'prefix' },
 		),

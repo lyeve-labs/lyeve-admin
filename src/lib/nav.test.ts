@@ -33,14 +33,15 @@ const ADMIN = ['admin'];
 const SUPER = ['super_admin'];
 
 describe('adminNav role gate', () => {
-	it('gives an admin and a super admin the seven daily destinations at depth 0', () => {
+	it('gives an admin and a super admin the eight daily destinations at depth 0', () => {
 		for (const roles of [ADMIN, SUPER]) {
-			expect(ids(adminNav(roles)).slice(0, 7)).toEqual([
+			expect(ids(adminNav(roles)).slice(0, 8)).toEqual([
 				'dashboard',
 				'content',
 				'schema',
 				'flows',
 				'reviews',
+				'forms',
 				'media',
 				'search',
 			]);
@@ -114,7 +115,7 @@ describe('adminNav role gate', () => {
 		]);
 	});
 
-	it('gives a super admin every section and all seventy-one destinations', () => {
+	it('gives a super admin every section and all seventy-two destinations', () => {
 		const tree = adminNav(SUPER);
 		expect(ids(tree)).toEqual([
 			'dashboard',
@@ -122,6 +123,7 @@ describe('adminNav role gate', () => {
 			'schema',
 			'flows',
 			'reviews',
+			'forms',
 			'media',
 			'search',
 			'delivery',
@@ -130,7 +132,7 @@ describe('adminNav role gate', () => {
 			'insight',
 			'settings',
 		]);
-		expect(labels(tree)).toHaveLength(71);
+		expect(labels(tree)).toHaveLength(72);
 		expect(ids(find(tree, 'settings').children ?? [])).toEqual([
 			'email',
 			'recommendations',
@@ -174,7 +176,7 @@ describe('adminNav reach by role', () => {
 	// Each entry is listed to the roles the engine answers on the read its
 	// page opens with. Listed to anybody else, it would open on a page the
 	// engine refuses, drawn as an empty one.
-	const ADMIN_DAILY = ['dashboard', 'content', 'schema', 'flows', 'reviews', 'media', 'search'];
+	const ADMIN_DAILY = ['dashboard', 'content', 'schema', 'flows', 'reviews', 'forms', 'media', 'search'];
 	const READER_DAILY = ['dashboard', 'schema', 'flows', 'reviews'];
 	const DELIVERY = [
 		'api-access',
@@ -301,6 +303,13 @@ describe('adminNav plugin gate', () => {
 		expect(items).toContain('search');
 		expect(items).toContain('ai');
 		expect(items).toContain('audit-log');
+	});
+
+	it('lists Forms to an administrator only while the builder plugin runs', () => {
+		expect(present(adminNav(ADMIN, { plugins: named(RUNNING) }))).not.toContain('forms');
+		const tree = adminNav(ADMIN, { plugins: named([...RUNNING, 'builder']) });
+		expect(find(tree, 'forms')).toMatchObject({ label: 'Forms', href: '/admin/forms' });
+		expect(present(adminNav(EDITOR, { plugins: named([...RUNNING, 'builder']) }))).not.toContain('forms');
 	});
 
 	it('drops the entry for a plugin withheld from this tenant', () => {
