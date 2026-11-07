@@ -25,7 +25,7 @@ vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => {
 });
 
 import MediaPreviewDrawer from './MediaPreviewDrawer.svelte';
-import { AUDIO, IMAGE, PDF, TEXT, VIDEO } from './fixtures';
+import { AUDIO, IMAGE, PDF, TEXT, VIDEO } from './test-support/fixtures';
 import type { MediaItem } from '$lib/api/media';
 
 afterEach(cleanup);

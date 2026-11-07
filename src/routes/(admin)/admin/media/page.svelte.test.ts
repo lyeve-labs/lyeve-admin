@@ -37,7 +37,7 @@ import type { PageData } from './$types';
 import type { MediaItem } from '$lib/api/media';
 import type { Gate } from '$lib/api/gate';
 import { MEDIA_VIEW_KEY } from '$lib/components/media/view-preference';
-import { IMAGE, ONE_OF_EACH, PDF } from '$lib/components/media/fixtures';
+import { IMAGE, ONE_OF_EACH, PDF } from '$lib/components/media/test-support/fixtures';
 
 afterEach(cleanup);
 beforeEach(() => {

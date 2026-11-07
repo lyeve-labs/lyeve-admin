@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 import { tick } from 'svelte';
 import Page from './+page.svelte';
-import { fixturePrice, fixtureSettings } from '$lib/components/ai/fixtures';
+import { fixturePrice, fixtureSettings } from '$lib/components/ai/test-support/fixtures';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 // enhance hands back each form's submit function by its action, so a test can
