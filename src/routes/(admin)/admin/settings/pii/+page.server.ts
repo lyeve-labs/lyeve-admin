@@ -1,70 +1,29 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail, isRedirect, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure, tagged } from '$lib/server/action-error';
 import { checked } from '$lib/checkbox';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
-import {
-	createRule,
-	deleteRule,
-	getRules,
-	listAccessLog,
-	testRule,
-	updateRule,
-	type AccessEntry,
-	type RuleCatalog,
-} from '$lib/api/pii-mask';
+import { createRule, deleteRule, getRules, testRule, updateRule, type RuleCatalog } from '$lib/api/pii-mask';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
-import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 199;
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
-	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.piiMask)) {
-		return {
-			rules: null as RuleCatalog | null,
-			entries: [] as AccessEntry[],
-			total: 0,
-			limit,
-			offset,
-			gate: { state: 'absent' } as Gate,
-		};
+		return { rules: null as RuleCatalog | null, gate: { state: 'absent' } as Gate };
 	}
 
-	const client = authedClient(event);
 	let rules: RuleCatalog | null = null;
 	let gate: Gate = GATE_OK;
 	try {
-		rules = await getRules(client);
+		rules = await getRules(authedClient(event));
 	} catch (err) {
 		gate = gateOf(err, 'Could not load the masking settings.');
 	}
-
-	// The access log is the second read. Losing it must not hide the rules,
-	// which are the answer to "is anything being masked at all".
-	let entries: AccessEntry[] = [];
-	let total = 0;
-	let logFailed = false;
-	if (gate.state === 'ok') {
-		try {
-			const page = await listAccessLog(client, limit, offset);
-			entries = page.data ?? [];
-			const back = pastEndOffset(entries.length, limit, offset, page.total_count ?? null);
-			if (back !== null) redirect(307, withOffset(event.url, back));
-			total = Math.max(page.total_count ?? 0, offset + entries.length);
-		} catch (err) {
-			if (isRedirect(err)) throw err;
-			logFailed = true;
-		}
-	}
-
-	return { rules, entries, total, limit, offset, gate, logFailed };
+	return { rules, gate };
 };
 
 /**

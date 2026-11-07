@@ -21,21 +21,7 @@ const rules = {
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		rules,
-		entries: [
-			{
-				id: 'a1',
-				viewer_user_id: 'u1',
-				viewer_role: 'admin',
-				pii_type: 'email',
-				record_type: 'user',
-				accessed_at: '2026-09-22T10:00:00Z',
-			},
-		],
-		total: 1,
-		limit: 50,
-		offset: 0,
 		gate: { state: 'ok' },
-		logFailed: false,
 		licensed: true,
 		...over,
 	} as never,
@@ -52,13 +38,19 @@ describe('PII masking gate', () => {
 
 	it('says responses are served as stored when the plugin is absent', () => {
 		const { container } = render(PiiPage, {
-			props: props({ gate: { state: 'absent' }, rules: null, entries: [] }),
+			props: props({ gate: { state: 'absent' }, rules: null }),
 		});
 		expect(said(container)).toContain('Responses are not masked');
 	});
 });
 
 describe('PII masking rules', () => {
+	it('carries the strip with Rules marked, and leaves the reads to their own page', () => {
+		const { getByRole, container } = render(PiiPage, { props: props() });
+		expect(getByRole('tab', { name: 'Rules' }).getAttribute('aria-selected')).toBe('true');
+		expect(container.querySelector('#pii-narrow')).toBeNull();
+	});
+
 	it('lists the rules in the order they run, not the order they arrived', () => {
 		const { container } = render(PiiPage, { props: props() });
 		const text = said(container);
@@ -75,37 +67,6 @@ describe('PII masking rules', () => {
 	it('names each mask style a field can ask for', () => {
 		const { container } = render(PiiPage, { props: props() });
 		expect(said(container)).toContain('Partial email masking');
-	});
-});
-
-describe('PII masking access log', () => {
-	it('keeps the rules when only the log failed', () => {
-		// The rules answer "is anything being masked at all", so losing the
-		// log must not hide them.
-		const { container } = render(PiiPage, { props: props({ logFailed: true }) });
-		expect(said(container)).toContain('Masking is still running');
-		expect(said(container)).toContain('EMAIL');
-	});
-
-	it('draws no count of unmasked reads when the log was not read', () => {
-		const { container } = render(PiiPage, { props: props({ logFailed: true, total: 0 }) });
-		expect(said(container)).toMatch(/Unmasked reads ?-/);
-		expect(said(container)).not.toMatch(/Unmasked reads ?0/);
-	});
-
-	it('names the search box for a screen reader', () => {
-		const { getByLabelText } = render(PiiPage, { props: props() });
-		expect(getByLabelText('Search this page')).toBeTruthy();
-	});
-
-	it('reads an empty log as nobody having looked', () => {
-		const { container } = render(PiiPage, { props: props({ entries: [], total: 0 }) });
-		expect(said(container)).toContain('No unmasked reads yet');
-	});
-
-	it('summarizes what is read most, which rows alone never answer', () => {
-		const { container } = render(PiiPage, { props: props() });
-		expect(said(container)).toContain('Most read on this page');
 	});
 });
 
@@ -246,21 +207,6 @@ describe('PII rule drawer', () => {
 		await fireEvent.click(getAllByRole('button', { name: /new rule/i })[0]);
 		const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
 		expect(form.textContent).toContain('pattern does not compile');
-	});
-});
-
-describe('PII unmasked reads pager', () => {
-	it('offers the next page of the access log', () => {
-		const entries = Array.from({ length: 50 }, (_, i) => ({
-			id: `a${i}`,
-			viewer_role: 'admin',
-			pii_type: 'email',
-			record_type: 'user',
-			accessed_at: '2026-09-22T10:00:00Z',
-		}));
-		const { container } = render(PiiPage, { props: props({ entries, total: 120 }) });
-		const next = [...container.querySelectorAll('a')].find((a) => a.getAttribute('aria-label')?.includes('Next'));
-		expect(next?.getAttribute('href')).toBe('/admin/settings/pii?limit=50&offset=50');
 	});
 });
 
