@@ -12,6 +12,7 @@ import {
 	type CaptchaSettings,
 } from '$lib/api/captcha-settings';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -21,7 +22,7 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		return { gate: GATE_OK as Gate, settings: await readCaptchaSettings(authedClient(event)) };
 	} catch (err) {
-		return { gate: gateOf(err, 'Could not load the captcha settings.'), settings: null as CaptchaSettings | null };
+		return { gate: gateOf(err, couldNotLoad('the captcha settings')), settings: null as CaptchaSettings | null };
 	}
 };
 
