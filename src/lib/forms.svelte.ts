@@ -110,7 +110,7 @@ export function drawerFailure<F>(form: () => F, actions: readonly string[]) {
  */
 export function tracked(fn: SubmitFunction) {
 	let pending = $state(false);
-	const enhance: SubmitFunction = (input) => {
+	const enhance: SubmitFunction = async (input) => {
 		pending = true;
 		let canceled = false;
 		let after;
@@ -118,8 +118,10 @@ export function tracked(fn: SubmitFunction) {
 			// A confirm-then-submit handler cancels when the question is
 			// declined, and enhance then never calls the callback below. Without
 			// this the primary spins until the reader navigates away, and that is
-			// the commonest handler shape in this application.
-			after = fn({
+			// the commonest handler shape in this application. enhance reads the
+			// cancel once the handler settles, so the wrapped handler is awaited
+			// here: returning before its question is answered sends the request.
+			after = await fn({
 				...input,
 				cancel: () => {
 					canceled = true;
@@ -131,12 +133,10 @@ export function tracked(fn: SubmitFunction) {
 			pending = false;
 			throw err;
 		}
-		if (canceled) return async () => {};
+		if (canceled) return;
 		return async (opts) => {
 			try {
-				// A handler may hand back the callback or a promise of one.
-				const then = await after;
-				if (then) await then(opts);
+				if (after) await after(opts);
 				else await opts.update();
 			} finally {
 				pending = false;

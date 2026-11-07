@@ -231,8 +231,8 @@ describe('the destination form across reloads', () => {
 		await fireEvent.input(screen.getByLabelText('Value'), { target: { value: 'Bearer new-key' } });
 		expect((screen.getByLabelText('Value') as HTMLInputElement).value).toBe('Bearer new-key');
 
-		const submit = forms.submits.get('?/saveDestination') as (i: unknown) => (o: unknown) => Promise<void>;
-		const after = submit({ cancel: vi.fn(), formData: new FormData() });
+		const submit = forms.submits.get('?/saveDestination') as (i: unknown) => Promise<(o: unknown) => Promise<void>>;
+		const after = await submit({ cancel: vi.fn(), formData: new FormData() });
 		await after({
 			result: { type: 'success', status: 200, data: { savedDestination: true } },
 			update: async () => {
