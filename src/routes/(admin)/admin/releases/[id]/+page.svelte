@@ -32,7 +32,8 @@
 		statusTone,
 		type ReleaseConflict,
 	} from '$lib/api/content-releases';
-	import { formatDateTime } from '$lib/format';
+	import { formatDateTime, plural } from '$lib/format';
+	import { couldNotLoad } from '$lib/outage';
 	import { shortId } from '$lib/utils/entry-identity';
 	import { ICON } from '$lib/icon';
 
@@ -240,7 +241,7 @@
 					{/snippet}
 					<p class="mb-3 text-sm text-muted">
 						{blocking.length > 0
-							? `${blocking.length} ${blocking.length === 1 ? 'conflict stops' : 'conflicts stop'} this release from publishing. Resolve each one or remove the entry.`
+							? `${blocking.length} ${plural(blocking.length, 'conflict stops', 'conflicts stop')} this release from publishing. Resolve each one or remove the entry.`
 							: 'None of these conflicts stop the release. Deleted entries are skipped when it publishes.'}
 					</p>
 					<ul class="flex flex-col gap-2 coarse:gap-6" data-testid="release-conflicts">
@@ -361,7 +362,7 @@
 				required
 				bind:value={entryId}
 				error={own.fields.entry_id}
-				hint="Could not load the entry list. Enter the ID shown under the entry's title on its page."
+				hint={`${couldNotLoad('the entry list')} Enter the ID shown under the entry's title on its page.`}
 			/>
 		{/if}
 		<SegmentedControl name="action" label="When the release publishes" options={ACTIONS} bind:value={itemAction} />

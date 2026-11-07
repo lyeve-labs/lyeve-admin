@@ -1,10 +1,10 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole, requireUser } from '$lib/server/authz';
-import type { DeadLetter, Webhook } from '@lyeve-labs/client';
+import type { DeadLetter, HttpClient, Webhook, WebhookDelivery } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { deleteWebhook, testWebhook, listDeliveries, rotateSecret, retryDelivery, replayDeadLetter, dismissDeadLetter, deleteDeadLetter } from '@lyeve-labs/client-rest';
-import { actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { createWebhookRecord, updateWebhookRecord, webhookBodyFrom } from '$lib/api/webhook-options';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, statedTotal, withOffset, type ListEnvelope } from '$lib/api/list';
@@ -32,6 +32,51 @@ const DEAD_LETTER_PAGE = 50;
 /** How many attempts the delivery history asks for. The plugin offers no offset. */
 const DELIVERY_LIMIT = 50;
 
+/** A webhook's delivery history, read when the address names the webhook. */
+interface DeliveriesRead {
+	id: string;
+	limit: number;
+	read: Section<WebhookDelivery[]>;
+}
+
+/** A page of the dead letter queue, read when the address opens it. */
+interface DeadLettersRead {
+	offset: number;
+	limit: number;
+	read: Section<{ rows: DeadLetter[]; total: number | null }>;
+}
+
+/**
+ * The delivery history of the webhook `?deliveries=<id>` names. The plugin
+ * answers the newest attempts up to the limit and offers no offset.
+ */
+async function readDeliveries(client: HttpClient, url: URL): Promise<DeliveriesRead | null> {
+	const id = url.searchParams.get('deliveries');
+	if (!id) return null;
+	return { id, limit: DELIVERY_LIMIT, read: await section(listDeliveries(id, client, DELIVERY_LIMIT), 'Could not load deliveries.') };
+}
+
+/*
+ * The page of the queue `?dead` opens, at `dead_offset`. Read straight from
+ * the endpoint rather than through listDeadLetters(). The engine answers with
+ * its standard envelope, data and total_count. The helper's declared type
+ * names items and total, so a page reading through it sees an empty queue
+ * while deliveries wait in it.
+ */
+async function readDeadLetters(client: HttpClient, url: URL): Promise<DeadLettersRead | null> {
+	if (!url.searchParams.has('dead')) return null;
+	const asked = Number(url.searchParams.get('dead_offset') ?? 0);
+	const offset = Number.isInteger(asked) && asked > 0 ? asked : 0;
+	const qs = new URLSearchParams({ limit: String(DEAD_LETTER_PAGE), offset: String(offset) });
+	const read = await section(
+		client
+			.get<ListEnvelope<DeadLetter> | DeadLetter[]>(`/api/admin/webhook-dead-letters?${qs}`)
+			.then((res) => ({ rows: rowsOf(res), total: statedTotal(res) })),
+		'Could not load dead letters.'
+	);
+	return { offset, limit: DEAD_LETTER_PAGE, read };
+}
+
 export const load: PageServerLoad = async (event) => {
 	const { url } = event;
 	const client = authedClient(event);
@@ -43,18 +88,20 @@ export const load: PageServerLoad = async (event) => {
 	 * states a total only when the endpoint sends one and falls back to a probe
 	 * row otherwise, so neither branch reports a number nobody measured.
 	 */
-	const [read, schemas] = await Promise.all([
+	const [read, schemas, deliveries, deadLetters] = await Promise.all([
 		section(
 			client.get<ListEnvelope<Webhook> | Webhook[]>(
 				`/api/admin/webhooks?limit=${limit + 1}&offset=${offset}`
 			),
 			LIST_FAILED
 		),
-		section(getSchemas(client), SCHEMAS_FAILED)
+		section(getSchemas(client), SCHEMAS_FAILED),
+		readDeliveries(client, url),
+		readDeadLetters(client, url)
 	]);
 
 	// The page draws the gate in place of the list, so nothing is paged.
-	if (!read.ok) return { webhooks: read, schemas, limit, offset, total: null, hasMore: false };
+	if (!read.ok) return { webhooks: read, schemas, limit, offset, total: null, hasMore: false, deliveries, deadLetters };
 
 	const page = pageOf<Webhook>(read.value, limit, offset);
 	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
@@ -68,18 +115,11 @@ export const load: PageServerLoad = async (event) => {
 		limit,
 		offset,
 		total: page.total,
-		hasMore: page.hasMore
+		hasMore: page.hasMore,
+		deliveries,
+		deadLetters
 	};
 };
-
-/**
- * A failure that names the action it came from. The page holds one result for
- * every form, so the drawer shows only its own writes' failures and the page
- * shows the rest.
- */
-function tagged(action: string, failure: ActionFailure<Record<string, unknown>>, id?: string) {
-	return fail(failure.status, { ...failure.data, action, ...(id ? { id } : {}) });
-}
 
 export const actions: Actions = {
 	create: async (event) => {
@@ -142,21 +182,6 @@ export const actions: Actions = {
 		}
 	},
 
-		deliveries: async (event) => {
-			await requireUser(event);
-			const { request } = event;
-			const client = authedClient(event);
-			const data = await request.formData();
-			const id = String(data.get('id') ?? '');
-
-			try {
-				const items = await listDeliveries(id, client, DELIVERY_LIMIT);
-				return { deliveries: { id, items, limit: DELIVERY_LIMIT } };
-			} catch (err) {
-				return tagged('deliveries', actionFailure(err, 'Could not load deliveries. Try again.'));
-			}
-		},
-
 		'rotate-secret': async (event) => {
 			// The plugin serves this write to a super admin only.
 			await requireRole(event, ['super_admin']);
@@ -192,43 +217,6 @@ export const actions: Actions = {
 				return { retryResult: result };
 			} catch (err) {
 				return tagged('retry-delivery', actionFailure(err, 'Could not retry the delivery. Try again.'));
-			}
-		},
-
-		/*
-		 * Read straight from the endpoint rather than through listDeadLetters().
-		 * The engine answers with its standard envelope, data and total_count.
-		 * The helper's declared type names items and total, so a page reading
-		 * through it sees an empty queue while deliveries wait in it.
-		 */
-		'dead-letters': async (event) => {
-			await requireUser(event);
-			const { request } = event;
-			const client = authedClient(event);
-			const data = await request.formData();
-			const status = data.get('status');
-			// The open queue's pager says it turned a page, which page 1 alone
-			// cannot tell apart from the first read.
-			const turned = data.get('turn') === 'page';
-			const asked = Number(data.get('offset') ?? 0);
-			const offset = Number.isInteger(asked) && asked > 0 ? asked : 0;
-			const qs = new URLSearchParams({ limit: String(DEAD_LETTER_PAGE), offset: String(offset) });
-			if (status) qs.set('status', String(status));
-
-			try {
-				const res = await client.get<ListEnvelope<DeadLetter> | DeadLetter[]>(
-					`/api/admin/webhook-dead-letters?${qs}`
-				);
-				return {
-					deadLetters: rowsOf(res),
-					deadLetterTotal: statedTotal(res),
-					deadLetterOffset: offset,
-					deadLetterLimit: DEAD_LETTER_PAGE
-				};
-			} catch (err) {
-				// A page turned inside the open queue reports there, and the first
-				// read reports above the list, where the button was.
-				return tagged(turned ? 'dead-letters-page' : 'dead-letters', actionFailure(err, 'Could not load dead letters. Try again.'));
 			}
 		},
 

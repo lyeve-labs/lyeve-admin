@@ -132,7 +132,7 @@ describe('region writes', () => {
 	});
 
 	it.each(['create', 'update', 'delete'] as const)('relays the engine refusal on %s under its action', async (name) => {
-		const { event } = engine({ id: 'r1', ...REGION }, { reply: json({ error: 'region has tenants assigned' }, 409) });
+		const { event } = engine({ id: 'r1', ...REGION }, { reply: json({ error: 'region has tenants assigned', code: 'conflict' }, 409) });
 		const out = (await actions[name](event)) as Failure;
 		expect(out.data).toEqual({ action: name, error: 'region has tenants assigned' });
 	});

@@ -233,9 +233,9 @@ describe('rate-limits rule edits, deletes and protection resets', () => {
 	});
 
 	it('relays the plugin refusal under the action that met it', async () => {
-		api.updateRule.mockRejectedValue(new ApiError(409, 'a built-in rule is changed through its own route'));
-		api.deleteRule.mockRejectedValue(new ApiError(404, 'rate-limit rule not found'));
-		api.resetProtection.mockRejectedValue(new ApiError(400, 'unknown protection'));
+		api.updateRule.mockRejectedValue(new ApiError(409, 'a built-in rule is changed through its own route', { error: 'a built-in rule is changed through its own route', code: 'conflict' }));
+		api.deleteRule.mockRejectedValue(new ApiError(404, 'rate-limit rule not found', { error: 'rate-limit rule not found', code: 'not_found' }));
+		api.resetProtection.mockRejectedValue(new ApiError(400, 'unknown protection', { error: 'unknown protection', code: 'bad_request' }));
 		expect(await actions.update(formEvent(RULE))).toMatchObject({
 			status: 400,
 			data: { action: 'rule', error: 'a built-in rule is changed through its own route' },

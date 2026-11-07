@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { listSchemaNames } from '$lib/api/search-settings';
 import { readError } from '$lib/server/read-error';
 import { GATE_OK, section } from '$lib/api/gate';
@@ -52,7 +52,8 @@ export const actions: Actions = {
 			await saveCustomPage(authedClient(event), page);
 			return { saved: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not save the page. Try again.') });
+			const failed = actionFailure(err, 'Could not save the page. Try again.');
+			return fail(failed.status, failed.data);
 		}
 	},
 
@@ -61,7 +62,8 @@ export const actions: Actions = {
 		try {
 			await deleteCustomPage(authedClient(event), event.params.slug);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not delete the page. Try again.') });
+			const failed = actionFailure(err, 'Could not delete the page. Try again.');
+			return fail(failed.status, failed.data);
 		}
 		redirect(303, '/admin/settings/customization');
 	},

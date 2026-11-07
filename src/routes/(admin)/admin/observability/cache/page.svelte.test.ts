@@ -50,9 +50,9 @@ describe('providers', () => {
 		const { container } = render(CachePage, {
 			props: props({ inactive: [{ name: 'redis-1', kind: 'redis', priority: 1, reason: 'provider_limit' }] }),
 		});
-		expect(screen.getByTestId('provider-tier').textContent).toContain('Only one provider runs on this install');
+		expect(screen.getByTestId('provider-tier').textContent).toContain('Only one provider runs on this instance');
 		expect(said(container)).toContain('redis-1');
-		expect(said(container)).toContain('Not running. Only one provider runs unless your license includes failover');
+		expect(said(container)).toContain('Not running. Only one provider runs on this instance');
 	});
 
 	it('says every provider runs with failover when the install is licensed for it', () => {
@@ -64,7 +64,7 @@ describe('providers', () => {
 		const { container } = render(CachePage, {
 			props: props({ inactive: [{ name: 'redis-0', kind: 'redis', priority: 0, reason: 'networked_unavailable' }] }),
 		});
-		expect(said(container)).toContain('Networked cache providers are not available on this instance');
+		expect(said(container)).toContain('Networked cache providers are not enabled on this instance');
 	});
 });
 
@@ -183,7 +183,7 @@ describe('stored entries', () => {
 			}),
 		});
 		expect(said(container)).toContain('Could not load stored entries.');
-		expect(said(container)).not.toContain('Nothing is cached');
+		expect(said(container)).not.toContain('No cached entries yet');
 	});
 
 	// A networked provider cannot list what it holds. The plugin answers an
@@ -197,7 +197,7 @@ describe('stored entries', () => {
 			}),
 		});
 		expect(said(container)).toContain('This cache provider cannot list its entries');
-		expect(said(container)).not.toContain('Nothing is cached');
+		expect(said(container)).not.toContain('No cached entries yet');
 	});
 
 	it('says a refused providers read with its gate', () => {

@@ -64,7 +64,7 @@ describe('tenant costs writes', () => {
 	});
 
 	it.each(NAMES)('%s relays a refusal under its own form', async (name) => {
-		const { event } = writeEvent(WRITES[name].fields, () => json({ error: 'budget not found' }, 404));
+		const { event } = writeEvent(WRITES[name].fields, () => json({ error: 'budget not found', code: 'not_found' }, 404));
 		expect(await actions[name](event)).toEqual({
 			status: 400,
 			data: { form: WRITES[name].form, error: 'budget not found', locked: false },

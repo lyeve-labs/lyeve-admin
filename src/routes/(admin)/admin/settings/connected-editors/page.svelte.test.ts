@@ -121,7 +121,7 @@ describe('the list', () => {
 			}),
 		});
 		const heads = [...document.querySelectorAll('thead th')].map((t) => t.textContent?.trim());
-		expect(heads).toEqual(['Person', 'Key', 'Approved', 'Last used', 'Expires', 'Status', 'Revoke']);
+		expect(heads).toEqual(['Approved by', 'Key', 'Approved on', 'Last used', 'Expires', 'Status', 'Revoke']);
 		expect(said()).toContain('Active');
 		expect(said()).toContain('Expired');
 		expect(said()).toContain('Removed person');
@@ -155,10 +155,7 @@ describe('the gates', () => {
 		[{ state: 'busy' }, 'Too many requests'],
 		[{ state: 'absent' }, 'Builder connections are not included in this build.'],
 		[{ state: 'forbidden' }, 'Your role cannot open builder connections.'],
-		[
-			{ state: 'withheld' },
-			'A super admin turned off builder connections for this tenant. Ask them to turn it back on.',
-		],
+		[{ state: 'withheld' }, SAID.withheld],
 	])('draws a refused read as its gate, never as an empty list', (gate, words) => {
 		render(Page, { props: props({ gate, connections: [] }) });
 		expect(said()).toContain(words);
@@ -252,7 +249,7 @@ describe('revoke all', () => {
 	});
 
 	it('keeps a failure on screen with a way to try again', () => {
-		render(Page, { props: props({}, { revokeAllFailed: true }) });
+		render(Page, { props: props({}, { revokeAllError: SAID.revokeAllFailed }) });
 		expect(said()).toContain('Could not revoke the connections. Check their status in the list, then try again.');
 		expect(said()).toContain('Try again');
 	});
@@ -290,7 +287,7 @@ describe('the approve drawer', () => {
 	it('says under the code what to do, and beside a disabled Approve what it waits for', async () => {
 		render(Page, { props: props({ openApprove: true }) });
 		await tick();
-		const reason = 'Enter the code the builder shows, then choose Find request.';
+		const reason = 'Eight characters, with or without the dash.';
 		const code = document.getElementById('connected-editors-code') as HTMLInputElement;
 		expect(document.querySelector('label[for="connected-editors-code"]')?.textContent?.trim()).toBe('Code');
 		expect(document.getElementById(code.getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason);
@@ -320,7 +317,7 @@ describe('the approve drawer', () => {
 		expect(said()).toContain('3FA2:9C11:5B07:E48D');
 		expect(said()).toContain('Check that the builder shows the same key.');
 		expect(said()).toContain('Sent by the browser and not verified.');
-		expect(said()).toContain('read and write pages, sections and the theme, and listed data only with consent');
+		expect(said()).toContain('Read and write pages, sections and the theme, and read entries of the schemas open to the builder.');
 		expect(said()).toContain('Browser name');
 		expect(document.querySelector('#connected-editors-step-up-password')).not.toBeNull();
 		expect(approve().disabled).toBe(false);
@@ -434,7 +431,7 @@ describe('the approve drawer', () => {
 		const cancel = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Cancel') as HTMLButtonElement;
 		await fireEvent.click(cancel);
 		await tick();
-		const open = [...document.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Approve a connection') as HTMLAnchorElement;
+		const open = [...document.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Approve connection') as HTMLAnchorElement;
 		await fireEvent.click(open);
 		await tick();
 		expect((document.querySelector('#connected-editors-code') as HTMLInputElement).value).toBe('');
@@ -544,7 +541,7 @@ describe('the settings card', () => {
 	it('switches the builder with a Toggle that applies at once', async () => {
 		const submit = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(() => {});
 		render(Page, { props: props({ settings: { ok: true, value: { ...SETTINGS, allowed: false } } }) });
-		expect(allowSwitch().getAttribute('aria-label')).toBe('Allow the builder');
+		expect(allowSwitch().getAttribute('aria-label')).toBe('Enabled');
 		expect(allowSwitch().getAttribute('aria-checked')).toBe('false');
 		await fireEvent.click(allowSwitch());
 		await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
@@ -596,7 +593,12 @@ describe('the settings card', () => {
 	});
 
 	it('draws a failed schema list as a failure, never as none to offer', () => {
-		render(Page, { props: props({ schemas: [], schemasFailed: true }) });
+		render(Page, {
+			props: props({
+				schemas: [],
+				schemasGate: { state: 'error', message: 'Could not load schemas. Pages keep showing the schemas saved before.' },
+			}),
+		});
 		expect(said()).toContain('Could not load schemas. Pages keep showing the schemas saved before.');
 		expect(said()).toContain('Try again');
 		expect(said()).not.toContain('Create a schema');

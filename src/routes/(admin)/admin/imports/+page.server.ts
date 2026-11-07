@@ -1,18 +1,15 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, isRedirect, redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
-import { refusalOf, refusalText } from '$lib/api/refusal';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	IMPORT_OK,
 	cancelJob,
 	createTemplate,
 	deleteTemplate,
 	getJob,
-	importGate,
 	listJobs,
 	listRows,
 	listTemplates,
@@ -21,13 +18,13 @@ import {
 	type FieldMapping,
 	type MappingTemplate,
 	type SaveMappingTemplate,
-	type ImportGate,
 	type ImportJob,
 	type ImportRow,
 	type ImportSchema,
 } from '$lib/api/bulk-import';
+import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
-import { section, type Gate, type Section } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
 /** The job the history's Rows button opened, with the rows it rejected and skipped. */
 export interface ImportDetail {
@@ -50,24 +47,22 @@ export const load: PageServerLoad = async (event) => {
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
 
 	const client = authedClient(event);
-	let jobs: ImportJob[] = [];
-	let total: number | null = null;
-	let hasMore = false;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: ImportGate = notRunning(plugins, PLUGIN.bulkImport) ? { state: 'absent' } : IMPORT_OK;
-	if (gate.state === 'ok') {
-		try {
-			const page = pageOf(await listJobs(client, limit + 1, offset), limit, offset);
-			const back = pastEndOffset(page.rows.length, limit, offset, page.total);
-			if (back !== null) redirect(307, withOffset(event.url, back));
-			jobs = page.rows;
-			total = page.total;
-			hasMore = page.hasMore;
-		} catch (err) {
-			if (isRedirect(err)) throw err;
-			gate = importGate(err);
-		}
+	const jobsRead = notRunning(plugins, PLUGIN.bulkImport)
+		? null
+		: await section(
+				listJobs(client, limit + 1, offset).then((res) => pageOf(res, limit, offset)),
+				couldNotLoad('imports'),
+			);
+	const gate: Gate = !jobsRead ? { state: 'absent' } : jobsRead.ok ? GATE_OK : jobsRead.gate;
+	const page = jobsRead?.ok ? jobsRead.value : null;
+	if (page) {
+		const back = pastEndOffset(page.rows.length, limit, offset, page.total);
+		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
+	const jobs: ImportJob[] = page?.rows ?? [];
+	const total = page?.total ?? null;
+	const hasMore = page?.hasMore ?? false;
 
 	// The content types an import fills. An unread list is kept as a failure,
 	// so the wizard says why it offers none rather than offering nothing.
@@ -86,7 +81,7 @@ export const load: PageServerLoad = async (event) => {
 							}))
 							.sort((a, b) => a.name.localeCompare(b.name))
 					),
-					'Could not load content types.'
+					couldNotLoad('content types')
 				)
 			: { ok: false, gate };
 
@@ -107,7 +102,7 @@ export const load: PageServerLoad = async (event) => {
 				skipped: skipped.rows,
 				skippedTotal: skipped.total,
 			})),
-			'Could not load the rows of this import.'
+			couldNotLoad('the rows of this import')
 		);
 	}
 
@@ -118,7 +113,7 @@ export const load: PageServerLoad = async (event) => {
 	// read as what they are.
 	const read =
 		gate.state === 'ok'
-			? await section(listTemplates(client), 'Could not load templates.')
+			? await section(listTemplates(client), couldNotLoad('templates'))
 			: null;
 	const templates = read?.ok
 		? {
@@ -174,17 +169,6 @@ function templateBody(form: FormData): SaveMappingTemplate | string {
 	};
 }
 
-/**
- * A failed write, tagged with the action that made it. Every form on the page
- * reports through one result, and the tag is how the template drawer tells
- * its own failure from a row action's.
- */
-function failure(action: string, err: unknown, fallback: string) {
-	const refused = refusalOf(err);
-	if (refused) return fail(402, { action, error: refusalText(refused), refused });
-	return fail(400, { action, error: actionError(err, fallback) });
-}
-
 async function saveTemplate(event: Parameters<Actions[string]>[0], id: string | null) {
 	await requireRole(event, ['admin', 'super_admin']);
 	const form = await event.request.formData();
@@ -194,7 +178,7 @@ async function saveTemplate(event: Parameters<Actions[string]>[0], id: string | 
 		if (id) await updateTemplate(authedClient(event), id, body);
 		else await createTemplate(authedClient(event), body);
 	} catch (err) {
-		return failure('saveTemplate', err, 'Could not save the template. Try again.');
+		return tagged('saveTemplate', actionFailure(err, 'Could not save the template. Try again.'));
 	}
 	return { savedTemplate: body.name };
 }
@@ -218,7 +202,7 @@ export const actions: Actions = {
 		try {
 			await deleteTemplate(authedClient(event), id);
 		} catch (err) {
-			return failure('deleteTemplate', err, 'Could not delete the template. Try again.');
+			return tagged('deleteTemplate', actionFailure(err, 'Could not delete the template. Try again.'));
 		}
 		return { removedTemplate: id };
 	},
@@ -232,7 +216,7 @@ export const actions: Actions = {
 		try {
 			await cancelJob(client, id);
 		} catch (err) {
-			return fail(400, { action: 'cancel', error: actionError(err, 'Could not cancel the import. Try again.') });
+			return tagged('cancel', actionFailure(err, 'Could not cancel the import. Try again.'));
 		}
 		return { canceled: id };
 	},
@@ -250,7 +234,7 @@ export const actions: Actions = {
 		try {
 			await rollbackJob(client, id);
 		} catch (err) {
-			return fail(400, { action: 'rollback', error: actionError(err, 'Could not roll back the import. Try again.') });
+			return tagged('rollback', actionFailure(err, 'Could not roll back the import. Try again.'));
 		}
 		return { rolledBack: id };
 	},

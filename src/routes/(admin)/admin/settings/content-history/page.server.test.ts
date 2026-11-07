@@ -261,7 +261,7 @@ describe('prune and delete', () => {
 	});
 
 	it('relays the reason a delete was refused', async () => {
-		engine.delete.mockRejectedValue(new ApiError(422, 'unknown content type'));
+		engine.delete.mockRejectedValue(new ApiError(422, 'unknown content type', { error: 'unknown content type', code: 'http_422' }));
 		const out = (await actions.deleteType(formEvent({ schema: 'nope' }))) as Failed;
 		expect(out.data.error).toBe('unknown content type');
 	});

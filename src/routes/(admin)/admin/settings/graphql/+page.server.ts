@@ -1,22 +1,20 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
-import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import {
-	GRAPHQL_OK,
 	deletePersisted,
 	introspect,
 	listPersisted,
 	registerPersisted,
 	togglePersisted,
-	type GraphqlGate,
 	type PersistedQuery,
 	type SchemaRoots,
 } from '$lib/api/graphql';
+import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 
 type Schema = { roots: SchemaRoots | null; refused: string | null };
 
@@ -28,7 +26,7 @@ export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
 	// The shell says why the page is unavailable while its plugin does not run.
 	if (notRunning(plugins, PLUGIN.graphql)) {
-		const absent: GraphqlGate = { state: 'absent' };
+		const absent: Gate = { state: 'absent' };
 		return {
 			gate: absent,
 			schema: { ok: false, gate: absent } as Section<Schema>,
@@ -57,7 +55,7 @@ export const load: PageServerLoad = async (event) => {
 		),
 	]);
 	// Both refused is the plugin's answer as a whole, so the page says it once.
-	const gate: GraphqlGate = !schema.ok && !persisted.ok ? schema.gate : GRAPHQL_OK;
+	const gate: Gate = !schema.ok && !persisted.ok ? schema.gate : GATE_OK;
 	if (persisted.ok) {
 		const back = pastEndOffset(persisted.value.length, limit, offset, persistedTotal);
 		if (back !== null) redirect(307, withOffset(event.url, back));
@@ -81,7 +79,7 @@ export const actions: Actions = {
 			});
 			return { registered: true };
 		} catch (err) {
-			return fail(400, { action: 'register', error: actionError(err, 'Could not register the query. Try again.') });
+			return tagged('register', actionFailure(err, 'Could not register the query. Try again.'));
 		}
 	},
 
@@ -93,7 +91,7 @@ export const actions: Actions = {
 			await togglePersisted(authedClient(event), hash);
 			return { toggled: hash };
 		} catch (err) {
-			return fail(400, { action: 'toggle', error: actionError(err, 'Could not enable or disable the query. Try again.') });
+			return tagged('toggle', actionFailure(err, 'Could not enable or disable the query. Try again.'));
 		}
 	},
 
@@ -105,7 +103,7 @@ export const actions: Actions = {
 			await deletePersisted(authedClient(event), hash);
 			return { deleted: hash };
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the query. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the query. Try again.'));
 		}
 	},
 };

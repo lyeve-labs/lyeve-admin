@@ -2,30 +2,20 @@
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+// enhance keeps each form's submit handler, so a case can run the one a
+// row's delete would run.
+const forms = vi.hoisted(() => ({ submits: new Map<HTMLFormElement, (input: unknown) => unknown>() }));
+vi.mock('$app/forms', () => ({
+	enhance: (node: HTMLFormElement, submit: (input: unknown) => unknown) => {
+		forms.submits.set(node, submit);
+		return { destroy: () => forms.submits.delete(node) };
+	},
+}));
 const kit = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
 vi.mock('@lyeve-labs/ui-kit', async (importOriginal) => ({
 	...(await importOriginal<Record<string, unknown>>()),
 	confirm: kit.confirm,
 }));
-
-/**
- * Press a row's delete, accept the question, and return its title and what
- * the hidden form held when it was sent. The value has to be in the form by
- * then, which is what waiting on the next render before sending is for.
- */
-async function pressDelete(button: HTMLElement, field: string): Promise<{ title: string; sent: string }> {
-	let sent = '';
-	const spy = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(function (this: HTMLFormElement) {
-		sent = (this.querySelector(`input[name="${field}"]`) as HTMLInputElement | null)?.value ?? '';
-	});
-	kit.confirm.mockClear();
-	await fireEvent.click(button);
-	await vi.waitFor(() => expect(spy).toHaveBeenCalled());
-	spy.mockRestore();
-	return { title: String((kit.confirm.mock.calls[0] as unknown[] | undefined)?.[0] ?? ''), sent };
-}
-
 
 import GraphqlPage from './+page.svelte';
 
@@ -137,9 +127,14 @@ describe('persisted query delete', () => {
 	it('names the query and sends its hash', async () => {
 		const query = { query_hash: 'abc123', query: '{ posts { id } }', operation_name: 'Posts', description: '', enabled: true, auto_registered: false };
 		const { getByRole } = render(GraphqlPage, { props: props({ persisted: { ok: true, value: [query] } }) });
-		const out = await pressDelete(getByRole('button', { name: 'Delete Posts' }), 'hash');
-		expect(out.title).toBe('Delete persisted query Posts?');
-		expect(out.sent).toBe('abc123');
+		const form = getByRole('button', { name: 'Delete Posts' }).closest('form') as HTMLFormElement;
+		expect(new FormData(form).get('hash')).toBe('abc123');
+		await forms.submits.get(form)?.({ cancel: vi.fn() });
+		expect(kit.confirm).toHaveBeenCalledWith(
+			'Delete persisted query Posts?',
+			'Clients that send only its hash will be refused.',
+			{ confirmLabel: 'Delete' },
+		);
 	});
 });
 

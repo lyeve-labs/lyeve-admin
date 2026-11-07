@@ -12,9 +12,10 @@
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { gateOf, type Gate } from './gate';
+import { couldNotLoad } from '../outage';
 
-export const CONNECTIONS_URL = '/api/admin/builder/connections';
-export const SETTINGS_URL = '/api/admin/builder/settings';
+const CONNECTIONS_URL = '/api/admin/builder/connections';
+const SETTINGS_URL = '/api/admin/builder/settings';
 
 /** The lifetimes a connection may have, in days. */
 export const LIFETIMES = [30, 90, 180] as const;
@@ -139,7 +140,7 @@ export type ConnectionsGate = Gate | { state: 'withheld' };
 /** What a refused read on this page means. */
 export function connectionsGate(err: unknown): ConnectionsGate {
 	if (err instanceof ApiError && err.status === 403 && refusalCode(err) === WITHHELD) return { state: 'withheld' };
-	return gateOf(err, 'Could not load builder connections.');
+	return gateOf(err, couldNotLoad('builder connections'));
 }
 
 /** Schemas a page may show: the builder's own and the engine's are never offered. */
@@ -189,14 +190,14 @@ export const SAID = {
 	decided: 'This request was already approved or declined.',
 	keyChanged: 'The key changed after you opened this request. Find the request again.',
 	lifetime: 'An administrator shortened how long a connection can last after you opened this request. Choose again.',
-	stepUpMissing: 'Enter your password or your MFA code.',
+	stepUpMissing: 'Enter your password or your authentication code.',
 	approvalUnavailable: 'Approving connections is not available on this engine.',
-	checkUnavailable: 'Could not check your password or MFA code. The connection was not approved. Try again.',
-	withheld: 'A super admin turned off builder connections for this tenant.',
+	checkUnavailable: 'Could not check your password or authentication code. The connection was not approved. Try again.',
+	withheld: 'Builder connections are not available to this tenant. Ask a super admin to make them available.',
 	lookupOutage: 'Could not load this request. Try again.',
 	approveOutage: 'Could not confirm the approval. Check whether the connection shows in the list, then try again.',
-	declineOutage: 'Could not confirm the decline. Find the request again to see whether it is still waiting.',
-	revokeOutage: "Could not confirm the revoke. Check the connection's status in the list, then try again.",
+	declineOutage: 'Could not confirm the request was declined. Find it again to see whether it is still waiting.',
+	revokeOutage: 'Could not confirm the connection was revoked. Check its status in the list, then try again.',
 	revokeAllFailed: 'Could not revoke the connections. Check their status in the list, then try again.',
 	settingOutage: 'Could not confirm the setting was saved. Reload the page to check it, then try again.',
 } as const;

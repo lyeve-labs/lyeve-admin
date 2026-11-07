@@ -2,7 +2,7 @@
 import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
-import { fixtureLocalProvider, fixtureProvider, fixtureSettings } from '$lib/components/ai/fixtures';
+import { fixtureLocalProvider, fixtureProvider, fixtureSettings } from '$lib/components/ai/test-support/fixtures';
 import { outlineSkips } from '$lib/test-outline';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

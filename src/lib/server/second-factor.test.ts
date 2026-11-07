@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '@lyeve-labs/client';
 import { secondFactorFailure } from './second-factor';
 
-const UNCHECKED = 'Could not check the code. Try again in a moment.';
+const UNCHECKED = 'The engine is unavailable, so your code was not checked. Try again in a moment.';
 
 // The engine's error body: a sentence, a code and the request's id.
 function refused(status: number, code: string, error: string): ApiError {

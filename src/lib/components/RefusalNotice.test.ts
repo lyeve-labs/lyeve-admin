@@ -15,11 +15,12 @@ describe('RefusalNotice', () => {
 		expect(getByRole('link', { name: 'View the license' }).getAttribute('href')).toBe('/admin/settings/license');
 	});
 
-	it('names the capability a feature refusal needs', () => {
+	it('says a feature refusal in the neutral locked state, without the capability', () => {
 		const { container } = render(RefusalNotice, {
 			props: { refusal: { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } },
 		});
-		expect(container.textContent).toContain('This needs example-feature');
+		expect(container.textContent).toContain('Not enabled on this instance');
+		expect(container.textContent).not.toContain('example-feature');
 	});
 
 	it('names a license before removing one, and offers the link the engine sent for more', () => {

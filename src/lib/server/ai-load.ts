@@ -15,14 +15,11 @@
 import { redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { clearSessionCookie, type SessionEvent } from './session-cookie';
-import { AI_OK, type AiGate } from '$lib/api/ai';
+import type { AiGate } from '$lib/api/ai';
+import { gateOf } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
-export { AI_OK, type AiGate };
-
-/** The static engine banner for one resource, named in the plural. */
-export function aiBanner(plural: string): string {
-	return `Could not load ${plural}.`;
-}
+export type { AiGate };
 
 export function aiGate(err: unknown, session: SessionEvent, plural: string): AiGate {
 	return sortGate(err, session, plural, 'off');
@@ -42,12 +39,14 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 			clearSessionCookie(session);
 			redirect(302, '/login');
 		}
-		if (err.status === 402) return { state: 'locked' };
-		if (err.status === 403) return { state: 'forbidden' };
 		if (err.status === 404) return { state: notFound };
 		if (noProvider(err)) return { state: 'no_provider' };
 	}
-	return { state: 'error', message: aiBanner(plural) };
+	const gate = gateOf(err, couldNotLoad(plural));
+	// The AI pages word a refused rate and an outage as the failed read they
+	// are for the reader, so both keep the page's own sentence.
+	if (gate.state === 'busy' || gate.state === 'unavailable') return { state: 'error', message: couldNotLoad(plural) };
+	return gate;
 }
 
 /**
@@ -82,8 +81,8 @@ export function aiBudgetSpent(err: unknown): boolean {
 export type AiWriteRole = 'admin' | 'super_admin';
 
 const ROLE_TEXT: Record<AiWriteRole, string> = {
-	admin: 'Your role cannot change this. Ask an admin if you need it.',
-	super_admin: 'Your role cannot change this. Ask a super admin if you need it.',
+	admin: 'Only an admin or a super admin can change this.',
+	super_admin: 'Only a super admin can change this.',
 };
 
 /**
@@ -102,7 +101,7 @@ export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRol
 			return msg;
 		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';
-		if (noProvider(err)) return 'No AI provider is enabled. Add or enable one first.';
+		if (noProvider(err)) return 'No AI provider is enabled. A super admin can add or enable one under AI providers.';
 		if (err.status === 409) return 'No configured provider supports this operation.';
 		if (err.status >= 400 && err.status < 500) {
 			const msg = err.message?.trim();

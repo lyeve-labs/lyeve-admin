@@ -351,7 +351,7 @@ describe('admin/flows/datasources actions', () => {
 
 	it('refuses a scheme missing what it cannot work without, before the engine sees it', async () => {
 		for (const [auth, message] of [
-			[{ auth_type: 'basic', auth_password: 'pw' }, 'needs a user'],
+			[{ auth_type: 'basic', auth_password: 'pw' }, 'Enter a user'],
 			[{ auth_type: 'oauth2_client_credentials', auth_client_id: 'cid' }, 'token URL'],
 			[{ auth_type: 'digest' }, 'authentication type'],
 		] as const) {
@@ -391,7 +391,7 @@ describe('admin/flows/datasources actions', () => {
 		form.set('name', 'x');
 		form.set('kind', 'http');
 		form.set('base_url', 'https://x');
-		const { event } = actionEvent(form, { '/datasources': () => json({ error: 'name already exists' }, 409) });
+		const { event } = actionEvent(form, { '/datasources': () => json({ error: 'name already exists', code: 'conflict' }, 409) });
 		const result = (await actions.create(event)) as { status: number; data: { error: string } };
 		expect(result.data.error).toBe('name already exists');
 	});

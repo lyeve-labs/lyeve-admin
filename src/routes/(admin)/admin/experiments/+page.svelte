@@ -30,7 +30,7 @@
 		statusTone,
 		type Experiment,
 	} from '$lib/api/ab-testing';
-	import { formatDateTime } from '$lib/format';
+	import { formatDateTime, plural } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -171,7 +171,7 @@
 
 <PageShell
 	title="Experiments"
-	description="Run A/B tests, split traffic between variants and see what the results show."
+	description="Split traffic between variants and see which one wins."
 	width="wide"
 >
 	{#snippet actions()}
@@ -217,7 +217,7 @@
 
 			<p class="text-xs text-muted">
 				{running}
-				{running === 1 ? 'experiment is' : 'experiments are'} running and splitting traffic now.
+				{plural(running, 'experiment is', 'experiments are')} running and splitting traffic now.
 			</p>
 
 			{#if visible.length === 0}

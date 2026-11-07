@@ -74,9 +74,9 @@ describe('mapping templates', () => {
 		expect(said(container)).toContain('Your role cannot open templates');
 	});
 
-	it('says what an unlicensed install keeps', () => {
+	it('says what an instance without templates keeps', () => {
 		const { container } = render(ImportsPage, { props: props({ licensed: false }) });
-		expect(said(container)).toContain('Saving templates and the date, split and lookup transforms need a license');
+		expect(said(container)).toContain('Saving templates and the date, split and lookup transforms are not enabled on this instance.');
 	});
 
 	it('opens a stored template in the drawer with its transform', async () => {

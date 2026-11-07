@@ -22,7 +22,7 @@ describe('an account with a passkey', () => {
 	it('says passkeys keep two-factor on and offers both app controls', () => {
 		const { container, getByRole } = setup(true, null, true);
 		expect(container.textContent).toContain('This account has a passkey');
-		expect(container.textContent).not.toContain('takes a TOTP code');
+		expect(container.textContent).not.toContain('takes a code from the authenticator app');
 		expect(getByRole('button', { name: /Set up with this code/ })).toBeTruthy();
 		expect(container.querySelector('form[action="?/setup"]')).not.toBeNull();
 		expect(container.querySelector('form[action="?/disable"]')).not.toBeNull();

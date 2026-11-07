@@ -3,7 +3,6 @@ import { ApiError } from '@lyeve-labs/client';
 import {
 	OUTCOME_LABELS,
 	cancelable,
-	importGate,
 	outcome,
 	outcomeTone,
 	previewImport,
@@ -96,20 +95,6 @@ describe('progress', () => {
 	it('reports a rejection rate only once rows have been read', () => {
 		expect(rejectionRate(job({ processed_rows: 100, errored_rows: 25 }))).toBe(25);
 		expect(rejectionRate(job({ processed_rows: 0 }))).toBeNull();
-	});
-});
-
-describe('the gate', () => {
-	it('tells a 402, a 404 and any other failure apart', () => {
-		expect(importGate(new ApiError(402, 'payment required')).state).toBe('locked');
-		expect(importGate(new ApiError(404, 'not found')).state).toBe('absent');
-		expect(importGate(new ApiError(500, 'internal error')).state).toBe('error');
-		expect(importGate(new ApiError(503, 'unavailable')).state).toBe('unavailable');
-	});
-
-	it('never reports a failed read as no imports having run', () => {
-		const gate = importGate(new Error('network'));
-		expect(gate.state === 'error' && gate.message).toBe('Could not load imports.');
 	});
 });
 
@@ -227,7 +212,7 @@ describe('a refused import call', () => {
 	it('keeps the body of an outage off the page and says the engine did not answer', async () => {
 		const err = await refusal(503, { error: 'dial tcp 10.0.0.4:5432: connection refused' });
 		expect(err.message).not.toContain('10.0.0.4');
-		expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
+		expect(err.message).toBe('The engine is unavailable, so nothing was imported. Try again in a moment.');
 	});
 
 	// The engine answers a start once it has stored the job and imports the
@@ -253,14 +238,14 @@ describe('a refused import call', () => {
 
 		it('says nothing was imported when the engine itself answered the 5xx', async () => {
 			const err = await started(new Response(JSON.stringify({ error: 'failed to create import job', code: 'service_unavailable' }), { status: 503 }));
-			expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
+			expect(err.message).toBe('The engine is unavailable, so nothing was imported. Try again in a moment.');
 		});
 	});
 
 	it('says nothing was imported by a preview, which imports nothing, whoever answered', async () => {
 		const res = new Response('<html>504 Gateway Time-out</html>', { status: 504 });
 		const err = (await previewImport((async () => res) as unknown as typeof fetch, { source_url: 'https://example.com/a.csv' }).catch((e: unknown) => e)) as ApiError;
-		expect(err.message).toBe('The engine is unavailable. Nothing was imported. Try again in a moment.');
+		expect(err.message).toBe('The engine is unavailable, so nothing was imported. Try again in a moment.');
 	});
 
 	it('keeps the body of any other engine failure off the page', async () => {

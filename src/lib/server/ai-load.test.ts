@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { AI_BUDGET_TEXT, aiActionError, aiBanner, aiGate } from './ai-load';
+import { AI_BUDGET_TEXT, aiActionError, aiGate } from './ai-load';
 
 function cookies(): Cookies {
 	return { get: vi.fn(), set: vi.fn(), delete: vi.fn(), getAll: vi.fn(() => []), serialize: vi.fn(() => '') } as unknown as Cookies;
@@ -17,7 +17,7 @@ describe('aiGate', () => {
 	});
 
 	it('sorts the four refusals into distinct states', () => {
-		expect(aiGate(new ApiError(402, 'payment required'), { cookies: cookies() }, 'providers')).toEqual({ state: 'locked' });
+		expect(aiGate(new ApiError(402, 'payment required'), { cookies: cookies() }, 'providers')).toEqual({ state: 'locked', upgradeUrl: '' });
 		expect(aiGate(new ApiError(403, 'forbidden'), { cookies: cookies() }, 'providers')).toEqual({ state: 'forbidden' });
 		expect(aiGate(new ApiError(404, 'AI is switched off for this tenant'), { cookies: cookies() }, 'providers')).toEqual({ state: 'off' });
 		expect(aiGate(new ApiError(503, 'no enabled AI provider configured', { error: 'no enabled AI provider configured', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toEqual({ state: 'no_provider' });
@@ -32,7 +32,7 @@ describe('aiGate', () => {
 	it('keeps the engine banner for a 5xx, a network failure and a status it does not expect', () => {
 		for (const err of [new ApiError(500, 'pq: connection refused'), new TypeError('fetch failed'), new ApiError(418, 'teapot')]) {
 			const out = aiGate(err, { cookies: cookies() }, 'transcripts');
-			expect(out).toEqual({ state: 'error', message: aiBanner('transcripts') });
+			expect(out).toEqual({ state: 'error', message: 'Could not load transcripts.' });
 			expect(JSON.stringify(out)).not.toContain('pq:');
 		}
 	});
@@ -41,8 +41,8 @@ describe('aiGate', () => {
 describe('aiActionError', () => {
 	it('names the lowest role the route admits on a role refusal', () => {
 		const refused = new ApiError(403, 'insufficient permissions', { error: 'insufficient permissions', code: 'forbidden' });
-		expect(aiActionError(refused, 'f')).toBe('Your role cannot change this. Ask an admin if you need it.');
-		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Your role cannot change this. Ask a super admin if you need it.');
+		expect(aiActionError(refused, 'f')).toBe('Only an admin or a super admin can change this.');
+		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Only a super admin can change this.');
 	});
 
 	it('says the budget is spent only when the 402 names the budget', () => {
@@ -78,6 +78,6 @@ describe('aiSettingsGate', () => {
 	it('reads a 404 on the settings route as a plugin that is not mounted', async () => {
 		const { aiSettingsGate } = await import('./ai-load');
 		expect(aiSettingsGate(new ApiError(404, 'not found'), { cookies: cookies() })).toEqual({ state: 'absent' });
-		expect(aiSettingsGate(new ApiError(402, 'x'), { cookies: cookies() })).toEqual({ state: 'locked' });
+		expect(aiSettingsGate(new ApiError(402, 'x'), { cookies: cookies() })).toEqual({ state: 'locked', upgradeUrl: '' });
 	});
 });

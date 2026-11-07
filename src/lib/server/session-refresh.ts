@@ -113,13 +113,6 @@ function countRefusal(address: string, now = Date.now()): { count: number } {
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 
-/** Forgets every trade, for a test that needs a fresh process. */
-export function resetSessionRefresh(): void {
-	running.clear();
-	kept.clear();
-	refusals.clear();
-}
-
 /**
  * The token's claims, read without checking its signature. The engine checks
  * it on every call, so this only decides when to ask for a new one.

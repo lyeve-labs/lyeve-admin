@@ -207,7 +207,7 @@ describe('deleting a definition', () => {
 	// The New definition drawer shows create failures only, so a delete names
 	// itself and never opens the next drawer as if the create had failed.
 	it('names the delete on a refusal and relays its reason', async () => {
-		engine.delete.mockRejectedValue(new ApiError(409, 'definition has active assignments'));
+		engine.delete.mockRejectedValue(new ApiError(409, 'definition has active assignments', { error: 'definition has active assignments', code: 'conflict' }));
 		const out = (await actions.delete(actionEvent({ id: 'd1' }))) as Failure;
 		expect(out.data).toEqual({ action: 'delete', error: 'definition has active assignments' });
 	});
@@ -228,7 +228,7 @@ describe('deleting a definition', () => {
 	});
 
 	it('names the create on a refused create', async () => {
-		engine.post.mockRejectedValue(new ApiError(409, 'slug already in use'));
+		engine.post.mockRejectedValue(new ApiError(409, 'slug already in use', { error: 'slug already in use', code: 'conflict' }));
 		const out = (await actions.create(actionEvent({ name: 'Editorial', stages: '[{"name":"Legal"}]' }))) as Failure;
 		expect(out.data).toMatchObject({ action: 'create', error: 'slug already in use' });
 	});

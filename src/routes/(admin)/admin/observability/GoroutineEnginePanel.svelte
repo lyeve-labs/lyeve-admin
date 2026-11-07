@@ -10,7 +10,7 @@
 		PARALLEL_TIMEOUT_MAX,
 		POOL_SIZE,
 	} from '$lib/api/goroutine-engine';
-	import { LICENSE_PAGE, formRefusal } from '$lib/api/refusal';
+	import { formRefusal } from '$lib/api/refusal';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { NO_VALUE, formatGoDuration } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
@@ -131,7 +131,7 @@
 						<Stat size="sm" label="Task timeout" mono value={formatGoDuration(ge.pool.task_timeout)} />
 					</div>
 				{:else}
-					<p class="text-xs text-muted">This install runs without a worker pool.</p>
+					<p class="text-xs text-muted">This instance runs without a worker pool.</p>
 				{/if}
 			</Card>
 
@@ -145,7 +145,7 @@
 						<Stat size="sm" label="Timeout" mono value={formatGoDuration(ge.parallel.timeout)} />
 					</div>
 				{:else}
-					<p class="text-xs text-muted">This install runs without a parallel engine.</p>
+					<p class="text-xs text-muted">This instance runs without a parallel engine.</p>
 				{/if}
 			</Card>
 
@@ -165,7 +165,7 @@
 						<Stat size="sm" label="Dropped" mono value={ge.asyncHooks.dropped ?? NO_VALUE} tone={(ge.asyncHooks.dropped ?? 0) > 0 ? 'danger' : undefined} />
 					</div>
 				{:else}
-					<p class="text-xs text-muted">This install runs without an async hook executor.</p>
+					<p class="text-xs text-muted">This instance runs without an async hook executor.</p>
 				{/if}
 			</Card>
 		</div>
@@ -212,12 +212,9 @@
 			</p>
 		{/if}
 		{#if !ge.licensed}
-			<div class="flex flex-wrap items-center gap-2" data-testid="goroutine-license-note">
-				<p class="text-xs text-muted">
-					Changing these settings on a running server needs a license that includes tuning. The readings above stay available.
-				</p>
-				<Button variant="ghost" size="sm" href={LICENSE_PAGE}>View the license</Button>
-			</div>
+			<p class="text-xs text-muted" data-testid="goroutine-license-note">
+				Tuning the goroutine engine is not enabled on this instance. You can still see the readings above.
+			</p>
 		{/if}
 
 		<div class="grid gap-4 lg:grid-cols-3" data-testid="goroutine-tunables">

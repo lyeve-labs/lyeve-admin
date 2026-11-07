@@ -29,10 +29,10 @@
 		riskOf,
 		riskTone,
 		statusHint,
-		statusTone,
 		type LabEndpoint,
 		type LabResult,
 	} from '$lib/api/labs';
+	import { httpStatusTone } from '$lib/tones';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import StreamLab from '$lib/components/labs/StreamLab.svelte';
@@ -174,9 +174,9 @@
 </script>
 
 {#snippet answer(result: LabResult)}
-	<SectionHeading level={3}>The answer</SectionHeading>
+	<SectionHeading level={3}>Response</SectionHeading>
 	<div class="flex flex-wrap items-center gap-2">
-		<Badge tone={statusTone(result.status)} dot>
+		<Badge tone={httpStatusTone(result.status)} dot>
 			{result.status}
 			{result.statusText}
 		</Badge>
@@ -197,12 +197,12 @@
 	{#if statusHint(result.status)}
 		<!-- The statuses a tester meets once and has to guess at. 402 is the
 		     one worth spelling out: nothing about the request is wrong. -->
-		<Alert tone={statusTone(result.status) === 'success' ? 'brand' : 'warn'}>
+		<Alert tone={httpStatusTone(result.status) === 'success' ? 'brand' : 'warn'}>
 			{statusHint(result.status)}
 		</Alert>
 	{/if}
 	{#if Object.keys(result.headers).length > 0}
-		<Table label="The answer">
+		<Table label="Response">
 			<tbody>
 				{#each Object.entries(result.headers) as [name, value] (name)}
 					<tr>
@@ -234,8 +234,8 @@
 
 	{#if data.source === 'catalog'}
 		<Alert tone="danger">
-			Could not load the API document, so this list is the built-in catalog, not what this
-			build serves. An endpoint missing here may still exist.
+			Could not load the engine's API document, so this is the catalog built into the console and may
+			miss an endpoint this build serves. Reload the page to try again.
 		</Alert>
 	{/if}
 
@@ -319,11 +319,11 @@
 
 				{#if selected.statuses?.length || selected.response}
 					<div class="flex flex-col gap-2">
-						<SectionHeading level={3}>What it answers</SectionHeading>
+						<SectionHeading level={3}>Responses</SectionHeading>
 						{#if selected.statuses?.length}
 							<div class="flex flex-wrap gap-2">
 								{#each selected.statuses as st (st.code)}
-									<Badge tone={statusTone(Number(st.code) || 0)}>{st.code} {st.description}</Badge>
+									<Badge tone={httpStatusTone(Number(st.code) || 0)}>{st.code} {st.description}</Badge>
 								{/each}
 							</div>
 						{/if}
@@ -451,8 +451,7 @@
 				     addresses a host and the listener's own JWT check still
 				     decides the answer. -->
 				<Alert tone="brand">
-					The gRPC plugin's own listener serves these paths. It checks your token exactly as it
-					would for a direct caller.
+					These paths go to the gRPC listener, which checks your token as it does for any caller.
 				</Alert>
 				<form method="POST" action="?/grpc" use:enhance={sendGrpc}>
 					<div class="grid gap-4">

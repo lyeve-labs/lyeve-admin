@@ -1,32 +1,17 @@
 <script lang="ts">
-	import { Alert, Badge, Button, Card, EmptyState, PageShell, SectionHeading, SegmentedControl, Stat, Table, type StatusTone } from '@lyeve-labs/ui-kit';
+	import { Alert, Badge, Card, EmptyState, PageShell, SectionHeading, SegmentedControl, Stat, Table, type StatusTone } from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
-	import { invalidateAll } from '$app/navigation';
-	import { Database, Gauge, AlertTriangle, CheckCircle, RefreshCw } from '@lucide/svelte';
+	import { Database, Gauge, AlertTriangle, CheckCircle } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { LATENCY_TOP_CHOICES } from '$lib/api/observability';
-	import { NO_VALUE } from '$lib/format';
+	import { formatMillis, NO_VALUE } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import GoroutineEnginePanel from './GoroutineEnginePanel.svelte';
 	import LiveLogTail from './LiveLogTail.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-
-	// Both panels read through the page load, so a refresh is one invalidation
-	// and the row count survives a reload as a query parameter. Fetching from
-	// the component would leave the server render and the client holding two
-	// different answers with nothing reconciling them.
-	let refreshing = $state(false);
-
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	// Each depth is a link, so the ranking a person is looking at is an
 	// address and the choice works before the page hydrates.
@@ -35,12 +20,6 @@
 		label: `Top ${c}`,
 		href: `/admin/observability?top=${c}`,
 	}));
-
-	function fmtUs(us: number): string {
-		if (us >= 1_000_000) return `${(us / 1_000_000).toFixed(2)}s`;
-		if (us >= 1_000) return `${(us / 1_000).toFixed(1)}ms`;
-		return `${us}µs`;
-	}
 
 	function latencyVariant(us: number): StatusTone {
 		if (us >= 1_000_000) return 'danger';
@@ -56,13 +35,6 @@
 	const measured = $derived(typeof pool?.open_connections === 'number');
 </script>
 
-{#snippet noPoolHealth()}
-	<Database size={ICON.lg} />
-{/snippet}
-
-{#snippet noLatency()}
-	<Gauge size={ICON.lg} />
-{/snippet}
 
 <PageShell
 	title="Observability"
@@ -72,9 +44,7 @@
 	{#snippet actions()}
 		<!-- One refresh for the page: both panels read through the load, so one
 		     invalidation refreshes them together. -->
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 	{/snippet}
 
 	<!-- The pool's state is a badge on its card, not a banner over the page:
@@ -107,7 +77,7 @@
 					size="sm"
 					label="Ping latency"
 					mono
-					value={typeof pool.latency_ms === 'number' ? fmtUs(Math.round(pool.latency_ms * 1000)) : NO_VALUE}
+					value={formatMillis(pool.latency_ms)}
 				/>
 				<Stat size="sm" label="Goroutines" mono value={data.goroutines ?? NO_VALUE} />
 				{#if measured}
@@ -129,11 +99,11 @@
 				</div>
 			{/if}
 		{:else}
-			<EmptyState
-				iconSnippet={noPoolHealth}
-				title="Pool health unavailable"
-				description="No pool statistics were returned. This deployment may not have a connection pooler configured."
-			/>
+			<EmptyState title="Pool health unavailable" description="No pool statistics for this instance.">
+				{#snippet iconSnippet()}
+					<Database size={ICON.lg} />
+				{/snippet}
+			</EmptyState>
 		{/if}
 	</Card>
 
@@ -166,11 +136,11 @@
 				absent="Latency rankings are not included in this build."
 			/>
 		{:else if data.latency.value.slowest.length === 0}
-			<EmptyState
-				iconSnippet={noLatency}
-				title="No latency data yet"
-				description="Endpoints appear here after they serve requests."
-			/>
+			<EmptyState title="No latency data yet" description="Endpoints appear here after they serve requests.">
+				{#snippet iconSnippet()}
+					<Gauge size={ICON.lg} />
+				{/snippet}
+			</EmptyState>
 		{:else}
 			<Table label="Latency rankings">
 				<thead>
@@ -194,14 +164,14 @@
 							<td><Badge tone="neutral">{entry.method}</Badge></td>
 							<td data-cell="nowrap" class="font-mono text-xs">{entry.path}</td>
 							<td data-cell="nowrap" class="text-right text-xs"><span class="text-faint">{entry.count}</span></td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtUs(entry.min_us)}</td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtUs(entry.avg_us)}</td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtUs(entry.p50_us)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatMillis(entry.min_us / 1000)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatMillis(entry.avg_us / 1000)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatMillis(entry.p50_us / 1000)}</td>
 							<td class="text-right">
-								<Badge tone={latencyVariant(entry.p95_us)}>{fmtUs(entry.p95_us)}</Badge>
+								<Badge tone={latencyVariant(entry.p95_us)}>{formatMillis(entry.p95_us / 1000)}</Badge>
 							</td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtUs(entry.p99_us)}</td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{fmtUs(entry.max_us)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatMillis(entry.p99_us / 1000)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatMillis(entry.max_us / 1000)}</td>
 						</tr>
 					{/each}
 				</tbody>

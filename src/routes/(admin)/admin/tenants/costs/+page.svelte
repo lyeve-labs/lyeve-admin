@@ -15,18 +15,17 @@
 		Select,
 		Stat,
 		Table,
-		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
-	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Coins, Plus, RefreshCw, RotateCcw, Trash2 } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, submitter } from '$lib/forms.svelte';
 	import { BUDGET_PERIODS, RESOURCE_TYPES, type Price, type ResourceType, costShares } from '$lib/api/cost';
-	import { formatDate, formatDateTime, NO_VALUE } from '$lib/format';
+	import { formatDate, formatDateTime, NO_VALUE, plural } from '$lib/format';
 	import { lastDay } from '$lib/cost/forms';
 	import { ICON } from '$lib/icon';
 
@@ -145,18 +144,11 @@
 		return prices?.find((p) => p.resource_type === r);
 	}
 
-	let deleteForm = $state<HTMLFormElement | null>(null);
-	let deleteId = $state('');
-
-	async function askDelete(id: string, label: string) {
-		const ok = await confirmDialog(`Delete budget ${label}?`, 'Its threshold history is deleted too.', {
+	function deleteBudget(label: string): SubmitFunction {
+		return confirmed(`Delete budget ${label}?`, 'Its threshold history is deleted too.', {
 			confirmLabel: 'Delete',
+			success: `Budget ${label} deleted.`,
 		});
-		if (!ok) return;
-		deleteId = id;
-		// The hidden form posts what it holds once the id has reached the DOM.
-		await tick();
-		deleteForm?.requestSubmit();
 	}
 
 	function track(name: string) {
@@ -172,7 +164,7 @@
 
 <PageShell
 	title="Tenant costs"
-	description="See what this tenant's usage costs, set prices and track budgets. Costs are updated every hour from the usage and AI meters."
+	description="See what this tenant's usage costs, set prices and track budgets."
 	width="wide"
 	{back}
 >
@@ -260,7 +252,7 @@
 											</li>
 										{/each}
 									</ul>
-									<p class="text-xs text-faint">From {summary.entry_count} cost {summary.entry_count === 1 ? 'line' : 'lines'} since the first of the month.</p>
+									<p class="text-xs text-faint">From {summary.entry_count} cost {plural(summary.entry_count, 'line')} since the first of the month. Costs are updated every hour from the usage and AI meters.</p>
 								</div>
 							{:else if !data.summary.ok}
 								<GateNotice gate={data.summary.gate} title="the split by resource" absent="The split by resource is not included in this build." />
@@ -319,15 +311,18 @@
 									</td>
 									<td data-cell="nowrap" class="text-xs text-muted">{budget.alert_thresholds.map((t) => `${t}%`).join(', ') || NO_VALUE}</td>
 									<td data-cell="nowrap" class="text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											onclick={() => askDelete(budget.id, budget.name)}
-											title="Delete"
-											aria-label="Delete {budget.name}"
-										>
-											<Trash2 size={ICON.sm} class="text-danger" />
-										</Button>
+										<form method="POST" action="?/deleteBudget" use:enhance={deleteBudget(budget.name)}>
+											<input type="hidden" name="id" value={budget.id} />
+											<Button
+												variant="ghost"
+												size="sm"
+												type="submit"
+												title="Delete"
+												aria-label="Delete {budget.name}"
+											>
+												<Trash2 size={ICON.sm} class="text-danger" />
+											</Button>
+										</form>
 									</td>
 								</tr>
 							{/each}
@@ -512,6 +507,3 @@
 	{/snippet}
 </Drawer>
 
-<form method="POST" action="?/deleteBudget" use:enhance bind:this={deleteForm} class="hidden">
-	<input type="hidden" name="id" value={deleteId} />
-</form>

@@ -21,9 +21,13 @@ import {
 } from '$lib/api/telemetry';
 import { errorCodeOf } from '$lib/api/limits';
 import { refusalOf, refusalText } from '$lib/api/refusal';
-import { actionError } from '$lib/server/action-error';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { section, type Section } from '$lib/api/gate';
 import { authedClient, authedHeaders, loadUser, requireRole } from '$lib/server/authz';
+import { couldNotLoad } from '$lib/outage';
+import { rolesInWords } from '$lib/roles';
+
+const READERS = ['admin', 'super_admin'];
 
 /**
  * What the page renders.
@@ -46,8 +50,8 @@ export interface TelemetryPage {
 export const load: PageServerLoad = async (event) => {
 	const { fetch } = event;
 	const user = await loadUser(event);
-	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
-		error(403, 'Only an admin or a super admin can open this page.');
+	if (!user.roles.some((r) => READERS.includes(r))) {
+		error(403, `Only ${rolesInWords(READERS)} can open this page.`);
 	}
 	const superAdmin = user.roles.includes('super_admin');
 	const client = authedClient(event);
@@ -55,12 +59,12 @@ export const load: PageServerLoad = async (event) => {
 	const [families, exporters, destination] = await Promise.all([
 		section(
 			readMetricsText(fetch, authedHeaders(event)).then(parseExposition),
-			'Could not load metrics.',
+			couldNotLoad('metrics'),
 		),
 		superAdmin
-			? section(listExporters(client), 'Could not load exporters.')
+			? section(listExporters(client), couldNotLoad('exporters'))
 			: Promise.resolve(null),
-		section(readDestination(client), 'Could not load the destination.'),
+		section(readDestination(client), couldNotLoad('the destination')),
 	]);
 
 	const page: TelemetryPage = { superAdmin, families, exporters, destination };
@@ -170,7 +174,8 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 429) {
 				return fail(429, { name, error: `${name} exported a moment ago. Wait five seconds and try again.` });
 			}
-			return fail(400, { name, error: actionError(err, `Could not export ${name}. Try again.`) });
+			const failed = actionFailure(err, `Could not export ${name}. Try again.`);
+			return fail(failed.status, { ...failed.data, name });
 		}
 	},
 };

@@ -29,7 +29,7 @@
 	import { confirmed, fieldErrors, submitter } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
 	import { ROLE_OPTIONS, roleTone } from '$lib/roles';
-	import { formatCount, formatDate } from '$lib/format';
+	import { formatCount, formatDate, plural } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import {
@@ -247,12 +247,12 @@
 		</EmptyState>
 	{:else}
 		{#if neverExpiring > 0}
-			<Alert tone="warn" title="{neverExpiring} admin {neverExpiring === 1 ? 'key never expires' : 'keys never expire'}">
+			<Alert tone="warn" title="{neverExpiring} admin {plural(neverExpiring, 'key never expires', 'keys never expire')}">
 				A key with the admin or super admin role expires within {MAX_PRIVILEGED_KEY_DAYS} days. A key marked No expiry keeps working until it is revoked. Replace each with one that expires, then revoke it.
 			</Alert>
 		{/if}
 		{#if adminRoleKeys > 0}
-			<Alert tone="warn" title="{adminRoleKeys} {adminRoleKeys === 1 ? 'key carries' : 'keys carry'} an admin role">
+			<Alert tone="warn" title="{adminRoleKeys} {plural(adminRoleKeys, 'key carries', 'keys carry')} an admin role">
 				The admin API refuses a key with an admin role. Move automation that calls it to <a class="underline" href="/admin/admin-tokens">admin tokens</a>. These keys still work on the content API.
 			</Alert>
 		{/if}
@@ -294,7 +294,7 @@
 						<td data-cell="nowrap" class="font-medium">{key.name}</td>
 						<td data-cell="nowrap">
 							<div class="flex flex-wrap gap-1">
-								{#each key.roles as role}
+								{#each key.roles as role (role)}
 									<Badge tone={roleTone(role)} size="sm">{role}</Badge>
 								{/each}
 								{#if key.roles.length === 0}
@@ -466,8 +466,8 @@
 	<Modal open title="API key created" onclose={() => (showRawKey = false)}>
 		<div class="flex flex-col gap-4">
 			<p class="text-sm text-fg">
-				Your API key <strong class="text-fg">{rawKeyName}</strong> has been created. Copy it now.
-				It will not be shown again.
+				Your API key <strong class="text-fg">{rawKeyName}</strong> is ready. Copy it now. It is not shown
+				again.
 			</p>
 			<CopyField
 				id="raw-api-key"

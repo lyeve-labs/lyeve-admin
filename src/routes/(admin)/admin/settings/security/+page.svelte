@@ -41,7 +41,7 @@
 
 <PageShell
 	title="Security"
-	description="See which controls protect this instance right now, and how to turn on the rest. The status comes from the running engine, not from configuration."
+	description="See which controls protect this instance, and how to turn on the rest."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -76,7 +76,7 @@
 			{#if controls.length === 0}
 				<EmptyState
 					title="No controls reported"
-					description="The security report is empty. This usually means a plugin that supplies it is not running."
+					description="The security report came back empty. Check that the plugins that supply it are running."
 				/>
 			{:else}
 				<Card pad="none">

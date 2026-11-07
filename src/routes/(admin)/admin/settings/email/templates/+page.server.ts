@@ -1,8 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail, type ActionFailure } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
-import { actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { section, type Section } from '$lib/api/gate';
@@ -46,14 +46,6 @@ export const load: PageServerLoad = async (event) => {
 	]);
 	return { templates, starters, limits };
 };
-
-/**
- * The failure marked with the action that caused it. The drawer shows only a
- * failed save, and a failed delete or preview shows above the list.
- */
-function tagged<T extends Record<string, unknown>>(action: string, failure: ActionFailure<T>) {
-	return fail(failure.status, { ...failure.data, action });
-}
 
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();
 

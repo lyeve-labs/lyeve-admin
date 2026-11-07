@@ -54,10 +54,11 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 });
 
 describe('tenant rate limits', () => {
-	it('says the install limit applies beside the tenant one', () => {
+	it('says the global limit applies beside the tenant one', () => {
 		const { container } = render(TenantPage, { props: props() });
 		expect(said(container)).toContain('This tenant has no limit of its own');
 		expect(said(container)).toContain('50/second');
+		expect(said(container)).toContain('The global limit of');
 		expect(said(container)).toContain('can only make it stricter');
 	});
 
@@ -100,6 +101,7 @@ describe('tenant rate limits', () => {
 		const drawer = document.body.querySelector('form#address-form')?.textContent ?? '';
 		expect(drawer.replace(/\s+/g, ' ')).toContain('Add your own address to the allow list first');
 		expect(drawer).toContain('0.0.0.0/0 covers the address you are signed in from');
+		expect(drawer.replace(/\s+/g, ' ')).toContain('only someone signing in from another address could undo that');
 	});
 
 	it('shows a locked history beside lists that still read', () => {
@@ -114,7 +116,7 @@ describe('tenant rate limits', () => {
 		const { container } = render(TenantPage, {
 			props: props({ addresses: { ok: true, value: { licensed: false, limits: { entries: { limit: 500, current: 0 } }, rules: [] } } }),
 		});
-		expect(said(container)).toContain('Adding an address needs a license');
+		expect(said(container)).toContain('Adding an address is not enabled on this instance.');
 		expect(said(container)).toContain('No address is refused');
 	});
 });
@@ -186,7 +188,7 @@ describe('the license', () => {
 		for (const b of screen.getAllByRole('button', { name: 'New address' })) expect((b as HTMLButtonElement).disabled).toBe(true);
 		expect((screen.getByRole('button', { name: 'Clear' }) as HTMLButtonElement).disabled).toBe(false);
 		expect((screen.getByRole('button', { name: 'Delete 198.51.100.7/32' }) as HTMLButtonElement).disabled).toBe(false);
-		expect(screen.getByText(/Setting this limit needs a license/)).toBeTruthy();
+		expect(screen.getByText(/Setting a tenant limit is not enabled on this instance\./)).toBeTruthy();
 	});
 
 	it('offers both writes on a licensed install', () => {

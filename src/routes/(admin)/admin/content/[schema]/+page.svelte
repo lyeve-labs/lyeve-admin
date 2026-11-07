@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { couldNotLoad } from '$lib/outage';
 	import {
 		Alert,
 		Autocomplete,
@@ -178,7 +179,7 @@
 			/>
 		</form>
 	{:else if !data.schemas.ok}
-		<p class="text-sm text-muted">Could not load the other collections. Reload the page to try again.</p>
+		<p class="text-sm text-muted">{couldNotLoad('the other collections', { reload: true })}</p>
 	{/if}
 
 	{#if form?.error}
@@ -241,7 +242,7 @@
 				<thead>
 					<tr>
 						<th scope="col">Entry</th>
-						{#each columnFields as field}
+						{#each columnFields as field (field.name)}
 							<th scope="col">{humanizeFieldName(field.name)}</th>
 						{/each}
 						{#if data.schemaDef.with_draft_publish}
@@ -283,7 +284,7 @@
 									{/if}
 								</span>
 							</td>
-							{#each columnFields as field}
+							{#each columnFields as field (field.name)}
 								<td class="max-w-50 truncate">
 									<FieldCell {field} value={item.data[field.name]} />
 								</td>

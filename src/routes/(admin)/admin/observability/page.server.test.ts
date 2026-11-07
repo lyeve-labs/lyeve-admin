@@ -161,7 +161,7 @@ describe('the tunable actions', () => {
 
 	it('relays the plugin bounds message on a 422', async () => {
 		const { event } = actionEvent(form({ workers: '8', queue_size: '64', timeout: '5s', enabled: 'on' }), {
-			'/debug/goroutines/async-hooks': () => json({ error: 'workers must be between 1 and 1024' }, 422),
+			'/debug/goroutines/async-hooks': () => json({ error: 'workers must be between 1 and 1024', code: 'http_422' }, 422),
 		});
 		const result = await actions.asyncHooks(event);
 		expect(result).toMatchObject({ status: 422, data: { form: 'asyncHooks', error: 'workers must be between 1 and 1024' } });
@@ -170,7 +170,7 @@ describe('the tunable actions', () => {
 	it('refuses an out-of-bounds value before the round trip', async () => {
 		const { event, calls } = actionEvent(form({ size: '9000' }), {});
 		const result = await actions.pool(event);
-		expect(result).toMatchObject({ status: 422, data: { form: 'pool', error: 'Pool size must be between 1 and 4096.' } });
+		expect(result).toMatchObject({ status: 422, data: { form: 'pool', error: 'Enter a value from 1 to 4096 for pool size.' } });
 		expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
 	});
 

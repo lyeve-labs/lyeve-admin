@@ -3,7 +3,8 @@ import { fail, redirect } from '@sveltejs/kit';
 import { type HttpClient, type Schema, type SchemaField } from '@lyeve-labs/client';
 import { getSchemas, getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, exactParse, requireUser, withExactIntegers } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
+import { couldNotLoad } from '$lib/outage';
 import { readError } from '$lib/server/read-error';
 import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, totalOf, withOffset, type ListEnvelope } from '$lib/api/list';
@@ -40,8 +41,8 @@ function statusFrom(url: URL): EntryStatus | null {
 	return (ENTRY_STATUSES as readonly string[]).includes(asked ?? '') ? (asked as EntryStatus) : null;
 }
 
-const ENTRIES_FAILED = 'Could not load entries.';
-const SCHEMAS_FAILED = 'Could not load the other collections.';
+const ENTRIES_FAILED = couldNotLoad('entries');
+const SCHEMAS_FAILED = couldNotLoad('the other collections');
 
 /**
  * Entries are listed through the admin API, which holds every entry with its
@@ -180,7 +181,7 @@ export const actions: Actions = {
 			await client.delete(`/api/admin/content/${encodeURIComponent(id)}`);
 			return { ok: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not delete the entry. Try again.') });
+			return actionFailure(err, 'Could not delete the entry. Try again.');
 		}
 	},
 };

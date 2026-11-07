@@ -263,7 +263,7 @@ describe('deleting a file', () => {
 	// The delete is asked from the preview drawer, which stays open on a
 	// refusal, so the failure names its file for that drawer to show.
 	it('returns a refusal against the file it was for', async () => {
-		const { event } = actionEvent({ id: 'm1' }, () => json({ error: 'media is referenced by a content entry' }, 409));
+		const { event } = actionEvent({ id: 'm1' }, () => json({ error: 'media is referenced by a content entry', code: 'conflict' }, 409));
 		const out = (await actions.delete(event)) as Failure;
 		expect(out.data).toEqual({ deleteError: 'media is referenced by a content entry', deleteId: 'm1' });
 	});
@@ -294,7 +294,7 @@ describe('importing a file from an address', () => {
 	});
 
 	it('relays the reason the plugin refused', async () => {
-		const { event } = actionEvent({ url: 'https://example.com/a.png' }, () => json({ error: 'file type not allowed' }, 415));
+		const { event } = actionEvent({ url: 'https://example.com/a.png' }, () => json({ error: 'file type not allowed', code: 'http_415' }, 415));
 		expect(((await actions.importUrl(event)) as Failure).data.importError).toContain('file type not allowed');
 	});
 
@@ -322,7 +322,7 @@ describe('describing an image', () => {
 			json({ error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' }, 402),
 		);
 		expect(((await actions.describe(license.event)) as Failure).data.detailsError).toBe(
-			'The license on this instance does not include ai. Nothing was changed.',
+			'This is not enabled on this instance. Nothing was changed.',
 		);
 	});
 

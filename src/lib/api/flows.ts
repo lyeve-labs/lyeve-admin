@@ -8,8 +8,9 @@
  */
 
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
-import { rowsOf, statedTotal, type ListEnvelope } from '$lib/api/list';
+import { query, readAll, rowsOf, statedTotal, type ListEnvelope } from '$lib/api/list';
 import type { EventTypes, FlowDefinition, FlowOption, FlowStatus, NodeSpec } from '$lib/flow/types';
+import { count } from './narrow';
 
 export interface LastRun {
 	id: string;
@@ -177,22 +178,12 @@ export interface FlowPage extends Page<Flow> {
 
 const BASE = '/api/admin/flows';
 
-const q = (params: Record<string, string | number | undefined>): string => {
-	const qs = new URLSearchParams();
-	for (const [k, v] of Object.entries(params)) {
-		if (v !== undefined && v !== '') qs.set(k, String(v));
-	}
-	const s = qs.toString();
-	return s ? `?${s}` : '';
-};
-
-const enc = encodeURIComponent;
 
 export async function listFlows(
 	client: HttpClient,
 	params: { limit?: number; offset?: number; status?: string; q?: string } = {}
 ): Promise<FlowPage> {
-	const res = await client.get<(ListEnvelope<Flow> & { can_create?: boolean }) | Flow[]>(`${BASE}${q(params)}`);
+	const res = await client.get<(ListEnvelope<Flow> & { can_create?: boolean }) | Flow[]>(`${BASE}${query(params)}`);
 	const canCreate = !Array.isArray(res) && typeof res?.can_create === 'boolean' ? res.can_create : true;
 	return { rows: rowsOf(res), total: statedTotal(res), canCreate };
 }
@@ -215,17 +206,16 @@ export function listAllFlows(client: HttpClient, cap = 1000): Promise<FlowOption
 }
 
 async function listFlowOptions(client: HttpClient, status: string, cap: number): Promise<FlowOption[]> {
-	const out: FlowOption[] = [];
-	for (let offset = 0; offset < cap; offset += FLOW_PAGE) {
-		const page = await listFlows(client, { limit: FLOW_PAGE, offset, status });
-		out.push(...page.rows.map((f) => ({ id: f.id, slug: f.slug, name: f.name })));
-		if (page.rows.length < FLOW_PAGE) break;
-	}
-	return out.slice(0, cap);
+	const { rows } = await readAll(
+		async (limit, offset) => ({ rows: (await listFlows(client, { limit, offset, status })).rows, total: null }),
+		FLOW_PAGE,
+		cap
+	);
+	return rows.slice(0, cap).map((f) => ({ id: f.id, slug: f.slug, name: f.name }));
 }
 
 export function getFlow(client: HttpClient, id: string): Promise<Flow> {
-	return client.get<Flow>(`${BASE}/${enc(id)}`);
+	return client.get<Flow>(`${BASE}/${encodeURIComponent(id)}`);
 }
 
 export function createFlow(
@@ -240,28 +230,28 @@ export function saveDraft(
 	id: string,
 	body: { name: string; slug?: string; description?: string; definition: FlowDefinition }
 ): Promise<Flow> {
-	return client.put<Flow>(`${BASE}/${enc(id)}`, body);
+	return client.put<Flow>(`${BASE}/${encodeURIComponent(id)}`, body);
 }
 
 export async function deleteFlow(client: HttpClient, id: string): Promise<void> {
-	await client.delete<void>(`${BASE}/${enc(id)}`);
+	await client.delete<void>(`${BASE}/${encodeURIComponent(id)}`);
 }
 
 export function publishFlow(client: HttpClient, id: string): Promise<Flow> {
-	return client.post<Flow>(`${BASE}/${enc(id)}/publish`, undefined);
+	return client.post<Flow>(`${BASE}/${encodeURIComponent(id)}/publish`, undefined);
 }
 
 export function disableFlow(client: HttpClient, id: string): Promise<Flow> {
-	return client.post<Flow>(`${BASE}/${enc(id)}/disable`, undefined);
+	return client.post<Flow>(`${BASE}/${encodeURIComponent(id)}/disable`, undefined);
 }
 
 export function rollbackFlow(client: HttpClient, id: string, version: number): Promise<Flow> {
-	return client.post<Flow>(`${BASE}/${enc(id)}/rollback`, { version });
+	return client.post<Flow>(`${BASE}/${encodeURIComponent(id)}/rollback`, { version });
 }
 
 export async function listVersions(client: HttpClient, id: string): Promise<FlowVersion[]> {
 	const res = await client.get<ListEnvelope<FlowVersion> | FlowVersion[]>(
-		`${BASE}/${enc(id)}/versions`
+		`${BASE}/${encodeURIComponent(id)}/versions`
 	);
 	return rowsOf(res);
 }
@@ -271,11 +261,11 @@ export function validateFlow(
 	id: string,
 	definition: FlowDefinition
 ): Promise<ValidationResult> {
-	return client.post<ValidationResult>(`${BASE}/${enc(id)}/validate`, definition);
+	return client.post<ValidationResult>(`${BASE}/${encodeURIComponent(id)}/validate`, definition);
 }
 
 export function testFlow(client: HttpClient, id: string, body: TestRequest): Promise<FlowRun> {
-	return client.post<FlowRun>(`${BASE}/${enc(id)}/test`, body);
+	return client.post<FlowRun>(`${BASE}/${encodeURIComponent(id)}/test`, body);
 }
 
 export async function listRuns(
@@ -284,13 +274,13 @@ export async function listRuns(
 	params: { limit?: number; offset?: number; status?: string; is_test?: string } = {}
 ): Promise<Page<FlowRun>> {
 	const res = await client.get<ListEnvelope<FlowRun> | FlowRun[]>(
-		`${BASE}/${enc(id)}/runs${q(params)}`
+		`${BASE}/${encodeURIComponent(id)}/runs${query(params)}`
 	);
 	return { rows: rowsOf(res), total: statedTotal(res) };
 }
 
 export function getRun(client: HttpClient, runId: string): Promise<FlowRun> {
-	return client.get<FlowRun>(`${BASE}/runs/${enc(runId)}`);
+	return client.get<FlowRun>(`${BASE}/runs/${encodeURIComponent(runId)}`);
 }
 
 /**
@@ -304,8 +294,8 @@ export async function exportFlow(
 	format: 'json' | 'yaml',
 	headers: Record<string, string> = {}
 ): Promise<string> {
-	const res = await fetchFn(`${BASE}/${enc(id)}/export?format=${format}`, { headers });
-	if (!res.ok) throw new Error(`export failed with ${res.status}`);
+	const res = await fetchFn(`${BASE}/${encodeURIComponent(id)}/export?format=${format}`, { headers });
+	if (!res.ok) throw new Error('Could not export the flow. Try again.');
 	return res.text();
 }
 
@@ -334,7 +324,7 @@ export async function importFlow(
 		init.headers = { ...headers, 'Content-Type': 'application/json' };
 		init.body = JSON.stringify({ content: body.content, format: body.format });
 	}
-	const res = await fetchFn(`${BASE}/import${q({ mode: body.mode, slug: body.slug })}`, init);
+	const res = await fetchFn(`${BASE}/import${query({ mode: body.mode, slug: body.slug })}`, init);
 	const text = await res.text();
 	if (!res.ok) {
 		const refusal = refusalOf(res.status, text);
@@ -430,15 +420,15 @@ export function updateDatasource(
 	id: string,
 	body: DatasourceBody
 ): Promise<Datasource> {
-	return client.put<Datasource>(`${BASE}/datasources/${enc(id)}`, body);
+	return client.put<Datasource>(`${BASE}/datasources/${encodeURIComponent(id)}`, body);
 }
 
 export async function deleteDatasource(client: HttpClient, id: string): Promise<void> {
-	await client.delete<void>(`${BASE}/datasources/${enc(id)}`);
+	await client.delete<void>(`${BASE}/datasources/${encodeURIComponent(id)}`);
 }
 
 export function testDatasource(client: HttpClient, id: string): Promise<DatasourceTest> {
-	return client.post<DatasourceTest>(`${BASE}/datasources/${enc(id)}/test`, undefined);
+	return client.post<DatasourceTest>(`${BASE}/datasources/${encodeURIComponent(id)}/test`, undefined);
 }
 
 export interface IntrospectedColumn {
@@ -461,7 +451,7 @@ export interface Introspection {
  * tables. A datasource of another kind answers 400, which the client throws.
  */
 export async function introspectDatasource(client: HttpClient, id: string): Promise<Introspection> {
-	const res = await client.get<Introspection>(`${BASE}/datasources/${enc(id)}/introspect`);
+	const res = await client.get<Introspection>(`${BASE}/datasources/${encodeURIComponent(id)}/introspect`);
 	return { tables: Array.isArray(res?.tables) ? res.tables : [] };
 }
 
@@ -483,7 +473,7 @@ export function putVariable(
 }
 
 export async function deleteVariable(client: HttpClient, key: string): Promise<void> {
-	await client.delete<void>(`${BASE}/variables/${enc(key)}`);
+	await client.delete<void>(`${BASE}/variables/${encodeURIComponent(key)}`);
 }
 
 /**
@@ -520,10 +510,6 @@ export class FlowRefusal extends ApiError {
 	get nodeIds(): string[] {
 		return [...new Set(this.errors.map((e) => e.node_id).filter((id): id is string => typeof id === 'string' && id !== ''))];
 	}
-}
-
-function count(value: unknown): number | null {
-	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 /** The refusal in a 402 body, or null for any other status. A body that is not JSON is a refusal that names nothing. */

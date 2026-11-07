@@ -1,4 +1,5 @@
 import { ApiError } from '@lyeve-labs/client';
+import { outageFor } from '$lib/outage';
 
 /** The sentence and status a sign-in answers with when a second factor fails. */
 export interface SecondFactorFailure {
@@ -65,5 +66,5 @@ export function secondFactorFailure(e: unknown, again = 'sign in again'): Second
 			return { status: 400, error: 'That code did not match. Try again.' };
 		}
 	}
-	return { status: 503, error: 'Could not check the code. Try again in a moment.' };
+	return { status: 503, error: outageFor('your code was not checked') };
 }

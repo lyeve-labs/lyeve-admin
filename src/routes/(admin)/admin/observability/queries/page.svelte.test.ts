@@ -90,7 +90,7 @@ describe('Slow queries gate', () => {
 		});
 
 		expect(container.textContent).toContain('is unavailable');
-		expect(container.textContent).not.toContain('Its table may be missing');
+		expect(container.textContent).not.toContain('Could not load the slow query log.');
 		expect(container.textContent).toContain('Try again');
 	});
 });

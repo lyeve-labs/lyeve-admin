@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail, type ActionFailure } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionError, actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -103,14 +103,6 @@ export const load: PageServerLoad = async (event) => {
 	]);
 	return { mail, providers };
 };
-
-/**
- * The failure marked with the action that caused it. The drawer shows only a
- * failed save, and a failed delete shows above the list.
- */
-function tagged<T extends Record<string, unknown>>(action: string, failure: ActionFailure<T>) {
-	return fail(failure.status, { ...failure.data, action });
-}
 
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();
 

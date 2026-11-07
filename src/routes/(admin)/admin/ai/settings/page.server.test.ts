@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { actions, load } from './+page.server';
-import { fixtureSettings } from '$lib/components/ai/fixtures';
-import { actionEvent, formOf, json, loadEvent, refused, sentBody } from '$lib/components/ai/test-events';
+import { fixtureSettings } from '$lib/components/ai/test-support/fixtures';
+import { actionEvent, formOf, json, loadEvent, refused, sentBody } from '$lib/components/ai/test-support/events';
 
 const path = '/admin/ai/settings';
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
@@ -77,7 +77,7 @@ describe('admin/ai/settings actions', () => {
 		const forbidden = actionEvent({ '/api/admin/ai/settings': () => refused(403, 'insufficient permissions') }, formOf({ enabled: 'false' }), { path });
 		expect(await actions.save(forbidden.event)).toMatchObject({
 			status: 403,
-			data: { error: 'Your role cannot change this. Ask an admin if you need it.' },
+			data: { error: 'Only an admin or a super admin can change this.' },
 		});
 	});
 

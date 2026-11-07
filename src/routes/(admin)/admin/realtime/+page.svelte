@@ -7,10 +7,9 @@
 		SectionHeading,
 		Stat,
 		Table,
-		Button,
 	} from '@lyeve-labs/ui-kit';
-	import { invalidateAll } from '$app/navigation';
-	import { Radio, RefreshCw, Satellite, Users } from '@lucide/svelte';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
+	import { Radio, Satellite, Users } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { inUse, tenantLoad, uptimeSince, type StreamMetrics } from '$lib/api/realtime';
 	import { NO_VALUE, formatCount } from '$lib/format';
@@ -18,16 +17,6 @@
 	import { ICON } from '$lib/icon';
 
 	let { data }: { data: PageData } = $props();
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	const streamUsed = $derived(inUse(data.stream));
 	const socketUsed = $derived(inUse(data.socket));
@@ -54,9 +43,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 	{/snippet}
 
 	{#if data.gate.state !== 'ok'}
@@ -95,7 +82,7 @@
 					/>
 				</div>
 				<p class="text-xs text-faint">
-					Open now and accepted count this tenant's connections. The other counters cover every tenant on
+					Open now and Accepted count this tenant's connections. The other counters cover every tenant on
 					the instance.
 				</p>
 			{/if}

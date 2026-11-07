@@ -16,8 +16,9 @@ import {
 	type PluginBreakdown,
 } from '$lib/api/profiler';
 import { section, type Section } from '$lib/api/gate';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
+import { couldNotLoad } from '$lib/outage';
 
 /**
  * What the page renders. Every view is the profiler plugin's, under
@@ -41,10 +42,10 @@ export interface ProfilerPage {
 
 /** What each view says when its read failed for a reason it cannot name. */
 const FAILED = {
-	endpoints: 'Could not load endpoint statistics.',
-	plugins: 'Could not load per-plugin statistics.',
-	memory: 'Could not load memory snapshots.',
-	detail: 'Could not load this endpoint.',
+	endpoints: couldNotLoad('endpoint statistics'),
+	plugins: couldNotLoad('per-plugin statistics'),
+	memory: couldNotLoad('memory snapshots'),
+	detail: couldNotLoad('this endpoint'),
 } as const;
 
 /**
@@ -93,7 +94,8 @@ export const actions: Actions = {
 			await resetProfiler(authedClient(event));
 			return { form: 'reset' as const, reset: true };
 		} catch (err) {
-			return fail(400, { form: 'reset' as const, error: actionError(err, 'Could not reset the profiler. Try again.') });
+			const failed = actionFailure(err, 'Could not reset the profiler. Try again.');
+			return fail(failed.status, { ...failed.data, form: 'reset' as const });
 		}
 	},
 
@@ -110,7 +112,8 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 403) {
 				return fail(403, { form: 'flamegraph' as const, error: 'Only a super admin can capture a profile.' });
 			}
-			return fail(400, { form: 'flamegraph' as const, error: actionError(err, 'Could not capture the flamegraph. Try again.') });
+			const failed = actionFailure(err, 'Could not capture the flamegraph. Try again.');
+			return fail(failed.status, { ...failed.data, form: 'flamegraph' as const });
 		}
 	},
 };

@@ -1,22 +1,21 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
+import { checked } from '$lib/checkbox';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
-	PII_OK,
 	createRule,
 	deleteRule,
 	getRules,
 	listAccessLog,
-	piiGate,
 	testRule,
 	updateRule,
 	type AccessEntry,
-	type PiiGate,
 	type RuleCatalog,
 } from '$lib/api/pii-mask';
+import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 50;
@@ -34,17 +33,17 @@ export const load: PageServerLoad = async (event) => {
 			total: 0,
 			limit,
 			offset,
-			gate: { state: 'absent' } as PiiGate,
+			gate: { state: 'absent' } as Gate,
 		};
 	}
 
 	const client = authedClient(event);
 	let rules: RuleCatalog | null = null;
-	let gate: PiiGate = PII_OK;
+	let gate: Gate = GATE_OK;
 	try {
 		rules = await getRules(client);
 	} catch (err) {
-		gate = piiGate(err);
+		gate = gateOf(err, 'Could not load the masking settings.');
 	}
 
 	// The access log is the second read. Losing it must not hide the rules,
@@ -87,7 +86,7 @@ function draftFrom(form: FormData) {
 		pattern: String(form.get('pattern') ?? '').trim(),
 		replacement: String(form.get('replacement') ?? '').trim(),
 		priority: priorityFrom(form.get('priority')),
-		enabled: form.get('enabled') === 'on' || form.get('enabled') === 'true',
+		enabled: checked(form, 'enabled'),
 	};
 }
 
@@ -108,7 +107,7 @@ export const actions: Actions = {
 			await createRule(authedClient(event), draft);
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { action: 'create', error: actionError(err, 'Could not create the rule. Try again.') });
+			return tagged('create', actionFailure(err, 'Could not create the rule. Try again.', 422));
 		}
 	},
 
@@ -121,7 +120,7 @@ export const actions: Actions = {
 			await updateRule(authedClient(event), id, draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { action: 'update', error: actionError(err, 'Could not save the rule. Try again.') });
+			return tagged('update', actionFailure(err, 'Could not save the rule. Try again.', 422));
 		}
 	},
 
@@ -134,7 +133,7 @@ export const actions: Actions = {
 			await deleteRule(authedClient(event), id);
 			return { deleted: true };
 		} catch (err) {
-			return fail(422, { action: 'delete', error: actionError(err, 'Could not delete the rule. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the rule. Try again.', 422));
 		}
 	},
 
@@ -152,7 +151,7 @@ export const actions: Actions = {
 			);
 			return { test: result };
 		} catch (err) {
-			return fail(422, { action: 'test', error: actionError(err, 'Could not run the pattern. Try again.') });
+			return tagged('test', actionFailure(err, 'Could not run the pattern. Try again.', 422));
 		}
 	},
 };

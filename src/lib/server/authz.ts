@@ -12,6 +12,8 @@ import {
 import { sessionEndedTarget } from '$lib/server/session-refresh';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { BUSY, OUTAGE } from '$lib/outage';
+import { SESSION_ENDED } from '$lib/session';
+import { rolesInWords } from '$lib/roles';
 
 /** The headers that carry the session, in lower case. Only `authedHeaders` sets them. */
 const SESSION_HEADERS = new Set(['authorization', 'x-csrf-token']);
@@ -236,7 +238,7 @@ export async function loadUser(event: RequestEvent): Promise<User> {
 export async function requireUser(event: RequestEvent): Promise<User> {
 	const user = await sessionUser(authedClient(event));
 	if (!user) {
-		error(401, 'Session invalid or expired');
+		error(401, SESSION_ENDED);
 	}
 	return user;
 }
@@ -260,7 +262,7 @@ export async function requireRole(event: RequestEvent, roles: string[]): Promise
  */
 export function assertRole(user: User, roles: string[]): User {
 	if (!roles.some((r) => user.roles.includes(r))) {
-		error(403, `This needs one of these roles: ${roles.join(', ')}.`);
+		error(403, `Only ${rolesInWords(roles)} can do this.`);
 	}
 	return user;
 }

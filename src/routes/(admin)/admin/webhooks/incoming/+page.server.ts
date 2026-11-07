@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { IncomingWebhook } from '@lyeve-labs/client';
 import {
 	getSchemas,
@@ -8,7 +8,8 @@ import {
 	deleteIncomingWebhook
 } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
+import { checked } from '$lib/checkbox';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
 
@@ -73,15 +74,6 @@ export const load: PageServerLoad = async (event) => {
 	};
 };
 
-/**
- * A failure that names the action it came from. The page holds one result for
- * every form, so the drawer shows only its own writes' failures and the page
- * shows the rest.
- */
-function tagged(action: string, failure: ActionFailure<Record<string, unknown>>) {
-	return fail(failure.status, { ...failure.data, action });
-}
-
 export const actions: Actions = {
 	create: async (event) => {
 		// The plugin serves this write to a super admin only.
@@ -95,7 +87,7 @@ export const actions: Actions = {
 		try {
 			fieldMap = JSON.parse(rawMap);
 		} catch {
-			return fail(400, { action: 'create', error: 'Field map must be valid JSON.' });
+			return fail(400, { action: 'create', error: 'Enter the field map as valid JSON.' });
 		}
 		// The engine refuses an empty map: every external key has to be mapped to a
 		// schema field explicitly. Catch it here so the operator is told before the
@@ -114,7 +106,7 @@ export const actions: Actions = {
 					schema_name: String(data.get('schema_name') ?? ''),
 					secret: String(data.get('secret') ?? ''),
 					field_map: fieldMap,
-					enabled: data.get('enabled') === 'true' || data.get('enabled') === 'on',
+					enabled: checked(data, 'enabled'),
 					allowed_ips: parseIPList(data.get('allowed_ips'))
 				},
 				client
@@ -137,7 +129,7 @@ export const actions: Actions = {
 		try {
 			fieldMap = JSON.parse(rawMap);
 		} catch {
-			return fail(400, { action: 'update', error: 'Field map must be valid JSON.' });
+			return fail(400, { action: 'update', error: 'Enter the field map as valid JSON.' });
 		}
 		// The engine refuses an empty map: every external key has to be mapped to a
 		// schema field explicitly. Catch it here so the operator is told before the
@@ -157,7 +149,7 @@ export const actions: Actions = {
 					schema_name: String(data.get('schema_name') ?? ''),
 					secret: String(data.get('secret') ?? ''),
 					field_map: fieldMap,
-					enabled: data.get('enabled') === 'true' || data.get('enabled') === 'on',
+					enabled: checked(data, 'enabled'),
 					allowed_ips: parseIPList(data.get('allowed_ips'))
 				},
 				client

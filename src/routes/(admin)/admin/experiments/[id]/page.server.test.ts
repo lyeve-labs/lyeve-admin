@@ -168,7 +168,7 @@ describe.each<WriteCase>([
 	});
 
 	it('relays the reason the plugin refused with, tagged with the action', async () => {
-		engine[call].mockRejectedValue(new ApiError(409, 'the experiment is running'));
+		engine[call].mockRejectedValue(new ApiError(409, 'the experiment is running', { error: 'the experiment is running', code: 'conflict' }));
 		expect(await run(form)).toMatchObject({ status: 400, data: { action: name, error: 'the experiment is running' } });
 	});
 

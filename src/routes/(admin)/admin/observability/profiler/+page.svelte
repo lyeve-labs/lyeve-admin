@@ -13,8 +13,8 @@
 		Table,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
 	import {
 		AlertTriangle,
 		CheckCircle,
@@ -23,34 +23,22 @@
 		Gauge,
 		MemoryStick,
 		Puzzle,
-		RefreshCw,
 		RotateCcw,
 	} from '@lucide/svelte';
 	import {
 		PROFILE_SECONDS,
 		PROFILE_TYPES,
-		formatSignedBinaryBytes,
 		formatNs,
 		latencyTone,
 		type EndpointStats,
 	} from '$lib/api/profiler';
-	import { NO_VALUE, formatDateTime, formatTime } from '$lib/format';
+	import { NO_VALUE, formatBytes, formatDateTime, formatSignedBytes, formatTime } from '$lib/format';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import { httpStatusTone } from '$lib/tones';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	let resetting = $state(false);
 	let capturing = $state(false);
@@ -122,7 +110,7 @@
 					<td class="text-right"><Badge tone={latencyTone(row.p95_duration_ns)}>{formatNs(row.p95_duration_ns)}</Badge></td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.p99_duration_ns)}</td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.max_duration_ns)}</td>
-					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(row.avg_alloc_bytes)}</td>
+					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(row.avg_alloc_bytes)}</td>
 				</tr>
 			{/each}
 		</tbody>
@@ -136,9 +124,7 @@
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 		<form
 			method="POST"
 			action="?/reset"
@@ -187,19 +173,17 @@
 		</div>
 		{#if !data.memory.ok}
 			<GateNotice gate={data.memory.gate} title="the memory trend" absent={ABSENT} />
-		{:else if !memory}
-			<EmptyState iconSnippet={noMemory} title="No memory trend" description="No memory snapshots are available yet." />
-		{:else if !latest}
-			<EmptyState iconSnippet={noMemory} title="No snapshot yet" description="Snapshots are taken on a schedule. The first one has not been taken yet." />
+		{:else if !memory || !latest}
+			<EmptyState iconSnippet={noMemory} title="No snapshots yet" description="Snapshots are taken on a schedule, and the first one appears here." />
 		{:else}
 			<Card>
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="memory-stats">
-					<Stat size="sm" label="Heap in use" mono value={formatSignedBinaryBytes(latest.heap_alloc)} />
+					<Stat size="sm" label="Heap in use" mono value={formatBytes(latest.heap_alloc)} />
 					<Stat size="sm" label="Heap objects" mono value={latest.heap_objects} />
-					<Stat size="sm" label="Allocated total" mono value={formatSignedBinaryBytes(latest.total_alloc)} />
+					<Stat size="sm" label="Allocated total" mono value={formatBytes(latest.total_alloc)} />
 					<Stat size="sm" label="GC cycles" mono value={latest.num_gc} />
 					<Stat size="sm" label="Goroutines" mono value={latest.num_goroutine} />
-					<Stat size="sm" label="Heap slope" mono value="{formatSignedBinaryBytes(memory.slope_bytes_per_sec)}/s" tone={memory.leak_likely ? 'danger' : undefined} />
+					<Stat size="sm" label="Heap slope" mono value="{formatSignedBytes(memory.slope_bytes_per_sec)}/s" tone={memory.leak_likely ? 'danger' : undefined} />
 				</div>
 				<p class="mt-3 text-xs text-muted">
 					Last snapshot {formatDateTime(latest.timestamp, NO_VALUE)}.
@@ -220,7 +204,7 @@
 		{#if !data.slowest.ok}
 			<GateNotice gate={data.slowest.gate} title="the endpoint statistics" absent={ABSENT} />
 		{:else if data.slowest.value.length === 0}
-			<EmptyState iconSnippet={noEndpoints} title="Nothing sampled yet" description="Endpoints appear here after they serve requests." />
+			<EmptyState iconSnippet={noEndpoints} title="No samples yet" description="Endpoints appear here after they serve requests." />
 		{:else}
 			{@render endpointRows(data.slowest.value, 'Slowest endpoints')}
 		{/if}
@@ -238,7 +222,7 @@
 			{#if data.detail && !data.detail.ok}
 				<GateNotice gate={data.detail.gate} title="this endpoint" absent={ABSENT} />
 			{:else if !detail || !detail.methods?.length}
-				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="The profiler may have been reset, or this path has not served any requests." />
+				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="No requests were sampled for this endpoint." />
 			{:else}
 				{@render endpointRows(detail.methods.map((m) => m.stats), `Methods for ${data.selected}`)}
 				{#each detail.methods as method (method.method)}
@@ -266,7 +250,7 @@
 										<td data-cell="nowrap" class="font-mono text-xs"><span class="text-faint">{formatTime(e.captured_at, e.captured_at)}</span></td>
 										<td class="text-right"><Badge tone={httpStatusTone(e.status_code)}>{e.status_code}</Badge></td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(e.duration_ns)}</td>
-										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(e.alloc_bytes)}</td>
+										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(e.alloc_bytes)}</td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{e.num_goroutine}</td>
 										<td data-cell="nowrap" class="text-xs">{e.plugin || NO_VALUE}</td>
 									</tr>
@@ -286,7 +270,7 @@
 		{#if !data.plugins.ok}
 			<GateNotice gate={data.plugins.gate} title="the plugin breakdown" absent={ABSENT} />
 		{:else if data.plugins.value.length === 0}
-			<EmptyState iconSnippet={noPlugins} title="Nothing sampled yet" description="Plugins appear here after they serve a request." />
+			<EmptyState iconSnippet={noPlugins} title="No samples yet" description="Plugins appear here after they serve a request." />
 		{:else}
 			<Table label="By plugin">
 				<thead>
@@ -305,7 +289,7 @@
 							<td data-cell="nowrap" class="text-right text-xs"><span class="text-faint">{p.count}</span></td>
 							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(p.avg_duration_ns)}</td>
 							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(p.max_duration_ns)}</td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(p.total_alloc_bytes)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(p.total_alloc_bytes)}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -324,8 +308,8 @@
 			{/snippet}
 			<div class="flex flex-col gap-4" data-testid="profiler-exports">
 				<p class="text-xs text-muted">
-					Each download is a gzipped pprof profile. Heap and allocations profiles contain raw
-					process memory and are logged when exported. This instance may not allow them.
+					Each download is a gzipped pprof profile. A heap or allocations profile contains raw
+					process memory, so each export is logged, and the engine can refuse it.
 				</p>
 				<NumberInput
 					id="cpu-seconds"

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import ExemptMark from './ExemptMark.svelte';
+	import { ShieldCheck } from '@lucide/svelte';
+	import { ICON } from '$lib/icon';
 	import { EXEMPT_ROLE, SUMMARY_FILL, type Action, type RuleMatrix } from './rules.svelte';
 
 	/**
@@ -12,7 +13,7 @@
 </script>
 
 {#if role === EXEMPT_ROLE}
-	<ExemptMark />
+	<ShieldCheck size={ICON.sm} class="inline-block align-middle text-violet" aria-hidden="true" data-mark="exempt" />
 	<span class="sr-only">
 		{role} is always allowed {action} on every schema. The role is exempt from these rules.
 	</span>

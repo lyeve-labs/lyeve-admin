@@ -105,6 +105,6 @@ jobs:
       - name: Build
         run: pnpm run build
         env:
-          # Build needs *some* origin to satisfy adapter-node. Runtime ORIGIN
-          # is supplied by the deployment, this is just to make the build pass.
+          # adapter-node refuses to build without an origin. The deployment
+          # sets the real one at run time.
           ORIGIN: http://localhost:3002

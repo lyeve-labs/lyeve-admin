@@ -69,7 +69,7 @@ describe('PII masking rules', () => {
 		const { container } = render(PiiPage, {
 			props: props({ rules: { presets: [], mask_tags: {} } }),
 		});
-		expect(said(container)).toContain('Nothing is being masked');
+		expect(said(container)).toContain('No rule is loaded, so responses are not masked.');
 	});
 
 	it('names each mask style a field can ask for', () => {
@@ -137,6 +137,16 @@ describe('custom PII rules', () => {
 		});
 		expect(said(container)).toContain('ACCOUNT');
 		expect(said(container)).toContain('Our account numbers');
+	});
+
+	// The delete is a form in the row, so the id it posts is the row's own.
+	it('deletes a rule through a form in its row that posts the rule id', () => {
+		const { getByRole } = render(PiiPage, {
+			props: props({ rules: { presets: [], custom: [rule()], mask_tags: {} } }),
+		});
+		const form = getByRole('button', { name: 'Delete ACCOUNT' }).closest('form') as HTMLFormElement;
+		expect(form.getAttribute('action')).toBe('?/delete');
+		expect(new FormData(form).get('id')).toBe('r1');
 	});
 
 	it('names RE2, because a PCRE pattern fails within minutes', () => {

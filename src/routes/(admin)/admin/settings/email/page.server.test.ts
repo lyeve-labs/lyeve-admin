@@ -115,7 +115,7 @@ describe('admin/settings/email actions', () => {
 
 		const refused = actionEvent(
 			form({ id: 'p1', name: 'Api', transport: 'api', api_key: 'k', api_base_url: 'https://api.example.test', from_addr: 'a@b.c', priority: '0', max_per_hour: '0' }),
-			{ '/email/providers/p1': () => json({ error: 'Invalid api_base_url' }, 400) },
+			{ '/email/providers/p1': () => json({ error: 'Invalid api_base_url', code: 'bad_request' }, 400) },
 		);
 		const result = (await actions.update(refused.event)) as { status: number; data: { error: string } };
 		expect(result.status).toBe(400);

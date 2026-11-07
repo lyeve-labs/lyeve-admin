@@ -67,7 +67,7 @@
 				<p class="text-muted">
 					Scripts that call the admin API under <span class="font-mono">/api/admin</span> use an
 					{#if operator}<a href="/admin/admin-tokens" class="text-brand hover:underline">admin token</a>{:else}admin token{/if}:
-					a Bearer credential that an admin creates with named grants. It expires within 90 days and logs every request it makes.
+					a Bearer credential that an administrator creates with named grants. It expires within 90 days, and every request made with it is logged.
 				</p>
 				<div class="flex flex-col gap-2">
 					<p class="font-medium text-muted">Role capabilities</p>

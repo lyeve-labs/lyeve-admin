@@ -1,13 +1,14 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
 import { refusalFailure } from '$lib/server/flow-refusal';
-import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { flowLoadOutcome } from '$lib/server/flow-load';
+import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import {
@@ -62,7 +63,7 @@ export const load: PageServerLoad = async (event) => {
 		hasMore = total === null ? page.rows.length > limit : offset + flows.length < total;
 	} catch (err) {
 		({ locked } = flowLoadOutcome(err, { cookies, url }, 'flows'));
-		if (!locked) gate = gateOf(err, engineBanner('flows'));
+		if (!locked) gate = gateOf(err, couldNotLoad('flows'));
 	}
 
 	const back = pastEndOffset(flows.length, limit, offset, total);
@@ -93,16 +94,8 @@ function validationFailure(err: unknown, fallback: string) {
 	if (err instanceof FlowRefusal) return refusalFailure(err);
 	if (isLocked(err)) return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
 	if (err instanceof ApiError && err.status === 403) return forbiddenFailure(err);
-	return fail(400, { error: actionError(err, fallback) });
-}
-
-/**
- * A failure tagged with the form that caused it. The create drawer, the
- * import drawer and the row's delete share one `form` result, and each shows
- * only its own failure.
- */
-function tagged<F extends ActionFailure<Record<string, unknown>>>(action: string, failure: F) {
-	return fail(failure.status, { ...(failure.data as F['data']), action });
+	const failed = actionFailure(err, fallback);
+	return fail(failed.status, failed.data);
 }
 
 export const actions: Actions = {
@@ -139,7 +132,7 @@ export const actions: Actions = {
 			await deleteFlow(client, id);
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 403) return tagged('delete', forbiddenFailure(err));
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the flow. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the flow. Try again.'));
 		}
 	},
 

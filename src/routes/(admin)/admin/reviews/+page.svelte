@@ -19,20 +19,19 @@
 		Pagination,
 		Table,
 		Toggle,
-		confirm as confirmDialog,
 		type StatusTone,
 	} from '@lyeve-labs/ui-kit';
-	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import { ArrowDown, ArrowUp, ClipboardCheck, Plus, Trash2, X } from '@lucide/svelte';
 	import type { ActionData, PageData } from './$types';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { submitter, fieldErrors } from '$lib/forms.svelte';
+	import { confirmed, submitter, fieldErrors } from '$lib/forms.svelte';
 	import { REVIEW_STATUSES, approvalsNeeded, conditionText, type ReviewStage, type ReviewStatus } from '$lib/api/review';
 	import RefusalNotice from '$lib/components/RefusalNotice.svelte';
 	import { formRefusal, type Refusal } from '$lib/api/refusal';
-	import { formatDateTime, NO_VALUE } from '$lib/format';
+	import { formatDateTime, NO_VALUE, plural } from '$lib/format';
+	import { couldNotLoad } from '$lib/outage';
 	import { shortId } from '$lib/utils/entry-identity';
 	import { pageNumber, pageOffset } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -241,21 +240,11 @@
 	}
 	let errors = $derived(fieldErrors(form));
 
-	let deleteForm = $state<HTMLFormElement | null>(null);
-	let deleteId = $state('');
-
-	async function askDelete(id: string, label: string) {
-		const ok = await confirmDialog(
-			`Delete ${label}?`,
-			'Its assignments, their history and their comments go with it.',
-			{ confirmLabel: 'Delete' },
-		);
-		if (!ok) return;
-		deleteId = id;
-		// The hidden form reads the id from the DOM, so it waits for Svelte to
-		// write it there.
-		await tick();
-		deleteForm?.requestSubmit();
+	function deleteDefinition(name: string) {
+		return confirmed(`Delete ${name}?`, 'Its assignments, their history and their comments go with it.', {
+			confirmLabel: 'Delete',
+			success: `Deleted ${name}`,
+		});
 	}
 </script>
 
@@ -290,7 +279,7 @@
 					{#if workflows && workflows.limit !== null}
 						<span class="text-xs text-muted" data-testid="workflow-count">
 							{workflows.current} of {workflows.limit}
-							{workflows.limit === 1 ? 'workflow' : 'workflows'}
+							{plural(workflows.limit, 'workflow')}
 						</span>
 					{/if}
 				</div>
@@ -337,7 +326,7 @@
 									<td data-cell="nowrap" class="font-mono text-xs">{row.definition.content_schema || 'default'}</td>
 									<td>
 										{#if row.stages === null}
-											<span class="text-xs text-warn">Could not load stages. Reload the page to try again.</span>
+											<span class="text-xs text-warn">{couldNotLoad('stages', { reload: true })}</span>
 										{:else}
 										<ol class="flex flex-wrap items-center gap-1.5">
 											{#each row.stages as stage, i (stage.id)}
@@ -362,15 +351,18 @@
 										</Badge>
 									</td>
 									<td data-cell="nowrap" class="text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											onclick={() => askDelete(row.definition.id, row.definition.name)}
-											title="Delete"
-											aria-label="Delete {row.definition.name}"
-										>
-											<Trash2 size={ICON.sm} class="text-danger" />
-										</Button>
+										<form method="POST" action="?/delete" use:enhance={deleteDefinition(row.definition.name)}>
+											<input type="hidden" name="id" value={row.definition.id} />
+											<Button
+												variant="ghost"
+												size="sm"
+												type="submit"
+												title="Delete"
+												aria-label="Delete {row.definition.name}"
+											>
+												<Trash2 size={ICON.sm} class="text-danger" />
+											</Button>
+										</form>
 									</td>
 								</tr>
 							{/each}
@@ -410,7 +402,7 @@
 			{:else}
 				{#if !data.entriesNamed}
 					<p class="text-xs text-muted">
-						Entries, definitions and stages are shown by ID, because only an admin can see their names.
+						Entries, definitions and stages are shown by ID, because only an administrator can see their names.
 					</p>
 				{/if}
 				<Table label="Review assignments">
@@ -523,7 +515,7 @@
 				label="Content schema"
 				hint={data.schemas.ok
 					? 'The schema whose entries this definition reviews.'
-					: 'Could not load schemas. Type the name of the schema whose entries this definition reviews.'}
+					: `${couldNotLoad('schemas')} Type the name of the schema whose entries this definition reviews.`}
 				value={contentSchema ?? ''}
 				oninput={(e) => (contentSchema = (e.currentTarget as HTMLInputElement).value)}
 				class="font-mono"
@@ -596,7 +588,7 @@
 										<Input
 											id="stage-role-{stage.key}"
 											label="Required role"
-											hint="Leave empty to allow anyone the permission rules allow. The admin and super_admin roles can always act."
+											hint="Leave empty to allow anyone the permission rules allow. An admin or a super admin can always act."
 											bind:value={stage.required_role}
 											placeholder="editor"
 											mono
@@ -701,7 +693,3 @@
 		<Button variant="primary" type="submit" form="definition-form" loading={submit.pending}>Create</Button>
 	{/snippet}
 </Drawer>
-
-<form method="POST" action="?/delete" use:enhance bind:this={deleteForm} class="hidden">
-	<input type="hidden" name="id" value={deleteId} />
-</form>

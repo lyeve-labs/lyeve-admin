@@ -24,7 +24,7 @@
 		type CollectionFilter,
 		type CollectionSort,
 	} from '$lib/api/collections';
-	import { NO_VALUE, formatCount, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatCount, formatDateTime, plural } from '$lib/format';
 	import { ICON } from '$lib/icon';
 
 	let { data }: { data: PageData } = $props();
@@ -260,7 +260,7 @@
 			{:else}
 				{#if empties > 0 && !filterCountsRows(data.filter)}
 					<p class="text-xs text-faint">
-						{empties} of {filtered.length} on this page {empties === 1 ? 'has' : 'have'} no entries.
+						{empties} of {filtered.length} on this page {plural(empties, 'has', 'have')} no entries.
 						<a href={filterHref('with-rows')} class="underline hover:text-fg">Hide them</a>.
 					</p>
 				{/if}

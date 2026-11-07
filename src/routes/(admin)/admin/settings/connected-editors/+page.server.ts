@@ -5,7 +5,7 @@ import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning, runs } from '$lib/plugins';
 import { describeRefusal } from '$lib/api/admin-tokens';
-import { isOutage, section, type Section } from '$lib/api/gate';
+import { isOutage, section, type Gate, type Section } from '$lib/api/gate';
 import { listSchemaNames } from '$lib/api/search-settings';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { normalizeUserCode } from '$lib/device-login';
@@ -66,7 +66,7 @@ export const load: PageServerLoad = async (event) => {
 			mfaEnrolled: false,
 			settings: null as Section<Settings> | null,
 			schemas: [] as string[],
-			schemasFailed: false,
+			schemasGate: null as Gate | null,
 		};
 	}
 
@@ -80,42 +80,30 @@ export const load: PageServerLoad = async (event) => {
 	// The settings route answers owners only, so nobody else asks and no 403
 	// from it reaches the page.
 	const settings = owner ? section(getSettings(client), 'Could not load the builder settings.') : null;
-	// A failed schema read is said as a failure, never offered as no schemas.
 	const schemas = owner
-		? listSchemaNames(client).then(
-				(names) => ({ names, failed: false }),
-				() => ({ names: [] as string[], failed: true }),
-			)
-		: Promise.resolve({ names: [] as string[], failed: false });
+		? section(listSchemaNames(client), 'Could not load schemas. Pages keep showing the schemas saved before.')
+		: null;
 
-	let connections: Connection[] = [];
-	let total: number | null = null;
-	let hasMore = false;
-	let gate: ConnectionsGate = { state: 'ok' };
-	try {
-		const page = pageOf(await listConnections(client, limit, offset), limit, offset);
-		connections = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
-	} catch (err) {
-		gate = connectionsGate(err);
-	}
-	if (gate.state === 'ok') {
-		const back = pastEndOffset(connections.length, limit, offset, total);
+	const page = await section(
+		listConnections(client, limit, offset).then((answer) => pageOf(answer, limit, offset)),
+		connectionsGate,
+	);
+	if (page.ok) {
+		const back = pastEndOffset(page.value.rows.length, limit, offset, page.value.total);
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
-	const schemaList = await schemas;
+	const schemaList = schemas ? await schemas : null;
 	return {
 		...base,
-		connections,
-		total,
-		hasMore,
-		gate,
+		connections: page.ok ? page.value.rows : [],
+		total: page.ok ? page.value.total : null,
+		hasMore: page.ok && page.value.hasMore,
+		gate: page.ok ? ({ state: 'ok' } as ConnectionsGate) : page.gate,
 		mfaEnrolled: await mfa,
 		settings: settings ? await settings : null,
-		schemas: showable(schemaList.names),
-		schemasFailed: schemaList.failed,
+		schemas: schemaList?.ok ? showable(schemaList.value) : [],
+		schemasGate: schemaList && !schemaList.ok ? schemaList.gate : null,
 	};
 };
 
@@ -314,7 +302,11 @@ export const actions: Actions = {
 			const out = await revokeAllConnections(authedClient(event));
 			return { revokedAll: out.revoked };
 		} catch (e) {
-			return fail(e instanceof ApiError ? e.status : 503, { revokeAllFailed: true });
+			if (refusalCode(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
+			if (isOutage(e)) return fail(503, { revokeAllError: SAID.revokeAllFailed });
+			return fail(e instanceof ApiError ? e.status : 400, {
+				revokeAllError: refusalSentence(e, 'Could not revoke the connections. Try again.'),
+			});
 		}
 	},
 

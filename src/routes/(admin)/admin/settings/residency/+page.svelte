@@ -30,7 +30,7 @@
 		unassigned,
 		type Region,
 	} from '$lib/api/residency';
-	import { formatDateTime } from '$lib/format';
+	import { formatDateTime, plural } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
@@ -108,7 +108,7 @@
 		return confirmed(
 			`Delete region ${r.display_name}?`,
 			'Tenants in this region are not moved. Move them first, or the report can no longer show where their data is.',
-			{ confirmLabel: 'Delete', success: `Deleted ${r.display_name}` },
+			{ confirmLabel: 'Delete', success: `${r.display_name} deleted.` },
 		);
 	}
 
@@ -154,7 +154,7 @@
 				<GateNotice
 					gate={data.reportGate}
 					title="The residency report"
-					absent="The residency report is not available on this instance."
+					absent="The residency report needs a newer version of the data residency plugin."
 				/>
 			{:else if summary}
 				<div class="grid gap-4 sm:grid-cols-4">
@@ -175,13 +175,13 @@
 					     region is not in a compliant default, it is unaccounted for. -->
 					<Alert tone="danger">
 						{stranded}
-						{stranded === 1 ? 'tenant has' : 'tenants have'} no region assigned. They are not in a default region, and this report cannot show where their data is.
+						{plural(stranded, 'tenant has', 'tenants have')} no region assigned. They are not in a default region, and this report cannot show where their data is.
 					</Alert>
 				{/if}
 
 				{#if partial}
 					<Alert tone="warn">
-						This report shows fewer tenants than its total. It covers one page of the data, not a complete audit, so do not share it as one.
+						This report covers one page of tenants, not all of them.
 					</Alert>
 				{/if}
 

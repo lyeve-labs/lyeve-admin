@@ -105,7 +105,7 @@ describe('Data export jobs', () => {
 
 	it('says a completed export that wrote the row ceiling reached it', () => {
 		const { container } = render(ExportPage, { props: props({ jobs: [job({ rows_written: 10000, rows_total: 10000 })] }) });
-		expect(said(container)).toContain('Reached the 10,000 entry limit. Entries past it are not in the file.');
+		expect(said(container)).toContain('This export reached the 10,000 entry limit, so entries past it are not in the file.');
 		expect(said(container)).not.toContain('Stopped');
 		cleanup();
 		const under = render(ExportPage, { props: props({ jobs: [job({ rows_written: 9999 })] }) });

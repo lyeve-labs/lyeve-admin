@@ -77,8 +77,8 @@
 		<GateNotice
 			level={2}
 			gate={data.gate}
-			title="Device recognition"
-			absent="Device recognition is not included in this build."
+			title="Trusted devices"
+			absent="Trusted devices are not included in this build."
 		/>
 	{:else}
 		{#if formError}
@@ -142,7 +142,7 @@
 				{#if visible.length === 0}
 					<EmptyState
 						title="No devices match this search"
-						description="The search covers this page only. Clear it or go to another page."
+						description="The search covers this page only. Clear it, or go to the next page."
 					/>
 				{:else}
 					<Table label="Remembered devices">

@@ -1,8 +1,8 @@
 import type { PageServerLoad, Actions } from './$types';
 import { listOAuthProviders, createOAuthProvider, updateOAuthProvider, deleteOAuthProvider } from '@lyeve-labs/client-rest';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
-import { fail, error, type ActionFailure } from '@sveltejs/kit';
-import { actionFailure } from '$lib/server/action-error';
+import { error } from '@sveltejs/kit';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
@@ -15,15 +15,6 @@ export const load: PageServerLoad = async (event) => {
 	);
 	return { providers };
 };
-
-/**
- * The failure marked with the action that caused it. The page shows a failed
- * delete beside the list and a failed save in its drawer, and never one in
- * the other's place.
- */
-function tagged<T extends Record<string, unknown>>(action: string, failure: ActionFailure<T>) {
-	return fail(failure.status, { ...failure.data, action });
-}
 
 export const actions: Actions = {
 	create: async (event) => {

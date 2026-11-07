@@ -207,19 +207,23 @@
 	{/snippet}
 
 	<div class="flex min-h-0 flex-1 overflow-hidden">
+		{#snippet groupLinks(groups: typeof filtered)}
+			{#each groups as g (g.id)}
+				<button
+					onclick={() => scrollToGroup(g.id)}
+					class="w-full px-4 py-2 coarse:min-h-control text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
+				>
+					{shortLabel(g.label)}
+				</button>
+			{/each}
+		{/snippet}
+
 		<ResizableAside storageKey="lyeve-api-reference-nav" label="Endpoints" side="start" width={288} min={200} max={480} breakpoint="lg" below="hidden" collapsible testId="api-reference-nav">
 			{#if adminGroups.length > 0}
 				<div class="px-4 pt-4 pb-1">
 					<p class="text-xs font-semibold tracking-widest text-faint uppercase">Admin API</p>
 				</div>
-				{#each adminGroups as g}
-					<button
-						onclick={() => scrollToGroup(g.id)}
-						class="w-full px-4 py-2 coarse:min-h-control text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
-					>
-						{shortLabel(g.label)}
-					</button>
-				{/each}
+				{@render groupLinks(adminGroups)}
 			{/if}
 
 			{#if pluginGroups.length > 0}
@@ -237,14 +241,7 @@
 					</span>
 				</button>
 				{#if pluginsOpen}
-					{#each pluginGroups as g}
-						<button
-							onclick={() => scrollToGroup(g.id)}
-							class="w-full px-4 py-2 coarse:min-h-control text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
-						>
-							{shortLabel(g.label)}
-						</button>
-					{/each}
+					{@render groupLinks(pluginGroups)}
 				{/if}
 			{/if}
 
@@ -252,14 +249,7 @@
 				<div class="px-4 pt-4 pb-1">
 					<p class="text-xs font-semibold tracking-widest text-faint uppercase">Content API</p>
 				</div>
-				{#each apiGroups as g}
-					<button
-						onclick={() => scrollToGroup(g.id)}
-						class="w-full px-4 py-2 coarse:min-h-control text-left text-sm text-muted transition-colors hover:bg-surface-2/40 hover:text-fg"
-					>
-						{shortLabel(g.label)}
-					</button>
-				{/each}
+				{@render groupLinks(apiGroups)}
 			{/if}
 		</ResizableAside>
 
@@ -283,9 +273,8 @@
 
 				{#if data.source === 'catalog'}
 					<Alert tone="warn" title="Showing the built-in catalog">
-						Could not load the engine's OpenAPI document, so this is the reference built into
-						the admin, not the routes the engine serves right now. Reload the page to try
-						again.
+						Could not load the engine's API document, so this is the catalog built into the console and
+						may miss an endpoint this build serves. Reload the page to try again.
 					</Alert>
 				{/if}
 
@@ -371,7 +360,7 @@
 												<div>
 													<p class="mb-1.5 text-xs font-medium text-faint">Required roles</p>
 													<div class="flex flex-wrap gap-1.5">
-														{#each ep.roles as role}
+														{#each ep.roles as role (role)}
 															<Badge tone="violet" class="font-mono">{role}</Badge>
 														{/each}
 													</div>
@@ -392,7 +381,7 @@
 															</tr>
 														</thead>
 														<tbody>
-															{#each ep.params as param}
+															{#each ep.params as param (`${param.in}:${param.name}`)}
 																<tr>
 																	<td data-cell="nowrap" class="font-mono">{param.name}</td>
 																	<td data-cell="nowrap" class="text-faint">{param.in}</td>

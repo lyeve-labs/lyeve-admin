@@ -32,7 +32,7 @@
 		type ConfigBundle,
 		type SyncPlan,
 	} from '$lib/api/config-sync';
-	import { formatDateTime } from '$lib/format';
+	import { formatDateTime, plural } from '$lib/format';
 	import { ICON } from '$lib/icon';
 
 	let { form }: { form: ActionData } = $props();
@@ -125,7 +125,7 @@
 		const ok = await confirm(
 			'Apply this bundle?',
 			prune
-				? 'This instance will match the bundle. Flows, permission rules and webhooks that are not in the bundle will be deleted. Content types are never deleted.'
+				? 'This instance will match the bundle. Flows, permission rules and webhooks that are not in the bundle are deleted. Content types are never deleted.'
 				: 'This instance will match the bundle. Nothing missing from the bundle is deleted.',
 			{ confirmLabel: 'Apply' },
 		);
@@ -308,7 +308,7 @@
 				<p class="text-sm text-muted">Nothing was written.</p>
 			{/if}
 			{#if blocked}
-				<Alert tone="danger" title="{plan.problems} {plan.problems === 1 ? 'problem stops' : 'problems stop'} the apply">
+				<Alert tone="danger" title="{plan.problems} {plural(plan.problems, 'problem stops', 'problems stop')} the apply">
 					Fix every problem below, here or in the bundle, before you apply. Nothing is written until then.
 				</Alert>
 			{:else if plan.changes === 0}

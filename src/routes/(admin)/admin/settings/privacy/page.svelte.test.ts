@@ -130,7 +130,7 @@ describe('privacy settings: who may export', () => {
 		const scope = container.querySelector('input[name="scope"]') as HTMLInputElement;
 		expect(scope.value).toBe('every');
 		expect(container.querySelector('input[name="roles"]')).toBeNull();
-		expect(said(container)).toContain('Admins and super admins can always export.');
+		expect(said(container)).toContain('An administrator can always export.');
 	});
 
 	it("offers the user editor's roles less the two that always export, and keeps a custom one already chosen", () => {

@@ -2,6 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
+import { checked } from '$lib/checkbox';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
@@ -9,6 +10,7 @@ import { describeMedia, importMedia, importRefusal, parseTags, setMediaPublic, u
 import { ApiError } from '@lyeve-labs/client';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
+import { couldNotLoad } from '$lib/outage';
 
 export type { MediaItem } from '$lib/api/media';
 
@@ -47,7 +49,7 @@ const MAX_LIMIT = 199;
  */
 const NO_FILE = 'This form is missing its file. Reload the page and try again.';
 
-const LIST_FAILED = 'Could not load the media library.';
+const LIST_FAILED = couldNotLoad('the media library');
 
 /**
  * The grid renders one window of the library. A library of ten thousand files
@@ -139,7 +141,7 @@ export const actions: Actions = {
 			const item = await importMedia(authedClient(event), {
 				url,
 				alt_text: String(data.get('alt_text') ?? '').trim(),
-				public: data.get('public') === 'true',
+				public: checked(data, 'public'),
 			});
 			return { imported: item };
 		} catch (err) {

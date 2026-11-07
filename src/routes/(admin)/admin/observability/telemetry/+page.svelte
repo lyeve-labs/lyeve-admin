@@ -15,11 +15,11 @@
 		Table,
 		toast,
 	} from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { Activity, AlertTriangle, CheckCircle, Plus, RefreshCw, Send, Trash2, Upload } from '@lucide/svelte';
+	import { Activity, AlertTriangle, CheckCircle, Plus, Send, Trash2, Upload } from '@lucide/svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
@@ -44,16 +44,6 @@
 	// The plugin says whether it is beta, in the manifest the shell's status
 	// report carries.
 	const beta = $derived(rowFor(data.pluginStatus, PLUGIN.telemetry)?.beta === true);
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	// The registry is filtered here, in the browser, because it is one read:
 	// a super admin's whole registry is a few hundred families, and a tenant
@@ -205,9 +195,7 @@
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 	{/snippet}
 
 	<div class="flex flex-wrap items-center gap-2">
@@ -359,7 +347,7 @@
 					{#if hostMoved}
 						<Alert tone="warn" title="Enter the headers again for the new host">
 							<p>
-								Stored headers usually include the collector's key, so they never move to a different host.
+								Stored headers stay with the host they were entered for.
 								Choose Replace them and enter the headers for the new address. Nothing was saved.
 							</p>
 						</Alert>

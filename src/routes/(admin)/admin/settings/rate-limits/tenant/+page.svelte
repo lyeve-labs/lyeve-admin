@@ -18,7 +18,7 @@
 		toast,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { confirmed, tracked } from '$lib/forms.svelte';
+	import { confirmed, drawerFailure, tracked } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Gauge, Plus, ShieldBan, Trash2 } from '@lucide/svelte';
 	import {
@@ -31,7 +31,7 @@
 		type AddressList,
 	} from '$lib/api/rate-limit';
 	import { atLimit } from '$lib/api/limits';
-	import { formatCount, formatDateTime } from '$lib/format';
+	import { formatCount, formatDateTime, plural } from '$lib/format';
 	import { ICON } from '$lib/icon';
 	import type { ActionData, PageData } from './$types';
 
@@ -43,14 +43,11 @@
 	 * only one that came back after it opened, so a failed delete never reads
 	 * as a failure of the next form opened. The page shows the row actions'.
 	 */
-	const failure = $derived(form as { action?: string; error?: string; lockout?: string } | null);
-	let openedOver = $state.raw<unknown>(null);
-	const fresh = $derived(form !== openedOver);
-	const inDrawer = $derived(failure?.action === 'limit' || failure?.action === 'address');
-	const refusal = $derived(inDrawer ? null : formRefusal(form));
-	const formError = $derived(inDrawer ? '' : (failure?.error ?? ''));
-	const limitFailure = $derived(fresh && failure?.action === 'limit' ? failure : null);
-	const addressFailure = $derived(fresh && failure?.action === 'address' ? failure : null);
+	const failure = drawerFailure(() => form as { action?: string; error?: string; lockout?: string } | null, ['limit', 'address']);
+	const refusal = $derived(formRefusal(failure.page));
+	const formError = $derived(failure.page?.error ?? '');
+	const limitFailure = $derived(failure.drawer?.action === 'limit' ? failure.drawer : null);
+	const addressFailure = $derived(failure.drawer?.action === 'address' ? failure.drawer : null);
 	const lockout = $derived(addressFailure?.lockout ?? '');
 
 	const limitRead = $derived(data.limit.ok ? data.limit.value : null);
@@ -76,7 +73,7 @@
 	let limitEnabled = $state(true);
 
 	function openLimit() {
-		openedOver = form;
+		failure.opened();
 		rate = String(own?.rate ?? install?.rate ?? 10);
 		burst = String(own?.burst ?? install?.burst ?? 20);
 		limitEnabled = own?.enabled ?? true;
@@ -95,7 +92,7 @@
 	let note = $state('');
 
 	function openAddress(which: AddressList) {
-		openedOver = form;
+		failure.opened();
 		cidr = '';
 		list = which;
 		note = '';
@@ -124,7 +121,7 @@
 
 	const clearLimit = confirmed(
 		'Clear the tenant limit?',
-		'This tenant goes back to the install-wide limit alone.',
+		'This tenant goes back to the global limit alone.',
 		{ confirmLabel: 'Clear', success: 'Tenant limit cleared.' },
 	);
 
@@ -220,9 +217,9 @@
 							{/if}
 							<p class="text-muted">
 								{#if install && install.enabled}
-									The install-wide limit of {rateLabel(install.rate)} with bursts of {formatCount(install.burst)} also applies, so a tenant limit can only make it stricter.
+									The global limit of {rateLabel(install.rate)} with bursts of {formatCount(install.burst)} also applies, so a tenant limit can only make it stricter.
 								{:else}
-									No install-wide limit is set.
+									No global limit is set.
 								{/if}
 							</p>
 						</div>
@@ -246,7 +243,7 @@
 					</div>
 					{#if !limitLicensed}
 						<p id="limit-license" class="mt-3 text-xs text-faint">
-							Setting this limit needs a license this install does not have. You can always clear it.
+							Setting a tenant limit is not enabled on this instance. You can always clear it.
 						</p>
 					{/if}
 				</Card>
@@ -261,7 +258,7 @@
 						{#if entryLimit.limit !== null}
 							{formatCount(entryLimit.current)} of {formatCount(entryLimit.limit)} entries
 						{:else}
-							{formatCount(entryLimit.current)} {entryLimit.current === 1 ? 'entry' : 'entries'}
+							{formatCount(entryLimit.current)} {plural(entryLimit.current, 'entry', 'entries')}
 						{/if}
 					</Badge>
 				{/if}
@@ -280,7 +277,7 @@
 				{#if !addressesLicensed}
 					<div id="address-license">
 						<Alert tone="brand">
-							Adding an address needs a license this install does not have. Saved entries still apply, and you can always remove one.
+							Adding an address is not enabled on this instance. Saved entries still apply, and you can always remove one.
 						</Alert>
 					</div>
 				{/if}
@@ -347,7 +344,7 @@
 				id="tenant-rate"
 				name="rate"
 				label="Rate, requests per second"
-				hint={install?.enabled ? `At most ${install.rate}, the install-wide rate.` : 'Sustained requests per second.'}
+				hint={install?.enabled ? `At most ${install.rate}, the global rate.` : 'Sustained requests per second.'}
 				bind:value={rate}
 				required
 			/>
@@ -355,7 +352,7 @@
 				id="tenant-burst"
 				name="burst"
 				label="Burst"
-				hint={install?.enabled ? `At most ${install.burst}, the install-wide burst.` : 'How many requests may arrive at once.'}
+				hint={install?.enabled ? `At most ${install.burst}, the global burst.` : 'How many requests can arrive at once.'}
 				bind:value={burst}
 				required
 			/>
@@ -377,7 +374,7 @@
 				     and how to proceed, beside the entry that caused it. -->
 				<Alert tone="danger" title="That entry would lock you out">
 					<p>
-						{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it would lock you out of this console, and only an operator of the install could undo that.
+						{lockout} covers the address you are signed in from, and nothing on the allow list covers it. Saving it would lock you out of the console, and only someone signing in from another address could undo that.
 					</p>
 					<p class="mt-2">
 						Add your own address to the allow list first, then deny the range. An allowed address is served

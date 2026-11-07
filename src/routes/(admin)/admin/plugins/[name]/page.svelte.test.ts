@@ -148,7 +148,7 @@ describe('plugin detail page', () => {
 		expect(screen.getByText('Request statistics unavailable')).toBeTruthy();
 		cleanup();
 		renderPage(SEARCH, { trafficRead: true, traffic: null });
-		expect(screen.getByText('Nothing sampled yet')).toBeTruthy();
+		expect(screen.getByText('No requests sampled yet')).toBeTruthy();
 	});
 
 	it('shows no request statistics to an admin', () => {

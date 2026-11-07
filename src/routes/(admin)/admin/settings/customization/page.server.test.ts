@@ -282,7 +282,7 @@ describe('tab icon', () => {
 });
 
 describe('menu link, dashboard page and page delete', () => {
-	const refusal = new ApiError(422, 'home_page names no page');
+	const refusal = new ApiError(422, 'home_page names no page', { error: 'home_page names no page', code: 'http_422' });
 	const outage = new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused');
 
 	it('removes the named link and keeps the rest of the menu', async () => {
@@ -327,7 +327,7 @@ describe('menu link, dashboard page and page delete', () => {
 
 describe('a failed page delete', () => {
 	it('reports under its own key, which the Pages card draws', async () => {
-		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found'));
+		api.deleteCustomPage.mockRejectedValue(new ApiError(404, 'page not found', { error: 'page not found', code: 'not_found' }));
 		expect(await actions.deletePage(event({ slug: 'gone' }))).toMatchObject({ status: 400, data: { pageDeleteError: 'page not found' } });
 		api.deleteCustomPage.mockRejectedValue(new ApiError(503, 'dial tcp 10.0.0.4:5432: connection refused'));
 		expect(await actions.deletePage(event({ slug: 'x' }))).toMatchObject({ data: { pageDeleteError: 'Could not delete the page. Try again.' } });

@@ -110,6 +110,14 @@ describe('section', () => {
 		});
 	});
 
+	it('keeps a failure as the gate a page maps it to', async () => {
+		const withheld = (err: unknown) => ({ state: err instanceof ApiError ? 'withheld' : 'error' });
+		expect(await section(Promise.reject(new ApiError(403, 'withheld')), withheld)).toEqual({
+			ok: false,
+			gate: { state: 'withheld' },
+		});
+	});
+
 	it('answers plain data a load can return', async () => {
 		const read = await section(Promise.reject(unreachable()), FAILED);
 		expect(JSON.parse(JSON.stringify(read))).toEqual(read);
@@ -139,5 +147,10 @@ describe('fullText', () => {
 describe('forbiddenText', () => {
 	it('names what the role cannot open and who can help', () => {
 		expect(forbiddenText('Scheduled jobs')).toBe('Your role cannot open Scheduled jobs. Ask a super admin if you need it.');
+	});
+
+	it('names the roles a check admits', () => {
+		expect(forbiddenText('this page', ['super_admin'])).toBe('Only a super admin can open this page.');
+		expect(forbiddenText('this page', ['super_admin', 'admin'])).toBe('Only an admin or a super admin can open this page.');
 	});
 });

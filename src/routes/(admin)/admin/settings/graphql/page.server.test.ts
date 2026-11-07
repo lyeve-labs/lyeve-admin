@@ -91,8 +91,8 @@ describe('switching and deleting a persisted query', () => {
 	});
 
 	it('relays the plugin refusal under its action', async () => {
-		togglePersisted.mockRejectedValue(new ApiError(404, 'persisted query not found'));
-		deletePersisted.mockRejectedValue(new ApiError(404, 'persisted query not found'));
+		togglePersisted.mockRejectedValue(new ApiError(404, 'persisted query not found', { error: 'persisted query not found', code: 'not_found' }));
+		deletePersisted.mockRejectedValue(new ApiError(404, 'persisted query not found', { error: 'persisted query not found', code: 'not_found' }));
 		expect(await actions.toggle(post('abc'))).toMatchObject({ data: { action: 'toggle', error: 'persisted query not found' } });
 		expect(await actions.delete(post('abc'))).toMatchObject({ data: { action: 'delete', error: 'persisted query not found' } });
 	});

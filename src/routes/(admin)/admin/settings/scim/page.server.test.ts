@@ -146,7 +146,7 @@ describe('SCIM writes', () => {
 	});
 
 	it.each(['create', 'rotate', 'delete'] as const)('relays the engine refusal on %s under its action', async (name) => {
-		const { event } = write(CONNECTION, json({ error: 'connection name already in use' }, 409));
+		const { event } = write(CONNECTION, json({ error: 'connection name already in use', code: 'conflict' }, 409));
 		const out = (await actions[name](event)) as Failure;
 		expect(out.data).toEqual({ action: name, error: 'connection name already in use' });
 	});

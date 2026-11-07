@@ -13,6 +13,7 @@
 	import { formatDateTime } from '$lib/format';
 	import { shortId } from '$lib/utils/entry-identity';
 	import { ICON } from '$lib/icon';
+	import { couldNotLoad } from '$lib/outage';
 
 	let {
 		entryId,
@@ -153,12 +154,11 @@
 	<div class="flex flex-col gap-4" data-testid="review-bar">
 		{#if unavailable}
 			<Alert tone="warn" title="Could not load the review">
-				The review plugin is included in this build but is not responding. You cannot see or move
-				this review until it responds.
+				The review plugin is not running on this instance, so this review is not available.
 			</Alert>
 		{:else if forbidden}
 			<Alert tone="warn" title="You cannot see this entry's review">
-				Your roles have no read permission on reviews. Ask an admin for a rule on
+				Your roles have no read permission on reviews. Ask a super admin for a rule on
 				<span class="font-mono">reviews</span> or on the definition's own resource.
 			</Alert>
 		{:else if !assignment}
@@ -246,7 +246,7 @@
 					</div>
 				</form>
 			{:else if definitionsFailed}
-				<p class="text-sm text-muted">Could not load the review definitions. Reload the page to try again.</p>
+				<p class="text-sm text-muted">{couldNotLoad('the review definitions', { reload: true })}</p>
 			{:else if error}
 				<Alert tone="danger">{error}</Alert>
 			{/if}

@@ -16,31 +16,22 @@
 		Pagination,
 		confirm,
 	} from '@lyeve-labs/ui-kit';
+	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { browserOffset } from '$lib/utils/wall-clock';
-	import { invalidateAll } from '$app/navigation';
-	import { History, RefreshCw, Rss, Search } from '@lucide/svelte';
+	import { History, Rss, Search } from '@lucide/svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
-	import { didFire, failedOnly, progressOf, runTone } from '$lib/api/events';
+	import { didFire, failedOnly, progressOf } from '$lib/api/events';
+	import { jobTone } from '$lib/tones';
 	import { NO_VALUE, formatDateTime } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-
-	let refreshing = $state(false);
-	async function refresh() {
-		refreshing = true;
-		try {
-			await invalidateAll();
-		} finally {
-			refreshing = false;
-		}
-	}
 
 	let narrow = $state('');
 	let failedFirst = $state(false);
@@ -99,9 +90,7 @@
 	width="wide"
 >
 	{#snippet actions()}
-		<Button variant="secondary" size="sm" onclick={refresh} loading={refreshing}>
-			<RefreshCw size={ICON.sm} /> Refresh
-		</Button>
+		<RefreshButton />
 	{/snippet}
 
 	{#if data.gate.state !== 'ok'}
@@ -205,7 +194,7 @@
 									{/if}
 								</td>
 								<td data-cell="nowrap">
-									<Badge tone={runTone(run.status)}>{run.status}</Badge>
+									<Badge tone={jobTone(run.status)}>{run.status}</Badge>
 									{#if run.dry_run}
 										<Badge tone="neutral">rehearsal</Badge>
 									{/if}

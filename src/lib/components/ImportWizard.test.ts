@@ -183,7 +183,7 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		await readWith(async () => {
 			throw new TypeError('Failed to fetch');
 		});
-		await waitFor(() => expect(document.body.textContent).toContain('The request did not reach the engine. Nothing was imported. Try again in a moment.'));
+		await waitFor(() => expect(document.body.textContent).toContain('The engine is unavailable, so nothing was imported. Try again in a moment.'));
 		expect(document.body.textContent).not.toContain('Failed to fetch');
 	});
 
@@ -255,6 +255,16 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		expect(answer).toHaveBeenCalledTimes(2);
 		expect(nav.invalidateAll).toHaveBeenCalledTimes(1);
 		expect(nav.goto).not.toHaveBeenCalled();
+	});
+
+	it('keeps the engine words of a 5xx and a code-less 4xx off the screen', async () => {
+		await readWith(async () => new Response(JSON.stringify({ error: 'pq: relation "sys_jobs" does not exist', code: 'internal' }), { status: 500, headers: { 'content-type': 'application/json' } }));
+		await waitFor(() => expect(document.body.textContent).toContain('Could not complete the request. Try again.'));
+		expect(document.body.textContent).not.toContain('pq:');
+		cleanup();
+		await readWith(async () => new Response(JSON.stringify({ error: 'Request Entity Too Large' }), { status: 413, headers: { 'content-type': 'application/json' } }));
+		await waitFor(() => expect(document.body.textContent).toContain('Could not complete the request. Try again.'));
+		expect(document.body.textContent).not.toContain('Request Entity Too Large');
 	});
 
 	it('says to sign in again when the renewed request is refused too, and keeps the wizard open', async () => {

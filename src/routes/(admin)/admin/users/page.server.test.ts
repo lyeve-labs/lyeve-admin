@@ -257,7 +257,7 @@ describe('creating an account', () => {
 			data: {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { email: 'Email is required' },
+				fields: { email: 'Enter an email address.' },
 			},
 		});
 	});
@@ -277,7 +277,7 @@ describe('creating an account', () => {
 			data: {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { password: 'Password is required' },
+				fields: { password: 'Enter a password.' },
 			},
 		});
 	});
@@ -430,16 +430,16 @@ describe('setting an account password', () => {
 	// The client above answers with the body whatever the status, so a refusal
 	// is thrown the way the real client throws it: as the error the engine
 	// wrote, with its status.
-	function refusing(status: number, message: string): typeof globalThis.fetch {
+	function refusing(status: number, message: string, code: string): typeof globalThis.fetch {
 		return vi.fn(async () => {
-			throw new ApiError(status, message);
+			throw new ApiError(status, message, { error: message, code });
 		}) as unknown as typeof globalThis.fetch;
 	}
 
 	// The policy's refusal names the rule, and that sentence is what the
 	// operator needs beside the control they are about to retype into.
 	it('puts the engine refusal on the password control', async () => {
-		const fetch = refusing(422, 'password must be at least 12 characters');
+		const fetch = refusing(422, 'password must be at least 12 characters', 'http_422');
 
 		const result = await submit(fetch, { id: 'u1', new_password: 'short' });
 
@@ -454,7 +454,7 @@ describe('setting an account password', () => {
 	});
 
 	it('relays an unknown account as the banner, not as a field message', async () => {
-		const fetch = refusing(404, 'user not found');
+		const fetch = refusing(404, 'user not found', 'not_found');
 
 		const result = await submit(fetch, { id: 'nope', new_password: 'correct horse battery' });
 
@@ -468,7 +468,7 @@ describe('setting an account password', () => {
 
 		expect(result).toEqual({
 			status: 400,
-			data: { action: 'setPassword', error: 'Check the highlighted field.', fields: { new_password: 'Password is required' } },
+			data: { action: 'setPassword', error: 'Check the highlighted field.', fields: { new_password: 'Enter a password.' } },
 		});
 		expect(fetch).not.toHaveBeenCalled();
 	});
@@ -536,7 +536,7 @@ describe('the admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never)) as { status: number; data: { error: string } };
 
-		expect(result.status).toBe(400);
+		expect(result.status).toBe(402);
 		expect(result.data.error).not.toContain('admin seat');
 	});
 
@@ -544,7 +544,7 @@ describe('the admin seat ceiling', () => {
 		const result = await actions.updateRoles(mockEvent({
 			request: { formData: () => Promise.resolve(form({ id: 'u1', roles: 'admin' })) } as never,
 			fetch: vi.fn(async () => {
-				throw new ApiError(404, 'user not found');
+				throw new ApiError(404, 'user not found', { error: 'user not found', code: 'not_found' });
 			}) as unknown as typeof globalThis.fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never);
@@ -659,7 +659,7 @@ describe('deleting an account', () => {
 	});
 
 	it('relays the engine refusal on the page', async () => {
-		const { run } = remove(() => json({ error: 'cannot delete the last super admin' }, 409));
+		const { run } = remove(() => json({ error: 'cannot delete the last super admin', code: 'conflict' }, 409));
 		expect(await run()).toEqual({ status: 400, data: { action: 'delete', error: 'cannot delete the last super admin' } });
 	});
 

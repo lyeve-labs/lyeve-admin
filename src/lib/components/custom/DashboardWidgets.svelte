@@ -12,6 +12,7 @@
 	import { formatBytes, formatCount, formatDate, formatDateTime, formatPercent } from '$lib/format';
 	import { entryTone } from '$lib/tones';
 	import type { ResolvedWidget } from '$lib/api/custom-dashboard';
+	import { couldNotLoad } from '$lib/outage';
 
 	/**
 	 * Draws a tenant's composed dashboard. Every number was read with the
@@ -25,7 +26,7 @@
 </script>
 
 {#snippet unreadable(what: string)}
-	<p class="text-sm text-muted">Could not load {what}. Reload the page to try again.</p>
+	<p class="text-sm text-muted">{couldNotLoad(what, { reload: true })}</p>
 {/snippet}
 
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-6" data-testid="dashboard-widgets">

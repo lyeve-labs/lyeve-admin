@@ -4,8 +4,9 @@
 	import type { ActionData, PageData } from './$types';
 	import AiSection from '$lib/components/ai/AiSection.svelte';
 	import SettingRow from '$lib/components/SettingRow.svelte';
-	import { AI_OK } from '$lib/api/ai';
+	import { GATE_OK } from '$lib/api/gate';
 	import { formatDateTime } from '$lib/format';
+	import { couldNotLoad } from '$lib/outage';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -22,7 +23,7 @@
 </script>
 
 <PageShell title="AI settings" description="Turn AI on or off for this tenant, and choose whether and how long transcripts are kept." width="wide">
-	<AiSection level={2} tab="settings" gate={AI_OK} layoutGate={data.aiLayoutGate} noun="settings">
+	<AiSection level={2} tab="settings" gate={GATE_OK} layoutGate={data.aiLayoutGate} noun="settings">
 		{#if settings}
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>This tenant</SectionHeading>
@@ -33,7 +34,7 @@
 							<Toggle
 								id="ai-enabled"
 								label="AI for this tenant"
-								hint="When off, AI routes return 404, flow nodes and the editor assistant stop, and other plugins are told AI is disabled. Nothing is sent to any provider."
+								hint="When off, AI routes return 404, flow nodes and the editor assistant stop, and nothing is sent to any provider."
 								checked={settings.enabled}
 								onchange={() => enabledForm?.requestSubmit()}
 							/>
@@ -110,12 +111,12 @@
 						{:else if data.isSuperAdmin && data.instanceReadable}
 							<p class="text-xs text-faint">
 								<Badge tone="neutral" size="sm">{retention?.source ?? 'default'}</Badge>
-								This setting comes from outside the console. Change it there.
+								This setting comes from the engine's configuration and cannot be changed here.
 							</p>
 						{:else if !data.isSuperAdmin}
 							<p class="text-xs text-faint">Only a super admin can see and change the retention window.</p>
 						{:else}
-							<p class="text-xs text-faint">Could not load the retention window. Reload the page to try again.</p>
+							<p class="text-xs text-faint">{couldNotLoad('the retention window', { reload: true })}</p>
 						{/if}
 					</div>
 				</Card>

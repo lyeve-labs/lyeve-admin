@@ -62,7 +62,7 @@ describe('new entry refusals', () => {
 		const { container, queryByRole } = render(NewEntryPage, {
 			props: {
 				data: data(null),
-				form: { error: 'The entry was created, but not every link was saved.', created: 'e1' } as never,
+				form: { error: 'Entry created. Could not add 1 link in tags.', created: 'e1' } as never,
 			},
 		});
 		expect(queryByRole('button', { name: 'Create' })).toBeNull();

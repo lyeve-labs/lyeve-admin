@@ -149,7 +149,7 @@ describe('Pool health badge', () => {
 		expect(text).toContain('Open 8');
 		expect(text).toContain('In use 3');
 		expect(text).toContain('Idle 5');
-		expect(text).toContain('1.2ms');
+		expect(text).toContain('1.2 ms');
 	});
 
 	it('still reads Unhealthy when the engine says so, metrics or not', () => {
@@ -528,8 +528,8 @@ describe('Goroutine engine', () => {
 		expect(fieldsets(container)).toHaveLength(3);
 		for (const fs of fieldsets(container)) expect(fs.disabled).toBe(true);
 		const note = section(container).querySelector('[data-testid="goroutine-license-note"]') as HTMLElement;
-		expect(note.textContent).toContain('Changing these settings on a running server needs a license that includes tuning.');
-		expect(note.querySelector('a')?.getAttribute('href')).toBe('/admin/settings/license');
+		expect(note.textContent).toContain('Tuning the goroutine engine is not enabled on this instance.');
+		expect(note.querySelector('a')).toBeNull();
 		expect(section(container).querySelector('[data-testid="goroutine-role-note"]')).toBeNull();
 		// Every reading stays: only the writes are licensed.
 		const views = section(container).querySelector('[data-testid="goroutine-views"]') as HTMLElement;
@@ -552,7 +552,7 @@ describe('Goroutine engine', () => {
 		});
 		const forms = [...section(container).querySelectorAll('form')];
 		const notice = forms[0].querySelector('[data-testid="refusal-notice"]') as HTMLElement;
-		expect(notice.textContent).toContain('This needs example-feature');
+		expect(notice.textContent).toContain('Not enabled on this instance');
 		expect(notice.textContent).toContain('Nothing was changed.');
 		expect(forms[0].querySelector('[role="alert"]')?.textContent ?? '').not.toContain('Failed to');
 		expect(forms[1].querySelector('[data-testid="refusal-notice"]')).toBeNull();
@@ -633,7 +633,7 @@ describe('reads that failed', () => {
 			props: props({ poolHealth: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		expect(container.textContent).toContain('is unavailable');
-		expect(container.textContent).not.toContain('may not have a connection pooler configured');
+		expect(container.textContent).not.toContain('No pool statistics for this instance');
 		expect(container.textContent).not.toContain('No check time reported');
 	});
 });

@@ -152,7 +152,7 @@ describe('admin/flows/variables actions', () => {
 		const form = new FormData();
 		form.set('key', 'region');
 		form.set('value', 'x');
-		const { event } = actionEvent(form, { '/variables': () => json({ error: 'value too long' }, 400) });
+		const { event } = actionEvent(form, { '/variables': () => json({ error: 'value too long', code: 'bad_request' }, 400) });
 		const result = (await actions.put(event)) as { data: { error: string } };
 		expect(result.data.error).toBe('value too long');
 	});

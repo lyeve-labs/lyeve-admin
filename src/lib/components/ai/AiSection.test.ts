@@ -39,7 +39,7 @@ describe('AiSection', () => {
 	});
 
 	it('shows the not-enabled state when locked', () => {
-		const { queryByTestId, getByText } = setup({ state: 'locked' });
+		const { queryByTestId, getByText } = setup({ state: 'locked', upgradeUrl: '' });
 		expect(queryByTestId('body')).toBeNull();
 		expect(queryByTestId('not-enabled')).toBeTruthy();
 		expect(getByText('Not enabled on this instance.')).toBeTruthy();
@@ -54,7 +54,7 @@ describe('AiSection', () => {
 
 	it('names the role and the resource when forbidden', () => {
 		const { getByText, queryByTestId } = setup({ state: 'forbidden' });
-		expect(getByText('Your role cannot read AI providers.')).toBeTruthy();
+		expect(getByText('Only an admin or a super admin can open AI providers.')).toBeTruthy();
 		expect(queryByTestId('body')).toBeNull();
 	});
 

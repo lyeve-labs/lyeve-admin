@@ -1,10 +1,11 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
-import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
+import { GATE_OK, gateOf, inSentence, type Gate } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 import {
 	CONFIG_FIELDS,
 	DELIVERY_LIMIT,
@@ -47,7 +48,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			providers = await listProviders(client);
 		} catch (err) {
-			gate = gateOf(err, 'Could not load destinations.');
+			gate = gateOf(err, couldNotLoad('destinations'));
 		}
 		if (gate.state === 'ok') {
 			try {
@@ -55,7 +56,7 @@ export const load: PageServerLoad = async (event) => {
 				moreDeliveries = read.data.length > DELIVERY_LIMIT;
 				deliveries = { ...read, data: read.data.slice(0, DELIVERY_LIMIT) };
 			} catch (err) {
-				deliveriesGate = gateOf(err, 'Could not load deliveries.');
+				deliveriesGate = gateOf(err, couldNotLoad('deliveries'));
 			}
 		}
 	}
@@ -110,7 +111,7 @@ export const actions: Actions = {
 		// A new destination needs every required setting. An edit that names
 		// none keeps the stored ones, and one that names any replaces all.
 		if (missing && (!id || config)) {
-			return fail(400, { error: `${missing.label} is required.`, drawer: true });
+			return fail(400, { error: `Enter the ${inSentence(missing.label)}.`, drawer: true });
 		}
 
 		const body: ProviderInput = { name, enabled: form.get('enabled') === 'true' };
@@ -140,7 +141,8 @@ export const actions: Actions = {
 		try {
 			await deleteProvider(authedClient(event), id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not delete the destination. Try again.') });
+			const failed = actionFailure(err, 'Could not delete the destination. Try again.');
+			return fail(failed.status, failed.data);
 		}
 		return { deleted: id };
 	},

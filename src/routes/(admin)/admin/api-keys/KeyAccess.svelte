@@ -12,6 +12,7 @@
 		type ResourceGroup,
 	} from '$lib/api/key-access';
 	import { narrows } from '$lib/narrow';
+	import { plural } from '$lib/format';
 
 	/**
 	 * What a new key may reach: content by schema and action, the schema
@@ -135,13 +136,13 @@
 						onchange={(v) => (access = { ...access, contentActions: v as typeof access.contentActions })}
 					/>
 				{:else if schemasFailed}
-					<Alert tone="warn">Could not load the schemas, so you cannot choose any right now. Reload the page to try again.</Alert>
+					<Alert tone="warn">Could not load the schemas, so you cannot choose any. Reload the page to try again.</Alert>
 				{:else if schemas.length === 0}
 					<p class="text-xs text-faint">No schemas yet.</p>
 				{:else}
 					{#if schemas.length > 8}
 						<label for="key-schema-search" class="sr-only">Narrow the schemas</label>
-						<SearchInput id="key-schema-search" bind:value={schemaQuery} placeholder="Narrow the schemas" />
+						<SearchInput id="key-schema-search" bind:value={schemaQuery} placeholder="" />
 					{/if}
 					<Table label="Actions by schema">
 						<thead>
@@ -198,7 +199,7 @@
 	</Panel>
 
 	{#if catalogFailed}
-		<Alert tone="warn">Could not load the route catalog, so you cannot grant other resources right now. Reload the page to try again.</Alert>
+		<Alert tone="warn">Could not load the route catalog, so you cannot grant other resources. Reload the page to try again.</Alert>
 	{/if}
 
 	{#each groups as g (g.resource)}
@@ -225,8 +226,7 @@
 							label="Only these"
 							value={st.names}
 							oninput={(e: Event) => setResource(g.resource, { names: (e.currentTarget as HTMLInputElement).value })}
-							placeholder="Leave blank for all"
-							hint="Comma-separated values of {g.nameParam} in the routes below. The key cannot use any other value."
+							hint="Comma-separated values of {g.nameParam} in the routes below. Leave it empty for every value."
 							error={namesProblem(st.names) || undefined}
 						/>
 					{/if}
@@ -245,6 +245,6 @@
 	{/each}
 
 	<p class="text-xs text-faint">
-		<span aria-live="polite">{scopes.length === 0 ? 'No scope chosen.' : `${scopes.length} ${scopes.length === 1 ? 'scope' : 'scopes'}`}</span>{#if scopes.length > 0}: {scopes.join(', ')}{/if}
+		<span aria-live="polite">{scopes.length === 0 ? 'No scope chosen.' : `${scopes.length} ${plural(scopes.length, 'scope')}`}</span>{#if scopes.length > 0}: {scopes.join(', ')}{/if}
 	</p>
 </section>

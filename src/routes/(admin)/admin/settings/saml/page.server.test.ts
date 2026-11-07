@@ -160,7 +160,7 @@ describe('SAML writes', () => {
 	});
 
 	it('relays the plugin refusal of a rollover with nothing prepared', async () => {
-		const { event } = write({ id: 'p1' }, json({ error: 'no next certificate configured' }, 400));
+		const { event } = write({ id: 'p1' }, json({ error: 'no next certificate configured', code: 'bad_request' }, 400));
 		const out = (await actions.rollover(event)) as Failure;
 		expect(out.data).toEqual({ action: 'rollover', error: 'no next certificate configured' });
 	});

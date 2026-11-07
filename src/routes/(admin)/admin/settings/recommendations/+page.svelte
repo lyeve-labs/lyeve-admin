@@ -20,15 +20,14 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import {
 		hasUsers,
-		percent,
 		score,
 		sourceLabel,
 		sourceTone,
 		splitIsSkewed,
-		took,
 		type FeedEntry,
 		INTEGRATION_EXAMPLE,
 	} from '$lib/api/recommendations';
+	import { formatMillis, formatPercent, plural } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
@@ -106,7 +105,7 @@
 
 		{#if outcome?.refreshed}
 			<Alert tone="success" autoDismiss>
-				Recomputed in {took(outcome.ms)}: {outcome.pairs} similarity pairs, {outcome.trending}
+				Recomputed in {formatMillis(outcome.ms)}: {outcome.pairs} similarity pairs, {outcome.trending}
 				trending items and {outcome.feeds} feeds.
 			</Alert>
 		{/if}
@@ -200,8 +199,8 @@
 			{:else if stats}
 				<div class="grid gap-4 sm:grid-cols-3">
 					<Stat size="sm" mono label="Readers assigned" value={stats.total_users} />
-					<Stat size="sm" mono label="Getting recommendations" value={percent(stats.recommendation_pct)} />
-					<Stat size="sm" mono label="Control arm, random" value={percent(stats.random_pct)} />
+					<Stat size="sm" mono label="Getting recommendations" value={formatPercent(stats.recommendation_pct / 100)} />
+					<Stat size="sm" mono label="Control arm, random" value={formatPercent(stats.random_pct / 100)} />
 				</div>
 				<p class="text-xs text-muted">
 					{stats.recommendation_count} readers see computed recommendations and
@@ -212,7 +211,7 @@
 				     row of three numbers stays whole. -->
 				{#if skewed}
 					<Alert tone="warn">
-						The two arms are far apart. Readers are assigned at random, so a few points of drift is normal, but this much is not. Either the control arm is too small to measure against, or many readers are being shown random content.
+						The two arms are far apart. Either the control arm is too small to measure against, or many readers are being shown random content.
 					</Alert>
 				{/if}
 			{/if}
@@ -280,7 +279,7 @@
 						</EmptyState>
 					{:else}
 						<p class="text-xs text-muted">
-							{preview.length} {preview.length === 1 ? 'entry' : 'entries'} for {previewFor}.
+							{preview.length} {plural(preview.length, 'entry', 'entries')} for {previewFor}.
 						</p>
 						<Table label="What one reader would see">
 							<thead>

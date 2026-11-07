@@ -38,13 +38,13 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	email: 'Set up the mail providers and the fallback transport behind them.',
 	recommendations: 'Set up similar entries, trending entries and a feed for each reader, based on what readers do.',
 	permissions: 'Set what each role can do with content and flows, for every schema, one schema or one flow.',
-	security: 'See what protects this instance right now.',
+	security: 'See what protects this instance.',
 	oauth: 'Add the OpenID Connect and OAuth 2.0 providers people can sign in with.',
 	saml: 'Add the SAML identity providers people sign in through, and manage their certificates.',
 	scim: 'Let identity providers create and remove accounts without anyone signing in.',
 	'rate-limits': 'See each rate limit and who is close to reaching one.',
 	'tenant-rate-limits': "Set this tenant's rate limit and the addresses it always allows or blocks, and see what was refused.",
-	captcha: "Choose the captcha this tenant's pages and flows use. The admin sign-in keeps the instance's captcha.",
+	captcha: "Choose the captcha this tenant's pages and flows use. The console sign-in keeps this instance's captcha.",
 	'sign-in': 'Set how long accounts from your identity provider can sign in without it.',
 	'api-access': 'See how external apps authenticate and what each role can do, and get a token to try it.',
 	'api-keys': 'Create machine-to-machine credentials for the content API and see their usage.',
@@ -68,7 +68,7 @@ const GROUPS: readonly { id: string; label: string; description: string; ids: re
 	{
 		id: 'workspace',
 		label: 'Workspace',
-		description: 'Set how this admin looks and what it offers your team.',
+		description: 'Set how the console looks and what it offers your team.',
 		ids: ['customization', 'localization', 'email', 'recommendations'],
 	},
 	{
@@ -164,6 +164,3 @@ export function settingsHub(tree: NavTree, personal: PersonalPages): HubGroup[] 
 	})).filter((g) => g.entries.length > 0);
 	return [account, ...groups];
 }
-
-/** Every instance entry id the hub knows how to place, for the test that keeps it complete. */
-export const HUB_IDS: readonly string[] = GROUPS.flatMap((g) => g.ids);

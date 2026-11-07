@@ -173,7 +173,7 @@ describe('dashboard tiles', () => {
 		const { container } = render(DashboardPage, {
 			props: { data: data({ schemas: { ok: true, value: [] }, isAdmin: false, superAdmin: false }), form: null },
 		});
-		expect(container.textContent).toContain('Ask an admin to create one.');
+		expect(container.textContent).toContain('Ask an administrator to create one.');
 		expect(container.querySelector('a[href="/admin/schema"]')).toBeNull();
 	});
 
@@ -272,7 +272,7 @@ describe('needs attention', () => {
 	it('does not call the instance quiet when the security report could not be read', () => {
 		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, controlFailures: null }), form: null } });
 
-		expect(container.textContent).toContain('Nothing needs attention in what loaded.');
+		expect(container.textContent).toContain('No problems in the tiles that loaded.');
 	});
 
 	it('does not call the instance quiet when a tile could not be read', () => {
@@ -280,7 +280,7 @@ describe('needs attention', () => {
 
 		const text = container.textContent ?? '';
 		expect(text).not.toContain('Nothing needs attention in the last 24 hours.');
-		expect(text).toContain('Nothing needs attention in what loaded.');
+		expect(text).toContain('No problems in the tiles that loaded.');
 	});
 
 	it('lists each item with its link', () => {
@@ -301,6 +301,7 @@ describe('needs attention', () => {
 		expect(container.querySelector('a[href="/admin/jobs?edit=j1"]')?.textContent).toContain('Open job');
 		expect(container.querySelector('a[href="/admin/webhooks"]')).not.toBeNull();
 		expect(text).not.toContain('Nothing needs attention');
+		expect(text).not.toContain('No problems in the tiles that loaded.');
 	});
 
 	it('is not shown to an editor', () => {

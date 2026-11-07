@@ -198,7 +198,7 @@ describe('data export writes', () => {
 	});
 
 	it.each(all)('relays the engine refusal on %s under its action', async (name) => {
-		const { event } = write({ id: 'j1', ...EXPORT, cron_expression: '0 3 * * *' }, json({ error: 'cron_expression is not valid' }, 422));
+		const { event } = write({ id: 'j1', ...EXPORT, cron_expression: '0 3 * * *' }, json({ error: 'cron_expression is not valid', code: 'http_422' }, 422));
 		const out = (await actions[name](event)) as Failure;
 		expect(out.data).toEqual({ action: name, error: 'cron_expression is not valid' });
 	});
@@ -207,7 +207,7 @@ describe('data export writes', () => {
 		const { event } = write(EXPORT, json({ error: 'too many concurrent exports running, try again later' }, 503));
 		expect(((await actions.start(event)) as Failure).data).toEqual({
 			action: 'start',
-			error: 'Too many exports are running. Try again in a moment.',
+			error: 'Too many exports are running. Wait for one to finish, then start this one.',
 		});
 	});
 

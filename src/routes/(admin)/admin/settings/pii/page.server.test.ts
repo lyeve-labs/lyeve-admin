@@ -45,7 +45,7 @@ describe('pii rule actions', () => {
 	// The page reads the failure from the error key. A bare string there left
 	// every refused save without a word on screen.
 	it('returns a refused save under the key the page reads', async () => {
-		api.createRule.mockRejectedValue(new ApiError(400, 'pattern does not compile'));
+		api.createRule.mockRejectedValue(new ApiError(400, 'pattern does not compile', { error: 'pattern does not compile', code: 'bad_request' }));
 		const out = (await actions.create(formEvent({ name: 'X', pattern: '(', replacement: '*' }))) as {
 			status: number;
 			data: { error: string };
@@ -140,7 +140,7 @@ describe('pii rule writes', () => {
 		['delete', 'deleteRule', 'id must be a UUID'],
 		['test', 'testRule', 'body must be a JSON object with pattern, replacement and sample'],
 	] as const)('relays the plugin refusal on %s under its action', async (name, fn, sentence) => {
-		api[fn].mockRejectedValue(new ApiError(400, sentence));
+		api[fn].mockRejectedValue(new ApiError(400, sentence, { error: sentence, code: 'bad_request' }));
 		const out = (await actions[name](formEvent({ id: 'r1', ...RULE }))) as Failure;
 		expect(out.data).toEqual({ action: name, error: sentence });
 	});

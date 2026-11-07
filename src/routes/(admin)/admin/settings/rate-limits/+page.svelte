@@ -11,7 +11,8 @@
 		Pagination,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
-	import { confirmed } from '$lib/forms.svelte';
+	import { confirmed, drawerFailure } from '$lib/forms.svelte';
+	import { plural } from '$lib/format';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Copy, Gauge, Pencil, Plus, RotateCcw, ShieldBan, Trash2 } from '@lucide/svelte';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
@@ -44,15 +45,13 @@
 	 * only one that came back after it opened, so a failed delete never reads
 	 * as a failure of the next form opened. The page shows the row actions'.
 	 */
-	const failure = $derived(form as { action?: string; error?: string } | null);
-	let openedOver = $state.raw<unknown>(null);
-	const fresh = $derived(form !== openedOver);
-	const failureOf = (action: string) => (fresh && failure?.action === action ? (failure.error ?? '') : '');
+	const failure = drawerFailure(() => form as { action?: string; error?: string } | null, ['rule', 'global', 'protection']);
+	const failureOf = (action: string) => (failure.drawer?.action === action ? (failure.drawer.error ?? '') : '');
 	const ruleError = $derived(failureOf('rule'));
 	const globalError = $derived(failureOf('global'));
 	const protectionError = $derived(failureOf('protection'));
 	const formError = $derived(
-		failure?.action === 'delete' || failure?.action === 'resetProtection' ? (failure.error ?? '') : '',
+		failure.page?.action === 'delete' || failure.page?.action === 'resetProtection' ? (failure.page.error ?? '') : '',
 	);
 	const blocking = $derived(data.rules.filter(blocksEverything));
 	const live = $derived(data.status.ok ? data.status.value : []);
@@ -78,7 +77,7 @@
 	 * only the requests that resolved none.
 	 */
 	const countedBy = (s: LimiterState & { kind?: string }) =>
-		s.tenant_id ? `Tenant ${s.tenant_id}` : s.kind === 'global' ? 'Whole instance' : 'No tenant';
+		s.tenant_id ? `Tenant ${s.tenant_id}` : s.kind === 'global' ? 'Every tenant' : 'No tenant';
 	const overview = $derived(data.overview);
 	// Unknown is its own state: a failed read is neither locked nor unlocked.
 	const customEnabled = $derived(overview?.custom_licensed ?? null);
@@ -105,27 +104,27 @@
 	let protectionDrawer = $state<ReturnType<typeof ProtectionDrawer>>();
 
 	function openCreate() {
-		openedOver = form;
+		failure.opened();
 		ruleDrawer?.openCreate();
 	}
 
 	function openEdit(r: RateRule) {
-		openedOver = form;
+		failure.opened();
 		ruleDrawer?.openEdit(r);
 	}
 
 	function openDuplicate(r: RateRule) {
-		openedOver = form;
+		failure.opened();
 		ruleDrawer?.openDuplicate(r, data.rules.map((x) => x.endpoint));
 	}
 
 	function openGlobal() {
-		openedOver = form;
+		failure.opened();
 		globalDrawer?.openGlobal(overview?.global);
 	}
 
 	function openProtection(p: Protection) {
-		openedOver = form;
+		failure.opened();
 		protectionDrawer?.openProtection(p);
 	}
 
@@ -264,9 +263,9 @@
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Sign-in and reset protections</SectionHeading>
 				<p class="text-xs text-muted">
-					These are built in and enforced on every install.
+					These are built in and enforced on every instance.
 					{#if customEnabled === false}
-						Changing them needs a license this instance does not have.
+						Changing them is not enabled on this instance.
 					{/if}
 				</p>
 				<Table label="Protections">
@@ -342,7 +341,7 @@
 					     live. -->
 					<Alert tone="warn">
 						{stored}
-						{stored === 1 ? 'saved rule is' : 'saved rules are'} not enforced on this instance. They apply again when your license includes custom rules. You can still delete them.
+						{plural(stored, 'saved rule is', 'saved rules are')} not enforced, because custom rules are not enabled on this instance. They apply again once custom rules are enabled. You can still delete them.
 					</Alert>
 				{/if}
 			{/if}
@@ -352,7 +351,7 @@
 				     the rate says. -->
 				<Alert tone="danger">
 					{blocking.length}
-					{blocking.length === 1 ? 'rule blocks' : 'rules block'} every request, not only the excess. A burst or rate of zero refuses even the first request.
+					{plural(blocking.length, 'rule blocks', 'rules block')} every request, not only the excess. A burst or rate of zero refuses even the first request.
 				</Alert>
 			{/if}
 
