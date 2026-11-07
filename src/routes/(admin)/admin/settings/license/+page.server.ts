@@ -44,7 +44,7 @@ const READER_ROLES = ['admin', 'super_admin'];
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
 	if (!user.roles.some((role) => READER_ROLES.includes(role))) {
-		error(403, forbiddenText('the license'));
+		error(403, forbiddenText('this page', READER_ROLES));
 	}
 
 	// Read here rather than taken from the shell, which kept its answer across

@@ -113,7 +113,10 @@ describe('license +page.server.ts load', () => {
 	it('refuses a reader below admin without asking the engine', async () => {
 		mockedCreateClient.mockReturnValue({} as never);
 
-		await expect(load(loadEvent(['editor']))).rejects.toMatchObject({ status: 403 });
+		await expect(load(loadEvent(['editor']))).rejects.toMatchObject({
+			status: 403,
+			body: { message: 'Only an admin or a super admin can open this page.' },
+		});
 		expect(mockedGetEntitlements).not.toHaveBeenCalled();
 	});
 

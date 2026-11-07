@@ -21,6 +21,7 @@
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { count, str } from './narrow';
+import { rolesInWords } from '$lib/roles';
 
 export type Gate =
 	| { state: 'ok' }
@@ -137,7 +138,13 @@ export function inSentence(title: string): string {
 	return title[0].toLowerCase() + title.slice(1);
 }
 
-/** The sentence for a read the reader's role may not make. `what` names what was refused. */
-export function forbiddenText(what: string): string {
+/**
+ * The sentence for a read the reader's role may not make. `what` names what
+ * was refused, and `roles` the roles the check admits when the console made
+ * the check. An engine refusal names no role, so it gets the sentence
+ * without one.
+ */
+export function forbiddenText(what: string, roles?: readonly string[]): string {
+	if (roles?.length) return `Only ${rolesInWords(roles)} can open ${what}.`;
 	return `Your role cannot open ${what}. Ask a super admin if you need it.`;
 }

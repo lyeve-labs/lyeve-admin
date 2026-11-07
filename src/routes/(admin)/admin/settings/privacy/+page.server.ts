@@ -29,7 +29,7 @@ const EDITORS = ['admin', 'super_admin'];
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins, pluginStatus, user } = await event.parent();
-	if (!user.roles.some((r) => EDITORS.includes(r))) error(403, forbiddenText('the privacy settings'));
+	if (!user.roles.some((r) => EDITORS.includes(r))) error(403, forbiddenText('this page', EDITORS));
 	const client = authedClient(event);
 	// A setting whose plugin the engine says is stopped is not read, and its
 	// card says why, the way the shell does for a stopped plugin's page. A

@@ -24,7 +24,7 @@ import { forbiddenText } from '$lib/api/gate';
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
-		error(403, forbiddenText('configuration sync'));
+		error(403, forbiddenText('this page', ['super_admin']));
 	}
 	return {};
 };

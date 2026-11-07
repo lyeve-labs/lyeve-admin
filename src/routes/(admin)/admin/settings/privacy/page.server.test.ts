@@ -55,7 +55,10 @@ describe('privacy settings load', () => {
 	});
 
 	it('answers 403 to a role that may not use the page, without asking the engine', async () => {
-		await expect(load(loadEvent(named(['schema']), ['editor']))).rejects.toMatchObject({ status: 403 });
+		await expect(load(loadEvent(named(['schema']), ['editor']))).rejects.toMatchObject({
+			status: 403,
+			body: { message: 'Only an admin or a super admin can open this page.' },
+		});
 		expect(engine.get).not.toHaveBeenCalled();
 	});
 

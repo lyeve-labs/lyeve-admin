@@ -148,4 +148,9 @@ describe('forbiddenText', () => {
 	it('names what the role cannot open and who can help', () => {
 		expect(forbiddenText('Scheduled jobs')).toBe('Your role cannot open Scheduled jobs. Ask a super admin if you need it.');
 	});
+
+	it('names the roles a check admits', () => {
+		expect(forbiddenText('this page', ['super_admin'])).toBe('Only a super admin can open this page.');
+		expect(forbiddenText('this page', ['super_admin', 'admin'])).toBe('Only an admin or a super admin can open this page.');
+	});
 });

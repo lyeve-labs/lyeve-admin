@@ -46,7 +46,7 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('config sync load', () => {
 	it('refuses anyone but a super admin', async () => {
-		await expect(load(loadEvent(['admin']))).rejects.toMatchObject({ status: 403 });
+		await expect(load(loadEvent(['admin']))).rejects.toMatchObject({ status: 403, body: { message: 'Only a super admin can open this page.' } });
 	});
 
 	it('offers the page to a super admin and leaves the license to the engine', async () => {
