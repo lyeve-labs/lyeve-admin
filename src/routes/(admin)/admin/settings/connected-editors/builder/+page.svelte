@@ -11,6 +11,7 @@
 		MultiSelect,
 		NumberInput,
 		PageShell,
+		SectionHeading,
 		SegmentedControl,
 		Skeleton,
 		Toggle,
@@ -21,6 +22,8 @@
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import { SAID, type Settings } from '$lib/api/connected-editors';
+	import { invalidateAll } from '$app/navigation';
+	import { FORMS_TYPE_TAKEN, FORM_SUBMISSIONS, SUBMISSIONS_PUBLIC, flowNotes, flowOptions } from '$lib/api/form-destinations';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -31,6 +34,10 @@
 	interface Answer {
 		saved?: { field: string; settings: Settings };
 		settingError?: { field: string; message: string };
+		presetApplied?: { created: boolean; settings: Settings };
+		presetMissing?: boolean;
+		presetError?: string;
+		presetCreated?: boolean;
 	}
 
 	const answer = $derived((form ?? {}) as Answer);
@@ -86,7 +93,42 @@
 	}
 
 	const schemaOptions = $derived(data.schemas.map((s) => ({ value: s, label: s })));
+
+	// Where forms may send.
+	const formSchemaOptions = $derived(data.formSchemas.map((s) => ({ value: s.name, label: s.label })));
+	// A type allowed earlier and deleted or opened to delivery since is not offered, so the next save drops it.
+	let formSchemas = $derived((settings?.form_schemas ?? []).filter((n) => data.formSchemas.some((s) => s.name === n)));
+	const goneFormSchemas = $derived(
+		data.schemasGate
+			? []
+			: (settings?.form_schemas ?? []).filter((n) => !data.formSchemas.some((s) => s.name === n)).map((n) => data.schemaLabels[n] ?? n),
+	);
+	const flowTargets = $derived(data.flows?.ok ? data.flows.value : null);
+	const formFlowOptions = $derived(flowTargets ? flowOptions(flowTargets, settings?.form_flows ?? []) : []);
+	let formFlows = $derived([...(settings?.form_flows ?? [])]);
+	// Warnings sit only beside the flows the reader has ticked, the same way at every list length.
+	const notes = $derived(flowTargets ? flowNotes(flowTargets, formFlows) : []);
+	// Offered while forms cannot send to the preset's submissions type yet.
+	const presetWanted = $derived(!!settings && !data.schemasGate && !(settings.form_schemas ?? []).includes(FORM_SUBMISSIONS));
+	const presetOffered = $derived(!!data.formsPreset?.ok && data.formsPreset.value && !answer.presetMissing);
+	// The forms card says the content types failed in its own words, not the pages card's.
+	const formsSchemasGate = $derived(
+		data.schemasGate?.state === 'error'
+			? { state: 'error' as const, message: 'Could not load content types. Forms keep sending to the content types saved before.' }
+			: data.schemasGate,
+	);
+	const saveForms = tracked(() => {});
+	// When the preset created its types but the save after it failed, the page reloads its data so it offers to allow them.
+	const applyPreset = tracked(() => async ({ result, update }) => {
+		await update();
+		if (result.type === 'failure' && result.data?.presetCreated) await invalidateAll();
+	});
 </script>
+
+{#snippet schemaBuilderLinked(text: string)}
+	{@const [before, after] = text.split('schema builder')}
+	{before}<a class="text-brand underline" href="/admin/schema">schema builder</a>{after}
+{/snippet}
 
 <PageShell
 	title="Builder connections"
@@ -206,12 +248,152 @@
 					error={errorOn('writes_per_minute')}
 				/>
 
-				{#if settingError && !['allowed', 'lifetime_days', 'show_schemas', 'writes_per_minute'].includes(settingError.field)}
+				{#if settingError && !['allowed', 'lifetime_days', 'show_schemas', 'writes_per_minute', 'forms', 'form_schemas', 'form_flows'].includes(settingError.field)}
 					<Alert tone="danger">{settingError.message}</Alert>
 				{/if}
 
 				<Button variant="primary" type="submit" loading={saveLimits.pending} disabled={!online}>Save</Button>
 			</form>
+		</Card>
+		<Card>
+			<div class="flex flex-col items-start gap-6">
+				<SectionHeading level={3}>Where forms can send</SectionHeading>
+				{#if answer.presetApplied}
+					<Alert tone="success" autoDismiss>
+						{answer.presetApplied.created
+							? 'The Forms and Form submissions content types were created. Forms can send to Form submissions now.'
+							: 'Forms can send to Form submissions now.'}
+					</Alert>
+				{/if}
+				{#if answer.presetError}
+					<Alert tone="danger">{answer.presetError}</Alert>
+				{/if}
+				{#if presetWanted}
+					{#if data.submissions === 'public'}
+						<Alert tone="warn">{@render schemaBuilderLinked(SUBMISSIONS_PUBLIC)}</Alert>
+					{:else if data.submissions === 'private' || (presetOffered && !data.formsTypeTaken)}
+						<div class="flex flex-col items-start gap-3" data-testid="forms-preset">
+							<p class="text-sm text-muted">
+								{#if data.submissions === 'private'}
+									Let forms save posts into the Form submissions content type you already have.
+								{:else}
+									Add the Forms and Form submissions content types, and let forms save posts into Form submissions. You manage what arrives on the Content screens.
+								{/if}
+							</p>
+							<form method="POST" action="?/formsPreset" use:enhance={applyPreset.enhance}>
+								<Button variant="secondary" type="submit" loading={applyPreset.pending} disabled={!online}>Set up form submissions</Button>
+							</form>
+						</div>
+					{:else if data.formsTypeTaken}
+						<p class="text-sm text-muted" data-testid="forms-type-taken">{@render schemaBuilderLinked(FORMS_TYPE_TAKEN)}</p>
+					{:else if data.formsPreset && !data.formsPreset.ok}
+						<GateNotice gate={data.formsPreset.gate} title="Content type presets" absent="Content type presets need a newer version of the schema plugin." />
+					{:else}
+						<p class="text-sm text-muted" data-testid="forms-preset-link">
+							Create a content type for form posts in the <a class="text-brand underline" href="/admin/schema">schema builder</a>, then choose
+							it here.
+						</p>
+					{/if}
+				{/if}
+
+				<form method="POST" action="?/setting" use:enhance={saveForms.enhance} class="flex w-full flex-col items-start gap-6">
+					<input type="hidden" name="field" value="forms" />
+					{#if savedField === 'forms'}
+						<Alert tone="success" autoDismiss>Settings saved.</Alert>
+					{/if}
+
+					{#if formsSchemasGate}
+						<GateNotice gate={formsSchemasGate} title="Content types" absent="Content types are not included in this build." />
+					{:else}
+						<input type="hidden" name="form_schemas_offered" value="1" />
+						{#if formSchemaOptions.length === 0}
+							<p class="text-sm text-muted">No content types forms can send to yet.</p>
+						{:else if formSchemaOptions.length <= 12}
+							<CheckboxGroup
+								label="Content types"
+								name="form_schemas"
+								bind:value={formSchemas}
+								options={formSchemaOptions}
+								orientation="horizontal"
+								hint="Forms can save posts into the content types you choose. Content types anyone can read through the delivery API are not listed."
+								error={errorOn('form_schemas')}
+							/>
+						{:else}
+							<MultiSelect
+								id="form-schemas"
+								label="Content types"
+								bind:value={formSchemas}
+								options={formSchemaOptions}
+								searchable
+								hint="Forms can save posts into the content types you choose. Content types anyone can read through the delivery API are not listed."
+								error={errorOn('form_schemas')}
+							/>
+							{#each formSchemas as name (name)}
+								<input type="hidden" name="form_schemas" value={name} />
+							{/each}
+						{/if}
+						{#if goneFormSchemas.length > 0}
+							<Alert tone="warn">
+								Forms cannot send to {goneFormSchemas.join(', ')} any more. Save to clear {goneFormSchemas.length === 1 ? 'it' : 'them'}.
+							</Alert>
+						{/if}
+					{/if}
+
+					{#if data.flows === null}
+						<p class="text-sm text-muted">The flow plugin is not running on this instance, so forms cannot start flows.</p>
+					{:else if !data.flows.ok}
+						<GateNotice gate={data.flows.gate} title="Flows" absent="Flows are not included in this build." />
+					{:else if !data.flows.value.eventKnown}
+						<!-- No flow list is offered, so the save leaves the allowed flows as they are. -->
+						<p class="text-sm text-muted">Choosing flows needs a newer version of the flow plugin.</p>
+					{:else}
+						<input type="hidden" name="form_flows_offered" value="1" />
+						{#if formFlowOptions.length === 0}
+							<p class="text-sm text-muted">
+								No flow starts from a builder form yet. <a class="text-brand underline" href="/admin/flows">Create a flow</a> whose trigger is
+								the builder form event.
+							</p>
+						{:else if formFlowOptions.length <= 12}
+							<CheckboxGroup
+								label="Flows"
+								name="form_flows"
+								bind:value={formFlows}
+								options={formFlowOptions}
+								hint="Forms can start the flows you choose. Only flows that start from a builder form are listed."
+								error={errorOn('form_flows')}
+							/>
+						{:else}
+							<MultiSelect
+								id="form-flows"
+								label="Flows"
+								bind:value={formFlows}
+								options={formFlowOptions}
+								searchable
+								hint="Forms can start the flows you choose. Only flows that start from a builder form are listed."
+								error={errorOn('form_flows')}
+							/>
+							{#each formFlows as slug (slug)}
+								<input type="hidden" name="form_flows" value={slug} />
+							{/each}
+						{/if}
+						{#if notes.length > 0}
+							<ul class="flex w-full min-w-0 flex-col gap-1 text-sm text-warn" data-testid="flow-notes">
+								{#each notes as n (n.slug)}
+									<li class="min-w-0">
+										{#if n.label === n.slug}<span class="font-mono break-all">{n.slug}</span>{:else}<span class="break-words">{n.label}</span>{/if}: {n.note}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if settingError?.field === 'forms'}
+						<Alert tone="danger">{settingError.message}</Alert>
+					{/if}
+
+					<Button variant="primary" type="submit" loading={saveForms.pending} disabled={!online}>Save</Button>
+				</form>
+			</div>
 		</Card>
 	{/if}
 </PageShell>

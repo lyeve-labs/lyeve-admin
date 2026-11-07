@@ -28,6 +28,11 @@ export interface Flow {
 	version: number;
 	draft?: FlowDefinition;
 	trigger_type: string;
+	/**
+	 * The event an event trigger starts on, null for any other trigger.
+	 * Absent from a flow plugin too old to send it.
+	 */
+	trigger_event?: { kind: string; name: string; schema?: string } | null;
 	created_by: string;
 	created_at: string;
 	updated_at: string;
