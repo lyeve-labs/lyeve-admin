@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 import LabsPage from './+page.svelte';
 import type { LabEndpoint, LabResult } from '$lib/api/labs';
@@ -43,9 +44,9 @@ function result(over: Partial<LabResult> = {}): LabResult {
 
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
+		user: { roles: ['super_admin'] },
 		endpoints: [endpoint()],
 		source: 'engine',
-		grpc: { listening: true, routes: ['GET /api/schemas'], gate: { state: 'ok' } },
 		...over,
 	} as never,
 	form: form as never,
@@ -98,95 +99,6 @@ describe('the answer', () => {
 	});
 });
 
-describe('GraphQL', () => {
-	// GraphQL answers 200 and puts the failure in the body, so a status badge
-	// alone reads as success.
-	it('warns that a 200 carrying errors is not a success', () => {
-		const { container } = render(LabsPage, {
-			props: props({}, { graphql: result({ path: '/api/v1/graphql', body: '{"errors":[{"message":"boom"}]}' }) }),
-		});
-		expect(said(container)).toContain('check the body, not the status');
-	});
-
-	it('says nothing of the sort on a clean response', () => {
-		const { container } = render(LabsPage, {
-			props: props({}, { graphql: result({ path: '/api/v1/graphql', body: '{"data":{}}' }) }),
-		});
-		expect(said(container)).not.toContain('check the body, not the status');
-	});
-});
-
-describe('gRPC', () => {
-	// Those paths are on the plugin's own listener. The engine runs the call
-	// inside the plugin rather than reaching across to it, so the tab sends.
-	it('offers the transcoded routes and a way to run one', async () => {
-		const { container } = render(LabsPage, { props: props() });
-		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		const text = said(container);
-		expect(text).toContain('checks your token as it does for any caller');
-		expect(container.querySelector('form[action="?/grpc"]')).not.toBeNull();
-	});
-
-	it('will not run until a route is chosen', async () => {
-		render(LabsPage, { props: props() });
-		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(screen.getByRole('button', { name: /run/i })).toHaveProperty('disabled', true);
-	});
-
-	it('shows the transcoded handler status, not the engine call status', async () => {
-		const { container } = render(LabsPage, {
-			props: props(
-				{},
-				{
-					grpc: result({ path: '/api/content/post', status: 404, body: '{"error":"schema not found"}' }),
-					grpcRoute: 'GET /api/content/{schema}',
-				},
-			),
-		});
-		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		const text = said(container);
-		expect(text).toContain('404');
-		expect(text).toContain('schema not found');
-	});
-
-	it('says the plugin is absent rather than showing an empty list', async () => {
-		const { container } = render(LabsPage, {
-			props: props({ grpc: { listening: false, routes: [], gate: { state: 'absent' } } }),
-		});
-		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('turned off on this instance');
-	});
-
-	// The status route is a super admin's, and an admin is not told the
-	// plugin is missing.
-	it('tells a role below super admin that the role is why', async () => {
-		const { container } = render(LabsPage, {
-			props: props({ grpc: { listening: false, routes: [], gate: { state: 'forbidden' } } }),
-		});
-		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('Your role cannot open the gRPC listener.');
-		expect(said(container)).not.toContain('turned off on this instance');
-	});
-
-	it('offers a retry when the status could not be read', async () => {
-		const { container } = render(LabsPage, {
-			props: props({ grpc: { listening: false, routes: [], gate: { state: 'unavailable' } } }),
-		});
-		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('the gRPC listener did not load');
-		expect(said(container)).not.toContain('turned off on this instance');
-		expect(said(container)).toContain('Try again');
-	});
-
-	it('separates a missing plugin from one that is present and down', async () => {
-		const { container } = render(LabsPage, {
-			props: props({ grpc: { listening: false, routes: [], gate: { state: 'ok' } } }),
-		});
-		await fireEvent.click(screen.getByRole('radio', { name: /grpc/i }));
-		expect(said(container)).toContain('installed, but its listener is not running');
-	});
-});
-
 describe('the endpoint picker', () => {
 	it('names its search box for a screen reader', () => {
 		const { container } = render(LabsPage, { props: props() });
@@ -232,5 +144,14 @@ describe('the endpoint picker', () => {
 		expect(rows[0].querySelector('button')?.textContent?.trim()).toBe('Select');
 		expect(getByRole('heading', { level: 2, name: 'POST /api/v1/content/{schema}' })).toBeTruthy();
 		expect(queryByRole('heading', { level: 2, name: 'GET /api/v1/content/{schema}' })).toBeNull();
+	});
+});
+
+describe('the REST tab', () => {
+	it('marks its own tab, and leaves the gRPC tab off for a role below super admin', () => {
+		const { getByRole, queryByRole } = render(LabsPage, { props: props({ user: { roles: ['admin'] } }) });
+		expect(getByRole('tab', { name: 'REST' }).getAttribute('aria-selected')).toBe('true');
+		expect(queryByRole('tab', { name: 'gRPC' })).toBeNull();
+		expect(queryByRole('radio', { name: /grpc/i })).toBeNull();
 	});
 });
