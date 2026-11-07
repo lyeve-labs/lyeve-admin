@@ -45,7 +45,7 @@ describe('secondFactorFailure', () => {
 		const failed = secondFactorFailure(refused(401, 'AUTH_MFA_NOT_CONFIGURED', 'Multi-factor authentication is not configured for this account.'));
 		expect(failed).toEqual({
 			status: 401,
-			error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',
+			error: 'This account has no authenticator app set up. Ask a super admin to restore your access.',
 			restart: true,
 		});
 		expect(failed.error).not.toMatch(/expired|sign in again/i);
