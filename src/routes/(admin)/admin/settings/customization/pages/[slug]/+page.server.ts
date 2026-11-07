@@ -4,7 +4,7 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
 import { listSchemaNames } from '$lib/api/search-settings';
 import { readError } from '$lib/server/read-error';
-import { GATE_OK, section } from '$lib/api/gate';
+import { forbiddenText, GATE_OK, section } from '$lib/api/gate';
 import {
 	deleteCustomPage,
 	getCustomPage,
@@ -14,7 +14,7 @@ import {
 
 export const load: PageServerLoad = async (event) => {
 	const { user, customization } = await event.parent();
-	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, 'Only an admin or a super admin can change customization.');
+	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, forbiddenText('this page', ['admin', 'super_admin']));
 	// The plugin says whether this tenant may shape its admin, and the shell
 	// has read its answer. The customization page says why when it may not.
 	if (!customization.entitled) redirect(303, '/admin/settings/customization/pages');
