@@ -7,6 +7,7 @@
 		Drawer,
 		EmptyState,
 		Input,
+		NumberInput,
 		PageShell,
 		PasswordInput,
 		SectionHeading,
@@ -64,7 +65,7 @@
 	let useSSL = $state(true);
 	let pathStyle = $state(false);
 	let enabled = $state(true);
-	let priority = $state('0');
+	let priority = $state(0);
 	let publicUnsigned = $state(false);
 
 	const typeOptions = PROVIDER_TYPES.map((t) => ({ value: t, label: PROVIDER_LABELS[t] ?? t }));
@@ -78,7 +79,7 @@
 		useSSL = true;
 		pathStyle = false;
 		enabled = true;
-		priority = '0';
+		priority = 0;
 		publicUnsigned = false;
 		failure.opened();
 		drawerOpen = true;
@@ -92,7 +93,7 @@
 		useSSL = p.use_ssl;
 		pathStyle = p.path_style;
 		enabled = p.enabled;
-		priority = String(p.priority);
+		priority = p.priority;
 		publicUnsigned = p.local_public_unsigned;
 		failure.opened();
 		drawerOpen = true;
@@ -125,7 +126,7 @@
 		useSSL = source.use_ssl;
 		pathStyle = source.path_style;
 		enabled = false;
-		priority = String(source.priority);
+		priority = source.priority;
 		publicUnsigned = source.local_public_unsigned;
 		failure.opened();
 		drawerOpen = true;
@@ -391,7 +392,7 @@
 				/>
 			{/if}
 		{/each}
-		<Input id="provider-priority" name="priority" label="Priority" type="text" inputmode="numeric" mono hint="Lower numbers receive uploads first." bind:value={priority} />
+		<NumberInput id="provider-priority" name="priority" label="Priority" min={0} hint="Lower numbers receive uploads first." bind:value={priority} />
 		{#if kind === 's3' || kind === 'minio'}
 			<Toggle id="provider-ssl" label="Use TLS" hint="Talk to the endpoint over HTTPS." bind:checked={useSSL} />
 			<Toggle id="provider-path-style" label="Path-style addresses" hint="Needed by MinIO and some S3-compatible services that do not serve bucket subdomains." bind:checked={pathStyle} />
