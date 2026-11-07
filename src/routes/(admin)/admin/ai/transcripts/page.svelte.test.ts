@@ -60,7 +60,7 @@ describe('AI transcripts page', () => {
 
 	it('paints the forbidden state and no table', () => {
 		const { getByText, container } = setup({ gate: { state: 'forbidden' } });
-		expect(getByText('Your role cannot read AI transcripts.')).toBeTruthy();
+		expect(getByText('Only an admin or a super admin can open AI transcripts.')).toBeTruthy();
 		expect(container.querySelector('table')).toBeNull();
 	});
 });

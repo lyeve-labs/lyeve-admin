@@ -41,8 +41,8 @@ describe('aiGate', () => {
 describe('aiActionError', () => {
 	it('names the lowest role the route admits on a role refusal', () => {
 		const refused = new ApiError(403, 'insufficient permissions', { error: 'insufficient permissions', code: 'forbidden' });
-		expect(aiActionError(refused, 'f')).toBe('Your role cannot change this. Ask an admin if you need it.');
-		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Your role cannot change this. Ask a super admin if you need it.');
+		expect(aiActionError(refused, 'f')).toBe('Only an admin or a super admin can change this.');
+		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Only a super admin can change this.');
 	});
 
 	it('says the budget is spent only when the 402 names the budget', () => {

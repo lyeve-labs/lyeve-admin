@@ -95,7 +95,7 @@
 		description="Providers, prompts, transcripts and the editor assistant are part of the AI plugin."
 	/>
 {:else if effective.state === 'forbidden'}
-	<Alert tone="danger" title="Not allowed">Your role cannot read AI {noun}.</Alert>
+	<Alert tone="danger" title="Not allowed">Only an admin or a super admin can open AI {noun}.</Alert>
 {:else if effective.state === 'absent'}
 	<EmptyState
 		{level}

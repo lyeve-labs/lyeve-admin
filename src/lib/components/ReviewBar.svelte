@@ -158,7 +158,7 @@
 			</Alert>
 		{:else if forbidden}
 			<Alert tone="warn" title="You cannot see this entry's review">
-				Your roles have no read permission on reviews. Ask an admin for a rule on
+				Your roles have no read permission on reviews. Ask a super admin for a rule on
 				<span class="font-mono">reviews</span> or on the definition's own resource.
 			</Alert>
 		{:else if !assignment}

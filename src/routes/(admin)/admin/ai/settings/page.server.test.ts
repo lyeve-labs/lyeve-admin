@@ -77,7 +77,7 @@ describe('admin/ai/settings actions', () => {
 		const forbidden = actionEvent({ '/api/admin/ai/settings': () => refused(403, 'insufficient permissions') }, formOf({ enabled: 'false' }), { path });
 		expect(await actions.save(forbidden.event)).toMatchObject({
 			status: 403,
-			data: { error: 'Your role cannot change this. Ask an admin if you need it.' },
+			data: { error: 'Only an admin or a super admin can change this.' },
 		});
 	});
 

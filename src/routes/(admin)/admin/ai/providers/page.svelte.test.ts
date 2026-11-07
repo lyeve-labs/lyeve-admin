@@ -81,7 +81,7 @@ describe('AI providers page', () => {
 
 	it.each([
 		['locked', 'Not enabled on this instance.'],
-		['forbidden', 'Your role cannot read AI providers.'],
+		['forbidden', 'Only an admin or a super admin can open AI providers.'],
 		['off', 'AI is switched off for this tenant'],
 		['no_provider', 'No AI provider is available'],
 	])('paints the %s state and no table', (state, words) => {

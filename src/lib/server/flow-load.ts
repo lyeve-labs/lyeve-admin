@@ -27,7 +27,7 @@ export function flowLoadOutcome(err: unknown, session: SessionEvent, plural: str
 			redirect(302, '/login');
 		}
 		if (err.status === 402) return { locked: true, loadError: null };
-		if (err.status === 403) return { locked: false, loadError: `Your role cannot read ${plural}.` };
+		if (err.status === 403) return { locked: false, loadError: `Your role does not allow you to open ${plural}. Ask a super admin to grant it.` };
 	}
 	return { locked: false, loadError: engineBanner(plural) };
 }

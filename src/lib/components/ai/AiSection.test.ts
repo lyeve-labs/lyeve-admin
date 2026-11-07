@@ -54,7 +54,7 @@ describe('AiSection', () => {
 
 	it('names the role and the resource when forbidden', () => {
 		const { getByText, queryByTestId } = setup({ state: 'forbidden' });
-		expect(getByText('Your role cannot read AI providers.')).toBeTruthy();
+		expect(getByText('Only an admin or a super admin can open AI providers.')).toBeTruthy();
 		expect(queryByTestId('body')).toBeNull();
 	});
 

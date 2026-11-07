@@ -31,7 +31,7 @@ describe('flowLoadOutcome', () => {
 	it('names the role on a 403', () => {
 		expect(flowLoadOutcome(new ApiError(403, 'forbidden'), { cookies: cookies() }, 'datasources')).toEqual({
 			locked: false,
-			loadError: 'Your role cannot read datasources.',
+			loadError: 'Your role does not allow you to open datasources. Ask a super admin to grant it.',
 		});
 	});
 

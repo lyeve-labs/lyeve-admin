@@ -82,8 +82,8 @@ export function aiBudgetSpent(err: unknown): boolean {
 export type AiWriteRole = 'admin' | 'super_admin';
 
 const ROLE_TEXT: Record<AiWriteRole, string> = {
-	admin: 'Your role cannot change this. Ask an admin if you need it.',
-	super_admin: 'Your role cannot change this. Ask a super admin if you need it.',
+	admin: 'Only an admin or a super admin can change this.',
+	super_admin: 'Only a super admin can change this.',
 };
 
 /**
