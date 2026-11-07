@@ -749,6 +749,11 @@ export function adminSection(pathname: string, items: NavTree, name = PRODUCT_NA
 	return trail.length > 0 ? trail.join(' / ') : name;
 }
 
+// Every entry, whoever reads: which plugin draws a page is a fact about the
+// page, and the role gate is the page's own. The tree takes no input past the
+// role, so it is built once, on first use, rather than on every navigation.
+let everyEntry: NavTree | undefined;
+
 /** The entry that owns a page: the longest href at or above the path, by prefix. */
 function owner(pathname: string): { href: string; label: string; plugin: PluginName | undefined } | undefined {
 	const path = pathname.replace(/\/+$/, '') || '/';
@@ -763,9 +768,7 @@ function owner(pathname: string): { href: string; label: string; plugin: PluginN
 			if (node.children) walk(node.children);
 		}
 	};
-	// Every entry, whoever reads: which plugin draws a page is a fact about
-	// the page, and the role gate is the page's own.
-	walk(adminNav(['super_admin']));
+	walk(everyEntry ??= adminNav(['super_admin']));
 	for (const page of UNLISTED_PAGES) consider(page.href, page.label, page.plugin);
 	return best;
 }
@@ -806,17 +809,7 @@ export interface NavCustomization {
 export function customizeNav(tree: NavTree, custom: NavCustomization | null | undefined, roles: readonly string[]): NavTree {
 	if (!custom) return tree;
 	const hidden = new Set(custom.hidden);
-	const drop = (nodes: NavTree): NavTree => {
-		const kept: NavNode[] = [];
-		for (const node of nodes) {
-			if (hidden.has(node.id)) continue;
-			const children = node.children ? drop(node.children) : undefined;
-			if (node.href === undefined && children !== undefined && children.length === 0) continue;
-			kept.push(children === undefined ? node : { ...node, children });
-		}
-		return kept;
-	};
-	const shaped = drop(tree);
+	const shaped = prune(tree, (id) => !hidden.has(id));
 
 	const byId = new Map<string, NavNode>();
 	const index = (nodes: NavTree) => {
