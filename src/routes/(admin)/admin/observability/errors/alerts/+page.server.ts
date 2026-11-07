@@ -13,6 +13,7 @@ import {
 	type AlertSettings,
 } from '$lib/api/error-tracking';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -30,7 +31,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			settings = await getAlertSettings(client);
 		} catch (err) {
-			gate = gateOf(err, 'Could not load errors.');
+			gate = gateOf(err, couldNotLoad('errors'));
 		}
 		windowDays = await window;
 	}

@@ -83,7 +83,7 @@
 				<div class="flex flex-col gap-4">
 					<p class="text-sm text-muted">
 						A spike is always logged. Each channel you set here is also notified, at most once every
-						fifteen minutes. Email alerts work on every install.
+						fifteen minutes. Email alerts are always available.
 					</p>
 					<AlertChannelFields
 						prefix={SETTINGS_CHANNEL_PREFIX}

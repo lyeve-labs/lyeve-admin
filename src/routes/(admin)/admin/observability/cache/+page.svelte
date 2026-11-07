@@ -37,7 +37,7 @@
 		underPressure,
 		type CacheProvider,
 	} from '$lib/api/cache';
-	import { formatBytes, formatDateTime } from '$lib/format';
+	import { formatBytes, formatDateTime, plural } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
@@ -115,7 +115,7 @@
 				confirmLabel: 'Purge',
 				success: (data) => {
 					const n = (data as { purged?: number } | undefined)?.purged ?? 0;
-					return `${n} ${n === 1 ? 'response' : 'responses'} purged.`;
+					return `${n} ${plural(n, 'response')} purged.`;
 				},
 			},
 		);
@@ -140,7 +140,7 @@
 		}
 		return confirmed(
 			'Flush the cache?',
-			`Your session is not scoped to a tenant. On an install with many tenants, this removes every key of every tenant. On an install with one tenant, it removes that tenant's cached responses. ${RECOMPUTED}`,
+			`Your session is not scoped to a tenant. On an instance with many tenants, this removes every key of every tenant. On an instance with one tenant, it removes that tenant's cached responses. ${RECOMPUTED}`,
 			{ confirmLabel: 'Flush', success: 'Cache flushed.' },
 		);
 	}
@@ -200,9 +200,8 @@
 			     is entirely out of service. -->
 			<Alert tone="danger">
 				{tripped.length}
-				{tripped.length === 1 ? 'provider is' : 'providers are'} switched off by their circuit
-				breaker. The hit rate above still looks normal because another provider is
-				taking over, so this is the only place it shows.
+				{plural(tripped.length, 'provider is', 'providers are')} switched off by their circuit
+				breaker. Another provider is taking over, so the hit rate above stays normal.
 			</Alert>
 		{/if}
 
@@ -230,9 +229,9 @@
 				     store was full. A capacity problem dressed as a working
 				     cache: the hit rate falls and nothing errors. -->
 				<Alert tone="warn">
-					{data.stats.evictions} entries were removed before they expired because the store
-					is full. The hit rate drops without any error, so this is the only place it
-					shows.
+					{data.stats.evictions}
+					{plural(data.stats.evictions, 'entry was', 'entries were')} removed before they expired
+					because the store is full.
 					{#if full !== null}
 						The store is at {Math.round(full * 100)}% of its limit.
 					{/if}
@@ -247,7 +246,7 @@
 					{#if data.providersLicensed}
 						Every configured provider runs, in priority order, with failover and a circuit breaker on each.
 					{:else}
-						Only one provider runs on this install: the highest-priority one that starts. Other configured
+						Only one provider runs on this instance: the highest-priority one that starts. Other configured
 						providers are listed below as left out.
 					{/if}
 				</p>
@@ -485,8 +484,8 @@
 				</Alert>
 			{:else if data.entries.length === 0}
 				<EmptyState
-					title="Nothing is cached"
-					description="Nothing has been requested yet, or every entry has expired."
+					title="No cached entries yet"
+					description="Entries appear here after the first cached request."
 				>
 					{#snippet iconSnippet()}
 						<Database size={ICON.lg} />

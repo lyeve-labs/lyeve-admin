@@ -149,7 +149,7 @@ describe('Pool health badge', () => {
 		expect(text).toContain('Open 8');
 		expect(text).toContain('In use 3');
 		expect(text).toContain('Idle 5');
-		expect(text).toContain('1.2ms');
+		expect(text).toContain('1.2 ms');
 	});
 
 	it('still reads Unhealthy when the engine says so, metrics or not', () => {
@@ -633,7 +633,7 @@ describe('reads that failed', () => {
 			props: props({ poolHealth: { ok: false, gate: { state: 'unavailable' } } }),
 		});
 		expect(container.textContent).toContain('is unavailable');
-		expect(container.textContent).not.toContain('may not have a connection pooler configured');
+		expect(container.textContent).not.toContain('No pool statistics for this instance');
 		expect(container.textContent).not.toContain('No check time reported');
 	});
 });

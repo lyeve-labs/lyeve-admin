@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -13,6 +13,7 @@ import {
 } from '$lib/api/idempotency';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { couldNotLoad } from '$lib/outage';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -37,7 +38,7 @@ export const load: PageServerLoad = async (event) => {
 			if (back !== null) redirect(307, withOffset(event.url, back));
 		} catch (err) {
 			if (isRedirect(err)) throw err;
-			gate = gateOf(err, 'Could not load idempotency keys.');
+			gate = gateOf(err, couldNotLoad('idempotency keys'));
 		}
 	}
 
@@ -52,7 +53,7 @@ export const load: PageServerLoad = async (event) => {
 					.catch((err: unknown) => ({
 						value: null,
 						read: false,
-						gate: gateOf(err, 'Could not load the counters.'),
+						gate: gateOf(err, couldNotLoad('the counters')),
 					}))
 			: { value: null, read: false, gate: null };
 
@@ -83,7 +84,7 @@ export const actions: Actions = {
 		try {
 			await releaseKey(client, key);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not release the key. Try again.') });
+			return actionFailure(err, 'Could not release the key. Try again.');
 		}
 		return { released: key };
 	},

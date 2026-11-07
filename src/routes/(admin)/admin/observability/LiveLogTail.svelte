@@ -178,10 +178,7 @@
 	{:else}
 		{#if logState === 'refused'}
 			<Alert tone="warn" title="Could not connect to the live log tail">
-				<p>
-					The connection was refused, and it will not reconnect on its own. Your role may not have
-					access to logs, or the engine may be unavailable.
-				</p>
+				<p>The connection was refused, and it does not reconnect on its own. Choose Try again.</p>
 				<div class="mt-3">
 					<Button variant="secondary" size="sm" onclick={retryLogStream}>
 						<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again

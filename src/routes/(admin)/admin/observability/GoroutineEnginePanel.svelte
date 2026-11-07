@@ -131,7 +131,7 @@
 						<Stat size="sm" label="Task timeout" mono value={formatGoDuration(ge.pool.task_timeout)} />
 					</div>
 				{:else}
-					<p class="text-xs text-muted">This install runs without a worker pool.</p>
+					<p class="text-xs text-muted">This instance runs without a worker pool.</p>
 				{/if}
 			</Card>
 
@@ -145,7 +145,7 @@
 						<Stat size="sm" label="Timeout" mono value={formatGoDuration(ge.parallel.timeout)} />
 					</div>
 				{:else}
-					<p class="text-xs text-muted">This install runs without a parallel engine.</p>
+					<p class="text-xs text-muted">This instance runs without a parallel engine.</p>
 				{/if}
 			</Card>
 
@@ -165,7 +165,7 @@
 						<Stat size="sm" label="Dropped" mono value={ge.asyncHooks.dropped ?? NO_VALUE} tone={(ge.asyncHooks.dropped ?? 0) > 0 ? 'danger' : undefined} />
 					</div>
 				{:else}
-					<p class="text-xs text-muted">This install runs without an async hook executor.</p>
+					<p class="text-xs text-muted">This instance runs without an async hook executor.</p>
 				{/if}
 			</Card>
 		</div>

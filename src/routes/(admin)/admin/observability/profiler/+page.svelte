@@ -186,10 +186,8 @@
 		</div>
 		{#if !data.memory.ok}
 			<GateNotice gate={data.memory.gate} title="the memory trend" absent={ABSENT} />
-		{:else if !memory}
-			<EmptyState iconSnippet={noMemory} title="No memory trend" description="No memory snapshots are available yet." />
-		{:else if !latest}
-			<EmptyState iconSnippet={noMemory} title="No snapshot yet" description="Snapshots are taken on a schedule. The first one has not been taken yet." />
+		{:else if !memory || !latest}
+			<EmptyState iconSnippet={noMemory} title="No snapshots yet" description="Snapshots are taken on a schedule, and the first one appears here." />
 		{:else}
 			<Card>
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="memory-stats">
@@ -219,7 +217,7 @@
 		{#if !data.slowest.ok}
 			<GateNotice gate={data.slowest.gate} title="the endpoint statistics" absent={ABSENT} />
 		{:else if data.slowest.value.length === 0}
-			<EmptyState iconSnippet={noEndpoints} title="Nothing sampled yet" description="Endpoints appear here after they serve requests." />
+			<EmptyState iconSnippet={noEndpoints} title="No samples yet" description="Endpoints appear here after they serve requests." />
 		{:else}
 			{@render endpointRows(data.slowest.value, 'Slowest endpoints')}
 		{/if}
@@ -237,7 +235,7 @@
 			{#if data.detail && !data.detail.ok}
 				<GateNotice gate={data.detail.gate} title="this endpoint" absent={ABSENT} />
 			{:else if !detail || !detail.methods?.length}
-				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="The profiler may have been reset, or this path has not served any requests." />
+				<EmptyState iconSnippet={noEndpoints} title="No data for this endpoint" description="No requests were sampled for this endpoint." />
 			{:else}
 				{@render endpointRows(detail.methods.map((m) => m.stats), `Methods for ${data.selected}`)}
 				{#each detail.methods as method (method.method)}
@@ -285,7 +283,7 @@
 		{#if !data.plugins.ok}
 			<GateNotice gate={data.plugins.gate} title="the plugin breakdown" absent={ABSENT} />
 		{:else if data.plugins.value.length === 0}
-			<EmptyState iconSnippet={noPlugins} title="Nothing sampled yet" description="Plugins appear here after they serve a request." />
+			<EmptyState iconSnippet={noPlugins} title="No samples yet" description="Plugins appear here after they serve a request." />
 		{:else}
 			<Table label="By plugin">
 				<thead>
@@ -323,8 +321,8 @@
 			{/snippet}
 			<div class="flex flex-col gap-4" data-testid="profiler-exports">
 				<p class="text-xs text-muted">
-					Each download is a gzipped pprof profile. Heap and allocations profiles contain raw
-					process memory and are logged when exported. This instance may not allow them.
+					Each download is a gzipped pprof profile. A heap or allocations profile contains raw
+					process memory, so each export is logged, and the engine can refuse it.
 				</p>
 				<NumberInput
 					id="cpu-seconds"

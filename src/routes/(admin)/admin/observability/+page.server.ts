@@ -21,6 +21,8 @@ import { refusalOf } from '$lib/api/refusal';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { goroutineCount } from '$lib/server/goroutines';
+import { couldNotLoad } from '$lib/outage';
+import { rolesInWords } from '$lib/roles';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 
@@ -33,7 +35,7 @@ import { notRunning } from '$lib/plugins';
  * Declared as always present, they would render a Healthy badge over tiles
  * measuring nothing.
  */
-export interface PoolHealth {
+interface PoolHealth {
 	engine?: string;
 	healthy: boolean;
 	latency_ms?: number;
@@ -49,7 +51,7 @@ export interface PoolHealth {
 	message?: string;
 }
 
-export interface LatencyStats {
+interface LatencyStats {
 	method: string;
 	path: string;
 	count: number;
@@ -62,7 +64,7 @@ export interface LatencyStats {
 	samples: number;
 }
 
-export interface LatencyResponse {
+interface LatencyResponse {
 	tracker?: Record<string, unknown>;
 	slowest: LatencyStats[];
 	total: number;
@@ -72,9 +74,11 @@ export interface LatencyResponse {
 // failed. A zeroed snapshot would read on screen as a pool with no connections
 // open, and an empty ranking as an engine that has timed nothing.
 const FAILED = {
-	pool: 'Could not load pool health.',
-	latency: 'Could not load latency rankings.',
+	pool: couldNotLoad('pool health'),
+	latency: couldNotLoad('latency rankings'),
 } as const;
+
+const READERS = ['admin', 'super_admin'];
 
 /** Which of the three tunable forms an action answered for. */
 export type TunableForm = 'pool' | 'parallel' | 'asyncHooks';
@@ -94,8 +98,8 @@ export interface GoroutineEnginePanel extends GoroutineEngineViews {
 export const load: PageServerLoad = async (event) => {
 	const { url, parent } = event;
 	const { user, plugins } = await parent();
-	if (!user.roles.some((r) => ['super_admin', 'admin'].includes(r))) {
-		error(403, 'Only an admin or a super admin can open this page.');
+	if (!user.roles.some((r) => READERS.includes(r))) {
+		error(403, `Only ${rolesInWords(READERS)} can open this page.`);
 	}
 
 	const client = authedClient(event);

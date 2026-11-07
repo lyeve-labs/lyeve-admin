@@ -2,7 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { sessionTenant } from '$lib/server/session-refresh';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -28,8 +28,9 @@ import {
 	type InactiveProvider,
 	type Limit,
 } from '$lib/api/cache';
-import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
+import { couldNotLoad } from '$lib/outage';
 
 /** What the response cache rules read answered, beside the rest of the page. */
 export interface RulesState {
@@ -60,55 +61,50 @@ export const load: PageServerLoad = async (event) => {
 	const flushScoped = Boolean(sessionTenant(event)) || !superAdmin;
 
 	const client = authedClient(event);
-	let stats: CacheStats | null = null;
 	// The shell says why the page is unavailable while its plugin does not run.
-	let gate: Gate = notRunning(plugins, PLUGIN.cache) ? { state: 'absent' } : GATE_OK;
-	if (gate.state === 'ok' && superAdmin) {
-		try {
-			stats = await readStats(client);
-		} catch (err) {
-			gate = gateOf(err, 'Could not load the cache status.');
-		}
-	}
+	const running = !notRunning(plugins, PLUGIN.cache);
+	// The four reads are independent, so they start together. The counters and
+	// the stored keys are a super admin's only.
+	const [statsRead, providersRead, rulesRead, entriesRead] = running
+		? await Promise.all([
+				superAdmin ? section(readStats(client), couldNotLoad('the cache status')) : null,
+				section(listProviders(client), couldNotLoad('providers')),
+				section(listRules(client), couldNotLoad('response cache rules')),
+				superAdmin ? section(listEntries(client, limit + 1, offset), couldNotLoad('stored entries')) : null,
+			])
+		: [null, null, null, null];
+	const gate: Gate = !running ? { state: 'absent' } : statsRead && !statsRead.ok ? statsRead.gate : GATE_OK;
+	const stats: CacheStats | null = statsRead?.ok ? statsRead.value : null;
 
 	// Providers are the half the stats hide: a tripped backend leaves the hit
 	// rate plausible because a lower-priority provider picks up. Losing this
 	// read must not read as every provider being healthy.
 	const unread = { rows: [] as CacheProvider[], read: false, licensed: null as boolean | null, inactive: [] as InactiveProvider[] };
 	const providers: typeof unread & { gate: Gate | null } =
-		gate.state === 'ok'
-			? await listProviders(client)
-					.then((p) => ({
-						rows: rowsOf(p),
+		gate.state !== 'ok' || !providersRead
+			? { ...unread, gate: null }
+			: providersRead.ok
+				? {
+						rows: rowsOf(providersRead.value),
 						read: true,
-						licensed: typeof p?.licensed === 'boolean' ? p.licensed : null,
-						inactive: p?.inactive ?? [],
+						licensed: typeof providersRead.value?.licensed === 'boolean' ? providersRead.value.licensed : null,
+						inactive: providersRead.value?.inactive ?? [],
 						gate: null,
-					}))
-					.catch((err: unknown) => ({
-						...unread,
-						gate: gateOf(err, 'Could not load providers.'),
-					}))
-			: { ...unread, gate: null };
+					}
+				: { ...unread, gate: providersRead.gate };
 
 	// The rules are the tenant's own and read on their own, so a refused or
 	// failed read says so in their section and leaves the rest of the page.
 	let rules: RulesState = { gate: { state: 'absent' }, rows: [], licensed: null, limit: undefined };
-	if (gate.state === 'ok') {
-		try {
-			const read = await listRules(client);
-			rules = {
-				gate: { state: 'ok' },
-				rows: read?.data ?? [],
-				licensed: typeof read?.licensed === 'boolean' ? read.licensed : null,
-				limit: read?.limits?.rules,
-			};
-		} catch (err) {
-			rules = {
-				...rules,
-				gate: gateOf(err, 'Could not load response cache rules.'),
-			};
-		}
+	if (gate.state === 'ok' && rulesRead) {
+		rules = rulesRead.ok
+			? {
+					gate: { state: 'ok' },
+					rows: rulesRead.value?.data ?? [],
+					licensed: typeof rulesRead.value?.licensed === 'boolean' ? rulesRead.value.licensed : null,
+					limit: rulesRead.value?.limits?.rules,
+				}
+			: { ...rules, gate: rulesRead.gate };
 	}
 
 	// A failed read of the stored keys keeps its reason. Drawn as no rows, it
@@ -119,17 +115,14 @@ export const load: PageServerLoad = async (event) => {
 	// note. Drawn as an empty list, it said nothing is cached beside a counter
 	// of thousands of entries.
 	let unlisted = false;
-	if (gate.state === 'ok' && superAdmin) {
-		try {
-			const read = await listEntries(client, limit + 1, offset);
-			unlisted = typeof read?.note === 'string' && read.note !== '';
-			entries = pageOf(read, limit, offset);
-		} catch (err) {
-			entriesGate = gateOf(err, 'Could not load stored entries.');
-		}
-		if (!entriesGate) {
+	if (gate.state === 'ok' && entriesRead) {
+		if (entriesRead.ok) {
+			unlisted = typeof entriesRead.value?.note === 'string' && entriesRead.value.note !== '';
+			entries = pageOf(entriesRead.value, limit, offset);
 			const back = pastEndOffset(entries.rows.length, limit, offset, entries.total);
 			if (back !== null) redirect(307, withOffset(event.url, back));
+		} else {
+			entriesGate = entriesRead.gate;
 		}
 	}
 
@@ -245,7 +238,7 @@ export const actions: Actions = {
 			if (tag) await flushTag(client, tag);
 			else await flushAll(client);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not flush the cache. Try again.') });
+			return actionFailure(err, 'Could not flush the cache. Try again.');
 		}
 		return { flushed: tag || 'everything' };
 	},
@@ -259,7 +252,7 @@ export const actions: Actions = {
 		try {
 			await resetCircuit(client, name);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not reset the circuit. Try again.') });
+			return actionFailure(err, 'Could not reset the circuit. Try again.');
 		}
 		return { reset: name };
 	},

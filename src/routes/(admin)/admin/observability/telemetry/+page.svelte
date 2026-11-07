@@ -359,7 +359,7 @@
 					{#if hostMoved}
 						<Alert tone="warn" title="Enter the headers again for the new host">
 							<p>
-								Stored headers usually include the collector's key, so they never move to a different host.
+								Stored headers stay with the host they were entered for.
 								Choose Replace them and enter the headers for the new address. Nothing was saved.
 							</p>
 						</Alert>

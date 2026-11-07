@@ -115,10 +115,7 @@
 
 	{#if data.gate.state === 'capture_store'}
 		<Alert tone="warn">
-			<p>
-				Could not load the slow query log. Its table may be missing until a pending
-				migration runs.
-			</p>
+			<p>Could not load the slow query log.</p>
 			<!-- A plain link to this address asks for a fresh document, as the
 			     shared notice's retry does, so it works before hydration. -->
 			<div class="mt-3">
@@ -170,8 +167,8 @@
 
 				{#if data.analyzeFailed}
 					<Alert tone="warn">
-						Could not explain these statements as {data.dialect}. Each instance uses one SQL
-						dialect, and EXPLAIN differs between dialects. Try the dialect this instance uses.
+						Could not explain these statements as {data.dialect}. Choose the dialect this
+						instance's database uses.
 					</Alert>
 				{:else if data.dialect && data.analysis && suggestions.length === 0}
 					<p class="text-sm text-muted">{noSuggestionText(data.dialect, data.analysis)}</p>

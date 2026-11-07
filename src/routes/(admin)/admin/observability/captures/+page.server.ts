@@ -29,6 +29,7 @@ import {
 } from '$lib/api/request-capture';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { couldNotLoad } from '$lib/outage';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -73,7 +74,7 @@ export const load: PageServerLoad = async (event) => {
 		page = { rows: p.rows, total: p.total, hasMore: p.hasMore };
 		if (typeof read?.licensed === 'boolean') licensed = read.licensed;
 	} catch (err) {
-		gate = gateOf(err, 'Could not load captures.');
+		gate = gateOf(err, couldNotLoad('captures'));
 	}
 	if (gate.state !== 'ok') return { ...empty, gate };
 	const back = pastEndOffset(page.rows.length, limit, offset, page.total);
@@ -88,14 +89,14 @@ export const load: PageServerLoad = async (event) => {
 				rows: [] as CaptureRule[],
 				read: false,
 				licensed: undefined,
-				gate: gateOf(err, 'Could not load capture rules.'),
+				gate: gateOf(err, couldNotLoad('capture rules')),
 			})),
 		listReplaySets(client)
 			.then((r) => ({ rows: r?.data ?? [], read: true, gate: null }))
 			.catch((err: unknown) => ({
 				rows: [] as ReplaySet[],
 				read: false,
-				gate: gateOf(err, 'Could not load replay sets.'),
+				gate: gateOf(err, couldNotLoad('replay sets')),
 			})),
 	]);
 	if (licensed === null && typeof rules.licensed === 'boolean') licensed = rules.licensed;

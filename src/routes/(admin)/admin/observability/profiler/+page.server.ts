@@ -18,6 +18,7 @@ import {
 import { section, type Section } from '$lib/api/gate';
 import { actionError } from '$lib/server/action-error';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
+import { couldNotLoad } from '$lib/outage';
 
 /**
  * What the page renders. Every view is the profiler plugin's, under
@@ -41,10 +42,10 @@ export interface ProfilerPage {
 
 /** What each view says when its read failed for a reason it cannot name. */
 const FAILED = {
-	endpoints: 'Could not load endpoint statistics.',
-	plugins: 'Could not load per-plugin statistics.',
-	memory: 'Could not load memory snapshots.',
-	detail: 'Could not load this endpoint.',
+	endpoints: couldNotLoad('endpoint statistics'),
+	plugins: couldNotLoad('per-plugin statistics'),
+	memory: couldNotLoad('memory snapshots'),
+	detail: couldNotLoad('this endpoint'),
 } as const;
 
 /**

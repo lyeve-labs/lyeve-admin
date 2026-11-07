@@ -38,7 +38,7 @@
 		type RuleMethod,
 		type SetReplay,
 	} from '$lib/api/request-capture';
-	import { NO_VALUE, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatDateTime, plural } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import { httpStatusTone } from '$lib/tones';
@@ -593,7 +593,7 @@
 			<Input id="set-name" name="name" label="Name" bind:value={setName} required />
 			<p class="text-sm text-muted">
 				{selected.length}
-				{selected.length === 1 ? 'capture' : 'captures'}, replayed in the order they were selected. A capture that
+				{plural(selected.length, 'capture')}, replayed in the order they were selected. A capture that
 				expires before a replay is reported as not replayed and the rest still run.
 			</p>
 		</div>
