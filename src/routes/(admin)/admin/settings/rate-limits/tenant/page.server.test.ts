@@ -56,29 +56,12 @@ beforeEach(() => {
 });
 
 describe('tenant rate limits load', () => {
-	it('reads each section on its own, with a day of history by default', async () => {
+	it('reads the limit and the address lists, and leaves the history to its own page', async () => {
 		const result = (await load(loadEvent())) as Loaded;
-		expect(result.hours).toBe(24);
-		expect(api.readRefusalHistory).toHaveBeenCalledWith(expect.anything(), 24);
 		expect(result.limit).toMatchObject({ ok: true, value: { licensed: false } });
 		expect(result.addresses).toMatchObject({ ok: true, value: { limits: { entries: { limit: 500, current: 0 } } } });
-	});
-
-	it('takes the history window from the address and ignores one the plugin would refuse', async () => {
-		await load(loadEvent('?hours=168'));
-		expect(api.readRefusalHistory).toHaveBeenLastCalledWith(expect.anything(), 168);
-		await load(loadEvent('?hours=9999'));
-		expect(api.readRefusalHistory).toHaveBeenLastCalledWith(expect.anything(), 24);
-	});
-
-	// The history needs the license and the lists do not, so a refused history
-	// is shown as locked beside lists that still read.
-	it('locks the history alone when the plugin refuses it for the license', async () => {
-		api.readRefusalHistory.mockRejectedValue(paymentRequired());
-		const result = (await load(loadEvent())) as Loaded;
-		expect(result.history).toMatchObject({ ok: false, gate: { state: 'locked' } });
-		expect(result.addresses.ok).toBe(true);
-		expect(result.limit.ok).toBe(true);
+		expect(result.superAdmin).toBe(false);
+		expect(api.readRefusalHistory).not.toHaveBeenCalled();
 	});
 });
 

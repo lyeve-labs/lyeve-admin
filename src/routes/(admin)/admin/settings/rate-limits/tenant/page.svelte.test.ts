@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => {} }) }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 import TenantPage from './+page.svelte';
 
@@ -17,7 +18,7 @@ const ok = { state: 'ok' };
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		gate: ok,
-		hours: 24,
+		superAdmin: false,
 		limit: {
 			ok: true,
 			value: {
@@ -37,23 +38,18 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 				],
 			},
 		},
-		history: {
-			ok: true,
-			value: {
-				hours: 24,
-				total_refused: 7,
-				minutes: [
-					{ minute: '2026-10-06T10:00:00Z', rule_id: 'd1', kind: 'deny', endpoint: '203.0.113.0/24', refused: 4 },
-					{ minute: '2026-10-06T10:01:00Z', rule_id: 'd1', kind: 'deny', endpoint: '203.0.113.0/24', refused: 3 },
-				],
-			},
-		},
 		...over,
 	} as never,
 	form: form as never,
 });
 
 describe('tenant rate limits', () => {
+	it('offers an admin the two tenant tabs with this one marked', () => {
+		render(TenantPage, { props: props() });
+		expect(screen.getAllByRole('tab').map((t) => t.textContent?.trim())).toEqual(['Tenant controls', 'Refusal history']);
+		expect(screen.getByRole('tab', { name: 'Tenant controls' }).getAttribute('aria-selected')).toBe('true');
+	});
+
 	it('says the global limit applies beside the tenant one', () => {
 		const { container } = render(TenantPage, { props: props() });
 		expect(said(container)).toContain('This tenant has no limit of its own');
@@ -86,14 +82,6 @@ describe('tenant rate limits', () => {
 		expect(said(container)).not.toMatch(/\d+ of \d+ entries/);
 	});
 
-	it('sums the refusal minutes per entry', () => {
-		const { container } = render(TenantPage, { props: props() });
-		const table = screen.getByRole('region', { name: 'Refusals by rule' });
-		expect(table.textContent).toContain('Deny list');
-		expect(table.textContent).toContain('7');
-		expect(said(container)).toContain('7 requests refused');
-	});
-
 	it('explains the self-lockout refusal and the way out inside the address drawer', async () => {
 		const { rerender } = render(TenantPage, { props: props() });
 		await fireEvent.click(screen.getAllByRole('button', { name: 'New address' })[1]);
@@ -102,14 +90,6 @@ describe('tenant rate limits', () => {
 		expect(drawer.replace(/\s+/g, ' ')).toContain('Add your own address to the allow list first');
 		expect(drawer).toContain('0.0.0.0/0 covers the address you are signed in from');
 		expect(drawer.replace(/\s+/g, ' ')).toContain('only someone signing in from another address could undo that');
-	});
-
-	it('shows a locked history beside lists that still read', () => {
-		const { container } = render(TenantPage, {
-			props: props({ history: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }),
-		});
-		expect(said(container)).toContain('Not enabled on this instance');
-		expect(said(container)).toContain('203.0.113.0/24');
 	});
 
 	it('says what an unlicensed install keeps', () => {
@@ -148,17 +128,6 @@ describe('tenant rate limit drawers', () => {
 		expect(drawerText('address-form')).toContain('already on the allow list');
 		await fireEvent.click(screen.getByRole('button', { name: 'Set a limit' }));
 		expect(drawerText('tenant-limit-form')).not.toContain('already on the allow list');
-	});
-});
-
-describe('the history window', () => {
-	it('marks the window the address named on the first render, as links', () => {
-		render(TenantPage, { props: props({ hours: 168 }) });
-		const group = screen.getByRole('group', { name: 'Window' });
-		const current = group.querySelector('[aria-current="page"]');
-		expect(current?.textContent).toContain('Last week');
-		expect(current?.getAttribute('href')).toBe('?hours=168');
-		expect(group.querySelectorAll('a[href^="?hours="]')).toHaveLength(3);
 	});
 });
 
