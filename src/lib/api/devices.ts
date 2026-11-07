@@ -15,8 +15,8 @@
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 
-export const DEVICES_URL = '/api/admin/devices';
-export const TRUST_URL = '/api/admin/devices/trust';
+const DEVICES_URL = '/api/admin/devices';
+const TRUST_URL = '/api/admin/devices/trust';
 
 /**
  * One remembered device, as the list route sends it.

@@ -17,7 +17,7 @@ import type { HttpClient } from '@lyeve-labs/client';
 import { CHANNEL_KEYS, toChannels, type AlertChannels } from './alert-channels';
 import { str } from './narrow';
 
-export const LOG_ALERTS_URL = '/api/admin/logging/alerts';
+const LOG_ALERTS_URL = '/api/admin/logging/alerts';
 
 /** The levels a rule can watch. Empty watches every level. */
 export const LOG_ALERT_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;

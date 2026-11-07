@@ -9,7 +9,7 @@ import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { ListEnvelope } from './list';
 
-export const RELEASES_URL = '/api/admin/content/releases';
+const RELEASES_URL = '/api/admin/content/releases';
 
 export const RELEASE_STATUSES = ['draft', 'scheduled', 'publishing', 'published', 'failed', 'canceled'] as const;
 export type ReleaseStatus = (typeof RELEASE_STATUSES)[number];

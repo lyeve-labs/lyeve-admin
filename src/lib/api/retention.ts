@@ -20,9 +20,9 @@ import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 import { plural } from '$lib/format';
 
-export const POLICIES_URL = '/api/admin/retention-policies';
-export const HOLDS_URL = '/api/admin/legal-holds';
-export const ENFORCE_URL = '/api/admin/retention/enforce';
+const POLICIES_URL = '/api/admin/retention-policies';
+const HOLDS_URL = '/api/admin/legal-holds';
+const ENFORCE_URL = '/api/admin/retention/enforce';
 
 export interface RetentionPolicy {
 	id: string;

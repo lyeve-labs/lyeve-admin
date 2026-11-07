@@ -19,7 +19,7 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 
-export const PROVIDERS_URL = '/api/admin/scim/providers';
+const PROVIDERS_URL = '/api/admin/scim/providers';
 export const SCIM_BASE_PATH = '/api/v1/scim/v2';
 
 /** How a SCIM attribute maps onto a field here. */

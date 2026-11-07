@@ -15,8 +15,8 @@
 import type { HttpClient } from '@lyeve-labs/client';
 import { num, record, str } from './narrow';
 
-export const PROVIDERS_URL = '/api/admin/analytics/providers';
-export const DELIVERIES_URL = '/api/admin/analytics/deliveries';
+const PROVIDERS_URL = '/api/admin/analytics/providers';
+const DELIVERIES_URL = '/api/admin/analytics/deliveries';
 
 export const PROVIDER_TYPES = ['ga4', 'mixpanel', 'plausible', 'segment', 'posthog', 'amplitude', 'webhook'] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];

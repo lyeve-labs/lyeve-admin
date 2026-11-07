@@ -13,7 +13,7 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
-export const STATUS_URL = '/api/admin/grpc/status';
+const STATUS_URL = '/api/admin/grpc/status';
 
 export interface ServiceStatus {
 	name: string;

@@ -13,7 +13,7 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
-export const QUERY_LOG_URL = '/api/admin/query-log';
+const QUERY_LOG_URL = '/api/admin/query-log';
 
 /** The dialects the plugin can explain, each with its own analyze route. */
 export const ANALYZABLE = ['postgres', 'mysql', 'mssql'] as const;

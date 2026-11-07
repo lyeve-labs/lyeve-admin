@@ -17,7 +17,7 @@ import type { HttpClient } from '@lyeve-labs/client';
 import { inSentence } from './gate';
 import type { ListEnvelope } from './list';
 
-export const PROVIDERS_URL = '/api/admin/storage/providers';
+const PROVIDERS_URL = '/api/admin/storage/providers';
 
 export const PROVIDER_TYPES = ['s3', 'gcs', 'azure_blob', 'minio', 'local'] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];

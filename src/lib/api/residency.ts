@@ -16,8 +16,8 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 
-export const REGIONS_URL = '/api/admin/regions';
-export const REPORT_URL = '/api/admin/residency/report';
+const REGIONS_URL = '/api/admin/regions';
+const REPORT_URL = '/api/admin/residency/report';
 
 export interface GeoCoord {
 	lat: number;

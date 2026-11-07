@@ -12,8 +12,8 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 
-export const RULES_URL = '/api/admin/pii/rules';
-export const ACCESS_LOG_URL = '/api/admin/pii/access-log';
+const RULES_URL = '/api/admin/pii/rules';
+const ACCESS_LOG_URL = '/api/admin/pii/access-log';
 
 /** One redaction rule as the plugin publishes it. */
 export interface RedactionRule {

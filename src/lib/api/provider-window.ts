@@ -10,7 +10,7 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 
-export const PROVIDER_WINDOW_URL = '/api/admin/auth/provider-window';
+const PROVIDER_WINDOW_URL = '/api/admin/auth/provider-window';
 
 /** The window when a tenant has never set one. */
 export const PROVIDER_WINDOW_DEFAULT_DAYS = 30;

@@ -17,7 +17,7 @@ import type { ListEnvelope } from './list';
 import { csrfHeaders } from './csrf';
 import { outageFor } from '../outage';
 
-export const IMPORTS_URL = '/api/admin/imports';
+const IMPORTS_URL = '/api/admin/imports';
 
 export interface ImportJob {
 	id: string;
@@ -331,7 +331,7 @@ export interface SaveMappingTemplate {
 	field_mappings: FieldMapping[];
 }
 
-export const TEMPLATES_URL = `${IMPORTS_URL}/templates`;
+const TEMPLATES_URL = `${IMPORTS_URL}/templates`;
 
 export async function listTemplates(
 	client: HttpClient,

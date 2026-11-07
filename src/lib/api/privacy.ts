@@ -13,7 +13,7 @@ import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { gateOf, type Section } from './gate';
 import type { NotRunningReason } from '$lib/plugins';
 
-export const FORM_ERASURE_URL = '/api/admin/schemas/form-erasure';
+const FORM_ERASURE_URL = '/api/admin/schemas/form-erasure';
 
 export const FORM_ERASURE_MODES = ['auto', 'soft', 'hard'] as const;
 export type FormErasureMode = (typeof FORM_ERASURE_MODES)[number];
@@ -93,8 +93,8 @@ export async function saveFormErasure(client: HttpClient, mode: FormErasureMode)
  * leaves out is stored, so a section that appears later is offered until
  * someone leaves it out too.
  */
-export const EXPORT_SECTIONS_URL = '/api/admin/analytics/gdpr/export-sections';
-export const EXPORT_ROLES_URL = '/api/admin/analytics/gdpr/export-roles';
+const EXPORT_SECTIONS_URL = '/api/admin/analytics/gdpr/export-sections';
+const EXPORT_ROLES_URL = '/api/admin/analytics/gdpr/export-roles';
 
 /** The most roles, and the longest role name, the export roles route takes. */
 export const MAX_EXPORT_ROLES = 64;

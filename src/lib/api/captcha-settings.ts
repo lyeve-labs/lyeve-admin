@@ -9,7 +9,7 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 
-export const CAPTCHA_SETTINGS_URL = '/api/admin/captcha/settings';
+const CAPTCHA_SETTINGS_URL = '/api/admin/captcha/settings';
 
 export type CaptchaProvider = 'turnstile' | 'hcaptcha' | 'recaptcha';
 

@@ -14,8 +14,8 @@ import type { HttpClient } from '@lyeve-labs/client';
 import { formatCount } from '$lib/format';
 
 export const JOBS_URL = '/api/admin/data-export/jobs';
-export const SCHEDULES_URL = '/api/admin/data-export/schedules';
-export const START_URL = '/api/admin/data-export/start';
+const SCHEDULES_URL = '/api/admin/data-export/schedules';
+const START_URL = '/api/admin/data-export/start';
 
 /**
  * The most entries one export holds. The plugin applies it to a request that

@@ -13,9 +13,9 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 
-export const SSE_METRICS_URL = '/api/admin/realtime/metrics';
-export const SSE_PLATFORM_URL = '/api/admin/realtime/metrics/platform';
-export const WS_METRICS_URL = '/api/admin/ws/metrics';
+const SSE_METRICS_URL = '/api/admin/realtime/metrics';
+const SSE_PLATFORM_URL = '/api/admin/realtime/metrics/platform';
+const WS_METRICS_URL = '/api/admin/ws/metrics';
 
 /**
  * Counters the SSE connection manager keeps.

@@ -9,7 +9,7 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { plural } from '$lib/format';
 
-export const SINKS_URL = '/api/admin/audit-log/sinks';
+const SINKS_URL = '/api/admin/audit-log/sinks';
 
 export const SINK_KINDS = ['https', 'splunk', 'datadog'] as const;
 export type SinkKind = (typeof SINK_KINDS)[number];

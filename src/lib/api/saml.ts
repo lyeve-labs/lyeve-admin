@@ -23,8 +23,8 @@ import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 import { plural } from '$lib/format';
 
-export const PROVIDERS_URL = '/api/admin/saml-providers';
-export const TEMPLATES_URL = '/api/admin/saml-templates';
+const PROVIDERS_URL = '/api/admin/saml-providers';
+const TEMPLATES_URL = '/api/admin/saml-templates';
 
 /**
  * One configured identity provider.

@@ -17,8 +17,8 @@ import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { rowsOf, type ListEnvelope } from './list';
 import { plural } from '$lib/format';
 
-export const PROBES_URL = '/api/admin/synthetic-monitoring/probes';
-export const ALERTS_URL = '/api/admin/synthetic-monitoring/alerts';
+const PROBES_URL = '/api/admin/synthetic-monitoring/probes';
+const ALERTS_URL = '/api/admin/synthetic-monitoring/alerts';
 
 export const PROBE_TYPES = [
 	'health_check',
@@ -250,7 +250,7 @@ export function runOutcome(results: readonly ProbeResult[]): RunOutcome {
 	};
 }
 
-export const LIMITS_URL = '/api/admin/synthetic-monitoring/limits';
+const LIMITS_URL = '/api/admin/synthetic-monitoring/limits';
 
 /** What a probe write will accept for this tenant, as the plugin answers it. */
 export interface ProbeLimits {

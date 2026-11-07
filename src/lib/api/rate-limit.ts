@@ -24,11 +24,11 @@ import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 import { limitOf, type Limit } from './limits';
 
-export const RULES_URL = '/api/admin/rate-limits';
-export const STATUS_URL = '/api/admin/rate-limits/status';
-export const OVERVIEW_URL = '/api/admin/rate-limits/overview';
-export const GLOBAL_URL = '/api/admin/rate-limits/global';
-export const PROTECTIONS_URL = '/api/admin/rate-limits/protections';
+const RULES_URL = '/api/admin/rate-limits';
+const STATUS_URL = '/api/admin/rate-limits/status';
+const OVERVIEW_URL = '/api/admin/rate-limits/overview';
+const GLOBAL_URL = '/api/admin/rate-limits/global';
+const PROTECTIONS_URL = '/api/admin/rate-limits/protections';
 
 export type RuleKind = 'global' | 'protection' | 'custom';
 export type KeyBy = 'ip' | 'user';
@@ -282,9 +282,9 @@ export function windowLabel(requests: number, windowSeconds: number): string {
 	return `${requests} per ${windowSeconds} seconds`;
 }
 
-export const TENANT_GLOBAL_URL = '/api/admin/rate-limits/tenant-global';
-export const IP_RULES_URL = '/api/admin/rate-limits/ip-rules';
-export const HISTORY_URL = '/api/admin/rate-limits/history';
+const TENANT_GLOBAL_URL = '/api/admin/rate-limits/tenant-global';
+const IP_RULES_URL = '/api/admin/rate-limits/ip-rules';
+const HISTORY_URL = '/api/admin/rate-limits/history';
 
 /** The caller's tenant limit, the instance-wide one beside it, and whether writing one is licensed. */
 export interface TenantGlobalRead {

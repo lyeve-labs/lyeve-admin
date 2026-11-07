@@ -7,7 +7,7 @@ import { couldNotLoad } from '../outage';
 
 export const GRAPHQL_HTTP = '/api/v1/graphql';
 export const GRAPHQL_WS = '/api/v1/graphql/ws';
-export const PERSISTED_URL = '/api/admin/graphql/persisted-queries';
+const PERSISTED_URL = '/api/admin/graphql/persisted-queries';
 
 export interface PersistedQuery {
 	query_hash: string;

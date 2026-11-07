@@ -14,9 +14,9 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 
-export const AB_STATS_URL = '/api/admin/recommendations/ab-stats';
-export const REFRESH_URL = '/api/admin/recommendations/refresh';
-export const GENERATE_FEED_URL = '/api/admin/recommendations/generate-feed';
+const AB_STATS_URL = '/api/admin/recommendations/ab-stats';
+const REFRESH_URL = '/api/admin/recommendations/refresh';
+const GENERATE_FEED_URL = '/api/admin/recommendations/generate-feed';
 
 /** How the users are split between recommendations and the control arm. */
 export interface AbStats {
@@ -133,7 +133,7 @@ export function score(value: number | null | undefined): string {
 	return value.toFixed(3);
 }
 
-export const TRENDING_URL = '/api/v1/recommendations/trending';
+const TRENDING_URL = '/api/v1/recommendations/trending';
 
 /** One item on the trending list, as the last recompute ranked it. */
 export interface TrendingItem {

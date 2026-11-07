@@ -18,10 +18,10 @@ import type { ListEnvelope } from './list';
 import type { Limit } from './limits';
 import { plural } from '$lib/format';
 
-export const STATS_URL = '/api/admin/cache/stats';
-export const PROVIDERS_URL = '/api/admin/cache/providers';
-export const ENTRIES_URL = '/api/admin/cache/entries';
-export const FLUSH_URL = '/api/admin/cache/flush';
+const STATS_URL = '/api/admin/cache/stats';
+const PROVIDERS_URL = '/api/admin/cache/providers';
+const ENTRIES_URL = '/api/admin/cache/entries';
+const FLUSH_URL = '/api/admin/cache/flush';
 
 export interface CacheStats {
 	hits: number;
@@ -130,7 +130,7 @@ export interface RulesRead {
 	limits?: { rules?: Limit };
 }
 
-export const RULES_URL = '/api/admin/cache/rules';
+const RULES_URL = '/api/admin/cache/rules';
 
 export interface SaveCacheRule {
 	pattern: string;

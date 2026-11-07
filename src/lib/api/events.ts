@@ -14,8 +14,8 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 
-export const EVENTS_URL = '/api/admin/events';
-export const REPLAY_URL = '/api/admin/events/replay';
+const EVENTS_URL = '/api/admin/events';
+const REPLAY_URL = '/api/admin/events/replay';
 
 /** One published event as GET /api/admin/events lists it. */
 export interface EventRow {

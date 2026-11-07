@@ -8,7 +8,7 @@
  */
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 
-export const EXPORT_STEP_UP_URL = '/api/admin/analytics/gdpr/export-step-up';
+const EXPORT_STEP_UP_URL = '/api/admin/analytics/gdpr/export-step-up';
 
 /** Every factor, in the order the engine names them. */
 export const STEP_UP_FACTORS = ['password', 'code', 'email'] as const;

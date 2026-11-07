@@ -17,11 +17,11 @@ import { toChannels, type AlertChannels } from './alert-channels';
 import { rowsOf, statedTotal, type ListEnvelope } from './list';
 import { count, num } from './narrow';
 
-export const BASE_URL = '/api/admin/error-tracking';
-export const ALERTS_URL = `${BASE_URL}/alerts`;
-export const CODES_URL = `${BASE_URL}/codes`;
-export const EVENTS_URL = `${BASE_URL}/events`;
-export const SETTINGS_URL = `${BASE_URL}/alert-settings`;
+const BASE_URL = '/api/admin/error-tracking';
+const ALERTS_URL = `${BASE_URL}/alerts`;
+const CODES_URL = `${BASE_URL}/codes`;
+const EVENTS_URL = `${BASE_URL}/events`;
+const SETTINGS_URL = `${BASE_URL}/alert-settings`;
 
 /** Where an alert is in its triage. */
 export const ALERT_STATUSES = ['open', 'resolved', 'ignored'] as const;

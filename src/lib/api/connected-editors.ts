@@ -14,8 +14,8 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { gateOf, type Gate } from './gate';
 import { couldNotLoad } from '../outage';
 
-export const CONNECTIONS_URL = '/api/admin/builder/connections';
-export const SETTINGS_URL = '/api/admin/builder/settings';
+const CONNECTIONS_URL = '/api/admin/builder/connections';
+const SETTINGS_URL = '/api/admin/builder/settings';
 
 /** The lifetimes a connection may have, in days. */
 export const LIFETIMES = [30, 90, 180] as const;

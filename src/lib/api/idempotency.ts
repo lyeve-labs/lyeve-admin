@@ -15,8 +15,8 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 
-export const KEYS_URL = '/api/admin/idempotency';
-export const STATS_URL = '/api/admin/idempotency/stats';
+const KEYS_URL = '/api/admin/idempotency';
+const STATS_URL = '/api/admin/idempotency/stats';
 
 export interface IdempotencyKey {
 	key: string;

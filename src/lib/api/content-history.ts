@@ -14,12 +14,12 @@ import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 import { record, whole } from './narrow';
 
-export const HISTORY_SETTINGS_URL = '/api/admin/content/history/settings';
-export const HISTORY_USAGE_URL = '/api/admin/content/history/usage';
-export const HISTORY_PRUNE_URL = '/api/admin/content/history/prune';
-export const HISTORY_URL = '/api/admin/content/history';
-export const ACTIVITY_URL = '/api/admin/content/activity';
-export const ACTIVITY_ALL_URL = '/api/admin/content/activity/all';
+const HISTORY_SETTINGS_URL = '/api/admin/content/history/settings';
+const HISTORY_USAGE_URL = '/api/admin/content/history/usage';
+const HISTORY_PRUNE_URL = '/api/admin/content/history/prune';
+const HISTORY_URL = '/api/admin/content/history';
+const ACTIVITY_URL = '/api/admin/content/activity';
+const ACTIVITY_ALL_URL = '/api/admin/content/activity/all';
 
 /** The capability that reads versions older than the read window. */
 export const HISTORY_READ_FEATURE = 'content-pro';

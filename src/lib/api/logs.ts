@@ -12,7 +12,7 @@ export const LOG_DEFAULT_LIMIT = 100;
  */
 export const LOG_MAX_LIMIT = 500;
 
-export const LOG_SEARCH_URL = '/api/admin/logs/search';
+const LOG_SEARCH_URL = '/api/admin/logs/search';
 
 /**
  * The engine's bound on an inbound request id. A longer term cannot be one, so

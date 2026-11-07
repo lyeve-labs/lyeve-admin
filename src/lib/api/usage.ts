@@ -21,9 +21,9 @@ import type { ListEnvelope } from './list';
 import { formatBytes, formatCount } from '$lib/format';
 import { shortId } from '$lib/utils/entry-identity';
 
-export const QUOTAS_URL = '/api/admin/quotas';
-export const REQUESTS_URL = '/api/admin/quota-requests';
-export const TENANTS_URL = '/api/admin/usage/tenants';
+const QUOTAS_URL = '/api/admin/quotas';
+const REQUESTS_URL = '/api/admin/quota-requests';
+const TENANTS_URL = '/api/admin/usage/tenants';
 
 export interface Quota {
 	id: string;
