@@ -126,7 +126,7 @@ describe('saving a destination', () => {
 	it('refuses a missing required setting on a new destination, without a request', async () => {
 		const out = (await actions.save(actionEvent({ name: 'W', type: 'webhook', max_attempts: '1' }))) as Failure;
 		expect(out.status).toBe(400);
-		expect(out.data.error).toBe('HTTPS URL is required.');
+		expect(out.data.error).toBe('Enter the HTTPS URL.');
 		expect(engine.post).not.toHaveBeenCalled();
 	});
 
