@@ -14,6 +14,7 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
+import { checked } from '$lib/checkbox';
 import { inSentence } from './gate';
 import type { ListEnvelope } from './list';
 
@@ -258,10 +259,10 @@ export function providerBodyFrom(form: FormData, creating: boolean): { body: Pro
 	const body: ProviderBody = {
 		provider_type: type,
 		name,
-		use_ssl: form.get('use_ssl') === 'on' || form.get('use_ssl') === 'true',
-		path_style: form.get('path_style') === 'on' || form.get('path_style') === 'true',
-		enabled: form.get('enabled') === 'on' || form.get('enabled') === 'true',
-		local_public_unsigned: type === 'local' && (form.get('local_public_unsigned') === 'on' || form.get('local_public_unsigned') === 'true'),
+		use_ssl: checked(form, 'use_ssl'),
+		path_style: checked(form, 'path_style'),
+		enabled: checked(form, 'enabled'),
+		local_public_unsigned: type === 'local' && checked(form, 'local_public_unsigned'),
 		priority: Math.max(0, Math.trunc(Number(form.get('priority') ?? 0)) || 0),
 	};
 	const cost = Number(form.get('cost_weight'));

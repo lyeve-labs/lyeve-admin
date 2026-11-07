@@ -5,7 +5,7 @@ import {
 	type EmailProviderBody,
 	type EmailTransport,
 } from '$lib/api/email';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();
 

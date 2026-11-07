@@ -6,7 +6,7 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError, actionFailure, tagged } from '$lib/server/action-error';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 import { passwordTooLong, setUserPassword, type ListedUser } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { refusalText } from '$lib/api/refusal';

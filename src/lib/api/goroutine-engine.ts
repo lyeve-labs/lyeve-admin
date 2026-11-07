@@ -1,4 +1,5 @@
 import type { HttpClient } from '@lyeve-labs/client';
+import { checked } from '$lib/checkbox';
 import { inSentence } from './gate';
 
 /**
@@ -183,8 +184,7 @@ export function parseAsyncHooksForm(data: FormData): { body: AsyncHooksBody } | 
 	if ('error' in queue) return queue;
 	const timeout = duration(data, 'timeout', 'Timeout', ASYNC_TIMEOUT_MAX);
 	if ('error' in timeout) return timeout;
-	const enabled = data.get('enabled');
-	return { body: { workers: workers.n, queue_size: queue.n, timeout: timeout.d, enabled: enabled === 'on' || enabled === 'true' } };
+	return { body: { workers: workers.n, queue_size: queue.n, timeout: timeout.d, enabled: checked(data, 'enabled') } };
 }
 
 /**

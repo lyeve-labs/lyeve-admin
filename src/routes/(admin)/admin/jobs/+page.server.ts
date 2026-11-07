@@ -3,7 +3,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
 import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';

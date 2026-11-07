@@ -7,7 +7,7 @@ import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { organizationFromUrl } from '$lib/organization';
 import { asksOrganization } from '$lib/server/sign-in-organization';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 import type { Actions, PageServerLoad } from './$types';
 
 const EXPIRED = 'This reset link no longer works. Request a new one.';

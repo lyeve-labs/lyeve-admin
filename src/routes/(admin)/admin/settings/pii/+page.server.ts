@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure, tagged } from '$lib/server/action-error';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {

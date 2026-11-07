@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, authedHeaders, loadUser, requireUser } from '$lib/server/authz';
 import { engineOriginFor } from '$lib/server/engine';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 import {
 	MAX_SHOWN_BODY,
 	presentBody,

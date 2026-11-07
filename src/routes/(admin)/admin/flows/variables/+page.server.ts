@@ -3,7 +3,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionFailure, tagged } from '$lib/server/action-error';
 import { flowLoadOutcome } from '$lib/server/flow-load';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';

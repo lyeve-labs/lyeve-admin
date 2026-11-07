@@ -9,7 +9,7 @@ import {
 } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure, tagged } from '$lib/server/action-error';
-import { checked } from '$lib/server/checkbox';
+import { checked } from '$lib/checkbox';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
 
