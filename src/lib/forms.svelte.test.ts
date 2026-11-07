@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SubmitFunction } from '@sveltejs/kit';
-import { confirmed, submitter, tracked } from './forms.svelte';
+import { confirmed, drawerFailure, submitter, tracked } from './forms.svelte';
 
 const kit = vi.hoisted(() => ({
 	confirm: vi.fn(async () => true),
@@ -204,5 +204,39 @@ describe('confirmed', () => {
 		})(input);
 		await after!(o as never);
 		expect(kit.success).toHaveBeenCalledWith('Purged 3');
+	});
+});
+
+describe('drawerFailure', () => {
+	type Failure = { action: string; error: string } | null;
+	const failed = (action: string): Failure => ({ action, error: `${action} failed` });
+
+	it('shows a drawer write failure in the drawer and nothing above the list', () => {
+		const form = failed('create');
+		const split = drawerFailure(() => form, ['create', 'update']);
+		expect(split.drawer).toBe(form);
+		expect(split.page).toBeNull();
+	});
+
+	it('shows any other failure above the list', () => {
+		const form = failed('delete');
+		const split = drawerFailure(() => form, ['create', 'update']);
+		expect(split.drawer).toBeNull();
+		expect(split.page).toBe(form);
+	});
+
+	it('keeps a failure from before the drawer opened out of it', () => {
+		let form: Failure = failed('update');
+		const split = drawerFailure(() => form, ['create', 'update']);
+		split.opened();
+		expect(split.drawer).toBeNull();
+		form = failed('update');
+		expect(split.drawer).toBe(form);
+	});
+
+	it('shows nothing when no action failed', () => {
+		const split = drawerFailure((): Failure => null, ['create']);
+		expect(split.drawer).toBeNull();
+		expect(split.page).toBeNull();
 	});
 });

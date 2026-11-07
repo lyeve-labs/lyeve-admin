@@ -74,6 +74,40 @@ export function fieldErrors(form: unknown): Record<string, string> {
 }
 
 /**
+ * Which of a page's action failures its drawer shows and which show above
+ * the list. Each failure names the action behind it. The drawer shows only
+ * its own writes' failures, and only one that came back after it opened, so
+ * a failed delete never reads as a failure of the form opened next. The
+ * page calls `opened()` as it opens the drawer.
+ *
+ * `form` is read through a function because a page's props are reactive
+ * only when read where they are used.
+ */
+export function drawerFailure<F>(form: () => F, actions: readonly string[]) {
+	let openedOver = $state.raw<unknown>(null);
+	const ownAction = (f: F) => {
+		const action = f && typeof f === 'object' ? (f as { action?: unknown }).action : undefined;
+		return typeof action === 'string' && actions.includes(action);
+	};
+	return {
+		/** The failure the drawer shows, or null. */
+		get drawer(): F | null {
+			const f = form();
+			return ownAction(f) && f !== openedOver ? f : null;
+		},
+		/** The failure the page shows above the list, or null. */
+		get page(): F | null {
+			const f = form();
+			return ownAction(f) ? null : f;
+		},
+		/** Marks the failure on screen as older than the drawer opening now. */
+		opened() {
+			openedOver = form();
+		},
+	};
+}
+
+/**
  * Whether a page's own submit handler is running, without changing what it
  * does.
  *
