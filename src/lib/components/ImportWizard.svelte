@@ -27,7 +27,7 @@
 	import { errorCodeOf } from '$lib/api/limits';
 	import { ApiError } from '@lyeve-labs/client';
 	import { renewingOnce } from '$lib/renew';
-	import { outageFor } from '$lib/outage';
+	import { couldNotLoad, outageFor } from '$lib/outage';
 	import { SIGN_IN_AGAIN } from '$lib/session';
 	import {
 		IMPORT_FORMATS,
@@ -117,7 +117,7 @@
 	// tenant with no content types, and neither leaves anything to import into.
 	const schemaHint = $derived(
 		schemas === null
-			? 'Could not load the content types. Reload the page to try again.'
+			? couldNotLoad('the content types', { reload: true })
 			: schemas.length === 0
 				? 'No content types yet. Create one before you import.'
 				: 'Each row becomes an entry of this type.',

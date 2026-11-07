@@ -3,7 +3,8 @@ import { fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { flowLoadOutcome } from '$lib/server/flow-load';
+import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { flowClient } from '$lib/server/flow-client';
 import {
@@ -38,7 +39,7 @@ export const load: PageServerLoad = async (event) => {
 		({ rows: datasources, enabled: available } = await listDatasources(client));
 	} catch (err) {
 		({ locked } = flowLoadOutcome(err, { cookies, url }, 'datasources'));
-		if (!locked) gate = gateOf(err, engineBanner('datasources'));
+		if (!locked) gate = gateOf(err, couldNotLoad('datasources'));
 	}
 	return { datasources, available, locked, gate };
 };

@@ -1,5 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { authedHeaders } from '$lib/server/authz';
+import { couldNotLoad } from '$lib/outage';
 
 /**
  * A many_to_many field whose links did not all reach the plugin. The entry
@@ -52,7 +53,7 @@ export async function setRelations(
 		headers,
 	});
 	if (!res.ok) {
-		throw new RelationWriteError(fieldName, `Could not load the links in ${fieldName}. Reload the page to try again.`);
+		throw new RelationWriteError(fieldName, couldNotLoad(`the links in ${fieldName}`, { reload: true }));
 	}
 	const body = await res.json();
 	const current = (Array.isArray(body) ? body : (body?.data ?? [])) as {

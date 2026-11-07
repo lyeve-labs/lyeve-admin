@@ -3,6 +3,7 @@
  * by introspection, and the persisted query allowlist it keeps per tenant.
  */
 import type { HttpClient } from '@lyeve-labs/client';
+import { couldNotLoad } from '../outage';
 
 export const GRAPHQL_HTTP = '/api/v1/graphql';
 export const GRAPHQL_WS = '/api/v1/graphql/ws';
@@ -59,7 +60,7 @@ function fieldsOf(t: IntrospectedType | undefined): RootField[] {
  */
 export function readRoots(answer: IntrospectionAnswer): { roots: SchemaRoots | null; refused: string | null } {
 	const schema = answer.data?.__schema;
-	if (!schema) return { roots: null, refused: answer.errors?.[0]?.message ?? 'Could not load the GraphQL schema.' };
+	if (!schema) return { roots: null, refused: answer.errors?.[0]?.message ?? couldNotLoad('the GraphQL schema') };
 	return {
 		roots: { query: fieldsOf(schema.queryType), mutation: fieldsOf(schema.mutationType), subscription: fieldsOf(schema.subscriptionType) },
 		refused: null,

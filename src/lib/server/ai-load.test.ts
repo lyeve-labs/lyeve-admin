@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
-import { AI_BUDGET_TEXT, aiActionError, aiBanner, aiGate } from './ai-load';
+import { AI_BUDGET_TEXT, aiActionError, aiGate } from './ai-load';
 
 function cookies(): Cookies {
 	return { get: vi.fn(), set: vi.fn(), delete: vi.fn(), getAll: vi.fn(() => []), serialize: vi.fn(() => '') } as unknown as Cookies;
@@ -32,7 +32,7 @@ describe('aiGate', () => {
 	it('keeps the engine banner for a 5xx, a network failure and a status it does not expect', () => {
 		for (const err of [new ApiError(500, 'pq: connection refused'), new TypeError('fetch failed'), new ApiError(418, 'teapot')]) {
 			const out = aiGate(err, { cookies: cookies() }, 'transcripts');
-			expect(out).toEqual({ state: 'error', message: aiBanner('transcripts') });
+			expect(out).toEqual({ state: 'error', message: 'Could not load transcripts.' });
 			expect(JSON.stringify(out)).not.toContain('pq:');
 		}
 	});

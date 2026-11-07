@@ -24,6 +24,16 @@ export function outageFor(what: string): string {
 }
 
 /**
+ * The sentence for a read that failed while the engine answered, which a page
+ * shows instead of the outage sentence for the same read. `things` names
+ * what did not load, such as "webhooks". Where no Try again control sits
+ * beside it, `reload` tells the reader how to retry.
+ */
+export function couldNotLoad(things: string, { reload = false }: { reload?: boolean } = {}): string {
+	return reload ? `Could not load ${things}. Reload the page to try again.` : `Could not load ${things}.`;
+}
+
+/**
  * What the console says when the engine refuses a request for the rate.
  *
  * It is not an outage, so it never borrows the outage body: the engine

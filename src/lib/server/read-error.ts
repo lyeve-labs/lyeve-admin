@@ -14,7 +14,7 @@
 import { error, isHttpError, isRedirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { forbiddenText, isOutage } from '$lib/api/gate';
-import { BUSY, OUTAGE } from '$lib/outage';
+import { BUSY, OUTAGE, couldNotLoad } from '$lib/outage';
 import { ROLES } from '$lib/roles';
 import { SESSION_ENDED } from '$lib/session';
 
@@ -46,5 +46,5 @@ export function readError(err: unknown, notFound: string): never {
 		if (err.status === 429) error(429, BUSY.body);
 	}
 	if (isOutage(err)) error(503, OUTAGE.title);
-	error(502, 'Could not load this record.');
+	error(502, couldNotLoad('this record'));
 }

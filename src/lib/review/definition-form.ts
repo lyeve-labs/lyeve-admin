@@ -1,5 +1,6 @@
 import { CONDITION_OPS, type ConditionOp, type StageCondition, type StageInput } from '$lib/api/review';
 import { text } from '$lib/api/narrow';
+import { couldNotLoad } from '$lib/outage';
 
 /** The SLA ceiling the plugin accepts, in seconds: ten days. */
 export const MAX_SLA_SECONDS = 864000;
@@ -55,7 +56,7 @@ export function parseStages(raw: string): { stages: StageInput[] } | { error: st
 	try {
 		parsed = JSON.parse(raw || '[]');
 	} catch {
-		return { error: 'Could not load the stages. Reload the page to try again.' };
+		return { error: couldNotLoad('the stages', { reload: true }) };
 	}
 	if (!Array.isArray(parsed) || parsed.length === 0) {
 		return { error: 'A definition needs at least one stage.' };

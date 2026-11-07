@@ -16,13 +16,9 @@ import { redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { clearSessionCookie, type SessionEvent } from './session-cookie';
 import { AI_OK, type AiGate } from '$lib/api/ai';
+import { couldNotLoad } from '$lib/outage';
 
 export { AI_OK, type AiGate };
-
-/** The static engine banner for one resource, named in the plural. */
-export function aiBanner(plural: string): string {
-	return `Could not load ${plural}.`;
-}
 
 export function aiGate(err: unknown, session: SessionEvent, plural: string): AiGate {
 	return sortGate(err, session, plural, 'off');
@@ -47,7 +43,7 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 		if (err.status === 404) return { state: notFound };
 		if (noProvider(err)) return { state: 'no_provider' };
 	}
-	return { state: 'error', message: aiBanner(plural) };
+	return { state: 'error', message: couldNotLoad(plural) };
 }
 
 /**

@@ -2,7 +2,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
-import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { flowLoadOutcome } from '$lib/server/flow-load';
+import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';
 import { pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
@@ -44,7 +45,7 @@ export const load: PageServerLoad = async (event) => {
 		variables = found.slice(offset, offset + limit);
 	} catch (err) {
 		({ locked } = flowLoadOutcome(err, { cookies, url }, 'variables'));
-		if (!locked) gate = gateOf(err, engineBanner('variables'));
+		if (!locked) gate = gateOf(err, couldNotLoad('variables'));
 	}
 	if (gate.state === 'ok' && !locked) {
 		const back = pastEndOffset(variables.length, limit, offset, total);

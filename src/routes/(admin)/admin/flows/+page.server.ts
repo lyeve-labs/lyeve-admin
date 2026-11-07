@@ -7,7 +7,8 @@ import { readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
 import { refusalFailure } from '$lib/server/flow-refusal';
-import { engineBanner, flowLoadOutcome } from '$lib/server/flow-load';
+import { flowLoadOutcome } from '$lib/server/flow-load';
+import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import {
@@ -62,7 +63,7 @@ export const load: PageServerLoad = async (event) => {
 		hasMore = total === null ? page.rows.length > limit : offset + flows.length < total;
 	} catch (err) {
 		({ locked } = flowLoadOutcome(err, { cookies, url }, 'flows'));
-		if (!locked) gate = gateOf(err, engineBanner('flows'));
+		if (!locked) gate = gateOf(err, couldNotLoad('flows'));
 	}
 
 	const back = pastEndOffset(flows.length, limit, offset, total);

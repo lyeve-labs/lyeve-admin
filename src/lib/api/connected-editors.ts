@@ -12,6 +12,7 @@
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { gateOf, type Gate } from './gate';
+import { couldNotLoad } from '../outage';
 
 export const CONNECTIONS_URL = '/api/admin/builder/connections';
 export const SETTINGS_URL = '/api/admin/builder/settings';
@@ -139,7 +140,7 @@ export type ConnectionsGate = Gate | { state: 'withheld' };
 /** What a refused read on this page means. */
 export function connectionsGate(err: unknown): ConnectionsGate {
 	if (err instanceof ApiError && err.status === 403 && refusalCode(err) === WITHHELD) return { state: 'withheld' };
-	return gateOf(err, 'Could not load builder connections.');
+	return gateOf(err, couldNotLoad('builder connections'));
 }
 
 /** Schemas a page may show: the builder's own and the engine's are never offered. */

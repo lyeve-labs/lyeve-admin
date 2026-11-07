@@ -12,13 +12,9 @@
 import { redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { clearSessionCookie, type SessionEvent } from './session-cookie';
+import { couldNotLoad } from '$lib/outage';
 
 export type LoadOutcome = { locked: boolean; loadError: string | null };
-
-/** The static engine banner for one resource, named in the plural. */
-export function engineBanner(plural: string): string {
-	return `Could not load ${plural}.`;
-}
 
 export function flowLoadOutcome(err: unknown, session: SessionEvent, plural: string): LoadOutcome {
 	if (err instanceof ApiError) {
@@ -29,5 +25,5 @@ export function flowLoadOutcome(err: unknown, session: SessionEvent, plural: str
 		if (err.status === 402) return { locked: true, loadError: null };
 		if (err.status === 403) return { locked: false, loadError: `Your role does not allow you to open ${plural}. Ask a super admin to grant it.` };
 	}
-	return { locked: false, loadError: engineBanner(plural) };
+	return { locked: false, loadError: couldNotLoad(plural) };
 }

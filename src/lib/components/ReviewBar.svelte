@@ -13,6 +13,7 @@
 	import { formatDateTime } from '$lib/format';
 	import { shortId } from '$lib/utils/entry-identity';
 	import { ICON } from '$lib/icon';
+	import { couldNotLoad } from '$lib/outage';
 
 	let {
 		entryId,
@@ -245,7 +246,7 @@
 					</div>
 				</form>
 			{:else if definitionsFailed}
-				<p class="text-sm text-muted">Could not load the review definitions. Reload the page to try again.</p>
+				<p class="text-sm text-muted">{couldNotLoad('the review definitions', { reload: true })}</p>
 			{:else if error}
 				<Alert tone="danger">{error}</Alert>
 			{/if}

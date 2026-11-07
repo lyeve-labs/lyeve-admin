@@ -16,6 +16,7 @@
 	import type { Refusal } from '$lib/api/refusal';
 	import { formatDateTime } from '$lib/format';
 	import { ICON } from '$lib/icon';
+	import { couldNotLoad } from '$lib/outage';
 
 	interface Person {
 		id: string;
@@ -99,7 +100,7 @@
 		{/if}
 
 		{#if unavailable}
-			<Alert tone="warn">Could not load comments. Reload the page to try again.</Alert>
+			<Alert tone="warn">{couldNotLoad('comments', { reload: true })}</Alert>
 		{:else}
 			{#if shown.length === 0}
 				<EmptyState
