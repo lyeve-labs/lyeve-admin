@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Cookies } from '@sveltejs/kit';
 
-import { actions } from './+page.server';
+import { actions as month } from './+page.server';
+import { actions as budgets } from './budgets/+page.server';
+import { actions as prices } from './prices/+page.server';
+
+// Each write lives on the route of the tab that makes it.
+const actions = { ...month, ...budgets, ...prices };
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -45,13 +50,17 @@ const BUDGET = {
 };
 const PRICE = { resource_type: 'storage', unit_price: '0.09', per_units: '1073741824' };
 
-/** Each write with the fields that pass the form's own checks. */
+/**
+ * Each write with the fields that pass the form's own checks, and the tag its
+ * result carries. The budget writes name their action, because the budgets
+ * page reads its drawer's failure through the shared helper that reads it.
+ */
 const WRITES = {
-	createBudget: { fields: BUDGET, form: 'budget-new', saved: { form: 'budget', saved: true } },
-	deleteBudget: { fields: { id: 'b1' }, form: 'budget', saved: { form: 'budget', saved: true } },
-	putPrice: { fields: PRICE, form: 'price', saved: { form: 'price', saved: true } },
-	resetPrice: { fields: { resource_type: 'storage' }, form: 'price', saved: { form: 'price', saved: true } },
-	aggregate: { fields: {}, form: 'aggregate', saved: { form: 'aggregate', saved: true } },
+	createBudget: { fields: BUDGET, tag: { action: 'createBudget' }, saved: { action: 'createBudget', saved: true } },
+	deleteBudget: { fields: { id: 'b1' }, tag: { action: 'deleteBudget' }, saved: { action: 'deleteBudget', saved: true } },
+	putPrice: { fields: PRICE, tag: { form: 'price' }, saved: { form: 'price', saved: true } },
+	resetPrice: { fields: { resource_type: 'storage' }, tag: { form: 'price' }, saved: { form: 'price', saved: true } },
+	aggregate: { fields: {}, tag: { form: 'aggregate' }, saved: { form: 'aggregate', saved: true } },
 } as const;
 
 const NAMES = Object.keys(WRITES) as (keyof typeof WRITES)[];
@@ -67,13 +76,13 @@ describe('tenant costs writes', () => {
 		const { event } = writeEvent(WRITES[name].fields, () => json({ error: 'budget not found', code: 'not_found' }, 404));
 		expect(await actions[name](event)).toEqual({
 			status: 400,
-			data: { form: WRITES[name].form, error: 'budget not found', locked: false },
+			data: { ...WRITES[name].tag, error: 'budget not found', locked: false },
 		});
 	});
 
 	it.each(NAMES)('%s says the ledger is not enabled on a license refusal', async (name) => {
 		const { event } = writeEvent(WRITES[name].fields, () => json({ error: 'payment_required', feature: 'feature:example_feature' }, 402));
-		expect(await actions[name](event)).toMatchObject({ status: 402, data: { form: WRITES[name].form, locked: true } });
+		expect(await actions[name](event)).toMatchObject({ status: 402, data: { ...WRITES[name].tag, locked: true } });
 	});
 
 	it.each(NAMES)('%s keeps driver text out of an outage', async (name) => {
