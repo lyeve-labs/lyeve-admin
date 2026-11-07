@@ -528,8 +528,8 @@ describe('Goroutine engine', () => {
 		expect(fieldsets(container)).toHaveLength(3);
 		for (const fs of fieldsets(container)) expect(fs.disabled).toBe(true);
 		const note = section(container).querySelector('[data-testid="goroutine-license-note"]') as HTMLElement;
-		expect(note.textContent).toContain('Changing these settings on a running server needs a license that includes tuning.');
-		expect(note.querySelector('a')?.getAttribute('href')).toBe('/admin/settings/license');
+		expect(note.textContent).toContain('Tuning the goroutine engine is not enabled on this instance.');
+		expect(note.querySelector('a')).toBeNull();
 		expect(section(container).querySelector('[data-testid="goroutine-role-note"]')).toBeNull();
 		// Every reading stays: only the writes are licensed.
 		const views = section(container).querySelector('[data-testid="goroutine-views"]') as HTMLElement;

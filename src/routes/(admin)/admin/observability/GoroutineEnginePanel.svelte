@@ -10,7 +10,7 @@
 		PARALLEL_TIMEOUT_MAX,
 		POOL_SIZE,
 	} from '$lib/api/goroutine-engine';
-	import { LICENSE_PAGE, formRefusal } from '$lib/api/refusal';
+	import { formRefusal } from '$lib/api/refusal';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { NO_VALUE, formatGoDuration } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
@@ -212,12 +212,9 @@
 			</p>
 		{/if}
 		{#if !ge.licensed}
-			<div class="flex flex-wrap items-center gap-2" data-testid="goroutine-license-note">
-				<p class="text-xs text-muted">
-					Changing these settings on a running server needs a license that includes tuning. The readings above stay available.
-				</p>
-				<Button variant="ghost" size="sm" href={LICENSE_PAGE}>View the license</Button>
-			</div>
+			<p class="text-xs text-muted" data-testid="goroutine-license-note">
+				Tuning the goroutine engine is not enabled on this instance. You can still see the readings above.
+			</p>
 		{/if}
 
 		<div class="grid gap-4 lg:grid-cols-3" data-testid="goroutine-tunables">
