@@ -138,7 +138,7 @@ export interface TenantDestination {
 
 export interface DestinationRead {
 	destination: TenantDestination | null;
-	/** Whether this install may save or change a destination. Removing one is always allowed. */
+	/** Whether this instance may save or change a destination. Removing one is always allowed. */
 	licensed: boolean;
 }
 

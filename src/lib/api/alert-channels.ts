@@ -10,7 +10,7 @@ import { plural } from '../format';
  * was read and sends it back unchanged, and the plugin reads a masked value as
  * "keep the one stored". Clearing a field removes that channel.
  *
- * Email works on every install. A plugin may refuse a new or changed chat,
+ * Email works on every instance. A plugin may refuse a new or changed chat,
  * webhook or PagerDuty channel with 402, and some plugins say beforehand
  * whether they would, through `licensed` on their own read.
  */

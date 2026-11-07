@@ -60,7 +60,7 @@ export async function setting<T>(read: Promise<T>, failed: string): Promise<Sett
 	}
 }
 
-/** Await an install setting's read. No tenant is involved, so a 400 is a failure like any other. */
+/** Await an instance setting's read. No tenant is involved, so a 400 is a failure like any other. */
 export async function installSetting<T>(read: Promise<T>, failed: string): Promise<Setting<T>> {
 	try {
 		return { ok: true, value: await read };

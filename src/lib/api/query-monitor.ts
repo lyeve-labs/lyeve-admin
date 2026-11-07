@@ -183,7 +183,7 @@ export function noSuggestionText(dialect: Dialect, read: AnalysisRead): string {
 		case 'source_missing':
 			return dialect === 'postgres'
 				? `No plans were read. Plans come from ${source}, and the extension is not installed in this database.`
-				: `No plans were read. Plans come from ${source}, and this server does not expose its statement digests.`;
+				: `No plans were read. Plans come from ${source}, and the database does not expose its statement digests.`;
 		case 'source_unreadable':
 			return `No plans were read. Could not check whether ${source} is available.`;
 		case 'none_captured':

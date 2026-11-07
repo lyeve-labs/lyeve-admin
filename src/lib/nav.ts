@@ -548,7 +548,7 @@ export function adminNav(roles: readonly string[], inputs: NavInputs = {}): NavT
 		// maturity the tree is not making.
 	};
 	// The widget this tenant's own pages render. The admin login is not on
-	// it: the console always challenges with the install's own settings.
+	// it: the console always challenges with the instance's own settings.
 	const captcha: NavNode = {
 		id: 'captcha',
 		label: 'Captcha',

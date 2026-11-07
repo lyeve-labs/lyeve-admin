@@ -94,7 +94,7 @@
 	const kind = $derived(item ? mediaKind(item.content_type) : 'other');
 	const fileUrl = $derived(item ? mediaFileUrl(item.id) : '');
 	// The URL the operator copies has to resolve from wherever it is pasted,
-	// and the download route is the one that answers on every install. The
+	// and the download route is the one that answers on every instance. The
 	// storage backend's own URL is empty on a local-disk one.
 	const absoluteUrl = $derived(browser && fileUrl ? window.location.origin + fileUrl : fileUrl);
 	// A published file has an address anyone can load, and that is the one a

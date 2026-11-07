@@ -85,7 +85,7 @@ export interface InactiveProvider {
 }
 
 export interface ProvidersRead extends ListEnvelope<CacheProvider> {
-	/** Whether this install runs every configured provider with failover. */
+	/** Whether this instance runs every configured provider with failover. */
 	licensed?: boolean;
 	inactive?: InactiveProvider[] | null;
 }
@@ -168,7 +168,7 @@ export async function purgeResponses(client: HttpClient, tag: string): Promise<n
 }
 
 /**
- * "4 of 10 rules" when the install holds a ceiling, and the count alone when
+ * "4 of 10 rules" when the instance holds a ceiling, and the count alone when
  * it holds none. The numbers come from the plugin's read, never from here.
  */
 export function ruleCount(limit: Limit | undefined, shown: number): string {

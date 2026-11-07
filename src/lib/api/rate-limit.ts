@@ -3,7 +3,7 @@
  *
  * Three kinds of limit live here. The global limit is one rate and burst over
  * every request. The protections are the built-in sign-in and reset limits,
- * enforced on every install. Custom rules are a rule per endpoint pattern,
+ * enforced on every instance. Custom rules are a rule per endpoint pattern,
  * tenant or role, counted by address or account. Whether this instance may
  * change the protections and enforce custom rules is the plugin's answer, in
  * the overview it serves. A stored custom rule on an instance that may not
@@ -286,7 +286,7 @@ export const TENANT_GLOBAL_URL = '/api/admin/rate-limits/tenant-global';
 export const IP_RULES_URL = '/api/admin/rate-limits/ip-rules';
 export const HISTORY_URL = '/api/admin/rate-limits/history';
 
-/** The caller's tenant limit, the install-wide one beside it, and whether writing one is licensed. */
+/** The caller's tenant limit, the instance-wide one beside it, and whether writing one is licensed. */
 export interface TenantGlobalRead {
 	licensed: boolean;
 	tenant_global: RateRule | null;

@@ -88,7 +88,7 @@ describe('presentation', () => {
 describe('the event list', () => {
 	const client = (body: unknown) => ({ get: async () => body }) as never;
 
-	it('reads the window the install reads, in days', async () => {
+	it('reads the window the instance reads, in days', async () => {
 		const page = await listEvents(client({ data: [], total_count: 0, hidden_older: 3, window_days: 30 }), 50);
 		expect(page).toMatchObject({ hiddenOlder: 3, windowDays: 30 });
 	});

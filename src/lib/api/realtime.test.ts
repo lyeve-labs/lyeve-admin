@@ -69,7 +69,7 @@ describe('uptimeSince', () => {
 });
 
 describe('inUse', () => {
-	// An install that pushes over one transport should read as "nobody uses
+	// An instance that pushes over one transport should read as "nobody uses
 	// this one" on the other, not as a wall of zeros that looks like a fault.
 	it('is false for a transport nothing has touched', () => {
 		expect(inUse(metrics())).toBe(false);

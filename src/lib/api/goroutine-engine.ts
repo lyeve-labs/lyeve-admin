@@ -66,7 +66,7 @@ export interface GoroutineEngineViews {
 	parallel: ParallelView | null;
 	asyncHooks: AsyncHooksView | null;
 	/**
-	 * Whether the install's license lets the three tuning writes through.
+	 * Whether the instance's license lets the three tuning writes through.
 	 * The plugin answers this as a plain flag, so the admin never has to know
 	 * which license grants it.
 	 */
@@ -188,7 +188,7 @@ export function parseAsyncHooksForm(data: FormData): { body: AsyncHooksBody } | 
 }
 
 /**
- * Whether the tuning writes are licensed on this install. Only an explicit
+ * Whether the tuning writes are licensed on this instance. Only an explicit
  * false closes the forms. A failed read, a 404 from a plugin that predates
  * the route, or a body without the flag all read as licensed, so an older
  * server keeps the forms it always had and a refused write still reports

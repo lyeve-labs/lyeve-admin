@@ -3,7 +3,7 @@
  *
  * A tenant may bring its own captcha provider and keys for the pages and
  * flows it serves. The admin login is not one of them: it always challenges
- * with the install's own settings, so a tenant that misconfigures its keys
+ * with the instance's own settings, so a tenant that misconfigures its keys
  * cannot lock its admins out. The read never carries the secret, only whether
  * one is stored, and a save that leaves the secret empty keeps the stored one.
  */
@@ -40,7 +40,7 @@ export interface CaptchaSettings {
 	source: 'tenant' | 'instance';
 	tenant: TenantCaptcha | null;
 	instance: CaptchaWidget;
-	/** Whether this install may save or change tenant settings. Clearing is always allowed. */
+	/** Whether this instance may save or change tenant settings. Clearing is always allowed. */
 	licensed: boolean;
 }
 

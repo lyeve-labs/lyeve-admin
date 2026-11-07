@@ -72,7 +72,7 @@
 		schemas: ImportSchema[] | null;
 		/** The tenant's saved mappings, offered on the first step. */
 		templates?: MappingTemplate[];
-		/** Whether the plugin said this install may name the paid transforms. Null when it did not say. */
+		/** Whether the plugin said this instance may name the paid transforms. Null when it did not say. */
 		licensed?: boolean | null;
 		onstarted: (job: ImportJob) => void;
 	} = $props();

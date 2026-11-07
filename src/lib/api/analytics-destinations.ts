@@ -5,7 +5,7 @@
  *
  * Both lists answer `{data, licensed}`. `licensed` is the plugin's answer to
  * whether it would take a retry policy and a replay, so the page offers them
- * without naming anything. A destination type the install is not enabled for
+ * without naming anything. A destination type the instance is not enabled for
  * is refused when it is created, with a 402 the page renders.
  *
  * A destination's settings carry its credentials, so every answer redacts

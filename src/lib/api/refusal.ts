@@ -107,7 +107,7 @@ export function refusalTitle(r: Refusal): string {
  * The sentence for a refusal: "7 of 7 items are in use" for a cap, and the
  * neutral locked state for a feature, which names no capability. A cap says what happened, then the way
  * forward: a license that allows more, and only after it removing one. It
- * reads the same to an install with no license and to one whose license
+ * reads the same to an instance with no license and to one whose license
  * allows less than it needs.
  */
 export function refusalText(r: Refusal): string {

@@ -31,7 +31,7 @@ export async function saveStepUp(client: HttpClient, factors: StepUpFactor[]): P
 }
 
 /**
- * Whether a save was refused because the install cannot send mail, so an
+ * Whether a save was refused because the instance cannot send mail, so an
  * emailed code cannot be required. The engine answers 422 for that alone,
  * so the status decides and a renamed code cannot break the check.
  */

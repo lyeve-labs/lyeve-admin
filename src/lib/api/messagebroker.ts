@@ -4,7 +4,7 @@
  * The broker is configured by the deployment, not through the admin, so there
  * is nothing here to write. What there is to read matters more than usual:
  * publishing is fire and forget by design, because failing the hook would stop
- * the CMS accepting content whenever the broker is down. The cost of that
+ * the engine accepting content whenever the broker is down. The cost of that
  * choice is that a broker can refuse every event for a week without anything
  * in the product saying so.
  *

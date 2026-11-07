@@ -95,8 +95,8 @@ export interface ErrorEvent {
 
 /**
  * A page of events. `hidden_older` counts the events older than the window
- * this install reads, which the page leaves out. It is 0 when the install
- * reads everything. `window_days` is that window, null when the install reads
+ * this instance reads, which the page leaves out. It is 0 when the instance
+ * reads everything. `window_days` is that window, null when the instance reads
  * every event.
  */
 export interface EventPage {
@@ -164,7 +164,7 @@ export async function assign(client: HttpClient, id: string, assignee: string): 
 	await client.put(`${ALERTS_URL}/${encodeURIComponent(id)}/assignee`, { assignee });
 }
 
-/** The newest events, with the count of older ones the install does not read. */
+/** The newest events, with the count of older ones the instance does not read. */
 export async function listEvents(client: HttpClient, limit: number): Promise<EventPage> {
 	const res = await client.get<Record<string, unknown>>(`${EVENTS_URL}?limit=${limit}&offset=0`);
 	const data = Array.isArray(res?.data) ? (res.data as ErrorEvent[]) : [];

@@ -9,7 +9,7 @@
  * narrows what is captured, it does not add to it.
  *
  * A replay set is a named list of captures replayed together, each answering
- * its own diff against the original. Whether this install may create a rule
+ * its own diff against the original. Whether this instance may create a rule
  * or a set is the plugin's answer, `licensed` on its reads. Replaying a set
  * that exists is not gated by it.
  */

@@ -190,7 +190,7 @@ export interface FieldMapping {
 
 /**
  * What a mapping does to a cell before it is stored. The three text
- * transforms work on every install. Parsing a date, splitting a cell into a list and
+ * transforms work on every instance. Parsing a date, splitting a cell into a list and
  * looking a value up need a license, which the plugin checks when a request
  * names one: a template saved with one keeps applying.
  */

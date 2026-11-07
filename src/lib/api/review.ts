@@ -80,7 +80,7 @@ export interface ReviewStage {
 }
 
 /**
- * What the definitions read says this install allows: `licensed` for the
+ * What the definitions read says this instance allows: `licensed` for the
  * paid stage settings, and the workflow ceiling with how many the tenant
  * holds. A null limit is no ceiling.
  */
@@ -152,7 +152,7 @@ export interface Paginated<T> {
 	total: number;
 }
 
-/** The definitions page, with what the read says this install allows. */
+/** The definitions page, with what the read says this instance allows. */
 export interface DefinitionPage extends Paginated<ReviewDefinition> {
 	/** Null when the plugin's read carries no such fields. */
 	limits: ReviewLimits | null;

@@ -86,7 +86,7 @@ export function resetSetupGateCache(): void {
  * engine cannot be reached.
  *
  * A request that carries a session goes through when the engine cannot be
- * reached. That session belonged to an install that already had an account,
+ * reached. That session belonged to an instance that already had an account,
  * so the engine is down rather than unset, and the page's own session check
  * shows the outage page. The setup screen would ask a signed-in reader to
  * configure an engine that is only away, and a form posted during the outage

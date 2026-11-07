@@ -263,7 +263,7 @@ export interface ProbeLimits {
 /**
  * The limits a probe write is held to, or null when the plugin does not say.
  *
- * The floor depends on what the install is licensed for, so the console reads
+ * The floor depends on what the instance is licensed for, so the console reads
  * it rather than guessing one of its own.
  */
 export async function readProbeLimits(client: HttpClient): Promise<ProbeLimits | null> {
