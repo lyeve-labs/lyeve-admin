@@ -16,6 +16,7 @@ import {
 } from '$lib/api/residency';
 import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
 import { rowsOf } from '$lib/api/list';
+import { couldNotLoad } from '$lib/outage';
 
 /** The most regions the page lists. An instance runs in a handful. */
 const REGION_CAP = 100;
@@ -49,7 +50,7 @@ export const load: PageServerLoad = async (event) => {
 		more = rows.length > REGION_CAP;
 		regions = rows.slice(0, REGION_CAP);
 	} catch (err) {
-		gate = gateOf(err, 'Could not load the residency report.');
+		gate = gateOf(err, couldNotLoad('regions'));
 	}
 
 	// The report is the evidence half of this page. An unread report is never
