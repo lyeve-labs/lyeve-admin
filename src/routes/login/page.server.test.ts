@@ -573,7 +573,7 @@ describe('signing in', () => {
 		const result = await verify(answer);
 		expect(result.status).toBe(503);
 		expect(result.data).toEqual({
-			error: 'Could not check the code. Try again in a moment.',
+			error: 'The engine is unavailable, so your code was not checked. Try again in a moment.',
 			mfa_required: true,
 			challenge_token: 'ch-tok',
 		});

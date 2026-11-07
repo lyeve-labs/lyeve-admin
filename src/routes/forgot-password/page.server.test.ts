@@ -27,7 +27,7 @@ describe('forgot-password action', () => {
 		const fetch = vi.fn(async () => answer()) as unknown as typeof globalThis.fetch;
 		const result = (await submit({ email: 'a@b.co' }, fetch)) as { status: number; data: { error: string } };
 		expect(result.status).toBeGreaterThanOrEqual(500);
-		expect(result.data.error).toBe('Password reset is unavailable right now. Try again in a moment.');
+		expect(result.data.error).toBe('The engine is unavailable, so password reset is not available. Try again in a moment.');
 	});
 
 	beforeEach(() => resetRateLimitStore());

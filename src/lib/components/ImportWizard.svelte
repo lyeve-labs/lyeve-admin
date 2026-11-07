@@ -27,6 +27,7 @@
 	import { errorCodeOf } from '$lib/api/limits';
 	import { ApiError } from '@lyeve-labs/client';
 	import { renewingOnce } from '$lib/renew';
+	import { outageFor } from '$lib/outage';
 	import { SIGN_IN_AGAIN } from '$lib/session';
 	import {
 		IMPORT_FORMATS,
@@ -254,7 +255,7 @@
 				// whose answer never came back may already be importing.
 				error = starts
 					? 'Could not confirm whether the import started. Check the entries before you try again.'
-					: 'The request did not reach the engine. Nothing was imported. Try again in a moment.';
+					: outageFor('nothing was imported');
 				return null;
 			}
 			refusal = refusalOf(e);

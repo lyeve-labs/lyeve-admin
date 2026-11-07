@@ -1,4 +1,6 @@
 import { ApiError } from '@lyeve-labs/client';
+import { inSentence } from '$lib/api/gate';
+import { outageFor } from '$lib/outage';
 
 /**
  * The sentence a signed-out recovery page shows for an engine refusal that is
@@ -13,7 +15,7 @@ import { ApiError } from '@lyeve-labs/client';
  */
 export function recoveryRefusal(e: unknown, feature: string): { status: number; error: string } | null {
 	if (!(e instanceof ApiError)) {
-		return { status: 503, error: `${feature} is unavailable right now. Try again in a moment.` };
+		return { status: 503, error: outageFor(`${inSentence(feature)} is not available`) };
 	}
 	if (e.status === 404 || e.status === 405 || e.status === 402) {
 		return { status: 404, error: `${feature} is not enabled on this instance. Ask an administrator to sign you in.` };
@@ -22,7 +24,7 @@ export function recoveryRefusal(e: unknown, feature: string): { status: number; 
 		return { status: 429, error: 'Too many attempts. Wait a few minutes, then try again.' };
 	}
 	if (e.status >= 500) {
-		return { status: e.status, error: `${feature} is unavailable right now. Try again in a moment.` };
+		return { status: e.status, error: outageFor(`${inSentence(feature)} is not available`) };
 	}
 	return null;
 }

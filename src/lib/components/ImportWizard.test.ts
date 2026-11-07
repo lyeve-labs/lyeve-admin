@@ -183,7 +183,7 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		await readWith(async () => {
 			throw new TypeError('Failed to fetch');
 		});
-		await waitFor(() => expect(document.body.textContent).toContain('The request did not reach the engine. Nothing was imported. Try again in a moment.'));
+		await waitFor(() => expect(document.body.textContent).toContain('The engine is unavailable, so nothing was imported. Try again in a moment.'));
 		expect(document.body.textContent).not.toContain('Failed to fetch');
 	});
 

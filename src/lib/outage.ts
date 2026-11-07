@@ -6,11 +6,22 @@
  * survived, because a reader who believes they were signed out signs in again,
  * and that cannot work until the engine answers.
  */
+const AGAIN = 'Try again in a moment.';
+
 export const OUTAGE = {
 	title: 'Temporarily unavailable',
-	body: "The engine is unavailable, so this page did not load. You're still signed in, and nothing was changed. Try again in a moment.",
+	body: `The engine is unavailable, so this page did not load. You're still signed in, and nothing was changed. ${AGAIN}`,
 	action: 'Try again',
 } as const;
+
+/**
+ * The outage sentence for one part of a page, or for one action, where the
+ * page around it still rendered. `what` says what did not happen, such as
+ * "the test run did not finish", so the reader knows which part to retry.
+ */
+export function outageFor(what: string): string {
+	return `The engine is unavailable, so ${what}. ${AGAIN}`;
+}
 
 /**
  * What the console says when the engine refuses a request for the rate.
