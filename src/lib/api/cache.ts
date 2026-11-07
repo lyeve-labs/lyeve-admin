@@ -178,10 +178,6 @@ export function ruleCount(limit: Limit | undefined, shown: number): string {
 	return `${current} ${noun}`;
 }
 
-/** Whether the next create would meet the ceiling the read stated. */
-export function atCeiling(limit: Limit | undefined): boolean {
-	return !!limit && limit.limit !== null && limit.current >= limit.limit;
-}
 
 /** A rule pattern the plugin accepts: a path under /api/v1/ with no query. */
 export function patternIsSound(pattern: string): boolean {

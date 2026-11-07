@@ -29,10 +29,10 @@
 		riskOf,
 		riskTone,
 		statusHint,
-		statusTone,
 		type LabEndpoint,
 		type LabResult,
 	} from '$lib/api/labs';
+	import { httpStatusTone } from '$lib/tones';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import StreamLab from '$lib/components/labs/StreamLab.svelte';
@@ -176,7 +176,7 @@
 {#snippet answer(result: LabResult)}
 	<SectionHeading level={3}>The answer</SectionHeading>
 	<div class="flex flex-wrap items-center gap-2">
-		<Badge tone={statusTone(result.status)} dot>
+		<Badge tone={httpStatusTone(result.status)} dot>
 			{result.status}
 			{result.statusText}
 		</Badge>
@@ -197,7 +197,7 @@
 	{#if statusHint(result.status)}
 		<!-- The statuses a tester meets once and has to guess at. 402 is the
 		     one worth spelling out: nothing about the request is wrong. -->
-		<Alert tone={statusTone(result.status) === 'success' ? 'brand' : 'warn'}>
+		<Alert tone={httpStatusTone(result.status) === 'success' ? 'brand' : 'warn'}>
 			{statusHint(result.status)}
 		</Alert>
 	{/if}
@@ -323,7 +323,7 @@
 						{#if selected.statuses?.length}
 							<div class="flex flex-wrap gap-2">
 								{#each selected.statuses as st (st.code)}
-									<Badge tone={statusTone(Number(st.code) || 0)}>{st.code} {st.description}</Badge>
+									<Badge tone={httpStatusTone(Number(st.code) || 0)}>{st.code} {st.description}</Badge>
 								{/each}
 							</div>
 						{/if}

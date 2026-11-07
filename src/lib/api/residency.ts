@@ -36,8 +36,6 @@ export interface Region {
 	updated_at: string;
 }
 
-export const REPLICATION_STATUSES = ['syncing', 'synced', 'failed', 'paused'] as const;
-
 export interface TenantResidency {
 	tenant_id: string;
 	tenant_slug: string;

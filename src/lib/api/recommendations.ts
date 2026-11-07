@@ -34,9 +34,6 @@ export interface RefreshResult {
 	duration_ms: number;
 }
 
-/** Where one entry in a person's feed came from. */
-export const FEED_SOURCES = ['similar', 'trending', 'collaborative', 'random'] as const;
-
 export interface FeedEntry {
 	id: string;
 	user_id: string;

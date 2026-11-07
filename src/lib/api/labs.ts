@@ -34,7 +34,6 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { EndpointDoc, EndpointGroup, HttpMethod } from './reference';
-import { httpStatusTone } from '../tones';
 import { SESSION_ENDED } from '../session';
 
 /** Methods that change something. Named so a page can say so before sending. */
@@ -256,10 +255,6 @@ export function formatBody(raw: string, contentType: string | null): { body: str
 	return { body: raw, json: false };
 }
 
-/** How a status reads, for the badge beside it. */
-export function statusTone(status: number): StatusTone {
-	return httpStatusTone(status);
-}
 
 /**
  * What a status means here, where the usual suspects have one cause.

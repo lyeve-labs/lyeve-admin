@@ -647,100 +647,98 @@ const apiSchemasGroup: EndpointGroup = {
 // parameter the engine resolves per request, so it is documented once. The
 // loader states the count of collections from the engine's document, never
 // their names.
-export function makeContentGroup(): EndpointGroup {
-	const base = '/api/v1/content/{schema}';
-	const schemaParam: EndpointParam = {
-		name: 'schema',
-		in: 'path',
-		type: 'string',
-		required: true,
-		description: 'Collection name, as listed by GET /api/v1/schemas.',
-	};
-	const idParam: EndpointParam = {
-		name: 'id',
-		in: 'path',
-		type: 'uuid',
-		required: true,
-		description: 'Content item ID',
-	};
-	return {
-		id: 'api-content',
-		label: 'API · Content',
-		description:
-			'Create, read, update and delete records in any collection. Only an editor, an admin or a super admin can write.',
-		server: 'api',
-		baseUrl: '/api/v1',
-		endpoints: [
-			{
-				method: 'GET',
-				path: base,
-				summary: 'List content',
-				auth: 'bearer',
-				params: [
-					schemaParam,
-					{ name: 'limit', in: 'query', type: 'number', required: false, description: 'Max records to return (default 25)' },
-					{ name: 'offset', in: 'query', type: 'number', required: false, description: 'Pagination offset (default 0)' },
-				],
-				response: {
-					description: 'Paginated array of content items',
-					example: `[\n  {\n    "id": "uuid",\n    "schema_name": "posts",\n    "data": { ... },\n    "created_at": "2026-01-01T00:00:00Z",\n    "updated_at": "2026-01-01T00:00:00Z"\n  }\n]`,
-				},
+const base = '/api/v1/content/{schema}';
+const schemaParam: EndpointParam = {
+	name: 'schema',
+	in: 'path',
+	type: 'string',
+	required: true,
+	description: 'Collection name, as listed by GET /api/v1/schemas.',
+};
+const idParam: EndpointParam = {
+	name: 'id',
+	in: 'path',
+	type: 'uuid',
+	required: true,
+	description: 'Content item ID',
+};
+const apiContentGroup: EndpointGroup = {
+	id: 'api-content',
+	label: 'API · Content',
+	description:
+		'Create, read, update and delete records in any collection. Only an editor, an admin or a super admin can write.',
+	server: 'api',
+	baseUrl: '/api/v1',
+	endpoints: [
+		{
+			method: 'GET',
+			path: base,
+			summary: 'List content',
+			auth: 'bearer',
+			params: [
+				schemaParam,
+				{ name: 'limit', in: 'query', type: 'number', required: false, description: 'Max records to return (default 25)' },
+				{ name: 'offset', in: 'query', type: 'number', required: false, description: 'Pagination offset (default 0)' },
+			],
+			response: {
+				description: 'Paginated array of content items',
+				example: `[\n  {\n    "id": "uuid",\n    "schema_name": "posts",\n    "data": { ... },\n    "created_at": "2026-01-01T00:00:00Z",\n    "updated_at": "2026-01-01T00:00:00Z"\n  }\n]`,
 			},
-			{
-				method: 'GET',
-				path: `${base}/{id}`,
-				summary: 'Get content item',
-				auth: 'bearer',
-				params: [schemaParam, idParam],
-				response: {
-					description: 'Single content item',
-					example: `{\n  "id": "uuid",\n  "schema_name": "posts",\n  "data": { ... },\n  "created_at": "2026-01-01T00:00:00Z"\n}`,
-				},
+		},
+		{
+			method: 'GET',
+			path: `${base}/{id}`,
+			summary: 'Get content item',
+			auth: 'bearer',
+			params: [schemaParam, idParam],
+			response: {
+				description: 'Single content item',
+				example: `{\n  "id": "uuid",\n  "schema_name": "posts",\n  "data": { ... },\n  "created_at": "2026-01-01T00:00:00Z"\n}`,
 			},
-			{
-				method: 'POST',
-				path: base,
-				summary: 'Create content',
-				auth: 'bearer',
-				roles: ['editor', 'admin', 'super_admin'],
-				params: [schemaParam],
-				requestBody: {
-					description: 'Field values wrapped in a data object',
-					example: `{\n  "data": {\n    "title": "My first post",\n    "published": false\n  }\n}`,
-				},
-				response: {
-					description: 'Created content item',
-					example: `{\n  "id": "uuid",\n  "schema_name": "posts",\n  "data": { ... },\n  "created_at": "2026-01-01T00:00:00Z"\n}`,
-				},
+		},
+		{
+			method: 'POST',
+			path: base,
+			summary: 'Create content',
+			auth: 'bearer',
+			roles: ['editor', 'admin', 'super_admin'],
+			params: [schemaParam],
+			requestBody: {
+				description: 'Field values wrapped in a data object',
+				example: `{\n  "data": {\n    "title": "My first post",\n    "published": false\n  }\n}`,
 			},
-			{
-				method: 'PUT',
-				path: `${base}/{id}`,
-				summary: 'Update content',
-				auth: 'bearer',
-				roles: ['editor', 'admin', 'super_admin'],
-				params: [schemaParam, idParam],
-				requestBody: {
-					description: 'Partial or full field values',
-					example: `{\n  "data": {\n    "published": true\n  }\n}`,
-				},
-				response: {
-					description: 'Updated content item',
-					example: `{\n  "id": "uuid",\n  "schema_name": "posts",\n  "data": { ... }\n}`,
-				},
+			response: {
+				description: 'Created content item',
+				example: `{\n  "id": "uuid",\n  "schema_name": "posts",\n  "data": { ... },\n  "created_at": "2026-01-01T00:00:00Z"\n}`,
 			},
-			{
-				method: 'DELETE',
-				path: `${base}/{id}`,
-				summary: 'Delete content',
-				auth: 'bearer',
-				roles: ['editor', 'admin', 'super_admin'],
-				params: [schemaParam, idParam],
-				response: { description: 'Empty 204 response.', example: '' },
+		},
+		{
+			method: 'PUT',
+			path: `${base}/{id}`,
+			summary: 'Update content',
+			auth: 'bearer',
+			roles: ['editor', 'admin', 'super_admin'],
+			params: [schemaParam, idParam],
+			requestBody: {
+				description: 'Partial or full field values',
+				example: `{\n  "data": {\n    "published": true\n  }\n}`,
 			},
-		],
-	};
-}
+			response: {
+				description: 'Updated content item',
+				example: `{\n  "id": "uuid",\n  "schema_name": "posts",\n  "data": { ... }\n}`,
+			},
+		},
+		{
+			method: 'DELETE',
+			path: `${base}/{id}`,
+			summary: 'Delete content',
+			auth: 'bearer',
+			roles: ['editor', 'admin', 'super_admin'],
+			params: [schemaParam, idParam],
+			response: { description: 'Empty 204 response.', example: '' },
+		},
+	],
+};
 
 const apiJwksGroup: EndpointGroup = {
 	id: 'api-jwks',
@@ -774,6 +772,6 @@ export const staticGroups: EndpointGroup[] = [
 	adminSystemGroup,
 	apiAuthGroup,
 	apiSchemasGroup,
-	makeContentGroup(),
+	apiContentGroup,
 	apiJwksGroup,
 ];

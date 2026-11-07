@@ -19,11 +19,11 @@
 	import { formRefusal } from '$lib/api/refusal';
 	import { enhance } from '$app/forms';
 	import { confirmed, tracked } from '$lib/forms.svelte';
+	import { atLimit } from '$lib/api/limits';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Database, Eraser, Pencil, Plus, RotateCcw, Route, Trash2 } from '@lucide/svelte';
 	import {
 		CIRCUIT_LABELS,
-		atCeiling,
 		inactiveReason,
 		ruleCount,
 		ttlLabel,
@@ -57,7 +57,7 @@
 	);
 	const rules = $derived(data.rules);
 	const ruleTags = $derived([...new Set(rules.rows.flatMap((r) => r.tags))].sort());
-	const rulesFull = $derived(rules.licensed !== true && atCeiling(rules.limit));
+	const rulesFull = $derived(rules.licensed !== true && atLimit(rules.limit));
 
 	let ruleOpen = $state(false);
 	let editing = $state<CacheRule | null>(null);

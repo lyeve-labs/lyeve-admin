@@ -41,6 +41,6 @@ export function limitOf(limits: unknown, key: string): Limit | null {
 }
 
 /** Whether the count has reached a ceiling. No ceiling is never full. */
-export function atLimit(l: Limit | null): boolean {
+export function atLimit(l: Limit | null | undefined): boolean {
 	return !!l && l.limit !== null && l.current >= l.limit;
 }

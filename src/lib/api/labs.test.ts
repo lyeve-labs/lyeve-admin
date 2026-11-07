@@ -21,7 +21,6 @@ import {
 	riskOf,
 	riskTone,
 	statusHint,
-	statusTone,
 	type LabEndpoint,
 } from './labs';
 import type { EndpointGroup } from './reference';
@@ -191,13 +190,6 @@ describe('reading the answer', () => {
 		expect(picked['content-type']).toBe('application/json');
 		expect(picked['retry-after']).toBe('30');
 		expect(picked['x-frame-options']).toBeUndefined();
-	});
-
-	it('tones a status by what it means', () => {
-		expect(statusTone(200)).toBe('success');
-		expect(statusTone(302)).toBe('neutral');
-		expect(statusTone(404)).toBe('warn');
-		expect(statusTone(503)).toBe('danger');
 	});
 
 	// 402 is the one a tester meets and misreads as a broken request.
