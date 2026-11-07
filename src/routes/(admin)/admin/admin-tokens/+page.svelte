@@ -34,7 +34,7 @@
 	import TokenExpiryField from '$lib/components/admin-tokens/TokenExpiryField.svelte';
 	import { tracked } from '$lib/forms.svelte';
 	import { narrows } from '$lib/narrow';
-	import { formatCount, formatDate, formatDateTime, relativeTime } from '$lib/format';
+	import { formatCount, formatDate, formatDateTime, plural, relativeTime } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import {
@@ -526,7 +526,7 @@
 	<Modal open title={issued.rotated ? `Rotated ${issued.name}` : `Token ${issued.name} issued`} onclose={() => (issued = null)}>
 		<div class="flex flex-col gap-4">
 			<Alert tone="warn" title="Copy it now">
-				You will not see this token again. Store it where the script that uses it runs, such as a CI secret.
+				It is not shown again. Store it where the script that uses it runs, such as a CI secret.
 			</Alert>
 			<CopyField id="issued-token" label="Admin token" value={issued.token} secret copyLabel="Copy the token" />
 			<p class="text-xs text-muted">
@@ -550,8 +550,8 @@
 {#if data.log}
 	{@const log = data.log}
 	<Drawer open title="Request log" description={logToken ? `${logToken.name} (lyat_${logToken.display_prefix})` : undefined} size="xl" onclose={closeLog}>
-		{#if log.error}
-			<Alert tone="danger">{log.error}</Alert>
+		{#if log.gate}
+			<GateNotice gate={log.gate} title="Request log" absent="This token does not exist, or you cannot view it." />
 		{:else if log.rows.length === 0}
 			<EmptyState title="No requests yet" description="Calls made with this token appear here, including refused ones." />
 		{:else}
@@ -573,7 +573,7 @@
 								<td data-cell="nowrap" class="text-xs text-muted">{formatDateTime(r.created_at)}</td>
 								{#if dropped !== null}
 									<td colspan="4" class="text-xs text-warn">
-										{formatCount(dropped)} {dropped === 1 ? 'request' : 'requests'} not logged (the log queue was full)
+										{formatCount(dropped)} {plural(dropped, 'request')} not logged (the log queue was full)
 									</td>
 								{:else}
 									<td data-cell="nowrap" class="font-mono text-xs">{r.method}</td>
