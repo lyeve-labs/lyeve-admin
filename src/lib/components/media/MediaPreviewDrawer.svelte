@@ -7,12 +7,13 @@
 		Input,
 		SectionHeading,
 		Textarea,
-		confirm,
 		CopyField,
 	} from '@lyeve-labs/ui-kit';
 	import { Download, File, FileText, Music, Sparkles, Trash2 } from '@lucide/svelte';
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
+	import { confirmed } from '$lib/forms.svelte';
 	import {
 		formatDimensions,
 		mediaFileUrl,
@@ -33,11 +34,9 @@
 	interface Props {
 		/** The item on show, or null while the drawer is shut. */
 		item: MediaItem | null;
-		/** True while the page's delete action is in flight. */
-		deleting?: boolean;
 		onclose: () => void;
-		/** Called once the operator has confirmed. The page owns the request. */
-		ondelete: (item: MediaItem) => void;
+		/** Called once a delete went through and the list reloaded without the item. */
+		ondeleted?: () => void | Promise<void>;
 		/** Whether the AI plugin can suggest alt text. */
 		aiEnabled?: boolean;
 		/** A suggestion that came back for this item, to review before saving. */
@@ -57,9 +56,8 @@
 
 	let {
 		item,
-		deleting = false,
 		onclose,
-		ondelete,
+		ondeleted,
 		aiEnabled = false,
 		suggestion = '',
 		detailsError = '',
@@ -118,13 +116,27 @@
 		return rows;
 	});
 
-	async function askDelete() {
-		if (!item) return;
-		const ok = await confirm(`Delete ${item.filename}?`, 'The file is removed from the library, and any page that links to it can no longer load it. This cannot be undone.', {
+	// The question and the toast name the file asked about, read at submit
+	// time. The flag starts once the question is answered, so a declined
+	// question never spins the button.
+	let deleting = $state(false);
+	const remove: SubmitFunction = async (input) => {
+		const name = item?.filename ?? 'file';
+		const after = await confirmed(`Delete ${name}?`, 'The file is removed from the library, and any page that links to it can no longer load it. This cannot be undone.', {
 			confirmLabel: 'Delete',
-		});
-		if (ok) ondelete(item);
-	}
+			success: `Deleted ${name}`,
+		})(input);
+		if (!after) return;
+		deleting = true;
+		return async (opts) => {
+			try {
+				await after(opts);
+			} finally {
+				deleting = false;
+			}
+			if (opts.result.type === 'success') await ondeleted?.();
+		};
+	};
 </script>
 
 {#if item}
@@ -172,14 +184,15 @@
 			<DescriptionList layout="stacked" items={facts} />
 
 			<FormErrors message={deleteError || undefined} />
-			<div class="flex flex-wrap gap-2">
+			<form method="POST" action="?/delete" class="flex flex-wrap gap-2" use:enhance={remove}>
+				<input type="hidden" name="id" value={item.id} />
 				<Button variant="secondary" size="sm" href={fileUrl} download={item.filename}>
 					<Download size={ICON.sm} /> Download
 				</Button>
-				<Button variant="danger" size="sm" loading={deleting} onclick={askDelete}>
+				<Button variant="danger" size="sm" type="submit" loading={deleting}>
 					<Trash2 size={ICON.sm} /> Delete
 				</Button>
-			</div>
+			</form>
 
 			<form
 				method="POST"

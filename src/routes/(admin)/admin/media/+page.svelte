@@ -95,16 +95,13 @@
 	// and a delete or reload that drops the row shuts the drawer.
 	let selectedId = $state<string | null>(null);
 	const selected = $derived(selectedId ? (items.find((it) => it.id === selectedId) ?? null) : null);
-	let deleteId = $state('');
-	let deleting = $state(false);
-	let deleteForm = $state<HTMLFormElement | undefined>(undefined);
 
-	async function requestDelete(item: MediaItem) {
-		deleteId = item.id;
-		// The hidden input takes the id on the next render. Submitting before
-		// that posts the previous one.
+	// The drawer's opener was the deleted file's tile, so focus would fall to
+	// the page body. It goes to the library's own control.
+	async function deleted() {
+		selectedId = null;
 		await tick();
-		deleteForm?.requestSubmit();
+		document.querySelector<HTMLElement>('[data-media-upload]')?.focus();
 	}
 
 	async function handleUpload(e: Event) {
@@ -298,7 +295,6 @@
 
 <MediaPreviewDrawer
 	item={selected}
-	{deleting}
 	aiEnabled={data.aiEnabled}
 	suggestion={form && 'described' in form && form.described && form.described.id === selected?.id ? form.described.text : ''}
 	deleteError={form && 'deleteError' in form && 'deleteId' in form && form.deleteId === selected?.id ? String(form.deleteError ?? '') : ''}
@@ -309,34 +305,5 @@
 	transformError={transformFailure?.error ?? ''}
 	transformRefused={transformFailure?.refused ?? null}
 	onclose={() => (selectedId = null)}
-	ondelete={requestDelete}
+	ondeleted={deleted}
 />
-
-<!-- The drawer asks, the page deletes: the request is a form action, so it
-     works the way every other write in the admin does and the drawer never
-     talks to the API. -->
-<form
-	method="POST"
-	action="?/delete"
-	class="hidden"
-	aria-hidden="true"
-	bind:this={deleteForm}
-	use:enhance={() => {
-		deleting = true;
-		const name = selected?.filename ?? 'file';
-		return async ({ result, update }) => {
-			deleting = false;
-			if (result.type === 'success') selectedId = null;
-			await update();
-			if (result.type === 'success') {
-				toast.success(`Deleted ${name}`);
-				// The drawer's opener was the deleted file's tile, so focus would
-				// fall to the page body. It goes to the library's own control.
-				await tick();
-				document.querySelector<HTMLElement>('[data-media-upload]')?.focus();
-			}
-		};
-	}}
->
-	<input type="hidden" name="id" value={deleteId} />
-</form>

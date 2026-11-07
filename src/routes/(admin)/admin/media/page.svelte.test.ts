@@ -10,10 +10,10 @@ vi.mock('$app/environment', () => ({ browser: true }));
  * before it sends anything, so capturing it here drives the round trip
  * without the DOM's submit plumbing.
  */
-const forms = vi.hoisted(() => ({ submits: [] as SubmitFunction[] }));
+const forms = vi.hoisted(() => ({ submits: new Map<string, SubmitFunction>() }));
 vi.mock('$app/forms', () => ({
-	enhance: (_el: HTMLFormElement, fn?: SubmitFunction) => {
-		if (fn) forms.submits.push(fn);
+	enhance: (el: HTMLFormElement, fn?: SubmitFunction) => {
+		if (fn) forms.submits.set(el.getAttribute('action') ?? '', fn);
 		return { destroy() {} };
 	},
 }));
@@ -42,7 +42,7 @@ import { IMAGE, ONE_OF_EACH, PDF } from '$lib/components/media/fixtures';
 afterEach(cleanup);
 beforeEach(() => {
 	vi.clearAllMocks();
-	forms.submits = [];
+	forms.submits.clear();
 	kit.confirm.mockResolvedValue(false);
 	localStorage.clear();
 });
@@ -148,17 +148,13 @@ describe('media library preview', () => {
 			.find((el) => (el.textContent ?? '').includes('clip.webm')) as HTMLElement;
 		await fireEvent.click(tile);
 
-		const form = container.querySelector('form[action="?/delete"]') as HTMLFormElement;
-		const submitted = vi.fn();
-		form.requestSubmit = submitted;
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-		await waitFor(() => expect(submitted).toHaveBeenCalled());
+		const form = document.querySelector('form[action="?/delete"]') as HTMLFormElement;
+		expect(form.contains(screen.getByRole('button', { name: 'Delete' }))).toBe(true);
 		expect((form.querySelector('[name="id"]') as HTMLInputElement).value).toBe('m-video');
 
 		// The round trip: the action answers, the page reloads without the row.
-		const submit = forms.submits[0] as SubmitFunction;
-		const after = await submit({ formData: new FormData() } as never);
+		const submit = forms.submits.get('?/delete') as SubmitFunction;
+		const after = await submit({ formData: new FormData(), cancel: vi.fn() } as never);
 		const update = vi.fn(async () => {});
 		await (after as (a: unknown) => Promise<void>)({ result: { type: 'success' }, update });
 		expect(update).toHaveBeenCalled();
@@ -175,18 +171,17 @@ describe('media library preview', () => {
 	});
 
 	it('leaves the file alone when the operator cancels', async () => {
-		const { container } = setup();
+		setup();
 		const tile = screen
 			.getAllByRole('button')
 			.find((el) => (el.textContent ?? '').includes('clip.webm')) as HTMLElement;
 		await fireEvent.click(tile);
-		const form = container.querySelector('form[action="?/delete"]') as HTMLFormElement;
-		const submitted = vi.fn();
-		form.requestSubmit = submitted;
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-		await waitFor(() => expect(kit.confirm).toHaveBeenCalled());
-		expect(submitted).not.toHaveBeenCalled();
+		const cancel = vi.fn();
+		const after = await (forms.submits.get('?/delete') as SubmitFunction)({ formData: new FormData(), cancel } as never);
+		expect(kit.confirm).toHaveBeenCalled();
+		expect(cancel).toHaveBeenCalled();
+		expect(after).toBeUndefined();
 		expect(screen.getByRole('dialog')).toBeTruthy();
 	});
 });
