@@ -95,7 +95,7 @@
 					/>
 				</div>
 				<p class="text-xs text-faint">
-					Open now and accepted count this tenant's connections. The other counters cover every tenant on
+					Open now and Accepted count this tenant's connections. The other counters cover every tenant on
 					the instance.
 				</p>
 			{/if}

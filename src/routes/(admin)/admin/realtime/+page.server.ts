@@ -10,6 +10,7 @@ import {
 	type StreamMetrics,
 } from '$lib/api/realtime';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
@@ -46,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
 	// transport answered. One transport failing is reported beside it.
 	let gate: Gate = GATE_OK;
 	if (!stream && !socket) {
-		gate = gateOf(streamRes.status === 'rejected' ? streamRes.reason : undefined, 'Could not load realtime metrics.');
+		gate = gateOf(streamRes.status === 'rejected' ? streamRes.reason : undefined, couldNotLoad('realtime metrics'));
 	}
 
 	// The per-tenant roster is the operator's view and the engine gates it on
@@ -57,13 +58,13 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			platform = await getPlatformMetrics(client);
 		} catch (err) {
-			platformGate = gateOf(err, 'Could not load connections by tenant.');
+			platformGate = gateOf(err, couldNotLoad('connections by tenant'));
 		}
 	}
 
 	// Each transport that did not answer keeps the reason, so the page reports
 	// it beside the other rather than calling it a transport nobody uses.
-	const failed = (what: string) => `Could not load the ${what} counters.`;
+	const failed = (what: string) => couldNotLoad(`the ${what} counters`);
 	const streamGate =
 		gate.state === 'ok' && streamRes.status === 'rejected' ? gateOf(streamRes.reason, failed('server-sent events')) : null;
 	const socketGate =

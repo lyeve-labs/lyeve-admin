@@ -96,7 +96,7 @@ describe('replaying events', () => {
 	it.each([
 		[{ since: '' }, 'Choose the point to replay from.'],
 		[{ since: 'yesterday' }, 'Choose a date and time to replay from.'],
-		[{ since: '2999-01-01T00:00', since_offset: '0' }, 'Choose a time in the past. Nothing has been published after that point yet.'],
+		[{ since: '2999-01-01T00:00', since_offset: '0' }, 'Choose a time in the past.'],
 	])('refuses %o without starting a run', async (fields, sentence) => {
 		const out = (await actions.replay(replayEvent(fields))) as Failure;
 		expect(out.status).toBe(400);

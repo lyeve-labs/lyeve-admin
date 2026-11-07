@@ -20,6 +20,7 @@ import {
 	type LogAlertRule,
 	type LogAlertRuleAnswer,
 } from '$lib/api/log-alerts';
+import { couldNotLoad } from '$lib/outage';
 
 /** What the rule drawer posts its channel fields under. */
 const CHANNEL_PREFIX = 'channel_';
@@ -35,7 +36,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			config = await getLogAlerts(authedClient(event));
 		} catch (err) {
-			gate = gateOf(err, 'Could not load volume alert rules.');
+			gate = gateOf(err, couldNotLoad('volume alert rules'));
 		}
 	}
 	return { gate, config, superAdmin };
