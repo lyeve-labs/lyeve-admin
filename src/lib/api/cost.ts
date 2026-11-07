@@ -1,4 +1,5 @@
 import type { HttpClient } from '@lyeve-labs/client';
+import { num, record, str } from './narrow';
 
 /**
  * The multitenant plugin's cost ledger. Amounts travel as decimal strings so
@@ -93,18 +94,6 @@ export interface FeedResult {
 
 const BASE = '/api/admin/cost-monitor';
 
-function asObject(v: unknown): Record<string, unknown> {
-	return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-}
-
-function str(v: unknown, fallback = ''): string {
-	return typeof v === 'string' ? v : fallback;
-}
-
-function num(v: unknown): number {
-	return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-}
-
 export function isResourceType(v: unknown): v is ResourceType {
 	return typeof v === 'string' && (RESOURCE_TYPES as readonly string[]).includes(v);
 }
@@ -142,7 +131,7 @@ export function toDashboard(raw: Record<string, unknown>): CostDashboard {
 	return {
 		total_cost_this_month: str(raw.total_cost_this_month, '0'),
 		budgets_at_risk: (Array.isArray(raw.budgets_at_risk) ? raw.budgets_at_risk : []).map((a) =>
-			toBudgetAlert(asObject(a)),
+			toBudgetAlert(record(a)),
 		),
 		open_anomalies: num(raw.open_anomalies),
 		active_recommendations: num(raw.active_recommendations),
@@ -250,10 +239,10 @@ export async function listBudgets(client: HttpClient): Promise<Budget[]> {
 	const out: Budget[] = [];
 	for (let page = 0; page < BUDGET_PAGES; page++) {
 		const res = await client.get<unknown>(`${BASE}/budgets?limit=${BUDGET_PAGE}&offset=${page * BUDGET_PAGE}`);
-		const list = Array.isArray(res) ? res : (asObject(res).data ?? []);
-		const rows = (Array.isArray(list) ? list : []).map((b) => toBudget(asObject(b)));
+		const list = Array.isArray(res) ? res : (record(res).data ?? []);
+		const rows = (Array.isArray(list) ? list : []).map((b) => toBudget(record(b)));
 		out.push(...rows);
-		const stated = Array.isArray(res) ? null : asObject(res).total_count;
+		const stated = Array.isArray(res) ? null : record(res).total_count;
 		const total = typeof stated === 'number' ? stated : null;
 		if (rows.length < BUDGET_PAGE || (total !== null && out.length >= total)) break;
 	}
@@ -281,7 +270,7 @@ export function deleteBudget(client: HttpClient, id: string): Promise<void> {
 
 export async function listPrices(client: HttpClient): Promise<Price[]> {
 	const res = await client.get<unknown>(`${BASE}/prices`);
-	return (Array.isArray(res) ? res : []).map((p) => toPrice(asObject(p)));
+	return (Array.isArray(res) ? res : []).map((p) => toPrice(record(p)));
 }
 
 export function putPrice(client: HttpClient, resourceType: ResourceType, input: PriceInput): Promise<Price> {

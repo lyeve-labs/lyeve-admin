@@ -15,6 +15,7 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { toChannels, type AlertChannels } from './alert-channels';
 import { rowsOf, statedTotal, type ListEnvelope } from './list';
+import { count, num } from './narrow';
 
 export const BASE_URL = '/api/admin/error-tracking';
 export const ALERTS_URL = `${BASE_URL}/alerts`;
@@ -163,14 +164,6 @@ export async function assign(client: HttpClient, id: string, assignee: string): 
 	await client.put(`${ALERTS_URL}/${encodeURIComponent(id)}/assignee`, { assignee });
 }
 
-function num(v: unknown, fallback = 0): number {
-	return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
-}
-
-function nullableNum(v: unknown): number | null {
-	return typeof v === 'number' && Number.isFinite(v) ? v : null;
-}
-
 /** The newest events, with the count of older ones the install does not read. */
 export async function listEvents(client: HttpClient, limit: number): Promise<EventPage> {
 	const res = await client.get<Record<string, unknown>>(`${EVENTS_URL}?limit=${limit}&offset=0`);
@@ -179,7 +172,7 @@ export async function listEvents(client: HttpClient, limit: number): Promise<Eve
 		data,
 		total: num(res?.total_count, data.length),
 		hiddenOlder: num(res?.hidden_older),
-		windowDays: nullableNum(res?.window_days),
+		windowDays: count(res?.window_days),
 	};
 }
 
@@ -189,8 +182,8 @@ export function toAlertSettings(raw: unknown): AlertSettings {
 	const secret = typeof r.webhook_signing_secret === 'string' ? r.webhook_signing_secret : '';
 	return {
 		channels: toChannels(r.channels),
-		spike_min_count: nullableNum(r.spike_min_count),
-		spike_z_score: nullableNum(r.spike_z_score),
+		spike_min_count: count(r.spike_min_count),
+		spike_z_score: count(r.spike_z_score),
 		defaults: { spike_min_count: num(d.spike_min_count, 10), spike_z_score: num(d.spike_z_score, 2.5) },
 		licensed: r.licensed === true,
 		...(secret ? { webhook_signing_secret: secret } : {}),
@@ -311,12 +304,4 @@ export function triageOrder(
 		if (aLive !== bLive) return aLive ? -1 : 1;
 		return Date.parse(b.last_seen) - Date.parse(a.last_seen);
 	});
-}
-
-/** A count that stays readable past a thousand. */
-export function count(n: number): string {
-	if (!Number.isFinite(n)) return '0';
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-	if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-	return String(n);
 }

@@ -1,3 +1,4 @@
+import { text } from './narrow';
 /**
  * The alert channels every monitoring plugin offers, in the one shape they
  * all answer and accept: email recipients, a Slack and a Discord URL, a
@@ -38,10 +39,6 @@ export function parseEmails(raw: string): string[] {
 		.split(/[\n,]/)
 		.map((e) => e.trim())
 		.filter(Boolean);
-}
-
-function text(v: unknown): string {
-	return typeof v === 'string' ? v.trim() : '';
 }
 
 /** A channels object as a plugin answered it, with every member typed. */

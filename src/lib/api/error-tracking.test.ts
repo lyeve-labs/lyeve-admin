@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	listCodes,
 	listEvents,
-	count,
 	firstSeenWithin,
 	severityTone,
 	sourceLabel,
@@ -83,12 +82,6 @@ describe('presentation', () => {
 		expect(severityTone('WARN')).toBe('warn');
 		expect(severityTone('INFO')).toBe('brand');
 		expect(severityTone('')).toBe('neutral');
-	});
-
-	it('keeps a large count readable', () => {
-		expect(count(900)).toBe('900');
-		expect(count(1500)).toBe('1.5k');
-		expect(count(2_500_000)).toBe('2.5M');
 	});
 });
 

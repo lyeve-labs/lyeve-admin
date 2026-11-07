@@ -12,6 +12,7 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
+import { record, whole } from './narrow';
 
 export const HISTORY_SETTINGS_URL = '/api/admin/content/history/settings';
 export const HISTORY_USAGE_URL = '/api/admin/content/history/usage';
@@ -187,15 +188,6 @@ export function readActivityFilter(url: URL): ActivityFilter {
 		from,
 		to,
 	};
-}
-
-/** A body that is not an object reads as an empty one, so a missing key is a default rather than a throw. */
-function record(value: unknown): Record<string, unknown> {
-	return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}
-
-function whole(value: unknown): number {
-	return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 function envSwitch(value: unknown): EnvSwitch {

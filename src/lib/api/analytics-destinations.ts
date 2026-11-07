@@ -13,6 +13,7 @@
  * then the plugin replaces all of them.
  */
 import type { HttpClient } from '@lyeve-labs/client';
+import { num, record, str } from './narrow';
 
 export const PROVIDERS_URL = '/api/admin/analytics/providers';
 export const DELIVERIES_URL = '/api/admin/analytics/deliveries';
@@ -122,25 +123,13 @@ export interface ProviderInput {
 	rotate_secret?: boolean;
 }
 
-function obj(v: unknown): Record<string, unknown> {
-	return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-}
-
-function str(v: unknown): string {
-	return typeof v === 'string' ? v : '';
-}
-
-function num(v: unknown, fallback = 0): number {
-	return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
-}
-
 export function isProviderType(v: unknown): v is ProviderType {
 	return typeof v === 'string' && (PROVIDER_TYPES as readonly string[]).includes(v);
 }
 
 export function toProvider(raw: unknown): Provider {
-	const r = obj(raw);
-	const rp = obj(r.retry_policy);
+	const r = record(raw);
+	const rp = record(r.retry_policy);
 	const secret = str(r.signing_secret);
 	return {
 		id: str(r.id),
@@ -155,7 +144,7 @@ export function toProvider(raw: unknown): Provider {
 }
 
 export function toDelivery(raw: unknown): Delivery {
-	const r = obj(raw);
+	const r = record(raw);
 	return {
 		id: str(r.id),
 		event_id: str(r.event_id),
@@ -171,7 +160,7 @@ export function toDelivery(raw: unknown): Delivery {
 }
 
 function listed<T>(res: unknown, map: (raw: unknown) => T): Listed<T> {
-	const r = obj(res);
+	const r = record(res);
 	// The list shape changed from a bare array to {data, licensed}. A bare
 	// array is read as a list from a plugin that does not say.
 	const rows = Array.isArray(res) ? res : Array.isArray(r.data) ? r.data : [];
@@ -218,7 +207,7 @@ export async function replayDelivery(
 	client: HttpClient,
 	id: string,
 ): Promise<{ delivered: boolean; delivery: Delivery | null }> {
-	const r = obj(await client.post<unknown>(`${DELIVERIES_URL}/${encodeURIComponent(id)}/replay`, {}));
+	const r = record(await client.post<unknown>(`${DELIVERIES_URL}/${encodeURIComponent(id)}/replay`, {}));
 	return { delivered: r.delivered === true, delivery: r.delivery ? toDelivery(r.delivery) : null };
 }
 

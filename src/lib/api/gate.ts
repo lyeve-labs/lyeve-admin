@@ -20,6 +20,7 @@
  */
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
+import { count, str } from './narrow';
 
 export type Gate =
 	| { state: 'ok' }
@@ -44,14 +45,6 @@ interface Refusal {
 	limit?: unknown;
 	current?: unknown;
 	upgrade_url?: unknown;
-}
-
-function count(value: unknown): number | null {
-	return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function text(value: unknown): string {
-	return typeof value === 'string' ? value : '';
 }
 
 /**
@@ -87,7 +80,7 @@ export function gateOf(err: unknown, failed: string): Gate {
 		if (err.status === 404) return { state: 'absent' };
 		if (err.status === 402) {
 			const body = (err.body ?? {}) as Refusal;
-			const upgradeUrl = text(body.upgrade_url);
+			const upgradeUrl = str(body.upgrade_url);
 			if (body.error === 'cap_exceeded') {
 				return { state: 'full', limit: count(body.limit), current: count(body.current), upgradeUrl };
 			}

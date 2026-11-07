@@ -1,4 +1,5 @@
 import { CONDITION_OPS, type ConditionOp, type StageCondition, type StageInput } from '$lib/api/review';
+import { text } from '$lib/api/narrow';
 
 /** The SLA ceiling the plugin accepts, in seconds: ten days. */
 export const MAX_SLA_SECONDS = 864000;
@@ -10,10 +11,6 @@ export const MAX_QUORUM = 100;
 export const MAX_CONDITION_VALUES = 100;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function text(v: unknown): string {
-	return typeof v === 'string' ? v.trim() : '';
-}
 
 /** The values of an `in` condition, one per comma or line. */
 export function conditionValues(raw: string): string[] {

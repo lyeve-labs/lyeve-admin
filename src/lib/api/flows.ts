@@ -10,6 +10,7 @@
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { rowsOf, statedTotal, type ListEnvelope } from '$lib/api/list';
 import type { EventTypes, FlowDefinition, FlowOption, FlowStatus, NodeSpec } from '$lib/flow/types';
+import { count } from './narrow';
 
 export interface LastRun {
 	id: string;
@@ -520,10 +521,6 @@ export class FlowRefusal extends ApiError {
 	get nodeIds(): string[] {
 		return [...new Set(this.errors.map((e) => e.node_id).filter((id): id is string => typeof id === 'string' && id !== ''))];
 	}
-}
-
-function count(value: unknown): number | null {
-	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 /** The refusal in a 402 body, or null for any other status. A body that is not JSON is a refusal that names nothing. */

@@ -15,6 +15,7 @@
  * the page renders it with `RefusalNotice`.
  */
 import { ApiError } from '@lyeve-labs/client';
+import { count, text } from './narrow';
 
 /**
  * An optional ceiling on admin accounts that a licensing implementation may
@@ -57,14 +58,6 @@ interface Body {
 	feature?: unknown;
 	plugin?: unknown;
 	upgrade_url?: unknown;
-}
-
-function count(value: unknown): number | null {
-	return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function text(value: unknown): string {
-	return typeof value === 'string' ? value.trim() : '';
 }
 
 /**
