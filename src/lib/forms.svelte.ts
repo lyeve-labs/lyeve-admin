@@ -1,5 +1,6 @@
 import type { SubmitFunction } from '@sveltejs/kit';
 import { confirm, toast, type ConfirmOptions } from '@lyeve-labs/ui-kit';
+import { CONFIRM_FIELD, CONFIRMED } from './confirmation';
 
 /**
  * The submit handler for a panel that closes itself, and whether it is running.
@@ -158,7 +159,10 @@ type Success = string | ((data: Record<string, unknown> | undefined) => string);
  * The submit handler for a write that asks first.
  *
  * enhance awaits the handler before it sends anything, so a declined question
- * cancels the request rather than undoing it. Once the write goes through,
+ * cancels the request rather than undoing it. An agreed one adds the
+ * confirmation the action's `asked()` wrapper requires, so a post that
+ * skipped the question, made before the page hydrated, runs nothing and the
+ * page asks instead. Once the write goes through,
  * the result is applied and, when the caller names one, a toast says what
  * happened. A row's delete leaves nothing on screen to say it worked, so the
  * toast is that word. A failure raises no toast: the action's answer lands in
@@ -176,11 +180,12 @@ export function confirmed(
 	detail: string,
 	{ success, ...options }: ConfirmOptions & { success?: Success } = {},
 ): SubmitFunction {
-	return async ({ cancel }) => {
+	return async ({ cancel, formData }) => {
 		if (!(await confirm(question, detail, options))) {
 			cancel();
 			return;
 		}
+		formData.set(CONFIRM_FIELD, CONFIRMED);
 		return async ({ result, update }) => {
 			await update();
 			if (success && result.type === 'success') {
