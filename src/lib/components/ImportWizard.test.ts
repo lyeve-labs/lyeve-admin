@@ -257,6 +257,16 @@ describe('a wizard request that the engine did not answer in its own words', () 
 		expect(nav.goto).not.toHaveBeenCalled();
 	});
 
+	it('keeps the engine words of a 5xx and a code-less 4xx off the screen', async () => {
+		await readWith(async () => new Response(JSON.stringify({ error: 'pq: relation "sys_jobs" does not exist', code: 'internal' }), { status: 500, headers: { 'content-type': 'application/json' } }));
+		await waitFor(() => expect(document.body.textContent).toContain('Could not complete the request. Try again.'));
+		expect(document.body.textContent).not.toContain('pq:');
+		cleanup();
+		await readWith(async () => new Response(JSON.stringify({ error: 'Request Entity Too Large' }), { status: 413, headers: { 'content-type': 'application/json' } }));
+		await waitFor(() => expect(document.body.textContent).toContain('Could not complete the request. Try again.'));
+		expect(document.body.textContent).not.toContain('Request Entity Too Large');
+	});
+
 	it('says to sign in again when the renewed request is refused too, and keeps the wizard open', async () => {
 		nav.goto.mockClear();
 		await readWith(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'content-type': 'application/json' } }));

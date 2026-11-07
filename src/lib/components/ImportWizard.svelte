@@ -261,8 +261,13 @@
 			}
 			refusal = refusalOf(e);
 			if (!refusal) {
-				error = e.message || 'Could not complete the request. Try again.';
-				hint = parseRefusalHint(error, errorCodeOf(e));
+				// The engine's words reach the reader only on a 4xx that names an
+				// error code. A 5xx can carry driver text, and a 4xx without a code
+				// came from something in front of the engine.
+				const code = errorCodeOf(e);
+				const relayed = e.status >= 400 && e.status < 500 && code !== '' && e.message;
+				error = relayed || 'Could not complete the request. Try again.';
+				hint = relayed ? parseRefusalHint(error, code) : '';
 			}
 			return null;
 		} finally {
