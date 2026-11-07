@@ -4,7 +4,8 @@ import { fail, error } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
-import { forbiddenText, isOutage } from '$lib/api/gate';
+import { isOutage } from '$lib/api/gate';
+import { rolesInWords } from '$lib/roles';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning, whyNotRunning } from '$lib/plugins';
 import { installSetting, type Setting } from '$lib/api/privacy';
@@ -13,7 +14,7 @@ import { isStepUpFactor, mailUnavailable, readStepUp, saveStepUp, type StepUp } 
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
 	if (!user.roles.includes('super_admin')) {
-		error(403, forbiddenText('privacy requests'));
+		error(403, `Only ${rolesInWords(['super_admin'])} can open this page.`);
 	}
 	const { plugins, pluginStatus } = await event.parent();
 	// The step-up is served by the plugin that runs the self-service export.
@@ -35,7 +36,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const subject = String(form.get('subject') ?? '').trim();
 		if (!subject) {
-			return fail(400, { action: 'export', error: 'Subject identifier is required' });
+			return fail(400, { action: 'export', error: "Enter the subject's email or ID." });
 		}
 		try {
 			const result = await exportSubject(subject, client);
@@ -83,12 +84,12 @@ export const actions: Actions = {
 		const subject = String(form.get('subject') ?? '').trim();
 		const confirm = String(form.get('confirm') ?? '').trim();
 		if (!subject) {
-			return fail(400, { action: 'erase', error: 'Subject identifier is required' });
+			return fail(400, { action: 'erase', error: "Enter the subject's email or ID." });
 		}
 		if (confirm !== subject) {
 			return fail(400, {
 				action: 'erase',
-				error: 'Confirmation does not match the subject identifier',
+				error: 'Type the subject exactly as above.',
 			});
 		}
 		try {

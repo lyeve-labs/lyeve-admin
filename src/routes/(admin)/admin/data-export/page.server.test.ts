@@ -207,7 +207,7 @@ describe('data export writes', () => {
 		const { event } = write(EXPORT, json({ error: 'too many concurrent exports running, try again later' }, 503));
 		expect(((await actions.start(event)) as Failure).data).toEqual({
 			action: 'start',
-			error: 'Too many exports are running. Try again in a moment.',
+			error: 'Too many exports are running. Wait for one to finish, then start this one.',
 		});
 	});
 

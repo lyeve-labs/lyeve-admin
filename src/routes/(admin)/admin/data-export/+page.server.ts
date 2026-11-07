@@ -18,6 +18,7 @@ import {
 	type ExportSchedule,
 } from '$lib/api/data-export';
 import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 import { exportConfigFrom } from '$lib/data-export-form';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
@@ -32,7 +33,7 @@ const EXPORTS_BUSY = 'too many concurrent exports running, try again later';
 function startError(err: unknown): string {
 	if (err instanceof ApiError && err.status === 503) {
 		const said = (err.body as { error?: unknown } | undefined)?.error;
-		if (said === EXPORTS_BUSY) return 'Too many exports are running. Try again in a moment.';
+		if (said === EXPORTS_BUSY) return 'Too many exports are running. Wait for one to finish, then start this one.';
 	}
 	return actionError(err, 'Could not start the export. Try again.');
 }
@@ -67,7 +68,7 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	} catch (err) {
 		if (isRedirect(err)) throw err;
-		gate = gateOf(err, 'Could not load exports.');
+		gate = gateOf(err, couldNotLoad('exports'));
 	}
 
 	// Schedules and the schema list are panels beside the jobs. Losing them
@@ -79,11 +80,11 @@ export const load: PageServerLoad = async (event) => {
 			? await Promise.all([
 					section(
 						listSchedules(client).then((p) => p.data),
-						'Could not load the schedules.'
+						couldNotLoad('the schedules')
 					),
 					section(
 						getSchemas(client).then((rows) => rows.map((s) => s.name).sort((a, b) => a.localeCompare(b))),
-						'Could not load the schemas.'
+						couldNotLoad('the schemas')
 					),
 				])
 			: [unread(), unread()];

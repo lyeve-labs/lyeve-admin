@@ -19,6 +19,7 @@ import {
 } from '$lib/api/retention';
 import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
 import { rowsOf } from '$lib/api/list';
+import { couldNotLoad } from '$lib/outage';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -31,7 +32,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			policies = rowsOf(await listPolicies(client));
 		} catch (err) {
-			gate = gateOf(err, 'Could not load the retention rules.');
+			gate = gateOf(err, couldNotLoad('the retention rules'));
 		}
 	}
 
@@ -42,7 +43,7 @@ export const load: PageServerLoad = async (event) => {
 		gate.state === 'ok'
 			? await section(
 					listHolds(client).then((h) => rowsOf(h)),
-					'Could not load the legal holds, so the policies above may not match what is actually deleted.'
+					couldNotLoad('the legal holds')
 				)
 			: { ok: false, gate };
 

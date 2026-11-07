@@ -264,7 +264,7 @@
 				</ListToolbar>
 
 				{#if visible.length === 0}
-					<EmptyState title="No exports match this search" description="Clear the search to see the rest.">
+					<EmptyState title="No exports match this search" description="Clear the search, or go to another page.">
 						{#snippet iconSnippet()}
 							<Search size={ICON.lg} />
 						{/snippet}
@@ -322,7 +322,7 @@
 										{#if job.rows_total > 0}<span class="text-faint"> of {formatCount(job.rows_total)}</span>{/if}
 										{#if atCeiling(job)}
 											<div class="text-warn">
-												Reached the {formatCount(EXPORT_ROW_CEILING)} entry limit. Entries past it are not in the file.
+												This export reached the {formatCount(EXPORT_ROW_CEILING)} entry limit, so entries past it are not in the file.
 											</div>
 										{/if}
 									</td>

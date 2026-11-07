@@ -6,6 +6,7 @@ import { refusalOf, refusalText } from '$lib/api/refusal';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 import { createSink, deleteSink, isSinkKind, listSinks, testSink, updateSink, type AuditSink } from '$lib/api/audit-sinks';
 
 const ADMINS = ['admin', 'super_admin'];
@@ -18,7 +19,7 @@ export const load: PageServerLoad = async (event) => {
 		try {
 			sinks = await listSinks(authedClient(event));
 		} catch (err) {
-			gate = gateOf(err, 'Could not load the streaming destinations.');
+			gate = gateOf(err, couldNotLoad('the streaming destinations'));
 		}
 	}
 	return { sinks, gate };
@@ -53,8 +54,8 @@ function failure(action: string, err: unknown, fallback: string) {
 
 function missing(action: string, body: { name: string; url: string }) {
 	const fields: Record<string, string> = {};
-	if (!body.name) fields.name = 'Name is required';
-	if (!body.url) fields.url = 'URL is required';
+	if (!body.name) fields.name = 'Enter a name.';
+	if (!body.url) fields.url = 'Enter the URL.';
 	return Object.keys(fields).length ? fail(400, { action, error: 'Check the highlighted fields.', fields }) : null;
 }
 
@@ -72,7 +73,7 @@ export const actions: Actions = {
 			return fail(400, {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { secret: kind === 'splunk' ? 'The HEC token is required' : 'The API key is required' },
+				fields: { secret: kind === 'splunk' ? 'Enter the HEC token.' : 'Enter the API key.' },
 			});
 		}
 		try {

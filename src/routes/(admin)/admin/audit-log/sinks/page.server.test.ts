@@ -40,7 +40,7 @@ describe('audit sinks', () => {
 		const out = (await actions.create(event({ kind: 'splunk', name: 'S', url: 'https://s.example.com' }))) as {
 			data: { fields: Record<string, string> };
 		};
-		expect(out.data.fields.secret).toBe('The HEC token is required');
+		expect(out.data.fields.secret).toBe('Enter the HEC token.');
 		expect(engine.post).not.toHaveBeenCalled();
 	});
 
