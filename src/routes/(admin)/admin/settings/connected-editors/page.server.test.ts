@@ -86,7 +86,7 @@ describe('connected editors load', () => {
 		expect(out.connections).toEqual([CONNECTION]);
 		expect(out.settings).toEqual({ ok: true, value: SETTINGS });
 		expect(out.schemas).toEqual(['posts', 'products']);
-		expect(out.schemasFailed).toBe(false);
+		expect(out.schemasGate).toBeNull();
 		expect(out.owner).toBe(true);
 		expect(calls.map((c) => c.path)).toContain(`${BASE}/connections?limit=50&offset=0`);
 	});
@@ -116,9 +116,9 @@ describe('connected editors load', () => {
 
 	it('says the schema list failed rather than reading it as empty', async () => {
 		const { event } = loadEvent({ ...LISTED, 'GET /api/admin/schemas': refusal(503, 'store_unavailable') });
-		const out = (await load(event)) as { schemas: unknown; schemasFailed: unknown };
+		const out = (await load(event)) as { schemas: unknown; schemasGate: unknown };
 		expect(out.schemas).toEqual([]);
-		expect(out.schemasFailed).toBe(true);
+		expect(out.schemasGate).toEqual({ state: 'unavailable' });
 	});
 
 	it('keeps a refused settings read beside a list that answered', async () => {
@@ -365,9 +365,17 @@ describe('revoke', () => {
 		expect(await actions.revokeAll(event)).toEqual({ revokedAll: 3 });
 	});
 
-	it('reports a failed revoke all', async () => {
-		const { event } = act({}, { [`POST ${BASE}/connections/revoke-all`]: refusal(503, 'store_unavailable') });
-		expect(((await actions.revokeAll(event)) as Failure).data).toEqual({ revokeAllFailed: true });
+	it.each([
+		[refusal(503, 'store_unavailable'), { revokeAllError: SAID.revokeAllFailed }],
+		[refusal(403, 'TENANT_FEATURE_WITHHELD'), { revokeError: SAID.withheld }],
+		[
+			refusal(403, 'permission_denied', 'Your role cannot revoke builder connections.'),
+			{ revokeAllError: 'Your role cannot revoke builder connections.' },
+		],
+		[json({ error: 'boom' }, 500), { revokeAllError: 'Could not revoke the connections. Try again.' }],
+	])('reports a failed revoke all in its own words', async (reply, data) => {
+		const { event } = act({}, { [`POST ${BASE}/connections/revoke-all`]: reply });
+		expect(((await actions.revokeAll(event)) as Failure).data).toEqual(data);
 	});
 });
 

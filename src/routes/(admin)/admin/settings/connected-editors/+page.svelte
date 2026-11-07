@@ -2,10 +2,11 @@
 	import { tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { navigating, page } from '$app/state';
+	import { navigating } from '$app/state';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import {
 		Alert,
+		Badge,
 		Banner,
 		Button,
 		Card,
@@ -14,7 +15,6 @@
 		Drawer,
 		EmptyState,
 		Field,
-		Indicator,
 		Input,
 		MultiSelect,
 		NumberInput,
@@ -33,7 +33,7 @@
 	import StepUpField from '$lib/components/admin-tokens/StepUpField.svelte';
 	import { confirmed, tracked } from '$lib/forms.svelte';
 	import { expiresIn, normalizeUserCode, rolesLabel } from '$lib/device-login';
-	import { formatDate, formatDateTime, relativeTime } from '$lib/format';
+	import { formatDate, formatDateTime, plural, relativeTime } from '$lib/format';
 	import { pageHref, pageNumber } from '$lib/api/list';
 	import { ICON } from '$lib/icon';
 	import {
@@ -76,7 +76,7 @@
 		revoked?: string;
 		revokeError?: string;
 		revokedAll?: number;
-		revokeAllFailed?: boolean;
+		revokeAllError?: string;
 		saved?: { field: string; settings: Settings };
 		settingError?: { field: string; message: string };
 	}
@@ -221,7 +221,6 @@
 
 	const loading = $derived(navigating.to?.url.pathname === PATH);
 
-	// The settings card.
 	const settings = $derived(data.settings?.ok ? data.settings.value : null);
 	const settingError = $derived(answer.settingError ?? null);
 	const savedField = $derived(answer.saved?.field ?? '');
@@ -293,7 +292,7 @@
 		<NotEnabled
 			level={2}
 			title="Builder connections"
-			description="A super admin turned off builder connections for this tenant. Ask them to turn it back on."
+			description={SAID.withheld}
 		/>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice level={2} gate={data.gate} title="Builder connections" absent="Builder connections are not included in this build." />
@@ -306,13 +305,13 @@
 			<Alert tone="success" autoDismiss>{answer.revoked}'s connection revoked.</Alert>
 		{:else if answer.revokedAll !== undefined}
 			<Alert tone="success" autoDismiss>
-				{answer.revokedAll} builder connection{answer.revokedAll === 1 ? '' : 's'} revoked.
+				{answer.revokedAll} builder {plural(answer.revokedAll, 'connection')} revoked.
 			</Alert>
 		{:else if answer.revokeError}
 			<Alert tone="danger">{answer.revokeError}</Alert>
-		{:else if answer.revokeAllFailed}
+		{:else if answer.revokeAllError}
 			<Alert tone="danger" dismissible>
-				<p>{SAID.revokeAllFailed}</p>
+				<p>{answer.revokeAllError}</p>
 				<div class="mt-3">
 					<Button variant="secondary" size="sm" type="submit" form="revoke-all" disabled={!online}>
 						<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again
@@ -323,19 +322,16 @@
 
 		<section class="flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-3">
-				<div class="flex flex-wrap items-center gap-3">
-					<Button
-						variant="primary"
-						href="{PATH}?approve"
-						onclick={(e) => {
-							e.preventDefault();
-							open = true;
-						}}
-					>
-						<Link2 size={ICON.sm} aria-hidden="true" /> Approve a connection
-					</Button>
-					<span class="text-sm text-muted">Enter the code the builder shows you.</span>
-				</div>
+				<Button
+					variant="primary"
+					href="{PATH}?approve"
+					onclick={(e) => {
+						e.preventDefault();
+						open = true;
+					}}
+				>
+					<Link2 size={ICON.sm} aria-hidden="true" /> Approve connection
+				</Button>
 				{#if data.owner}
 					<form id="revoke-all" method="POST" action="?/revokeAll" use:enhance={revokeAll.enhance}>
 						<Button variant="danger" type="submit" loading={revokeAll.pending} disabled={!anyActive || !online}>
@@ -365,9 +361,9 @@
 				<Table label="Builder connections">
 					<thead>
 						<tr>
-							<th scope="col">Person</th>
+							<th scope="col">Approved by</th>
 							<th scope="col">Key</th>
-							<th scope="col">Approved</th>
+							<th scope="col">Approved on</th>
 							<th scope="col">Last used</th>
 							<th scope="col">Expires</th>
 							<th scope="col">Status</th>
@@ -394,12 +390,7 @@
 								<td data-cell="nowrap" class="text-xs text-faint" title={formatDateTime(c.expires_at)}>
 									{formatDate(c.expires_at)}
 								</td>
-								<td data-cell="nowrap">
-									<span class="inline-flex items-center gap-2">
-										<Indicator tone={status.tone} />
-										{status.label}
-									</span>
-								</td>
+								<td data-cell="nowrap"><Badge tone={status.tone} dot>{status.label}</Badge></td>
 								<td data-cell="nowrap">
 									{#if c.status === 'approved'}
 										<div class="flex justify-end">
@@ -437,7 +428,7 @@
 
 		{#if data.owner && data.settings}
 			<section class="flex flex-col gap-4" aria-label="Builder settings">
-				<SectionHeading level={2}>Builder</SectionHeading>
+				<SectionHeading level={2}>Builder settings</SectionHeading>
 				{#if !data.settings.ok}
 					<GateNotice gate={data.settings.gate} title="Builder settings" absent="Builder settings need a newer version of the builder plugin." />
 				{:else if loading}
@@ -460,7 +451,7 @@
 								<Alert tone="success" autoDismiss>Setting saved.</Alert>
 							{/if}
 							<Toggle
-								label="Allow the builder"
+								label="Enabled"
 								hint="Lets connected browsers save pages. Changes apply immediately."
 								bind:checked={allowedOn}
 								disabled={saveAllowed.pending || !online}
@@ -495,15 +486,8 @@
 								error={errorOn('lifetime_days')}
 							/>
 
-							{#if data.schemasFailed}
-								<Alert tone="danger">
-									<p>Could not load schemas. Pages keep showing the schemas saved before.</p>
-									<div class="mt-3">
-										<Button variant="secondary" size="sm" href="{page.url.pathname}{page.url.search}" data-sveltekit-reload>
-											<RefreshCw size={ICON.sm} aria-hidden="true" /> Try again
-										</Button>
-									</div>
-								</Alert>
+							{#if data.schemasGate}
+								<GateNotice gate={data.schemasGate} title="Schemas" absent="Schemas are not included in this build." />
 							{:else if data.schemas.length === 0}
 								<p class="text-sm text-muted">Create a schema to show its entries on pages.</p>
 							{:else}
@@ -511,7 +495,7 @@
 								<input type="hidden" name="schemas_offered" value="1" />
 								{#if data.schemas.length <= 12}
 									<CheckboxGroup
-										label="Pages may show"
+										label="Open to the builder"
 										name="show_schemas"
 										bind:value={shown}
 										options={schemaOptions}
@@ -522,7 +506,7 @@
 								{:else}
 									<MultiSelect
 										id="show-schemas"
-										label="Pages may show"
+										label="Open to the builder"
 										bind:value={shown}
 										options={schemaOptions}
 										searchable
@@ -583,7 +567,7 @@
 							bind:value={codeInput}
 							oninput={typed}
 							error={answered?.codeError}
-							hint={request ? undefined : 'Enter the code the builder shows, then choose Find request.'}
+							hint={request ? undefined : 'Eight characters, with or without the dash.'}
 						/>
 						<Button variant="secondary" type="submit" loading={pending === 'lookup'}>Find request</Button>
 					</div>
@@ -638,10 +622,13 @@
 						{ term: 'Requested from', value: request.requester_network || 'Unknown address' },
 						{ term: 'Your address', value: request.approver_address || 'Unknown address' },
 						{ term: 'Code expires', value: expiresIn(request.code_expires_at) },
-						{ term: 'Access', value: 'read and write pages, sections and the theme, and listed data only with consent' },
+						{
+							term: 'Access',
+							value: 'Read and write pages, sections and the theme, and read entries of the schemas open to the builder.',
+						},
 						{
 							term: 'Approved as',
-							value: `${data.email}, with the ${rolesLabel(data.roles)} role${data.roles.length === 1 ? '' : 's'}`,
+							value: `${data.email}, with the ${rolesLabel(data.roles)} ${plural(data.roles.length, 'role')}`,
 						},
 						...(data.tenant ? [{ term: 'Tenant', value: data.tenant }] : []),
 						{ term: 'Expires', value: formatDate(expiryOf(request, Number(lifetime))) },
