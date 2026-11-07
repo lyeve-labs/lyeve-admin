@@ -17,7 +17,8 @@
 	import { ICON } from '$lib/icon';
 	import { methodTone } from '$lib/tones';
 	import { isExternalHref } from '$lib/links';
-	import { formatCount, formatBytes, formatDateTime, relativeTime } from '$lib/format';
+	import { formatCount, formatBytes, formatDateTime, plural, relativeTime } from '$lib/format';
+	import { couldNotLoad } from '$lib/outage';
 	import { formatNs } from '$lib/api/profiler';
 	import { CATEGORY_LABEL } from '$lib/plugin-categories';
 	import { ROUTE_GROUP_LABEL, STATE_LABEL, STATE_TONE, groupRoutes } from '$lib/plugin-rows';
@@ -126,7 +127,7 @@
 				What it serves
 				{#snippet actions()}
 					{#if routeCount > 0}
-						<span class="text-sm text-muted">{routeCount} {routeCount === 1 ? 'route' : 'routes'}</span>
+						<span class="text-sm text-muted">{routeCount} {plural(routeCount, 'route')}</span>
 					{/if}
 				{/snippet}
 			</SectionHeading>
@@ -181,12 +182,12 @@
 				<EmptyState
 					iconSnippet={noTraffic}
 					title="Request statistics unavailable"
-					description="Could not load statistics from the Profiler plugin. Check that it is running."
+					description={`${couldNotLoad('statistics from the profiler plugin')} Check that it is running.`}
 				/>
 			{:else if !data.traffic}
 				<EmptyState
 					iconSnippet={noTraffic}
-					title="Nothing sampled yet"
+					title="No requests sampled yet"
 					description="The profiler has not sampled a request to this plugin since it started."
 				/>
 			{:else}

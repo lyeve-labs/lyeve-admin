@@ -9,6 +9,7 @@ import { notRunning } from '$lib/plugins';
 import { section, type Section } from '$lib/api/gate';
 import { pageOffset, pageNumber, pastEndOffset, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
+import { couldNotLoad } from '$lib/outage';
 import { entryTitle } from '$lib/utils/entry-identity';
 import {
 	createDefinition,
@@ -58,9 +59,9 @@ export type ReviewsPage = {
 	people: Record<string, string>;
 };
 
-const DEFINITIONS_FAILED = 'Could not load review definitions.';
-const ASSIGNMENTS_FAILED = 'Could not load review assignments.';
-const SCHEMAS_FAILED = 'Could not load content schemas.';
+const DEFINITIONS_FAILED = couldNotLoad('review definitions');
+const ASSIGNMENTS_FAILED = couldNotLoad('review assignments');
+const SCHEMAS_FAILED = couldNotLoad('content schemas');
 
 /**
  * The title each listed entry is known by. The assignment list carries only

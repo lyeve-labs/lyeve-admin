@@ -257,7 +257,7 @@ describe('creating an account', () => {
 			data: {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { email: 'Email is required' },
+				fields: { email: 'Enter an email address.' },
 			},
 		});
 	});
@@ -277,7 +277,7 @@ describe('creating an account', () => {
 			data: {
 				action: 'create',
 				error: 'Check the highlighted fields.',
-				fields: { password: 'Password is required' },
+				fields: { password: 'Enter a password.' },
 			},
 		});
 	});
@@ -468,7 +468,7 @@ describe('setting an account password', () => {
 
 		expect(result).toEqual({
 			status: 400,
-			data: { action: 'setPassword', error: 'Check the highlighted field.', fields: { new_password: 'Password is required' } },
+			data: { action: 'setPassword', error: 'Check the highlighted field.', fields: { new_password: 'Enter a password.' } },
 		});
 		expect(fetch).not.toHaveBeenCalled();
 	});

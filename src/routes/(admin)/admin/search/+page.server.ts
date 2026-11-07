@@ -22,6 +22,7 @@ import {
 } from '$lib/api/search-settings';
 import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { couldNotLoad } from '$lib/outage';
 
 /** The results a page shows when the request names no limit. */
 const RESULTS_LIMIT = 20;
@@ -64,11 +65,11 @@ export const load: PageServerLoad = async (event) => {
 	// plugin answers its default weights when none are set, so a failed
 	// ranking read is a failure and never the defaults.
 	const [synonyms, ranking, publicSchemas, schemas, analytics] = await Promise.all([
-		section<SynonymList>(attempt(() => listSynonymGroups(client)), 'Could not load synonym groups.'),
-		section<RankingConfig>(getRanking(client, '*'), 'Could not load ranking weights.'),
-		section(attempt(() => getPublicSchemas(client)), 'Could not load the public schema list.'),
-		section(attempt(() => listSchemaNames(client)), 'Could not load schemas.'),
-		section<SearchAnalytics>(attempt(() => getSearchAnalytics(client)), 'Could not load search analytics.'),
+		section<SynonymList>(attempt(() => listSynonymGroups(client)), couldNotLoad('synonym groups')),
+		section<RankingConfig>(getRanking(client, '*'), couldNotLoad('ranking weights')),
+		section(attempt(() => getPublicSchemas(client)), couldNotLoad('the public schema list')),
+		section(attempt(() => listSchemaNames(client)), couldNotLoad('schemas')),
+		section<SearchAnalytics>(attempt(() => getSearchAnalytics(client)), couldNotLoad('search analytics')),
 	]);
 
 	return {

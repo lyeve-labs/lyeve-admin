@@ -26,7 +26,7 @@
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { ICON } from '$lib/icon';
 	import { pageHref, pageNumber } from '$lib/api/list';
-	import { formatCount } from '$lib/format';
+	import { formatCount, formatPercent, plural } from '$lib/format';
 	import { snippetParts } from '$lib/highlight';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -69,7 +69,7 @@
 
 <PageShell
 	title="Search"
-	description="Search content entries, choose what anyone may search on your site, and tune how results rank."
+	description="Search entries, and tune what the public search covers and how results rank."
 	width="wide"
 >
 	<!-- A native GET form re-runs the server load with ?q=, so a result page
@@ -109,7 +109,7 @@
 				{@const total = data.results.value.total}
 				<div class="space-y-3">
 					<SectionHeading level={2}>
-						{formatCount(total)} result{total === 1 ? '' : 's'} for "{data.q}"
+						{formatCount(total)} {plural(total, 'result')} for "{data.q}"
 					</SectionHeading>
 					<ul class="space-y-3">
 						{#each hits as hit (hit.entry_id)}
@@ -129,7 +129,7 @@
 										{#if hit.slug}<span class="text-faint">/{hit.slug}</span>{/if}
 									</div>
 									{#if hit.snippets}
-										{#each Object.entries(hit.snippets) as [field, snippet]}
+										{#each Object.entries(hit.snippets) as [field, snippet] (field)}
 											<p class="mt-2 text-xs text-muted">
 												<span class="text-faint">{field}</span>
 												{#each snippetParts(snippet) as part, i (i)}
@@ -285,7 +285,7 @@
 					{@const analytics = data.analytics.value}
 					<div class="grid grid-cols-2 gap-3">
 						<Stat size="sm" mono label="Searches" value={analytics.total_searches} />
-						<Stat size="sm" mono label="No results" value={`${analytics.zero_result_pct.toFixed(1)}%`} />
+						<Stat size="sm" mono label="No results" value={formatPercent(analytics.zero_result_pct / 100)} />
 					</div>
 					{#if analytics.top_queries.length > 0}
 						<ul class="mt-3 space-y-1 text-xs">
