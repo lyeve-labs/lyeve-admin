@@ -83,9 +83,6 @@
 		};
 	};
 
-	const chip =
-		'flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs whitespace-nowrap';
-
 	// Below sm the words leave the screen and stay with a screen reader. Each
 	// state keeps an icon of its own shape, so the chip never says which state
 	// it is in by color alone.
@@ -96,18 +93,18 @@
 	<!-- Not "checking": the shell asked and got no answer. Reading that as zero
 	     would paint this green and claim a database nobody heard from is in step
 	     with the schemas. -->
-	<span
-		class="{chip} border-line text-faint"
-		data-testid="db-status"
-		title="Could not check for pending migrations"
-	>
-		<CircleHelp size={ICON.sm} class="shrink-0" aria-hidden="true" />
-		<span class={words}>Database unknown</span>
+	<span data-testid="db-status" title="Could not check for pending migrations">
+		<Badge size="md" class="h-8">
+			<CircleHelp size={ICON.sm} class="shrink-0" aria-hidden="true" />
+			<span class={words}>Database unknown</span>
+		</Badge>
 	</span>
 {:else if pending === 0}
-	<span class="{chip} border-line text-success" data-testid="db-status" title="No pending migrations">
-		<CircleCheck size={ICON.sm} class="shrink-0" aria-hidden="true" />
-		<span class={words}>Database synced</span>
+	<span data-testid="db-status" title="No pending migrations">
+		<Badge tone="success" size="md" class="h-8">
+			<CircleCheck size={ICON.sm} class="shrink-0" aria-hidden="true" />
+			<span class={words}>Database synced</span>
+		</Badge>
 	</span>
 {:else}
 	<!-- Pending work, so the control that clears it is the thing on screen

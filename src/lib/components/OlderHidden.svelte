@@ -11,8 +11,7 @@
 	 * RefusalNotice.
 	 */
 	import type { Snippet } from 'svelte';
-	import { Lock } from '@lucide/svelte';
-	import { ICON } from '$lib/icon';
+	import { Alert } from '@lyeve-labs/ui-kit';
 	import { formatCount } from '$lib/format';
 
 	let {
@@ -34,16 +33,14 @@
 	const span = $derived(windowDays ? `the last ${windowDays} days` : 'a recent window');
 </script>
 
-<div data-testid="older-hidden" class="flex flex-col gap-2 rounded-md bg-warn/10 px-3 py-2 text-xs text-warn">
-	<p class="flex items-center gap-1.5 font-medium">
-		<Lock size={ICON.xs} aria-hidden="true" />
-		{label}
-	</p>
-	<p>
-		You can read {span} of them. The older ones are still stored, and reading them is not enabled on
-		this instance.
-	</p>
-	{#if children}
-		<div>{@render children()}</div>
-	{/if}
+<div data-testid="older-hidden">
+	<Alert tone="warn" title={label}>
+		<p>
+			You can read {span} of them. The older ones are still stored, and reading them is not enabled on
+			this instance.
+		</p>
+		{#if children}
+			<div class="mt-2">{@render children()}</div>
+		{/if}
+	</Alert>
 </div>
