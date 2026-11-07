@@ -2,6 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionError } from '$lib/server/action-error';
+import { checked } from '$lib/server/checkbox';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
 import { section, type Section } from '$lib/api/gate';
@@ -140,7 +141,7 @@ export const actions: Actions = {
 			const item = await importMedia(authedClient(event), {
 				url,
 				alt_text: String(data.get('alt_text') ?? '').trim(),
-				public: data.get('public') === 'true',
+				public: checked(data, 'public'),
 			});
 			return { imported: item };
 		} catch (err) {

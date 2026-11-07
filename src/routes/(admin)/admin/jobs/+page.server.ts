@@ -3,6 +3,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { actionFailure } from '$lib/server/action-error';
+import { checked } from '$lib/server/checkbox';
 import { alertsFrom, type AlertConfig } from '$lib/api/cron-alerts';
 import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
@@ -120,7 +121,7 @@ function jobBody(form: FormData): { body: Record<string, unknown> } | { error: s
 		description: String(form.get('description') ?? '').trim(),
 		schedule: String(form.get('schedule') ?? '').trim(),
 		endpoint: String(form.get('endpoint') ?? '').trim(),
-		enabled: form.get('enabled') === 'on',
+		enabled: checked(form, 'enabled'),
 		payload: null,
 	};
 	const payloadRaw = String(form.get('payload') ?? '').trim();

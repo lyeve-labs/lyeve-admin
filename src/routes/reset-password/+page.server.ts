@@ -7,6 +7,7 @@ import { recoveryRefusal } from '$lib/server/recovery';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { organizationFromUrl } from '$lib/organization';
 import { asksOrganization } from '$lib/server/sign-in-organization';
+import { checked } from '$lib/server/checkbox';
 import type { Actions, PageServerLoad } from './$types';
 
 const EXPIRED = 'This reset link no longer works. Request a new one.';
@@ -39,7 +40,7 @@ export const actions: Actions = {
 		const password = String(form.get('password') ?? '');
 		const confirm = String(form.get('confirm') ?? '');
 		// A checkbox posts nothing when it is cleared, so absent means keep.
-		const removePasskeys = form.has('remove_passkeys');
+		const removePasskeys = checked(form, 'remove_passkeys');
 
 		if (!token) return fail(400, { error: EXPIRED, expired: true });
 		if (password.length < RESET_MIN_PASSWORD_LENGTH) {

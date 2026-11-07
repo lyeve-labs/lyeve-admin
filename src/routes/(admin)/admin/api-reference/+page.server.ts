@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, authedHeaders, loadUser, requireUser } from '$lib/server/authz';
 import { engineOriginFor } from '$lib/server/engine';
+import { checked } from '$lib/server/checkbox';
 import {
 	MAX_SHOWN_BODY,
 	presentBody,
@@ -79,7 +80,7 @@ export const actions: Actions = {
 		const refusal = refuse({
 			method,
 			path,
-			acknowledged: form.get('acknowledge') === 'on',
+			acknowledged: checked(form, 'acknowledge'),
 			canWrite: user.roles.includes('super_admin'),
 		});
 		if (refusal) return fail(422, { tryError: refusal.reason });

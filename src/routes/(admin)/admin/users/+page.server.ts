@@ -6,6 +6,7 @@ import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { actionError, actionFailure, tagged } from '$lib/server/action-error';
+import { checked } from '$lib/server/checkbox';
 import { passwordTooLong, setUserPassword, type ListedUser } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { refusalText } from '$lib/api/refusal';
@@ -186,7 +187,7 @@ export const actions: Actions = {
 			});
 		}
 		// A checkbox posts nothing when it is cleared, so absent means keep.
-		const removePasskeys = form.has('remove_passkeys');
+		const removePasskeys = checked(form, 'remove_passkeys');
 		try {
 			const saved = await setUserPassword(id, password, client, removePasskeys);
 			return { ok: true, passkeysRemoved: saved?.passkeys_removed ?? 0 };

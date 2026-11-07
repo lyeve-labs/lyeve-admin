@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure, tagged } from '$lib/server/action-error';
+import { checked } from '$lib/server/checkbox';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -85,7 +86,7 @@ function draftFrom(form: FormData) {
 		pattern: String(form.get('pattern') ?? '').trim(),
 		replacement: String(form.get('replacement') ?? '').trim(),
 		priority: priorityFrom(form.get('priority')),
-		enabled: form.get('enabled') === 'on' || form.get('enabled') === 'true',
+		enabled: checked(form, 'enabled'),
 	};
 }
 

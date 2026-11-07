@@ -7,6 +7,7 @@ import { flowLoadOutcome } from '$lib/server/flow-load';
 import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { flowClient } from '$lib/server/flow-client';
+import { checked } from '$lib/server/checkbox';
 import {
 	createDatasource,
 	deleteDatasource,
@@ -74,7 +75,6 @@ function invalidFailure(err: unknown) {
 	return fail(422, { action: 'save', error, nameError });
 }
 
-const on = (v: FormDataEntryValue | null): boolean => v === 'true' || v === 'on';
 const text = (data: FormData, key: string): string => String(data.get(key) ?? '').trim();
 
 /**
@@ -142,8 +142,8 @@ function bodyFrom(data: FormData): DatasourceBody | string {
 		kind,
 		config,
 		secret: Object.keys(secret).length > 0 ? secret : undefined,
-		allow_writes: on(data.get('allow_writes')),
-		allow_private: on(data.get('allow_private')),
+		allow_writes: checked(data, 'allow_writes'),
+		allow_private: checked(data, 'allow_private'),
 	};
 }
 

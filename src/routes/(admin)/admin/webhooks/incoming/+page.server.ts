@@ -9,6 +9,7 @@ import {
 } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { actionFailure, tagged } from '$lib/server/action-error';
+import { checked } from '$lib/server/checkbox';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
 
@@ -105,7 +106,7 @@ export const actions: Actions = {
 					schema_name: String(data.get('schema_name') ?? ''),
 					secret: String(data.get('secret') ?? ''),
 					field_map: fieldMap,
-					enabled: data.get('enabled') === 'true' || data.get('enabled') === 'on',
+					enabled: checked(data, 'enabled'),
 					allowed_ips: parseIPList(data.get('allowed_ips'))
 				},
 				client
@@ -148,7 +149,7 @@ export const actions: Actions = {
 					schema_name: String(data.get('schema_name') ?? ''),
 					secret: String(data.get('secret') ?? ''),
 					field_map: fieldMap,
-					enabled: data.get('enabled') === 'true' || data.get('enabled') === 'on',
+					enabled: checked(data, 'enabled'),
 					allowed_ips: parseIPList(data.get('allowed_ips'))
 				},
 				client

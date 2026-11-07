@@ -3,6 +3,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
 import { actionFailure, tagged } from '$lib/server/action-error';
 import { flowLoadOutcome } from '$lib/server/flow-load';
+import { checked } from '$lib/server/checkbox';
 import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
 import { deleteVariable, listVariables, putVariable, type Variable } from '$lib/api/flows';
@@ -61,7 +62,7 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const key = String(data.get('key') ?? '').trim();
 		const value = String(data.get('value') ?? '');
-		const isSecret = data.get('is_secret') === 'true' || data.get('is_secret') === 'on';
+		const isSecret = checked(data, 'is_secret');
 		if (!KEY.test(key)) {
 			return fail(400, { action: 'put', error: 'Use lower case letters, digits and underscores for the key, starting with a letter.', key });
 		}
