@@ -5,35 +5,18 @@
 		Button,
 		Card,
 		EmptyState,
-		Input,
-		NumberInput,
 		PageShell,
 		SectionHeading,
-		Stat,
 		Table,
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import RefreshButton from '$lib/components/RefreshButton.svelte';
 	import { enhance } from '$app/forms';
-	import {
-		AlertTriangle,
-		CheckCircle,
-		Download,
-		Flame,
-		Gauge,
-		MemoryStick,
-		Puzzle,
-		RotateCcw,
-	} from '@lucide/svelte';
-	import {
-		PROFILE_SECONDS,
-		PROFILE_TYPES,
-		formatNs,
-		latencyTone,
-		type EndpointStats,
-	} from '$lib/api/profiler';
-	import { NO_VALUE, formatBytes, formatDateTime, formatSignedBytes, formatTime } from '$lib/format';
+	import { Gauge, Puzzle, RotateCcw } from '@lucide/svelte';
+	import { formatNs, latencyTone, type EndpointStats } from '$lib/api/profiler';
+	import { NO_VALUE, formatBytes, formatTime } from '$lib/format';
 	import GateNotice from '$lib/components/GateNotice.svelte';
+	import ProfilerTabs from '$lib/components/ProfilerTabs.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import { httpStatusTone } from '$lib/tones';
@@ -41,33 +24,13 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let resetting = $state(false);
-	let capturing = $state(false);
-	let flameEndpoint = $state('');
-	let flameSeconds = $state<number>(PROFILE_SECONDS.default);
-	let cpuSeconds = $state<number>(PROFILE_SECONDS.default);
 
-	const memory = $derived(data.memory.ok ? data.memory.value : null);
 	const ABSENT = 'The profiler is not included in this build.';
-	const latest = $derived(memory?.snapshots.at(-1) ?? null);
 	const detail = $derived(data.detail?.ok ? data.detail.value : null);
-
-	// The flamegraph is the last action's answer while the page holds it. It
-	// is drawn as an image from a data URL rather than inlined as markup: the
-	// SVG comes from the engine's pprof renderer, and an image cannot run the
-	// script such a file may carry.
-	const graph = $derived(form?.form === 'flamegraph' && 'graph' in form ? form.graph : null);
-	const graphSrc = $derived(graph ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(graph.svg)}` : null);
 
 	function detailHref(endpoint: string): string {
 		return `/admin/observability/profiler?endpoint=${encodeURIComponent(endpoint.replace(/^\/+/, ''))}`;
 	}
-
-	const PROFILE_LABELS: Record<(typeof PROFILE_TYPES)[number], string> = {
-		cpu: 'CPU',
-		goroutine: 'Goroutines',
-		heap: 'Heap',
-		allocs: 'Allocations',
-	};
 </script>
 
 {#snippet noEndpoints()}
@@ -76,10 +39,6 @@
 
 {#snippet noPlugins()}
 	<Puzzle size={ICON.lg} />
-{/snippet}
-
-{#snippet noMemory()}
-	<MemoryStick size={ICON.lg} />
 {/snippet}
 
 {#snippet endpointRows(rows: EndpointStats[], label: string)}
@@ -119,7 +78,7 @@
 
 <PageShell
 	title="Profiler"
-	description="See request timings by endpoint and plugin, track memory, and capture CPU profiles."
+	description="See request timings by endpoint and by plugin."
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
 >
@@ -151,6 +110,8 @@
 		</form>
 	{/snippet}
 
+	<ProfilerTabs active="timings" />
+
 	{#if form?.form === 'reset'}
 		{#if 'error' in form && form.error}
 			<Alert tone="danger">{form.error}</Alert>
@@ -158,40 +119,6 @@
 			<Alert tone="success" autoDismiss>Profiler reset.</Alert>
 		{/if}
 	{/if}
-
-	<section class="flex flex-col gap-4" data-testid="profiler-memory">
-		<div class="flex flex-wrap items-center gap-2">
-			<SectionHeading level={2}>Memory</SectionHeading>
-			{#if memory}
-				{#if memory.leak_likely}
-					<Badge tone="danger"><AlertTriangle size={ICON.xs} /> Leak likely</Badge>
-				{:else}
-					<Badge tone="success"><CheckCircle size={ICON.xs} /> Steady</Badge>
-				{/if}
-				<span class="ms-auto text-xs text-faint">{memory.snapshots.length} snapshots</span>
-			{/if}
-		</div>
-		{#if !data.memory.ok}
-			<GateNotice gate={data.memory.gate} title="the memory trend" absent={ABSENT} />
-		{:else if !memory || !latest}
-			<EmptyState iconSnippet={noMemory} title="No snapshots yet" description="Snapshots are taken on a schedule, and the first one appears here." />
-		{:else}
-			<Card>
-				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="memory-stats">
-					<Stat size="sm" label="Heap in use" mono value={formatBytes(latest.heap_alloc)} />
-					<Stat size="sm" label="Heap objects" mono value={latest.heap_objects} />
-					<Stat size="sm" label="Allocated total" mono value={formatBytes(latest.total_alloc)} />
-					<Stat size="sm" label="GC cycles" mono value={latest.num_gc} />
-					<Stat size="sm" label="Goroutines" mono value={latest.num_goroutine} />
-					<Stat size="sm" label="Heap slope" mono value="{formatSignedBytes(memory.slope_bytes_per_sec)}/s" tone={memory.leak_likely ? 'danger' : undefined} />
-				</div>
-				<p class="mt-3 text-xs text-muted">
-					Last snapshot {formatDateTime(latest.timestamp, NO_VALUE)}.
-					{#if memory.leak_reason}{memory.leak_reason}{/if}
-				</p>
-			</Card>
-		{/if}
-	</section>
 
 	<section class="flex flex-col gap-4" data-testid="profiler-slowest">
 		<div class="flex flex-wrap items-center gap-2">
@@ -297,109 +224,4 @@
 		{/if}
 	</section>
 
-	<div class="grid gap-4 lg:grid-cols-2">
-		<!-- A pprof export is a file. The form posts without enhancement so the
-		     browser takes the engine's attachment as a download. -->
-		<Card>
-			{#snippet header()}
-				<div class="flex flex-wrap items-center gap-2">
-					<SectionHeading level={3}>pprof export</SectionHeading>
-				</div>
-			{/snippet}
-			<div class="flex flex-col gap-4" data-testid="profiler-exports">
-				<p class="text-xs text-muted">
-					Each download is a gzipped pprof profile. A heap or allocations profile contains raw
-					process memory, so each export is logged, and the engine can refuse it.
-				</p>
-				<NumberInput
-					id="cpu-seconds"
-					name="cpu_seconds"
-					label="CPU window"
-					hint="Seconds the CPU profile samples, {PROFILE_SECONDS.min} to {PROFILE_SECONDS.max}."
-					min={PROFILE_SECONDS.min}
-					max={PROFILE_SECONDS.max}
-					bind:value={cpuSeconds}
-				/>
-				<div class="flex flex-wrap gap-2">
-					{#each PROFILE_TYPES as type (type)}
-						<!-- A download, so it posts to an endpoint and stays a plain form. -->
-						<form method="POST" action="/admin/observability/profiler/profile/{type}">
-							{#if type === 'cpu'}
-								<input type="hidden" name="duration_sec" value={cpuSeconds} />
-							{/if}
-							<Button type="submit" variant="secondary" size="sm">
-								<Download size={ICON.sm} /> {PROFILE_LABELS[type]}
-							</Button>
-						</form>
-					{/each}
-				</div>
-			</div>
-		</Card>
-
-		<Card>
-			{#snippet header()}
-				<div class="flex flex-wrap items-center gap-2">
-					<SectionHeading level={3}>Flamegraph</SectionHeading>
-				</div>
-			{/snippet}
-			<form
-				method="POST"
-				action="?/flamegraph"
-				class="flex flex-col gap-4"
-				aria-label="Capture a flamegraph"
-				use:enhance={() => {
-					capturing = true;
-					return async ({ update }) => {
-						capturing = false;
-						await update({ reset: false });
-					};
-				}}
-			>
-				<p class="text-xs text-muted">
-					Captures a CPU profile over the window and draws it as a graph. The endpoint only
-					labels the result. The profile covers every goroutine in the process.
-				</p>
-				<Input
-					id="flame-endpoint"
-					name="endpoint"
-					label="Endpoint"
-					placeholder="/api/v1/content"
-					bind:value={flameEndpoint}
-					autocomplete="off"
-					mono
-				/>
-				<NumberInput
-					id="flame-seconds"
-					name="duration_sec"
-					label="Window"
-					hint="Seconds, {PROFILE_SECONDS.min} to {PROFILE_SECONDS.max}."
-					min={PROFILE_SECONDS.min}
-					max={PROFILE_SECONDS.max}
-					bind:value={flameSeconds}
-				/>
-				<div>
-					<Button type="submit" variant="primary" size="sm" loading={capturing}>
-						<Flame size={ICON.sm} /> Capture
-					</Button>
-				</div>
-				{#if form?.form === 'flamegraph' && 'error' in form && form.error}
-					<Alert tone="danger">{form.error}</Alert>
-				{/if}
-			</form>
-		</Card>
-	</div>
-
-	{#if graph && graphSrc}
-		<Card>
-			{#snippet header()}
-				<div class="flex flex-wrap items-center gap-2">
-					<SectionHeading level={3}><span class="font-mono">{graph.endpoint}</span></SectionHeading>
-					<span class="ms-auto text-xs text-faint">{graph.duration_sec}s CPU, captured {formatDateTime(graph.captured_at, NO_VALUE)}</span>
-				</div>
-			{/snippet}
-			<div class="overflow-x-auto" data-testid="flamegraph">
-				<img src={graphSrc} alt="CPU flamegraph for {graph.endpoint}" class="max-w-none" />
-			</div>
-		</Card>
-	{/if}
 </PageShell>

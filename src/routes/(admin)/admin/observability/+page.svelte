@@ -6,12 +6,11 @@
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { LATENCY_TOP_CHOICES } from '$lib/api/observability';
 	import { formatMillis, NO_VALUE } from '$lib/format';
-	import type { ActionData, PageData } from './$types';
+	import ObservabilityTabs from '$lib/components/ObservabilityTabs.svelte';
+	import type { PageData } from './$types';
 	import { ICON } from '$lib/icon';
-	import GoroutineEnginePanel from './GoroutineEnginePanel.svelte';
-	import LiveLogTail from './LiveLogTail.svelte';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	// Each depth is a link, so the ranking a person is looking at is an
 	// address and the choice works before the page hydrates.
@@ -38,7 +37,7 @@
 
 <PageShell
 	title="Observability"
-	description="Check connection pool health, goroutines and endpoint latency."
+	description="Check connection pool health and endpoint latency."
 	width="wide"
 >
 	{#snippet actions()}
@@ -46,6 +45,8 @@
 		     invalidation refreshes them together. -->
 		<RefreshButton />
 	{/snippet}
+
+	<ObservabilityTabs active="overview" />
 
 	<!-- The pool's state is a badge on its card, not a banner over the page:
 	     an engine with no pool health provider answers this way every time, and a warning
@@ -99,15 +100,13 @@
 				</div>
 			{/if}
 		{:else}
-			<EmptyState title="Pool health unavailable" description="No pool statistics for this instance.">
+			<EmptyState title="No pool statistics">
 				{#snippet iconSnippet()}
 					<Database size={ICON.lg} />
 				{/snippet}
 			</EmptyState>
 		{/if}
 	</Card>
-
-	<GoroutineEnginePanel engine={data.goroutineEngine} {form} />
 
 	<section class="flex flex-col gap-4">
 		<div class="flex items-center gap-2">
@@ -178,6 +177,4 @@
 			</Table>
 		{/if}
 	</section>
-
-	<LiveLogTail running={data.logTail} />
 </PageShell>

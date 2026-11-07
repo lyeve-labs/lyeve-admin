@@ -8,8 +8,8 @@
  * every route but the settings pair answers it while the switch is off, and the
  * way back is that switch. A 503 that says no provider is enabled is the
  * plugin with nothing to answer through. A 401 is an expired
- * session and goes where the shell sends one. Everything else keeps the engine
- * banner, which is not a report that there is nothing.
+ * session and goes where the shell sends one. Everything else sorts the way
+ * any other read does, so a refused rate and an outage read as themselves.
  */
 
 import { redirect } from '@sveltejs/kit';
@@ -18,6 +18,7 @@ import { clearSessionCookie, type SessionEvent } from './session-cookie';
 import type { AiGate } from '$lib/api/ai';
 import { gateOf } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
+import { actionError } from './action-error';
 
 export type { AiGate };
 
@@ -42,11 +43,7 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 		if (err.status === 404) return { state: notFound };
 		if (noProvider(err)) return { state: 'no_provider' };
 	}
-	const gate = gateOf(err, couldNotLoad(plural));
-	// The AI pages word a refused rate and an outage as the failed read they
-	// are for the reader, so both keep the page's own sentence.
-	if (gate.state === 'busy' || gate.state === 'unavailable') return { state: 'error', message: couldNotLoad(plural) };
-	return gate;
+	return gateOf(err, couldNotLoad(plural));
 }
 
 /**
@@ -86,8 +83,9 @@ const ROLE_TEXT: Record<AiWriteRole, string> = {
 };
 
 /**
- * Words for a refused write, by status. The static fallback for the rest.
- * `lowest` is the lowest role the route admits, which a role refusal names.
+ * Words for a refused write, by status. The static fallback for the rest, and
+ * the engine's own sentence only where `actionError` would relay it. `lowest`
+ * is the lowest role the route admits, which a role refusal names.
  */
 export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRole = 'admin'): string {
 	if (err instanceof ApiError) {
@@ -96,17 +94,13 @@ export function aiActionError(err: unknown, fallback: string, lowest: AiWriteRol
 		if (err.status === 403) {
 			// The engine's role gate answers a bare "insufficient permissions".
 			// The plugin's own 403 is a sentence about the tenant, worth relaying.
-			const msg = err.message?.trim();
-			if (!msg || msg === 'insufficient permissions' || msg === '403') return ROLE_TEXT[lowest];
+			const msg = actionError(err, '');
+			if (!msg || msg === 'insufficient permissions') return ROLE_TEXT[lowest];
 			return msg;
 		}
 		if (err.status === 404) return 'AI is switched off for this tenant.';
 		if (noProvider(err)) return 'No AI provider is enabled. A super admin can add or enable one under AI providers.';
 		if (err.status === 409) return 'No configured provider supports this operation.';
-		if (err.status >= 400 && err.status < 500) {
-			const msg = err.message?.trim();
-			if (msg && msg !== String(err.status)) return msg;
-		}
 	}
-	return fallback;
+	return actionError(err, fallback);
 }

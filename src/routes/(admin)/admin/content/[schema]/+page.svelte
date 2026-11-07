@@ -122,10 +122,12 @@
 			const title = entryTitle(item, userFields);
 			const named =
 				title.source === 'none' ? `the untitled entry ${shortId(item.id)}` : title.label;
+			const done =
+				title.source === 'none' ? `Untitled entry ${shortId(item.id)} deleted.` : `${title.label} deleted.`;
 			return confirmed(`Delete ${named}?`, 'Its revisions and translations are deleted too.', {
 				confirmLabel: 'Delete',
 				detail: item.id,
-				success: `Deleted ${named}`
+				success: done
 			})(input);
 		};
 	}

@@ -23,14 +23,19 @@ describe('aiGate', () => {
 		expect(aiGate(new ApiError(503, 'no enabled AI provider configured', { error: 'no enabled AI provider configured', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toEqual({ state: 'no_provider' });
 		// The plugin answers its own store failures with a JSON 503 too, and
 		// that is an outage behind the engine, not a missing provider.
-		expect(aiGate(new ApiError(503, 'failed to list providers', { error: 'failed to list providers', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toMatchObject({ state: 'error' });
+		expect(aiGate(new ApiError(503, 'failed to list providers', { error: 'failed to list providers', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toEqual({ state: 'unavailable' });
 		// A 503 page from a proxy in front of the engine is an outage, not a
 		// plugin without a provider.
-		expect(aiGate(new ApiError(503, '<html>Service Unavailable</html>'), { cookies: cookies() }, 'providers')).toMatchObject({ state: 'error' });
+		expect(aiGate(new ApiError(503, '<html>Service Unavailable</html>'), { cookies: cookies() }, 'providers')).toEqual({ state: 'unavailable' });
 	});
 
-	it('keeps the engine banner for a 5xx, a network failure and a status it does not expect', () => {
-		for (const err of [new ApiError(500, 'pq: connection refused'), new TypeError('fetch failed'), new ApiError(418, 'teapot')]) {
+	it('reads a refused rate and an outage as themselves, as every other page does', () => {
+		expect(aiGate(new ApiError(429, 'slow down'), { cookies: cookies() }, 'transcripts')).toEqual({ state: 'busy' });
+		expect(aiGate(new TypeError('fetch failed'), { cookies: cookies() }, 'transcripts')).toEqual({ state: 'unavailable' });
+	});
+
+	it('says the read failed for a 5xx and a status it does not expect, without the engine text', () => {
+		for (const err of [new ApiError(500, 'pq: connection refused'), new ApiError(418, 'teapot')]) {
 			const out = aiGate(err, { cookies: cookies() }, 'transcripts');
 			expect(out).toEqual({ state: 'error', message: 'Could not load transcripts.' });
 			expect(JSON.stringify(out)).not.toContain('pq:');
@@ -43,6 +48,10 @@ describe('aiActionError', () => {
 		const refused = new ApiError(403, 'insufficient permissions', { error: 'insufficient permissions', code: 'forbidden' });
 		expect(aiActionError(refused, 'f')).toBe('Only an admin or a super admin can change this.');
 		expect(aiActionError(refused, 'f', 'super_admin')).toBe('Only a super admin can change this.');
+		// A 403 with no code came from something in front of the engine.
+		expect(aiActionError(new ApiError(403, '<html>Forbidden</html>'), 'f')).toBe('Only an admin or a super admin can change this.');
+		const tenant = new ApiError(403, 'AI calls are paused for this tenant', { error: 'AI calls are paused for this tenant', code: 'forbidden' });
+		expect(aiActionError(tenant, 'f')).toBe('AI calls are paused for this tenant');
 	});
 
 	it('says the budget is spent only when the 402 names the budget', () => {
@@ -63,9 +72,13 @@ describe('aiActionError', () => {
 		expect(aiActionError(new ApiError(503, 'failed to list models', { error: 'failed to list models' }), 'f')).toBe('f');
 		expect(aiActionError(new ApiError(503, '<html>Service Unavailable</html>'), 'f')).toBe('f');
 		expect(aiActionError(new ApiError(409, 'x'), 'f')).toContain('supports');
-		expect(aiActionError(new ApiError(400, 'base_url is required for the openai_compatible kind'), 'f')).toBe(
-			'base_url is required for the openai_compatible kind'
-		);
+		const coded = new ApiError(400, 'base_url is required for the openai_compatible kind', {
+			error: 'base_url is required for the openai_compatible kind',
+			code: 'http_400',
+		});
+		expect(aiActionError(coded, 'f')).toBe('base_url is required for the openai_compatible kind');
+		// A proxy's refusal carries no code, so its text stays off the page.
+		expect(aiActionError(new ApiError(413, 'Request Entity Too Large'), 'f')).toBe('f');
 	});
 
 	it('collapses a 5xx to the fallback so driver text never reaches the page', () => {

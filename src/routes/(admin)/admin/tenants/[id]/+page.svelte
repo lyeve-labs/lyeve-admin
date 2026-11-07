@@ -206,7 +206,7 @@
 					id="tenant-features"
 					label="Available to this tenant"
 					placeholder="Nothing"
-					hint="Only plugins this instance runs can be turned on. Turning one off here affects this tenant only: its routes refuse requests, its screens leave the console and its capabilities are turned off."
+					hint="Only plugins this instance runs can be turned on. Turning one off affects only this tenant: its requests to the plugin are refused, its screens leave the console and its capabilities are turned off."
 					searchable
 					options={featureOptions}
 					bind:value={available}

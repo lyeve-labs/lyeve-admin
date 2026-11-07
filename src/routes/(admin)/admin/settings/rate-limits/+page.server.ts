@@ -11,13 +11,11 @@ import {
 	endpointIsSound,
 	listRules,
 	readOverview,
-	readStatus,
 	resetProtection,
 	roleIsSound,
 	setProtection,
 	updateGlobal,
 	updateRule,
-	type LimiterState,
 	type RateLimitOverview,
 	type RateRule,
 } from '$lib/api/rate-limit';
@@ -66,16 +64,6 @@ export const load: PageServerLoad = async (event) => {
 		overview = await readOverview(client).catch(() => null);
 	}
 
-	// The live view is a snapshot from the process that answered, so losing it
-	// must not lose the rules, and an unread one is never drawn as quiet.
-	const status: Section<LimiterState[]> =
-		gate.state === 'ok'
-			? await section(
-					readStatus(client).then((r) => r.buckets ?? []),
-					'Could not load the live counters.',
-				)
-			: { ok: false, gate };
-
 	// The routes the instance serves, to pick a rule's endpoint from. The
 	// document is read as the caller: an admin gets the public routes, a super
 	// admin every route. Missing, the field still takes a typed pattern.
@@ -90,7 +78,6 @@ export const load: PageServerLoad = async (event) => {
 		hasMore: page?.hasMore ?? false,
 		overview,
 		superAdmin,
-		status,
 		gate,
 	};
 };

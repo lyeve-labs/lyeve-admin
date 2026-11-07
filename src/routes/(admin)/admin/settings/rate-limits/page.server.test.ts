@@ -4,7 +4,6 @@ import { ApiError } from '@lyeve-labs/client';
 const api = vi.hoisted(() => ({
 	listRules: vi.fn(),
 	readOverview: vi.fn(),
-	readStatus: vi.fn(),
 	createRule: vi.fn(),
 	updateRule: vi.fn(),
 	deleteRule: vi.fn(),
@@ -65,7 +64,6 @@ beforeEach(() => {
 	});
 	api.listRules.mockResolvedValue({ data: [], total: 0 });
 	api.readOverview.mockResolvedValue(overview);
-	api.readStatus.mockResolvedValue({ buckets: [], count: 0 });
 });
 
 describe('rate-limits load', () => {
@@ -88,28 +86,6 @@ describe('rate-limits load', () => {
 		api.listRules.mockRejectedValue(new Error('down'));
 		const result = (await load(loadEvent(['admin'], '?offset=200'))) as { gate: { state: string } };
 		expect(result.gate.state).toBe('error');
-	});
-
-	it('reads the live buckets the status route answers', async () => {
-		const bucket = {
-			rule_id: 'r1',
-			kind: 'custom',
-			client_ip: '10.0.0.0',
-			endpoint: 'GET /api/x',
-			rate: 1,
-			burst: 2,
-			remaining: 0,
-			reset_at: '2026-10-14T00:00:00Z',
-		};
-		api.readStatus.mockResolvedValue({ buckets: [bucket], count: 1 });
-		const result = (await load(loadEvent(['admin']))) as Record<string, unknown>;
-		expect(result.status).toEqual({ ok: true, value: [bucket] });
-	});
-
-	it('keeps a failed live read as its gate, so a busy engine is not drawn as quiet', async () => {
-		api.readStatus.mockRejectedValue(new ApiError(429, 'slow down'));
-		const result = (await load(loadEvent(['admin']))) as Record<string, unknown>;
-		expect(result.status).toEqual({ ok: false, gate: { state: 'busy' } });
 	});
 
 	it('reports an unread overview as unknown, not as locked', async () => {

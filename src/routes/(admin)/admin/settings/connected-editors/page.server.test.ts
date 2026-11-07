@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$lib/server/authz', async () => {
 	const { createClient } = await vi.importActual<typeof import('@lyeve-labs/client')>('@lyeve-labs/client');
@@ -49,8 +49,6 @@ const CONNECTION = {
 	status: 'approved',
 };
 
-const SETTINGS = { allowed: true, lifetime_days: 90, show_schemas: ['posts'], writes_per_minute: 120, max_writes_per_minute: 120 };
-
 function loadEvent(routes: Routes, { roles = ['admin'], search = '', plugins = RUNNING as unknown } = {}) {
 	const e = engine(routes);
 	const url = new URL(`http://admin/admin/settings/connected-editors${search}`);
@@ -67,8 +65,6 @@ function loadEvent(routes: Routes, { roles = ['admin'], search = '', plugins = R
 
 const LISTED: Routes = {
 	[`GET ${BASE}/connections`]: json({ data: [CONNECTION], total: 1 }),
-	[`GET ${BASE}/settings`]: json(SETTINGS),
-	'GET /api/admin/schemas': json([{ name: 'posts' }, { name: 'lyeve_builder_pages' }, { name: 'products' }]),
 	'GET /api/admin/mfa/status': json({ enabled: false }),
 };
 
@@ -80,24 +76,19 @@ describe('connected editors load', () => {
 		expect(calls).toEqual([]);
 	});
 
-	it('reads the list, the settings and the schemas for an owner', async () => {
+	it('reads the list for an owner, and leaves the settings to their own page', async () => {
 		const { event, calls } = loadEvent(LISTED);
 		const out = (await load(event)) as Record<string, unknown>;
 		expect(out.connections).toEqual([CONNECTION]);
-		expect(out.settings).toEqual({ ok: true, value: SETTINGS });
-		expect(out.schemas).toEqual(['posts', 'products']);
-		expect(out.schemasGate).toBeNull();
 		expect(out.owner).toBe(true);
 		expect(calls.map((c) => c.path)).toContain(`${BASE}/connections?limit=50&offset=0`);
-	});
-
-	it('never reads the settings for a person below owner', async () => {
-		const { event, calls } = loadEvent(LISTED, { roles: ['editor'] });
-		const out = (await load(event)) as Record<string, unknown>;
-		expect(out.settings).toBeNull();
-		expect(out.owner).toBe(false);
 		expect(calls.some((c) => c.path.startsWith(`${BASE}/settings`))).toBe(false);
 		expect(calls.some((c) => c.path === '/api/admin/schemas')).toBe(false);
+	});
+
+	it('marks a person below owner, who manages only their own connections', async () => {
+		const { event } = loadEvent(LISTED, { roles: ['editor'] });
+		expect(((await load(event)) as { owner: boolean }).owner).toBe(false);
 	});
 
 	it.each([
@@ -112,20 +103,6 @@ describe('connected editors load', () => {
 		const out = (await load(event)) as { gate: unknown; connections: unknown[] };
 		expect(out.gate).toEqual(gate);
 		expect(out.connections).toEqual([]);
-	});
-
-	it('says the schema list failed rather than reading it as empty', async () => {
-		const { event } = loadEvent({ ...LISTED, 'GET /api/admin/schemas': refusal(503, 'store_unavailable') });
-		const out = (await load(event)) as { schemas: unknown; schemasGate: unknown };
-		expect(out.schemas).toEqual([]);
-		expect(out.schemasGate).toEqual({ state: 'unavailable' });
-	});
-
-	it('keeps a refused settings read beside a list that answered', async () => {
-		const { event } = loadEvent({ ...LISTED, [`GET ${BASE}/settings`]: refusal(503, 'store_unavailable') });
-		const out = (await load(event)) as { settings: unknown; gate: unknown };
-		expect(out.gate).toEqual({ state: 'ok' });
-		expect(out.settings).toEqual({ ok: false, gate: { state: 'unavailable' } });
 	});
 
 	it('sends a page past the end back to the last page', async () => {
@@ -202,7 +179,7 @@ describe('lookup', () => {
 
 	it('keeps outage detail off the page', async () => {
 		const { event } = act({ code: 'K7F3A2M9' }, { [`GET ${REQ}`]: json({ error: 'dial tcp 10.0.0.4:5432' }, 503) });
-		expect(((await actions.lookup(event)) as Failure).data.drawer).toEqual({ code: 'K7F3-A2M9', codeError: SAID.lookupOutage });
+		expect(((await actions.lookup(event)) as Failure).data.drawer).toEqual({ code: 'K7F3-A2M9', codeError: SAID.lookupFailed });
 	});
 });
 
@@ -376,47 +353,5 @@ describe('revoke', () => {
 	])('reports a failed revoke all in its own words', async (reply, data) => {
 		const { event } = act({}, { [`POST ${BASE}/connections/revoke-all`]: reply });
 		expect(((await actions.revokeAll(event)) as Failure).data).toEqual(data);
-	});
-});
-
-describe('setting', () => {
-	afterEach(() => vi.restoreAllMocks());
-
-	it.each([
-		[{ field: 'allowed', allowed: 'off' }, { allowed: false }],
-		[
-			{ field: 'limits', lifetime_days: '30', writes_per_minute: '60', schemas_offered: '1', show_schemas: ['posts', 'products'] },
-			{ lifetime_days: 30, writes_per_minute: 60, show_schemas: ['posts', 'products'] },
-		],
-		[
-			{ field: 'limits', lifetime_days: '90', writes_per_minute: '120', schemas_offered: '1' },
-			{ lifetime_days: 90, writes_per_minute: 120, show_schemas: [] },
-		],
-		// A form whose schema list failed to load leaves the schemas as they are.
-		[{ field: 'limits', lifetime_days: '180', writes_per_minute: '10' }, { lifetime_days: 180, writes_per_minute: 10 }],
-	])('saves the switch alone and the other settings together', async (fields, body) => {
-		const { event, calls } = act(fields, { [`PUT ${BASE}/settings`]: json(SETTINGS) });
-		expect(await actions.setting(event)).toMatchObject({ saved: { field: fields.field } });
-		expect(calls).toEqual([{ method: 'PUT', path: `${BASE}/settings`, body }]);
-	});
-
-	it('lands a refused value on the field the engine names', async () => {
-		const { event } = act(
-			{ field: 'limits', lifetime_days: '90', writes_per_minute: '100000' },
-			{ [`PUT ${BASE}/settings`]: json({ error: 'Writes must be between 1 and 120 a minute.', code: 'settings_invalid', field: 'writes_per_minute' }, 422) },
-		);
-		expect(((await actions.setting(event)) as Failure).data.settingError).toEqual({
-			field: 'writes_per_minute',
-			message: 'Writes must be between 1 and 120 a minute.',
-		});
-	});
-
-	it('refuses a lifetime the engine does not offer without asking it', async () => {
-		const { event, calls } = act({ field: 'limits', lifetime_days: '45', writes_per_minute: '60' }, {});
-		expect(((await actions.setting(event)) as Failure).data.settingError).toEqual({
-			field: 'lifetime_days',
-			message: 'Choose 30, 90 or 180 days.',
-		});
-		expect(calls).toEqual([]);
 	});
 });

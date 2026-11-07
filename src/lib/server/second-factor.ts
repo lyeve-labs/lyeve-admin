@@ -1,4 +1,5 @@
 import { ApiError } from '@lyeve-labs/client';
+import { errorCodeOf } from '$lib/api/limits';
 import { outageFor } from '$lib/outage';
 
 /** The sentence and status a sign-in answers with when a second factor fails. */
@@ -14,11 +15,6 @@ export interface SecondFactorFailure {
 
 /** The engine's code for a challenge whose account has no authenticator app. */
 const MFA_NOT_CONFIGURED = 'AUTH_MFA_NOT_CONFIGURED';
-
-function codeOf(e: ApiError): string {
-	const body = e.body as { code?: unknown } | undefined;
-	return typeof body?.code === 'string' ? body.code : '';
-}
 
 /**
  * What a failed second factor tells the reader.
@@ -52,7 +48,7 @@ export function secondFactorFailure(e: unknown, again = 'sign in again'): Second
 		if (e.status === 429) {
 			return { status: 429, error: `Too many verification attempts. Wait, then ${again}.`, restart: true };
 		}
-		if (e.status === 401 && codeOf(e) === MFA_NOT_CONFIGURED) {
+		if (e.status === 401 && errorCodeOf(e) === MFA_NOT_CONFIGURED) {
 			return {
 				status: 401,
 				error: 'This account has no authenticator app set up. Ask an administrator to restore your access.',

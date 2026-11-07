@@ -120,7 +120,7 @@
 	documentTitle={`${page.title || 'Page'} - Customization`}
 	description="Build the page from blocks."
 	width="wide"
-	back={{ href: '/admin/settings/customization', label: 'Customization' }}
+	back={{ href: '/admin/settings/customization/pages', label: 'Customization' }}
 >
 	{#snippet actions()}
 		<Badge tone="violet" size="sm">Beta</Badge>

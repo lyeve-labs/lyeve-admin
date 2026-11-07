@@ -135,6 +135,6 @@ describe('Content entry delete confirmation', () => {
 		const after = (await submit()({ cancel: vi.fn() } as never)) as (a: unknown) => Promise<void>;
 		await after({ result: { type: 'success' }, update: async () => {} });
 
-		expect(kit.success).toHaveBeenCalledWith('Deleted The launch post');
+		expect(kit.success).toHaveBeenCalledWith('The launch post deleted.');
 	});
 });

@@ -60,6 +60,16 @@ describe('AI provider detail page', () => {
 		expect(getByText(/Enter it again/)).toBeTruthy();
 	});
 
+	// The form a super admin came to change sat under two checks. It now
+	// follows the facts it edits.
+	it('puts the configuration directly under the facts, above the checks', () => {
+		const { container } = setup();
+		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent?.trim());
+		expect(headings.indexOf('Configuration')).toBeGreaterThanOrEqual(0);
+		expect(headings.indexOf('Configuration')).toBeLessThan(headings.indexOf('Models'));
+		expect(headings.indexOf('Models')).toBeLessThan(headings.indexOf('Capabilities'));
+	});
+
 	it('hides the configuration form from a tenant admin and keeps the reads', () => {
 		const { container, getByText, queryByText } = setup({ isSuperAdmin: false });
 		expect(container.querySelector('form[action="?/update"]')).toBeNull();

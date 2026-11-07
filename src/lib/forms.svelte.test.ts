@@ -117,10 +117,20 @@ describe('a handler that cancels', () => {
 		const o = opts();
 		const after = await t.enhance({ ...o, cancel: vi.fn() } as never);
 		expect(t.pending).toBe(false);
-		// The returned callback is inert, so nothing is applied over a submit
-		// that never went.
-		await after!(o as never);
+		expect(after).toBeUndefined();
 		expect(o.update).not.toHaveBeenCalled();
+	});
+
+	it('cancels before enhance sends when the wrapped handler asks first', async () => {
+		// enhance awaits the handler and then reads whether it canceled, so a
+		// question answered after a delay still has to stop the request.
+		kit.confirm.mockImplementationOnce(() => new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10)));
+		let canceled = false;
+		const o = opts();
+		const t = tracked(confirmed('Delete it?', 'Gone.', { confirmLabel: 'Delete' }));
+		await t.enhance({ ...o, cancel: () => (canceled = true), submitter: null, controller: new AbortController() } as never);
+		expect(canceled).toBe(true);
+		expect(t.pending).toBe(false);
 	});
 
 	it('still clears pending on a handler that goes through', async () => {

@@ -29,6 +29,11 @@ describe('the import wizard', () => {
 		expect(document.body.textContent).toContain('Could not load the content types');
 	});
 
+	it('says the saved mappings could not be read rather than offering none', () => {
+		render(ImportWizard, { props: { open: true, schemas, templatesFailed: true, onstarted: vi.fn() } });
+		expect(document.body.textContent).toContain('Could not load the mapping templates. Reload the page to try again.');
+	});
+
 	it('says there is no content type yet when the tenant has none', () => {
 		render(ImportWizard, { props: { open: true, schemas: [], onstarted: vi.fn() } });
 		expect(document.body.textContent).toContain('No content types yet');

@@ -158,7 +158,7 @@ describe('MediaPreviewDrawer', () => {
 		const update = vi.fn(async () => {});
 		await (after as (a: unknown) => Promise<void>)({ result: { type: 'success' }, update });
 		expect(update).toHaveBeenCalled();
-		expect(kit.success).toHaveBeenCalledWith('Deleted clip.webm');
+		expect(kit.success).toHaveBeenCalledWith('clip.webm deleted.');
 		expect(ondeleted).toHaveBeenCalledOnce();
 		expect(native).not.toHaveBeenCalled();
 		native.mockRestore();

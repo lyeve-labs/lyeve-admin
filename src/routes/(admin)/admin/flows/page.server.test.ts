@@ -368,6 +368,22 @@ describe('admin/flows import action', () => {
 		expect(result.data.errors).toEqual([{ node_id: '', path: '/trigger', message: 'unknown type' }]);
 	});
 
+	it("relays the engine's own refusal and keeps a proxy's page off the screen", async () => {
+		const form = new FormData();
+		form.set('text', '{}');
+		const coded = actionEvent(
+			{ '/api/admin/flows/import': () => json({ error: 'a flow with this slug already exists', code: 'conflict' }, 409) },
+			form
+		);
+		expect(((await actions.import(coded.event)) as { data: { error: string } }).data.error).toBe('a flow with this slug already exists');
+
+		const proxy = actionEvent(
+			{ '/api/admin/flows/import': () => new Response('<html><body>413 Request Entity Too Large</body></html>', { status: 413 }) },
+			form
+		);
+		expect(((await actions.import(proxy.event)) as { data: { error: string } }).data.error).toBe('Could not import the flow. Try again.');
+	});
+
 	it('refuses an empty import and a replace with no slug before calling the engine', async () => {
 		const empty = actionEvent({}, new FormData());
 		const refused = (await actions.import(empty.event)) as { status: number; data: { action: string } };

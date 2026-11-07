@@ -89,7 +89,7 @@
 			<Alert tone="warn">
 				The broker refused {data.status.failed} publish
 				{plural(data.status.failed, 'attempt')} since the engine last started. The outbox
-				retries them. Could not load the outbox counts, so you cannot tell whether any event was lost.
+				retries them. Could not load the outbox counts.
 			</Alert>
 		{:else if data.status.failed > 0}
 			<Alert tone="danger">

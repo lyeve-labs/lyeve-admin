@@ -72,7 +72,7 @@
 			description: 'Check the code shown on the device. It is eight letters and digits, like WDJB-MJHT.',
 		},
 		forbidden: {
-			title: 'Only an admin or a super admin can approve a device',
+			title: 'You cannot approve this sign-in',
 			description: 'Only an admin or a super admin can approve a device sign-in.',
 		},
 	};

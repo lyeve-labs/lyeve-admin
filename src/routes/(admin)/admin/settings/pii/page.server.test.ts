@@ -29,9 +29,9 @@ function formEvent(fields: Record<string, string>) {
 	return { request: new Request('http://admin/x', { method: 'POST', body }), cookies: {}, fetch: vi.fn() } as never;
 }
 
-function loadEvent(query = '') {
+function loadEvent() {
 	return {
-		url: new URL(`http://admin.test/admin/settings/pii${query}`),
+		url: new URL('http://admin.test/admin/settings/pii'),
 		parent: async () => ({ plugins: null }),
 	} as never;
 }
@@ -55,12 +55,9 @@ describe('pii rule actions', () => {
 });
 
 describe('pii load', () => {
-	it('sends an access log page past the end back to the last page', async () => {
-		api.listAccessLog.mockResolvedValue({ data: [], total_count: 70 });
-		await expect(load(loadEvent('?offset=300'))).rejects.toMatchObject({
-			status: 307,
-			location: '/admin/settings/pii?offset=50',
-		});
+	it('reads the rules and nothing of the access log', async () => {
+		expect(await load(loadEvent())).toEqual({ rules: { presets: [], mask_tags: {} }, gate: { state: 'ok' } });
+		expect(api.listAccessLog).not.toHaveBeenCalled();
 	});
 });
 

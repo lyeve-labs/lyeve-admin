@@ -10,41 +10,30 @@ import {
 	ADDRESS_DUPLICATE,
 	ADDRESS_LIST_FULL,
 	ADDRESS_SELF_LOCKOUT,
-	HISTORY_WINDOWS,
 	cidrIsSound,
 	clearTenantGlobal,
 	createAddressEntry,
 	deleteAddressEntry,
 	listAddressEntries,
-	readRefusalHistory,
 	readTenantGlobal,
 	setTenantGlobal,
 	type AddressListRead,
-	type RefusalHistory,
 	type TenantGlobalRead,
 } from '$lib/api/rate-limit';
 
-function windowOf(url: URL): number {
-	const raw = url.searchParams.get('hours') ?? '24';
-	return HISTORY_WINDOWS.some((w) => w.value === raw) ? Number(raw) : 24;
-}
-
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
-	const hours = windowOf(event.url);
 	if (notRunning(plugins, PLUGIN.rateLimit)) {
 		const gate: Gate = { state: 'absent' };
 		return {
 			gate,
 			limit: { ok: false, gate } as Section<TenantGlobalRead>,
 			addresses: { ok: false, gate } as Section<AddressListRead>,
-			history: { ok: false, gate } as Section<RefusalHistory>,
-			hours,
 		};
 	}
 
 	const client = authedClient(event);
-	const [limit, addresses, history] = await Promise.all([
+	const [limit, addresses] = await Promise.all([
 		section(
 			readTenantGlobal(client),
 			'Could not load the tenant limit.',
@@ -53,13 +42,9 @@ export const load: PageServerLoad = async (event) => {
 			listAddressEntries(client),
 			'Could not load the address lists.',
 		),
-		section(
-			readRefusalHistory(client, hours),
-			'Could not load the refusal history.',
-		),
 	]);
 
-	return { gate: GATE_OK as Gate, limit, addresses, history, hours };
+	return { gate: GATE_OK as Gate, limit, addresses };
 };
 
 function num(raw: FormDataEntryValue | null): number {

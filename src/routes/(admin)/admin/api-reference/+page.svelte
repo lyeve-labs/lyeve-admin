@@ -273,8 +273,8 @@
 
 				{#if data.source === 'catalog'}
 					<Alert tone="warn" title="Showing the built-in catalog">
-						Could not load the engine's API document, so this is the catalog built into the console and
-						may miss an endpoint this build serves. Reload the page to try again.
+						Could not load the engine's API document, so this is the catalog built into the console.
+						Reload the page to try again.
 					</Alert>
 				{/if}
 

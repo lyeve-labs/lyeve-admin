@@ -19,6 +19,7 @@
 	import type { Snippet } from 'svelte';
 	import { effectiveGate, type AiGate } from '$lib/api/ai';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
+	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { ICON } from '$lib/icon';
@@ -141,6 +142,6 @@
 			<Button variant="secondary" href="/admin/ai/providers">Open providers</Button>
 		{/snippet}
 	</EmptyState>
-{:else if effective.state === 'error'}
-	<Alert tone="danger" title="Could not load {noun}">{effective.message}</Alert>
+{:else if effective.state === 'busy' || effective.state === 'unavailable' || effective.state === 'error'}
+	<GateNotice gate={effective} title="AI {noun}" absent="" />
 {/if}

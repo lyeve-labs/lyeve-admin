@@ -20,7 +20,7 @@ export const ROLES = ['viewer', 'editor', 'admin', 'super_admin'] as const;
 export type Role = (typeof ROLES)[number];
 
 /** A role as a sentence names it: "a super admin", "an editor". */
-export function roleInWords(role: string): string {
+function roleInWords(role: string): string {
 	const name = role.replaceAll('_', ' ');
 	return `${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`;
 }
