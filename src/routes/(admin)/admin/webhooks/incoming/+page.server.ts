@@ -12,6 +12,7 @@ import { actionFailure, tagged } from '$lib/server/action-error';
 import { checked } from '$lib/checkbox';
 import { section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type ListEnvelope } from '$lib/api/list';
+import { asked } from '$lib/server/asked';
 
 /** The page size when a request names none. */
 const DEFAULT_LIMIT = 50;
@@ -159,18 +160,25 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		// The plugin serves this write to a super admin only.
-		await requireRole(event, ['super_admin']);
-		const { request } = event;
-		const client = authedClient(event);
-		const data = await request.formData();
-		const id = String(data.get('id') ?? '');
+	delete: asked(
+		{
+			question: 'Delete this incoming webhook?',
+			detail: 'External services can no longer send payloads to this endpoint.',
+			label: 'Delete',
+		},
+		async (event) => {
+			// The plugin serves this write to a super admin only.
+			await requireRole(event, ['super_admin']);
+			const { request } = event;
+			const client = authedClient(event);
+			const data = await request.formData();
+			const id = String(data.get('id') ?? '');
 
-		try {
-			await deleteIncomingWebhook(id, client);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the incoming webhook. Try again.'));
-		}
-	}
+			try {
+				await deleteIncomingWebhook(id, client);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the incoming webhook. Try again.'));
+			}
+		},
+	),
 };

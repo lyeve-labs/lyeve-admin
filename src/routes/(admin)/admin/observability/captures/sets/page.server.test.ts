@@ -43,6 +43,7 @@ function loadEvent(plugins?: unknown) {
 
 function formEvent(fields: Record<string, string | string[]>) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) {
 		for (const one of Array.isArray(v) ? v : [v]) body.append(k, one);
 	}
@@ -122,6 +123,27 @@ describe('replaying a set', () => {
 		api.replaySet.mockResolvedValue({ set_id: 's1', results: [] });
 		await actions.replaySet(formEvent({ id: 's1', confirm_mutating: 'true' }));
 		expect(api.replaySet).toHaveBeenCalledWith(expect.anything(), 's1', true);
+	});
+
+	// A click before the page hydrates posts the set's form with no question.
+	it('replays nothing on a post that skipped the question, and keeps what it named for the second post', async () => {
+		const body = new FormData();
+		body.set('id', 's1');
+		body.set('confirm_mutating', 'true');
+		const url = new URL('http://admin/admin/observability/captures/sets?/replaySet');
+		const out = await actions.replaySet({ url, request: new Request(url, { method: 'POST', body }), cookies: {}, fetch: vi.fn() } as never);
+		expect(api.replaySet).not.toHaveBeenCalled();
+		expect(out).toMatchObject({
+			unconfirmed: {
+				question: 'Replay this set?',
+				label: 'Replay',
+				action: '/admin/observability/captures/sets?/replaySet',
+				fields: [
+					['id', 's1'],
+					['confirm_mutating', 'true'],
+				],
+			},
+		});
 	});
 });
 

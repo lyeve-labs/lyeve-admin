@@ -20,6 +20,7 @@ import {
 	type AddressListRead,
 	type TenantGlobalRead,
 } from '$lib/api/rate-limit';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -73,15 +74,22 @@ export const actions: Actions = {
 	},
 
 	// Clearing puts the tenant back on the install-wide limit, and is always allowed.
-	clearLimit: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		try {
-			await clearTenantGlobal(authedClient(event));
-		} catch (err) {
-			return tagged('clear', actionFailure(err, 'Could not clear the tenant limit. Try again.'));
-		}
-		return { clearedLimit: true };
-	},
+	clearLimit: asked(
+		{
+			question: 'Clear the tenant limit?',
+			detail: 'This tenant goes back to the global limit alone.',
+			label: 'Clear',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			try {
+				await clearTenantGlobal(authedClient(event));
+			} catch (err) {
+				return tagged('clear', actionFailure(err, 'Could not clear the tenant limit. Try again.'));
+			}
+			return { clearedLimit: true };
+		},
+	),
 
 	addAddress: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
@@ -117,16 +125,23 @@ export const actions: Actions = {
 		return { savedAddress: cidr, list };
 	},
 
-	deleteAddress: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '').trim();
-		if (!id) return fail(400, { action: 'deleteAddress', error: 'This form is missing its entry. Reload the page and try again.' });
-		try {
-			await deleteAddressEntry(authedClient(event), id);
-		} catch (err) {
-			return tagged('deleteAddress', actionFailure(err, 'Could not remove the entry. Try again.'));
-		}
-		return { removedAddress: id };
-	},
+	deleteAddress: asked(
+		{
+			question: 'Remove this address from the list?',
+			detail: 'Requests from it are treated like any other from the next request.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '').trim();
+			if (!id) return fail(400, { action: 'deleteAddress', error: 'This form is missing its entry. Reload the page and try again.' });
+			try {
+				await deleteAddressEntry(authedClient(event), id);
+			} catch (err) {
+				return tagged('deleteAddress', actionFailure(err, 'Could not remove the entry. Try again.'));
+			}
+			return { removedAddress: id };
+		},
+	),
 };

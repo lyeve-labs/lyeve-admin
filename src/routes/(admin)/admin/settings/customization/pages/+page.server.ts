@@ -11,6 +11,7 @@ import {
 	type PageSummary,
 } from '$lib/api/customization';
 import { openTab, roleList } from '../customization.server';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
@@ -48,14 +49,21 @@ export const actions: Actions = {
 		redirect(303, `/admin/settings/customization/pages/${slug}`);
 	},
 
-	deletePage: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const slug = String((await event.request.formData()).get('slug') ?? '');
-		try {
-			await deleteCustomPage(authedClient(event), slug);
-			return { pageDeleted: true };
-		} catch (err) {
-			return fail(400, { pageDeleteError: actionError(err, 'Could not delete the page. Try again.') });
-		}
-	},
+	deletePage: asked(
+		{
+			question: 'Delete this page?',
+			detail: 'Its menu entry is removed too, and the dashboard stops showing it.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const slug = String((await event.request.formData()).get('slug') ?? '');
+			try {
+				await deleteCustomPage(authedClient(event), slug);
+				return { pageDeleted: true };
+			} catch (err) {
+				return fail(400, { pageDeleteError: actionError(err, 'Could not delete the page. Try again.') });
+			}
+		},
+	),
 };

@@ -371,6 +371,7 @@ function writeEvent(
 	roles = ['super_admin'],
 ) {
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [key, value] of Object.entries(fields)) form.append(key, value);
 	const fetch = vi.fn(async (url: string, init?: RequestInit) =>
 		init?.method && init.method !== 'GET'
@@ -378,7 +379,7 @@ function writeEvent(
 			: json({ id: 'u1', email: 'admin@b.co', roles })
 	) as unknown as typeof globalThis.fetch;
 	return {
-		request: { formData: async () => form },
+		request: { formData: async () => form, clone: () => ({ formData: async () => form }) },
 		fetch,
 		cookies: mockCookies(),
 		url: new URL('http://localhost/admin/tenants'),

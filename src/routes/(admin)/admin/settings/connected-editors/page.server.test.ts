@@ -123,9 +123,20 @@ describe('connected editors load', () => {
 
 type Failure = { status: number; data: Record<string, unknown> };
 
+describe('revoking every connection', () => {
+	it('revokes nothing on a post that skipped the question', async () => {
+		const e = engine({});
+		const url = new URL('http://admin/admin/settings/connected-editors?/revokeAll');
+		const out = await actions.revokeAll({ fetch: e.fetch, url, request: new Request(url, { method: 'POST', body: new FormData() }) } as never);
+		expect(e.calls).toEqual([]);
+		expect(out).toMatchObject({ unconfirmed: { question: 'Revoke all builder connections?', label: 'Revoke all', fields: [] } });
+	});
+});
+
 function act(fields: Record<string, string | string[]>, routes: Routes) {
 	const e = engine(routes);
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) {
 		for (const one of Array.isArray(v) ? v : [v]) body.append(k, one);
 	}

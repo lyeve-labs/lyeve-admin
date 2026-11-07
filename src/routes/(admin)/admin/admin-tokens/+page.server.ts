@@ -23,6 +23,7 @@ import { pageWindow, pastEndOffset, rowsOf, statedTotal, totalOf, withOffset } f
 import { gateOf, section, type Gate, type Section } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
 import { rolesInWords } from '$lib/roles';
+import { asked } from '$lib/server/asked';
 
 /** The engine pages this list at fifty and refuses more than a hundred. */
 const PAGE = 50;
@@ -212,24 +213,31 @@ export const actions: Actions = {
 		}
 	},
 
-	revoke: async (event) => {
-		await requireRole(event, OWNER_ROLES);
-		const data = await event.request.formData();
-		const id = String(data.get('id') ?? '');
-		try {
-			await revokeAdminToken(authedClient(event), id);
-			return { revoked: true };
-		} catch (err) {
-			const status = err instanceof ApiError ? err.status : 500;
-			const message =
-				status === 409
-					? 'This token was already revoked.'
-					: status === 403
-						? 'Only the owner of a token or a super admin can revoke it.'
-						: status >= 500
-							? 'Check whether the token was revoked, then try again.'
-							: 'Could not revoke the token. Try again.';
-			return fail(400, { action: 'revoke', error: message, fields: {} });
-		}
-	},
+	revoke: asked(
+		{
+			question: 'Revoke this token?',
+			detail: 'Anything calling the admin API with it is refused from now on. The token stays listed as revoked and cannot be used again.',
+			label: 'Revoke',
+		},
+		async (event) => {
+			await requireRole(event, OWNER_ROLES);
+			const data = await event.request.formData();
+			const id = String(data.get('id') ?? '');
+			try {
+				await revokeAdminToken(authedClient(event), id);
+				return { revoked: true };
+			} catch (err) {
+				const status = err instanceof ApiError ? err.status : 500;
+				const message =
+					status === 409
+						? 'This token was already revoked.'
+						: status === 403
+							? 'Only the owner of a token or a super admin can revoke it.'
+							: status >= 500
+								? 'Check whether the token was revoked, then try again.'
+								: 'Could not revoke the token. Try again.';
+				return fail(400, { action: 'revoke', error: message, fields: {} });
+			}
+		},
+	),
 };

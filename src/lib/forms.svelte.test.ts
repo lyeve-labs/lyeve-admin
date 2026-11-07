@@ -177,6 +177,15 @@ describe('confirmed', () => {
 		expect(after).toBeUndefined();
 		expect(o.update).not.toHaveBeenCalled();
 		expect(kit.success).not.toHaveBeenCalled();
+		expect(o.formData.has('confirmed')).toBe(false);
+	});
+
+	// The action's asked() wrapper runs only on a post that carries this, so a
+	// form posted before the page hydrated, which never asked, deletes nothing.
+	it('adds the confirmation to the post once the reader agrees', async () => {
+		const { o, input } = start();
+		await confirmed('Delete it?', 'Gone.', { confirmLabel: 'Delete' })(input);
+		expect(o.formData.get('confirmed')).toBe('yes');
 	});
 
 	it('applies the result and says what happened once the write goes through', async () => {

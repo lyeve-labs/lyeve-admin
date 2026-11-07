@@ -55,7 +55,7 @@ function actionEvent(routes: Record<string, Route>, form: FormData) {
 		event: {
 			fetch,
 			cookies: mockCookies(),
-			request: { formData: async () => form },
+			request: { formData: async () => form, clone: () => ({ formData: async () => form }) },
 			url: new URL('http://localhost/admin/flows'),
 			params: {},
 		} as never,
@@ -280,6 +280,7 @@ describe('admin/flows create action', () => {
 describe('admin/flows delete action', () => {
 	it('deletes by id', async () => {
 		const form = new FormData();
+		form.set('confirmed', 'yes');
 		form.set('id', 'f9');
 		const { event, calls } = actionEvent({ '/api/admin/flows/f9': () => new Response(null, { status: 204 }) }, form);
 		await actions.delete(event);
@@ -289,6 +290,7 @@ describe('admin/flows delete action', () => {
 
 	it('relays the engine message on refusal', async () => {
 		const form = new FormData();
+		form.set('confirmed', 'yes');
 		form.set('id', 'f9');
 		const { event } = actionEvent({ '/api/admin/flows/f9': () => json({ error: 'super_admin required', code: 'forbidden' }, 403) }, form);
 		const result = (await actions.delete(event)) as { status: number; data: { error: string; forbidden: boolean; action: string } };

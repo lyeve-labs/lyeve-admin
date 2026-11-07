@@ -14,6 +14,7 @@
 		Toaster,
 	} from '@lyeve-labs/ui-kit';
 	import { BookOpen, LifeBuoy, LogOut, MonitorSmartphone, Settings, ShieldCheck } from '@lucide/svelte';
+	import ConfirmFallback from '$lib/components/ConfirmFallback.svelte';
 	import DbStatus from '$lib/components/DbStatus.svelte';
 	import RouteProgress from '$lib/components/RouteProgress.svelte';
 	import NotRunning from '$lib/components/NotRunning.svelte';
@@ -262,6 +263,7 @@
 			<NotRunning level={2} title={gated.title} plugin={gated.plugin} reason={gated.reason} {operator} />
 		</PageShell>
 	{:else}
+		<ConfirmFallback />
 		{@render children()}
 	{/if}
 </AppShell>

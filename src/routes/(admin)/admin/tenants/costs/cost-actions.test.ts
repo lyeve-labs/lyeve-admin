@@ -25,6 +25,7 @@ function mockCookies(): Cookies {
 /** An action event whose fetch answers the session read as `roles`, then `answer` for the write. */
 function writeEvent(fields: Record<string, string>, answer: () => Response, roles = ['admin']) {
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [key, value] of Object.entries(fields)) form.append(key, value);
 	const written = vi.fn(answer);
 	const fetch = vi.fn(async (url: string, init?: RequestInit) =>
@@ -33,7 +34,7 @@ function writeEvent(fields: Record<string, string>, answer: () => Response, role
 	return {
 		written,
 		event: {
-			request: { formData: async () => form },
+			request: { formData: async () => form, clone: () => ({ formData: async () => form }) },
 			fetch,
 			cookies: mockCookies(),
 			url: new URL('http://localhost/admin/tenants/costs'),

@@ -249,11 +249,24 @@ function actionEvent(fields: Record<string, string>, answer: () => Response = ()
 		return answer();
 	}) as unknown as typeof globalThis.fetch;
 	const fd = new FormData();
+	fd.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) fd.set(k, v);
-	return { event: { fetch, cookies: mockCookies(), request: { formData: async () => fd } } as never, calls };
+	return { event: { fetch, cookies: mockCookies(), request: { formData: async () => fd, clone: () => ({ formData: async () => fd }) } } as never, calls };
 }
 
 describe('deleting a file', () => {
+	// The preview drawer posts the delete. Before the page hydrates, it posts
+	// with no question asked.
+	it('deletes nothing on a post that skipped the question', async () => {
+		const fetch = vi.fn();
+		const body = new FormData();
+		body.set('id', 'm1');
+		const url = new URL('http://admin/admin/media?/delete');
+		const out = await actions.delete({ fetch, cookies: mockCookies(), url, request: new Request(url, { method: 'POST', body }) } as never);
+		expect(fetch).not.toHaveBeenCalled();
+		expect(out).toMatchObject({ unconfirmed: { question: 'Delete this file?', label: 'Delete', action: '/admin/media?/delete', fields: [['id', 'm1']] } });
+	});
+
 	it('deletes the file it names', async () => {
 		const { event, calls } = actionEvent({ id: 'm 1' }, () => new Response(null, { status: 204 }));
 		expect(await actions.delete(event)).toBeUndefined();

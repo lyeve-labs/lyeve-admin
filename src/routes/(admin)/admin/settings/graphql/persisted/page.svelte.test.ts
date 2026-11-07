@@ -80,7 +80,7 @@ describe('persisted query delete', () => {
 		const { getByRole } = render(PersistedPage, { props: props({ persisted: { ok: true, value: [query] } }) });
 		const form = getByRole('button', { name: 'Delete Posts' }).closest('form') as HTMLFormElement;
 		expect(new FormData(form).get('hash')).toBe('abc123');
-		await forms.submits.get(form)?.({ cancel: vi.fn() });
+		await forms.submits.get(form)?.({ cancel: vi.fn(), formData: new FormData(form) });
 		expect(kit.confirm).toHaveBeenCalledWith(
 			'Delete persisted query Posts?',
 			'Clients that send only its hash will be refused.',

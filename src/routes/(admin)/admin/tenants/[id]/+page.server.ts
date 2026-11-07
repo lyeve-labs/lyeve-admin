@@ -29,6 +29,7 @@ import {
 	type TenantMember,
 } from '$lib/api/tenant-access';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const user = await loadUser(event);
@@ -152,27 +153,41 @@ export const actions: Actions = {
 		}
 	},
 
-	revoke: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const form = await event.request.formData();
-		const userId = String(form.get('user_id') ?? '');
-		try {
-			await revokeMembership(authedClient(event), userId, await tenantSlug(event));
-			return { memberRevoked: true };
-		} catch (err) {
-			return fail(400, { action: 'revoke', memberError: actionError(err, 'Could not remove the membership. Try again.') });
-		}
-	},
+	revoke: asked(
+		{
+			question: 'Remove this account from this tenant?',
+			detail: 'The account keeps its home tenant and every other membership. Its open sessions here end at their next refresh.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const form = await event.request.formData();
+			const userId = String(form.get('user_id') ?? '');
+			try {
+				await revokeMembership(authedClient(event), userId, await tenantSlug(event));
+				return { memberRevoked: true };
+			} catch (err) {
+				return fail(400, { action: 'revoke', memberError: actionError(err, 'Could not remove the membership. Try again.') });
+			}
+		},
+	),
 
-	archive: async (event) => {
-		await requireRole(event, ['super_admin']);
-		try {
-			await archiveTenant(event.params.id ?? '', authedClient(event));
-			return { archived: true };
-		} catch (err) {
-			return fail(400, { stateError: actionError(err, 'Could not archive the tenant. Try again.') });
-		}
-	},
+	archive: asked(
+		{
+			question: 'Archive this tenant?',
+			detail: 'The tenant stays readable, but every change is refused until you restore it.',
+			label: 'Archive',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			try {
+				await archiveTenant(event.params.id ?? '', authedClient(event));
+				return { archived: true };
+			} catch (err) {
+				return fail(400, { stateError: actionError(err, 'Could not archive the tenant. Try again.') });
+			}
+		},
+	),
 
 	restore: async (event) => {
 		await requireRole(event, ['super_admin']);

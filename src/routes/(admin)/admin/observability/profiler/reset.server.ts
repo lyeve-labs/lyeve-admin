@@ -2,6 +2,14 @@ import { fail, type RequestEvent } from '@sveltejs/kit';
 import { resetProfiler } from '$lib/api/profiler';
 import { actionFailure } from '$lib/server/action-error';
 import { authedClient, requireRole } from '$lib/server/authz';
+import type { Question } from '$lib/server/asked';
+
+/** What a reset that skipped the question asks, on either tab. */
+export const RESET_QUESTION: Question = {
+	question: 'Reset the profiler?',
+	detail: 'Sampled requests and memory snapshots are deleted, and a new snapshot is taken. This cannot be undone.',
+	label: 'Reset',
+};
 
 /**
  * The Reset both the timings and the memory tab carry. One reset clears the

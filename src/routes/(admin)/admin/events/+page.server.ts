@@ -15,6 +15,7 @@ import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { instantFromWallClock } from '$lib/utils/wall-clock';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 199;
@@ -69,40 +70,48 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
-	replay: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
+	replay: asked(
+		{
+			question: 'Replay these events?',
+			detail: 'Each event is published again to every webhook, flow, the message broker, realtime clients and email triggers. This cannot be undone.',
+			label: 'Replay',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
 
-		const since = String(form.get('since') ?? '').trim();
-		const handler = String(form.get('handler') ?? '').trim();
-		// The checkbox is absent when it is cleared, and absent must mean a
-		// real replay only when the operator cleared it on purpose. The form
-		// posts an explicit value so a missing field cannot fire one.
-		const dryRun = String(form.get('dry_run') ?? '') !== 'false';
+			const since = String(form.get('since') ?? '').trim();
+			const handler = String(form.get('handler') ?? '').trim();
+			// The checkbox is absent when it is cleared, and absent must mean a
+			// real replay only when the operator cleared it on purpose. The form
+			// posts an explicit value so a missing field cannot fire one.
+			const dryRun = String(form.get('dry_run') ?? '') !== 'false';
 
-		if (!since) {
-			return fail(400, { error: 'Choose the point to replay from.', fields: { since: 'Required' } });
-		}
-		const from = instantFromWallClock(since, String(form.get('since_offset') ?? ''));
-		if (!from) {
-			return fail(400, { error: 'Choose a date and time to replay from.' });
-		}
-		if (from.getTime() > Date.now()) {
-			// The log holds what was published, so a window that starts in the
-			// future matches nothing and reads as a silent no-op.
-			return fail(400, { error: 'Choose a time in the past.' });
-		}
+			if (!since) {
+				return fail(400, { error: 'Choose the point to replay from.', fields: { since: 'Required' } });
+			}
+			const from = instantFromWallClock(since, String(form.get('since_offset') ?? ''));
+			if (!from) {
+				return fail(400, { error: 'Choose a date and time to replay from.' });
+			}
+			if (from.getTime() > Date.now()) {
+				// The log holds what was published, so a window that starts in the
+				// future matches nothing and reads as a silent no-op.
+				return fail(400, { error: 'Choose a time in the past.' });
+			}
 
-		try {
-			const run = await startReplay(client, {
-				since: from.toISOString(),
-				handler: handler || undefined,
-				dry_run: dryRun,
-			});
-			return { started: run.run_id, dryRun };
-		} catch (err) {
-			return actionFailure(err, 'Could not start the replay. Try again.');
-		}
-	},
+			try {
+				const run = await startReplay(client, {
+					since: from.toISOString(),
+					handler: handler || undefined,
+					dry_run: dryRun,
+				});
+				return { started: run.run_id, dryRun };
+			} catch (err) {
+				return actionFailure(err, 'Could not start the replay. Try again.');
+			}
+		},
+		(form) => form.get('dry_run') === 'false',
+	),
 };

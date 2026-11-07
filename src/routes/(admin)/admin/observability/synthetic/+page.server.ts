@@ -41,6 +41,7 @@ const CHANNEL_PREFIX = 'channel_';
 type ChannelsFor = { probe: Probe; read: ProbeChannels | null; gate: Gate } | null;
 import { pageOf, pageWindow, pastEndOffset, rowsOf, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 const NO_ALERTS: Section<ProbeAlert[]> = { ok: true, value: [] };
 
@@ -264,19 +265,26 @@ export const actions: Actions = {
 		return save(event, id);
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'This form is missing its probe. Reload the page and try again.' });
-		try {
-			await deleteProbe(client, id);
-		} catch (err) {
-			return actionFailure(err, 'Could not delete the probe. Try again.');
-		}
-		return { removed: id };
-	},
+	delete: asked(
+		{
+			question: 'Delete this probe?',
+			detail: 'Its results and alert history are deleted. This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { error: 'This form is missing its probe. Reload the page and try again.' });
+			try {
+				await deleteProbe(client, id);
+			} catch (err) {
+				return actionFailure(err, 'Could not delete the probe. Try again.');
+			}
+			return { removed: id };
+		},
+	),
 
 	run: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);

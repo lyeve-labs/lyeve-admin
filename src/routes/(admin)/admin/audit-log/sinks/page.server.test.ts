@@ -12,10 +12,11 @@ import { actions, load } from './+page.server';
 
 function event(form: Record<string, string> = {}) {
 	const data = new FormData();
+	data.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(form)) data.set(k, v);
 	return {
 		parent: async () => ({ plugins: { state: 'named', running: ['audit'], withheld: [] } }),
-		request: { formData: async () => data },
+		request: { formData: async () => data, clone: () => ({ formData: async () => data }) },
 	} as never;
 }
 

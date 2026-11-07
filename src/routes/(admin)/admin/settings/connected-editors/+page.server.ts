@@ -25,6 +25,7 @@ import {
 	type ConnectionsGate,
 } from '$lib/api/connected-editors';
 import { isOwner, refusalSentence } from './shared.server';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -216,33 +217,47 @@ export const actions: Actions = {
 		}
 	},
 
-	revoke: async (event) => {
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		const person = String(form.get('person') ?? '');
-		if (!id) return fail(400, { revokeError: 'This form is missing its connection. Reload the page and try again.' });
-		try {
-			await revokeConnection(authedClient(event), id);
-		} catch (e) {
-			if (errorCodeOf(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
-			if (isOutage(e)) return fail(503, { revokeError: SAID.revokeOutage });
-			return fail(e instanceof ApiError ? e.status : 400, {
-				revokeError: refusalSentence(e, 'Could not revoke the connection. Try again.'),
-			});
-		}
-		return { revoked: person };
-	},
+	revoke: asked(
+		{
+			question: 'Revoke this builder connection?',
+			detail: 'That browser stops editing immediately.',
+			label: 'Revoke',
+		},
+		async (event) => {
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			const person = String(form.get('person') ?? '');
+			if (!id) return fail(400, { revokeError: 'This form is missing its connection. Reload the page and try again.' });
+			try {
+				await revokeConnection(authedClient(event), id);
+			} catch (e) {
+				if (errorCodeOf(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
+				if (isOutage(e)) return fail(503, { revokeError: SAID.revokeOutage });
+				return fail(e instanceof ApiError ? e.status : 400, {
+					revokeError: refusalSentence(e, 'Could not revoke the connection. Try again.'),
+				});
+			}
+			return { revoked: person };
+		},
+	),
 
-	revokeAll: async (event) => {
-		try {
-			const out = await revokeAllConnections(authedClient(event));
-			return { revokedAll: out.revoked };
-		} catch (e) {
-			if (errorCodeOf(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
-			if (isOutage(e)) return fail(503, { revokeAllError: SAID.revokeAllFailed });
-			return fail(e instanceof ApiError ? e.status : 400, {
-				revokeAllError: refusalSentence(e, 'Could not revoke the connections. Try again.'),
-			});
-		}
-	},
+	revokeAll: asked(
+		{
+			question: 'Revoke all builder connections?',
+			detail: 'Every connected browser stops editing immediately, and every waiting request is declined.',
+			label: 'Revoke all',
+		},
+		async (event) => {
+			try {
+				const out = await revokeAllConnections(authedClient(event));
+				return { revokedAll: out.revoked };
+			} catch (e) {
+				if (errorCodeOf(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
+				if (isOutage(e)) return fail(503, { revokeAllError: SAID.revokeAllFailed });
+				return fail(e instanceof ApiError ? e.status : 400, {
+					revokeAllError: refusalSentence(e, 'Could not revoke the connections. Try again.'),
+				});
+			}
+		},
+	),
 };

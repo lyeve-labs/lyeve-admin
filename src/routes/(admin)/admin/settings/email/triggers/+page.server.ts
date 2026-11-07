@@ -15,6 +15,7 @@ import {
 	updateEmailTrigger,
 } from '$lib/api/email-triggers';
 import { readTriggerForm } from '$lib/server/email-trigger-form';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
@@ -65,16 +66,23 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const id = String((await event.request.formData()).get('id') ?? '').trim();
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its trigger. Reload the page and try again.' });
-		try {
-			await deleteEmailTrigger(client, id);
-			return { deleted: id };
-		} catch (err) {
-			return writeFailure('delete', err, 'Could not delete the trigger. Try again.');
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this trigger?',
+			detail: 'Mail stops going out for this event.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const id = String((await event.request.formData()).get('id') ?? '').trim();
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its trigger. Reload the page and try again.' });
+			try {
+				await deleteEmailTrigger(client, id);
+				return { deleted: id };
+			} catch (err) {
+				return writeFailure('delete', err, 'Could not delete the trigger. Try again.');
+			}
+		},
+	),
 };

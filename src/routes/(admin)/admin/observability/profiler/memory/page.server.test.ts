@@ -46,8 +46,10 @@ function loadEvent(routes: Record<string, Route>, roles: string[]) {
 
 function actionEvent(routes: Record<string, Route>, roles: string[]) {
 	const { fetch, calls } = fetchFor(routes, roles);
+	const body = new FormData();
+	body.set('confirmed', 'yes');
 	return {
-		event: { fetch, cookies: mockCookies(), request: new Request('http://localhost/admin/observability/profiler/memory', { method: 'POST', body: new FormData() }) } as never,
+		event: { fetch, cookies: mockCookies(), request: new Request('http://localhost/admin/observability/profiler/memory', { method: 'POST', body }) } as never,
 		calls,
 	};
 }

@@ -234,13 +234,14 @@ describe('admin/webhooks/+page.server.ts writes by role', () => {
 			return json({});
 		}) as unknown as typeof globalThis.fetch;
 		const form = new FormData();
+		form.set('confirmed', 'yes');
 		form.set('id', 'w1');
 		return {
 			seen,
 			event: {
 				fetch,
 				cookies: mockCookies(),
-				request: { formData: async () => form },
+				request: { formData: async () => form, clone: () => ({ formData: async () => form }) },
 				url: new URL('http://localhost/admin/webhooks'),
 			} as never,
 		};
@@ -257,6 +258,25 @@ describe('admin/webhooks/+page.server.ts writes by role', () => {
 		await actions.delete(event);
 		expect(seen.some((u) => u.includes('/api/admin/webhooks/w1'))).toBe(true);
 	});
+
+	// A click before the page hydrates posts the form with no question asked.
+	it('deletes nothing on a post that skipped the question, and asks it on the page', async () => {
+		const fetch = vi.fn();
+		const body = new FormData();
+		body.set('id', 'w1');
+		const url = new URL('http://localhost/admin/webhooks?/delete');
+		const out = await actions.delete({ fetch, cookies: mockCookies(), url, request: new Request(url, { method: 'POST', body }) } as never);
+		expect(fetch).not.toHaveBeenCalled();
+		expect(out).toEqual({
+			unconfirmed: {
+				question: 'Delete this webhook?',
+				detail: 'This cannot be undone.',
+				label: 'Delete',
+				action: '/admin/webhooks?/delete',
+				fields: [['id', 'w1']],
+			},
+		});
+	});
 });
 
 /** An action event whose session reads as `roles` and whose writes answer `answer`. */
@@ -269,14 +289,16 @@ function postEvent(fields: Record<string, string>, answer: (url: string) => Resp
 		return answer(asked);
 	}) as unknown as typeof globalThis.fetch;
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [key, value] of Object.entries(fields)) form.set(key, value);
+	const url = new URL('http://localhost/admin/webhooks');
 	return {
 		seen,
 		event: {
 			fetch,
 			cookies: mockCookies(),
-			request: { formData: async () => form },
-			url: new URL('http://localhost/admin/webhooks'),
+			request: new Request(url, { method: 'POST', body: form }),
+			url,
 		} as never,
 	};
 }

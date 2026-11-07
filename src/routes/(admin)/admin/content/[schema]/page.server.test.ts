@@ -363,12 +363,13 @@ describe('deleting an entry', () => {
 			return answer();
 		}) as unknown as typeof globalThis.fetch;
 		const fd = new FormData();
+		fd.set('confirmed', 'yes');
 		fd.set('id', id);
 		const event = {
 			fetch,
 			cookies: mockCookies({ '__Host-sys_session': 'tok', '__Host-csrf': 'csrf' }),
 			params: { schema: 'posts' },
-			request: { formData: async () => fd },
+			request: { formData: async () => fd, clone: () => ({ formData: async () => fd }) },
 		} as never;
 		return { event, calls };
 	}

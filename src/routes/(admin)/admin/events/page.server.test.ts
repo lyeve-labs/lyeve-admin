@@ -60,6 +60,7 @@ type Failure = { status: number; data: { error: string } };
 
 function replayEvent(fields: Record<string, string>) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) body.set(k, v);
 	return { request: new Request('http://localhost/admin/events', { method: 'POST', body }), url: new URL('http://localhost/admin/events') } as never;
 }

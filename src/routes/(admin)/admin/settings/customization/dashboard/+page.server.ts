@@ -18,6 +18,7 @@ import { resolveWidgets } from '$lib/server/dashboard-widgets';
 import { readError } from '$lib/server/read-error';
 import { GATE_OK, section } from '$lib/api/gate';
 import { current, openTab } from '../customization.server';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();
@@ -98,16 +99,23 @@ export const actions: Actions = {
 		return { preview, previewAs: roles[0], previewAt: new Date().toISOString() };
 	},
 
-	reset: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		try {
-			await resetDashboardLayout(authedClient(event));
-			return { reset: true };
-		} catch (err) {
-			const failed = actionFailure(err, 'Could not reset the dashboard. Try again.');
-			return fail(failed.status, failed.data);
-		}
-	},
+	reset: asked(
+		{
+			question: 'Reset the dashboard?',
+			detail: 'Everyone in this tenant sees the stock dashboard again, and this layout is deleted.',
+			label: 'Reset',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			try {
+				await resetDashboardLayout(authedClient(event));
+				return { reset: true };
+			} catch (err) {
+				const failed = actionFailure(err, 'Could not reset the dashboard. Try again.');
+				return fail(failed.status, failed.data);
+			}
+		},
+	),
 
 	/** The page shown above the dashboard, or none. */
 	home: async (event) => {

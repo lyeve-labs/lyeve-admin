@@ -21,6 +21,7 @@ import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 import { rowsOf, pageWindow, pastEndOffset, statedTotal, totalOf, withOffset } from '$lib/api/list';
 import { listPeople } from '$lib/server/people';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 /** What the page says in place of a requests read that failed. */
 const REQUESTS_FAILED = couldNotLoad('the requests for more quota');
@@ -120,23 +121,31 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
-	review: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		const decision = String(form.get('decision') ?? '');
-		if (!id) return fail(400, { action: 'review', error: 'This form is missing its request. Reload the page and try again.' });
-		if (decision !== 'approve' && decision !== 'deny') {
-			return fail(400, { action: 'review', error: 'Choose approve or deny.' });
-		}
-		try {
-			await reviewRequest(client, id, decision === 'approve');
-		} catch (err) {
-			return tagged('review', actionFailure(err, 'Could not review the request. Try again.'));
-		}
-		return { reviewed: id };
-	},
+	review: asked(
+		{
+			question: 'Approve this request?',
+			detail: 'The tenant\'s limits are raised to what it asked for.',
+			label: 'Approve',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			const decision = String(form.get('decision') ?? '');
+			if (!id) return fail(400, { action: 'review', error: 'This form is missing its request. Reload the page and try again.' });
+			if (decision !== 'approve' && decision !== 'deny') {
+				return fail(400, { action: 'review', error: 'Choose approve or deny.' });
+			}
+			try {
+				await reviewRequest(client, id, decision === 'approve');
+			} catch (err) {
+				return tagged('review', actionFailure(err, 'Could not review the request. Try again.'));
+			}
+			return { reviewed: id };
+		},
+		(form) => form.get('decision') === 'approve',
+	),
 
 	quota: async (event) => {
 		await requireRole(event, ['super_admin']);

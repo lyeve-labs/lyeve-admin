@@ -84,6 +84,7 @@ function write(fields: Record<string, string>, reply: Response = json({})) {
 		return reply.clone();
 	});
 	const form = new FormData();
+	form.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) form.set(k, v);
 	const url = new URL('http://admin/admin/settings/email/triggers');
 	return { calls, event: { fetch, url, request: new Request(url, { method: 'POST', body: form }) } as never };

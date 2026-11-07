@@ -19,6 +19,7 @@ import {
 } from '$lib/api/cache';
 import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 /** What the response cache rules read answered. */
 interface RulesState {
@@ -96,36 +97,50 @@ export const actions: Actions = {
 		return saveRule(event, id);
 	},
 
-	deleteRule: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.' });
-		try {
-			await deleteRule(client, id);
-		} catch (err) {
-			return actionFailure(err, 'Could not delete the rule. Try again.');
-		}
-		return { removedRule: id };
-	},
+	deleteRule: asked(
+		{
+			question: 'Delete this rule?',
+			detail: 'Its cached responses are removed, and the route is served without the cache from the next request.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.' });
+			try {
+				await deleteRule(client, id);
+			} catch (err) {
+				return actionFailure(err, 'Could not delete the rule. Try again.');
+			}
+			return { removedRule: id };
+		},
+	),
 
 	// A purge evicts this tenant's cached responses only. Each one is
 	// recomputed on its next request, which is the load the confirm names.
-	purge: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const rule = String(form.get('rule') ?? '').trim();
-		const tag = String(form.get('tag') ?? '').trim();
-		if (tag && !tagIsSound(tag)) {
-			return fail(400, { error: 'Use 1 to 64 letters, digits, dots, dashes or underscores for the tag.' });
-		}
-		try {
-			const purged = rule ? await purgeRule(client, rule) : await purgeResponses(client, tag);
-			return { purged, purgedWhat: rule ? 'rule' : tag ? `tag ${tag}` : 'all' };
-		} catch (err) {
-			return actionFailure(err, 'Could not purge the cached responses. Try again.');
-		}
-	},
+	purge: asked(
+		{
+			question: 'Purge these cached responses?',
+			detail: 'Each purged response is computed again on its next request.',
+			label: 'Purge',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const rule = String(form.get('rule') ?? '').trim();
+			const tag = String(form.get('tag') ?? '').trim();
+			if (tag && !tagIsSound(tag)) {
+				return fail(400, { error: 'Use 1 to 64 letters, digits, dots, dashes or underscores for the tag.' });
+			}
+			try {
+				const purged = rule ? await purgeRule(client, rule) : await purgeResponses(client, tag);
+				return { purged, purgedWhat: rule ? 'rule' : tag ? `tag ${tag}` : 'all' };
+			} catch (err) {
+				return actionFailure(err, 'Could not purge the cached responses. Try again.');
+			}
+		},
+	),
 };

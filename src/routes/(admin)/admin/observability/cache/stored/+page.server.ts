@@ -9,6 +9,7 @@ import { flushAll, flushTag, listEntries, type CacheEntry } from '$lib/api/cache
 import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -72,20 +73,27 @@ export const actions: Actions = {
 	// on its next request, so this is a deliberate load against the database
 	// and the page says so before it happens. The plugin admits a tenant admin
 	// and scopes the flush to the tenant.
-	flush: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const tag = String(form.get('tag') ?? '').trim();
-		// The plugin scopes only a tenant tag to the tenant. Any other tag is
-		// flushed from every tenant's entries, so it stays with a super admin.
-		if (tag) await requireRole(event, ['super_admin']);
-		try {
-			if (tag) await flushTag(client, tag);
-			else await flushAll(client);
-		} catch (err) {
-			return actionFailure(err, 'Could not flush the cache. Try again.');
-		}
-		return { flushed: tag || 'everything' };
-	},
+	flush: asked(
+		{
+			question: 'Flush these cached entries?',
+			detail: 'Each flushed key is computed again on its next request, which adds that load to the database immediately.',
+			label: 'Flush',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const tag = String(form.get('tag') ?? '').trim();
+			// The plugin scopes only a tenant tag to the tenant. Any other tag is
+			// flushed from every tenant's entries, so it stays with a super admin.
+			if (tag) await requireRole(event, ['super_admin']);
+			try {
+				if (tag) await flushTag(client, tag);
+				else await flushAll(client);
+			} catch (err) {
+				return actionFailure(err, 'Could not flush the cache. Try again.');
+			}
+			return { flushed: tag || 'everything' };
+		},
+	),
 };

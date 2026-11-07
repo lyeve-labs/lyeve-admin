@@ -11,6 +11,7 @@ import {
 	saveCustomPage,
 	type CustomPage,
 } from '$lib/api/customization';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { user, customization } = await event.parent();
@@ -57,14 +58,21 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		try {
-			await deleteCustomPage(authedClient(event), event.params.slug);
-		} catch (err) {
-			const failed = actionFailure(err, 'Could not delete the page. Try again.');
-			return fail(failed.status, failed.data);
-		}
-		redirect(303, '/admin/settings/customization/pages');
-	},
+	delete: asked(
+		{
+			question: 'Delete this page?',
+			detail: 'Its menu entry is removed too, and the dashboard stops showing it.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			try {
+				await deleteCustomPage(authedClient(event), event.params.slug);
+			} catch (err) {
+				const failed = actionFailure(err, 'Could not delete the page. Try again.');
+				return fail(failed.status, failed.data);
+			}
+			redirect(303, '/admin/settings/customization/pages');
+		},
+	),
 };

@@ -13,6 +13,7 @@ import { actions, load } from './+page.server';
 
 function event(form: Record<string, string>) {
 	const data = new FormData();
+	data.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(form)) data.set(k, v);
 	const request = { formData: async () => data, clone: () => request };
 	return { request } as never;

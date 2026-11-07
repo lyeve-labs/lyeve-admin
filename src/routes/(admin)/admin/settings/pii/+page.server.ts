@@ -7,6 +7,7 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { createRule, deleteRule, getRules, testRule, updateRule, type RuleCatalog } from '$lib/api/pii-mask';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -83,18 +84,25 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its rule. Reload the page and try again.' });
-		try {
-			await deleteRule(authedClient(event), id);
-			return { deleted: true };
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the rule. Try again.', 422));
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this rule?',
+			detail: 'Values it masks appear unmasked from the next request.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its rule. Reload the page and try again.' });
+			try {
+				await deleteRule(authedClient(event), id);
+				return { deleted: true };
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the rule. Try again.', 422));
+			}
+		},
+	),
 
 	// The dry run. It stores nothing, so it is safe to press repeatedly while
 	// a pattern is being worked out, which is the whole point of it.

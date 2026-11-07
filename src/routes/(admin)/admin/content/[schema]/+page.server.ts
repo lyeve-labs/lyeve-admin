@@ -9,6 +9,7 @@ import { readError } from '$lib/server/read-error';
 import { section, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, totalOf, withOffset, type ListEnvelope } from '$lib/api/list';
 import { fieldKey } from '$lib/utils/content-form';
+import { asked } from '$lib/server/asked';
 
 /** One row of the admin content listing, before it is reshaped for the table. */
 type EntryRow = {
@@ -170,18 +171,25 @@ async function nameRelatedEntries(
 }
 
 export const actions: Actions = {
-	delete: async (event) => {
-		await requireUser(event);
-		const { request } = event;
-		const client = authedClient(event);
-		const form = await request.formData();
-		const id = form.get('id') as string;
-		if (!id) return fail(400, { error: 'This form is missing its entry. Reload the page and try again.' });
-		try {
-			await client.delete(`/api/admin/content/${encodeURIComponent(id)}`);
-			return { ok: true };
-		} catch (err) {
-			return actionFailure(err, 'Could not delete the entry. Try again.');
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this entry?',
+			detail: 'Its revisions and translations are deleted too.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const { request } = event;
+			const client = authedClient(event);
+			const form = await request.formData();
+			const id = form.get('id') as string;
+			if (!id) return fail(400, { error: 'This form is missing its entry. Reload the page and try again.' });
+			try {
+				await client.delete(`/api/admin/content/${encodeURIComponent(id)}`);
+				return { ok: true };
+			} catch (err) {
+				return actionFailure(err, 'Could not delete the entry. Try again.');
+			}
+		},
+	),
 };

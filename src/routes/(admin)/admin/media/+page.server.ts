@@ -11,6 +11,7 @@ import { ApiError } from '@lyeve-labs/client';
 import { PLUGIN } from '$lib/plugin-names';
 import { runs } from '$lib/plugins';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 export type { MediaItem } from '$lib/api/media';
 
@@ -97,21 +98,28 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions: Actions = {
-	delete: async (event) => {
-		await requireUser(event);
-		const { request } = event;
-		const client = authedClient(event);
-		const data = await request.formData();
-		const id = String(data.get('id') ?? '');
-		if (!id) return fail(400, { error: NO_FILE });
-		try {
-			await client.delete(`/api/admin/media/${encodeURIComponent(id)}`);
-		} catch (err) {
-			// The delete is asked from the preview drawer, which stays open on a
-			// refusal, so the failure names its file and shows there.
-			return fail(400, { deleteError: actionError(err, 'Could not delete the file. Try again.'), deleteId: id });
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this file?',
+			detail: 'The file is removed from the library, and any page that links to it can no longer load it. This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireUser(event);
+			const { request } = event;
+			const client = authedClient(event);
+			const data = await request.formData();
+			const id = String(data.get('id') ?? '');
+			if (!id) return fail(400, { error: NO_FILE });
+			try {
+				await client.delete(`/api/admin/media/${encodeURIComponent(id)}`);
+			} catch (err) {
+				// The delete is asked from the preview drawer, which stays open on a
+				// refusal, so the failure names its file and shows there.
+				return fail(400, { deleteError: actionError(err, 'Could not delete the file. Try again.'), deleteId: id });
+			}
+		},
+	),
 
 	update: async (event) => {
 		await requireUser(event);

@@ -41,6 +41,7 @@ const welcome = { slug: 'welcome', title: 'Welcome', roles: [], position: 0 };
 
 function event(form: Record<string, string> = {}, { roles = ['admin'], running = true } = {}) {
 	const fd = new FormData();
+	fd.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(form)) fd.append(k, v);
 	return {
 		request: new Request('http://localhost', { method: 'POST', body: fd }),

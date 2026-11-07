@@ -24,6 +24,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { ActionData, PageData } from './$types';
 	import { applyAction, enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Ban, KeySquare, Plus, RefreshCw, ScrollText } from '@lucide/svelte';
@@ -75,11 +76,11 @@
 		return { action: String(v.action), error: String(v.error), fields: v.fields ?? {}, needsMfa: v.needsMfa };
 	}
 
-	// The last refusal, per action, kept here rather than read from `form`: a
+	// The last refusal, per action. It follows `form`, which a post from the
+	// layout's confirmation banner sets, and the handlers below overwrite it: a
 	// success never goes through `form` (see issue below), so `form` would
 	// keep showing a refusal the operator has already fixed.
-	// svelte-ignore state_referenced_locally
-	let failure = $state<Failure | null>(asFailure(form));
+	let failure = $derived<Failure | null>(asFailure(form));
 	const createFailure = $derived(failure?.action === 'create' ? failure : null);
 	const rotateFailure = $derived(failure?.action === 'rotate' ? failure : null);
 	const pageFailure = $derived(failure?.action === 'revoke' ? failure : null);
@@ -179,7 +180,7 @@
 
 	/** Revoking asks first and names the token, then the row stays as revoked. */
 	function revokeToken(t: AdminToken): SubmitFunction {
-		return async ({ cancel }) => {
+		return async ({ cancel, formData }) => {
 			const ok = await confirmDialog(
 				`Revoke token ${t.name} (lyat_${t.display_prefix})?`,
 				'Anything calling the admin API with it is refused from now on. The token stays listed as revoked and cannot be used again.',
@@ -189,6 +190,7 @@
 				cancel();
 				return;
 			}
+			formData.set(CONFIRM_FIELD, CONFIRMED);
 			return async ({ result }) => {
 				if (result.type === 'success') {
 					failure = null;

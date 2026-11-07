@@ -18,6 +18,7 @@ import {
 } from '$lib/api/request-capture';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 export const load: PageServerLoad = async (event) => {
 	const { plugins } = await event.parent();
@@ -108,16 +109,23 @@ export const actions: Actions = {
 		return saveRule(event, idOf(form), fromRow ? null : 'rule');
 	},
 
-	deleteRule: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const form = await event.request.formData();
-		const id = idOf(form);
-		if (!id) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.' });
-		try {
-			await deleteCaptureRule(authedClient(event), id);
-		} catch (err) {
-			return actionFailure(err, 'Could not delete the rule. Try again.');
-		}
-		return { removedRule: id };
-	},
+	deleteRule: asked(
+		{
+			question: 'Delete this rule?',
+			detail: 'The captures it kept stay until their retention ends.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const form = await event.request.formData();
+			const id = idOf(form);
+			if (!id) return fail(400, { error: 'This form is missing its rule. Reload the page and try again.' });
+			try {
+				await deleteCaptureRule(authedClient(event), id);
+			} catch (err) {
+				return actionFailure(err, 'Could not delete the rule. Try again.');
+			}
+			return { removedRule: id };
+		},
+	),
 };

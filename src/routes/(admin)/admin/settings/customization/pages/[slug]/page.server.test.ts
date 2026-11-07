@@ -76,6 +76,7 @@ type Failure = { status: number; data: { error: string } };
 
 function actionEvent(fields: Record<string, string> = {}) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) body.set(k, v);
 	return {
 		params: { slug: 'launch' },

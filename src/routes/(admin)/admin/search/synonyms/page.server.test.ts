@@ -77,8 +77,9 @@ async function runLoad(search: string, routes: Record<string, () => Response> = 
 function actionEvent(fields: Record<string, string | string[]>, routes: Record<string, () => Response> = {}) {
 	const { fetch, calls } = engine(routes);
 	const fd = new FormData();
+	fd.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) fd.append(k, one);
-	const event = { fetch, cookies: mockCookies(), request: { formData: async () => fd } } as never;
+	const event = { fetch, cookies: mockCookies(), request: { formData: async () => fd, clone: () => ({ formData: async () => fd }) } } as never;
 	return { event, calls };
 }
 

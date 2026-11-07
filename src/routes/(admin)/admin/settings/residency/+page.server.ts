@@ -17,6 +17,7 @@ import {
 import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
 import { rowsOf } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 /** The most regions the page lists. An instance runs in a handful. */
 const REGION_CAP = 100;
@@ -159,17 +160,24 @@ export const actions: Actions = {
 		return { saved: displayName };
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its region. Reload the page and try again.' });
-		try {
-			await deleteRegion(client, id);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the region. Try again.'));
-		}
-		return { removed: id };
-	},
+	delete: asked(
+		{
+			question: 'Delete this region?',
+			detail: 'Tenants in this region are not moved. Move them first, or the report can no longer show where their data is.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its region. Reload the page and try again.' });
+			try {
+				await deleteRegion(client, id);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the region. Try again.'));
+			}
+			return { removed: id };
+		},
+	),
 };

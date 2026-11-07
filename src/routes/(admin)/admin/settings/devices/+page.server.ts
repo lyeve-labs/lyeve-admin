@@ -13,6 +13,7 @@ import {
 import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -80,17 +81,24 @@ export const actions: Actions = {
 		return { trusted: label };
 	},
 
-	untrust: async (event) => {
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'This form is missing its device. Reload the page and try again.' });
-		try {
-			await untrustDevice(client, id);
-		} catch (err) {
-			const failed = actionFailure(err, 'Could not forget this device. Try again.');
-			return fail(failed.status, failed.data);
-		}
-		return { removed: id };
-	},
+	untrust: asked(
+		{
+			question: 'Forget this device?',
+			detail: 'It stops being a trusted device. Signing in from it again is treated as a new device.',
+			label: 'Forget',
+		},
+		async (event) => {
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { error: 'This form is missing its device. Reload the page and try again.' });
+			try {
+				await untrustDevice(client, id);
+			} catch (err) {
+				const failed = actionFailure(err, 'Could not forget this device. Try again.');
+				return fail(failed.status, failed.data);
+			}
+			return { removed: id };
+		},
+	),
 };

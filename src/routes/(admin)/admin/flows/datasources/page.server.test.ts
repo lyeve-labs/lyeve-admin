@@ -46,7 +46,7 @@ function loadEvent(routes: Record<string, Route>) {
 
 function actionEvent(form: FormData, routes: Record<string, Route>) {
 	const { fetch, calls } = fetchFor(routes);
-	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => form }, url: new URL('http://localhost/admin/flows/datasources'), params: {} } as never };
+	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => form, clone: () => ({ formData: async () => form }) }, url: new URL('http://localhost/admin/flows/datasources'), params: {} } as never };
 }
 
 const body = (calls: { url: string; init?: RequestInit }[], method: string) =>
@@ -406,6 +406,7 @@ describe('admin/flows/datasources actions', () => {
 
 	it('delete removes by id', async () => {
 		const form = new FormData();
+		form.set('confirmed', 'yes');
 		form.set('id', 'd1');
 		const { event, calls } = actionEvent(form, { '/datasources/d1': () => new Response(null, { status: 204 }) });
 		await actions.delete(event);

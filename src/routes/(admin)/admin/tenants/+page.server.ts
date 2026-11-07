@@ -15,6 +15,7 @@ import { refusalText } from '$lib/api/refusal';
 import { section, type Gate, type Section } from '$lib/api/gate';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 /** The engine's own page size when a request names none. */
 const DEFAULT_LIMIT = 50;
@@ -162,17 +163,24 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const { request } = event;
-		const client = authedClient(event);
-		const data = await request.formData();
-		const id = String(data.get('id') ?? '');
-		try {
-			await deleteTenant(id, client);
-		} catch (err) {
-			const failed = actionFailure(err, 'Could not delete the tenant. Try again.');
-			return fail(failed.status, { action: 'delete', ...failed.data });
-		}
-	},
+	delete: asked(
+		{
+			question: 'Delete this tenant?',
+			detail: "All of its data and users are deleted. Its stored files stay in the storage backend until that backend's own lifecycle rules remove them.",
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const { request } = event;
+			const client = authedClient(event);
+			const data = await request.formData();
+			const id = String(data.get('id') ?? '');
+			try {
+				await deleteTenant(id, client);
+			} catch (err) {
+				const failed = actionFailure(err, 'Could not delete the tenant. Try again.');
+				return fail(failed.status, { action: 'delete', ...failed.data });
+			}
+		},
+	),
 };

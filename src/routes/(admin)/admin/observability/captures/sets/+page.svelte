@@ -13,6 +13,7 @@
 		confirm as confirmDialog,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import { confirmed } from '$lib/forms.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Play, Trash2 } from '@lucide/svelte';
@@ -42,7 +43,7 @@
 	 * place of the redacted ones, so the confirm says that before it runs.
 	 */
 	function runSet(s: ReplaySet, writes: boolean): SubmitFunction {
-		return async ({ cancel }) => {
+		return async ({ cancel, formData }) => {
 			const ok = await confirmDialog(
 				writes ? `Replay ${s.name}, writes included?` : `Replay ${s.name}?`,
 				writes
@@ -54,6 +55,7 @@
 				cancel();
 				return;
 			}
+			formData.set(CONFIRM_FIELD, CONFIRMED);
 			return async ({ update }) => {
 				await update({ reset: false });
 			};

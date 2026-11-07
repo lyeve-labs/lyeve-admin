@@ -18,6 +18,7 @@ import {
 } from '$lib/api/saml';
 import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -169,19 +170,26 @@ export const actions: Actions = {
 		return { saved: name };
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its provider. Reload the page and try again.' });
-		try {
-			await deleteProvider(client, id);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the provider. Try again.'));
-		}
-		return { removed: id };
-	},
+	delete: asked(
+		{
+			question: 'Delete this SAML provider?',
+			detail: 'People who sign in through this provider lose access, and its private key is deleted. This cannot be undone.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its provider. Reload the page and try again.' });
+			try {
+				await deleteProvider(client, id);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the provider. Try again.'));
+			}
+			return { removed: id };
+		},
+	),
 
 	prepare: async (event) => {
 		await requireRole(event, ['super_admin']);
@@ -197,17 +205,24 @@ export const actions: Actions = {
 		return { prepared: id };
 	},
 
-	rollover: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'rollover', error: 'This form is missing its provider. Reload the page and try again.' });
-		try {
-			await rolloverCert(client, id);
-		} catch (err) {
-			return tagged('rollover', actionFailure(err, 'Could not promote the certificate. Try again.'));
-		}
-		return { rolled: id };
-	},
+	rollover: asked(
+		{
+			question: 'Promote the new certificate for this provider?',
+			detail: 'Every request is signed with it from now on. Promote it only after the identity provider trusts the new certificate from the metadata document.',
+			label: 'Promote',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'rollover', error: 'This form is missing its provider. Reload the page and try again.' });
+			try {
+				await rolloverCert(client, id);
+			} catch (err) {
+				return tagged('rollover', actionFailure(err, 'Could not promote the certificate. Try again.'));
+			}
+			return { rolled: id };
+		},
+	),
 };

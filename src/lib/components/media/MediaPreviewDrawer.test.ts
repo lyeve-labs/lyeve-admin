@@ -154,7 +154,9 @@ describe('MediaPreviewDrawer', () => {
 		expect(kit.confirm.mock.calls[0]?.[2]).toEqual({ confirmLabel: 'Delete' });
 
 		kit.confirm.mockResolvedValue(true);
-		const after = await deleteSubmit()({ cancel: vi.fn() } as never);
+		const formData = new FormData(form);
+		const after = await deleteSubmit()({ cancel: vi.fn(), formData } as never);
+		expect(formData.get('confirmed')).toBe('yes');
 		const update = vi.fn(async () => {});
 		await (after as (a: unknown) => Promise<void>)({ result: { type: 'success' }, update });
 		expect(update).toHaveBeenCalled();
@@ -167,7 +169,7 @@ describe('MediaPreviewDrawer', () => {
 	it('keeps the drawer and says nothing more when the delete is refused', async () => {
 		kit.confirm.mockResolvedValue(true);
 		const { ondeleted } = setup(VIDEO);
-		const after = await deleteSubmit()({ cancel: vi.fn() } as never);
+		const after = await deleteSubmit()({ cancel: vi.fn(), formData: new FormData() } as never);
 		await (after as (a: unknown) => Promise<void>)({ result: { type: 'failure' }, update: vi.fn(async () => {}) });
 		expect(kit.success).not.toHaveBeenCalled();
 		expect(ondeleted).not.toHaveBeenCalled();

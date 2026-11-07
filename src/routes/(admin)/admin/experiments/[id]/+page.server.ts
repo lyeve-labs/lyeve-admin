@@ -24,6 +24,7 @@ import {
 } from '$lib/api/ab-testing';
 import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 function metricType(value: string): MetricType | null {
 	return METRIC_TYPES.includes(value as MetricType) ? (value as MetricType) : null;
@@ -88,19 +89,26 @@ export const actions: Actions = {
 		return { saved: name };
 	},
 
-	removeVariant: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const vid = String(form.get('vid') ?? '');
-		if (!vid) return fail(400, { action: 'removeVariant', error: 'This form is missing its variant. Reload the page and try again.' });
-		try {
-			await deleteVariant(client, event.params.id, vid);
-		} catch (err) {
-			return tagged('removeVariant', actionFailure(err, 'Could not remove the variant. Try again.'));
-		}
-		return { removed: vid };
-	},
+	removeVariant: asked(
+		{
+			question: 'Remove this variant?',
+			detail: 'Exposures already recorded for it are kept, and the results still count people who saw it.',
+			label: 'Remove',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const vid = String(form.get('vid') ?? '');
+			if (!vid) return fail(400, { action: 'removeVariant', error: 'This form is missing its variant. Reload the page and try again.' });
+			try {
+				await deleteVariant(client, event.params.id, vid);
+			} catch (err) {
+				return tagged('removeVariant', actionFailure(err, 'Could not remove the variant. Try again.'));
+			}
+			return { removed: vid };
+		},
+	),
 
 	addMetric: async (event) => {
 		await requireRole(event, ['admin', 'super_admin']);
@@ -132,17 +140,24 @@ export const actions: Actions = {
 		return { saved: name };
 	},
 
-	removeMetric: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const mid = String(form.get('mid') ?? '');
-		if (!mid) return fail(400, { action: 'removeMetric', error: 'This form is missing its metric. Reload the page and try again.' });
-		try {
-			await deleteMetric(client, event.params.id, mid);
-		} catch (err) {
-			return tagged('removeMetric', actionFailure(err, 'Could not remove the metric. Try again.'));
-		}
-		return { removed: mid };
-	},
+	removeMetric: asked(
+		{
+			question: 'Remove this metric?',
+			detail: 'The events it counted stay recorded.',
+			label: 'Remove',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const mid = String(form.get('mid') ?? '');
+			if (!mid) return fail(400, { action: 'removeMetric', error: 'This form is missing its metric. Reload the page and try again.' });
+			try {
+				await deleteMetric(client, event.params.id, mid);
+			} catch (err) {
+				return tagged('removeMetric', actionFailure(err, 'Could not remove the metric. Try again.'));
+			}
+			return { removed: mid };
+		},
+	),
 };

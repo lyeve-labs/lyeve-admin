@@ -53,11 +53,12 @@ function loadEvent(routes: Record<string, Route>, plugins = withEmail) {
 
 function actionEvent(form: FormData, routes: Record<string, Route>) {
 	const { fetch, calls } = fetchFor(routes);
-	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => form }, url: new URL('http://localhost/admin/settings/email'), params: {} } as never };
+	return { calls, event: { fetch, cookies: mockCookies(), request: { formData: async () => form, clone: () => ({ formData: async () => form }) }, url: new URL('http://localhost/admin/settings/email'), params: {} } as never };
 }
 
 function form(entries: Record<string, string | string[]>): FormData {
 	const fd = new FormData();
+	fd.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(entries)) {
 		for (const one of Array.isArray(v) ? v : [v]) fd.append(k, one);
 	}

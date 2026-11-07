@@ -4,6 +4,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { CONFIRM_FIELD, CONFIRMED } from '$lib/confirmation';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { RotateCcw, Skull, Trash2, XCircle } from '@lucide/svelte';
@@ -68,7 +69,7 @@
 
 	/** Deleting drops the delivery for good, so it asks first and names it. */
 	function deletePermanently(dl: DeadLetter): SubmitFunction {
-		return async ({ cancel }) => {
+		return async ({ cancel, formData }) => {
 			const ok = await confirm(
 				`Delete the dead letter from ${dl.webhook_name}?`,
 				`The ${dl.event_type} delivery that died at ${formatDateTime(dl.dead_at)} is deleted permanently. It cannot be replayed.`,
@@ -78,6 +79,7 @@
 				cancel();
 				return;
 			}
+			formData.set(CONFIRM_FIELD, CONFIRMED);
 			return async ({ result, update }) => {
 				if (result.type === 'success') {
 					deadLetterItems = deadLetterItems.filter((x) => x.id !== dl.id);

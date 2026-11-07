@@ -125,8 +125,9 @@ describe('the experiment load', () => {
 
 function actionEvent(form: Record<string, string>) {
 	const data = new FormData();
+	data.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(form)) data.set(k, v);
-	return { params: { id: ID }, request: { formData: async () => data } } as never;
+	return { params: { id: ID }, request: { formData: async () => data, clone: () => ({ formData: async () => data }) } } as never;
 }
 
 const EXP = `/api/admin/ab/experiments/${ID}`;

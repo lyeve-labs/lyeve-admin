@@ -22,6 +22,7 @@ import {
 import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset, type PagedList } from '$lib/api/list';
 import { couldNotLoad } from '$lib/outage';
+import { asked } from '$lib/server/asked';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -153,19 +154,26 @@ export const actions: Actions = {
 		return save(event, id);
 	},
 
-	delete: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'delete', error: 'This form is missing its rule. Reload the page and try again.' });
-		try {
-			await deleteRule(client, id);
-		} catch (err) {
-			return tagged('delete', actionFailure(err, 'Could not delete the rule. Try again.'));
-		}
-		return { removed: id };
-	},
+	delete: asked(
+		{
+			question: 'Delete this rule?',
+			detail: 'If the rule is enforced, its endpoint stops being limited by it immediately.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'delete', error: 'This form is missing its rule. Reload the page and try again.' });
+			try {
+				await deleteRule(client, id);
+			} catch (err) {
+				return tagged('delete', actionFailure(err, 'Could not delete the rule. Try again.'));
+			}
+			return { removed: id };
+		},
+	),
 
 	global: async (event) => {
 		await requireRole(event, ['super_admin']);
@@ -216,17 +224,24 @@ export const actions: Actions = {
 		return { savedProtection: name };
 	},
 
-	resetProtection: async (event) => {
-		await requireRole(event, ['super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const name = String(form.get('name') ?? '');
-		if (!name) return fail(400, { action: 'resetProtection', error: 'This form is missing its protection. Reload the page and try again.' });
-		try {
-			await resetProtection(client, name);
-		} catch (err) {
-			return tagged('resetProtection', actionFailure(err, 'Could not reset the protection. Try again.'));
-		}
-		return { resetProtection: name };
-	},
+	resetProtection: asked(
+		{
+			question: 'Reset this protection?',
+			detail: 'It returns to its default limit.',
+			label: 'Reset',
+		},
+		async (event) => {
+			await requireRole(event, ['super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const name = String(form.get('name') ?? '');
+			if (!name) return fail(400, { action: 'resetProtection', error: 'This form is missing its protection. Reload the page and try again.' });
+			try {
+				await resetProtection(client, name);
+			} catch (err) {
+				return tagged('resetProtection', actionFailure(err, 'Could not reset the protection. Try again.'));
+			}
+			return { resetProtection: name };
+		},
+	),
 };

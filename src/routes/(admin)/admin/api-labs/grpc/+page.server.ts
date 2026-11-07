@@ -13,6 +13,7 @@ import {
 	type GrpcInvokeResult,
 } from '$lib/api/labs';
 import { MAX_BODY_BYTES, send } from '../labs.server';
+import { asked } from '$lib/server/asked';
 
 /** The roles that may read the listener's status and send through it. */
 const READERS = ['super_admin'];
@@ -81,55 +82,66 @@ function notRun(status: number, body: string): string {
 }
 
 export const actions: Actions = {
-	grpc: async (event) => {
-		// The allowlist is what the plugin says it transcodes, read from the
-		// engine here rather than taken from the form, for the same reason the
-		// REST allowlist is: a list the caller can choose is not one. The
-		// plugin checks it again on its side, which is where it counts.
-		const form = await event.request.formData();
-		const route = String(form.get('route') ?? '');
+	grpc: asked(
+		{
+			question: 'Run this call?',
+			detail: 'It runs on the transcoding listener as you, and it changes data.',
+			label: 'Run it',
+		},
+		async (event) => {
+			// The allowlist is what the plugin says it transcodes, read from the
+			// engine here rather than taken from the form, for the same reason the
+			// REST allowlist is: a list the caller can choose is not one. The
+			// plugin checks it again on its side, which is where it counts.
+			const form = await event.request.formData();
+			const route = String(form.get('route') ?? '');
 
-		const grpc = await readGrpcRoutes(authedClient(event));
-		if (!grpc.routes.includes(route)) {
-			return fail(400, { error: 'Choose a route from the list.' });
-		}
-
-		const params: Record<string, string> = {};
-		for (const name of grpcRouteParams(route)) {
-			const v = String(form.get(`g_${name}`) ?? '').trim();
-			if (!v) {
-				return fail(400, { error: `Fill in ${name}. A placeholder left in the path returns a misleading 404.` });
+			const grpc = await readGrpcRoutes(authedClient(event));
+			if (!grpc.routes.includes(route)) {
+				return fail(400, { error: 'Choose a route from the list.' });
 			}
-			params[name] = v;
-		}
 
-		const payload: Record<string, unknown> = { route, params };
-		const raw = String(form.get('body') ?? '').trim();
-		if (raw && grpcRouteTakesBody(route)) {
-			if (byteLength(raw) > MAX_BODY_BYTES) {
-				return fail(400, { error: 'The body can be at most 256 KB.' });
+			const params: Record<string, string> = {};
+			for (const name of grpcRouteParams(route)) {
+				const v = String(form.get(`g_${name}`) ?? '').trim();
+				if (!v) {
+					return fail(400, { error: `Fill in ${name}. A placeholder left in the path returns a misleading 404.` });
+				}
+				params[name] = v;
 			}
+
+			const payload: Record<string, unknown> = { route, params };
+			const raw = String(form.get('body') ?? '').trim();
+			if (raw && grpcRouteTakesBody(route)) {
+				if (byteLength(raw) > MAX_BODY_BYTES) {
+					return fail(400, { error: 'The body can be at most 256 KB.' });
+				}
+				try {
+					payload.body = JSON.parse(raw);
+				} catch (err) {
+					return fail(400, { error: `Fix the JSON in the body: ${(err as Error).message}` });
+				}
+			}
+
+			const out = await send(event, 'POST', GRPC_INVOKE_URL, JSON.stringify(payload), 'application/json');
+			if ('error' in out) return fail(504, { error: out.error });
+
+			// The engine answers 200 when the call ran, whatever the transcoded
+			// handler said. Anything else is the plugin refusing to run it.
+			if (out.result.status !== 200) {
+				return fail(400, { error: notRun(out.result.status, out.result.body) });
+			}
+			let invoked: GrpcInvokeResult;
 			try {
-				payload.body = JSON.parse(raw);
-			} catch (err) {
-				return fail(400, { error: `Fix the JSON in the body: ${(err as Error).message}` });
+				invoked = JSON.parse(out.result.body) as GrpcInvokeResult;
+			} catch {
+				return fail(502, { error: 'Could not read the response.' });
 			}
-		}
-
-		const out = await send(event, 'POST', GRPC_INVOKE_URL, JSON.stringify(payload), 'application/json');
-		if ('error' in out) return fail(504, { error: out.error });
-
-		// The engine answers 200 when the call ran, whatever the transcoded
-		// handler said. Anything else is the plugin refusing to run it.
-		if (out.result.status !== 200) {
-			return fail(400, { error: notRun(out.result.status, out.result.body) });
-		}
-		let invoked: GrpcInvokeResult;
-		try {
-			invoked = JSON.parse(out.result.body) as GrpcInvokeResult;
-		} catch {
-			return fail(502, { error: 'Could not read the response.' });
-		}
-		return { grpc: labResultFromInvoke(invoked), grpcRoute: route };
-	},
+			return { grpc: labResultFromInvoke(invoked), grpcRoute: route };
+		},
+		(form) => {
+			const route = String(form.get('route') ?? '');
+			return grpcRouteTakesBody(route) || route.startsWith('DELETE ');
+		},
+	),
 };

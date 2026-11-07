@@ -76,8 +76,10 @@ describe('webhooks page', () => {
 
 		kit.confirm.mockResolvedValue(true);
 		const agreed = vi.fn();
-		await submit({ cancel: agreed });
+		const formData = new FormData(form);
+		await submit({ cancel: agreed, formData });
 		expect(agreed).not.toHaveBeenCalled();
+		expect(formData.get('confirmed')).toBe('yes');
 	});
 
 	it('creates and edits in one drawer, Create on new and Save on a row', async () => {

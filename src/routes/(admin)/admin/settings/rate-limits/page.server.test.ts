@@ -31,6 +31,7 @@ import { load, actions } from './+page.server';
 
 function formEvent(fields: Record<string, string>) {
 	const body = new FormData();
+	body.set('confirmed', 'yes');
 	for (const [k, v] of Object.entries(fields)) body.set(k, v);
 	return {
 		request: new Request('http://admin/settings/rate-limits', { method: 'POST', body }),

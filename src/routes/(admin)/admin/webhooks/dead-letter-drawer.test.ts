@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 type After = (input: { result: { type: string }; update: () => Promise<void> }) => Promise<void>;
-type Submit = (input: { cancel: () => void }) => Promise<After | void>;
+type Submit = (input: { cancel: () => void; formData: FormData }) => Promise<After | void>;
 
 /** The submit function enhance holds for the connected delete form. */
 function deleteSubmit(): Submit {
@@ -92,7 +92,9 @@ describe('the dead letter drawer', () => {
 
 	it('drops a deleted entry from the list once the delete succeeds', async () => {
 		render(DeadLetterDrawer, { props: props(queue([entry('a', 'pending'), entry('c', 'pending')])) });
-		const after = (await deleteSubmit()({ cancel: vi.fn() })) as After;
+		const formData = new FormData();
+		const after = (await deleteSubmit()({ cancel: vi.fn(), formData })) as After;
+		expect(formData.get('confirmed')).toBe('yes');
 		await after({ result: { type: 'success' }, update: async () => {} });
 		flushSync();
 		expect(dialog()?.querySelectorAll('tbody tr')).toHaveLength(1);
@@ -100,7 +102,7 @@ describe('the dead letter drawer', () => {
 
 	it('keeps an entry whose delete failed', async () => {
 		render(DeadLetterDrawer, { props: props(queue([entry('a', 'pending')])) });
-		const after = (await deleteSubmit()({ cancel: vi.fn() })) as After;
+		const after = (await deleteSubmit()({ cancel: vi.fn(), formData: new FormData() })) as After;
 		await after({ result: { type: 'failure' }, update: async () => {} });
 		flushSync();
 		expect(dialog()?.querySelectorAll('tbody tr')).toHaveLength(1);
@@ -111,8 +113,10 @@ describe('the dead letter drawer', () => {
 		kit.confirm.mockResolvedValue(false);
 		render(DeadLetterDrawer, { props: props(queue([entry('a', 'pending')])) });
 		const cancel = vi.fn();
-		expect(await deleteSubmit()({ cancel })).toBeUndefined();
+		const formData = new FormData();
+		expect(await deleteSubmit()({ cancel, formData })).toBeUndefined();
 		expect(cancel).toHaveBeenCalled();
+		expect(formData.has('confirmed')).toBe(false);
 		const [title, detail] = kit.confirm.mock.calls[0] as unknown as [string, string];
 		expect(title).toBe('Delete the dead letter from Ship it?');
 		expect(detail).toContain('2026');

@@ -21,6 +21,7 @@ import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate
 import { couldNotLoad } from '$lib/outage';
 import { exportConfigFrom } from '$lib/data-export-form';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
+import { asked } from '$lib/server/asked';
 
 /** The plugin's own 503 when every export slot is taken. */
 const EXPORTS_BUSY = 'too many concurrent exports running, try again later';
@@ -167,17 +168,24 @@ export const actions: Actions = {
 		}
 	},
 
-	deleteSchedule: async (event) => {
-		await requireRole(event, ['admin', 'super_admin']);
-		const client = authedClient(event);
-		const form = await event.request.formData();
-		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { action: 'deleteSchedule' as const, error: 'This form is missing its schedule. Reload the page and try again.' });
-		try {
-			await deleteSchedule(client, id);
-			return { deleted: id };
-		} catch (err) {
-			return tagged('deleteSchedule', actionFailure(err, 'Could not delete the schedule. Try again.'));
-		}
-	},
+	deleteSchedule: asked(
+		{
+			question: 'Delete this schedule?',
+			detail: 'No new exports start from it. Exports it already started stay in the list.',
+			label: 'Delete',
+		},
+		async (event) => {
+			await requireRole(event, ['admin', 'super_admin']);
+			const client = authedClient(event);
+			const form = await event.request.formData();
+			const id = String(form.get('id') ?? '');
+			if (!id) return fail(400, { action: 'deleteSchedule' as const, error: 'This form is missing its schedule. Reload the page and try again.' });
+			try {
+				await deleteSchedule(client, id);
+				return { deleted: id };
+			} catch (err) {
+				return tagged('deleteSchedule', actionFailure(err, 'Could not delete the schedule. Try again.'));
+			}
+		},
+	),
 };
