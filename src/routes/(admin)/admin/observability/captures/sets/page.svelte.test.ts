@@ -107,6 +107,13 @@ describe('the gate', () => {
 	});
 });
 
+describe('a failed delete', () => {
+	it('says the set was not deleted', () => {
+		const { container } = render(SetsPage, { props: props({}, { error: 'Could not delete the replay set. Try again.' }) });
+		expect(said(container)).toContain('Could not delete the replay set. Try again.');
+	});
+});
+
 describe('a failed side read', () => {
 	it('says a refused sets read with its gate', () => {
 		const { container } = render(SetsPage, {
