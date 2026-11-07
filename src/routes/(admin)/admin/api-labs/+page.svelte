@@ -116,7 +116,7 @@
 	<ApiLabsTabs active="rest" {superAdmin} />
 
 	<section class="flex flex-col gap-4">
-		<SectionHeading level={2}>Pick an endpoint</SectionHeading>
+		<SectionHeading level={2}>Choose an endpoint</SectionHeading>
 		<label for="endpoint-narrow" class="sr-only">Search endpoints</label>
 		<SearchInput id="endpoint-narrow" bind:value={narrow} placeholder="Search {data.endpoints.length} endpoints" />
 
@@ -128,7 +128,7 @@
 			</EmptyState>
 		{:else}
 			<div class="max-h-72 overflow-auto rounded border border-line">
-				<Table label="Pick an endpoint">
+				<Table label="Choose an endpoint">
 					<tbody>
 						{#each visible.slice(0, 200) as e (e.id)}
 							<tr>

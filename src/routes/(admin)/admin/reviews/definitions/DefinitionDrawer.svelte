@@ -311,7 +311,7 @@
 												id="stage-escalate-{stage.key}"
 												label="User"
 												hint="The user becomes the assignee when the SLA passes."
-												placeholder="Pick a user"
+												placeholder="Choose a user"
 												options={escalateOptions(stage.escalate_to)}
 												searchable
 												disabled={stagesLocked}

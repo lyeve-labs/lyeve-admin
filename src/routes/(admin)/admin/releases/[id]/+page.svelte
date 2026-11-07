@@ -344,7 +344,7 @@
 				id="release-entry"
 				name="entry_id"
 				label="Entry"
-				placeholder="Pick an entry"
+				placeholder="Choose an entry"
 				options={entryOptions}
 				searchable
 				required

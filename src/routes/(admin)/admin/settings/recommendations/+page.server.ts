@@ -109,7 +109,7 @@ export const actions: Actions = {
 		const userId = String(form.get('user_id') ?? '').trim();
 		if (!userId) return fail(400, { action: 'preview', error: 'Enter a user id.' });
 		if (!isUserId(userId)) {
-			return fail(400, { action: 'preview', error: 'That is not a user id. Pick a reader by email, or paste the id from the Users page.' });
+			return fail(400, { action: 'preview', error: 'That is not a user id. Choose a reader by email, or paste the id from the Users page.' });
 		}
 		try {
 			const entries = await generateFeed(client, userId);

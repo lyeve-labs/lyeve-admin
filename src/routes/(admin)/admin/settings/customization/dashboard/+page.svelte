@@ -305,7 +305,7 @@
 									<MultiSelect
 										id="widget-{w.id}-schemas"
 										label="Content types"
-										placeholder="Pick content types"
+										placeholder="Choose content types"
 										hint="Up to 12, in the order picked."
 										searchable
 										options={withOwn(w.schemas ?? [])}

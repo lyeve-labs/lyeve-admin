@@ -219,7 +219,7 @@
 		{:else if entries.length === 0 && data.status}
 			<EmptyState
 				title="No {STATUS_LABELS[data.status].toLowerCase()} entries"
-				description="Pick another status, or All to see every entry."
+				description="Choose another status, or All to see every entry."
 			>
 				{#snippet iconSnippet()}
 					<Inbox size={ICON.lg} />

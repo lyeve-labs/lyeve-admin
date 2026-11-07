@@ -183,7 +183,7 @@
 							id="review-definition"
 							name="definition_id"
 							label="Definition"
-							placeholder="Pick a definition"
+							placeholder="Choose a definition"
 							options={definitionOptions}
 							searchable
 							bind:value={definitionId}
@@ -195,7 +195,7 @@
 								name="assignee_id"
 								label="Assignee"
 								hint="The first reviewer."
-								placeholder="Pick a user"
+								placeholder="Choose a user"
 								options={personOptions}
 								searchable
 								bind:value={assigneeId}
@@ -222,7 +222,7 @@
 							id="review-other-assignees"
 							label="More assignees"
 							hint="A stage that needs several approvals gets them from these assignees, so pick at least as many people as it needs."
-							placeholder="Pick users"
+							placeholder="Choose users"
 							options={otherOptions}
 							searchable
 							bind:value={otherIds}

@@ -106,7 +106,7 @@
 						label="Transcoded route"
 						bind:value={grpcRoute}
 						options={data.grpc.routes.map((r) => ({ value: r, label: r }))}
-						placeholder="Pick a route"
+						placeholder="Choose a route"
 						searchable
 					/>
 					{#if grpcParams.length > 0}

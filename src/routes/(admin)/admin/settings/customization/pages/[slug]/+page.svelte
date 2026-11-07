@@ -194,7 +194,7 @@
 						<MultiSelect
 							id="block-{i}-schemas"
 							label="Content types to count"
-							placeholder="Pick content types"
+							placeholder="Choose content types"
 							hint="Up to 12."
 							searchable
 							options={withOwn(block.schemas ?? [])}

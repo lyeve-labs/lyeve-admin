@@ -128,7 +128,7 @@
 			<EmptyState
 				title="Nothing under review"
 				description={data.status
-					? 'No assignments have this status. Pick another status to see the rest.'
+					? 'No assignments have this status. Choose another status to see the rest.'
 					: 'Entries appear here when you start a review from the entry editor.'}
 			>
 				{#snippet iconSnippet()}<ClipboardCheck size={ICON.lg} />{/snippet}
