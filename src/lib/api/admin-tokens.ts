@@ -3,6 +3,7 @@ import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 import { httpStatusTone } from '../tones';
 import { outageFor } from '../outage';
+import { plural } from '../format';
 
 const TOKENS_URL = '/api/admin/admin-tokens';
 
@@ -306,7 +307,7 @@ export function expiryDistance(expiresAt: string, now: Date = new Date()): strin
 	if (Number.isNaN(at)) return '';
 	const left = at - now.getTime();
 	const span = Math.abs(left);
-	const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+	const unit = (n: number, word: string) => `${n} ${plural(n, word)}`;
 	let amount: string;
 	if (span < 60 * 60 * 1000) amount = unit(Math.max(1, Math.round(span / 60000)), 'minute');
 	else if (span < DAY_MS) amount = unit(Math.round(span / 3600000), 'hour');

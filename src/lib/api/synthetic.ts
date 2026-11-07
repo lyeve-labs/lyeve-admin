@@ -15,6 +15,7 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { toChannels, type AlertChannels } from './alert-channels';
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import { rowsOf, type ListEnvelope } from './list';
+import { plural } from '$lib/format';
 
 export const PROBES_URL = '/api/admin/synthetic-monitoring/probes';
 export const ALERTS_URL = '/api/admin/synthetic-monitoring/alerts';
@@ -366,11 +367,11 @@ export function everyLabel(seconds: number): string {
 	if (!Number.isFinite(seconds) || seconds <= 0) return 'Not scheduled';
 	if (seconds % 3600 === 0) {
 		const hours = seconds / 3600;
-		return `Every ${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+		return `Every ${hours} ${plural(hours, 'hour')}`;
 	}
 	if (seconds % 60 === 0) {
 		const minutes = seconds / 60;
-		return `Every ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+		return `Every ${minutes} ${plural(minutes, 'minute')}`;
 	}
 	return `Every ${seconds} seconds`;
 }

@@ -21,6 +21,7 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
+import { plural } from '$lib/format';
 
 export const PROVIDERS_URL = '/api/admin/saml-providers';
 export const TEMPLATES_URL = '/api/admin/saml-templates';
@@ -219,7 +220,7 @@ export function providerHealth(p: SamlProvider, now: Date = new Date()): CertHea
 export function expiryLabel(when: string | null | undefined, now: Date = new Date()): string {
 	const days = daysUntil(when, now);
 	if (days === null) return 'Expiry unknown';
-	if (days < 0) return `Expired ${Math.abs(days)} ${Math.abs(days) === 1 ? 'day' : 'days'} ago`;
+	if (days < 0) return `Expired ${Math.abs(days)} ${plural(Math.abs(days), 'day')} ago`;
 	if (days === 0) return 'Expires today';
-	return `Expires in ${days} ${days === 1 ? 'day' : 'days'}`;
+	return `Expires in ${days} ${plural(days, 'day')}`;
 }

@@ -17,8 +17,8 @@
 	import { ICON } from '$lib/icon';
 	import { methodTone } from '$lib/tones';
 	import { isExternalHref } from '$lib/links';
-	import { formatCount, formatDateTime, relativeTime } from '$lib/format';
-	import { formatSignedBinaryBytes, formatNs } from '$lib/api/profiler';
+	import { formatCount, formatBytes, formatDateTime, relativeTime } from '$lib/format';
+	import { formatNs } from '$lib/api/profiler';
 	import { CATEGORY_LABEL } from '$lib/plugin-categories';
 	import { ROUTE_GROUP_LABEL, STATE_LABEL, STATE_TONE, groupRoutes } from '$lib/plugin-rows';
 
@@ -194,7 +194,7 @@
 					<Stat size="sm" label="Requests sampled" mono value={formatCount(data.traffic.count)} />
 					<Stat size="sm" label="Average" mono value={formatNs(data.traffic.avg_duration_ns)} />
 					<Stat size="sm" label="Slowest" mono value={formatNs(data.traffic.max_duration_ns)} />
-					<Stat size="sm" label="Allocated" mono value={formatSignedBinaryBytes(data.traffic.total_alloc_bytes)} />
+					<Stat size="sm" label="Allocated" mono value={formatBytes(data.traffic.total_alloc_bytes)} />
 				</div>
 				<p class="text-xs text-faint">
 					Across every tenant, from the profiler's recent sample. Resetting the profiler restarts the count.

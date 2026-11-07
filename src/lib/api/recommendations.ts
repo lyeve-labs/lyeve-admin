@@ -124,24 +124,6 @@ export function hasUsers(stats: AbStats | null): boolean {
 	return !!stats && stats.total_users > 0;
 }
 
-/** A percentage the engine already computed, at one decimal place. */
-export function percent(value: number | null | undefined): string {
-	if (value === null || value === undefined || !Number.isFinite(value)) return '-';
-	return `${value.toFixed(1)}%`;
-}
-
-/** How long a recompute took, in units a person reads. */
-export function took(ms: number | null | undefined): string {
-	if (ms === null || ms === undefined || !Number.isFinite(ms)) return '-';
-	if (ms >= 60_000) {
-		const minutes = Math.floor(ms / 60_000);
-		const seconds = Math.round((ms % 60_000) / 1000);
-		return `${minutes}m ${seconds}s`;
-	}
-	if (ms >= 1000) return `${(ms / 1000).toFixed(1)} s`;
-	return `${Math.round(ms)} ms`;
-}
-
 /**
  * A score at a precision the model supports.
  *

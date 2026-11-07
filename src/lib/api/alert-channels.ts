@@ -1,4 +1,5 @@
 import { text } from './narrow';
+import { plural } from '../format';
 /**
  * The alert channels every monitoring plugin offers, in the one shape they
  * all answer and accept: email recipients, a Slack and a Discord URL, a
@@ -75,7 +76,7 @@ export function channelSummary(c: AlertChannels | null | undefined): string {
 	if (!c || !hasChannels(c)) return 'No channels';
 	const parts: string[] = [];
 	const n = c.email?.length ?? 0;
-	if (n) parts.push(n === 1 ? '1 email' : `${n} emails`);
+	if (n) parts.push(`${n} ${plural(n, 'email')}`);
 	if (c.slack_url) parts.push('Slack');
 	if (c.discord_url) parts.push('Discord');
 	if (c.webhook_url) parts.push('Webhook');

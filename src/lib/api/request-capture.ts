@@ -15,6 +15,7 @@
  */
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
+import { plural } from '$lib/format';
 
 export const CAPTURES_URL = '/api/admin/request-captures';
 export const CAPTURE_RULES_URL = `${CAPTURES_URL}/rules`;
@@ -199,11 +200,11 @@ export function sampleLabel(rate: number): string {
 export function retentionLabel(seconds: number): string {
 	if (seconds % 86400 === 0) {
 		const d = seconds / 86400;
-		return `${d} ${d === 1 ? 'day' : 'days'}`;
+		return `${d} ${plural(d, 'day')}`;
 	}
 	if (seconds % 3600 === 0) {
 		const h = seconds / 3600;
-		return `${h} ${h === 1 ? 'hour' : 'hours'}`;
+		return `${h} ${plural(h, 'hour')}`;
 	}
 	return `${Math.round(seconds / 60)} minutes`;
 }

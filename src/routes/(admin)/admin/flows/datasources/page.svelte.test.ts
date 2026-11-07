@@ -207,7 +207,7 @@ describe('datasources page', () => {
 		const { container } = setup([warehouse, inventory], { testResult: { id: 'd1', ok: true, latency_ms: 8, error: '' } });
 		const rows = container.querySelectorAll('tbody tr');
 		expect(rows[0].textContent).toContain('connected');
-		expect(rows[0].textContent).toContain('8 ms');
+		expect(rows[0].textContent).toContain('8.0 ms');
 		expect(rows[1].textContent).toContain('not tested');
 	});
 

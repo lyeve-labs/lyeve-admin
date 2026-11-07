@@ -24,7 +24,6 @@
 		STATUS_LABELS,
 		hasWinner,
 		pValue,
-		ratePercent,
 		splitIsSound,
 		splitTotal,
 		statusTone,
@@ -34,7 +33,7 @@
 		type Metric,
 		type Variant,
 	} from '$lib/api/ab-testing';
-	import { NO_VALUE } from '$lib/format';
+	import { NO_VALUE, formatPercent } from '$lib/format';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
@@ -206,7 +205,7 @@
 							</td>
 							<td data-cell="nowrap" class="font-mono text-xs">{v.sample_size}</td>
 							<td data-cell="nowrap" class="font-mono text-xs">{v.conversions}</td>
-							<td data-cell="nowrap" class="font-mono text-xs">{ratePercent(v.conversion_rate)}</td>
+							<td data-cell="nowrap" class="font-mono text-xs">{formatPercent(v.conversion_rate)}</td>
 							<td data-cell="nowrap" class="text-xs text-faint">{pValue(v.p_value)}</td>
 						</tr>
 					{/each}

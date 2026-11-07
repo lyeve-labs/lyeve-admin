@@ -29,6 +29,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { MIGRATIONS_DEPENDENCY, type PendingStatement } from '$lib/api/migrate';
 	import { overlayClosed } from '$lib/overlay';
+	import { plural } from '$lib/format';
 
 	interface Props {
 		/** Migrations waiting to be applied, or null when the engine did not answer. */
@@ -118,17 +119,17 @@
 		type="button"
 		data-testid="db-status"
 		loading={syncing}
-		title="{pending} migration{pending === 1 ? '' : 's'} waiting to be applied"
+		title="{pending} {plural(pending, 'migration')} waiting to be applied"
 		onclick={() => (confirming = true)}
 	>
 		<CircleAlert size={ICON.sm} class="shrink-0 text-warn" aria-hidden="true" />
 		<span class="text-warn">{pending} pending</span>
-		<span class="text-warn {words}">migration{pending === 1 ? '' : 's'}</span>
+		<span class="text-warn {words}">{plural(pending, 'migration')}</span>
 	</Button>
 	<Modal
 		bind:open={confirming}
 		size="lg"
-		title="Apply {pending} pending migration{pending === 1 ? '' : 's'}"
+		title="Apply {pending} pending {plural(pending, 'migration')}"
 		description="Every statement queued for every tenant runs now. A dropped column cannot be brought back."
 	>
 		<ul class="flex flex-col gap-2 text-sm" data-testid="db-status-queue">
@@ -153,7 +154,7 @@
 		{#snippet footer()}
 			<Button variant="secondary" onclick={() => (confirming = false)}>Cancel</Button>
 			<Button variant="danger" type="submit" form="db-status-apply" loading={syncing}>
-				Apply {pending} migration{pending === 1 ? '' : 's'}
+				Apply {pending} {plural(pending, 'migration')}
 			</Button>
 		{/snippet}
 	</Modal>

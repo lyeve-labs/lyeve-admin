@@ -58,6 +58,7 @@
 		type ValidateResult,
 	} from '$lib/api/bulk-import';
 	import { formatBytes, formatCount } from '$lib/format';
+	import { plural } from '$lib/format';
 
 	let {
 		open = $bindable(false),
@@ -436,7 +437,7 @@
 			{/if}
 		{:else if step === 1 && preview}
 			<p class="text-sm text-muted">
-				{formatCount(preview.total_rows)} {preview.total_rows === 1 ? 'row' : 'rows'} of {IMPORT_FORMAT_LABELS[preview.source_format] ?? preview.source_format}
+				{formatCount(preview.total_rows)} {plural(preview.total_rows, 'row')} of {IMPORT_FORMAT_LABELS[preview.source_format] ?? preview.source_format}
 				from <span class="font-mono text-xs">{preview.source_name}</span>.
 				{#if preview.export}This is a LyEve export: its slug, title and status are mapped to the entry's own.{/if}
 				{#if template}Mapped from the template {template.name}.{/if}
@@ -588,7 +589,7 @@
 		{:else}
 			<Button variant="secondary" onclick={() => (step = 1)}>Back</Button>
 			<Button variant="primary" loading={busy} disabled={importable === 0} onclick={importRows}>
-				Import {formatCount(importable)} {importable === 1 ? 'row' : 'rows'}
+				Import {formatCount(importable)} {plural(importable, 'row')}
 			</Button>
 		{/if}
 	{/snippet}

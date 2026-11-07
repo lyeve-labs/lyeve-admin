@@ -18,6 +18,7 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
+import { plural } from '$lib/format';
 
 export const POLICIES_URL = '/api/admin/retention-policies';
 export const HOLDS_URL = '/api/admin/legal-holds';
@@ -230,13 +231,13 @@ export function retentionLabel(days: number): string {
 	if (days === 0) return 'Delete at the next run';
 	if (days % 365 === 0) {
 		const years = days / 365;
-		return `${years} ${years === 1 ? 'year' : 'years'}`;
+		return `${years} ${plural(years, 'year')}`;
 	}
 	if (days % 30 === 0) {
 		const months = days / 30;
-		return `${months} ${months === 1 ? 'month' : 'months'}`;
+		return `${months} ${plural(months, 'month')}`;
 	}
-	return `${days} ${days === 1 ? 'day' : 'days'}`;
+	return `${days} ${plural(days, 'day')}`;
 }
 
 /**

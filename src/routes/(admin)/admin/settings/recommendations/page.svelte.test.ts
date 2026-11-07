@@ -119,7 +119,7 @@ describe('the recompute', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({}, { refreshed: true, pairs: 120, trending: 30, feeds: 400, ms: 125_000 }),
 		});
-		await vi.waitFor(() => expect(said(container)).toContain('2m 5s'));
+		await vi.waitFor(() => expect(said(container)).toContain('2m 05s'));
 		expect(said(container)).toContain('120 similarity pairs');
 	});
 

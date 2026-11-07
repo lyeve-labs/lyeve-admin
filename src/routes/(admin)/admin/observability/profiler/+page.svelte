@@ -29,12 +29,11 @@
 	import {
 		PROFILE_SECONDS,
 		PROFILE_TYPES,
-		formatSignedBinaryBytes,
 		formatNs,
 		latencyTone,
 		type EndpointStats,
 	} from '$lib/api/profiler';
-	import { NO_VALUE, formatDateTime, formatTime } from '$lib/format';
+	import { NO_VALUE, formatBytes, formatDateTime, formatSignedBytes, formatTime } from '$lib/format';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
@@ -122,7 +121,7 @@
 					<td class="text-right"><Badge tone={latencyTone(row.p95_duration_ns)}>{formatNs(row.p95_duration_ns)}</Badge></td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.p99_duration_ns)}</td>
 					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(row.max_duration_ns)}</td>
-					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(row.avg_alloc_bytes)}</td>
+					<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(row.avg_alloc_bytes)}</td>
 				</tr>
 			{/each}
 		</tbody>
@@ -194,12 +193,12 @@
 		{:else}
 			<Card>
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="memory-stats">
-					<Stat size="sm" label="Heap in use" mono value={formatSignedBinaryBytes(latest.heap_alloc)} />
+					<Stat size="sm" label="Heap in use" mono value={formatBytes(latest.heap_alloc)} />
 					<Stat size="sm" label="Heap objects" mono value={latest.heap_objects} />
-					<Stat size="sm" label="Allocated total" mono value={formatSignedBinaryBytes(latest.total_alloc)} />
+					<Stat size="sm" label="Allocated total" mono value={formatBytes(latest.total_alloc)} />
 					<Stat size="sm" label="GC cycles" mono value={latest.num_gc} />
 					<Stat size="sm" label="Goroutines" mono value={latest.num_goroutine} />
-					<Stat size="sm" label="Heap slope" mono value="{formatSignedBinaryBytes(memory.slope_bytes_per_sec)}/s" tone={memory.leak_likely ? 'danger' : undefined} />
+					<Stat size="sm" label="Heap slope" mono value="{formatSignedBytes(memory.slope_bytes_per_sec)}/s" tone={memory.leak_likely ? 'danger' : undefined} />
 				</div>
 				<p class="mt-3 text-xs text-muted">
 					Last snapshot {formatDateTime(latest.timestamp, NO_VALUE)}.
@@ -266,7 +265,7 @@
 										<td data-cell="nowrap" class="font-mono text-xs"><span class="text-faint">{formatTime(e.captured_at, e.captured_at)}</span></td>
 										<td class="text-right"><Badge tone={httpStatusTone(e.status_code)}>{e.status_code}</Badge></td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(e.duration_ns)}</td>
-										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(e.alloc_bytes)}</td>
+										<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(e.alloc_bytes)}</td>
 										<td data-cell="nowrap" class="text-right font-mono text-xs">{e.num_goroutine}</td>
 										<td data-cell="nowrap" class="text-xs">{e.plugin || NO_VALUE}</td>
 									</tr>
@@ -305,7 +304,7 @@
 							<td data-cell="nowrap" class="text-right text-xs"><span class="text-faint">{p.count}</span></td>
 							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(p.avg_duration_ns)}</td>
 							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatNs(p.max_duration_ns)}</td>
-							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatSignedBinaryBytes(p.total_alloc_bytes)}</td>
+							<td data-cell="nowrap" class="text-right font-mono text-xs">{formatBytes(p.total_alloc_bytes)}</td>
 						</tr>
 					{/each}
 				</tbody>

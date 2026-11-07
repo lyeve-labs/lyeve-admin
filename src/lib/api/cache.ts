@@ -16,6 +16,7 @@ import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import type { ListEnvelope } from './list';
 import type { Limit } from './limits';
+import { plural } from '$lib/format';
 
 export const STATS_URL = '/api/admin/cache/stats';
 export const PROVIDERS_URL = '/api/admin/cache/providers';
@@ -172,7 +173,7 @@ export async function purgeResponses(client: HttpClient, tag: string): Promise<n
  */
 export function ruleCount(limit: Limit | undefined, shown: number): string {
 	const current = limit?.current ?? shown;
-	const noun = current === 1 ? 'rule' : 'rules';
+	const noun = plural(current, 'rule');
 	if (limit && limit.limit !== null) return `${current} of ${limit.limit} rules`;
 	return `${current} ${noun}`;
 }

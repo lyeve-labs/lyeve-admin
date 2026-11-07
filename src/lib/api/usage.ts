@@ -152,7 +152,7 @@ export async function deleteQuota(client: HttpClient, tenantId: string): Promise
 
 const GIB = 1024 ** 3;
 
-/** GiB, the unit the editor speaks, to the bytes the engine stores. */
+/** GB of 1,024 MB, the unit the editor speaks, to the bytes the engine stores. */
 export function gibToBytes(gib: number): number {
 	return Number.isFinite(gib) && gib > 0 ? Math.round(gib * GIB) : 0;
 }
@@ -164,7 +164,7 @@ export function bytesToGib(b: number): number {
 /**
  * The bytes a byte limit field posts: the stored value while the field still
  * shows what it showed when the editor opened, so a limit the editor can only
- * round to hundredths of a GiB is sent back unchanged.
+ * round to hundredths of a GB is sent back unchanged.
  */
 export function keptBytes(gib: number, shownGib: number, storedBytes: number): number {
 	return gib === shownGib ? storedBytes : gibToBytes(gib);
@@ -172,7 +172,7 @@ export function keptBytes(gib: number, shownGib: number, storedBytes: number): n
 
 /**
  * The quota a form names. A field that is not a non-negative number reads as
- * 0. A byte limit posted in bytes wins over the same limit in GiB.
+ * 0. A byte limit posted in bytes wins over the same limit in GB.
  */
 export function quotaFrom(form: FormData): QuotaInput {
 	const n = (key: string) => {

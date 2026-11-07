@@ -4,7 +4,6 @@ import {
 	isFinished,
 	movesFrom,
 	pValue,
-	ratePercent,
 	splitIsSound,
 	splitTotal,
 	statusTone,
@@ -184,12 +183,6 @@ describe('the traffic split', () => {
 });
 
 describe('the numbers as printed', () => {
-	it('shows a rate at a precision the sample supports', () => {
-		expect(ratePercent(0.1234)).toBe('12.3%');
-		expect(ratePercent(0)).toBe('0.0%');
-		expect(ratePercent(null)).toBe('-');
-	});
-
 	// A p-value of 0.0000001 reads as a measurement and is a floating point
 	// artifact of a small sample.
 	it('shows a very small p-value as a bound', () => {

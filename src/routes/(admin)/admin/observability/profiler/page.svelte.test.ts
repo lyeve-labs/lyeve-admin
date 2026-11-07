@@ -54,9 +54,9 @@ describe('the profiler page', () => {
 		const { container, getByTestId } = render(ProfilerPage, props(page()));
 		expect(container.textContent).toContain('Leak likely');
 		expect(container.textContent).toContain('heap grew for 10 snapshots');
-		expect(getByTestId('memory-stats').textContent).toContain('3.0 MiB');
+		expect(getByTestId('memory-stats').textContent).toContain('3.0 MB');
 		expect(getByTestId('profiler-slowest').textContent).toContain('/api/v1/content');
-		expect(getByTestId('profiler-slowest').textContent).toContain('2.50s');
+		expect(getByTestId('profiler-slowest').textContent).toContain('2.50 s');
 		expect(getByTestId('profiler-plugins').textContent).toContain('core');
 	});
 

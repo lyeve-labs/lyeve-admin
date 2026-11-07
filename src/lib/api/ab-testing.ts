@@ -304,17 +304,6 @@ export function totalSample(results: ExperimentResults | null): number {
 }
 
 /**
- * A conversion rate as a percentage.
- *
- * The engine sends a fraction. One decimal place, because a rate quoted to
- * four looks measured to a precision the sample size does not support.
- */
-export function ratePercent(rate: number | null | undefined): string {
-	if (rate === null || rate === undefined || !Number.isFinite(rate)) return '-';
-	return `${(rate * 100).toFixed(1)}%`;
-}
-
-/**
  * A p-value, or a note that there is not one.
  *
  * Very small values are shown as a bound rather than a number: 0.0000001 reads

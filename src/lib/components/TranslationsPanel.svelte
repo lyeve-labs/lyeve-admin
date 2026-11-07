@@ -14,6 +14,7 @@
 	} from '$lib/api/localization';
 	import FieldInput from './FieldInput.svelte';
 	import { ICON } from '$lib/icon';
+	import { plural } from '$lib/format';
 
 	let {
 		fields,
@@ -228,7 +229,7 @@
 						<div class="flex items-baseline justify-between gap-2 text-xs">
 							<span class="text-muted">
 								{activeProgress.done} of {activeProgress.total}
-								{activeProgress.total === 1 ? 'field' : 'fields'} written
+								{plural(activeProgress.total, 'field')} written
 							</span>
 							<span class="font-mono text-faint">{activeProgress.percent}%</span>
 						</div>

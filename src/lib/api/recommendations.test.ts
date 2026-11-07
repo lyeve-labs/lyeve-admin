@@ -3,12 +3,10 @@ import { ApiError } from '@lyeve-labs/client';
 import {
 	hasUsers,
 	isAlreadyRunning,
-	percent,
 	score,
 	sourceLabel,
 	sourceTone,
 	splitIsSkewed,
-	took,
 	type AbStats,
 } from './recommendations';
 
@@ -79,20 +77,6 @@ describe('where a feed entry came from', () => {
 });
 
 describe('the numbers as printed', () => {
-	it('shows a percentage the engine computed at one decimal place', () => {
-		expect(percent(33.333)).toBe('33.3%');
-		expect(percent(0)).toBe('0.0%');
-		expect(percent(null)).toBe('-');
-	});
-
-	// A recompute is minutes on a large corpus, and 480000 ms is unreadable.
-	it('reads a long recompute in minutes', () => {
-		expect(took(450)).toBe('450 ms');
-		expect(took(2500)).toBe('2.5 s');
-		expect(took(125_000)).toBe('2m 5s');
-		expect(took(null)).toBe('-');
-	});
-
 	// Scores are unbounded floats. Fifteen digits in a table cell implies a
 	// precision ranking does not have.
 	it('rounds a score to something a table can hold', () => {

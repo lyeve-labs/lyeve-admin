@@ -1,6 +1,7 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { authedHeaders } from '$lib/server/authz';
 import { couldNotLoad } from '$lib/outage';
+import { plural } from '$lib/format';
 
 /**
  * A many_to_many field whose links did not all reach the plugin. The entry
@@ -96,8 +97,8 @@ export async function setRelations(
 	const notAdded = added.filter((r) => !r.ok).length;
 	if (notRemoved + notAdded > 0) {
 		const parts = [
-			notAdded > 0 ? `add ${notAdded} ${notAdded === 1 ? 'link' : 'links'}` : '',
-			notRemoved > 0 ? `remove ${notRemoved} ${notRemoved === 1 ? 'link' : 'links'}` : '',
+			notAdded > 0 ? `add ${notAdded} ${plural(notAdded, 'link')}` : '',
+			notRemoved > 0 ? `remove ${notRemoved} ${plural(notRemoved, 'link')}` : '',
 		].filter(Boolean);
 		throw new RelationWriteError(fieldName, `Could not ${parts.join(' or ')} in ${fieldName}.`);
 	}
