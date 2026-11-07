@@ -203,7 +203,7 @@ describe('admin/webhooks/incoming writes', () => {
 
 	it.each(['create', 'update'] as const)('refuses a map that is not JSON on %s without a request', async (name) => {
 		const { event, calls } = superAdminWrite({ ...ENDPOINT, id: 'i1', field_map: '{id:' });
-		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'Field map must be valid JSON.' });
+		expect(((await actions[name](event)) as Failure).data).toEqual({ action: name, error: 'Enter the field map as valid JSON.' });
 		expect(calls).toEqual([]);
 	});
 

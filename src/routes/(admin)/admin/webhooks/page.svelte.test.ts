@@ -60,32 +60,24 @@ function setup(roles: string[] = ['super_admin']) {
 }
 
 describe('webhooks page', () => {
-	it('does not delete straight from the row', async () => {
-		// A row that posts ?/delete directly destroys a webhook on one click and
-		// never reaches the confirmation.
-		const { container } = setup();
-		const rowForms = [...container.querySelectorAll('tbody form[action="?/delete"]')];
-		expect(rowForms, 'a delete form is live in the row').toHaveLength(0);
-	});
-
 	it('asks first, names the webhook, and posts its id only once agreed', async () => {
-		const { container, getByTitle } = setup();
-		const form = container.querySelector('form[action="?/delete"]') as HTMLFormElement;
-		const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {});
+		const { getByTitle } = setup();
+		const form = getByTitle('Delete').closest('form') as HTMLFormElement;
+		expect(form.getAttribute('action')).toBe('?/delete');
+		expect(new FormData(form).get('id')).toBe('w1');
+		const submit = forms.submits.find((f) => f.node === form)?.submit as (input: unknown) => Promise<unknown>;
 
-		await fireEvent.click(getByTitle('Delete'));
-		await tick();
+		const declined = vi.fn();
+		await submit({ cancel: declined });
 		expect(kit.confirm).toHaveBeenCalledWith('Delete webhook Ship it?', 'This cannot be undone.', {
 			confirmLabel: 'Delete',
 		});
-		expect(submit).not.toHaveBeenCalled();
+		expect(declined).toHaveBeenCalled();
 
 		kit.confirm.mockResolvedValue(true);
-		await fireEvent.click(getByTitle('Delete'));
-		await tick();
-		await tick();
-		expect(new FormData(form).get('id')).toBe('w1');
-		expect(submit).toHaveBeenCalled();
+		const agreed = vi.fn();
+		await submit({ cancel: agreed });
+		expect(agreed).not.toHaveBeenCalled();
 	});
 
 	it('creates and edits in one drawer, Create on new and Save on a row', async () => {

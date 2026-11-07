@@ -172,7 +172,7 @@
 													disabled={held !== null}
 													aria-label="Replay the dead letter from {dl.webhook_name}"
 												>
-													<RotateCcw class="h-3.5 w-3.5" />
+													<RotateCcw size={ICON.sm} />
 												</Button>
 											</form>
 											<form method="POST" action="?/dead-letter-dismiss" use:enhance>
@@ -185,7 +185,7 @@
 													disabled={held !== null}
 													aria-label="Dismiss the dead letter from {dl.webhook_name}"
 												>
-													<XCircle class="h-3.5 w-3.5" />
+													<XCircle size={ICON.sm} />
 												</Button>
 											</form>
 											<form method="POST" action="?/dead-letter-delete" use:enhance={deletePermanently(dl)}>
@@ -197,7 +197,7 @@
 													title="Delete permanently"
 													aria-label="Delete the dead letter from {dl.webhook_name} permanently"
 												>
-													<Trash2 class="h-3.5 w-3.5 text-danger" />
+													<Trash2 size={ICON.sm} class="text-danger" />
 												</Button>
 											</form>
 										</div>

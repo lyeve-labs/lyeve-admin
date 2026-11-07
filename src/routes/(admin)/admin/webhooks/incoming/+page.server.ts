@@ -95,7 +95,7 @@ export const actions: Actions = {
 		try {
 			fieldMap = JSON.parse(rawMap);
 		} catch {
-			return fail(400, { action: 'create', error: 'Field map must be valid JSON.' });
+			return fail(400, { action: 'create', error: 'Enter the field map as valid JSON.' });
 		}
 		// The engine refuses an empty map: every external key has to be mapped to a
 		// schema field explicitly. Catch it here so the operator is told before the
@@ -137,7 +137,7 @@ export const actions: Actions = {
 		try {
 			fieldMap = JSON.parse(rawMap);
 		} catch {
-			return fail(400, { action: 'update', error: 'Field map must be valid JSON.' });
+			return fail(400, { action: 'update', error: 'Enter the field map as valid JSON.' });
 		}
 		// The engine refuses an empty map: every external key has to be mapped to a
 		// schema field explicitly. Catch it here so the operator is told before the

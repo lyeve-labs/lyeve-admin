@@ -104,16 +104,16 @@
 								<td data-cell="nowrap">
 									{#if d.success}
 										<span class="flex items-center gap-1 text-xs text-success">
-											<CheckCircle class="h-3.5 w-3.5" /> OK
+											<CheckCircle size={ICON.xs} /> OK
 										</span>
 									{:else if d.error}
 										<span class="flex items-center gap-1 text-xs text-danger" title={d.error}>
-											<XCircle class="h-3.5 w-3.5" />
+											<XCircle size={ICON.xs} />
 											{d.error.slice(0, 40)}
 										</span>
 									{:else}
 										<span class="flex items-center gap-1 text-xs text-danger">
-											<XCircle class="h-3.5 w-3.5" /> Failed
+											<XCircle size={ICON.xs} /> Failed
 										</span>
 									{/if}
 								</td>
@@ -132,7 +132,7 @@
 													d.attempted_at
 												)}"
 											>
-												<RotateCcw class="h-3.5 w-3.5" />
+												<RotateCcw size={ICON.sm} />
 											</Button>
 										</form>
 									{/if}
