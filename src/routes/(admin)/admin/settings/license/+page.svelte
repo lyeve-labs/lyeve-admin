@@ -89,8 +89,8 @@
 <PageShell
 	title="License"
 	description={licensing.renew
-		? "See this instance's license and activate a new key."
-		: "See this instance's license."}
+		? "See this engine's license and activate a new key."
+		: "See this engine's license."}
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -208,7 +208,7 @@
 						{/if}
 					</form>
 				{:else}
-					<p class="text-sm text-muted">Only a super admin can change the license of this instance.</p>
+					<p class="text-sm text-muted">Only a super admin can change the license of this engine.</p>
 				{/if}
 			</Card>
 		</section>

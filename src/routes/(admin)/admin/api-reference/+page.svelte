@@ -507,7 +507,7 @@
 </PageShell>
 
 <!--
-	Running one endpoint against this instance.
+	Running one endpoint against this engine.
 
 	A reference answers "what exists". The question somebody actually opened it
 	with is "what does this return on my data", and this page is in an unusual
@@ -543,14 +543,14 @@
 				value={ep.path}
 				hint={missing.length > 0
 					? `Replace ${missing.map((m) => `{${m}}`).join(', ')} with real values before sending.`
-					: 'The request goes to this instance, signed in as you.'}
+					: 'The request goes to this engine, signed in as you.'}
 			/>
 
 			{#if write}
 				{#if data.canSeeAdmin}
 					<Checkbox
 						name="acknowledge"
-						label={`I understand this ${method} changes data on this instance.`}
+						label={`I understand this ${method} changes data on this engine.`}
 					/>
 					<Textarea id="try-body-{key}" name="body" label="Body" rows={3} />
 				{:else}

@@ -340,7 +340,7 @@
 					{/if}
 
 					{#if data.flows === null}
-						<p class="text-sm text-muted">The flow plugin is not running on this instance, so forms cannot start flows.</p>
+						<p class="text-sm text-muted">The flow plugin is not running on this engine, so forms cannot start flows.</p>
 					{:else if !data.flows.ok}
 						<GateNotice gate={data.flows.gate} title="Flows" absent="Flows are not included in this build." />
 					{:else if !data.flows.value.eventKnown}

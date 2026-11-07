@@ -35,7 +35,7 @@ const EXCHANGE_FAILURES: Readonly<Record<string, string>> = {
 	'the license server returned a token that does not verify':
 		'Could not verify the license returned for this key. The current license is unchanged. Trying the same key again fails the same way.',
 	'license key exchange is not configured on this instance':
-		'This instance cannot exchange a key with the license server. Paste the license token instead. The current license is unchanged.',
+		'This engine cannot exchange a key with the license server. Paste the license token instead. The current license is unchanged.',
 };
 
 /** Roles the engine gives the entitlements to. Nobody else has a license to read. */

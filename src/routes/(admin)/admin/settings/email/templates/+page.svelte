@@ -151,7 +151,7 @@
 	<FormErrors message={formError} refused={pageRefusal} />
 	{#if atCeiling}
 		<Alert tone="info" title="Every template slot is in use">
-			{#snippet children()}This instance has reached its limit of {limit} templates. Edit one, delete one you no longer send, or change the license to allow more.{/snippet}
+			{#snippet children()}This engine has reached its limit of {limit} templates. Edit one, delete one you no longer send, or change the license to allow more.{/snippet}
 		</Alert>
 	{/if}
 

@@ -266,7 +266,7 @@ describe('datasources page when the plugin says they are not enabled', () => {
 		const notice = getAllByTestId('not-enabled');
 		expect(notice).toHaveLength(1);
 		expect(notice[0].textContent).toContain('Datasources');
-		expect(notice[0].textContent).toContain('Not enabled on this instance.');
+		expect(notice[0].textContent).toContain('Not enabled on this engine.');
 		expect(queryByText('No datasources yet')).toBeNull();
 		const create = getAllByText('New datasource')[0].closest('button') as HTMLButtonElement;
 		expect(create.disabled).toBe(true);
@@ -288,8 +288,8 @@ describe('datasources page when the plugin says they are not enabled', () => {
 	});
 
 	it('renders a refused write as not enabled, naming no capability', () => {
-		const { container } = unavailable([], { action: 'test', error: 'Datasources are not enabled on this instance.', refused: true });
-		expect(container.textContent).toContain('Datasources are not enabled on this instance.');
+		const { container } = unavailable([], { action: 'test', error: 'Datasources are not enabled on this engine.', refused: true });
+		expect(container.textContent).toContain('Datasources are not enabled on this engine.');
 		expect(container.textContent).not.toMatch(/capability|license/i);
 	});
 
@@ -465,7 +465,7 @@ describe('the link that enables datasources', () => {
 
 	it('names a link to an add-on by what it opens and opens it in a new tab, on the page and in the drawer', async () => {
 		upgrade.link = { href: away, label: 'Manage the license' };
-		const refusal = { action: 'save', error: 'Datasources are not enabled on this instance.', refused: true };
+		const refusal = { action: 'save', error: 'Datasources are not enabled on this engine.', refused: true };
 		const { getAllByText, container, rerender } = setup([]);
 		await fireEvent.click(getAllByText('New datasource')[0]);
 		await rerender({ data: { datasources: [], locked: false, gate: { state: 'ok' }, user: { roles: ['super_admin'] }, entitlements: licensed }, form: refusal } as never);
@@ -484,7 +484,7 @@ describe('the link that enables datasources', () => {
 
 	it('keeps a link on this console in the same tab', () => {
 		upgrade.link = { href: '/admin/settings/license', label: 'Manage the license' };
-		setup([], { action: 'delete', error: 'Datasources are not enabled on this instance.', refused: true });
+		setup([], { action: 'delete', error: 'Datasources are not enabled on this engine.', refused: true });
 		const a = document.body.querySelector('a[href="/admin/settings/license"]') as HTMLAnchorElement;
 		expect(a.textContent).toBe('Manage the license');
 		expect(a.getAttribute('target')).toBeNull();

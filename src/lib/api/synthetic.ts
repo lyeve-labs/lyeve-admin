@@ -283,7 +283,7 @@ export async function readProbeLimits(client: HttpClient): Promise<ProbeLimits |
 
 /** The interval field's hint, with the floor when the plugin said what it is. */
 export function intervalHint(limits: ProbeLimits | null): string {
-	const why = 'Each probe sends a request to this instance.';
+	const why = 'Each probe sends a request to this engine.';
 	return limits ? `At least ${limits.minIntervalSeconds}. ${why}` : why;
 }
 

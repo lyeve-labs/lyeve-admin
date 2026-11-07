@@ -269,13 +269,13 @@ describe('needs attention', () => {
 		expect(container.textContent).toContain('Nothing needs attention in the last 24 hours.');
 	});
 
-	it('does not call the instance quiet when the security report could not be read', () => {
+	it('does not call the engine quiet when the security report could not be read', () => {
 		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, controlFailures: null }), form: null } });
 
 		expect(container.textContent).toContain('No problems in the tiles that loaded.');
 	});
 
-	it('does not call the instance quiet when a tile could not be read', () => {
+	it('does not call the engine quiet when a tile could not be read', () => {
 		const { container } = render(DashboardPage, { props: { data: data({ ...quiet, jobs: null }), form: null } });
 
 		const text = container.textContent ?? '';

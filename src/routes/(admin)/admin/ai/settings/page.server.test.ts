@@ -7,7 +7,7 @@ const path = '/admin/ai/settings';
 type Loaded = Exclude<Awaited<ReturnType<typeof load>>, void>;
 
 describe('admin/ai/settings load', () => {
-	it('reads the retention window from the instance configuration for a super admin', async () => {
+	it('reads the retention window from the engine configuration for a super admin', async () => {
 		const { event } = loadEvent(
 			{ '/api/admin/config': () => json({ settings: [{ key: 'AI_TRANSCRIPT_RETENTION', source: 'admin', value: '168h', editable: true }] }) },
 			{ path }
@@ -73,7 +73,7 @@ describe('admin/ai/settings actions', () => {
 
 	it('names the license on a 402 and the role on a 403', async () => {
 		const locked = actionEvent({ '/api/admin/ai/settings': () => refused(402, 'payment_required') }, formOf({ enabled: 'false' }), { path });
-		expect(await actions.save(locked.event)).toMatchObject({ status: 400, data: { error: 'AI is not enabled on this instance.' } });
+		expect(await actions.save(locked.event)).toMatchObject({ status: 400, data: { error: 'AI is not enabled on this engine.' } });
 		const forbidden = actionEvent({ '/api/admin/ai/settings': () => refused(403, 'insufficient permissions') }, formOf({ enabled: 'false' }), { path });
 		expect(await actions.save(forbidden.event)).toMatchObject({
 			status: 403,

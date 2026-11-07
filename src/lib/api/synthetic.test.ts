@@ -209,9 +209,9 @@ describe('the probe limits', () => {
 
 	it('puts the floor in the hint only when it is known', () => {
 		expect(intervalHint({ probes: { limit: 0, current: 0 }, minIntervalSeconds: 15 })).toBe(
-			'At least 15. Each probe sends a request to this instance.',
+			'At least 15. Each probe sends a request to this engine.',
 		);
-		expect(intervalHint(null)).toBe('Each probe sends a request to this instance.');
+		expect(intervalHint(null)).toBe('Each probe sends a request to this engine.');
 	});
 });
 

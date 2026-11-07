@@ -72,7 +72,7 @@ describe('a call the plugin would not run', () => {
 
 	it('says the feature is not enabled on a 402 and names the role on a 403', async () => {
 		expect(await said(() => json({ error: 'the license does not carry this plugin, so no listener was started', code: 'http_402' }, 402))).toBe(
-			'gRPC is not enabled on this instance.',
+			'gRPC is not enabled on this engine.',
 		);
 		expect(await said(() => json({ error: 'super_admin role required', code: 'forbidden' }, 403))).toBe('Only a super admin can run a gRPC call.');
 	});

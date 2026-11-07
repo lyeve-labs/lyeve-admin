@@ -142,7 +142,7 @@ describe('admin dashboard applyMigrations action', () => {
 	});
 
 	// The target is a form field, so it is whatever was posted.
-	it('refuses a redirect target that leaves the instance', async () => {
+	it('refuses a redirect target that leaves the engine', async () => {
 		const { event } = applyEvent({ redirectTo: 'https://evil.example/' });
 
 		const r = await catchRedirect(() => actions.applyMigrations(event));
@@ -465,7 +465,7 @@ describe('admin dashboard load', () => {
 		expect(d.errors).toBeNull();
 	});
 
-	it('keeps a failed schemas read apart from an instance with no schemas', async () => {
+	it('keeps a failed schemas read apart from an engine with no schemas', async () => {
 		const { event } = loadEvent({});
 		const inner = (event as { fetch: typeof globalThis.fetch }).fetch;
 		(event as { fetch: typeof globalThis.fetch }).fetch = (async (url: string, init?: RequestInit) => {

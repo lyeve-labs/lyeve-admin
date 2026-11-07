@@ -191,7 +191,7 @@
 <PageShell
 	title="Email"
 	documentTitle="Email providers"
-	description="Set up how this instance sends mail."
+	description="Set up how this engine sends mail."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -306,7 +306,7 @@
 			<p class="text-sm text-muted">
 				These engine settings are used when the pool is empty or every provider in it fails.
 				Password resets and sign-in links use them when no provider can send, so those still arrive
-				on an instance with no pool. A change takes effect at the next engine restart. A password
+				on an engine with no pool. A change takes effect at the next engine restart. A password
 				is never shown again after you save it, and saving a new one replaces it.
 			</p>
 
@@ -434,9 +434,9 @@
 				<SectionHeading level={3} variant="eyebrow">Delivery webhook</SectionHeading>
 				<p class="text-xs text-muted">
 					{#if editing && editing.transport === 'api'}
-						Set the provider's webhook to <span class="font-mono">{webhookPath(editing.id)}</span> on this instance, and send the secret as the token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
+						Set the provider's webhook to <span class="font-mono">{webhookPath(editing.id)}</span> on this engine, and send the secret as the token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
 					{:else}
-						After you create the provider, the list shows its webhook path on this instance. Send the secret as the token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
+						After you create the provider, the list shows its webhook path on this engine. Send the secret as the token in <span class="font-mono">X-Webhook-Token</span> or <span class="font-mono">?token=</span>.
 					{/if}
 					The paths below find each field in what the provider posts.
 				</p>

@@ -135,7 +135,7 @@
 	title="Telemetry"
 	documentTitle="Export - Telemetry"
 	description={data.superAdmin
-		? "Send this tenant's metrics to a destination, and see where the instance exports them."
+		? "Send this tenant's metrics to a destination, and see where the engine exports them."
 		: "Send this tenant's metrics to a destination."}
 	width="wide"
 	back={{ href: '/admin/observability', label: 'Observability' }}
@@ -150,7 +150,7 @@
 		<div class="flex flex-wrap items-center gap-2">
 			<SectionHeading level={2}>Tenant destination</SectionHeading>
 			<span class="text-xs text-faint">
-				Push this tenant's metrics to your own collector, in addition to the instance's exporters.
+				Push this tenant's metrics to your own collector, in addition to the engine's exporters.
 			</span>
 		</div>
 
@@ -279,7 +279,7 @@
 								Save
 							</Button>
 							{#if !licensed}
-								<span class="text-xs text-muted">Not enabled on this instance.</span>
+								<span class="text-xs text-muted">Not enabled on this engine.</span>
 							{/if}
 						</div>
 					</fieldset>

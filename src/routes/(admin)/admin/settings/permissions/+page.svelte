@@ -200,7 +200,7 @@
 
 	{#if !loadError && atRoleCap && !failure?.roleCapReached}
 		<Alert tone="info" title="{storedRoleCount} of {roleCap} roles">
-			This instance's role ceiling is {roleCap}, so you cannot add another role. Your existing roles keep working.
+			This engine's role ceiling is {roleCap}, so you cannot add another role. Your existing roles keep working.
 		</Alert>
 	{/if}
 
@@ -212,11 +212,11 @@
 		<Alert tone="warn" title="Role ceiling reached">
 			{#snippet children()}
 				{#if refusedLimit !== null && refusedCount !== null}
-					The ceiling is {refusedLimit} roles and this instance has {refusedCount}.
+					The ceiling is {refusedLimit} roles and this engine has {refusedCount}.
 				{:else if refusedLimit !== null}
 					The ceiling is {refusedLimit} roles.
 				{:else}
-					This instance allows no more roles.
+					This engine allows no more roles.
 				{/if}
 				Nothing was saved, and your existing roles keep working.
 			{/snippet}

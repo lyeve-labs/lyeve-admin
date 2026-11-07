@@ -98,9 +98,9 @@ export async function listProviders(client: HttpClient): Promise<ProvidersRead> 
 export function inactiveReason(reason: string): string {
 	switch (reason) {
 		case 'provider_limit':
-			return 'Not running. Only one provider runs on this instance.';
+			return 'Not running. Only one provider runs on this engine.';
 		case 'networked_unavailable':
-			return 'Not running. Networked cache providers are not enabled on this instance.';
+			return 'Not running. Networked cache providers are not enabled on this engine.';
 		case 'create_failed':
 			return 'Could not start. Check its address and settings in your deployment.';
 		case 'register_failed':

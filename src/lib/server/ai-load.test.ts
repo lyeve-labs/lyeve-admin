@@ -58,11 +58,11 @@ describe('aiActionError', () => {
 		const budget = new ApiError(402, 'ai budget exhausted for this billing period', { error: 'ai budget exhausted for this billing period', code: 'http_402' });
 		expect(aiActionError(budget, 'f')).toBe(AI_BUDGET_TEXT);
 		const other = new ApiError(402, 'this request needs a paid plan', { error: 'this request needs a paid plan', code: 'http_402' });
-		expect(aiActionError(other, 'f')).toBe('AI is not enabled on this instance.');
+		expect(aiActionError(other, 'f')).toBe('AI is not enabled on this engine.');
 		const ceiling = new ApiError(402, 'cap_exceeded', { error: 'cap_exceeded', cap: 'ai.providers', limit: 2, current: 2, upgrade_url: '' });
-		expect(aiActionError(ceiling, 'f')).toBe('AI is not enabled on this instance.');
+		expect(aiActionError(ceiling, 'f')).toBe('AI is not enabled on this engine.');
 		const license = new ApiError(402, 'payment_required', { error: 'payment_required', plugin: 'ai', feature: 'feature:ai', upgrade_url: '' });
-		expect(aiActionError(license, 'f')).toBe('AI is not enabled on this instance.');
+		expect(aiActionError(license, 'f')).toBe('AI is not enabled on this engine.');
 	});
 
 	it('names each refusal and relays a 4xx reason', () => {

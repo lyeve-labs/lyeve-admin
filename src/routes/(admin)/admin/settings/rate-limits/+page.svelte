@@ -123,7 +123,7 @@
 
 <PageShell
 	title="Rate limits"
-	description="See and change each rate limit on this instance."
+	description="See and change each rate limit on this engine."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -224,9 +224,9 @@
 			<section class="flex flex-col gap-4">
 				<SectionHeading level={2}>Sign-in and reset protections</SectionHeading>
 				<p class="text-xs text-muted">
-					These are built in and enforced on every instance.
+					These are built in and enforced on every engine.
 					{#if customEnabled === false}
-						Changing them is not enabled on this instance.
+						Changing them is not enabled on this engine.
 					{/if}
 				</p>
 				<Table label="Protections">
@@ -302,7 +302,7 @@
 					     live. -->
 					<Alert tone="warn">
 						{stored}
-						{plural(stored, 'saved rule is', 'saved rules are')} not enforced, because custom rules are not enabled on this instance. They apply again once custom rules are enabled. You can still delete them.
+						{plural(stored, 'saved rule is', 'saved rules are')} not enforced, because custom rules are not enabled on this engine. They apply again once custom rules are enabled. You can still delete them.
 					</Alert>
 				{/if}
 			{/if}

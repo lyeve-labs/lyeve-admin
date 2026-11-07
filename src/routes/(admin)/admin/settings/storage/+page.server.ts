@@ -91,7 +91,7 @@ export const actions: Actions = {
 	delete: asked(
 		{
 			question: 'Delete this provider?',
-			detail: 'Files already stored there stay where they are, but this instance can no longer read them.',
+			detail: 'Files already stored there stay where they are, but this engine can no longer read them.',
 			label: 'Delete',
 		},
 		async (event) => {

@@ -78,7 +78,7 @@
 			const verb = selectedRisk === 'destructive' ? 'delete from' : 'write to';
 			const ok = await confirmDialog(
 				`Send ${selected.method} ${selected.path}?`,
-				`This will ${verb} the instance you are signed in to, as you. This is not a test run.`,
+				`This will ${verb} the engine you are signed in to, as you. This is not a test run.`,
 				{ confirmLabel: 'Send it' },
 			);
 			if (!ok) {
@@ -97,7 +97,7 @@
 
 <PageShell
 	title="API labs"
-	description="Send a real request to this instance and see the response."
+	description="Send a real request to this engine and see the response."
 	width="wide"
 >
 	<NoSandbox />

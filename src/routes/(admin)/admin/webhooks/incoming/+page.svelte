@@ -130,7 +130,7 @@
 
 	{#if data.incomingWebhooks.ok && isSuperAdmin && held}
 		<Alert tone="warn">
-			Creating and changing incoming webhooks is not enabled on this instance. You can still delete them.
+			Creating and changing incoming webhooks is not enabled on this engine. You can still delete them.
 		</Alert>
 	{/if}
 

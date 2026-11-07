@@ -13,7 +13,7 @@
 <PageShell
 	title="API labs"
 	documentTitle="Streams - API labs"
-	description="Send a real request to this instance and see the response."
+	description="Send a real request to this engine and see the response."
 	width="wide"
 >
 	<NoSandbox />

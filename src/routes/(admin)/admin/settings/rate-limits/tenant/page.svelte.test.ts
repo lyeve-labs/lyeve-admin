@@ -95,7 +95,7 @@ describe('tenant rate limits', () => {
 		const { container } = render(TenantPage, {
 			props: props({ addresses: { ok: true, value: { licensed: false, limits: { entries: { limit: 500, current: 0 } }, rules: [] } } }),
 		});
-		expect(said(container)).toContain('Adding an address is not enabled on this instance.');
+		expect(said(container)).toContain('Adding an address is not enabled on this engine.');
 		expect(said(container)).toContain('No address is refused');
 	});
 });
@@ -156,7 +156,7 @@ describe('the license', () => {
 		for (const b of screen.getAllByRole('button', { name: 'New address' })) expect((b as HTMLButtonElement).disabled).toBe(true);
 		expect((screen.getByRole('button', { name: 'Clear' }) as HTMLButtonElement).disabled).toBe(false);
 		expect((screen.getByRole('button', { name: 'Delete 198.51.100.7/32' }) as HTMLButtonElement).disabled).toBe(false);
-		expect(screen.getByText(/Setting a tenant limit is not enabled on this instance\./)).toBeTruthy();
+		expect(screen.getByText(/Setting a tenant limit is not enabled on this engine\./)).toBeTruthy();
 	});
 
 	it('offers both writes on a licensed install', () => {

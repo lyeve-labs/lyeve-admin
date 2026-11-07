@@ -173,7 +173,7 @@
 
 	{#if !logTail}
 		<Alert tone="brand">
-			The logging plugin is not running on this instance, so the live log tail is not available.
+			The logging plugin is not running on this engine, so the live log tail is not available.
 		</Alert>
 	{:else}
 		{#if logState === 'refused'}

@@ -66,7 +66,7 @@
 <PageShell
 	title="API labs"
 	documentTitle="gRPC - API labs"
-	description="Send a real request to this instance and see the response."
+	description="Send a real request to this engine and see the response."
 	width="wide"
 >
 	<NoSandbox />
@@ -85,7 +85,7 @@
 			<GateNotice
 				gate={data.grpc.gate}
 				title="the gRPC listener"
-				absent="The gRPC listener is not included in this build, or it is turned off on this instance."
+				absent="The gRPC listener is not included in this build, or it is turned off on this engine."
 			/>
 		{:else if !data.grpc.listening}
 			<Alert tone="danger">

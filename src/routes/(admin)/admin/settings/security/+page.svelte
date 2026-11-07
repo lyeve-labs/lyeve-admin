@@ -41,7 +41,7 @@
 
 <PageShell
 	title="Security"
-	description="See which controls protect this instance, and how to turn on the rest."
+	description="See which controls protect this engine, and how to turn on the rest."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -59,7 +59,7 @@
 				{report.failures === 1
 					? 'One control is switched on and not in the request path.'
 					: `${report.failures} controls are switched on and not in the request path.`}
-				Fix this first, because the instance looks protected and is not.
+				Fix this first, because the engine looks protected and is not.
 			</Alert>
 		{/if}
 

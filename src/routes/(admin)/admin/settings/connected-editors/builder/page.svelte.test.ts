@@ -300,7 +300,7 @@ describe('where forms can send', () => {
 
 	it('says the flow plugin is not running instead of offering no flows', () => {
 		render(Page, { props: props({ settings: { ok: true, value: FORM_SETTINGS }, formSchemas: FORM_SCHEMAS }) });
-		expect(said()).toContain('The flow plugin is not running on this instance, so forms cannot start flows.');
+		expect(said()).toContain('The flow plugin is not running on this engine, so forms cannot start flows.');
 	});
 
 	it('names a type forms can no longer send to by its label', () => {

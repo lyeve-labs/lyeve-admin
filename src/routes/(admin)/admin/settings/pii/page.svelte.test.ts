@@ -33,7 +33,7 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 describe('PII masking gate', () => {
 	it('shows the not-enabled state when the engine refuses the routes', () => {
 		const { container } = render(PiiPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' } }) });
-		expect(said(container)).toContain('Not enabled on this instance');
+		expect(said(container)).toContain('Not enabled on this engine');
 	});
 
 	it('says responses are served as stored when the plugin is absent', () => {

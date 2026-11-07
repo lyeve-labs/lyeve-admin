@@ -117,7 +117,7 @@ describe('the tenant destination', () => {
 		const save = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
 		expect(save.disabled).toBe(true);
 		expect((screen.getByLabelText(/^URL/) as HTMLInputElement).matches(':disabled')).toBe(true);
-		expect(said(container)).toContain('Not enabled on this instance.');
+		expect(said(container)).toContain('Not enabled on this engine.');
 		expect((screen.getByRole('button', { name: 'Delete destination' }) as HTMLButtonElement).disabled).toBe(false);
 	});
 

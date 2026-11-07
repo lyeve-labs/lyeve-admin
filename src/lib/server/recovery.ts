@@ -18,7 +18,7 @@ export function recoveryRefusal(e: unknown, feature: string): { status: number; 
 		return { status: 503, error: outageFor(`${inSentence(feature)} is not available`) };
 	}
 	if (e.status === 402) {
-		return { status: 404, error: `${feature} is not enabled on this instance. Ask an administrator to sign you in.` };
+		return { status: 404, error: `${feature} is not enabled on this engine. Ask an administrator to sign you in.` };
 	}
 	if (e.status === 404 || e.status === 405) {
 		return { status: 404, error: `${feature} is not included in this build. Ask an administrator to sign you in.` };

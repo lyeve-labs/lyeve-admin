@@ -74,7 +74,7 @@ describe('the gate', () => {
 		const { container } = render(ResidencyPage, {
 			props: props({ gate: { state: 'locked', upgradeUrl: '' }, regions: [], report: null }),
 		});
-		expect(said(container)).toContain('Not enabled on this instance');
+		expect(said(container)).toContain('Not enabled on this engine');
 	});
 
 	it('explains the refusal to an admin who may not read it', () => {

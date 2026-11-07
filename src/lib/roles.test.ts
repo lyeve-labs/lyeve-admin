@@ -7,7 +7,7 @@ const read = (rel: string) =>
 	readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 describe('the role list', () => {
-	it('offers the four roles this instance issues, least privileged first', () => {
+	it('offers the four roles this engine issues, least privileged first', () => {
 		expect(ROLES).toEqual(['viewer', 'editor', 'admin', 'super_admin']);
 	});
 

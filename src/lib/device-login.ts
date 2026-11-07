@@ -67,7 +67,7 @@ export function expiresIn(expiresAt: string, now: Date = new Date()): string {
 
 /** The tenant a session acts in, as the page names it. */
 export function tenantLabel(tenantId: string | null | undefined): string {
-	return tenantId ? tenantId : 'No tenant (instance-wide account)';
+	return tenantId ? tenantId : 'No tenant (engine-wide account)';
 }
 
 /**

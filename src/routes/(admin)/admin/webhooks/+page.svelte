@@ -521,7 +521,7 @@
 
 		<fieldset class="flex flex-col gap-4 border-t border-line pt-4">
 			<legend class="text-sm font-medium text-fg">Delivery options</legend>
-			<p class="text-xs text-muted">Leave a field empty to use the default. An option that is not enabled on this instance cannot be saved.</p>
+			<p class="text-xs text-muted">Leave a field empty to use the default. An option that is not enabled on this engine cannot be saved.</p>
 			<Textarea
 				id="webhook-template"
 				name="payload_template"

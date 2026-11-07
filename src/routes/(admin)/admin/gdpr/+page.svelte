@@ -301,7 +301,7 @@
 				<SectionHeading level={2}>Before a person exports their own data</SectionHeading>
 				<p class="text-sm text-muted">
 					Signed-in people can download a copy of their own data. Choose what they must confirm first. This
-					applies to every tenant on this instance.
+					applies to every tenant on this engine.
 				</p>
 			</div>
 			{#if 'stopped' in data.stepUp}

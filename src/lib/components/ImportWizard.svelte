@@ -404,7 +404,7 @@
 					id="import-url"
 					label="Address"
 					placeholder="https://example.com/export.json"
-					hint="An http or https link. To import from another LyEve instance, paste the signed download link of a finished export. Private and internal addresses are refused."
+					hint="An http or https link. To import from another LyEve engine, paste the signed download link of a finished export. Private and internal addresses are refused."
 					bind:value={url}
 				/>
 			{/if}

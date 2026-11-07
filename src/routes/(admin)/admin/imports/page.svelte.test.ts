@@ -79,7 +79,7 @@ describe('Imports', () => {
 		expect(text).toContain('A dry run comes first');
 		expect(text).toContain('File upload');
 		expect(text).toContain('Web address');
-		expect(text).toContain('Another LyEve instance');
+		expect(text).toContain('Another LyEve engine');
 		expect(text).toContain('No imports yet');
 	});
 

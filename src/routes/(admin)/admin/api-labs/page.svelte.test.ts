@@ -57,7 +57,7 @@ describe('the warning a tester needs first', () => {
 	it('says every request hits the live instance as the caller', () => {
 		const { container } = render(LabsPage, { props: props() });
 		const text = said(container);
-		expect(text).toContain('instance you are signed in to, as you');
+		expect(text).toContain('engine you are signed in to, as you');
 		expect(text).toContain('a write changes data and a delete removes it');
 	});
 

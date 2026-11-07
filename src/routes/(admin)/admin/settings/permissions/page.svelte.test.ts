@@ -220,7 +220,7 @@ describe('permissions page role ceiling', () => {
 		const { queryAllByRole, container } = setupAtCeiling(1);
 		expect(container.textContent).toContain('1 of 1 roles');
 		expect(container.textContent).toContain(
-			"This instance's role ceiling is 1, so you cannot add another role. Your existing roles keep working.",
+			"This engine's role ceiling is 1, so you cannot add another role. Your existing roles keep working.",
 		);
 		expect(queryAllByRole('button').find((b) => b.textContent?.includes('New role'))).toBeFalsy();
 	});
@@ -700,13 +700,13 @@ describe('permissions page drawers', () => {
 	it('takes the ceiling from the refusal when the limits read failed', () => {
 		const refused = { kind: 'cap', cap: 'rbac.roles', limit: 5, current: 5, upgradeUrl: '' };
 		const { container } = setupWith({ action: 'role', roleCapReached: true, refused }, { roleCap: 0, roleCount: null });
-		expect(container.textContent).toContain('The ceiling is 5 roles and this instance has 5.');
+		expect(container.textContent).toContain('The ceiling is 5 roles and this engine has 5.');
 		expect(container.textContent).not.toContain('The ceiling is 0 roles');
 	});
 
 	it('states no ceiling when neither the refusal nor the read gave one', () => {
 		const { container } = setupWith({ action: 'role', roleCapReached: true }, { roleCap: 0, roleCount: null });
-		expect(container.textContent).toContain('This instance allows no more roles.');
+		expect(container.textContent).toContain('This engine allows no more roles.');
 		expect(container.textContent).not.toContain('The ceiling is 0 roles');
 	});
 

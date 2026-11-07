@@ -46,7 +46,7 @@ describe('webhooks create drawer posts a real event list', () => {
 			[...container.querySelectorAll('fieldset')].find((f) => f.querySelector('legend')?.textContent === 'Delivery options')
 				?.textContent ?? '';
 		expect(options).toContain(
-			'Leave a field empty to use the default. An option that is not enabled on this instance cannot be saved.'
+			'Leave a field empty to use the default. An option that is not enabled on this engine cannot be saved.'
 		);
 	});
 });

@@ -10,10 +10,10 @@ describe('recoveryRefusal', () => {
 		});
 	});
 
-	it('reads a 402 as a way in this instance does not enable', () => {
+	it('reads a 402 as a way in this engine does not enable', () => {
 		expect(recoveryRefusal(new ApiError(402, 'x'), 'Password reset')).toEqual({
 			status: 404,
-			error: 'Password reset is not enabled on this instance. Ask an administrator to sign you in.',
+			error: 'Password reset is not enabled on this engine. Ask an administrator to sign you in.',
 		});
 	});
 

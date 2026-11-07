@@ -134,7 +134,7 @@ export function withExactIntegers(
 	return out;
 }
 
-const NO_SEAT = 'This instance has no admin seat left for this account.';
+const NO_SEAT = 'This engine has no admin seat left for this account.';
 const UNREACHABLE = 'Access to the admin is blocked for this account or network.';
 
 /**

@@ -69,7 +69,7 @@ const ME = { id: 'u0', email: 'root@example.com', roles: ['super_admin'] };
 const ADA = { id: 'u1', email: 'ada@example.com', roles: ['editor'], tenant_id: 'other', disabled: false };
 
 describe('admin/tenants/[id] load', () => {
-	it('offers what the instance serves and marks what is withheld', async () => {
+	it('offers what the engine serves and marks what is withheld', async () => {
 		const { event: ev } = event({
 			'GET /api/admin/tenants/t1': TENANT,
 			'GET /api/admin/tenant-features/acme': { tenant: 'acme', withheld: ['search'], known: ['ai', 'flow', 'search'] },
@@ -216,7 +216,7 @@ describe('admin/tenants/[id] grant action', () => {
 			data: {
 				action: 'grant',
 				memberError:
-					"Every admin seat is taken. You're using 7 of 7, the most this instance allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.",
+					"Every admin seat is taken. You're using 7 of 7, the most this engine allows. A license that allows more lifts the limit. Removing the admin role from an account also frees a seat. Editors and viewers take no seat.",
 				refused: { kind: 'cap', cap: 'admin.seats', limit: 7, current: 7, upgradeUrl: 'https://shop.example.com/pricing?utm_campaign=admin.seats' },
 			},
 		});

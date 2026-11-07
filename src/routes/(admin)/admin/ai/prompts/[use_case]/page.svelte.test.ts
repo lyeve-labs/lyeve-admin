@@ -88,7 +88,7 @@ describe('AI prompt page', () => {
 
 	it('paints the locked state and no editor', () => {
 		const { container, getByText } = setup({ gate: { state: 'locked' }, prompt: null });
-		expect(getByText('Not enabled on this instance.')).toBeTruthy();
+		expect(getByText('Not enabled on this engine.')).toBeTruthy();
 		expect(container.querySelector('textarea')).toBeNull();
 	});
 });

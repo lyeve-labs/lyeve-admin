@@ -40,9 +40,9 @@
 							/>
 							<Panel pad="sm">
 								<div class="text-sm leading-relaxed text-muted" data-testid="what-never-leaves">
-									<p class="mb-2 font-medium text-fg">What never leaves this instance</p>
+									<p class="mb-2 font-medium text-fg">What never leaves this engine</p>
 									<p>
-										Only the request to the endpoint you configured leaves this instance: the system prompt, the
+										Only the request to the endpoint you configured leaves this engine: the system prompt, the
 										conversation and, for image operations, the image. It goes to the vendor behind that endpoint, under
 										your agreement with that vendor, and to nobody else. The plugin has no default provider, no hosted
 										proxy and no prompt telemetry. LyEve Labs never sees your prompts, responses, keys, transcripts or
@@ -87,14 +87,14 @@
 				<Card>
 					<div class="flex flex-col gap-4">
 						<p class="text-sm text-muted">
-							Retention applies to the whole instance, not one tenant. Every hour, transcripts older than the retention
+							Retention applies to the whole engine, not one tenant. Every hour, transcripts older than the retention
 							window are deleted on every tenant. The minimum is 1h and the default is 720h (30 days).
 						</p>
 						{#if data.instanceReadable && retention && instanceTranscripts}
 							<DescriptionList
 								items={[
 									{ term: 'Retention', value: `${retention.value} (${retention.source})` },
-									{ term: 'Instance transcript switch', value: `${instanceTranscripts.value} (${instanceTranscripts.source})` },
+									{ term: 'Engine transcript switch', value: `${instanceTranscripts.value} (${instanceTranscripts.source})` },
 								]}
 							/>
 						{/if}

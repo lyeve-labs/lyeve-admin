@@ -132,7 +132,7 @@ describe('admin/flows/datasources actions', () => {
 		const result = (await actions.create(event)) as { status: number; data: { error: string; refused: boolean } };
 		expect(result.status).toBe(402);
 		expect(result.data.refused).toBe(true);
-		expect(result.data.error).toBe('Datasources are not enabled on this instance.');
+		expect(result.data.error).toBe('Datasources are not enabled on this engine.');
 		expect(result.data.error).not.toContain('example-capability');
 	});
 

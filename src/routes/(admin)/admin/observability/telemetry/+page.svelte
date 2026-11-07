@@ -87,7 +87,7 @@
 			<Badge tone="violet" size="sm">Beta</Badge>
 		{/if}
 		<span class="text-xs text-muted">
-			Histograms use the engine's buckets. One exporter set serves the whole instance. The
+			Histograms use the engine's buckets. One exporter set serves the whole engine. The
 			tenant label is the tenant slug.
 		</span>
 	</div>
@@ -99,7 +99,7 @@
 				{#if data.superAdmin}
 					Includes the process, the pool, every tenant's request series and the plugin's own metrics.
 				{:else}
-					Only series with your tenant label. Only a super admin can see instance-wide series.
+					Only series with your tenant label. Only a super admin can see engine-wide series.
 				{/if}
 			</span>
 		</div>

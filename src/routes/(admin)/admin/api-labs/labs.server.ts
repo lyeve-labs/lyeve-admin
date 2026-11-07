@@ -43,7 +43,7 @@ export async function send(
 	if (body !== undefined) headers['Content-Type'] = contentType;
 
 	if (!isSameOriginPath(path)) {
-		return { error: 'That path is not on this instance. The request was not sent.' };
+		return { error: 'That path is not on this engine. The request was not sent.' };
 	}
 
 	const started = Date.now();

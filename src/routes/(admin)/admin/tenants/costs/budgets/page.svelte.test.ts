@@ -58,7 +58,7 @@ describe('tenant cost budgets page', () => {
 		render(BudgetsPage, {
 			props: { data: data({ enabled: false, budgets: { ok: false, gate: { state: 'locked', upgradeUrl: '' } } }), form: null },
 		});
-		expect(screen.getByTestId('not-enabled').textContent).toContain('Not enabled on this instance.');
+		expect(screen.getByTestId('not-enabled').textContent).toContain('Not enabled on this engine.');
 		expect(screen.queryByRole('region', { name: 'Budgets' })).toBeNull();
 		expect(screen.queryByRole('button', { name: /New budget/ })).toBeNull();
 	});
@@ -89,14 +89,14 @@ describe('the budget drawer and the failures of other actions', () => {
 		await fireEvent.click(screen.getAllByRole('button', { name: /New budget/ })[0]);
 		await rerender({
 			data: data(),
-			form: { action: 'createBudget', error: 'The cost ledger is not enabled on this instance.', locked: true } as never,
+			form: { action: 'createBudget', error: 'The cost ledger is not enabled on this engine.', locked: true } as never,
 		});
 		const form = document.body.querySelector('form#budget-form') as HTMLFormElement;
 		const alert = [...form.querySelectorAll('[role="alert"], [role="status"], div')].find(
-			(el) => el.textContent?.trim() === 'The cost ledger is not enabled on this instance.' && el.className.includes('warn'),
+			(el) => el.textContent?.trim() === 'The cost ledger is not enabled on this engine.' && el.className.includes('warn'),
 		);
 		expect(alert).toBeTruthy();
-		expect(form.textContent).toContain('The cost ledger is not enabled on this instance.');
+		expect(form.textContent).toContain('The cost ledger is not enabled on this engine.');
 	});
 
 	it('shows a failed create inside the open drawer, first in its form', async () => {

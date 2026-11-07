@@ -133,7 +133,7 @@ export const HEALTH_LABELS: Readonly<Record<BrokerHealth, string>> = {
 	retrying: 'The broker refused events, and the outbox is retrying them',
 	lost: 'Events failed after every retry',
 	undelivered: 'Some events were dropped',
-	disabled: 'Dropping events, not enabled on this instance',
+	disabled: 'Dropping events, not enabled on this engine',
 	discarding: 'No broker, events are discarded',
 	idle: 'No events published yet',
 };

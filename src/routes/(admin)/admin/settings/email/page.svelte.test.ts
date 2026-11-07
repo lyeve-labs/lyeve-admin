@@ -284,7 +284,7 @@ describe('email page fallback transport', () => {
 		// indent, so a phrase that spans two source lines never matches raw.
 		const text = (setup([smtp], { mail: { ok: true, value: mail } }).container.textContent ?? '').replace(/\s+/g, ' ');
 		expect(text).toContain('Provider pool');
-		expect(text).toContain('Set up how this instance sends mail.');
+		expect(text).toContain('Set up how this engine sends mail.');
 		expect(text).toContain('The healthy provider with the lowest priority number sends first');
 		expect(text).toContain('used when the pool is empty or every provider in it fails');
 		expect(text).toContain('takes effect at the next engine restart');

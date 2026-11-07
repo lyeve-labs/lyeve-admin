@@ -108,7 +108,7 @@ describe('the history and its own failures', () => {
 		render(DeliveriesDrawer, { props: props(listed(), null, held) });
 		const retry = document.body.querySelector<HTMLButtonElement>('form[action="?/retry-delivery"] button');
 		expect(retry?.disabled).toBe(true);
-		expect(document.body.querySelector('[data-testid="retry-held"]')?.textContent).toContain('This is not enabled on this instance.');
+		expect(document.body.querySelector('[data-testid="retry-held"]')?.textContent).toContain('This is not enabled on this engine.');
 	});
 
 	// The plugin offers no offset on this list, so a full page says the older

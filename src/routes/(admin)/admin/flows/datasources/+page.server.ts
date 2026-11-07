@@ -55,7 +55,7 @@ function isRefused(err: unknown): boolean {
 	return err instanceof ApiError && err.status === 402;
 }
 
-const REFUSED = { error: 'Datasources are not enabled on this instance.', refused: true };
+const REFUSED = { error: 'Datasources are not enabled on this engine.', refused: true };
 
 /** The plugin's name rule, in words a reader can act on. */
 const NAME_RULE = 'Start the name with a lower case letter, and use up to 40 lower case letters, digits, dashes and underscores.';

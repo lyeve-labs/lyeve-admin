@@ -68,7 +68,7 @@ async function readGrpcRoutes(client: HttpClient): Promise<{ listening: boolean;
  * own sentence.
  */
 function notRun(status: number, body: string): string {
-	if (status === 402) return 'gRPC is not enabled on this instance.';
+	if (status === 402) return 'gRPC is not enabled on this engine.';
 	if (status === 403) return 'Only a super admin can run a gRPC call.';
 	if (status >= 400 && status < 500) {
 		try {

@@ -174,7 +174,7 @@
 						<li class="flex gap-3">
 							<FileText size={ICON.md} class="mt-0.5 shrink-0 text-brand" />
 							<div>
-								<div class="text-sm text-fg">Another LyEve instance</div>
+								<div class="text-sm text-fg">Another LyEve engine</div>
 								<div class="text-xs text-muted">
 									Import its data export in JSON, NDJSON, YAML or CSV as it is, from a file or the signed
 									download link. Entries keep their slug, title and status.

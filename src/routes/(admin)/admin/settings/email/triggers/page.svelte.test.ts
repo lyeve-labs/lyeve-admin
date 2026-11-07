@@ -76,7 +76,7 @@ describe('email triggers without the license for writes', () => {
 		expect(create.disabled).toBe(true);
 		expect((screen.getByRole('button', { name: 'Edit Order confirmation' }) as HTMLButtonElement).disabled).toBe(true);
 		expect((screen.getByRole('button', { name: 'Delete Order confirmation' }) as HTMLButtonElement).disabled).toBe(false);
-		expect(document.body.textContent).toContain('Creating or editing a trigger is not enabled on this instance.');
+		expect(document.body.textContent).toContain('Creating or editing a trigger is not enabled on this engine.');
 		expect(document.body.textContent).not.toContain('Trigger Studio');
 	});
 
@@ -160,7 +160,7 @@ describe('email trigger drawer', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
 		const refused = { kind: 'feature', feature: 'Trigger Studio', plugin: 'email', upgradeUrl: '' };
 		await rerender(props({}, { action: 'save', error: 'This needs Trigger Studio.', refused }));
-		expect(drawerText()).toContain('Not enabled on this instance');
+		expect(drawerText()).toContain('Not enabled on this engine');
 		expect(drawerText()).not.toContain('This needs Trigger Studio.');
 	});
 

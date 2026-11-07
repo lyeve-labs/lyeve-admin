@@ -177,7 +177,7 @@ describe('the queue and its own failures', () => {
 		expect(button(/^Replay/).disabled).toBe(true);
 		expect(button(/^Dismiss/).disabled).toBe(true);
 		expect(button(/^Delete/).disabled).toBe(false);
-		expect(dialog()?.textContent).toContain('This is not enabled on this instance. Nothing was changed. You can still delete entries.');
+		expect(dialog()?.textContent).toContain('This is not enabled on this engine. Nothing was changed. You can still delete entries.');
 	});
 
 	it('links each page of the queue by its offset and keeps the list under it', () => {

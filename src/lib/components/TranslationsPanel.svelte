@@ -166,7 +166,7 @@
 	<div class="flex flex-col gap-4" data-testid="translations-panel">
 		{#if unavailable}
 			<Alert tone="warn" title="Could not load translations">
-				The localization plugin is not running on this instance, so translations are not available.
+				The localization plugin is not running on this engine, so translations are not available.
 			</Alert>
 		{:else if targets.length === 0}
 			<p class="text-sm text-muted">

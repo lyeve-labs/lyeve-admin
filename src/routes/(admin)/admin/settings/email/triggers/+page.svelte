@@ -137,7 +137,7 @@
 
 	{#if data.triggers.ok && writeRefusal}
 		<Alert tone="warn" title="Triggers cannot be created or changed">
-			{#snippet children()}Creating or editing a trigger is not enabled on this instance. You can still delete triggers.{/snippet}
+			{#snippet children()}Creating or editing a trigger is not enabled on this engine. You can still delete triggers.{/snippet}
 		</Alert>
 	{/if}
 

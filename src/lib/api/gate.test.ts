@@ -134,13 +134,13 @@ describe('section', () => {
 describe('fullText', () => {
 	it('states the count against the ceiling when both are known', () => {
 		expect(fullText({ state: 'full', limit: 7, current: 7, upgradeUrl: '' })).toBe(
-			"You're using 7 of 7, the most this instance allows.",
+			"You're using 7 of 7, the most this engine allows.",
 		);
 	});
 
 	it('states only what the refusal carried', () => {
-		expect(fullText({ state: 'full', limit: 5, current: null, upgradeUrl: '' })).toBe('This instance allows at most 5.');
-		expect(fullText({ state: 'full', limit: null, current: null, upgradeUrl: '' })).toBe('This instance is at its limit.');
+		expect(fullText({ state: 'full', limit: 5, current: null, upgradeUrl: '' })).toBe('This engine allows at most 5.');
+		expect(fullText({ state: 'full', limit: null, current: null, upgradeUrl: '' })).toBe('This engine is at its limit.');
 	});
 });
 

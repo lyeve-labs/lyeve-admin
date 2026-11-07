@@ -43,7 +43,7 @@ describe('the gate', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({ gate: { state: 'locked', upgradeUrl: '' }, stats: null }),
 		});
-		expect(said(container)).toContain('Not enabled on this instance');
+		expect(said(container)).toContain('Not enabled on this engine');
 	});
 
 	it('reports a failed read as a failure, not as nobody bucketed', () => {

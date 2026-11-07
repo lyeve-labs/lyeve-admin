@@ -205,7 +205,7 @@ export function buildReference(doc: OpenAPIDocument, catalog: EndpointGroup[]): 
 			const p = e.params?.find((x) => x.name === 'schema' && x.in === 'path');
 			if (p) {
 				p.description = count
-					? `Content type name. This instance has ${count} ${plural(count, 'content type')}. See the Schema builder.`
+					? `Content type name. This engine has ${count} ${plural(count, 'content type')}. See the Schema builder.`
 					: 'Content type name, as listed by GET /api/v1/schemas.';
 				delete p.values;
 			}

@@ -50,7 +50,7 @@ describe('Slow queries gate', () => {
 	it('shows the not-enabled state when the engine refuses the routes', () => {
 		const { container } = render(QueriesPage, { props: props({ gate: { state: 'locked', upgradeUrl: '' } }) });
 
-		expect(container.textContent).toContain('Not enabled on this instance');
+		expect(container.textContent).toContain('Not enabled on this engine');
 		expect(container.textContent).not.toContain('Captured statements');
 	});
 
@@ -134,7 +134,7 @@ describe('Slow queries list', () => {
 });
 
 describe('Slow queries analysis', () => {
-	it('offers each dialect rather than guessing which one the instance runs', () => {
+	it('offers each dialect rather than guessing which one the engine runs', () => {
 		const { container } = render(QueriesPage, { props: props() });
 
 		for (const d of ['postgres', 'mysql', 'mssql']) {

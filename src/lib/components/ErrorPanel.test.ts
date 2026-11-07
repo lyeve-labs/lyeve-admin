@@ -42,7 +42,7 @@ describe('ErrorPanel', () => {
 	// No admin seat left is a refusal too: the engine knows the account and
 	// the instance is full, so the page says why and offers no sign-in.
 	it('reads a 402 as a refusal in the words the load gave', () => {
-		const seats = "Every admin seat is taken. You're using 5 of 5, the most this instance allows.";
+		const seats = "Every admin seat is taken. You're using 5 of 5, the most this engine allows.";
 		const { getByText, getAllByRole, queryByRole } = mount(402, seats);
 		expect(getByText('Access denied')).toBeTruthy();
 		expect(getByText(seats)).toBeTruthy();

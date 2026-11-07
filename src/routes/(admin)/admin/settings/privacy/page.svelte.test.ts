@@ -48,7 +48,7 @@ describe('privacy settings: form submissions on erasure', () => {
 	it('leaves the setting out while its routes do not answer', () => {
 		const { container } = render(PrivacyPage, { props: props({ formErasure: null }) });
 		expect(said(container)).not.toContain('Form submissions on erasure');
-		expect(said(container)).toContain('None of these settings apply to this instance');
+		expect(said(container)).toContain('None of these settings apply to this engine');
 	});
 
 	it('says why the card is empty while its plugin is stopped', () => {
