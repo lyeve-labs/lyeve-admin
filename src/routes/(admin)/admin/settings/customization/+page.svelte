@@ -18,14 +18,14 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { ExternalLink, LayoutDashboard, Pencil, Plus, Trash2 } from '@lucide/svelte';
-	import { confirmed } from '$lib/forms.svelte';
+	import { confirmed, drawerFailure } from '$lib/forms.svelte';
 	import { ICON } from '$lib/icon';
 	import NotEnabled from '$lib/components/NotEnabled.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import BrandImageCard, { type ImageNotice } from './BrandImageCard.svelte';
 	import { accentShades, parseAccent, slugify, ROLE_CHOICES } from '$lib/api/customization';
-	import { formatDateTime } from '$lib/format';
+	import { formatDateTime, plural } from '$lib/format';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -133,15 +133,14 @@
 	let pageRoles = $state<string[]>([]);
 	const suggestedSlug = $derived(slugTouched ? pageSlug : slugify(pageTitle));
 
-	// Each drawer reads only its own action's failure key. The result it was
-	// opened over is an older write's, so a reopened drawer starts clean.
-	let openedOver = $state.raw<unknown>(null);
+	// Each drawer reads only its own action's failure key.
+	const failure = drawerFailure(() => form, ['addLink', 'createPage']);
 	function openLink() {
-		openedOver = form;
+		failure.opened();
 		linkOpen = true;
 	}
 	function openPage() {
-		openedOver = form;
+		failure.opened();
 		pageOpen = true;
 	}
 
@@ -163,7 +162,7 @@
 
 <PageShell
 	title="Customization"
-	description="Set this tenant's name, logo, tab icon, colors, dashboard, menu and pages."
+	description="Set this tenant's name, logo, colors and menu."
 	width="wide"
 >
 	{#snippet actions()}
@@ -181,7 +180,7 @@
 		<NotEnabled
 			level={2}
 			title="Customization"
-			description="Give each tenant its own name, logo, colors, dashboard, menu and pages."
+			description="Set this tenant's name, logo, colors and menu."
 		/>
 	{:else}
 		<!-- Every form on this page stacks the same way: label, control, hint,
@@ -197,7 +196,7 @@
 					{#if form?.brandError}
 						<Alert tone="danger">{form.brandError}</Alert>
 					{:else if form && 'brandSaved' in form}
-						<Alert tone="success" autoDismiss>Brand saved. Every page of this tenant's admin now uses it.</Alert>
+						<Alert tone="success" autoDismiss>Brand saved. Every page of this tenant's console now uses it.</Alert>
 					{/if}
 					<Input id="brand-name" name="name" label="Name" hint="Replaces the product name in the sidebar, on the sign-in pages and in every tab title." bind:value={name} />
 					<div class="flex flex-col gap-2">
@@ -248,7 +247,7 @@
 					<p class="text-sm text-muted" data-testid="dashboard-state">
 						{#if data.dashboard?.custom}
 							This tenant uses its own dashboard of {data.dashboard.widgets.length}
-							{data.dashboard.widgets.length === 1 ? 'widget' : 'widgets'}{#if data.dashboard.updated_at}, saved {formatDateTime(data.dashboard.updated_at)}{/if}.
+							{plural(data.dashboard.widgets.length, 'widget')}{#if data.dashboard.updated_at}, saved {formatDateTime(data.dashboard.updated_at)}{/if}.
 						{:else if data.dashboard}
 							This tenant uses the stock dashboard. Build your own from widgets for content, activity, media and API usage.
 						{:else}
@@ -422,7 +421,7 @@
 
 <Drawer bind:open={linkOpen} title="New link">
 	<form method="POST" action="?/addLink" id="link-form" class="flex flex-col gap-4" use:enhance={closeOnSuccess(() => (linkOpen = false))}>
-		<FormErrors message={form !== openedOver ? form?.linkError : undefined} fields={form !== openedOver && form?.linkError ? fields : {}} />
+		<FormErrors message={failure.drawer?.linkError} fields={failure.drawer?.linkError ? fields : {}} />
 		<Input id="link-label" name="label" label="Label" required error={fields.label} />
 		<Input id="link-url" name="url" label="Address" mono required placeholder="https://" hint="An https URL, or an admin path such as /admin/media." error={fields.url} />
 		<CheckboxGroup name="roles" label="Seen by" hint="Leave empty for everyone." options={roleOptions} bind:value={linkRoles} />
@@ -435,7 +434,7 @@
 
 <Drawer bind:open={pageOpen} title="New page">
 	<form method="POST" action="?/createPage" id="page-form" class="flex flex-col gap-4" use:enhance>
-		<FormErrors message={form !== openedOver ? form?.pageError : undefined} fields={form !== openedOver && form?.pageError ? fields : {}} />
+		<FormErrors message={failure.drawer?.pageError} fields={failure.drawer?.pageError ? fields : {}} />
 		<Input id="page-title" name="title" label="Title" required bind:value={pageTitle} error={fields.title} />
 		<Input
 			id="page-slug"

@@ -230,14 +230,14 @@ export const actions: Actions = {
 		const fields: Record<string, string> = {};
 		if (!link.label) fields.label = 'Required';
 		if (!/^https:\/\/\S+$/.test(link.url) && !link.url.startsWith('/admin/')) fields.url = 'An https URL or a path starting /admin/';
-		if (Object.keys(fields).length > 0) return fail(400, { linkError: 'Check the highlighted fields.', fields });
+		if (Object.keys(fields).length > 0) return fail(400, { action: 'addLink', linkError: 'Check the highlighted fields.', fields });
 		try {
 			const settings = await current(event);
 			settings.menu.links = [...settings.menu.links, link];
 			await saveCustomization(authedClient(event), settings);
 			return { linkSaved: true };
 		} catch (err) {
-			return fail(400, { linkError: actionError(err, 'Could not save the link. Try again.') });
+			return fail(400, { action: 'addLink', linkError: actionError(err, 'Could not save the link. Try again.') });
 		}
 	},
 
@@ -275,11 +275,11 @@ export const actions: Actions = {
 		const fields: Record<string, string> = {};
 		if (!title) fields.title = 'Required';
 		if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(slug)) fields.slug = 'Lower-case letters, digits and hyphens';
-		if (Object.keys(fields).length > 0) return fail(400, { pageError: 'Check the highlighted fields.', fields });
+		if (Object.keys(fields).length > 0) return fail(400, { action: 'createPage', pageError: 'Check the highlighted fields.', fields });
 		try {
 			const custom = await getCustomization(authedClient(event));
 			if (custom.pages.some((p) => p.slug === slug)) {
-				return fail(409, { pageError: `A page already uses ${slug}.`, fields: { slug: 'Taken' } });
+				return fail(409, { action: 'createPage', pageError: `A page already uses ${slug}.`, fields: { slug: 'Taken' } });
 			}
 			await saveCustomPage(authedClient(event), {
 				slug,
@@ -290,7 +290,7 @@ export const actions: Actions = {
 				position: custom.pages.length,
 			});
 		} catch (err) {
-			return fail(400, { pageError: actionError(err, 'Could not create the page. Try again.') });
+			return fail(400, { action: 'createPage', pageError: actionError(err, 'Could not create the page. Try again.') });
 		}
 		redirect(303, `/admin/settings/customization/pages/${slug}`);
 	},

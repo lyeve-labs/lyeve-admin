@@ -51,7 +51,7 @@ describe('the customization drawers and older failures', () => {
 	const pageText = () => document.body.querySelector('form#page-form')?.textContent ?? '';
 
 	it('opens the page drawer clean after a failed link save', async () => {
-		render(CustomizationPage, { props: props({}, { linkError: 'Could not save the link. Try again.' }) });
+		render(CustomizationPage, { props: props({}, { action: 'addLink', linkError: 'Could not save the link. Try again.' }) });
 		await fireEvent.click(screen.getAllByRole('button', { name: /new page/i })[0]);
 		expect(pageText()).not.toContain('Could not save');
 	});
@@ -59,7 +59,7 @@ describe('the customization drawers and older failures', () => {
 	it('shows a failed link save first in the open link drawer, and not when reopened', async () => {
 		const { rerender } = render(CustomizationPage, { props: props() });
 		await fireEvent.click(screen.getByRole('button', { name: /new link/i }));
-		await rerender(props({}, { linkError: 'Check the highlighted fields.', fields: { label: 'Required' } }));
+		await rerender(props({}, { action: 'addLink', linkError: 'Check the highlighted fields.', fields: { label: 'Required' } }));
 		const form = document.body.querySelector('form#link-form') as HTMLFormElement;
 		expect(form.firstElementChild?.textContent).toContain('Check the highlighted fields.');
 		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));

@@ -39,7 +39,7 @@
 		type WidgetWidth,
 		type WidgetWindow,
 	} from '$lib/api/custom-dashboard';
-	import { formatDateTime } from '$lib/format';
+	import { formatDateTime, plural } from '$lib/format';
 	import { inSentence } from '$lib/api/gate';
 	import type { ResolvedWidget } from '$lib/api/custom-dashboard';
 	import type { PageData, ActionData } from './$types';
@@ -172,7 +172,7 @@
 	<p class="text-sm text-muted" data-testid="layout-state">
 		{#if data.layout.custom}
 			This tenant uses its own dashboard of {data.layout.widgets.length}
-			{data.layout.widgets.length === 1 ? 'widget' : 'widgets'}{#if data.layout.updated_at}, saved {formatDateTime(data.layout.updated_at)}{/if}.
+			{plural(data.layout.widgets.length, 'widget')}{#if data.layout.updated_at}, saved {formatDateTime(data.layout.updated_at)}{/if}.
 		{:else}
 			This tenant uses the stock dashboard. Saving a layout replaces it, and a reset brings it back.
 		{/if}
@@ -224,7 +224,7 @@
 						<p class="text-sm text-muted">
 							{kind.description}
 							{#if kind.adminData}
-								Only admins can see its data. Viewers and editors see a message that it could not be loaded.
+								Only an admin or a super admin can see its data. An editor or a viewer sees that it could not be loaded.
 							{/if}
 						</p>
 						<div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
