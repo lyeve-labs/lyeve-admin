@@ -5,44 +5,34 @@ import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning, runs } from '$lib/plugins';
 import { describeRefusal } from '$lib/api/admin-tokens';
-import { isOutage, section, type Gate, type Section } from '$lib/api/gate';
-import { listSchemaNames } from '$lib/api/search-settings';
+import { isOutage, section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { normalizeUserCode } from '$lib/device-login';
 import {
-	LIFETIMES,
 	SAID,
 	WITHHELD,
 	approveRequest,
 	connectionsGate,
 	declineRequest,
 	getRequest,
-	getSettings,
 	listConnections,
 	refusalCode,
-	refusedField,
 	revokeAllConnections,
 	revokeConnection,
-	saveSettings,
-	showable,
 	type ApproveStepUp,
 	type Connection,
 	type ConnectionRequest,
 	type ConnectionsGate,
-	type Settings,
-	type SettingsPatch,
 } from '$lib/api/connected-editors';
+import { isOwner, refusalSentence } from './shared.server';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
-/** The roles that manage every connection of the tenant and its settings. */
-const OWNER_ROLES = ['admin', 'super_admin'];
-
 export const load: PageServerLoad = async (event) => {
 	const { plugins, user } = await event.parent();
 	const { limit, offset } = pageWindow(event.url, DEFAULT_LIMIT, MAX_LIMIT);
-	const owner = (user?.roles ?? []).some((r) => OWNER_ROLES.includes(r));
+	const owner = isOwner(user?.roles);
 	const base = {
 		limit,
 		offset,
@@ -64,9 +54,6 @@ export const load: PageServerLoad = async (event) => {
 			hasMore: false,
 			gate: { state: 'absent' } as ConnectionsGate,
 			mfaEnrolled: false,
-			settings: null as Section<Settings> | null,
-			schemas: [] as string[],
-			schemasGate: null as Gate | null,
 		};
 	}
 
@@ -77,12 +64,6 @@ export const load: PageServerLoad = async (event) => {
 		.get<{ enabled: boolean }>('/api/admin/mfa/status')
 		.then((s) => s.enabled === true)
 		.catch(() => false);
-	// The settings route answers owners only, so nobody else asks and no 403
-	// from it reaches the page.
-	const settings = owner ? section(getSettings(client), 'Could not load the builder settings.') : null;
-	const schemas = owner
-		? section(listSchemaNames(client), 'Could not load schemas. Pages keep showing the schemas saved before.')
-		: null;
 
 	const page = await section(
 		listConnections(client, limit, offset).then((answer) => pageOf(answer, limit, offset)),
@@ -93,7 +74,6 @@ export const load: PageServerLoad = async (event) => {
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
-	const schemaList = schemas ? await schemas : null;
 	return {
 		...base,
 		connections: page.ok ? page.value.rows : [],
@@ -101,23 +81,8 @@ export const load: PageServerLoad = async (event) => {
 		hasMore: page.ok && page.value.hasMore,
 		gate: page.ok ? ({ state: 'ok' } as ConnectionsGate) : page.gate,
 		mfaEnrolled: await mfa,
-		settings: settings ? await settings : null,
-		schemas: schemaList?.ok ? showable(schemaList.value) : [],
-		schemasGate: schemaList && !schemaList.ok ? schemaList.gate : null,
 	};
 };
-
-/**
- * The sentence for a refusal outside the cases a page names. A 4xx that
- * carries the engine's code shows the engine's sentence. Anything else gets
- * the page's own, so no transport text reaches it.
- */
-function refusalSentence(err: unknown, fallback: string): string {
-	if (err instanceof ApiError && err.status >= 400 && err.status < 500 && refusalCode(err) && err.message.trim()) {
-		return err.message;
-	}
-	return fallback;
-}
 
 /** Whether a request whose code ran out at `expiresAt` has run out by now. */
 function ranOut(expiresAt: string): boolean {
@@ -165,38 +130,9 @@ function stepUpRefusal(e: ApiError, step: 'password' | 'mfa_code') {
 	return { field, needsMfa };
 }
 
-function setting(form: FormData): { field: string; patch?: SettingsPatch; error?: string } {
-	const field = String(form.get('field') ?? '');
-	switch (field) {
-		case 'allowed': {
-			const v = String(form.get('allowed') ?? '');
-			if (v !== 'on' && v !== 'off') return { field, error: 'Choose On or Off.' };
-			return { field, patch: { allowed: v === 'on' } };
-		}
-		// Everything but the switch saves together. A refusal names the field it lands on.
-		case 'limits': {
-			const lifetime = Number(form.get('lifetime_days'));
-			if (!(LIFETIMES as readonly number[]).includes(lifetime)) {
-				return { field: 'lifetime_days', error: 'Choose 30, 90 or 180 days.' };
-			}
-			const raw = String(form.get('writes_per_minute') ?? '').trim();
-			const writes = Number(raw);
-			if (!raw || !Number.isInteger(writes)) {
-				return { field: 'writes_per_minute', error: 'Enter a whole number of writes a minute.' };
-			}
-			const patch: SettingsPatch = { lifetime_days: lifetime, writes_per_minute: writes };
-			// A form whose schema list failed to load offered none, and must not clear them.
-			if (form.get('schemas_offered')) patch.show_schemas = form.getAll('show_schemas').map(String).filter(Boolean);
-			return { field, patch };
-		}
-		default:
-			return { field: '', error: 'This form is missing its setting. Reload the page and try again.' };
-	}
-}
-
 // No requireRole here. Every route reads the person from the session and
 // answers for itself: anyone at editor or above approves and sees their own
-// connections, owners see all of them and the settings.
+// connections, and owners see all of them.
 export const actions: Actions = {
 	lookup: async (event) => {
 		const form = await event.request.formData();
@@ -306,23 +242,6 @@ export const actions: Actions = {
 			if (isOutage(e)) return fail(503, { revokeAllError: SAID.revokeAllFailed });
 			return fail(e instanceof ApiError ? e.status : 400, {
 				revokeAllError: refusalSentence(e, 'Could not revoke the connections. Try again.'),
-			});
-		}
-	},
-
-	setting: async (event) => {
-		const form = await event.request.formData();
-		const { field, patch, error } = setting(form);
-		if (!patch) return fail(400, { settingError: { field, message: error ?? '' } });
-		try {
-			return { saved: { field, settings: await saveSettings(authedClient(event), patch) } };
-		} catch (e) {
-			if (refusalCode(e) === 'settings_invalid') {
-				return fail(422, { settingError: { field: refusedField(e) || field, message: (e as ApiError).message } });
-			}
-			if (isOutage(e)) return fail(503, { settingError: { field, message: SAID.settingOutage } });
-			return fail(e instanceof ApiError ? e.status : 400, {
-				settingError: { field, message: refusalSentence(e, 'Could not save the setting. Try again.') },
 			});
 		}
 	},

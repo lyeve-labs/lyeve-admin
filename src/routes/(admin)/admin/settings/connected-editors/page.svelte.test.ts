@@ -11,7 +11,7 @@ vi.mock('$app/forms', () => ({
 		return { destroy() {} };
 	},
 }));
-vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn(async () => {}) }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(async () => {}) }));
 const app = vi.hoisted(() => ({
 	page: { url: new URL('http://admin/admin/settings/connected-editors') },
 	navigating: { to: null as null | { url: URL } },
@@ -68,8 +68,6 @@ const REQUEST: ConnectionRequest = {
 	same_network: true,
 };
 
-const SETTINGS = { allowed: true, lifetime_days: 90, show_schemas: ['posts', 'gone'], writes_per_minute: 120, max_writes_per_minute: 120 };
-
 function props(over: Record<string, unknown> = {}, form: unknown = null) {
 	return {
 		data: {
@@ -85,8 +83,6 @@ function props(over: Record<string, unknown> = {}, form: unknown = null) {
 			tenant: '',
 			openApprove: false,
 			mfaEnrolled: false,
-			settings: { ok: true, value: SETTINGS },
-			schemas: ['posts', 'products'],
 			...over,
 		} as never,
 		form: form as never,
@@ -110,7 +106,6 @@ describe('the list', () => {
 		app.navigating.to = { url: new URL('http://admin/admin/settings/connected-editors?offset=50') };
 		const { container } = render(Page, { props: props() });
 		expect(container.querySelectorAll('[data-testid="connections-loading"] > *')).toHaveLength(5);
-		expect(container.querySelector('[data-testid="settings-loading"]')).not.toBeNull();
 	});
 
 	it('names each column and each status in words', () => {
@@ -142,6 +137,20 @@ describe('the list', () => {
 		expect(cell.getAttribute('title')).toBe(name);
 		expect(Array.from(cell.textContent ?? '')).toHaveLength(60);
 		expect(document.querySelector('tbody img')).toBeNull();
+	});
+});
+
+describe('the strip', () => {
+	it('carries the strip with Connections marked for an owner, and no settings', () => {
+		render(Page, { props: props() });
+		const tab = [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent?.trim() === 'Connections');
+		expect(tab?.getAttribute('aria-selected')).toBe('true');
+		expect(said()).not.toContain('Writes a minute for each connection');
+	});
+
+	it('draws no strip for a person below owner, who has this page alone', () => {
+		render(Page, { props: props({ owner: false }) });
+		expect(document.querySelector('[role="tablist"]')).toBeNull();
 	});
 });
 
@@ -221,7 +230,7 @@ describe('revoke all', () => {
 		[...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Revoke all') as HTMLButtonElement;
 
 	it('is offered to owners only', () => {
-		render(Page, { props: props({ owner: false, settings: null }) });
+		render(Page, { props: props({ owner: false }) });
 		expect(revokeAllButton()).toBeUndefined();
 	});
 
@@ -514,121 +523,5 @@ describe('decisions', () => {
 		render(Page, { props: props({}, { declined: true }) });
 		await frames();
 		expect(said()).toContain('Request declined.');
-	});
-});
-
-describe('the settings card', () => {
-	it('is not drawn for a person below owner', () => {
-		render(Page, { props: props({ owner: false, settings: null }) });
-		expect(said()).not.toContain('Writes a minute for each connection');
-	});
-
-	it('draws a refused settings read as a failure', () => {
-		render(Page, { props: props({ settings: { ok: false, gate: { state: 'unavailable' } } }) });
-		expect(said()).toContain('builder settings did not load');
-	});
-
-	it('states that the builder is off, and keeps saying it', () => {
-		render(Page, { props: props({ settings: { ok: true, value: { ...SETTINGS, allowed: false } } }) });
-		expect(said()).toContain('The builder is off. Connected browsers cannot save.');
-		// A standing condition is no outcome, so it never clears itself.
-		const live = [...document.querySelectorAll('[aria-live="polite"]')].some((a) => a.textContent?.includes('The builder is off'));
-		expect(live).toBe(false);
-	});
-
-	const allowSwitch = () => document.querySelector('[role="switch"]') as HTMLButtonElement;
-
-	it('switches the builder with a Toggle that applies at once', async () => {
-		const submit = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(() => {});
-		render(Page, { props: props({ settings: { ok: true, value: { ...SETTINGS, allowed: false } } }) });
-		expect(allowSwitch().getAttribute('aria-label')).toBe('Enabled');
-		expect(allowSwitch().getAttribute('aria-checked')).toBe('false');
-		await fireEvent.click(allowSwitch());
-		await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
-		const form = submit.mock.contexts[0] as HTMLFormElement;
-		expect(new FormData(form).get('allowed')).toBe('on');
-		// Turning it on asks nothing.
-		expect(kit.confirm).not.toHaveBeenCalled();
-		submit.mockRestore();
-	});
-
-	it('asks before it turns the builder off, and stays on when the person says no', async () => {
-		const submit = vi.spyOn(HTMLFormElement.prototype, 'requestSubmit').mockImplementation(() => {});
-		render(Page, { props: props() });
-		await fireEvent.click(allowSwitch());
-		await waitFor(() =>
-			expect(kit.confirm).toHaveBeenCalledWith(
-				'Turn off the builder?',
-				'Connected browsers stop saving immediately.',
-				{ confirmLabel: 'Turn off' },
-			),
-		);
-		await tick();
-		expect(allowSwitch().getAttribute('aria-checked')).toBe('true');
-		expect(submit).not.toHaveBeenCalled();
-		submit.mockRestore();
-	});
-
-	it('saves the other settings together under one Save', () => {
-		render(Page, { props: props() });
-		const cards = [...document.querySelectorAll('form[action="?/setting"]')];
-		expect(cards).toHaveLength(2);
-		const limits = cards.find((f) => f.querySelector('input[name="field"][value="limits"]')) as HTMLFormElement;
-		expect(limits.querySelector('[name="lifetime_days"]')).not.toBeNull();
-		expect(limits.querySelector('#writes-per-minute')).not.toBeNull();
-		expect(limits.querySelector('input[name="schemas_offered"]')).not.toBeNull();
-		const saves = [...limits.querySelectorAll('button[type="submit"]')].map((b) => b.textContent?.trim());
-		expect(saves).toEqual(['Save']);
-		// The switch saves itself, so its card has no Save at all.
-		const allowed = cards.find((f) => f !== limits) as HTMLFormElement;
-		expect(allowed.querySelector('button[type="submit"]')).toBeNull();
-	});
-
-	it('names the lifetime and the write limit in plain words', () => {
-		render(Page, { props: props() });
-		expect(said()).toContain('Valid for');
-		expect(said()).not.toContain('Lasts');
-		expect(said()).toContain('Applies to connections approved from now on.');
-		expect(said()).toContain('When a connection reaches this limit, the builder waits and saves again.');
-	});
-
-	it('draws a failed schema list as a failure, never as none to offer', () => {
-		render(Page, {
-			props: props({
-				schemas: [],
-				schemasGate: { state: 'error', message: 'Could not load schemas. Pages keep showing the schemas saved before.' },
-			}),
-		});
-		expect(said()).toContain('Could not load schemas. Pages keep showing the schemas saved before.');
-		expect(said()).toContain('Try again');
-		expect(said()).not.toContain('Create a schema');
-		// Nothing offered, so a Save clears no stored schema.
-		expect(document.querySelector('input[name="schemas_offered"]')).toBeNull();
-	});
-
-	it('says how to offer a schema when there is none', () => {
-		render(Page, { props: props({ schemas: [] }) });
-		expect(said()).toContain('Create a schema to show its entries on pages.');
-		expect(document.querySelector('input[name="schemas_offered"]')).toBeNull();
-	});
-
-	it('drops a schema that no longer exists', () => {
-		render(Page, { props: props() });
-		const labels = [...document.querySelectorAll('label')].map((l) => l.textContent?.trim());
-		expect(labels).toContain('posts');
-		expect(labels).not.toContain('gone');
-	});
-
-	it('says a setting saved, and lets the words clear themselves', async () => {
-		render(Page, { props: props({}, { saved: { field: 'limits', settings: SETTINGS } }) });
-		await frames();
-		expect(said()).toContain('Settings saved.');
-	});
-
-	it('lands a refused value on its field', () => {
-		render(Page, {
-			props: props({}, { settingError: { field: 'writes_per_minute', message: 'Writes must be between 1 and 120 a minute.' } }),
-		});
-		expect(said()).toContain('Writes must be between 1 and 120 a minute.');
 	});
 });
