@@ -3,7 +3,7 @@
  * because neither route file may import the other.
  */
 import { ApiError } from '@lyeve-labs/client';
-import { refusalCode } from '$lib/api/connected-editors';
+import { errorCodeOf } from '$lib/api/limits';
 
 /** The roles that manage every connection of the tenant and its settings. */
 export const OWNER_ROLES = ['admin', 'super_admin'];
@@ -19,7 +19,7 @@ export function isOwner(roles: readonly string[] | undefined): boolean {
  * the page's own, so no transport text reaches it.
  */
 export function refusalSentence(err: unknown, fallback: string): string {
-	if (err instanceof ApiError && err.status >= 400 && err.status < 500 && refusalCode(err) && err.message.trim()) {
+	if (err instanceof ApiError && err.status >= 400 && err.status < 500 && errorCodeOf(err) && err.message.trim()) {
 		return err.message;
 	}
 	return fallback;

@@ -179,7 +179,7 @@ describe('lookup', () => {
 
 	it('keeps outage detail off the page', async () => {
 		const { event } = act({ code: 'K7F3A2M9' }, { [`GET ${REQ}`]: json({ error: 'dial tcp 10.0.0.4:5432' }, 503) });
-		expect(((await actions.lookup(event)) as Failure).data.drawer).toEqual({ code: 'K7F3-A2M9', codeError: SAID.lookupOutage });
+		expect(((await actions.lookup(event)) as Failure).data.drawer).toEqual({ code: 'K7F3-A2M9', codeError: SAID.lookupFailed });
 	});
 });
 

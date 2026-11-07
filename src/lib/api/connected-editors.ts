@@ -12,6 +12,7 @@
 import { ApiError, type HttpClient } from '@lyeve-labs/client';
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import { gateOf, type Gate } from './gate';
+import { errorCodeOf } from './limits';
 import { couldNotLoad } from '../outage';
 
 const CONNECTIONS_URL = '/api/admin/builder/connections';
@@ -120,26 +121,12 @@ export function saveSettings(client: HttpClient, patch: SettingsPatch): Promise<
 /** The engine's refusal of a tenant an operator withheld the plugin from. */
 export const WITHHELD = 'TENANT_FEATURE_WITHHELD';
 
-/** The code a refusal carries, or an empty string for an answer that carries none. */
-export function refusalCode(err: unknown): string {
-	if (!(err instanceof ApiError)) return '';
-	const body = err.body as { code?: unknown } | undefined;
-	return typeof body?.code === 'string' ? body.code : '';
-}
-
-/** The field a refused settings value names. */
-export function refusedField(err: unknown): string {
-	if (!(err instanceof ApiError)) return '';
-	const body = err.body as { field?: unknown } | undefined;
-	return typeof body?.field === 'string' ? body.field : '';
-}
-
 /** A gate, plus a tenant the operator withheld the plugin from, which no role or retry changes. */
 export type ConnectionsGate = Gate | { state: 'withheld' };
 
 /** What a refused read on this page means. */
 export function connectionsGate(err: unknown): ConnectionsGate {
-	if (err instanceof ApiError && err.status === 403 && refusalCode(err) === WITHHELD) return { state: 'withheld' };
+	if (err instanceof ApiError && err.status === 403 && errorCodeOf(err) === WITHHELD) return { state: 'withheld' };
 	return gateOf(err, couldNotLoad('builder connections'));
 }
 
@@ -194,7 +181,7 @@ export const SAID = {
 	approvalUnavailable: 'Approving connections is not available on this engine.',
 	checkUnavailable: 'Could not check your password or authentication code. The connection was not approved. Try again.',
 	withheld: 'Builder connections are not available to this tenant. Ask a super admin to make them available.',
-	lookupOutage: 'Could not load this request. Try again.',
+	lookupFailed: 'Could not load this request. Try again.',
 	approveOutage: 'Could not confirm the approval. Check whether the connection shows in the list, then try again.',
 	declineOutage: 'Could not confirm the request was declined. Find it again to see whether it is still waiting.',
 	revokeOutage: 'Could not confirm the connection was revoked. Check its status in the list, then try again.',

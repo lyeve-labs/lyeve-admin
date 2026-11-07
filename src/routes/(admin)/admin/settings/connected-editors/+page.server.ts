@@ -6,6 +6,7 @@ import { PLUGIN } from '$lib/plugin-names';
 import { notRunning, runs } from '$lib/plugins';
 import { describeRefusal } from '$lib/api/admin-tokens';
 import { isOutage, section } from '$lib/api/gate';
+import { errorCodeOf } from '$lib/api/limits';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { normalizeUserCode } from '$lib/device-login';
 import {
@@ -16,7 +17,6 @@ import {
 	declineRequest,
 	getRequest,
 	listConnections,
-	refusalCode,
 	revokeAllConnections,
 	revokeConnection,
 	type ApproveStepUp,
@@ -142,11 +142,11 @@ export const actions: Actions = {
 		try {
 			return { drawer: { code, request: await getRequest(authedClient(event), code) } };
 		} catch (e) {
-			if (refusalCode(e) === 'request_unknown') return fail(404, { drawer: { code, codeError: SAID.unknown } });
-			if (refusalCode(e) === WITHHELD) return fail(403, { drawer: { code, withheld: true } });
-			if (isOutage(e)) return fail(503, { drawer: { code, codeError: SAID.lookupOutage } });
+			if (errorCodeOf(e) === 'request_unknown') return fail(404, { drawer: { code, codeError: SAID.unknown } });
+			if (errorCodeOf(e) === WITHHELD) return fail(403, { drawer: { code, withheld: true } });
+			if (isOutage(e)) return fail(503, { drawer: { code, codeError: SAID.lookupFailed } });
 			return fail(e instanceof ApiError ? e.status : 400, {
-				drawer: { code, codeError: refusalSentence(e, 'Could not load this request. Try again.') },
+				drawer: { code, codeError: refusalSentence(e, SAID.lookupFailed) },
 			});
 		}
 	},
@@ -167,7 +167,7 @@ export const actions: Actions = {
 			const out = await approveRequest(client, code, { fingerprint, lifetime_days: lifetime, ...step.stepUp });
 			return { approved: { expires_at: out.expires_at } };
 		} catch (e) {
-			const reason = refusalCode(e);
+			const reason = errorCodeOf(e);
 			if (e instanceof ApiError) {
 				switch (reason) {
 					case 'step_up_required':
@@ -205,7 +205,7 @@ export const actions: Actions = {
 			await declineRequest(authedClient(event), code);
 			return { declined: true };
 		} catch (e) {
-			const reason = refusalCode(e);
+			const reason = errorCodeOf(e);
 			if (reason === 'request_unknown') return missing(code, String(form.get('code_expires_at') ?? ''));
 			if (reason === 'request_decided') return fail(409, { drawer: { code, decided: true } });
 			if (reason === WITHHELD) return fail(403, { drawer: { code, withheld: true } });
@@ -224,7 +224,7 @@ export const actions: Actions = {
 		try {
 			await revokeConnection(authedClient(event), id);
 		} catch (e) {
-			if (refusalCode(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
+			if (errorCodeOf(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
 			if (isOutage(e)) return fail(503, { revokeError: SAID.revokeOutage });
 			return fail(e instanceof ApiError ? e.status : 400, {
 				revokeError: refusalSentence(e, 'Could not revoke the connection. Try again.'),
@@ -238,7 +238,7 @@ export const actions: Actions = {
 			const out = await revokeAllConnections(authedClient(event));
 			return { revokedAll: out.revoked };
 		} catch (e) {
-			if (refusalCode(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
+			if (errorCodeOf(e) === WITHHELD) return fail(403, { revokeError: SAID.withheld });
 			if (isOutage(e)) return fail(503, { revokeAllError: SAID.revokeAllFailed });
 			return fail(e instanceof ApiError ? e.status : 400, {
 				revokeAllError: refusalSentence(e, 'Could not revoke the connections. Try again.'),

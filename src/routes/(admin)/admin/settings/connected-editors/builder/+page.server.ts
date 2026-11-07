@@ -5,14 +5,13 @@ import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { forbiddenText, gateOf, GATE_OK, isOutage, section, type Gate, type Section } from '$lib/api/gate';
+import { bodyString, errorCodeOf } from '$lib/api/limits';
 import { listSchemaNames } from '$lib/api/search-settings';
 import {
 	LIFETIMES,
 	SAID,
 	WITHHELD,
 	getSettings,
-	refusalCode,
-	refusedField,
 	saveSettings,
 	showable,
 	type ConnectionsGate,
@@ -23,7 +22,7 @@ import { OWNER_ROLES, isOwner, refusalSentence } from '../shared.server';
 
 /** What a refused settings read means. A tenant the plugin is withheld from gets the area's own notice. */
 function settingsGate(err: unknown): ConnectionsGate {
-	if (err instanceof ApiError && err.status === 403 && refusalCode(err) === WITHHELD) return { state: 'withheld' };
+	if (err instanceof ApiError && err.status === 403 && errorCodeOf(err) === WITHHELD) return { state: 'withheld' };
 	return gateOf(err, 'Could not load the builder settings.');
 }
 
@@ -97,8 +96,8 @@ export const actions: Actions = {
 		try {
 			return { saved: { field, settings: await saveSettings(authedClient(event), patch) } };
 		} catch (e) {
-			if (refusalCode(e) === 'settings_invalid') {
-				return fail(422, { settingError: { field: refusedField(e) || field, message: (e as ApiError).message } });
+			if (errorCodeOf(e) === 'settings_invalid') {
+				return fail(422, { settingError: { field: bodyString(e, 'field') || field, message: (e as ApiError).message } });
 			}
 			if (isOutage(e)) return fail(503, { settingError: { field, message: SAID.settingOutage } });
 			return fail(e instanceof ApiError ? e.status : 400, {
