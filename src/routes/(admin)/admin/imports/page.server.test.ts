@@ -70,24 +70,18 @@ beforeEach(() => {
 });
 
 describe('imports load', () => {
-	it('carries the templates and whether this install may save one', async () => {
+	// The wizard offers the saved mappings, so the history reads them too.
+	it('hands the wizard the templates and whether this install may name a paid transform', async () => {
 		const result = (await load(loadEvent())) as Loaded;
 		expect(result.templates).toEqual([template]);
-		expect(result.templatesRead).toBe(true);
 		expect(result.licensed).toBe(false);
 	});
 
-	it('says the templates were not read rather than that there are none', async () => {
+	it('offers the wizard no template when the read failed', async () => {
 		api.listTemplates.mockRejectedValue(new Error('down'));
 		const result = (await load(loadEvent())) as Loaded;
-		expect(result.templatesRead).toBe(false);
+		expect(result.templates).toEqual([]);
 		expect(result.licensed).toBeNull();
-	});
-
-	it('keeps the reason the templates were not read', async () => {
-		api.listTemplates.mockRejectedValue(new ApiError(403, 'insufficient permissions'));
-		const result = (await load(loadEvent())) as Loaded & { templatesGate: unknown };
-		expect(result.templatesGate).toEqual({ state: 'forbidden' });
 	});
 });
 
@@ -135,55 +129,6 @@ describe('rollback', () => {
 	});
 });
 
-describe('template actions', () => {
-	it('creates a template from the drawer', async () => {
-		api.createTemplate.mockResolvedValue(template);
-		const out = await actions.createTemplate(
-			formEvent({ name: 'People', content_type: 'people', mode: 'create', mappings: mapping }),
-		);
-		expect(api.createTemplate).toHaveBeenCalledWith(expect.anything(), {
-			name: 'People',
-			content_type: 'people',
-			mode: 'create',
-			field_mappings: JSON.parse(mapping),
-		});
-		expect(out).toEqual({ savedTemplate: 'People' });
-	});
-
-	it('refuses an upsert template with no key before the round trip', async () => {
-		const out = (await actions.createTemplate(
-			formEvent({ name: 'People', content_type: 'people', mode: 'upsert', mappings: mapping }),
-		)) as { status: number };
-		expect(out.status).toBe(400);
-		expect(api.createTemplate).not.toHaveBeenCalled();
-	});
-
-	it('refuses a template with no mapping', async () => {
-		const out = (await actions.createTemplate(
-			formEvent({ name: 'People', content_type: 'people', mode: 'create', mappings: '[]' }),
-		)) as { status: number };
-		expect(out.status).toBe(400);
-	});
-
-	it('returns the license refusal so the page renders it', async () => {
-		api.updateTemplate.mockRejectedValue(
-			new ApiError(402, 'payment_required', { error: 'payment_required', plugin: 'example', feature: 'feature:example_feature' }),
-		);
-		const out = (await actions.updateTemplate(
-			formEvent({ id: 't1', name: 'People', content_type: 'people', mode: 'create', mappings: mapping }),
-		)) as { status: number; data: { refused: { kind: string } } };
-		expect(out.status).toBe(402);
-		expect(out.data.refused.kind).toBe('feature');
-		expect((out.data as unknown as { action: string }).action).toBe('saveTemplate');
-		expect(api.updateTemplate).toHaveBeenCalledWith(expect.anything(), 't1', expect.anything());
-	});
-
-	it('deletes a template', async () => {
-		api.deleteTemplate.mockResolvedValue(undefined);
-		expect(await actions.deleteTemplate(formEvent({ id: 't1' }))).toEqual({ removedTemplate: 't1' });
-	});
-});
-
 describe('canceling an import', () => {
 	type Failure = { status: number; data: Record<string, unknown> };
 
@@ -212,4 +157,3 @@ describe('canceling an import', () => {
 		expect(api.cancelJob).not.toHaveBeenCalled();
 	});
 });
-
