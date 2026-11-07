@@ -10,7 +10,8 @@ import {
 	untrustDevice,
 	type Device,
 } from '$lib/api/devices';
-import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { type Gate, GATE_OK, section } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
@@ -39,24 +40,24 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
-	let devices: Device[] = [];
-	let total: number | null = null;
-	let hasMore = false;
-	let gate: Gate = GATE_OK;
-	try {
-		const page = pageOf(await listDevices(client, limit + 1, offset), limit, offset);
-		devices = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
-	} catch (err) {
-		gate = gateOf(err, 'Could not load your devices.');
-	}
-	if (gate.state === 'ok') {
-		const back = pastEndOffset(devices.length, limit, offset, total);
+	const read = await section(
+		listDevices(client, limit + 1, offset).then((res) => pageOf(res, limit, offset)),
+		couldNotLoad('your devices'),
+	);
+	if (read.ok) {
+		const back = pastEndOffset(read.value.rows.length, limit, offset, read.value.total);
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
-	return { devices, total, limit, offset, hasMore, userAgent, gate };
+	return {
+		devices: read.ok ? read.value.rows : [],
+		total: read.ok ? read.value.total : null,
+		limit,
+		offset,
+		hasMore: read.ok && read.value.hasMore,
+		userAgent,
+		gate: read.ok ? GATE_OK : read.gate,
+	};
 };
 
 // No requireRole here, and deliberately. Every route behind this page reads the

@@ -14,7 +14,7 @@ import {
 	readTrending,
 	type TrendingItem,
 } from '$lib/api/recommendations';
-import { type Gate, GATE_OK, gateOf, section, type Section } from '$lib/api/gate';
+import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 
 /** An account the preview can run for. */
 interface Reader {
@@ -40,13 +40,6 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
-	// The trending list is read beside the split: a list the reader cannot
-	// see is no reason to hide the split, and the reverse.
-	const trending = await section(
-		readTrending(client),
-		'Could not load the trending list.',
-	);
-
 	/*
 	 * The accounts the preview can be run for.
 	 *
@@ -58,31 +51,28 @@ export const load: PageServerLoad = async (event) => {
 	 * Only for the role that may run the preview. An admin who cannot generate a
 	 * feed has no reason to be handed a roster of accounts.
 	 */
-	const readers: Section<Reader[]> = canRecompute
-		? await section(
+	const readersRead: Promise<Section<Reader[]>> = canRecompute
+		? section(
 				client
 					.get<Reader[]>('/api/admin/users?limit=200')
 					.then((rows) => (Array.isArray(rows) ? rows : [])),
 				'Could not load the accounts.',
 			)
-		: { ok: true, value: [] };
-	try {
-		return {
-			stats: await readAbStats(client),
-			gate: GATE_OK,
-			canRecompute,
-			trending,
-			readers,
-		};
-	} catch (err) {
-		return {
-			stats: null,
-			gate: gateOf(err, 'Could not load the recommendation split.'),
-			canRecompute,
-			trending,
-			readers,
-		};
-	}
+		: Promise.resolve({ ok: true, value: [] });
+	// The three reads are independent: a list the reader cannot see is no
+	// reason to hide the split, and the reverse.
+	const [trending, readers, split] = await Promise.all([
+		section(readTrending(client), 'Could not load the trending list.'),
+		readersRead,
+		section(readAbStats(client), 'Could not load the recommendation split.'),
+	]);
+	return {
+		stats: split.ok ? split.value : null,
+		gate: split.ok ? GATE_OK : split.gate,
+		canRecompute,
+		trending,
+		readers,
+	};
 };
 
 export const actions: Actions = {

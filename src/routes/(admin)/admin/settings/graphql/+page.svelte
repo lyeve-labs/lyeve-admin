@@ -12,34 +12,27 @@
 		SectionHeading,
 		Table,
 		Textarea,
-		confirm,
 	} from '@lyeve-labs/ui-kit';
 	import { Braces, FlaskConical, Plus, Power, Trash2 } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
-	import { submitter } from '$lib/forms.svelte';
+	import { confirmed, drawerFailure, submitter } from '$lib/forms.svelte';
 	import GateNotice from '$lib/components/GateNotice.svelte';
 	import FormErrors from '$lib/components/FormErrors.svelte';
 	import { GRAPHQL_HTTP, GRAPHQL_WS, type PersistedQuery, type RootField } from '$lib/api/graphql';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import { pageHref, pageNumber } from '$lib/api/list';
+	import { couldNotLoad } from '$lib/outage';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	/*
-	 * The drawer and the row actions report through the one `form`, so each
-	 * failure names the action that caused it. The drawer shows only a failed
-	 * register, and only one that came back after it opened, so a failed delete
-	 * never reads as a failure of the next form opened. The page shows the rest.
-	 */
-	const failure = $derived(form as { action?: string; error?: string } | null);
-	let openedOver = $state.raw<unknown>(null);
-	const registerError = $derived(failure?.action === 'register' && form !== openedOver ? (failure.error ?? '') : '');
-	const formError = $derived(failure?.action === 'toggle' || failure?.action === 'delete' ? (failure.error ?? '') : '');
+	// The drawer shows a failed register, and the page shows a failed toggle or delete.
+	type Failure = { action?: string; error?: string } | null;
+	const failure = drawerFailure(() => form as Failure, ['register']);
 
 	function openRegister() {
-		openedOver = form;
+		failure.opened();
 		open = true;
 	}
 	const curl = `curl -X POST ${GRAPHQL_HTTP} \\\n  -H 'Authorization: Bearer <token>' \\\n  -H 'Content-Type: application/json' \\\n  -d '{"query":"{ __typename }"}'`;
@@ -48,20 +41,14 @@
 	const register = submitter(() => (open = false));
 
 	let hash = $state('');
-	let deleteForm = $state<HTMLFormElement>();
 	let toggleForm = $state<HTMLFormElement>();
 
-	async function askDelete(q: PersistedQuery) {
-		const ok = await confirm(
+	const deleteQuery = (q: PersistedQuery) =>
+		confirmed(
 			`Delete persisted query ${q.operation_name || q.query_hash.slice(0, 12)}?`,
 			'Clients that send only its hash will be refused.',
 			{ confirmLabel: 'Delete' },
 		);
-		if (!ok) return;
-		hash = q.query_hash;
-		await tick();
-		deleteForm?.requestSubmit();
-	}
 
 	async function toggle(q: PersistedQuery) {
 		hash = q.query_hash;
@@ -86,7 +73,7 @@
 <PageShell
 	title="GraphQL"
 	documentTitle="GraphQL - Settings"
-	description="See the GraphQL schema built from your content types, its endpoints and the queries clients can call by hash."
+	description="See the GraphQL schema, its endpoints and the persisted queries."
 	width="wide"
 >
 	{#snippet actions()}
@@ -95,8 +82,8 @@
 		</Button>
 	{/snippet}
 
-	{#if formError}
-		<Alert tone="danger">{formError}</Alert>
+	{#if failure.page?.error}
+		<Alert tone="danger">{failure.page.error}</Alert>
 	{/if}
 
 	{#if data.gate.state !== 'ok'}
@@ -143,13 +130,13 @@
 			{:else if refused}
 				<Alert tone="warn">
 					Introspection was refused: {refused} By default the graphql.introspection setting allows it only for
-					admins, and the setting can turn it off. The schema is served either way.
+					an administrator, and the setting can turn it off. The schema is served either way.
 				</Alert>
 			{:else if !schemaRoots}
-				<Alert tone="danger">Could not load the GraphQL schema. Reload the page to try again.</Alert>
+				<Alert tone="danger">{couldNotLoad('the GraphQL schema', { reload: true })}</Alert>
 			{:else}
 				<p class="text-xs text-muted">
-					Built from your content types. A schema you add in the Schema builder appears here as its own
+					Built from your content types. A schema you add in the schema builder appears here as its own
 					fields.
 				</p>
 				<div class="grid gap-4 xl:grid-cols-3">
@@ -244,14 +231,17 @@
 										>
 											<Power size={ICON.sm} />
 										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											onclick={() => askDelete(q)}
-											aria-label="Delete {q.operation_name || q.query_hash.slice(0, 12)}"
-										>
-											<Trash2 size={ICON.sm} class="text-danger" />
-										</Button>
+										<form method="POST" action="?/delete" use:enhance={deleteQuery(q)}>
+											<input type="hidden" name="hash" value={q.query_hash} />
+											<Button
+												variant="ghost"
+												size="sm"
+												type="submit"
+												aria-label="Delete {q.operation_name || q.query_hash.slice(0, 12)}"
+											>
+												<Trash2 size={ICON.sm} class="text-danger" />
+											</Button>
+										</form>
 									</div>
 								</td>
 							</tr>
@@ -273,7 +263,7 @@
 
 <Drawer bind:open title="New persisted query">
 	<form method="POST" action="?/register" id="persisted-form" use:enhance={register.enhance} class="flex flex-col gap-4">
-		<FormErrors message={registerError || undefined} />
+		<FormErrors message={failure.drawer?.error || undefined} />
 		<Textarea
 			id="persisted-query"
 			name="query"
@@ -293,9 +283,7 @@
 	{/snippet}
 </Drawer>
 
-<form method="POST" action="?/delete" use:enhance bind:this={deleteForm} class="hidden">
-	<input type="hidden" name="hash" value={hash} />
-</form>
+
 <form method="POST" action="?/toggle" use:enhance bind:this={toggleForm} class="hidden">
 	<input type="hidden" name="hash" value={hash} />
 </form>

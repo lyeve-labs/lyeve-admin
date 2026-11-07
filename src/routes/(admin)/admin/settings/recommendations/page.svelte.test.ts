@@ -94,14 +94,14 @@ describe('the split', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({ stats: stats({ recommendation_pct: 99, random_pct: 1 }) }),
 		});
-		expect(said(container)).toContain('a few points of drift is normal');
+		expect(said(container)).toContain('The two arms are far apart.');
 	});
 
 	it('says nothing about drift on a healthy split', () => {
 		const { container } = render(RecommendationsPage, {
 			props: props({ stats: stats({ recommendation_pct: 52, random_pct: 48 }) }),
 		});
-		expect(said(container)).not.toContain('drift is normal');
+		expect(said(container)).not.toContain('The two arms are far apart.');
 	});
 });
 

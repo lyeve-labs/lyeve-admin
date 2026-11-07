@@ -13,7 +13,7 @@ import {
 	rotateToken,
 	type ScimProvider,
 } from '$lib/api/scim';
-import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { type Gate, GATE_OK, gateOf, section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 import { listProviders as listSamlProviders } from '$lib/api/saml';
 
@@ -60,25 +60,25 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
-	let providers: ScimProvider[] = [];
-	let total: number | null = null;
-	let hasMore = false;
-	let gate: Gate = GATE_OK;
-	try {
-		const page = pageOf(await listProviders(client, limit + 1, offset), limit, offset);
-		providers = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
-	} catch (err) {
-		gate = gateOf(err, 'Could not load SCIM connections.');
-	}
-	if (gate.state === 'ok') {
-		const back = pastEndOffset(providers.length, limit, offset, total);
+	const read = await section(
+		listProviders(client, limit + 1, offset).then((res) => pageOf(res, limit, offset)),
+		'Could not load SCIM connections.',
+	);
+	if (read.ok) {
+		const back = pastEndOffset(read.value.rows.length, limit, offset, read.value.total);
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
-	const saml = gate.state === 'ok' ? await samlLink(event, plugins) : ({ state: 'off' } as SamlLink);
-	return { providers, total, limit, offset, hasMore, gate, saml };
+	const saml = read.ok ? await samlLink(event, plugins) : ({ state: 'off' } as SamlLink);
+	return {
+		providers: read.ok ? read.value.rows : [],
+		total: read.ok ? read.value.total : null,
+		limit,
+		offset,
+		hasMore: read.ok && read.value.hasMore,
+		gate: read.ok ? GATE_OK : read.gate,
+		saml,
+	};
 };
 
 export const actions: Actions = {

@@ -14,7 +14,6 @@
 		Table,
 		Textarea,
 		Toggle,
-		confirm,
 	} from '@lyeve-labs/ui-kit';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
@@ -30,7 +29,8 @@
 		shortPattern,
 		type CustomRule,
 	} from '$lib/api/pii-mask';
-	import { NO_VALUE, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatDateTime, plural } from '$lib/format';
+	import { confirmed } from '$lib/forms.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 	import { pageHref, pageNumber } from '$lib/api/list';
@@ -140,18 +140,10 @@
 		open = true;
 	}
 
-	let deleteForm = $state<HTMLFormElement>();
-	let deleteId = $state('');
-
-	async function askDelete(rule: CustomRule) {
-		deleteId = rule.id;
-		const ok = await confirm(
-			`Delete rule ${rule.name}?`,
-			'Values it masks appear unmasked from the next request.',
-			{ confirmLabel: 'Delete' },
-		).catch(() => false);
-		if (ok) deleteForm?.requestSubmit();
-	}
+	const deleteRule = (rule: CustomRule) =>
+		confirmed(`Delete rule ${rule.name}?`, 'Values it masks appear unmasked from the next request.', {
+			confirmLabel: 'Delete',
+		});
 	const looks = $derived(byType(data.entries));
 	const visible = $derived(
 		narrow.trim()
@@ -270,9 +262,12 @@
 									<Button variant="ghost" size="sm" aria-label={`Duplicate ${rule.name}`} onclick={() => duplicate(rule)}>
 										<Copy size={ICON.sm} />
 									</Button>
-									<Button variant="ghost" size="sm" aria-label={`Delete ${rule.name}`} onclick={() => askDelete(rule)}>
-										<Trash2 size={ICON.sm} class="text-danger" />
-									</Button>
+									<form method="POST" action="?/delete" use:enhance={deleteRule(rule)} class="inline-block">
+										<input type="hidden" name="id" value={rule.id} />
+										<Button variant="ghost" size="sm" type="submit" aria-label={`Delete ${rule.name}`}>
+											<Trash2 size={ICON.sm} class="text-danger" />
+										</Button>
+									</form>
 								</td>
 							</tr>
 						{/each}
@@ -281,11 +276,6 @@
 			{/if}
 		</section>
 
-		<!-- One hidden form for the delete, submitted by the confirmation
-		     rather than by a button of its own. -->
-		<form method="POST" action="?/delete" use:enhance bind:this={deleteForm} class="hidden">
-			<input type="hidden" name="id" value={deleteId} />
-		</form>
 
 		<section class="flex flex-col gap-4">
 			<SectionHeading level={2}>Presets, in the order they run</SectionHeading>
@@ -296,7 +286,7 @@
 			{#if rules.length === 0}
 				<EmptyState
 					title="No rules loaded"
-					description="Nothing is being masked."
+					description="No rule is loaded, so responses are not masked. Reload the page to try again."
 				>
 					{#snippet iconSnippet()}
 						<ShieldCheck size={ICON.lg} />
@@ -549,7 +539,7 @@
 			{:else}
 				<Alert tone="success">
 					{result.count}
-					{result.count === 1 ? 'match' : 'matches'}.
+					{plural(result.count, 'match', 'matches')}.
 				</Alert>
 				<div class="flex flex-col gap-1">
 					<span class="text-xs text-muted">What a reader would get</span>

@@ -27,7 +27,7 @@
 		type FeedEntry,
 		INTEGRATION_EXAMPLE,
 	} from '$lib/api/recommendations';
-	import { formatMillis, formatPercent } from '$lib/format';
+	import { formatMillis, formatPercent, plural } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
@@ -211,7 +211,7 @@
 				     row of three numbers stays whole. -->
 				{#if skewed}
 					<Alert tone="warn">
-						The two arms are far apart. Readers are assigned at random, so a few points of drift is normal, but this much is not. Either the control arm is too small to measure against, or many readers are being shown random content.
+						The two arms are far apart. Either the control arm is too small to measure against, or many readers are being shown random content.
 					</Alert>
 				{/if}
 			{/if}
@@ -279,7 +279,7 @@
 						</EmptyState>
 					{:else}
 						<p class="text-xs text-muted">
-							{preview.length} {preview.length === 1 ? 'entry' : 'entries'} for {previewFor}.
+							{preview.length} {plural(preview.length, 'entry', 'entries')} for {previewFor}.
 						</p>
 						<Table label="What one reader would see">
 							<thead>

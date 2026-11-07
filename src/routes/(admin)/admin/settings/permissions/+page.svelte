@@ -23,6 +23,8 @@
 	import ListToolbar from '$lib/components/ListToolbar.svelte';
 	import { ALL_FLOWS, isFlowResource } from '$lib/flow/permissions';
 	import { ICON } from '$lib/icon';
+	import { drawerFailure } from '$lib/forms.svelte';
+	import { plural } from '$lib/format';
 	import FieldMaskCell from './FieldMaskCell.svelte';
 	import MarkCell from './MarkCell.svelte';
 	import RoleDrawer from './RoleDrawer.svelte';
@@ -43,19 +45,15 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const refusal = $derived(formRefusal(form));
 
-	/*
-	 * Each failure names what caused it: the rule drawer, the new role drawer
-	 * or a delete. A drawer shows only its own failure, and only one that came
-	 * back after it was opened, so a failed delete never reads as a failure of
-	 * the form opened next. A failed delete shows above the matrix.
-	 */
-	const failure = $derived(form as { error?: unknown; action?: string; roleCapReached?: boolean } | null);
-	const failureText = $derived(typeof failure?.error === 'string' ? failure.error : undefined);
-	const inDrawer = $derived(failure?.action === 'rule' || failure?.action === 'role');
-	let openedOver = $state.raw<unknown>(null);
-	const freshIn = (drawer: 'rule' | 'role') => failure?.action === drawer && form !== openedOver;
-	const pageRefusal = $derived(inDrawer ? null : refusal);
-	const pageError = $derived(inDrawer ? undefined : failureText);
+	// The rule drawer and the new role drawer each show their own failure, and
+	// a failed delete shows above the matrix.
+	type Failure = { error?: unknown; action?: string; roleCapReached?: boolean } | null;
+	const failure = $derived(form as Failure);
+	const failures = drawerFailure(() => form as Failure, ['rule', 'role']);
+	const textOf = (f: Failure) => (typeof f?.error === 'string' ? f.error : undefined);
+	const freshIn = (drawer: 'rule' | 'role') => (failures.drawer?.action === drawer ? failures.drawer : null);
+	const pageRefusal = $derived(formRefusal(failures.page));
+	const pageError = $derived(textOf(failures.page));
 
 	// The matrix, its cells and the rule drawer read the rules through one
 	// object, so the index over them is built once per load.
@@ -140,7 +138,7 @@
 	let ruleDrawer = $state<RuleDrawer>();
 
 	function openRule(role: string, schema: string | null) {
-		openedOver = form;
+		failures.opened();
 		ruleDrawer?.edit(role, schema);
 	}
 
@@ -154,15 +152,15 @@
 	async function askDelete(target: Permission) {
 		const inherited = rules.inheritedActions(target.role, target.schema_name);
 		const where = schemaLabel(target.schema_name);
-		let message = `Remove the rule for ${target.role} on ${where}?`;
+		let message = '';
 		if (target.schema_name === WILDCARD) {
-			message += ' Every schema falls back to its own rule, and any schema without one is denied.';
+			message = 'Every schema falls back to its own rule, and any schema without one is denied.';
 		} else if (target.schema_name === ALL_FLOWS) {
-			message += ' Every flow falls back to its own rule, and any flow without one is denied.';
+			message = 'Every flow falls back to its own rule, and any flow without one is denied.';
 		} else if (inherited.length > 0) {
-			message += ` The ${parentLabel(target.schema_name)} for ${target.role} then applies to this ${isFlowResource(target.schema_name) ? 'flow' : 'schema'} and grants ${inherited.join(', ')}.`;
+			message = `The ${parentLabel(target.schema_name)} for ${target.role} then applies to this ${isFlowResource(target.schema_name) ? 'flow' : 'schema'} and grants ${inherited.join(', ')}.`;
 		}
-		const ok = await confirmDialog(`Delete rule for ${target.role} on ${where}`, message, { confirmLabel: 'Delete' });
+		const ok = await confirmDialog(`Delete the rule for ${target.role} on ${where}?`, message, { confirmLabel: 'Delete' });
 		if (!ok) return;
 		deleteId = target.id;
 		// The hidden field takes the id on the next render, and the form posts
@@ -181,7 +179,7 @@
 
 	let roleOpen = $state(false);
 	function openRole() {
-		openedOver = form;
+		failures.opened();
 		roleOpen = true;
 	}
 </script>
@@ -301,7 +299,7 @@
 										{:else if rules.ruleCount(role) === 0}
 											<Badge tone="warn">No rules</Badge>
 										{:else}
-											<Badge>{rules.ruleCount(role)} {rules.ruleCount(role) === 1 ? 'rule' : 'rules'}</Badge>
+											<Badge>{rules.ruleCount(role)} {plural(rules.ruleCount(role), 'rule')}</Badge>
 										{/if}
 									</button>
 								</td>
@@ -395,8 +393,8 @@
 	bind:this={ruleDrawer}
 	{rules}
 	flowsFailed={data.flowsFailed}
-	error={freshIn('rule') ? failureText : undefined}
-	refused={freshIn('rule') ? refusal : null}
+	error={textOf(freshIn('rule'))}
+	refused={formRefusal(freshIn('rule'))}
 	ondelete={(perm) => void askDelete(perm)}
 />
 
@@ -406,6 +404,6 @@
 
 <RoleDrawer
 	bind:open={roleOpen}
-	error={freshIn('role') ? failureText : undefined}
-	refused={freshIn('role') ? refusal : null}
+	error={textOf(freshIn('role'))}
+	refused={formRefusal(freshIn('role'))}
 />

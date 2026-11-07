@@ -16,7 +16,7 @@ import {
 	type SamlProvider,
 	type SamlTemplate,
 } from '$lib/api/saml';
-import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { type Gate, GATE_OK, section } from '$lib/api/gate';
 import { pageOf, pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
 
 const DEFAULT_LIMIT = 25;
@@ -58,22 +58,15 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
-	let providers: SamlProvider[] = [];
-	let total: number | null = null;
-	let hasMore = false;
-	let gate: Gate = GATE_OK;
-	try {
-		const page = pageOf(await listProviders(client, limit + 1, offset), limit, offset);
-		providers = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
-	} catch (err) {
-		gate = gateOf(err, 'Could not load identity providers.');
-	}
-	if (gate.state === 'ok') {
-		const back = pastEndOffset(providers.length, limit, offset, total);
+	const read = await section(
+		listProviders(client, limit + 1, offset).then((res) => pageOf(res, limit, offset)),
+		'Could not load identity providers.',
+	);
+	if (read.ok) {
+		const back = pastEndOffset(read.value.rows.length, limit, offset, read.value.total);
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
+	const gate = read.ok ? GATE_OK : read.gate;
 
 	// Templates fill a new provider's protocol settings. The list names them
 	// and each one's own read carries the settings. Losing them costs the
@@ -85,7 +78,15 @@ export const load: PageServerLoad = async (event) => {
 					.catch((): SamlTemplate[] => [])
 			: [];
 
-	return { providers, templates, total, limit, offset, hasMore, gate };
+	return {
+		providers: read.ok ? read.value.rows : [],
+		templates,
+		total: read.ok ? read.value.total : null,
+		limit,
+		offset,
+		hasMore: read.ok && read.value.hasMore,
+		gate,
+	};
 };
 
 export const actions: Actions = {

@@ -39,7 +39,7 @@ describe('OAuth providers page', () => {
 
 	it('narrows the list by name or issuer', async () => {
 		const { container, getByPlaceholderText } = setup([provider('google'), provider('github')]);
-		await fireEvent.input(getByPlaceholderText('Search providers'), { target: { value: 'git' } });
+		await fireEvent.input(getByPlaceholderText('Name, issuer or client ID'), { target: { value: 'git' } });
 		expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
 	});
 
