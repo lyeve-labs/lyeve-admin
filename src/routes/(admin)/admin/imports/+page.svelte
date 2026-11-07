@@ -104,7 +104,7 @@
 
 <PageShell
 	title="Imports"
-	description="Bring content in from a file or another instance, and see what each import wrote and rejected."
+	description="Bring content in from a file or another engine, and see what each import wrote and rejected."
 	width="wide"
 >
 	{#snippet actions()}

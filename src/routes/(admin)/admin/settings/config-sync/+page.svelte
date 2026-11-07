@@ -182,7 +182,7 @@
 		<RefusalNotice refusal={refused} />
 	{/if}
 
-	<Card title="Export this instance" description="Download every section as one file to apply on another instance.">
+	<Card title="Export this instance" description="Download every section as one file to apply on another engine.">
 		<form method="POST" action="?/export" use:enhance={exportEnhance} class="flex flex-col gap-4" data-testid="export-form">
 			<PasswordInput
 				id="export-passphrase"
@@ -192,7 +192,7 @@
 				required
 				bind:value={exportPass}
 				error={scope === 'export' ? errors.passphrase : undefined}
-				hint="At least {MIN_PASSPHRASE} characters. It encrypts every webhook secret and header in the bundle, and you need it to apply the bundle on another instance. Store it separately from the file."
+				hint="At least {MIN_PASSPHRASE} characters. It encrypts every webhook secret and header in the bundle, and you need it to apply the bundle on another engine. Store it separately from the file."
 			/>
 			{#if exportMessage}
 				<Alert tone="danger">{exportMessage}</Alert>

@@ -60,14 +60,14 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	privacy: "Choose what an erasure does with this tenant's form submissions and what people get when they export their data.",
 	license: 'See the license this instance runs on and activate a new key.',
 	configuration: 'See every setting the engine uses and the layer each value came from.',
-	'config-sync': 'Export this configuration as one bundle, or compare, dry run and apply a bundle from another instance.',
+	'config-sync': 'Export this configuration as one bundle, or compare, dry run and apply a bundle from another engine.',
 };
 
 /** The instance groups, by purpose, each naming sidebar entries by id. */
 const GROUPS: readonly { id: string; label: string; description: string; ids: readonly string[] }[] = [
 	{
 		id: 'workspace',
-		label: 'Workspace',
+		label: 'Tenant',
 		description: 'Set how the console looks and what it offers your team.',
 		ids: ['customization', 'localization', 'email', 'recommendations'],
 	},
@@ -93,8 +93,8 @@ const GROUPS: readonly { id: string; label: string; description: string; ids: re
 	},
 	{
 		id: 'instance',
-		label: 'Instance',
-		description: 'Manage the license and the engine settings, and move settings between instances.',
+		label: 'Engine',
+		description: 'Manage the license and the engine settings, and move settings between engines.',
 		ids: ['license', 'configuration', 'config-sync'],
 	},
 ];
