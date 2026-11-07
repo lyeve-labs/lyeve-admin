@@ -3,7 +3,7 @@ import { fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
-import { notRunning } from '$lib/plugins';
+import { notRunning, readPluginSet } from '$lib/plugins';
 import { isOutage, section, type Gate, type Section } from '$lib/api/gate';
 import { pageWindow } from '$lib/api/list';
 import { listSchemaNames } from '$lib/api/search-settings';
@@ -48,9 +48,13 @@ function selectedRef(url: URL): FormRef | null {
 
 export const load: PageServerLoad = async (event) => {
 	// The triage forms invalidate only this, so the flows and settings in the
-	// layout are not read again on every submit.
+	// layout are not read again on every submit. The plugin set is read here
+	// rather than through parent(), because a child that awaits parent() makes
+	// SvelteKit run every parent load again on the server, the flow reads
+	// included.
 	event.depends('forms:submissions');
-	const { plugins } = await event.parent();
+	const client = authedClient(event);
+	const plugins = await readPluginSet(client);
 	const ref = selectedRef(event.url);
 	const stateParam = event.url.searchParams.get('state') ?? 'new';
 	const state: FormState | 'all' = isFormState(stateParam) ? stateParam : 'all';
@@ -60,7 +64,6 @@ export const load: PageServerLoad = async (event) => {
 		return { gate: { state: 'absent' } as Gate, forms: [] as PublishedForm[], selected: null as Selected | null };
 	}
 
-	const client = authedClient(event);
 	const forms = await section(listForms(client), 'Could not load forms.');
 
 	let selected: Selected | null = null;

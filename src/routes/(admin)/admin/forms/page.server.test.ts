@@ -60,11 +60,12 @@ const ROUTES: Routes = {
 	'GET /api/admin/builder/forms/submissions': json({ data: [SUBMISSION], total: 1, limit: 50, offset: 0 }),
 };
 
-function loadEvent(routes: Routes, { search = '', plugins = RUNNING as unknown } = {}) {
-	const e = engine(routes);
+function loadEvent(routes: Routes, { search = '', plugins = RUNNING as { state?: string; running: string[]; withheld: string[] } } = {}) {
+	const e = engine({ 'GET /api/admin/plugins/running': json({ plugins: plugins.running, withheld: plugins.withheld }), ...routes });
 	const url = new URL(`http://admin/admin/forms${search}`);
 	const depends = vi.fn();
-	return { ...e, depends, event: { fetch: e.fetch, url, request: new Request(url), depends, parent: async () => ({ plugins }) } as never };
+	const parent = vi.fn(async () => ({ plugins }));
+	return { ...e, depends, parent, event: { fetch: e.fetch, url, request: new Request(url), depends, parent } as never };
 }
 
 function actionEvent(routes: Routes, fields: [string, string][] = []) {
@@ -84,17 +85,21 @@ describe('forms load', () => {
 		expect(((await load(page.event)) as Loaded).gate).toEqual({ state: 'absent' });
 		const layout = loadEvent(ROUTES, off);
 		expect(await layoutLoad(layout.event)).toMatchObject({ settings: null, flows: null });
-		expect([...page.calls, ...layout.calls]).toEqual([]);
+		// The page asks only for the running list, and the layout asks nothing.
+		expect(page.calls.map((c) => c.path)).toEqual(['/api/admin/plugins/running']);
+		expect(layout.calls).toEqual([]);
 	});
 
-	it('reads the forms in the page load and nothing the layout reads', async () => {
-		const { event, calls, depends } = loadEvent(ROUTES);
+	it('reads the forms in the page load and never awaits the layout', async () => {
+		const { event, calls, depends, parent } = loadEvent(ROUTES);
 		const out = (await load(event)) as Loaded;
 		expect(out.gate).toEqual({ state: 'ok' });
 		expect(out.forms).toEqual([FORM]);
 		expect(out.selected).toBeNull();
-		expect(calls.map((c) => c.path)).toEqual(['/api/admin/builder/forms']);
+		expect(calls.map((c) => c.path)).toEqual(['/api/admin/plugins/running', '/api/admin/builder/forms']);
 		expect(depends).toHaveBeenCalledWith('forms:submissions');
+		// A child that awaits parent() makes SvelteKit rerun the layout's flow reads on the server.
+		expect(parent).not.toHaveBeenCalled();
 	});
 
 	it('reads the settings, the content types, the flows and the preset in the layout load', async () => {

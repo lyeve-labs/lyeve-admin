@@ -1,16 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { error } from '@sveltejs/kit';
 
 const roles = vi.hoisted(() => ({ current: ['admin'] as string[] }));
 vi.mock('$lib/server/authz', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/authz')>();
-	return {
-		...actual,
-		requireRole: vi.fn(async (_event: unknown, allowed: string[]) => {
-			if (!allowed.some((r) => roles.current.includes(r))) error(403, 'This needs one of these roles.');
-			return { id: 'u1', roles: roles.current };
-		}),
-	};
+	return { ...actual, requireUser: vi.fn(async () => ({ id: 'u1', roles: roles.current })) };
 });
 
 import { GET } from './+server';
@@ -56,7 +49,10 @@ describe('form submissions export', () => {
 	it('refuses a role that is not an administrator before asking the engine', async () => {
 		roles.current = ['editor'];
 		const { ev, fetch } = event(new Response(''));
-		await expect(GET(ev)).rejects.toMatchObject({ status: 403 });
+		await expect(GET(ev)).rejects.toMatchObject({
+			status: 403,
+			body: { message: 'Only an admin or a super admin can export form submissions.' },
+		});
 		expect(fetch).not.toHaveBeenCalled();
 	});
 

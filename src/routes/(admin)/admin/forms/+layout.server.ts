@@ -33,8 +33,9 @@ async function contactPresetOffered(client: ReturnType<typeof authedClient>): Pr
 /**
  * Where forms can send, and what that is checked against. The flow read
  * costs one request per flow on an event trigger, so it lives here rather
- * than in the page load, which every triage submit reruns. It reads no
- * address, so a filter or a page change does not rerun it either.
+ * than in the page load, which every triage submit reruns. This load reads
+ * no address, so a filter or a page change does not rerun it, and the page
+ * load never awaits parent(), which would run it again on the server.
  */
 export const load: LayoutServerLoad = async (event) => {
 	event.depends('forms:flows');

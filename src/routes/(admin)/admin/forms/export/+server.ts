@@ -1,7 +1,9 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { authedHeaders, requireRole } from '$lib/server/authz';
+import { authedHeaders, requireUser } from '$lib/server/authz';
 import { exportPath, isFormState } from '$lib/api/builder-forms';
+
+const FORBIDDEN = 'Only an admin or a super admin can export form submissions.';
 
 /**
  * One form's submissions as a CSV file, as a plain link.
@@ -13,7 +15,8 @@ import { exportPath, isFormState } from '$lib/api/builder-forms';
 export const GET: RequestHandler = async (event) => {
 	const { cookies, url, fetch } = event;
 	const auth = authedHeaders({ cookies, url });
-	await requireRole(event, ['admin', 'super_admin']);
+	const user = await requireUser(event);
+	if (!user.roles.some((r) => r === 'admin' || r === 'super_admin')) error(403, FORBIDDEN);
 	const site = url.searchParams.get('site') ?? '';
 	const path = url.searchParams.get('path') ?? '';
 	const block = url.searchParams.get('block') ?? '';
@@ -29,7 +32,7 @@ export const GET: RequestHandler = async (event) => {
 	}
 	if (!res.ok) {
 		if (res.status === 401) error(401, 'Not authenticated');
-		if (res.status === 403) error(403, 'Only an admin or a super admin can export form submissions.');
+		if (res.status === 403) error(403, FORBIDDEN);
 		if (res.status === 404) error(404, 'Exporting form submissions needs a newer version of the builder plugin.');
 		error(502, 'Could not export the submissions. Try again.');
 	}
