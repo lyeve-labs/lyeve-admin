@@ -222,7 +222,7 @@
 						<div class="flex flex-col gap-2 text-sm text-muted">
 							<SectionHeading level={3}>What is published</SectionHeading>
 							<p>
-								Every content create, update and delete is published as JSON: the event type, schema,
+								Every content create, update and delete is published as JSON: the event type, content type,
 								tenant, the record and an event id to deduplicate on. A broker outage delays events
 								rather than losing them.
 							</p>

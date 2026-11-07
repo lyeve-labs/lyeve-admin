@@ -234,7 +234,7 @@
 			<EmptyState
 				iconSnippet={emptyIcon}
 				title="No audit entries yet"
-				description="Changes to content, schema and settings are recorded here as they happen."
+				description="Changes to content, content types and settings are recorded here as they happen."
 			/>
 		{:else}
 			<div class="flex flex-col gap-4">

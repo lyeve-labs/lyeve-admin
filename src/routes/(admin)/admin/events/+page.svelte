@@ -255,7 +255,7 @@
 							<th scope="col">Topic</th>
 							<th scope="col">Type</th>
 							<th scope="col">Source</th>
-							<th scope="col">Schema</th>
+							<th scope="col">Content type</th>
 						</tr>
 					</thead>
 					<tbody>

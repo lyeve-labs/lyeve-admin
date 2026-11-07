@@ -326,7 +326,7 @@ describe('the approve drawer', () => {
 		expect(said()).toContain('3FA2:9C11:5B07:E48D');
 		expect(said()).toContain('Check that the builder shows the same key.');
 		expect(said()).toContain('Sent by the browser and not verified.');
-		expect(said()).toContain('Read and write pages, sections and the theme, and read entries of the schemas open to the builder.');
+		expect(said()).toContain('Read and write pages, sections and the theme, and read entries of the content types open to the builder.');
 		expect(said()).toContain('Browser name');
 		expect(document.querySelector('#connected-editors-step-up-password')).not.toBeNull();
 		expect(approve().disabled).toBe(false);

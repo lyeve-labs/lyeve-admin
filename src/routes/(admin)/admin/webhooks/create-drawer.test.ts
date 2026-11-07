@@ -68,7 +68,7 @@ describe('webhooks edit drawer posts the schemas it holds', () => {
 		await fireEvent.click(getByRole('button', { name: 'Edit Ship it' }));
 		const posted = [...container.querySelectorAll('form#webhook-form input[name="schemas"]')].map((i) => (i as HTMLInputElement).value);
 		expect(posted).toEqual(['orders', 'posts']);
-		expect(container.textContent).toContain('Could not load schemas');
+		expect(container.textContent).toContain('Could not load content types');
 	});
 });
 
@@ -92,7 +92,7 @@ describe('webhooks create drawer during a schema outage', () => {
 		});
 		await fireEvent.click(getAllByText('New webhook')[0]);
 		const form = container.querySelector('form#webhook-form') as HTMLFormElement;
-		expect(form.textContent).toContain('If you save it like this, the webhook fires for every schema.');
+		expect(form.textContent).toContain('If you save it like this, the webhook fires for every content type.');
 		expect(form.textContent).not.toContain('already names');
 	});
 });

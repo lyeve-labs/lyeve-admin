@@ -206,9 +206,9 @@ export function accessSchemas(a: KeyAccess): string[] {
 
 /** A short summary of one section, for the badge on its fold. */
 export function contentSummary(a: KeyAccess): string {
-	if (a.contentMode === 'all') return a.contentActions.length ? `All schemas: ${orderActions(a.contentActions).join(', ')}` : 'Off';
+	if (a.contentMode === 'all') return a.contentActions.length ? `All content types: ${orderActions(a.contentActions).join(', ')}` : 'Off';
 	const n = chosenSchemas(a).length;
-	return n === 0 ? 'Off' : `${n} ${plural(n, 'schema')}`;
+	return n === 0 ? 'Off' : `${n} ${plural(n, 'content type')}`;
 }
 
 const SCOPE_RE = /^[a-z0-9_-]+(\.[a-z0-9_-]+)?:[a-z_-]+$/;

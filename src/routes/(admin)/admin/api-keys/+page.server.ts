@@ -90,7 +90,7 @@ export const load: PageServerLoad = async (event) => {
 	// says which part could not be read.
 	const [catalogRead, schemaRead] = await Promise.all([
 		section(fetchKeyScopeCatalog(client), couldNotLoad('the route catalog')),
-		section(listSchemaNames(client), couldNotLoad('the schemas')),
+		section(listSchemaNames(client), couldNotLoad('the content types')),
 	]);
 	const catalog = catalogRead.ok ? catalogRead.value : null;
 	const schemaNames = schemaRead.ok ? schemaRead.value : [];

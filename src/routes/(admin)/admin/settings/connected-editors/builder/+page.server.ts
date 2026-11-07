@@ -85,7 +85,7 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const client = authedClient(event);
-	const schemas = section(formSchemaRows(client), 'Could not load schemas. Pages keep showing the schemas saved before.');
+	const schemas = section(formSchemaRows(client), 'Could not load content types. Pages keep showing the content types saved before.');
 	// Without the flow plugin no flow can start, so forms send only to content types.
 	const flows = runs(plugins, PLUGIN.flow) ? section(readFlowTargets(client), 'Could not load flows.') : null;
 	// Without the schema plugin there is no preset to apply. A catalog that fails to load is said as a failure.

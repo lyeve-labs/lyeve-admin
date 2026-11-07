@@ -82,13 +82,13 @@ describe('SummaryCell', () => {
 	});
 
 	it('says what the bar shows to a screen reader', () => {
-		expect(said(summary('editor', 'read'))).toBe('editor grants read on some schemas. editor grants read on no flow.');
+		expect(said(summary('editor', 'read'))).toBe('editor grants read on some content types. editor grants read on no flow.');
 	});
 
 	it('marks the exempt role with a shield and says it is always allowed', () => {
 		const c = summary('super_admin', 'update');
 		expect(c.querySelector('[data-mark="exempt"]')).toBeTruthy();
-		expect(said(c)).toBe('super_admin is always allowed update on every schema. The role is exempt from these rules.');
+		expect(said(c)).toBe('super_admin is always allowed update on every content type. The role is exempt from these rules.');
 	});
 });
 

@@ -37,7 +37,7 @@
 		const names = [...schemaNames];
 		const current = editing?.schema;
 		if (current && current !== '*' && !names.includes(current)) names.push(current);
-		return [{ value: '*', label: 'Every schema' }, ...names.map((s) => ({ value: s, label: s }))];
+		return [{ value: '*', label: 'Every content type' }, ...names.map((s) => ({ value: s, label: s }))];
 	});
 	// A draft or archived template is refused at send time, so the list offers
 	// the active ones and says so when there are none. A list that did not
@@ -175,7 +175,7 @@
 								{#if !t.enabled}<Badge tone="neutral" size="sm">off</Badge>{/if}
 							</span>
 						</td>
-						<td class="text-sm text-muted">{eventLabel(t.event)} in <span class="font-mono text-xs">{t.schema === '*' ? 'every schema' : t.schema}</span></td>
+						<td class="text-sm text-muted">{eventLabel(t.event)} in <span class="font-mono text-xs">{t.schema === '*' ? 'every content type' : t.schema}</span></td>
 						<td data-cell="nowrap" class="font-mono text-xs text-fg">{t.template_key}</td>
 						<td class="text-sm text-muted">{recipients(t)}</td>
 						<td>
@@ -220,8 +220,8 @@
 			value={schema}
 			onvaluechange={(v) => (schema = v)}
 			hint={data.schemas.ok
-			? 'The schema whose records the trigger watches. For a review event, choose the schema of the entry under review.'
-			: 'Could not load schemas, so only every schema is listed. Reload the page to try again.'}
+			? 'The content type whose records the trigger watches. For a review event, choose the content type of the entry under review.'
+			: 'Could not load content types, so only every content type is listed. Reload the page to try again.'}
 		/>
 		<Select
 			id="trigger-template"

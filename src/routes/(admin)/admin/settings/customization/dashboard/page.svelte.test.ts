@@ -85,7 +85,7 @@ describe('dashboard widget controls', () => {
 				data: {
 					layout: { entitled: true, custom: true, widgets, updated_at: null },
 					schemas,
-					schemasGate: schemasRead === 'forbidden' ? { state: 'forbidden' } : schemasRead ? { state: 'ok' } : { state: 'error', message: 'Could not load schemas. Widgets keep the schemas they already use.' },
+					schemasGate: schemasRead === 'forbidden' ? { state: 'forbidden' } : schemasRead ? { state: 'ok' } : { state: 'error', message: 'Could not load content types. Widgets keep the content types they already use.' },
 					plugins: { state: 'named', running: ['content', 'media', 'audit'], withheld: [] },
 					user: { roles: ['admin'] },
 					gate: { state: 'ok' },
@@ -112,13 +112,13 @@ describe('dashboard widget controls', () => {
 
 	it('names the schema list in lower case inside the role refusal', () => {
 		const { container } = mountWith([], 'forbidden', []);
-		expect(container.textContent).toContain('Your role cannot open the schema list.');
+		expect(container.textContent).toContain('Your role cannot open the content type list.');
 	});
 
 	it('keeps the schemas a widget names on screen when the schema list was not read', () => {
 		const { container } = mountWith([{ id: 'b', type: 'entry_counts', schemas: ['orders'] }], false, []);
-		expect(container.textContent).toContain('Could not load schemas');
-		expect(container.textContent).not.toContain('No schemas to count yet');
+		expect(container.textContent).toContain('Could not load content types');
+		expect(container.textContent).not.toContain('No content types to count yet');
 		expect(container.querySelector('#widget-b-schemas')?.closest('div')?.parentElement?.textContent).toContain('orders');
 	});
 });

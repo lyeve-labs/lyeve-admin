@@ -137,7 +137,7 @@ export const load: PageServerLoad = async (event) => {
 	] = await Promise.all([
 		// Any signed-in reader may list the schemas.
 		offers.schema
-			? section(getSchemas(client), couldNotLoad('the schemas'))
+			? section(getSchemas(client), couldNotLoad('the content types'))
 			: Promise.resolve(null),
 		ifAdmin(offers.content, () =>
 			client.get<ListEnvelope<RecentEntry>>(`/api/admin/content?limit=${RECENT}&offset=0`),

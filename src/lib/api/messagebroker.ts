@@ -182,7 +182,7 @@ export function connectionGuide(backend: string, topicPrefix = ''): ConnectionGu
 	switch (backend) {
 		case 'nats':
 			return {
-				listen: "Subscribe to lyeve.tenant.<tenant>.> on the LYEVE_EVENTS stream, for example nats sub 'lyeve.tenant.acme.>'. Narrow it to a schema with lyeve.tenant.acme.orders.*.",
+				listen: "Subscribe to lyeve.tenant.<tenant>.> on the LYEVE_EVENTS stream, for example nats sub 'lyeve.tenant.acme.>'. Narrow it to a content type with lyeve.tenant.acme.orders.*.",
 				send: "Publish to lyeve.tenant.<tenant>.<subject>, for example nats pub lyeve.tenant.acme.orders.paid '{\"id\":42}'.",
 			};
 		case 'kafka': {

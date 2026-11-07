@@ -27,7 +27,7 @@ export type DefinitionsPage = {
 	people: Record<string, string>;
 };
 
-const SCHEMAS_FAILED = couldNotLoad('content schemas');
+const SCHEMAS_FAILED = couldNotLoad('content types');
 
 export const load: PageServerLoad = async (event) => {
 	const { user, plugins } = await event.parent();

@@ -207,7 +207,7 @@
 
 <PageShell
 	title="API keys"
-	description="Create machine-to-machine credentials, each limited to the schemas, routes and request limits you choose."
+	description="Create machine-to-machine credentials, each limited to the content types, routes and request limits you choose."
 	width="wide"
 >
 	{#snippet actions()}
@@ -219,7 +219,7 @@
 	{/snippet}
 
 	<p class="text-sm text-muted">
-		For automation that calls the admin API, such as a deploy script that creates schemas, use an
+		For automation that calls the admin API, such as a deploy script that creates content types, use an
 		<a href="/admin/admin-tokens" class="text-brand hover:underline">admin token</a> instead. It has scoped grants, an expiry and a request log.
 	</p>
 
@@ -259,7 +259,7 @@
 		<ListToolbar label="Filter API keys">
 			{#snippet search()}
 				<label for="key-search" class="sr-only">Search this page</label>
-				<SearchInput id="key-search" bind:value={query} placeholder="Name, role or schema on this page" />
+				<SearchInput id="key-search" bind:value={query} placeholder="Name, role or content type on this page" />
 			{/snippet}
 			{#snippet filters()}
 				<SegmentedControl label="Status" labelHidden bind:value={status} options={STATUSES} />
@@ -278,7 +278,7 @@
 					<th scope="col">Name</th>
 					<th scope="col">Roles</th>
 					<th scope="col">Scopes</th>
-					<th scope="col">Schemas</th>
+					<th scope="col">Content types</th>
 					<th scope="col">Status</th>
 					<th scope="col">Created</th>
 					<th scope="col">Expires</th>

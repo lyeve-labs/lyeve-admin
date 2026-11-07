@@ -122,65 +122,65 @@ const adminAuthGroup: EndpointGroup = {
 
 const adminSchemasGroup: EndpointGroup = {
 	id: 'admin-schemas',
-	label: 'Admin · Schemas',
-	description: 'Manage content type definitions. Only an admin or a super admin can write a schema.',
+	label: 'Admin · Content types',
+	description: 'Manage content type definitions. Only an admin or a super admin can write a content type.',
 	server: 'admin',
 	baseUrl: '/api/admin',
 	endpoints: [
 		{
 			method: 'GET',
 			path: '/api/admin/schemas',
-			summary: 'List schemas',
+			summary: 'List content types',
 			auth: 'cookie',
 			response: {
-				description: 'Array of schema definitions',
+				description: 'Array of content type definitions',
 				example: `[{ "name": "posts", "display_name": "Posts", "fields": [...] }]`,
 			},
 		},
 		{
 			method: 'GET',
 			path: '/api/admin/schemas/{name}',
-			summary: 'Get schema',
+			summary: 'Get content type',
 			auth: 'cookie',
-			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Schema identifier' }],
+			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Content type identifier' }],
 			response: {
-				description: 'Single schema definition',
+				description: 'Single content type definition',
 				example: `{ "name": "posts", "display_name": "Posts", "fields": [...] }`,
 			},
 		},
 		{
 			method: 'POST',
 			path: '/api/admin/schemas',
-			summary: 'Create / update schema',
-			description: 'Creates a new schema or updates an existing one. Generates and applies DDL automatically.',
+			summary: 'Create / update content type',
+			description: 'Creates a new content type or updates an existing one. Generates and applies DDL automatically.',
 			auth: 'cookie',
 			roles: ['admin', 'super_admin'],
 			requestBody: {
-				description: 'Full schema definition',
+				description: 'Full content type definition',
 				example: `{\n  "name": "posts",\n  "display_name": "Posts",\n  "with_created_at": true,\n  "with_updated_at": true,\n  "fields": [\n    {\n      "name": "title",\n      "field_type": "text",\n      "required": true,\n      "unique": false,\n      "indexed": true\n    }\n  ]\n}`,
 			},
 			response: {
-				description: 'Saved schema',
+				description: 'Saved content type',
 				example: `{ "name": "posts", "display_name": "Posts", "fields": [...] }`,
 			},
 		},
 		{
 			method: 'DELETE',
 			path: '/api/admin/schemas/{name}',
-			summary: 'Delete schema',
-			description: "Deletes the schema definition and this tenant's rows. The table is dropped only when no other tenant defines the schema. This cannot be undone.",
+			summary: 'Delete content type',
+			description: "Deletes the content type definition and this tenant's rows. The table is dropped only when no other tenant defines the content type. This cannot be undone.",
 			auth: 'cookie',
 			roles: ['admin', 'super_admin'],
-			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Schema identifier' }],
+			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Content type identifier' }],
 			response: { description: 'Empty 204 response.', example: '' },
 		},
 		{
 			method: 'GET',
 			path: '/api/admin/schemas/{name}/stats',
-			summary: 'Schema stats',
-			description: 'Returns row count and storage size for the collection table.',
+			summary: 'Content type stats',
+			description: "Returns row count and storage size for the content type's table.",
 			auth: 'cookie',
-			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Schema identifier' }],
+			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Content type identifier' }],
 			response: {
 				description: 'Stats object',
 				example: `{ "rows": 142, "table": "content_posts" }`,
@@ -189,9 +189,9 @@ const adminSchemasGroup: EndpointGroup = {
 		{
 			method: 'POST',
 			path: '/api/admin/schemas/import',
-			summary: 'Import schemas',
+			summary: 'Import content types',
 			description:
-				'Plans an import of a schema bundle, or of definitions from another system named by from, and applies it only with apply=true. The body is JSON or YAML, sent as application/json, application/yaml, application/x-yaml or text/yaml, at most 4 MiB. 422 when the definitions cannot be read, 409 when their references cannot be satisfied.',
+				'Plans an import of a content type bundle, or of definitions from another system named by from, and applies it only with apply=true. The body is JSON or YAML, sent as application/json, application/yaml, application/x-yaml or text/yaml, at most 4 MiB. 422 when the definitions cannot be read, 409 when their references cannot be satisfied.',
 			auth: 'cookie',
 			roles: ['super_admin'],
 			params: [
@@ -614,29 +614,29 @@ const apiAuthGroup: EndpointGroup = {
 
 const apiSchemasGroup: EndpointGroup = {
 	id: 'api-schemas',
-	label: 'API · Schemas',
-	description: 'Read-only schema discovery for API consumers. Useful for dynamic form generation.',
+	label: 'API · Content types',
+	description: 'Read-only content type discovery for API consumers. Useful for dynamic form generation.',
 	server: 'api',
 	baseUrl: '/api/v1',
 	endpoints: [
 		{
 			method: 'GET',
 			path: '/api/v1/schemas',
-			summary: 'List schemas',
+			summary: 'List content types',
 			auth: 'bearer',
 			response: {
-				description: 'Array of schema definitions',
+				description: 'Array of content type definitions',
 				example: `[{ "name": "posts", "display_name": "Posts", "fields": [...] }]`,
 			},
 		},
 		{
 			method: 'GET',
 			path: '/api/v1/schemas/{name}',
-			summary: 'Get schema',
+			summary: 'Get content type',
 			auth: 'bearer',
-			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Schema identifier' }],
+			params: [{ name: 'name', in: 'path', type: 'string', required: true, description: 'Content type identifier' }],
 			response: {
-				description: 'Single schema definition',
+				description: 'Single content type definition',
 				example: `{ "name": "posts", "display_name": "Posts", "fields": [...] }`,
 			},
 		},
@@ -653,7 +653,7 @@ const schemaParam: EndpointParam = {
 	in: 'path',
 	type: 'string',
 	required: true,
-	description: 'Collection name, as listed by GET /api/v1/schemas.',
+	description: 'Content type name, as listed by GET /api/v1/schemas.',
 };
 const idParam: EndpointParam = {
 	name: 'id',
@@ -666,7 +666,7 @@ const apiContentGroup: EndpointGroup = {
 	id: 'api-content',
 	label: 'API · Content',
 	description:
-		'Create, read, update and delete records in any collection. Only an editor, an admin or a super admin can write.',
+		'Create, read, update and delete records in any content type. Only an editor, an admin or a super admin can write.',
 	server: 'api',
 	baseUrl: '/api/v1',
 	endpoints: [

@@ -101,7 +101,7 @@
 		return [...schemaOptions, ...extra.map((s) => ({ value: s, label: s }))];
 	}
 	function anySchema(own: string | undefined) {
-		return [{ value: '', label: 'Every schema' }, ...withOwn([own])];
+		return [{ value: '', label: 'Every content type' }, ...withOwn([own])];
 	}
 	const widthOptions = (['third', 'half', 'full'] as WidgetWidth[]).map((w) => ({ value: w, label: WIDTH_LABEL[w] }));
 	const windowOptions = (['6h', '24h', '7d'] as WidgetWindow[]).map((w) => ({ value: w, label: w }));
@@ -247,8 +247,8 @@
 			<GateNotice
 				level={2}
 				gate={data.schemasGate}
-				title="The schema list"
-				absent="The schema list is not included in this build, so you cannot choose a schema below."
+				title="The content type list"
+				absent="The content type list is not included in this build, so you cannot choose a content type below."
 			/>
 		{/if}
 
@@ -300,12 +300,12 @@
 
 							{#if w.type === 'entry_counts'}
 								{#if data.schemasGate.state === 'ok' && schemaOptions.length === 0}
-									<p class="text-sm text-muted">No schemas to count yet.</p>
+									<p class="text-sm text-muted">No content types to count yet.</p>
 								{:else}
 									<MultiSelect
 										id="widget-{w.id}-schemas"
-										label="Schemas"
-										placeholder="Pick schemas"
+										label="Content types"
+										placeholder="Pick content types"
 										hint="Up to 12, in the order picked."
 										searchable
 										options={withOwn(w.schemas ?? [])}
@@ -314,13 +314,13 @@
 								{/if}
 							{:else if w.type === 'latest_entries'}
 								<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
-									<Select id="widget-{w.id}-schema" label="Schema" searchable options={anySchema(w.schema)} bind:value={w.schema} />
+									<Select id="widget-{w.id}-schema" label="Content type" searchable options={anySchema(w.schema)} bind:value={w.schema} />
 									<SegmentedControl label="Status" options={statusOptions} value={w.status ?? ''} onchange={(v) => (w.status = v as Widget['status'])} />
 									<NumberInput id="widget-{w.id}-limit" label="Entries" min={1} max={MAX_WIDGET_ROWS} bind:value={w.limit} />
 								</div>
 							{:else if w.type === 'status_breakdown'}
 								<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
-									<Select id="widget-{w.id}-schema" label="Schema" searchable options={anySchema(w.schema)} bind:value={w.schema} />
+									<Select id="widget-{w.id}-schema" label="Content type" searchable options={anySchema(w.schema)} bind:value={w.schema} />
 								</div>
 							{:else if w.type === 'recent_activity'}
 								<div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">

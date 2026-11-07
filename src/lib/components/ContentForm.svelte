@@ -105,7 +105,7 @@
 <FormErrors message={error ?? undefined} fields={validationErrors} />
 
 {#if fields.length === 0}
-	<p class="text-faint text-sm py-4 text-center">This schema has no editable fields.</p>
+	<p class="text-faint text-sm py-4 text-center">This content type has no editable fields.</p>
 {:else}
 	<!-- The form states the gap between its fields. The caller's Card wraps
 	     its children, so a space-y on the Card would not reach them. -->

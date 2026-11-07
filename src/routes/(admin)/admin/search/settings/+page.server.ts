@@ -25,7 +25,7 @@ export const load: PageServerLoad = async (event) => {
 	// ranking read is a failure and never the defaults.
 	const [ranking, publicSchemas, schemas] = await Promise.all([
 		section<RankingConfig>(getRanking(client, '*'), couldNotLoad('ranking weights')),
-		section(attempt(() => getPublicSchemas(client)), couldNotLoad('the public schema list')),
+		section(attempt(() => getPublicSchemas(client)), couldNotLoad('the public content type list')),
 		section(attempt(() => listSchemaNames(client)), couldNotLoad('schemas')),
 	]);
 
@@ -46,7 +46,7 @@ export const actions: Actions = {
 			const saved = await setPublicSchemas(authedClient(event), schemas);
 			return { publicSaved: saved.length };
 		} catch (err) {
-			return fail(400, { publicError: actionError(err, 'Could not save the public schemas. Try again.') });
+			return fail(400, { publicError: actionError(err, 'Could not save the public content types. Try again.') });
 		}
 	},
 

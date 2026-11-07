@@ -78,7 +78,7 @@
 						<tr>
 							<th scope="col">Time</th>
 							<th scope="col">Event</th>
-							<th scope="col">Schema</th>
+							<th scope="col">Content type</th>
 							<th scope="col">Status</th>
 							<th scope="col">Duration</th>
 							<th scope="col">Result</th>

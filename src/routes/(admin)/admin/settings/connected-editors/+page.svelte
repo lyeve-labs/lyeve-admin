@@ -467,7 +467,7 @@
 						{ term: 'Code expires', value: expiresIn(request.code_expires_at) },
 						{
 							term: 'Access',
-							value: 'Read and write pages, sections and the theme, and read entries of the schemas open to the builder.',
+							value: 'Read and write pages, sections and the theme, and read entries of the content types open to the builder.',
 						},
 						{
 							term: 'Approved as',

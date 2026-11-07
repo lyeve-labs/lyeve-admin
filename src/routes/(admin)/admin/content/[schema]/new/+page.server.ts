@@ -40,7 +40,7 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		schemaDef = await getSchema(params.schema, client);
 	} catch (err) {
-		readError(err, `Schema "${params.schema}" not found`);
+		readError(err, `Content type "${params.schema}" not found`);
 	}
 
 	// The locale routes belong to the localization plugin. Without it there is

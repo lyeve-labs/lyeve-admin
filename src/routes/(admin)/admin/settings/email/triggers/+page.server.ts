@@ -27,7 +27,7 @@ export const load: PageServerLoad = async (event) => {
 		section(listEmailTemplates(client), 'Could not load email templates.'),
 		section(
 			getSchemas(client).then((rows: { name: string }[]) => rows.map((s) => s.name).sort()),
-			'Could not load schemas, so a trigger can only watch every schema for now.',
+			'Could not load content types, so a trigger can only watch every content type for now.',
 		),
 		triggerWriteRefusal(client),
 	]);

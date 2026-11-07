@@ -154,11 +154,11 @@
 		const where = schemaLabel(target.schema_name);
 		let message = '';
 		if (target.schema_name === WILDCARD) {
-			message = 'Every schema falls back to its own rule, and any schema without one is denied.';
+			message = 'Every content type falls back to its own rule, and any content type without one is denied.';
 		} else if (target.schema_name === ALL_FLOWS) {
 			message = 'Every flow falls back to its own rule, and any flow without one is denied.';
 		} else if (inherited.length > 0) {
-			message = `The ${parentLabel(target.schema_name)} for ${target.role} then applies to this ${isFlowResource(target.schema_name) ? 'flow' : 'schema'} and grants ${inherited.join(', ')}.`;
+			message = `The ${parentLabel(target.schema_name)} for ${target.role} then applies to this ${isFlowResource(target.schema_name) ? 'flow' : 'content type'} and grants ${inherited.join(', ')}.`;
 		}
 		const ok = await confirmDialog(`Delete the rule for ${target.role} on ${where}?`, message, { confirmLabel: 'Delete' });
 		if (!ok) return;
@@ -186,7 +186,7 @@
 
 <PageShell
 	title="Row-level permissions"
-	description="Set what each role can do with each schema and flow."
+	description="Set what each role can do with each content type and flow."
 	width="wide"
 >
 	{#snippet actions()}
@@ -243,14 +243,14 @@
 			<ListToolbar label="Filter rules">
 				{#snippet search()}
 					<label for="schema-filter" class="sr-only">Filter resources</label>
-					<SearchInput id="schema-filter" bind:value={schemaFilter} placeholder="Schema or flow name" />
+					<SearchInput id="schema-filter" bind:value={schemaFilter} placeholder="Content type or flow name" />
 				{/snippet}
 				{#snippet filters()}
 					<Toggle
 						id="show-unruled"
 						bind:checked={showUnruled}
 						label="Show resources with no rule"
-						hint="Shows schemas that use the wildcard rule and flows that use the All flows rule."
+						hint="Shows content types that use the wildcard rule and flows that use the All flows rule."
 					/>
 				{/snippet}
 			</ListToolbar>
@@ -258,7 +258,7 @@
 			{#if !filterMatches}
 				<EmptyState
 					title="No resources match this search"
-					description="Clear the search, or turn on Show resources with no rule to include schemas and flows without a rule of their own."
+					description="Clear the search, or turn on Show resources with no rule to include content types and flows without a rule of their own."
 				/>
 			{:else}
 				<Table label="Rules by role">
@@ -313,7 +313,7 @@
 											variant="ghost"
 											size="sm"
 											disabled={role === EXEMPT_ROLE || rules.unruledSchemas(role).length === 0}
-											aria-label="Add a schema rule for {role}"
+											aria-label="Add a content type rule for {role}"
 											onclick={() => openRule(role, null)}
 										>
 											<Plus size={ICON.sm} />
@@ -330,7 +330,7 @@
 										<span class="flex items-center gap-2 pl-6">
 											<Asterisk size={ICON.sm} class="shrink-0 text-brand" />
 											<span class="font-mono text-xs text-brand">*</span>
-											<Badge tone="brand">Every schema</Badge>
+											<Badge tone="brand">Every content type</Badge>
 										</span>
 									</td>
 									{#each ACTIONS as action}
@@ -369,11 +369,11 @@
 									<tr>
 										<td colspan="8" class="text-sm text-muted">
 											{#if filterText}
-												No schemas in this role match this search.
+												No content types in this role match this search.
 											{:else if wildcard}
-												No schema rules of its own. Every schema uses the wildcard rule above, and every flow is denied.
+												No content type rules of its own. Every content type uses the wildcard rule above, and every flow is denied.
 											{:else}
-												{role} has no rules, so it is denied every action on every schema and flow.
+												{role} has no rules, so it is denied every action on every content type and flow.
 											{/if}
 										</td>
 									</tr>

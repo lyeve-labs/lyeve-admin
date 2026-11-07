@@ -109,7 +109,7 @@ describe('dashboard tiles', () => {
 		const { container } = render(DashboardPage, { props: { data: data({ schemas: null, offers: none }), form: null } });
 
 		const text = container.textContent ?? '';
-		for (const gone of ['Collections', 'Entries', 'Requests, 24h', 'Failed jobs', 'Errors logged', 'Webhooks failing', 'What changed', 'No schemas yet']) {
+		for (const gone of ['Content types', 'Entries', 'Requests, 24h', 'Failed jobs', 'Errors logged', 'Webhooks failing', 'What changed', 'No content types yet']) {
 			expect(text, gone).not.toContain(gone);
 		}
 	});
@@ -136,7 +136,7 @@ describe('dashboard tiles', () => {
 		});
 
 		const text = container.textContent ?? '';
-		expect(text).toContain('Collections');
+		expect(text).toContain('Content types');
 		expect(text).not.toContain('Entries');
 		expect(text).not.toContain('Requests, 24h');
 		expect(text).not.toContain('Recent audit entries');
@@ -159,14 +159,14 @@ describe('dashboard tiles', () => {
 		});
 
 		const text = container.textContent ?? '';
-		expect(text).not.toContain('No schemas yet');
+		expect(text).not.toContain('No content types yet');
 		expect(text).toContain('Right now');
-		expect(text).toContain('schemas unavailable');
+		expect(text).toContain('content types unavailable');
 	});
 
 	it('offers the first schema only to a role that may make one', () => {
 		const admin = render(DashboardPage, { props: { data: empty, form: null } });
-		expect(admin.container.textContent).toContain('No schemas yet');
+		expect(admin.container.textContent).toContain('No content types yet');
 		expect(admin.container.querySelector('a[href="/admin/schema"]')).not.toBeNull();
 		cleanup();
 

@@ -37,7 +37,7 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	localization: 'Choose the languages for content and the order a missing translation falls back through.',
 	email: 'Set up the mail providers and the fallback transport behind them.',
 	recommendations: 'Set up similar entries, trending entries and a feed for each reader, based on what readers do.',
-	permissions: 'Set what each role can do with content and flows, for every schema, one schema or one flow.',
+	permissions: 'Set what each role can do with content and flows, for every content type, one content type or one flow.',
 	security: 'See what protects this instance.',
 	oauth: 'Add the OpenID Connect and OAuth 2.0 providers people can sign in with.',
 	saml: 'Add the SAML identity providers people sign in through, and manage their certificates.',

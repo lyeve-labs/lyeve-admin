@@ -49,7 +49,7 @@ describe('Search settings refusals', () => {
 		const { container } = render(SettingsPage, {
 			props: { data: data({ schemas: { ok: false, gate: { state: 'forbidden' } } }) as never, form: null },
 		});
-		expect(container.textContent).toContain('Your role cannot open the schemas.');
+		expect(container.textContent).toContain('Your role cannot open the content types.');
 	});
 });
 
@@ -87,7 +87,7 @@ describe('Search settings', () => {
 			},
 		});
 		expect(getByText('Could not load schemas.')).toBeTruthy();
-		expect(queryByText('No schemas yet')).toBeNull();
+		expect(queryByText('No content types yet')).toBeNull();
 	});
 
 	it('offers the index to a super admin only', () => {

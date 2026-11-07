@@ -166,7 +166,7 @@ describe('the public schemas', () => {
 			'PUT /api/admin/search/public-schemas': () => json({ error: 'pq: connection refused' }, 503),
 		});
 
-		expect(((await actions.publicSchemas(event)) as Failure).data.publicError).toBe('Could not save the public schemas. Try again.');
+		expect(((await actions.publicSchemas(event)) as Failure).data.publicError).toBe('Could not save the public content types. Try again.');
 	});
 });
 

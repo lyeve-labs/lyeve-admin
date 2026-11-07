@@ -133,7 +133,7 @@
 						<tr>
 							<th scope="col">Webhook</th>
 							<th scope="col">Event</th>
-							<th scope="col">Schema</th>
+							<th scope="col">Content type</th>
 							<th scope="col">Attempts</th>
 							<th scope="col">Last error</th>
 							<th scope="col">Status</th>
