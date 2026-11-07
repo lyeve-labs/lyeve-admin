@@ -181,7 +181,7 @@
 
 					{#if modeStatus.secrets_included}
 						<Alert tone="warn">
-							These secrets are shown only once. Copy them now and store them where the engine reads its settings.
+							These secrets are shown only once. Copy them now and store them with the engine's settings.
 							The engine does not save them, so they are gone after it restarts.
 						</Alert>
 					{:else if generatedSecrets.length > 0}

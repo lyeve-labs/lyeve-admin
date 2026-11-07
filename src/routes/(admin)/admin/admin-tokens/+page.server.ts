@@ -51,7 +51,7 @@ export const load: PageServerLoad = async (event) => {
 		section(listAdminTokens(client, limit, offset), couldNotLoad('the admin tokens')),
 		// The grants are the create form's only required choice, so a failed
 		// read is said in the form rather than drawn as a catalog with none.
-		section(listAdminGrants(client), 'Could not load the grants, so you cannot create a token right now. Reload the page to try again.'),
+		section(listAdminGrants(client), 'Could not load the grants, so you cannot create a token. Reload the page to try again.'),
 		// Which step-up the engine will ask for. An unreadable status leaves it
 		// unknown: the form asks for the password, and an engine that wants a
 		// code says so and the form switches.

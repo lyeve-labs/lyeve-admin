@@ -135,7 +135,7 @@
 	{/if}
 
 	{#if nothingShown}
-		<Alert tone="brand">None of these settings apply to this instance right now.</Alert>
+		<Alert tone="brand">None of these settings apply to this instance.</Alert>
 	{/if}
 
 	{#if data.formErasure}
@@ -206,12 +206,12 @@
 								<input type="hidden" name="kept" value={section} />
 							{/each}
 							{#if sectionOptions.length === 0}
-								<p class="text-sm text-muted">Nothing on this instance can be exported right now.</p>
+								<p class="text-sm text-muted">Nothing on this instance can be exported.</p>
 							{:else}
 								<CheckboxGroup
 									name="offered"
 									label="What a person may include"
-									hint="A person picks from these each time they export. If nothing is checked, no one in this tenant can export their own data."
+									hint="Each export offers the sections checked here. If none is checked, no one in this tenant can export their own data."
 									options={sectionOptions}
 									bind:value={offered}
 								/>

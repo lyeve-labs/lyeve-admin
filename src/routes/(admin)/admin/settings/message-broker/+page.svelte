@@ -89,7 +89,7 @@
 			<Alert tone="warn">
 				The broker refused {data.status.failed} publish
 				{plural(data.status.failed, 'attempt')} since the engine last started. The outbox
-				retries them, but its counts could not be loaded, so it is unknown whether any event was lost.
+				retries them. Could not load the outbox counts, so you cannot tell whether any event was lost.
 			</Alert>
 		{:else if data.status.failed > 0}
 			<Alert tone="danger">
@@ -261,7 +261,7 @@
 			<!-- One run of text per sentence end: a line break inside the markup
 			     before a period renders as a space in front of it. -->
 			<p class="text-xs text-muted">
-				The broker is configured by the deployment, through <span class="font-mono">EVENT_BUS</span
+				The broker is configured through <span class="font-mono">EVENT_BUS</span
 				>{#if backendSettings.length}{' '}and {backendSettings.join(', ')}{/if}.
 				{backendSettings.length
 					? 'Set them as environment variables or in the configuration file'

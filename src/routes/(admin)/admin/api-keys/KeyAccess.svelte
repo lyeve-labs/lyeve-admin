@@ -136,7 +136,7 @@
 						onchange={(v) => (access = { ...access, contentActions: v as typeof access.contentActions })}
 					/>
 				{:else if schemasFailed}
-					<Alert tone="warn">Could not load the schemas, so you cannot choose any right now. Reload the page to try again.</Alert>
+					<Alert tone="warn">Could not load the schemas, so you cannot choose any. Reload the page to try again.</Alert>
 				{:else if schemas.length === 0}
 					<p class="text-xs text-faint">No schemas yet.</p>
 				{:else}
@@ -199,7 +199,7 @@
 	</Panel>
 
 	{#if catalogFailed}
-		<Alert tone="warn">Could not load the route catalog, so you cannot grant other resources right now. Reload the page to try again.</Alert>
+		<Alert tone="warn">Could not load the route catalog, so you cannot grant other resources. Reload the page to try again.</Alert>
 	{/if}
 
 	{#each groups as g (g.resource)}

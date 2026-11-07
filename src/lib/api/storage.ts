@@ -213,7 +213,7 @@ export const PROVIDER_FIELDS: Readonly<Record<ProviderType, readonly ProviderFie
 	s3: [
 		{ key: 'bucket', label: 'Bucket', hint: 'The bucket objects are written to.', required: true, placeholder: 'my-uploads' },
 		{ key: 'region', label: 'Region', hint: 'The bucket region, such as us-east-1. Cloudflare R2 takes auto.', required: true, placeholder: 'us-east-1' },
-		{ key: 'endpoint', label: 'Endpoint', hint: 'Empty for Amazon S3. Set it for an S3-compatible service: Cloudflare R2, Wasabi, Backblaze B2 or DigitalOcean Spaces.', required: false, placeholder: 'https://<account>.r2.cloudflarestorage.com' },
+		{ key: 'endpoint', label: 'Endpoint', hint: 'Leave empty for Amazon S3. Set it for an S3-compatible service: Cloudflare R2, Wasabi, Backblaze B2 or DigitalOcean Spaces.', required: false, placeholder: 'https://<account>.r2.cloudflarestorage.com' },
 		{ key: 'access_key', label: 'Access key ID', hint: 'An IAM key allowed to put, get and delete in this bucket only.', required: true },
 		{ key: 'secret_key', label: 'Secret access key', hint: 'Stored encrypted and never shown again.', required: true, secret: true },
 		{ key: 'cdn_base_url', label: 'CDN base URL', hint: 'Optional. A CDN in front of the bucket. Download links use it.', required: false, placeholder: 'https://cdn.example.com' },

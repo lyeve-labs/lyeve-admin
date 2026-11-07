@@ -106,8 +106,8 @@
 					empty turns the setting off, even when a file or this page sets it.
 				</p>
 				<p>
-					<span class="font-medium text-fg">A YAML file</span> comes next. The engine reads the file or
-					directory set in <code class="font-mono text-xs">LYEVE_CONFIG</code>. Without it, the engine reads
+					<span class="font-medium text-fg">A YAML file</span> comes next. The engine uses the file or
+					directory set in <code class="font-mono text-xs">LYEVE_CONFIG</code>. Without it, the engine uses
 					<code class="font-mono text-xs">lyeve.yaml</code> (or <code class="font-mono text-xs">lyeve.yml</code>) in the
 					directory it runs in, then in <code class="font-mono text-xs">/etc/lyeve</code>, then the files of
 					<code class="font-mono text-xs">/etc/lyeve/conf.d</code> in name order. A key is the variable's name in

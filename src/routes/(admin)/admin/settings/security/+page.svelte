@@ -41,7 +41,7 @@
 
 <PageShell
 	title="Security"
-	description="See which controls protect this instance right now, and how to turn on the rest."
+	description="See which controls protect this instance, and how to turn on the rest."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >

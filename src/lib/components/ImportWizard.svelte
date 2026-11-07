@@ -466,7 +466,7 @@
 			{/if}
 			{#if preview.errors.length > 0}
 				<Alert tone="warn">
-					{formatCount(preview.errors.length)} rows could not be read and will be rejected, starting with row
+					{formatCount(preview.errors.length)} rows cannot be read and will be rejected, starting with row
 					{preview.errors[0].row_index + 1}: {preview.errors[0].message}
 				</Alert>
 			{/if}

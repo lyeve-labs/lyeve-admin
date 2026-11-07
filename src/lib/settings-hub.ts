@@ -38,7 +38,7 @@ const DESCRIBE: Readonly<Record<string, string>> = {
 	email: 'Set up the mail providers and the fallback transport behind them.',
 	recommendations: 'Set up similar entries, trending entries and a feed for each reader, based on what readers do.',
 	permissions: 'Set what each role can do with content and flows, for every schema, one schema or one flow.',
-	security: 'See what protects this instance right now.',
+	security: 'See what protects this instance.',
 	oauth: 'Add the OpenID Connect and OAuth 2.0 providers people can sign in with.',
 	saml: 'Add the SAML identity providers people sign in through, and manage their certificates.',
 	scim: 'Let identity providers create and remove accounts without anyone signing in.',

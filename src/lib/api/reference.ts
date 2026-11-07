@@ -303,7 +303,7 @@ const adminMigrateGroup: EndpointGroup = {
 const adminWebhooksGroup: EndpointGroup = {
 	id: 'admin-webhooks',
 	label: 'Admin · Webhooks',
-	description: 'Manage outgoing HTTP webhooks. The engine sends a POST to each matching URL after a content event.',
+	description: 'Manage outgoing HTTP webhooks. Each matching URL receives a POST after a content event.',
 	server: 'admin',
 	baseUrl: '/api/admin',
 	endpoints: [
