@@ -3,7 +3,7 @@ import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionError, actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -123,7 +123,7 @@ export const actions: Actions = {
 			await cancelJob(client, id);
 			return { canceled: id };
 		} catch (err) {
-			return fail(400, { action: 'cancel' as const, error: actionError(err, 'Could not cancel the export. Try again.') });
+			return tagged('cancel', actionFailure(err, 'Could not cancel the export. Try again.'));
 		}
 	},
 
@@ -148,7 +148,7 @@ export const actions: Actions = {
 			});
 			return { scheduled: name };
 		} catch (err) {
-			return fail(400, { action: 'createSchedule' as const, error: actionError(err, 'Could not create the schedule. Try again.') });
+			return tagged('createSchedule', actionFailure(err, 'Could not create the schedule. Try again.'));
 		}
 	},
 
@@ -163,7 +163,7 @@ export const actions: Actions = {
 			await setScheduleEnabled(client, id, enabled);
 			return { toggled: id, enabled };
 		} catch (err) {
-			return fail(400, { action: 'toggleSchedule' as const, error: actionError(err, 'Could not save the schedule. Try again.') });
+			return tagged('toggleSchedule', actionFailure(err, 'Could not save the schedule. Try again.'));
 		}
 	},
 
@@ -177,7 +177,7 @@ export const actions: Actions = {
 			await deleteSchedule(client, id);
 			return { deleted: id };
 		} catch (err) {
-			return fail(400, { action: 'deleteSchedule' as const, error: actionError(err, 'Could not delete the schedule. Try again.') });
+			return tagged('deleteSchedule', actionFailure(err, 'Could not delete the schedule. Try again.'));
 		}
 	},
 };

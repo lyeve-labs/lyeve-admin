@@ -2,7 +2,7 @@ import { readRouteOptions, routeOptions } from '$lib/api/route-options';
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -151,7 +151,7 @@ async function save(event: Parameters<Actions[string]>[0], id: string | null) {
 		if (id) await updateRule(client, id, body);
 		else await createRule(client, body);
 	} catch (err) {
-		return fail(400, { action: 'rule', error: actionError(err, 'Could not save the rule. Try again.') });
+		return tagged('rule', actionFailure(err, 'Could not save the rule. Try again.'));
 	}
 	return { saved: endpoint };
 }
@@ -175,7 +175,7 @@ export const actions: Actions = {
 		try {
 			await deleteRule(client, id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the rule. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the rule. Try again.'));
 		}
 		return { removed: id };
 	},
@@ -195,7 +195,7 @@ export const actions: Actions = {
 		try {
 			await updateGlobal(client, { rate, burst, enabled: form.get('enabled') === 'true' });
 		} catch (err) {
-			return fail(400, { action: 'global', error: actionError(err, 'Could not save the global limit. Try again.') });
+			return tagged('global', actionFailure(err, 'Could not save the global limit. Try again.'));
 		}
 		return { savedGlobal: true };
 	},
@@ -224,7 +224,7 @@ export const actions: Actions = {
 				window_seconds: Math.max(1, Math.round(minutes * 60)),
 			});
 		} catch (err) {
-			return fail(400, { action: 'protection', error: actionError(err, 'Could not save the protection. Try again.') });
+			return tagged('protection', actionFailure(err, 'Could not save the protection. Try again.'));
 		}
 		return { savedProtection: name };
 	},
@@ -238,7 +238,7 @@ export const actions: Actions = {
 		try {
 			await resetProtection(client, name);
 		} catch (err) {
-			return fail(400, { action: 'resetProtection', error: actionError(err, 'Could not reset the protection. Try again.') });
+			return tagged('resetProtection', actionFailure(err, 'Could not reset the protection. Try again.'));
 		}
 		return { resetProtection: name };
 	},

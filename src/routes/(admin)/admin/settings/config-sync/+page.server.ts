@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { error, fail, type RequestEvent } from '@sveltejs/kit';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import {
 	MIN_PASSPHRASE,
@@ -83,9 +83,8 @@ export const actions: Actions = {
 				sections: Object.keys(bundle.sections ?? {}),
 			};
 		} catch (err) {
-			const refused = refusalOf(err);
-			if (refused) return fail(402, { scope: 'export' as const, error: refusalText(refused), refused });
-			return fail(400, { scope: 'export' as const, error: actionError(err, 'Could not export the configuration. Try again.') });
+			const failed = actionFailure(err, 'Could not export the configuration. Try again.');
+			return fail(failed.status, { ...failed.data, scope: 'export' as const });
 		}
 	},
 

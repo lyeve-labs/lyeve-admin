@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -79,7 +79,7 @@ export const actions: Actions = {
 				archival_path_prefix: String(form.get('archival_path_prefix') ?? '').trim(),
 			});
 		} catch (err) {
-			return fail(400, { action: 'createPolicy' as const, error: actionError(err, 'Could not create the policy. Try again.') });
+			return tagged('createPolicy', actionFailure(err, 'Could not create the policy. Try again.'));
 		}
 		return { saved: 'policy' };
 	},
@@ -93,7 +93,7 @@ export const actions: Actions = {
 		try {
 			await deletePolicy(client, id);
 		} catch (err) {
-			return fail(400, { action: 'deletePolicy' as const, error: actionError(err, 'Could not delete the policy. Try again.') });
+			return tagged('deletePolicy', actionFailure(err, 'Could not delete the policy. Try again.'));
 		}
 		return { removed: id };
 	},
@@ -116,7 +116,7 @@ export const actions: Actions = {
 				filter_tenant_id: String(form.get('filter_tenant_id') ?? '').trim(),
 			});
 		} catch (err) {
-			return fail(400, { action: 'createHold' as const, error: actionError(err, 'Could not create the hold. Try again.') });
+			return tagged('createHold', actionFailure(err, 'Could not create the hold. Try again.'));
 		}
 		return { saved: name };
 	},
@@ -130,7 +130,7 @@ export const actions: Actions = {
 		try {
 			await releaseHold(client, id);
 		} catch (err) {
-			return fail(400, { action: 'releaseHold' as const, error: actionError(err, 'Could not release the hold. Try again.') });
+			return tagged('releaseHold', actionFailure(err, 'Could not release the hold. Try again.'));
 		}
 		return { released: id };
 	},
@@ -148,7 +148,7 @@ export const actions: Actions = {
 				archiveFailed: archiveFailures(run),
 			};
 		} catch (err) {
-			return fail(400, { action: 'enforce' as const, error: actionError(err, 'Could not enforce retention. Try again.') });
+			return tagged('enforce', actionFailure(err, 'Could not enforce retention. Try again.'));
 		}
 	},
 };

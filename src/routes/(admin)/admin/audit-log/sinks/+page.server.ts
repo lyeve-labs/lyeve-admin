@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { refusalOf, refusalText } from '$lib/api/refusal';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
@@ -49,7 +49,7 @@ function common(form: FormData) {
 function failure(action: string, err: unknown, fallback: string) {
 	const refused = refusalOf(err);
 	if (refused) return fail(402, { action, error: refusalText(refused), refused });
-	return fail(400, { action, error: actionError(err, fallback) });
+	return tagged(action, actionFailure(err, fallback));
 }
 
 function missing(action: string, body: { name: string; url: string }) {

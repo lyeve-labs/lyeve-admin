@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -98,7 +98,7 @@ export const actions: Actions = {
 					error: 'A recompute is already running. Wait for it to finish.',
 				});
 			}
-			return fail(400, { action: 'refresh', error: actionError(err, 'Could not start the recompute. Try again.') });
+			return tagged('refresh', actionFailure(err, 'Could not start the recompute. Try again.'));
 		}
 	},
 
@@ -115,7 +115,7 @@ export const actions: Actions = {
 			const entries = await generateFeed(client, userId);
 			return { previewFor: userId, feed: entries ?? [] };
 		} catch (err) {
-			return fail(400, { action: 'preview', error: actionError(err, 'Could not generate the feed. Try again.') });
+			return tagged('preview', actionFailure(err, 'Could not generate the feed. Try again.'));
 		}
 	},
 };

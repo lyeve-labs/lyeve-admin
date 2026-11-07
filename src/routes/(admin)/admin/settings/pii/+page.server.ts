@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, isRedirect, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -106,7 +106,7 @@ export const actions: Actions = {
 			await createRule(authedClient(event), draft);
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { action: 'create', error: actionError(err, 'Could not create the rule. Try again.') });
+			return tagged('create', actionFailure(err, 'Could not create the rule. Try again.', 422));
 		}
 	},
 
@@ -119,7 +119,7 @@ export const actions: Actions = {
 			await updateRule(authedClient(event), id, draftFrom(form));
 			return { saved: true };
 		} catch (err) {
-			return fail(422, { action: 'update', error: actionError(err, 'Could not save the rule. Try again.') });
+			return tagged('update', actionFailure(err, 'Could not save the rule. Try again.', 422));
 		}
 	},
 
@@ -132,7 +132,7 @@ export const actions: Actions = {
 			await deleteRule(authedClient(event), id);
 			return { deleted: true };
 		} catch (err) {
-			return fail(422, { action: 'delete', error: actionError(err, 'Could not delete the rule. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the rule. Try again.', 422));
 		}
 	},
 
@@ -150,7 +150,7 @@ export const actions: Actions = {
 			);
 			return { test: result };
 		} catch (err) {
-			return fail(422, { action: 'test', error: actionError(err, 'Could not run the pattern. Try again.') });
+			return tagged('test', actionFailure(err, 'Could not run the pattern. Try again.', 422));
 		}
 	},
 };

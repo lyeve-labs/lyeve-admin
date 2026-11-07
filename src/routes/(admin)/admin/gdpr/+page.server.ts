@@ -3,7 +3,7 @@ import { exportSubject, eraseSubject } from '@lyeve-labs/client-rest';
 import { fail, error } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { isOutage } from '$lib/api/gate';
 import { rolesInWords } from '$lib/roles';
 import { PLUGIN } from '$lib/plugin-names';
@@ -42,7 +42,7 @@ export const actions: Actions = {
 			const result = await exportSubject(subject, client);
 			return { action: 'export', ok: true, subject, result };
 		} catch (err) {
-			return fail(400, { action: 'export', error: actionError(err, 'Could not export data for this subject. Try again.') });
+			return tagged('export', actionFailure(err, 'Could not export data for this subject. Try again.'));
 		}
 	},
 
@@ -96,10 +96,7 @@ export const actions: Actions = {
 			const result = await eraseSubject(subject, client);
 			return { action: 'erase', ok: true, subject, result };
 		} catch (err) {
-			return fail(400, {
-				action: 'erase',
-				error: actionError(err, 'Could not start the erasure. Nothing was erased. Try again.'),
-			});
+			return tagged('erase', actionFailure(err, 'Could not start the erasure. Nothing was erased. Try again.'));
 		}
 	},
 };

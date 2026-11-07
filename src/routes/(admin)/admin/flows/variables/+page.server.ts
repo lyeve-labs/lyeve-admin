@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { flowLoadOutcome } from '$lib/server/flow-load';
 import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
@@ -71,7 +71,8 @@ export const actions: Actions = {
 		try {
 			await putVariable(client, { key, value, is_secret: isSecret });
 		} catch (err) {
-			return fail(400, { action: 'put', error: actionError(err, 'Could not save the variable. Try again.'), key });
+			const failed = actionFailure(err, 'Could not save the variable. Try again.');
+			return fail(failed.status, { ...failed.data, action: 'put', key });
 		}
 		return { saved: key };
 	},
@@ -84,7 +85,7 @@ export const actions: Actions = {
 		try {
 			await deleteVariable(client, key);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the variable. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the variable. Try again.'));
 		}
 	},
 };

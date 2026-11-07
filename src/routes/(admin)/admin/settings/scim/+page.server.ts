@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -110,7 +110,7 @@ export const actions: Actions = {
 				...(samlProvider ? { saml_provider_id: samlProvider } : {}),
 			});
 		} catch (err) {
-			return fail(400, { action: 'create', error: actionError(err, 'Could not create the connection. Try again.') });
+			return tagged('create', actionFailure(err, 'Could not create the connection. Try again.'));
 		}
 		return { saved: name };
 	},
@@ -131,7 +131,7 @@ export const actions: Actions = {
 		try {
 			await rotateToken(client, id, token);
 		} catch (err) {
-			return fail(400, { action: 'rotate', error: actionError(err, 'Could not rotate the token. Try again.') });
+			return tagged('rotate', actionFailure(err, 'Could not rotate the token. Try again.'));
 		}
 		return { rotated: id };
 	},
@@ -145,7 +145,7 @@ export const actions: Actions = {
 		try {
 			await deleteProvider(client, id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the connection. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the connection. Try again.'));
 		}
 		return { removed: id };
 	},

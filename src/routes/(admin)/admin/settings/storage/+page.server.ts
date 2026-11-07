@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -55,7 +55,8 @@ export const actions: Actions = {
 			}
 			return { tested: id };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not test the provider. Try again.') });
+			const failed = actionFailure(err, 'Could not test the provider. Try again.');
+			return fail(failed.status, failed.data);
 		}
 	},
 
@@ -95,7 +96,8 @@ export const actions: Actions = {
 		try {
 			await deleteProvider(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not delete the provider. Try again.') });
+			const failed = actionFailure(err, 'Could not delete the provider. Try again.');
+			return fail(failed.status, failed.data);
 		}
 		return { removed: id };
 	},

@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { GATE_OK, gateOf, inSentence, type Gate } from '$lib/api/gate';
@@ -141,7 +141,8 @@ export const actions: Actions = {
 		try {
 			await deleteProvider(authedClient(event), id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not delete the destination. Try again.') });
+			const failed = actionFailure(err, 'Could not delete the destination. Try again.');
+			return fail(failed.status, failed.data);
 		}
 		return { deleted: id };
 	},

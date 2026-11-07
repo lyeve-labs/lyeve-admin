@@ -5,7 +5,7 @@ import { fail, error, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
-import { actionError } from '$lib/server/action-error';
+import { actionError, actionFailure, tagged } from '$lib/server/action-error';
 import { passwordTooLong, setUserPassword, type ListedUser } from '$lib/api/users';
 import { seatRefusal } from '$lib/api/admin-seats';
 import { refusalText } from '$lib/api/refusal';
@@ -127,7 +127,7 @@ export const actions: Actions = {
 					fields: { password: actionError(err, 'This password does not meet the password policy.') },
 				});
 			}
-			return fail(400, { action: 'create', error: actionError(err, 'Could not create the user. Try again.') });
+			return tagged('create', actionFailure(err, 'Could not create the user. Try again.'));
 		}
 	},
 
@@ -150,7 +150,7 @@ export const actions: Actions = {
 		} catch (err) {
 			const full = seatRefusal(err);
 			if (full) return fail(402, { action: 'updateRoles', error: refusalText(full), refused: full });
-			return fail(400, { action: 'updateRoles', error: actionError(err, 'Could not save the roles. Try again.') });
+			return tagged('updateRoles', actionFailure(err, 'Could not save the roles. Try again.'));
 		}
 	},
 
@@ -164,7 +164,7 @@ export const actions: Actions = {
 			await deleteUser(id, client);
 			return { ok: true };
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the user. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the user. Try again.'));
 		}
 	},
 
@@ -205,7 +205,7 @@ export const actions: Actions = {
 					fields: { new_password: actionError(err, 'This password does not meet the password policy.') },
 				});
 			}
-			return fail(400, { action: 'setPassword', error: actionError(err, 'Could not set the password. Try again.') });
+			return tagged('setPassword', actionFailure(err, 'Could not set the password. Try again.'));
 		}
 	},
 };

@@ -21,7 +21,7 @@ import {
 } from '$lib/api/telemetry';
 import { errorCodeOf } from '$lib/api/limits';
 import { refusalOf, refusalText } from '$lib/api/refusal';
-import { actionError } from '$lib/server/action-error';
+import { actionError, actionFailure } from '$lib/server/action-error';
 import { section, type Section } from '$lib/api/gate';
 import { authedClient, authedHeaders, loadUser, requireRole } from '$lib/server/authz';
 import { couldNotLoad } from '$lib/outage';
@@ -174,7 +174,8 @@ export const actions: Actions = {
 			if (err instanceof ApiError && err.status === 429) {
 				return fail(429, { name, error: `${name} exported a moment ago. Wait five seconds and try again.` });
 			}
-			return fail(400, { name, error: actionError(err, `Could not export ${name}. Try again.`) });
+			const failed = actionFailure(err, `Could not export ${name}. Try again.`);
+			return fail(failed.status, { ...failed.data, name });
 		}
 	},
 };

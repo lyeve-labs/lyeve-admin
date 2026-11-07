@@ -5,7 +5,6 @@ import { getSchema } from '@lyeve-labs/client-rest';
 import { authedClient, exactParse, requireUser, stripProtectedFields, withExactIntegers } from '$lib/server/authz';
 import { actionError, actionFailure } from '$lib/server/action-error';
 import { readError } from '$lib/server/read-error';
-import { refusalOf, refusalText } from '$lib/api/refusal';
 import { readRelationChoices } from '$lib/server/relation-choices';
 import { setEntryRelations } from '$lib/server/content-relations';
 import { fieldRefusalOf } from '$lib/server/content-validation';
@@ -559,12 +558,8 @@ export const actions: Actions = {
 		} catch (err) {
 			// A 402 is the locale ceiling or a license refusal, which carries
 			// numbers and a link a bare relayed code would drop.
-			const refused = refusalOf(err);
-			if (refused) return fail(402, { error: refusalText(refused), refused, translationLocale: locale });
-			return fail(400, {
-				error: actionError(err, 'Could not save the translation. Try again.'),
-				translationLocale: locale,
-			});
+			const failed = actionFailure(err, 'Could not save the translation. Try again.');
+			return fail(failed.status, { ...failed.data, translationLocale: locale });
 		}
 		redirect(303, `/admin/content/${params.schema}/${params.id}`);
 	},
@@ -582,10 +577,8 @@ export const actions: Actions = {
 		try {
 			await updateTranslation(client, params.id, locale, { translation_status: 'translated' });
 		} catch (err) {
-			return fail(400, {
-				error: actionError(err, 'Could not mark the translation as translated. Try again.'),
-				translationLocale: locale,
-			});
+			const failed = actionFailure(err, 'Could not mark the translation as translated. Try again.');
+			return fail(failed.status, { ...failed.data, translationLocale: locale });
 		}
 		redirect(303, `/admin/content/${params.schema}/${params.id}`);
 	},

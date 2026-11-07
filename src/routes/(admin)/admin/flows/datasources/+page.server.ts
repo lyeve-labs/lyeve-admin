@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, requireUser } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { flowLoadOutcome } from '$lib/server/flow-load';
 import { couldNotLoad } from '$lib/outage';
 import { GATE_OK, gateOf, type Gate } from '$lib/api/gate';
@@ -159,7 +159,7 @@ export const actions: Actions = {
 			await createDatasource(client, body);
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
-			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Could not create the datasource. Try again.') });
+			return invalidFailure(err) ?? tagged('save', actionFailure(err, 'Could not create the datasource. Try again.'));
 		}
 	},
 
@@ -174,7 +174,7 @@ export const actions: Actions = {
 			await updateDatasource(client, id, body);
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'save' });
-			return invalidFailure(err) ?? fail(400, { action: 'save', error: actionError(err, 'Could not save the datasource. Try again.') });
+			return invalidFailure(err) ?? tagged('save', actionFailure(err, 'Could not save the datasource. Try again.'));
 		}
 	},
 
@@ -185,7 +185,7 @@ export const actions: Actions = {
 		try {
 			await deleteDatasource(client, text(data, 'id'));
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the datasource. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the datasource. Try again.'));
 		}
 	},
 
@@ -199,7 +199,7 @@ export const actions: Actions = {
 			return { testResult: { id, ...result } };
 		} catch (err) {
 			if (isRefused(err)) return fail(402, { ...REFUSED, action: 'test' });
-			return fail(400, { action: 'test', error: actionError(err, 'Could not test the datasource. Try again.') });
+			return tagged('test', actionFailure(err, 'Could not test the datasource. Try again.'));
 		}
 	},
 };

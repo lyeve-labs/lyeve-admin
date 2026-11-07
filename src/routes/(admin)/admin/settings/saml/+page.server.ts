@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -121,7 +121,7 @@ export const actions: Actions = {
 				enabled: form.get('enabled') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { action: 'create', error: actionError(err, 'Could not create the provider. Try again.') });
+			return tagged('create', actionFailure(err, 'Could not create the provider. Try again.'));
 		}
 		return { saved: name };
 	},
@@ -164,7 +164,7 @@ export const actions: Actions = {
 				enabled: form.get('enabled') === 'true',
 			});
 		} catch (err) {
-			return fail(400, { action: 'update', error: actionError(err, 'Could not save the provider. Try again.') });
+			return tagged('update', actionFailure(err, 'Could not save the provider. Try again.'));
 		}
 		return { saved: name };
 	},
@@ -178,7 +178,7 @@ export const actions: Actions = {
 		try {
 			await deleteProvider(client, id);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the provider. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the provider. Try again.'));
 		}
 		return { removed: id };
 	},
@@ -192,7 +192,7 @@ export const actions: Actions = {
 		try {
 			await prepareCert(client, id);
 		} catch (err) {
-			return fail(400, { action: 'prepare', error: actionError(err, 'Could not prepare a new certificate. Try again.') });
+			return tagged('prepare', actionFailure(err, 'Could not prepare a new certificate. Try again.'));
 		}
 		return { prepared: id };
 	},
@@ -206,7 +206,7 @@ export const actions: Actions = {
 		try {
 			await rolloverCert(client, id);
 		} catch (err) {
-			return fail(400, { action: 'rollover', error: actionError(err, 'Could not promote the certificate. Try again.') });
+			return tagged('rollover', actionFailure(err, 'Could not promote the certificate. Try again.'));
 		}
 		return { rolled: id };
 	},

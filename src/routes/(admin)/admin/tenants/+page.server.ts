@@ -9,7 +9,7 @@ import {
 	type Tenant
 } from '@lyeve-labs/client-rest';
 import { ApiError } from '@lyeve-labs/client';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { getProvisioning, tenantRefusal } from '$lib/api/tenants';
 import { refusalText } from '$lib/api/refusal';
 import { section, type Gate, type Section } from '$lib/api/gate';
@@ -50,7 +50,7 @@ function createFailure(err: unknown) {
 	}
 	const refused = tenantRefusal(err);
 	if (refused) return fail(402, { action: 'create', error: refusalText(refused), refused });
-	return fail(400, { action: 'create', error: actionError(err, 'Could not create the tenant. Try again.') });
+	return tagged('create', actionFailure(err, 'Could not create the tenant. Try again.'));
 }
 
 export const load: PageServerLoad = async (event) => {

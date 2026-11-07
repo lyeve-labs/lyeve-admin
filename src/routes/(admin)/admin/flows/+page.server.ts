@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { ApiError } from '@lyeve-labs/client';
 import { authedClient, authedHeaders, requireUser } from '$lib/server/authz';
-import { actionError, tagged } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { readImportForm } from '$lib/server/flow-import';
 import { flowClient } from '$lib/server/flow-client';
 import { forbiddenFailure } from '$lib/server/flow-forbidden';
@@ -94,7 +94,8 @@ function validationFailure(err: unknown, fallback: string) {
 	if (err instanceof FlowRefusal) return refusalFailure(err);
 	if (isLocked(err)) return fail(402, { error: 'Flows are not enabled on this instance.', locked: true });
 	if (err instanceof ApiError && err.status === 403) return forbiddenFailure(err);
-	return fail(400, { error: actionError(err, fallback) });
+	const failed = actionFailure(err, fallback);
+	return fail(failed.status, failed.data);
 }
 
 export const actions: Actions = {
@@ -131,7 +132,7 @@ export const actions: Actions = {
 			await deleteFlow(client, id);
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 403) return tagged('delete', forbiddenFailure(err));
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the flow. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the flow. Try again.'));
 		}
 	},
 

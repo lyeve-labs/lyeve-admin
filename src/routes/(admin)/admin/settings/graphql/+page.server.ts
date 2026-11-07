@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireUser } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import { pageWindow, pastEndOffset, withOffset } from '$lib/api/list';
@@ -79,7 +79,7 @@ export const actions: Actions = {
 			});
 			return { registered: true };
 		} catch (err) {
-			return fail(400, { action: 'register', error: actionError(err, 'Could not register the query. Try again.') });
+			return tagged('register', actionFailure(err, 'Could not register the query. Try again.'));
 		}
 	},
 
@@ -91,7 +91,7 @@ export const actions: Actions = {
 			await togglePersisted(authedClient(event), hash);
 			return { toggled: hash };
 		} catch (err) {
-			return fail(400, { action: 'toggle', error: actionError(err, 'Could not enable or disable the query. Try again.') });
+			return tagged('toggle', actionFailure(err, 'Could not enable or disable the query. Try again.'));
 		}
 	},
 
@@ -103,7 +103,7 @@ export const actions: Actions = {
 			await deletePersisted(authedClient(event), hash);
 			return { deleted: hash };
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the query. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the query. Try again.'));
 		}
 	},
 };

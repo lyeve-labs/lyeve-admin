@@ -4,7 +4,7 @@ import { ApiError } from '@lyeve-labs/client';
 import { isOutage, section } from '$lib/api/gate';
 import { getSchemas } from '@lyeve-labs/client-rest';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import { refusalOf } from '$lib/api/refusal';
 import {
 	createEmailTrigger,
@@ -44,7 +44,7 @@ function writeFailure(action: 'save' | 'delete', err: unknown, fallback: string)
 		return fail(refused.status, { ...refused.data, action });
 	}
 	const status = isOutage(err) ? 503 : err instanceof ApiError && err.status === 422 ? 422 : 400;
-	return fail(status, { action, error: actionError(err, fallback) });
+	return tagged(action, actionFailure(err, fallback, status));
 }
 
 export const actions: Actions = {

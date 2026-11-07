@@ -3,7 +3,7 @@ import { fail, error, redirect } from '@sveltejs/kit';
 import { authedClient, loadUser, requireRole } from '$lib/server/authz';
 import { revokeAPIKey, deleteAPIKey } from '@lyeve-labs/client-rest';
 import type { APIKey } from '@lyeve-labs/client';
-import { actionError, actionFailure } from '$lib/server/action-error';
+import { actionFailure, tagged } from '$lib/server/action-error';
 import {
 	createKey,
 	keyExpiryProblem,
@@ -218,7 +218,7 @@ export const actions: Actions = {
 		try {
 			await revokeAPIKey(id, client);
 		} catch (err) {
-			return fail(400, { action: 'revoke', error: actionError(err, 'Could not revoke the API key. Try again.') });
+			return tagged('revoke', actionFailure(err, 'Could not revoke the API key. Try again.'));
 		}
 	},
 
@@ -231,7 +231,7 @@ export const actions: Actions = {
 		try {
 			await deleteAPIKey(id, client);
 		} catch (err) {
-			return fail(400, { action: 'delete', error: actionError(err, 'Could not delete the API key. Try again.') });
+			return tagged('delete', actionFailure(err, 'Could not delete the API key. Try again.'));
 		}
 	}
 };

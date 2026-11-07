@@ -7,7 +7,7 @@ import { passwordTooLong } from '$lib/api/users';
 import { readEngineSetup, safeNext } from '$lib/server/setup-gate';
 import { LANDING } from '$lib/landing';
 import { setRefreshCookie, setSessionCookie } from '$lib/server/session-cookie';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 
 export const load: PageServerLoad = async ({ fetch, url }) => {
 	const next = safeNext(url.searchParams.get('next'));
@@ -106,7 +106,8 @@ export const actions: Actions = {
 			// 422 names the rule. Repeating a length here would be wrong on any
 			// install that changed it.
 			if (err instanceof ApiError && err.status === 422) {
-				return fail(422, { error: actionError(err, 'This password does not meet the password policy.') });
+				const failed = actionFailure(err, 'This password does not meet the password policy.', 422);
+				return fail(failed.status, failed.data);
 			}
 			// A 5xx or no answer at all says nothing about the form, so the
 			// operator is told to wait rather than to change it. An account

@@ -536,7 +536,7 @@ describe('the admin seat ceiling', () => {
 			cookies: mockCookies({ '__Host-sys_session': 'tok' }),
 		}) as never)) as { status: number; data: { error: string } };
 
-		expect(result.status).toBe(400);
+		expect(result.status).toBe(402);
 		expect(result.data.error).not.toContain('admin seat');
 	});
 

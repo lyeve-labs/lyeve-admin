@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { authedClient } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { PLUGIN } from '$lib/plugin-names';
 import { notRunning } from '$lib/plugins';
 import {
@@ -74,7 +74,8 @@ export const actions: Actions = {
 		try {
 			await trustThisDevice(client, label);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not trust this device. Try again.') });
+			const failed = actionFailure(err, 'Could not trust this device. Try again.');
+			return fail(failed.status, failed.data);
 		}
 		return { trusted: label };
 	},
@@ -87,7 +88,8 @@ export const actions: Actions = {
 		try {
 			await untrustDevice(client, id);
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not forget this device. Try again.') });
+			const failed = actionFailure(err, 'Could not forget this device. Try again.');
+			return fail(failed.status, failed.data);
 		}
 		return { removed: id };
 	},

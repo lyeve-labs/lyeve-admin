@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { authedClient, requireRole } from '$lib/server/authz';
-import { actionError } from '$lib/server/action-error';
+import { actionFailure } from '$lib/server/action-error';
 import { listSchemaNames } from '$lib/api/search-settings';
 import { ROLE_CHOICES } from '$lib/api/customization';
 import { readPluginSet } from '$lib/plugins';
@@ -65,7 +65,8 @@ export const actions: Actions = {
 			await saveDashboardLayout(authedClient(event), widgets);
 			return { saved: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not save the dashboard. Try again.') });
+			const failed = actionFailure(err, 'Could not save the dashboard. Try again.');
+			return fail(failed.status, failed.data);
 		}
 	},
 
@@ -92,7 +93,8 @@ export const actions: Actions = {
 			await resetDashboardLayout(authedClient(event));
 			return { reset: true };
 		} catch (err) {
-			return fail(400, { error: actionError(err, 'Could not reset the dashboard. Try again.') });
+			const failed = actionFailure(err, 'Could not reset the dashboard. Try again.');
+			return fail(failed.status, failed.data);
 		}
 	},
 };
