@@ -1,5 +1,23 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { error } from '@sveltejs/kit';
+
+const roles = vi.hoisted(() => ({ current: ['admin'] as string[] }));
+vi.mock('$lib/server/authz', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/server/authz')>();
+	return {
+		...actual,
+		requireRole: vi.fn(async (_event: unknown, allowed: string[]) => {
+			if (!allowed.some((r) => roles.current.includes(r))) error(403, 'This needs one of these roles.');
+			return { id: 'u1', roles: roles.current };
+		}),
+	};
+});
+
 import { GET } from './+server';
+
+beforeEach(() => {
+	roles.current = ['admin'];
+});
 
 function event(reply: Response, search = '?site=s1&path=%2Fcontact&block=b1', session: string | null = 'tok') {
 	const fetch = vi.fn(async () => reply);
@@ -25,6 +43,26 @@ describe('form submissions export', () => {
 		expect(res.headers.get('content-disposition')).toBe('attachment; filename="form-submissions.csv"');
 		expect(res.headers.get('cache-control')).toBe('no-store');
 		expect(await res.text()).toBe('id,state\ne1,new\n');
+	});
+
+	it('asks the engine for the state the list is filtered to', async () => {
+		const { ev, fetch } = event(new Response('id\n'), '?site=s1&path=%2Fcontact&block=b1&state=spam');
+		await GET(ev);
+		expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe(
+			'/api/admin/builder/forms/submissions/export?site=s1&path=%2Fcontact&block=b1&state=spam',
+		);
+	});
+
+	it('refuses a role that is not an administrator before asking the engine', async () => {
+		roles.current = ['editor'];
+		const { ev, fetch } = event(new Response(''));
+		await expect(GET(ev)).rejects.toMatchObject({ status: 403 });
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	it('passes an expired session through as a 401', async () => {
+		const { ev } = event(new Response('{"error":"unauthorized"}', { status: 401 }));
+		await expect(GET(ev)).rejects.toMatchObject({ status: 401 });
 	});
 
 	it('refuses a link that names no form before asking the engine', async () => {

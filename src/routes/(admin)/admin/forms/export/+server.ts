@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { authedHeaders } from '$lib/server/authz';
-import { exportPath } from '$lib/api/builder-forms';
+import { authedHeaders, requireRole } from '$lib/server/authz';
+import { exportPath, isFormState } from '$lib/api/builder-forms';
 
 /**
  * One form's submissions as a CSV file, as a plain link.
@@ -10,20 +10,25 @@ import { exportPath } from '$lib/api/builder-forms';
  * route reads the cookie and streams the engine's file back with its own
  * type and filename.
  */
-export const GET: RequestHandler = async ({ cookies, url, fetch }) => {
+export const GET: RequestHandler = async (event) => {
+	const { cookies, url, fetch } = event;
 	const auth = authedHeaders({ cookies, url });
+	await requireRole(event, ['admin', 'super_admin']);
 	const site = url.searchParams.get('site') ?? '';
 	const path = url.searchParams.get('path') ?? '';
 	const block = url.searchParams.get('block') ?? '';
 	if (!site || !path || !block) error(400, 'Choose a form first.');
+	// The file holds the state the list is filtered to, so it matches what the reader sees.
+	const state = url.searchParams.get('state');
 
 	let res: Response;
 	try {
-		res = await fetch(exportPath({ site, path, block }), { headers: auth });
+		res = await fetch(exportPath({ site, path, block }, isFormState(state) ? state : undefined), { headers: auth });
 	} catch {
 		error(502, 'Could not reach the engine. Try again in a moment.');
 	}
 	if (!res.ok) {
+		if (res.status === 401) error(401, 'Not authenticated');
 		if (res.status === 403) error(403, 'Only an admin or a super admin can export form submissions.');
 		if (res.status === 404) error(404, 'Exporting form submissions needs a newer version of the builder plugin.');
 		error(502, 'Could not export the submissions. Try again.');
