@@ -380,7 +380,7 @@ describe('signing in', () => {
 		}) as never) as { status: number; data: { error: string } };
 
 		expect(result.status).toBe(503);
-		expect(result.data.error).toBe('Sign-in is unavailable right now. Try again in a moment.');
+		expect(result.data.error).toBe('The engine is unavailable, so you cannot sign in yet. Try again in a moment.');
 	});
 
 	// The engine rate-limits login at 5 attempts. Reporting that as a bad

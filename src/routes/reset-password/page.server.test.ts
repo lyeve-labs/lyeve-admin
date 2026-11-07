@@ -111,7 +111,7 @@ describe('reset-password action', () => {
 		const result = (await submit({ token: 't1', password: STRONG, confirm: STRONG + '!' }, fetch)) as {
 			data: { error: string };
 		};
-		expect(result.data.error).toBe('The two passwords do not match.');
+		expect(result.data.error).toBe('The passwords do not match.');
 		expect(fetch).not.toHaveBeenCalled();
 	});
 

@@ -49,7 +49,7 @@ export const actions: Actions = {
 		// password, so a refusal there would cost the reader the link.
 		const tooLong = passwordTooLong(password);
 		if (tooLong) return fail(400, { error: tooLong });
-		if (password !== confirm) return fail(400, { error: 'The two passwords do not match.' });
+		if (password !== confirm) return fail(400, { error: 'The passwords do not match.' });
 
 		let removed: number;
 		try {

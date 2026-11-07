@@ -83,7 +83,7 @@ export const actions: Actions = {
 			return { error: 'Enter your email and password.' };
 		}
 		if (password !== confirm) {
-			return { error: 'Passwords do not match.' };
+			return { error: 'The passwords do not match.' };
 		}
 		// The engine's hasher reads 72 bytes at most and fails a longer password
 		// with a 500 that names no rule, so the limit is checked here.
@@ -106,7 +106,7 @@ export const actions: Actions = {
 			// 422 names the rule. Repeating a length here would be wrong on any
 			// install that changed it.
 			if (err instanceof ApiError && err.status === 422) {
-				return fail(422, { error: actionError(err, 'The password does not meet the password policy.') });
+				return fail(422, { error: actionError(err, 'This password does not meet the password policy.') });
 			}
 			// A 5xx or no answer at all says nothing about the form, so the
 			// operator is told to wait rather than to change it. An account
