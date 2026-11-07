@@ -45,7 +45,6 @@ describe('refusal history load', () => {
 		expect(api.readRefusalHistory).toHaveBeenCalledWith(expect.anything(), 24);
 		expect(result.history).toMatchObject({ ok: true, value: { total_refused: 0 } });
 		expect(result.addresses.ok).toBe(true);
-		expect(result.superAdmin).toBe(false);
 	});
 
 	it('takes the history window from the address and ignores one the plugin would refuse', async () => {

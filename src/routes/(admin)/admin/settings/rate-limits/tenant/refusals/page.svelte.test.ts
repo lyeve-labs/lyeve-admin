@@ -16,7 +16,6 @@ const props = (over: Record<string, unknown> = {}) => ({
 	data: {
 		gate: { state: 'ok' },
 		hours: 24,
-		superAdmin: true,
 		addresses: {
 			ok: true,
 			value: {

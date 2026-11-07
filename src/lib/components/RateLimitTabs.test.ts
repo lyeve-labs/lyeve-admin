@@ -15,23 +15,18 @@ afterEach(() => {
 const labels = (container: HTMLElement) => [...container.querySelectorAll('[role="tab"]')].map((t) => t.textContent?.trim());
 
 /*
- * The only strip whose tabs depend on the role. An admin reaches this tenant's
- * controls from the sidebar and never the instance pages, so the instance tabs
- * are a super admin's alone.
+ * An admin opens the limits and the live counters too, so the strip names all
+ * four pages whoever reads it, and the page on screen is always one of them.
  */
 describe('RateLimitTabs', () => {
-	it('names all four pages for a super admin', () => {
-		const { container } = render(RateLimitTabs, { props: { active: 'limits', superAdmin: true } });
+	it.each(['limits', 'live', 'tenant', 'refusals'] as const)('names all four pages on %s', (active) => {
+		const { container } = render(RateLimitTabs, { props: { active } });
 		expect(labels(container)).toEqual(['Limits', 'Right now', 'Tenant controls', 'Refusal history']);
-	});
-
-	it('names only the tenant pages for an admin', () => {
-		const { container } = render(RateLimitTabs, { props: { active: 'tenant', superAdmin: false } });
-		expect(labels(container)).toEqual(['Tenant controls', 'Refusal history']);
+		expect(container.querySelector('[aria-selected="true"]')).not.toBeNull();
 	});
 
 	it('marks the page that is on screen', () => {
-		const { getByRole } = render(RateLimitTabs, { props: { active: 'refusals', superAdmin: true } });
+		const { getByRole } = render(RateLimitTabs, { props: { active: 'refusals' } });
 		expect(getByRole('tab', { name: 'Refusal history' }).getAttribute('aria-selected')).toBe('true');
 		expect(getByRole('tab', { name: 'Limits' }).getAttribute('aria-selected')).toBe('false');
 	});
@@ -43,7 +38,7 @@ describe('RateLimitTabs', () => {
 		['Refusal history', '/admin/settings/rate-limits/tenant/refusals'],
 	])('navigates to %s rather than swapping a panel', async (name, href) => {
 		const active = name === 'Limits' ? 'live' : 'limits';
-		const { getByRole } = render(RateLimitTabs, { props: { active, superAdmin: true } });
+		const { getByRole } = render(RateLimitTabs, { props: { active } });
 		getByRole('tab', { name }).click();
 		await Promise.resolve();
 		expect(goto).toHaveBeenCalledWith(href);

@@ -6,8 +6,7 @@ import { readStatus, type LimiterState } from '$lib/api/rate-limit';
 import { type Gate, GATE_OK, section, type Section } from '$lib/api/gate';
 
 export const load: PageServerLoad = async (event) => {
-	const { plugins, user } = await event.parent();
-	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	const { plugins } = await event.parent();
 
 	// The shell says why the page is unavailable while its plugin does not run.
 	const gate: Gate = notRunning(plugins, PLUGIN.rateLimit) ? { state: 'absent' } : GATE_OK;
@@ -22,5 +21,5 @@ export const load: PageServerLoad = async (event) => {
 				)
 			: { ok: false, gate };
 
-	return { superAdmin, status, gate };
+	return { status, gate };
 };

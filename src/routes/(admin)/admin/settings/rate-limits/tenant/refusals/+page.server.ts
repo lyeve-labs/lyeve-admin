@@ -17,8 +17,7 @@ function windowOf(url: URL): number {
 }
 
 export const load: PageServerLoad = async (event) => {
-	const { plugins, user } = await event.parent();
-	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	const { plugins } = await event.parent();
 	const hours = windowOf(event.url);
 	if (notRunning(plugins, PLUGIN.rateLimit)) {
 		const gate: Gate = { state: 'absent' };
@@ -27,7 +26,6 @@ export const load: PageServerLoad = async (event) => {
 			history: { ok: false, gate } as Section<RefusalHistory>,
 			addresses: { ok: false, gate } as Section<AddressListRead>,
 			hours,
-			superAdmin,
 		};
 	}
 
@@ -39,5 +37,5 @@ export const load: PageServerLoad = async (event) => {
 		section(listAddressEntries(client), 'Could not load the address lists.'),
 	]);
 
-	return { gate: GATE_OK as Gate, history, addresses, hours, superAdmin };
+	return { gate: GATE_OK as Gate, history, addresses, hours };
 };

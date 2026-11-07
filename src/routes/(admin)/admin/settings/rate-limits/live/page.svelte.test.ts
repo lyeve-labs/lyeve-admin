@@ -12,7 +12,6 @@ function setup(status: unknown[] | { ok: false; gate: unknown } = [], gate: unkn
 	return render(LivePage, {
 		props: {
 			data: {
-				superAdmin: true,
 				status: Array.isArray(status) ? { ok: true, value: status } : status,
 				gate,
 			},

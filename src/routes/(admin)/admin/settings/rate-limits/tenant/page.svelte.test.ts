@@ -18,7 +18,6 @@ const ok = { state: 'ok' };
 const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 	data: {
 		gate: ok,
-		superAdmin: false,
 		limit: {
 			ok: true,
 			value: {
@@ -44,9 +43,9 @@ const props = (over: Record<string, unknown> = {}, form: unknown = null) => ({
 });
 
 describe('tenant rate limits', () => {
-	it('offers an admin the two tenant tabs with this one marked', () => {
+	it('offers all four tabs with this one marked', () => {
 		render(TenantPage, { props: props() });
-		expect(screen.getAllByRole('tab').map((t) => t.textContent?.trim())).toEqual(['Tenant controls', 'Refusal history']);
+		expect(screen.getAllByRole('tab').map((t) => t.textContent?.trim())).toEqual(['Limits', 'Right now', 'Tenant controls', 'Refusal history']);
 		expect(screen.getByRole('tab', { name: 'Tenant controls' }).getAttribute('aria-selected')).toBe('true');
 	});
 

@@ -60,7 +60,6 @@ describe('tenant rate limits load', () => {
 		const result = (await load(loadEvent())) as Loaded;
 		expect(result.limit).toMatchObject({ ok: true, value: { licensed: false } });
 		expect(result.addresses).toMatchObject({ ok: true, value: { limits: { entries: { limit: 500, current: 0 } } } });
-		expect(result.superAdmin).toBe(false);
 		expect(api.readRefusalHistory).not.toHaveBeenCalled();
 	});
 });

@@ -27,7 +27,7 @@
 	width="wide"
 	back={{ href: '/admin/settings/rate-limits', label: 'Rate limits' }}
 >
-	<RateLimitTabs active="refusals" superAdmin={data.superAdmin} />
+	<RateLimitTabs active="refusals" />
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice

@@ -46,7 +46,6 @@ describe('rate-limits live load', () => {
 		api.readStatus.mockResolvedValue({ buckets: [bucket], count: 1 });
 		const result = (await load(loadEvent(['super_admin']))) as Loaded;
 		expect(result.status).toEqual({ ok: true, value: [bucket] });
-		expect(result.superAdmin).toBe(true);
 	});
 
 	it('keeps a failed live read as its gate, so a busy engine is not drawn as quiet', async () => {
@@ -54,7 +53,6 @@ describe('rate-limits live load', () => {
 		const result = (await load(loadEvent(['admin']))) as Loaded;
 		expect(result.status).toEqual({ ok: false, gate: { state: 'busy' } });
 		expect(result.gate.state).toBe('ok');
-		expect(result.superAdmin).toBe(false);
 	});
 
 	it('asks nothing while the rate limit plugin does not run', async () => {

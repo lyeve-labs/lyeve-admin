@@ -135,7 +135,7 @@
 		{/if}
 	{/snippet}
 
-	<RateLimitTabs active="limits" superAdmin={data.superAdmin} />
+	<RateLimitTabs active="limits" />
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice

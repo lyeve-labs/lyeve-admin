@@ -174,11 +174,11 @@
 
 <PageShell
 	title="Tenant rate limits"
-	description="Set this tenant's own limit and address lists, and see which requests were refused."
+	description="Set this tenant's own limit and address lists."
 	width="wide"
 	back={{ href: '/admin/settings/rate-limits', label: 'Rate limits' }}
 >
-	<RateLimitTabs active="tenant" superAdmin={data.superAdmin} />
+	<RateLimitTabs active="tenant" />
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice

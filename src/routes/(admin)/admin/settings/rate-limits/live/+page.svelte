@@ -42,7 +42,7 @@
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
-	<RateLimitTabs active="live" superAdmin={data.superAdmin} />
+	<RateLimitTabs active="live" />
 
 	{#if data.gate.state !== 'ok'}
 		<GateNotice

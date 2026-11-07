@@ -22,15 +22,13 @@ import {
 } from '$lib/api/rate-limit';
 
 export const load: PageServerLoad = async (event) => {
-	const { plugins, user } = await event.parent();
-	const superAdmin = user?.roles?.includes('super_admin') ?? false;
+	const { plugins } = await event.parent();
 	if (notRunning(plugins, PLUGIN.rateLimit)) {
 		const gate: Gate = { state: 'absent' };
 		return {
 			gate,
 			limit: { ok: false, gate } as Section<TenantGlobalRead>,
 			addresses: { ok: false, gate } as Section<AddressListRead>,
-			superAdmin,
 		};
 	}
 
@@ -46,7 +44,7 @@ export const load: PageServerLoad = async (event) => {
 		),
 	]);
 
-	return { gate: GATE_OK as Gate, limit, addresses, superAdmin };
+	return { gate: GATE_OK as Gate, limit, addresses };
 };
 
 function num(raw: FormDataEntryValue | null): number {
