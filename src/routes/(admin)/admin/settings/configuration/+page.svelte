@@ -55,7 +55,7 @@
 
 <PageShell
 	title="Configuration"
-	description="See every engine setting and where its value comes from. An environment variable overrides the configuration file, and the file overrides a value saved here."
+	description="See every engine setting and where its value comes from."
 	width="wide"
 	back={{ href: '/admin/settings', label: 'Settings' }}
 >
@@ -89,8 +89,8 @@
 			{#if suppressed.length > 0}
 				<Alert tone="warn" title="Set to empty by an environment variable">
 					<p>
-						A file or this page sets these, but an empty environment variable overrides them. This is
-						usually a leftover line in a .env file.
+						A file or this page sets these, but an empty environment variable overrides them. Check for a
+						leftover line in a .env file.
 					</p>
 					<p class="mt-2 font-mono text-xs text-faint">{suppressed.join(', ')}</p>
 				</Alert>

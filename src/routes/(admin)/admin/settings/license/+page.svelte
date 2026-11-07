@@ -17,6 +17,7 @@
 	import { isExternalHref } from '$lib/links';
 	import { linkOf, NO_LICENSING, REL, type LicenseLink } from '$lib/api/license';
 	import { licenseStateLabel, licenseTone, unlicensed } from '$lib/license-state';
+	import { couldNotLoad } from '$lib/outage';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -130,7 +131,7 @@
 						<DescriptionList items={facts} />
 					</div>
 				{:else}
-					<Alert tone="danger">Could not load the license. Reload the page to try again.</Alert>
+					<Alert tone="danger">{couldNotLoad('the license', { reload: true })}</Alert>
 				{/if}
 
 				{#if links.length > 0}

@@ -23,7 +23,7 @@
 		hasBroker,
 		healthTone,
 	} from '$lib/api/messagebroker';
-	import { NO_VALUE, formatDateTime } from '$lib/format';
+	import { NO_VALUE, formatDateTime, plural } from '$lib/format';
 	import type { PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
@@ -63,7 +63,7 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			Only a super admin can view the broker status, because it shows infrastructure outside this
+			Only a super admin can see the broker status, because it shows infrastructure outside this
 			instance and covers every tenant.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
@@ -90,34 +90,33 @@
 			<Alert tone={outbox.dead > 0 ? 'danger' : 'warn'}>
 				{#if outbox.dead > 0}
 					{outbox.dead}
-					{outbox.dead === 1 ? 'event' : 'events'} failed every retry and never reached the broker.
+					{plural(outbox.dead, 'event')} failed every retry and never reached the broker.
 				{/if}
 				{outbox.pending}
-				{outbox.pending === 1 ? 'event is' : 'events are'} waiting in the outbox.
+				{plural(outbox.pending, 'event is', 'events are')} waiting in the outbox.
 				{#if data.status.failed > 0}
 					The broker refused {data.status.failed} publish
-					{data.status.failed === 1 ? 'attempt' : 'attempts'} since the engine last started. The outbox
+					{plural(data.status.failed, 'attempt')} since the engine last started. The outbox
 					retries a refused event until the broker accepts it or it reaches its retry limit.
 				{/if}
 			</Alert>
 		{:else if outbox?.enabled && !outbox.available && data.status.failed > 0}
 			<Alert tone="warn">
 				The broker refused {data.status.failed} publish
-				{data.status.failed === 1 ? 'attempt' : 'attempts'} since the engine last started. The outbox
+				{plural(data.status.failed, 'attempt')} since the engine last started. The outbox
 				retries them, but its counts could not be loaded, so it is unknown whether any event was lost.
 			</Alert>
 		{:else if data.status.failed > 0}
 			<Alert tone="danger">
 				The broker refused {data.status.failed}
-				{data.status.failed === 1 ? 'event' : 'events'}. Refused events are not retried, but the
-				content changes behind them were all saved. No other screen reports these
-				failures.
+				{plural(data.status.failed, 'event')}. Refused events are not retried, but the content
+				changes behind them were all saved.
 			</Alert>
 		{:else if data.status.dropped > 0 && !data.status.connected}
 			<Alert tone="warn">
 				{data.status.dropped}
-				{data.status.dropped === 1 ? 'event' : 'events'} were dropped because no broker connection
-				was open. Check this instance's broker configuration, not the broker.
+				{plural(data.status.dropped, 'event')} were dropped because no broker connection was open.
+				Check this instance's broker configuration.
 			</Alert>
 		{/if}
 
@@ -155,8 +154,7 @@
 			{/if}
 		</div>
 		<p class="text-xs text-muted">
-			Counted since the engine last started. A restart resets them to zero, so a low number does
-			not mean a quiet week.
+			Counted since the engine last started. A restart resets them to zero.
 			{#if !broker}
 				With no broker set, Published counts events that were discarded.
 			{:else if rate !== null}
@@ -224,7 +222,7 @@
 						<td class="text-xs text-faint">
 							{broker && data.status.last_publish_at
 								? formatDateTime(data.status.last_publish_at)
-								: 'Nothing published yet'}
+								: HEALTH_LABELS.idle}
 						</td>
 					</tr>
 				</tbody>

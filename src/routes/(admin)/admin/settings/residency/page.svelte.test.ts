@@ -141,7 +141,7 @@ describe('the report', () => {
 			},
 		});
 		const { container } = render(ResidencyPage, { props: props({ report: partial }) });
-		expect(said(container)).toContain('not a complete audit');
+		expect(said(container)).toContain('This report covers one page of tenants, not all of them.');
 	});
 
 	it('says nothing is placed rather than reporting compliance', () => {

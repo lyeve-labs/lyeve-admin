@@ -7,6 +7,7 @@ import { pluginSettings } from '$lib/config-forms';
 import { sessionToken } from '$lib/server/session-cookie';
 import { actionError } from '$lib/server/action-error';
 import { section, type Section } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
 export interface ConfigSetting {
 	key: string;
@@ -51,7 +52,7 @@ export const load: PageServerLoad = async (event) => {
 	const client = authedClient(event);
 	const read = await section(
 		client.get<ConfigProvenance>('/api/admin/config'),
-		'Could not load the configuration.'
+		couldNotLoad('the configuration')
 	);
 
 	// Opened for one plugin, the page shows that plugin's settings: the ones

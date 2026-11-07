@@ -22,7 +22,7 @@
 		serviceTone,
 		undeclared,
 	} from '$lib/api/grpc';
-	import { NO_VALUE } from '$lib/format';
+	import { NO_VALUE, plural } from '$lib/format';
 	import type { PageData } from './$types';
 	import { ICON } from '$lib/icon';
 
@@ -58,7 +58,7 @@
 
 	{#if !data.permitted}
 		<Alert tone="brand">
-			Only a super admin can see the gRPC status, because it shows the addresses this server listens on.
+			Only a super admin can see the gRPC status, because it shows the addresses the engine listens on.
 		</Alert>
 	{:else if data.gate.state !== 'ok'}
 		<GateNotice
@@ -90,7 +90,7 @@
 			     first is told it does not exist. -->
 			<Alert tone="warn">
 				{gaps.length}
-				{gaps.length === 1 ? 'service is' : 'services are'} registered on the server but missing from the health service. They accept calls, but a client that runs a health check first is told they do not exist.
+				{plural(gaps.length, 'service is', 'services are')} registered on the server but missing from the health service. They accept calls, but a client that runs a health check first is told they do not exist.
 			</Alert>
 		{/if}
 

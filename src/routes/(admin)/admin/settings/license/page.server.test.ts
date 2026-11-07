@@ -311,7 +311,7 @@ describe('license +page.server.ts actions.renew', () => {
 	});
 
 	it.each([
-		[502, 'the license server could not be reached', 'Try again in a moment.'],
+		[502, 'the license server could not be reached', 'The current license is unchanged. Try again.'],
 		[502, 'the license server returned a token that does not verify', 'Trying the same key again fails the same way.'],
 		[503, 'license key exchange is not configured on this instance', 'Paste the license token instead'],
 	])('says what a %i exchange failure means for trying again', async (status, message, said) => {

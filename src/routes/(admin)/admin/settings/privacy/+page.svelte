@@ -243,7 +243,7 @@
 							<SegmentedControl
 								name="scope"
 								label="Who may export their own data"
-								hint="Admins and super admins can always export."
+								hint="An administrator can always export."
 								options={SCOPE_OPTIONS}
 								bind:value={scope}
 							/>
@@ -251,7 +251,7 @@
 								<CheckboxGroup
 									name="roles"
 									label="Roles that may export"
-									hint="If no role is checked, only admins and super admins can export."
+									hint="If no role is checked, only an administrator can export."
 									orientation="horizontal"
 									options={roleOptions}
 									bind:value={roles}

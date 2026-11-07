@@ -10,12 +10,13 @@ import {
 	type ProviderWindow,
 } from '$lib/api/provider-window';
 import { type Gate, GATE_OK, gateOf } from '$lib/api/gate';
+import { couldNotLoad } from '$lib/outage';
 
 export const load: PageServerLoad = async (event) => {
 	try {
 		return { gate: GATE_OK as Gate, window: await readProviderWindow(authedClient(event)) };
 	} catch (err) {
-		return { gate: gateOf(err, 'Could not load the sign-in window.'), window: null as ProviderWindow | null };
+		return { gate: gateOf(err, couldNotLoad('the sign-in window')), window: null as ProviderWindow | null };
 	}
 };
 
