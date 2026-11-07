@@ -84,30 +84,22 @@ export const load: PageServerLoad = async (event) => {
 		? section(listSchemaNames(client), 'Could not load schemas. Pages keep showing the schemas saved before.')
 		: null;
 
-	let connections: Connection[] = [];
-	let total: number | null = null;
-	let hasMore = false;
-	let gate: ConnectionsGate = { state: 'ok' };
-	try {
-		const page = pageOf(await listConnections(client, limit, offset), limit, offset);
-		connections = page.rows;
-		total = page.total;
-		hasMore = page.hasMore;
-	} catch (err) {
-		gate = connectionsGate(err);
-	}
-	if (gate.state === 'ok') {
-		const back = pastEndOffset(connections.length, limit, offset, total);
+	const page = await section(
+		listConnections(client, limit, offset).then((answer) => pageOf(answer, limit, offset)),
+		connectionsGate,
+	);
+	if (page.ok) {
+		const back = pastEndOffset(page.value.rows.length, limit, offset, page.value.total);
 		if (back !== null) redirect(307, withOffset(event.url, back));
 	}
 
 	const schemaList = schemas ? await schemas : null;
 	return {
 		...base,
-		connections,
-		total,
-		hasMore,
-		gate,
+		connections: page.ok ? page.value.rows : [],
+		total: page.ok ? page.value.total : null,
+		hasMore: page.ok && page.value.hasMore,
+		gate: page.ok ? ({ state: 'ok' } as ConnectionsGate) : page.gate,
 		mfaEnrolled: await mfa,
 		settings: settings ? await settings : null,
 		schemas: schemaList?.ok ? showable(schemaList.value) : [],

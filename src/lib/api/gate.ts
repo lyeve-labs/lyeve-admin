@@ -98,18 +98,22 @@ export function gateOf(err: unknown, failed: string): Gate {
  * there is none. A failure never becomes an empty value, so a page cannot draw
  * its first-run state for a read that did not answer.
  */
-export type Section<T> = { ok: true; value: T } | { ok: false; gate: Gate };
+export type Section<T, G = Gate> = { ok: true; value: T } | { ok: false; gate: G };
 
 /**
  * Await a read and keep its failure as a gate. A redirect or an HTTP error
- * thrown on purpose is not a failed read, so it still ends the load.
+ * thrown on purpose is not a failed read, so it still ends the load. A page
+ * whose refusals mean more than `gateOf` knows passes its own mapper in
+ * place of the sentence.
  */
-export async function section<T>(read: Promise<T>, failed: string): Promise<Section<T>> {
+export async function section<T>(read: Promise<T>, failed: string): Promise<Section<T>>;
+export async function section<T, G>(read: Promise<T>, toGate: (err: unknown) => G): Promise<Section<T, G>>;
+export async function section<T, G>(read: Promise<T>, failed: string | ((err: unknown) => G)): Promise<Section<T, G | Gate>> {
 	try {
 		return { ok: true, value: await read };
 	} catch (err) {
 		if (isRedirect(err) || isHttpError(err)) throw err;
-		return { ok: false, gate: gateOf(err, failed) };
+		return { ok: false, gate: typeof failed === 'string' ? gateOf(err, failed) : failed(err) };
 	}
 }
 

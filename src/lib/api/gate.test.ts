@@ -110,6 +110,14 @@ describe('section', () => {
 		});
 	});
 
+	it('keeps a failure as the gate a page maps it to', async () => {
+		const withheld = (err: unknown) => ({ state: err instanceof ApiError ? 'withheld' : 'error' });
+		expect(await section(Promise.reject(new ApiError(403, 'withheld')), withheld)).toEqual({
+			ok: false,
+			gate: { state: 'withheld' },
+		});
+	});
+
 	it('answers plain data a load can return', async () => {
 		const read = await section(Promise.reject(unreachable()), FAILED);
 		expect(JSON.parse(JSON.stringify(read))).toEqual(read);
