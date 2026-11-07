@@ -552,7 +552,7 @@ describe('Goroutine engine', () => {
 		});
 		const forms = [...section(container).querySelectorAll('form')];
 		const notice = forms[0].querySelector('[data-testid="refusal-notice"]') as HTMLElement;
-		expect(notice.textContent).toContain('This needs example-feature');
+		expect(notice.textContent).toContain('Not enabled on this instance');
 		expect(notice.textContent).toContain('Nothing was changed.');
 		expect(forms[0].querySelector('[role="alert"]')?.textContent ?? '').not.toContain('Failed to');
 		expect(forms[1].querySelector('[data-testid="refusal-notice"]')).toBeNull();

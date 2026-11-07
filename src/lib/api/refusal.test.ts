@@ -61,16 +61,16 @@ describe('refusalText', () => {
 		expect(text.indexOf('license')).toBeLessThan(text.indexOf('Removing'));
 	});
 
-	it('names the capability a feature refusal needs', () => {
+	it('says a feature refusal without the capability it names', () => {
 		const r = { kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: '' } as const;
-		expect(refusalText(r)).toBe('The license on this instance does not include example-feature. Nothing was changed.');
-		expect(refusalTitle(r)).toBe('This needs example-feature');
+		expect(refusalText(r)).toBe('This is not enabled on this instance. Nothing was changed.');
+		expect(refusalTitle(r)).toBe('Not enabled on this instance');
 	});
 
 	it('words a feature refusal that names no capability', () => {
 		const r = { kind: 'feature', feature: '', plugin: '', upgradeUrl: '' } as const;
-		expect(refusalText(r)).toBe('This needs a capability the license on this instance does not include. Nothing was changed.');
-		expect(refusalTitle(r)).toBe('This is not enabled on this instance');
+		expect(refusalText(r)).toBe('This is not enabled on this instance. Nothing was changed.');
+		expect(refusalTitle(r)).toBe('Not enabled on this instance');
 	});
 });
 

@@ -1,12 +1,12 @@
 <script lang="ts">
 	/**
 	 * The row a list ends with when the plugin left older records out because
-	 * this install reads only a recent window of them.
+	 * this instance reads only a recent window of them.
 	 *
 	 * The count and the window are the plugin's, from its own list answer, so
 	 * the row never states a number the admin holds. It is styled as a refusal
-	 * rather than as an empty state: the records exist and are kept, and the
-	 * license decides whether they are read. A page that can try to open one
+	 * rather than as an empty state: the records exist and are kept, and what
+	 * this instance enables decides whether they are read. A page that can try to open one
 	 * passes `children`, typically a form whose 402 the page renders with
 	 * RefusalNotice.
 	 */
@@ -25,7 +25,7 @@
 		count: number;
 		/** What the records are, plural: "revisions", "events". */
 		noun: string;
-		/** The window the install reads, in days, when the plugin said. */
+		/** The window the instance reads, in days, when the plugin said. */
 		windowDays?: number | null;
 		children?: Snippet;
 	} = $props();
@@ -40,8 +40,8 @@
 		{label}
 	</p>
 	<p>
-		You can read {span} of them. The older ones are still stored, and your license does not include
-		reading them.
+		You can read {span} of them. The older ones are still stored, and reading them is not enabled on
+		this instance.
 	</p>
 	{#if children}
 		<div>{@render children()}</div>

@@ -158,7 +158,7 @@ describe('the queue and its own failures', () => {
 		expect(button(/^Replay/).disabled).toBe(true);
 		expect(button(/^Dismiss/).disabled).toBe(true);
 		expect(button(/^Delete/).disabled).toBe(false);
-		expect(dialog()?.textContent).toContain('example-feature');
+		expect(dialog()?.textContent).toContain('This is not enabled on this instance. Nothing was changed. You can still delete entries.');
 	});
 
 	it('turns the page by posting the offset it names', async () => {

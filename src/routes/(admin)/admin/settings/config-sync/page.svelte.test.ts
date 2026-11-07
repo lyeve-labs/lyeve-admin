@@ -108,7 +108,7 @@ describe('config sync page', () => {
 
 	it('renders a refused write as the refusal notice, with the forms still there', () => {
 		const { getByTestId } = setup({ scope: 'sync', mode: 'diff', error: 'x', refused: { kind: 'feature', feature: 'example-capability', plugin: 'example', upgradeUrl: '' } });
-		expect(getByTestId('refusal-notice').textContent).toContain('example-capability');
+		expect(getByTestId('refusal-notice').textContent).toContain('Not enabled on this instance');
 		expect(getByTestId('export-form')).toBeTruthy();
 		expect(getByTestId('sync-form')).toBeTruthy();
 	});

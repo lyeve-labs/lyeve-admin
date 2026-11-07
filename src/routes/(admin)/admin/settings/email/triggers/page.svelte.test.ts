@@ -152,7 +152,7 @@ describe('email trigger drawer', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'New trigger' }));
 		const refused = { kind: 'feature', feature: 'Trigger Studio', plugin: 'email', upgradeUrl: '' };
 		await rerender(props({}, { action: 'save', error: 'This needs Trigger Studio.', refused }));
-		expect(drawerText()).toContain('Trigger Studio');
+		expect(drawerText()).toContain('Not enabled on this instance');
 		expect(drawerText()).not.toContain('This needs Trigger Studio.');
 	});
 

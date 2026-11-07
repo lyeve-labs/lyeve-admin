@@ -72,7 +72,7 @@ describe('AddToRelease', () => {
 			props: { releases, holding: [], error: 'ignored', refused: { kind: 'feature', feature: 'Content releases', plugin: 'content-releases', upgradeUrl: '' } },
 		});
 		expect(screen.queryByText('ignored')).toBeNull();
-		expect(screen.getAllByText(/Content releases/).length).toBeGreaterThan(0);
+		expect(screen.getAllByText(/Not enabled on this instance/).length).toBeGreaterThan(0);
 	});
 
 	it('confirms an add', async () => {

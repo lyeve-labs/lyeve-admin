@@ -56,7 +56,7 @@ describe('login/magic-link action', () => {
 		const fetch = vi.fn(async () => json({ error: 'not found' }, 404)) as unknown as typeof globalThis.fetch;
 		const result = (await submit({ email: 'a@b.co' }, fetch)) as { status: number; data: { error: string } };
 		expect(result.status).toBe(404);
-		expect(result.data.error).toMatch(/not enabled/);
+		expect(result.data.error).toMatch(/not included in this build/);
 	});
 
 	it('relays the engine rate limit', async () => {

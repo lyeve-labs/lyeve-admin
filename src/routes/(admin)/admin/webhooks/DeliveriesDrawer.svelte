@@ -58,7 +58,7 @@
 	{#snippet children()}
 			<FormErrors message={failure?.error || undefined} refused={formRefusal(failure)} />
 			{#if held}
-				<p class="mb-2 text-xs text-muted" data-testid="retry-held">{refusalText(held)} Retrying a delivery needs it.</p>
+				<p class="mb-2 text-xs text-muted" data-testid="retry-held">{refusalText(held)}</p>
 			{/if}
 			{#if history.items.length === 0}
 				<EmptyState

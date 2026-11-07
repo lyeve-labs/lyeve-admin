@@ -117,7 +117,7 @@
 			{:else}
 				{#if held}
 					<p class="mb-2 text-xs text-muted" data-testid="replay-held">
-						{refusalText(held)} Replaying and dismissing need it. You can still delete entries.
+						{refusalText(held)} You can still delete entries.
 					</p>
 				{/if}
 				<Table label="Dead letters">

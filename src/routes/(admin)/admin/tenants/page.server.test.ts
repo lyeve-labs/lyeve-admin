@@ -263,7 +263,7 @@ describe('admin/tenants/+page.server.ts actions.create', () => {
 			status: 402,
 			data: { refused: { kind: 'feature', feature: 'example-feature', upgradeUrl: link } },
 		});
-		expect((result as { data: { error: string } }).data.error).toContain('does not include example-feature');
+		expect((result as { data: { error: string } }).data.error).toBe('This is not enabled on this instance. Nothing was changed.');
 	});
 
 	it('returns the tenant ceiling as a limit reached with the link the plugin sent', async () => {

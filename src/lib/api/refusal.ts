@@ -25,6 +25,9 @@ export const ADMIN_SEATS_CAP = 'admin.seats';
 /** Where an operator reads and changes what this instance is licensed for. */
 export const LICENSE_PAGE = '/admin/settings/license';
 
+/** The neutral locked state, which names no plan, license or capability. */
+export const NOT_ENABLED = 'Not enabled on this instance';
+
 /** The way forward from any limit, said first. */
 export const LIFTS = 'A license that allows more lifts the limit.';
 
@@ -104,12 +107,12 @@ export function refusalTitle(r: Refusal): string {
 		const noun = capNoun(r.cap);
 		return `No more ${noun} on this instance`;
 	}
-	return r.feature ? `This needs ${r.feature}` : 'This is not enabled on this instance';
+	return NOT_ENABLED;
 }
 
 /**
  * The sentence for a refusal: "7 of 7 items are in use" for a cap, and the
- * capability's name for a feature. A cap says what happened, then the way
+ * neutral locked state for a feature, which names no capability. A cap says what happened, then the way
  * forward: a license that allows more, and only after it removing one. It
  * reads the same to an install with no license and to one whose license
  * allows less than it needs.
@@ -132,8 +135,7 @@ export function refusalText(r: Refusal): string {
 		}
 		return `${line} ${LIFTS} Removing one also makes room.`;
 	}
-	if (!r.feature) return 'This needs a capability the license on this instance does not include. Nothing was changed.';
-	return `The license on this instance does not include ${r.feature}. Nothing was changed.`;
+	return 'This is not enabled on this instance. Nothing was changed.';
 }
 
 /**

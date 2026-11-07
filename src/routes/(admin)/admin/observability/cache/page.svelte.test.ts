@@ -52,7 +52,7 @@ describe('providers', () => {
 		});
 		expect(screen.getByTestId('provider-tier').textContent).toContain('Only one provider runs on this install');
 		expect(said(container)).toContain('redis-1');
-		expect(said(container)).toContain('Not running. Only one provider runs unless your license includes failover');
+		expect(said(container)).toContain('Not running. Only one provider runs on this instance');
 	});
 
 	it('says every provider runs with failover when the install is licensed for it', () => {
@@ -64,7 +64,7 @@ describe('providers', () => {
 		const { container } = render(CachePage, {
 			props: props({ inactive: [{ name: 'redis-0', kind: 'redis', priority: 0, reason: 'networked_unavailable' }] }),
 		});
-		expect(said(container)).toContain('Networked cache providers are not available on this instance');
+		expect(said(container)).toContain('Networked cache providers are not enabled on this instance');
 	});
 });
 

@@ -331,8 +331,8 @@ describe('Tenants refusals', () => {
 		const drawer = await refusedCreate({ kind: 'feature', feature: 'example-feature', plugin: 'example', upgradeUrl: ADD_ON });
 
 		const notice = drawer.querySelector('[data-testid="refusal-notice"]') as HTMLElement;
-		expect(notice.textContent).toContain('This needs example-feature');
-		expect(notice.textContent).toContain('The license on this instance does not include example-feature.');
+		expect(notice.textContent).toContain('Not enabled on this instance');
+		expect(notice.textContent).toContain('This is not enabled on this instance.');
 		expect(notice.querySelector(`a[href="${ADD_ON}"]`)?.textContent?.trim()).toBe('View the add-on');
 	});
 
