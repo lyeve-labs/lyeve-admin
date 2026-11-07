@@ -14,7 +14,7 @@
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
 import { toChannels, type AlertChannels } from './alert-channels';
-import { rowsOf, statedTotal, type ListEnvelope } from './list';
+import { query, readAll, rowsOf, statedTotal, type ListEnvelope } from './list';
 import { count, num } from './narrow';
 
 const BASE_URL = '/api/admin/error-tracking';
@@ -149,9 +149,7 @@ export async function listAlerts(
 	offset: number,
 	status: AlertStatus | '' = ''
 ): Promise<AlertPage> {
-	const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-	if (status) q.set('status', status);
-	const res = await client.get<ListEnvelope<ErrorAlert>>(`${ALERTS_URL}?${q}`);
+	const res = await client.get<ListEnvelope<ErrorAlert>>(`${ALERTS_URL}${query({ limit, offset, status })}`);
 	return { alerts: rowsOf(res), total: statedTotal(res) };
 }
 
@@ -207,15 +205,11 @@ const CODES_PAGE = 500;
  * as an unclassified failure.
  */
 export async function listCodes(client: HttpClient): Promise<ListEnvelope<ErrorCode>> {
-	const all: ErrorCode[] = [];
-	for (let offset = 0; ; offset += CODES_PAGE) {
-		const page = await client.get<ListEnvelope<ErrorCode>>(`${CODES_URL}?limit=${CODES_PAGE}&offset=${offset}`);
-		const rows = rowsOf(page);
-		all.push(...rows);
-		const total = statedTotal(page);
-		if (rows.length < CODES_PAGE || (total !== null && all.length >= total)) break;
-	}
-	return { data: all, total_count: all.length };
+	const { rows } = await readAll(async (limit, offset) => {
+		const page = await client.get<ListEnvelope<ErrorCode>>(`${CODES_URL}?limit=${limit}&offset=${offset}`);
+		return { rows: rowsOf(page), total: statedTotal(page) };
+	}, CODES_PAGE);
+	return { data: rows, total_count: rows.length };
 }
 
 export async function acknowledge(client: HttpClient, id: string): Promise<void> {

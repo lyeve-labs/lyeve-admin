@@ -91,7 +91,6 @@ export interface EmailProviderBody {
 }
 
 const BASE = '/api/admin/email/providers';
-const enc = encodeURIComponent;
 
 function stringMap(v: unknown): Record<string, string> | undefined {
 	const obj = record(v);
@@ -157,9 +156,9 @@ export function updateEmailProvider(
 	id: string,
 	body: Partial<EmailProviderBody>,
 ): Promise<EmailProvider> {
-	return client.put<Record<string, unknown>>(`${BASE}/${enc(id)}`, body).then(toEmailProvider);
+	return client.put<Record<string, unknown>>(`${BASE}/${encodeURIComponent(id)}`, body).then(toEmailProvider);
 }
 
 export async function deleteEmailProvider(client: HttpClient, id: string): Promise<void> {
-	await client.delete<void>(`${BASE}/${enc(id)}`);
+	await client.delete<void>(`${BASE}/${encodeURIComponent(id)}`);
 }

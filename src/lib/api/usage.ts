@@ -17,7 +17,7 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import type { ListEnvelope } from './list';
+import { query, type ListEnvelope } from './list';
 import { formatBytes, formatCount } from '$lib/format';
 import { shortId } from '$lib/utils/entry-identity';
 
@@ -100,9 +100,7 @@ export async function listRequests(
 	status = '',
 	limit = REQUESTS_LIMIT
 ): Promise<ListEnvelope<QuotaRequest>> {
-	const qs = new URLSearchParams({ limit: String(limit), offset: '0' });
-	if (status) qs.set('status', status);
-	return client.get<ListEnvelope<QuotaRequest>>(`${REQUESTS_URL}?${qs}`);
+	return client.get<ListEnvelope<QuotaRequest>>(`${REQUESTS_URL}${query({ limit, offset: 0, status })}`);
 }
 
 /** Every tenant's usage this period. Super admin only. */

@@ -13,6 +13,7 @@
  * then the plugin replaces all of them.
  */
 import type { HttpClient } from '@lyeve-labs/client';
+import { query } from './list';
 import { num, record, str } from './narrow';
 
 const PROVIDERS_URL = '/api/admin/analytics/providers';
@@ -197,9 +198,7 @@ export async function listDeliveries(
 	status: DeliveryStatus | '' = '',
 	limit: number = DELIVERY_LIMIT,
 ): Promise<Listed<Delivery>> {
-	const q = new URLSearchParams({ limit: String(limit) });
-	if (status) q.set('status', status);
-	return listed(await client.get<unknown>(`${DELIVERIES_URL}?${q}`), toDelivery);
+	return listed(await client.get<unknown>(`${DELIVERIES_URL}${query({ limit, status })}`), toDelivery);
 }
 
 /** Sends one delivery again, now, once. A delivery that fails again comes back with its new error. */

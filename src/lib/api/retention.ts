@@ -17,7 +17,7 @@
  */
 import type { StatusTone } from '@lyeve-labs/ui-kit';
 import type { HttpClient } from '@lyeve-labs/client';
-import type { ListEnvelope } from './list';
+import { readAll, type ListEnvelope } from './list';
 import { plural } from '$lib/format';
 
 const POLICIES_URL = '/api/admin/retention-policies';
@@ -65,25 +65,21 @@ const PAGE = 500;
  * judges whether deletion is blocked from the whole set, so a partial read
  * would answer wrong.
  */
-async function readAll<T>(client: HttpClient, url: string): Promise<ListEnvelope<T>> {
-	const rows: T[] = [];
-	for (let offset = 0; ; offset += PAGE) {
-		const page = await client.get<ListEnvelope<T>>(`${url}?limit=${PAGE}&offset=${offset}`);
-		const got = page.data ?? [];
-		rows.push(...got);
-		const total = page.total_count ?? page.total;
-		if (got.length < PAGE || (typeof total === 'number' && rows.length >= total)) {
-			return { data: rows, total_count: total ?? rows.length };
-		}
-	}
+async function readEvery<T>(client: HttpClient, url: string): Promise<ListEnvelope<T>> {
+	const { rows, total } = await readAll(async (limit, offset) => {
+		const page = await client.get<ListEnvelope<T>>(`${url}?limit=${limit}&offset=${offset}`);
+		const stated = page.total_count ?? page.total;
+		return { rows: page.data ?? [], total: typeof stated === 'number' ? stated : null };
+	}, PAGE);
+	return { data: rows, total_count: total ?? rows.length };
 }
 
 export async function listPolicies(client: HttpClient): Promise<ListEnvelope<RetentionPolicy>> {
-	return readAll<RetentionPolicy>(client, POLICIES_URL);
+	return readEvery<RetentionPolicy>(client, POLICIES_URL);
 }
 
 export async function listHolds(client: HttpClient): Promise<ListEnvelope<LegalHold>> {
-	return readAll<LegalHold>(client, HOLDS_URL);
+	return readEvery<LegalHold>(client, HOLDS_URL);
 }
 
 export interface SavePolicy {

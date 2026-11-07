@@ -1,4 +1,5 @@
 import type { HttpClient } from '@lyeve-labs/client';
+import { query } from './list';
 import { num, record, str } from './narrow';
 
 /**
@@ -352,12 +353,13 @@ export async function listAssignments(
 	client: HttpClient,
 	filters: { status?: string; assignee_id?: string; limit?: number; offset?: number } = {},
 ): Promise<Paginated<ReviewAssignment>> {
-	const q = new URLSearchParams();
-	q.set('limit', String(filters.limit ?? 50));
-	q.set('offset', String(filters.offset ?? 0));
-	if (filters.status) q.set('status', filters.status);
-	if (filters.assignee_id) q.set('assignee_id', filters.assignee_id);
-	const res = await client.get<unknown>(`/api/admin/review/assignments?${q.toString()}`);
+	const q = query({
+		limit: filters.limit ?? 50,
+		offset: filters.offset ?? 0,
+		status: filters.status,
+		assignee_id: filters.assignee_id,
+	});
+	const res = await client.get<unknown>(`/api/admin/review/assignments${q}`);
 	const items = rows(res).map(toAssignment);
 	return { items, total: total(res, items.length) };
 }
