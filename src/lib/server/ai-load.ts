@@ -8,8 +8,8 @@
  * every route but the settings pair answers it while the switch is off, and the
  * way back is that switch. A 503 that says no provider is enabled is the
  * plugin with nothing to answer through. A 401 is an expired
- * session and goes where the shell sends one. Everything else keeps the engine
- * banner, which is not a report that there is nothing.
+ * session and goes where the shell sends one. Everything else sorts the way
+ * any other read does, so a refused rate and an outage read as themselves.
  */
 
 import { redirect } from '@sveltejs/kit';
@@ -43,11 +43,7 @@ function sortGate(err: unknown, session: SessionEvent, plural: string, notFound:
 		if (err.status === 404) return { state: notFound };
 		if (noProvider(err)) return { state: 'no_provider' };
 	}
-	const gate = gateOf(err, couldNotLoad(plural));
-	// The AI pages word a refused rate and an outage as the failed read they
-	// are for the reader, so both keep the page's own sentence.
-	if (gate.state === 'busy' || gate.state === 'unavailable') return { state: 'error', message: couldNotLoad(plural) };
-	return gate;
+	return gateOf(err, couldNotLoad(plural));
 }
 
 /**

@@ -23,14 +23,19 @@ describe('aiGate', () => {
 		expect(aiGate(new ApiError(503, 'no enabled AI provider configured', { error: 'no enabled AI provider configured', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toEqual({ state: 'no_provider' });
 		// The plugin answers its own store failures with a JSON 503 too, and
 		// that is an outage behind the engine, not a missing provider.
-		expect(aiGate(new ApiError(503, 'failed to list providers', { error: 'failed to list providers', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toMatchObject({ state: 'error' });
+		expect(aiGate(new ApiError(503, 'failed to list providers', { error: 'failed to list providers', code: 'service_unavailable' }), { cookies: cookies() }, 'providers')).toEqual({ state: 'unavailable' });
 		// A 503 page from a proxy in front of the engine is an outage, not a
 		// plugin without a provider.
-		expect(aiGate(new ApiError(503, '<html>Service Unavailable</html>'), { cookies: cookies() }, 'providers')).toMatchObject({ state: 'error' });
+		expect(aiGate(new ApiError(503, '<html>Service Unavailable</html>'), { cookies: cookies() }, 'providers')).toEqual({ state: 'unavailable' });
 	});
 
-	it('keeps the engine banner for a 5xx, a network failure and a status it does not expect', () => {
-		for (const err of [new ApiError(500, 'pq: connection refused'), new TypeError('fetch failed'), new ApiError(418, 'teapot')]) {
+	it('reads a refused rate and an outage as themselves, as every other page does', () => {
+		expect(aiGate(new ApiError(429, 'slow down'), { cookies: cookies() }, 'transcripts')).toEqual({ state: 'busy' });
+		expect(aiGate(new TypeError('fetch failed'), { cookies: cookies() }, 'transcripts')).toEqual({ state: 'unavailable' });
+	});
+
+	it('says the read failed for a 5xx and a status it does not expect, without the engine text', () => {
+		for (const err of [new ApiError(500, 'pq: connection refused'), new ApiError(418, 'teapot')]) {
 			const out = aiGate(err, { cookies: cookies() }, 'transcripts');
 			expect(out).toEqual({ state: 'error', message: 'Could not load transcripts.' });
 			expect(JSON.stringify(out)).not.toContain('pq:');
