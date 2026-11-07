@@ -14,6 +14,7 @@ import {
 import { parseProvider } from '$lib/email/provider-form';
 import { ApiError } from '@lyeve-labs/client';
 import { sessionToken } from '$lib/server/session-cookie';
+import { SESSION_ENDED } from '$lib/session';
 import { section, type Section } from '$lib/api/gate';
 
 /**
@@ -147,7 +148,7 @@ export const actions: Actions = {
 	// engine is told to unset one.
 	saveSetting: async (event) => {
 		await requireUser(event);
-		if (!sessionToken(event)) return fail(401, { error: 'Your session has ended. Sign in again.' });
+		if (!sessionToken(event)) return fail(401, { error: SESSION_ENDED });
 
 		const data = await event.request.formData();
 		const key = text(data, 'key');
